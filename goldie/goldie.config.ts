@@ -47,7 +47,7 @@ const config: GoldieConfig = {
     copyBand: 0.16,
     copyScale: 0.95,
     // why: two player boards put an upside-down seat on top, so their tiles show the whole device or its bottom half.
-    template: ["hero", "classic", "tilt", "offset", "copy-below", "classic", "tilt-right"],
+    template: ["hero", "trio", "classic", "tilt", "offset", "copy-below", "tilt-right"],
   },
 
   store: {
@@ -75,6 +75,19 @@ const config: GoldieConfig = {
     },
     {
       kind: "screenshot",
+      id: "games",
+      flow: "store-06-pokemon",
+      // why: trio is a three device layout in the mchisolm0/goldie fork; Pokémon sits in front.
+      layout: "trio",
+      secondScene: "game-ygo",
+      thirdScene: "game-lorcana",
+      headline: { "en-US": "Your game, covered" },
+      subhead: { "en-US": "Pick your game. More on the way." },
+    },
+    { kind: "capture", id: "game-ygo", flow: "store-game-ygo" },
+    { kind: "capture", id: "game-lorcana", flow: "store-game-lorcana" },
+    {
+      kind: "screenshot",
       id: "shared-deck",
       flow: "store-02-shared-deck",
       headline: { "en-US": "Play a friend's deck" },
@@ -100,13 +113,6 @@ const config: GoldieConfig = {
       flow: "store-05-history",
       headline: { "en-US": "Every game saved" },
       subhead: { "en-US": "Local and connected games, one history." },
-    },
-    {
-      kind: "screenshot",
-      id: "pokemon",
-      flow: "store-06-pokemon",
-      headline: { "en-US": "HP, card by card" },
-      subhead: { "en-US": "Pick your Active. HP stays up front." },
     },
     {
       kind: "screenshot",

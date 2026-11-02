@@ -1,0 +1,47 @@
+steps:
+  - echo: A two seat lorcana-core board for the multi-game tile
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - tap: { id: game-menu-button }
+  - tap: { id: setup-button }
+  - await: { visible: { id: game-tab-lorcana } }
+  - tap: { id: game-tab-lorcana }
+  - tap: { id: game-type-lorcana-core }
+  - echo: Seat count carries over between games; pin it to 2 (the stepper clamps at 2 and 6)
+  - tap: { id: setup-change-button }
+  - await: { visible: { id: player-count-decrement } }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: setup-options-done }
+  - await: { idle: true }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }
+  - tap: { id: dice-chip-1-claim }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - tap: { id: life-seat-2-1 }
+  - wait: 1500
+  - await: { idle: true }

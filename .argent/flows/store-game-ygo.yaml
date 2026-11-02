@@ -1,0 +1,29 @@
+steps:
+  - echo: A two seat ygo-advanced board for the multi-game tile
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - tap: { id: game-menu-button }
+  - tap: { id: setup-button }
+  - await: { visible: { id: game-tab-ygo } }
+  - tap: { id: game-tab-ygo }
+  - tap: { id: game-type-ygo-advanced }
+  - echo: Seat count carries over between games; pin it to 2 (the stepper clamps at 2 and 6)
+  - tap: { id: setup-change-button }
+  - await: { visible: { id: player-count-decrement } }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: setup-options-done }
+  - await: { idle: true }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }
+  - tap: { id: dice-chip-2-claim }
+  - tap: { id: life-seat-1--1000 }
+  - tap: { id: life-seat-1--1000 }
+  - tap: { id: life-seat-2--1000 }
+  - tap: { id: life-seat-2--1000 }
+  - tap: { id: life-seat-2--1000 }
+  - wait: 1500
+  - await: { idle: true }

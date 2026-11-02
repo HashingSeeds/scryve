@@ -4,6 +4,12 @@ steps:
       fresh game with the same setup) and leaves the board idle with the menu closed.
   - echo: Reopening an abandoned connected game shows "Lobby closed"; OK returns to the board
   - wait: 2500
+  - echo: A fresh install opens on "What do you play?"; Commander starts the four seat board
+  - when: { visible: { text: What do you play? } }
+    steps:
+      - tap: { text: Commander }
+      - tap: { text: Play }
+      - await: { idle: true }
   - when: { visible: { text: Lobby closed } }
     steps:
       - tap: { text: OK }
