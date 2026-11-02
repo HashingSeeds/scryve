@@ -634,7 +634,6 @@ export default {
     previewUnavailable: "プレビューを表示できません",
     browseOffline: "オフラインです。再接続するとデッキを読み込みます。",
     rateLimited_other: "{{count}}秒後に更新できます。保存済みの結果は引き続き利用できます。",
-    refreshing: "デッキを更新中。保存済みの結果は引き続き利用できます。",
     refreshFailed: "デッキを更新できませんでした。保存済みの結果は引き続き利用できます。",
     checkAgain: "再確認",
     open: "開く",

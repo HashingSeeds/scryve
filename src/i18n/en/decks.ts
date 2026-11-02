@@ -705,7 +705,6 @@ const decks = {
     browseOffline: "You're offline. Decks will load when you reconnect.",
     rateLimited_one: "Refresh available in {{count}} seconds. Saved results remain available.",
     rateLimited_other: "Refresh available in {{count}} seconds. Saved results remain available.",
-    refreshing: "Refreshing decks. Saved results remain available.",
     refreshFailed: "Could not refresh decks. Saved results remain available.",
     checkAgain: "Check again",
     open: "Open",

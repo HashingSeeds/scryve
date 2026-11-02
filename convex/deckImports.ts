@@ -6,7 +6,7 @@ import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx } from "./_generated/server"
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
-import { preconstructedFormat } from "./lib/deckGames"
+import { PRECON_SOURCE, preconstructedFormat } from "./lib/deckGames"
 import { limitDeckImport } from "./lib/deckRateLimits"
 import type { DeckSource } from "./lib/deckSources"
 import { archidektDeckLink, loadArchidektDeck, resolveArchidektDeck } from "./lib/games/archidekt"
@@ -74,6 +74,7 @@ const MAX_PASTED_LIST_LENGTH = 50_000
 const MAX_PRECON_RESULTS = 30
 const MAX_PRECON_CATALOG = 4000
 const PRECON_CATALOG_TTL_MS = 24 * 60 * 60 * 1000
+const PRECON_ROW_BATCH = 200
 const RESOLVED_PRECON_TTL_MS = 24 * 60 * 60 * 1000
 const RESOLVED_PRECON_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const PRECON_REFRESH_LEASE_MS = 5 * 60 * 1000
@@ -723,14 +724,74 @@ export const storeCatalog = internalMutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("preconCatalogs").first()
     const value = { fetchedAt: Date.now(), decks: args.decks }
-    if (existing) {
-      await ctx.db.replace(existing._id, value)
-      return null
-    }
-    await ctx.db.insert("preconCatalogs", value)
+    if (existing) await ctx.db.replace(existing._id, value)
+    else await ctx.db.insert("preconCatalogs", value)
+    await ctx.scheduler.runAfter(0, internal.deckImports.syncPreconRows, { offset: 0 })
     return null
   },
 })
+
+export const syncPreconRows = internalMutation({
+  args: { offset: v.number() },
+  handler: async (ctx, { offset }) => {
+    const catalog = await ctx.db.query("preconCatalogs").first()
+    if (!catalog) return null
+    // why: rows tie on fetchedAt, so inserting oldest first makes the newest-first index list recent releases first.
+    const decks = [...catalog.decks].sort((left, right) =>
+      (left.releaseDate ?? "").localeCompare(right.releaseDate ?? ""),
+    )
+    for (const deck of decks.slice(offset, offset + PRECON_ROW_BATCH)) {
+      const publishedAt = deck.releaseDate ? Date.parse(deck.releaseDate) : Number.NaN
+      const row = {
+        game: "mtg",
+        source: PRECON_SOURCE,
+        externalId: deck.fileName,
+        kind: "official",
+        name: deck.name,
+        format: preconstructedFormat(deck.type),
+        ...(Number.isNaN(publishedAt) ? {} : { publishedAt }),
+      }
+      const existing = await ctx.db
+        .query("deckCatalogs")
+        .withIndex("by_game_and_source_and_external_id", (q) =>
+          q.eq("game", row.game).eq("source", row.source).eq("externalId", row.externalId),
+        )
+        .unique()
+      if (!existing) await ctx.db.insert("deckCatalogs", { ...row, fetchedAt: catalog.fetchedAt })
+      else if (
+        existing.name !== row.name ||
+        existing.format !== row.format ||
+        existing.publishedAt !== row.publishedAt
+      )
+        await ctx.db.patch(existing._id, { ...row, publishedAt: row.publishedAt })
+    }
+    if (offset + PRECON_ROW_BATCH < decks.length)
+      await ctx.scheduler.runAfter(0, internal.deckImports.syncPreconRows, {
+        offset: offset + PRECON_ROW_BATCH,
+      })
+    return null
+  },
+})
+
+// why: deployments that stored the deck list before precon rows existed get them on first use.
+export const startPreconRowSync = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const row = await ctx.db
+      .query("deckCatalogs")
+      .withIndex("by_game_and_source_and_external_id", (q) =>
+        q.eq("game", "mtg").eq("source", PRECON_SOURCE),
+      )
+      .first()
+    if (!row) await ctx.scheduler.runAfter(0, internal.deckImports.syncPreconRows, { offset: 0 })
+    return null
+  },
+})
+
+export async function ensurePreconRows(ctx: ActionCtx) {
+  await preconCatalog(ctx)
+  await ctx.runMutation(internal.deckImports.startPreconRowSync, {})
+}
 
 async function fetchPreconCatalog() {
   const response = await fetch(`${MTGJSON_BASE_URL}/DeckList.json`, {

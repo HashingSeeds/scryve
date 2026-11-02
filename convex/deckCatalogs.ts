@@ -13,8 +13,9 @@ import {
   internalQuery,
   query,
 } from "./_generated/server"
+import { ensurePreconRows } from "./deckImports"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
-import { assertDeckGameFormat, magicCatalogCardFields } from "./lib/deckGames"
+import { assertDeckGameFormat, magicCatalogCardFields, PRECON_SOURCE } from "./lib/deckGames"
 import { deckRateLimiter } from "./lib/deckRateLimits"
 import { storesValue } from "./lib/documents"
 import { MAX_CATALOG_BATCH } from "./lib/games/cards"
@@ -97,14 +98,39 @@ function catalogQuery(
   return rows.order("desc")
 }
 
+// why: older clients list precons from searchPreconstructed and open catalog rows by their cards, which precon rows lack.
+function legacyCatalogQuery(
+  ctx: QueryCtx,
+  args: { game: string; query: string; format?: string; kind?: string },
+) {
+  return catalogQuery(ctx, args).filter((q) => q.neq(q.field("source"), PRECON_SOURCE))
+}
+
 async function searchRows(
   ctx: QueryCtx,
   args: { game: string; query: string; format?: string; kind?: string },
 ) {
   const term = args.query.trim()
   if (term.length === 1 || term.length > 120) return []
-  return await catalogQuery(ctx, args).take(30)
+  return await legacyCatalogQuery(ctx, args).take(30)
 }
+
+export const list = query({
+  args: {
+    game: v.string(),
+    format: v.string(),
+    query: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const game = assertGameSystem(args.game)
+    await requireReleasedCapability(ctx, game, "exampleDecks")
+    const format = assertDeckGameFormat(game, args.format)
+    const term = args.query.trim()
+    if (term.length > 120) return { page: [], isDone: true, continueCursor: "" }
+    return await catalogQuery(ctx, { game, format, query: term }).paginate(args.paginationOpts)
+  },
+})
 
 export const browseCached = internalQuery({
   args: {
@@ -115,7 +141,7 @@ export const browseCached = internalQuery({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const rows = catalogQuery(ctx, {
+    const rows = legacyCatalogQuery(ctx, {
       ...args,
       ...(args.source === "official" ? { kind: "official" } : {}),
     })
@@ -497,10 +523,21 @@ async function browseDecks(
     : exampleDecks.some((deck) => deck.game === game && deck.format === format)
   if (!supported) return { ...cached, status: cached.decks.length ? "ready" : "unsupported" }
   if (!feed) return { ...cached, status: "ready" }
+  const { waited, ...freshness } = await refreshIfStale(ctx, game, format)
+  return { ...(waited ? await readPage() : cached), ...freshness }
+}
+
+type Freshness = Pick<BrowseResult, "status" | "retryAfterMs">
+
+async function refreshIfStale(
+  ctx: ActionCtx,
+  game: string,
+  format: string,
+): Promise<Freshness & { waited: boolean }> {
   const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
   const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
   const fetchedAt = health?.lastSuccessAt ?? latest?.fetchedAt
-  if (feedFresh(health, fetchedAt)) return { ...cached, status: "ready" }
+  if (feedFresh(health, fetchedAt)) return { status: "ready", waited: false }
   const background = fetchedAt !== undefined
   const result = await ctx.runMutation(internal.deckCatalogs.requestRefresh, {
     game,
@@ -508,15 +545,19 @@ async function browseDecks(
     background,
   })
   if (!result.ok) {
+    const retryAfterMs = result.retryAfter
     if (health?.status === "unavailable")
-      return { ...cached, status: "unavailable", retryAfterMs: result.retryAfter }
-    if (background) return { ...cached, status: "refreshing", retryAfterMs: result.retryAfter }
-    return { ...cached, status: "rate_limited", retryAfterMs: result.retryAfter }
+      return { status: "unavailable", retryAfterMs, waited: false }
+    if (background) return { status: "refreshing", retryAfterMs, waited: false }
+    return { status: "rate_limited", retryAfterMs, waited: false }
   }
   if (background)
-    return { ...cached, status: health?.status === "unavailable" ? "unavailable" : "refreshing" }
+    return {
+      status: health?.status === "unavailable" ? "unavailable" : "refreshing",
+      waited: false,
+    }
   const refreshed = await refreshFeed(ctx, game, format)
-  return { ...(await readPage()), status: refreshed ? "ready" : "unavailable" }
+  return { status: refreshed ? "ready" : "unavailable", waited: true }
 }
 
 export const browse = action({
@@ -528,6 +569,20 @@ export const browse = action({
     source: v.optional(v.union(v.literal("examples"), v.literal("official"), v.literal("all"))),
   },
   handler: browseDecks,
+})
+
+export const ensureFresh = action({
+  args: { game: v.string(), format: v.string() },
+  handler: async (ctx, args): Promise<Freshness> => {
+    const game = assertGameSystem(args.game)
+    const format = assertDeckGameFormat(game, args.format)
+    await requireActionCapability(ctx, game, "exampleDecks")
+    await ctx.runMutation(internal.deckCatalogs.seedCuratedDecks, { game, format })
+    if (game === "mtg") await ensurePreconRows(ctx)
+    if (!deckFeed(game)?.formats.includes(format)) return { status: "ready" }
+    const { waited: _waited, ...freshness } = await refreshIfStale(ctx, game, format)
+    return freshness
+  },
 })
 
 export const searchTopDecks = action({

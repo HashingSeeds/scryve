@@ -11,7 +11,7 @@ import {
 } from "react"
 import type { ViewStyle } from "react-native"
 import { Keyboard, Linking, TouchableOpacity, View } from "react-native"
-import { useAction, useQuery } from "convex/react"
+import { useAction, usePaginatedQuery, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -55,13 +55,13 @@ import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
-import type { Id } from "../../convex/_generated/dataModel"
 import {
   DECK_GAME_LIST,
   DEFAULT_DECK_GAME,
   deckFormatLabel,
   deckFormats,
   defaultDeckFormat,
+  PRECON_SOURCE,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
 import type { ProviderGame } from "../../convex/lib/games/providers"
@@ -201,15 +201,26 @@ type PreconstructedDeckOutline = {
   cards: PreviewCard[]
 }
 
-type CatalogDeck = {
-  _id: Id<"deckCatalogs">
-  game: string
-  name: string
-  kind: string
-  format?: string
-  source?: string
-  sourceUrl?: string
-  publishedAt?: number
+type CatalogDeck = FunctionReturnType<typeof api.deckCatalogs.list>["page"][number]
+
+type FeedCheck =
+  | FunctionReturnType<typeof api.deckCatalogs.ensureFresh>
+  | { status: "checking" }
+  | { status: "failed"; error: string }
+
+const CATALOG_PAGE_SIZE = 30
+
+// why: MTGJSON names deck files `<Name>_<SET>`, so the set code survives without a column for it.
+function catalogPrecon(deck: CatalogDeck): PreconstructedDeck {
+  const code = deck.externalId.split("_").at(-1)
+  return {
+    fileName: deck.externalId,
+    name: deck.name,
+    ...(code && code !== deck.externalId ? { code } : {}),
+    ...(deck.publishedAt === undefined
+      ? {}
+      : { releaseDate: new Date(deck.publishedAt).toISOString().slice(0, 10) }),
+  }
 }
 
 function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
@@ -256,7 +267,7 @@ function normalizeImportedCards(cards: ImportedDeckCard[], game: string, format:
 }
 
 function preconDetail(deck: PreconstructedDeck) {
-  return ["Wizards", deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
+  return ["Wizards", deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
     .filter(Boolean)
     .join(" · ")
 }
@@ -336,13 +347,12 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
   const [saving, setSaving] = useState(false)
   const savingNow = useRef(false)
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
-  const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
   const resolveLink = useAction(api.deckImports.resolveLink)
   const cardsByName = useAction(api.cards.byNames)
-  const searchTopDecks = useAction(api.deckCatalogs.browse)
+  const ensureFresh = useAction(api.deckCatalogs.ensureFresh)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const browsable = useCapabilityReleased("exampleDecks")(game)
@@ -351,10 +361,6 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     pickedMode === "precon" && !browsable
       ? "paste"
       : (pickedMode ?? (browsable ? "precon" : "paste"))
-  const [catalogStatus, setCatalogStatus] =
-    useState<FunctionReturnType<typeof api.deckCatalogs.browse>["status"]>("ready")
-  const [catalogCursor, setCatalogCursor] = useState<string | null>(null)
-  const [retryAfterMs, setRetryAfterMs] = useState<number>()
   const [name, setName] = useState("")
   const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
@@ -375,8 +381,14 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     pastedDraft.game === game &&
     pastedDraft.format === format
   const [preconQuery, setPreconQuery] = useState("")
-  const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
-  const [catalogDecks, setCatalogDecks] = useState<CatalogDeck[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const catalog = usePaginatedQuery(
+    api.deckCatalogs.list,
+    mode === "precon" ? { game, format, query: searchTerm } : "skip",
+    { initialNumItems: CATALOG_PAGE_SIZE },
+  )
+  const [feedChecks, setFeedChecks] = useState<Record<string, FeedCheck>>({})
+  const feed: FeedCheck | undefined = feedChecks[`${game}:${format}`]
   const [selectedCatalogDeck, setSelectedCatalogDeck] = useState<CatalogDeck>()
   const [selectedPrecon, setSelectedPrecon] = useState<PreconstructedDeck>()
   const [preconOutline, setPreconOutline] = useState<PreconstructedDeckOutline>()
@@ -391,14 +403,18 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     retryDetails: retryPreviewDetails,
   } = useCardDetails(focusedPreviewCard)
   const [error, setError] = useState<string>()
-  const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState<string>()
   const online = useConvexOnline()
-  const browseOffline = !online && (searching || Boolean(searchError))
-  const searchCursor = useRef<string | undefined>(undefined)
+  const waitingForDecks =
+    catalog.status === "LoadingFirstPage" ||
+    (catalog.results.length === 0 && (!feed || feed.status === "checking"))
+  const browseOffline = !online && waitingForDecks
+  const browseEmpty =
+    mode === "precon" &&
+    !waitingForDecks &&
+    catalog.results.length === 0 &&
+    feed?.status !== "failed"
   const [previewError, setPreviewError] = useState<string>()
   const [previewRetryAfterMs, setPreviewRetryAfterMs] = useState<number>()
-  const searchToken = useRef(0)
   const previewToken = useRef(0)
   useEffect(
     () => () => {
@@ -471,111 +487,54 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     setGame(next, nextFormat)
     setDeckFormat(nextFormat)
     setPreconQuery("")
-    setPrecons([])
-    setCatalogDecks([])
+    setSearchTerm("")
     setSelectedCatalogDeck(undefined)
     setSelectedPrecon(undefined)
     setFocusedPreviewCard(undefined)
     setMode(undefined)
-    setCatalogStatus("ready")
-    setCatalogCursor(null)
   }
 
   function chooseFormat(next: string) {
     invalidatePasted()
     setDeckFormat(next)
     setFormat(next)
-    setCatalogStatus("ready")
-    setCatalogCursor(null)
-    setPrecons([])
-    setCatalogDecks([])
   }
 
-  const runCatalogSearch = useCallback(
-    async (query: string, cursor?: string) => {
-      const token = ++searchToken.current
-      searchCursor.current = cursor
-      try {
-        setSearching(true)
-        setSearchError(undefined)
-        const [catalogResult, preconResult] = await Promise.allSettled([
-          searchTopDecks({
-            game,
-            format,
-            query,
-            source: "all",
-            ...(cursor ? { cursor } : {}),
-          }),
-          // eslint-disable-next-line no-restricted-syntax -- preconstructed decks come from MTGJSON, which covers only Magic.
-          game === "mtg" && !cursor
-            ? searchPreconstructed({ query, ...(format ? { format } : {}) })
-            : Promise.resolve(null),
-        ])
-        if (searchToken.current !== token) return
-        if (preconResult.status === "fulfilled" && preconResult.value)
-          setPrecons(preconResult.value)
-        const failures = [catalogResult, preconResult].filter(
-          (result) => result.status === "rejected",
-        )
-        if (failures.length)
-          setSearchError(
-            failures
-              .map((result) =>
-                convexErrorMessage(result.reason, translate("decks:addDeck.loadDecksFailed")),
-              )
-              .join("\n"),
-          )
-        if (catalogResult.status === "fulfilled") {
-          const found = catalogResult.value
-          setCatalogDecks((current) =>
-            cursor
-              ? [
-                  ...current,
-                  ...found.decks.filter((deck) => !current.some((row) => row._id === deck._id)),
-                ]
-              : found.decks,
-          )
-          setCatalogStatus(found.status)
-          setCatalogCursor(found.cursor)
-          setRetryAfterMs(found.retryAfterMs)
-          const preconsFound = preconResult.status === "fulfilled" && preconResult.value?.length
-          if (!cursor && !query.trim() && !found.decks.length && !preconsFound)
-            captureAnalytics("deck_browse_empty", { system: game, format, status: found.status })
-        }
-      } catch (cause) {
-        if (searchToken.current === token)
-          setSearchError(convexErrorMessage(cause, translate("decks:addDeck.loadDecksFailed")))
-      } finally {
-        if (searchToken.current === token) setSearching(false)
+  async function checkFeed(feedGame: string, feedFormat: string) {
+    const key = `${feedGame}:${feedFormat}`
+    setFeedChecks((checks) => ({ ...checks, [key]: { status: "checking" } }))
+    let check: FeedCheck
+    try {
+      check = await ensureFresh({ game: feedGame, format: feedFormat })
+    } catch (cause) {
+      check = {
+        status: "failed",
+        error: convexErrorMessage(cause, translate("decks:addDeck.loadDecksFailed")),
       }
-    },
-    [format, game, searchPreconstructed, searchTopDecks],
-  )
-
-  useEffect(() => {
-    if (mode !== "precon") return undefined
-    setPrecons([])
-    setCatalogDecks([])
-    setCatalogCursor(null)
-    setCatalogStatus("ready")
-    // why: the empty state must wait for an answer, not show during the debounce or a request that never lands.
-    setSearching(true)
-    const timer = setTimeout(() => void runCatalogSearch(preconQuery), SEARCH_DEBOUNCE_MS)
-    return () => {
-      clearTimeout(timer)
-      searchToken.current += 1
     }
-  }, [mode, preconQuery, runCatalogSearch])
+    setFeedChecks((checks) => ({ ...checks, [key]: check }))
+  }
 
-  const retryUnfinishedSearch = useEffectEvent(() => {
-    if (mode === "precon" && (searching || searchError))
-      void runCatalogSearch(preconQuery, searchCursor.current)
+  const checkFeedOnce = useEffectEvent(() => {
+    if (mode === "precon" && (!feed || feed.status === "failed")) void checkFeed(game, format)
   })
-  const wasOnline = useRef(online)
   useEffect(() => {
-    if (online && !wasOnline.current) retryUnfinishedSearch()
-    wasOnline.current = online
-  }, [online])
+    if (online) checkFeedOnce()
+  }, [game, format, mode, online])
+
+  useEffect(() => {
+    const term = preconQuery.trim()
+    const timer = setTimeout(() => setSearchTerm(term), term ? SEARCH_DEBOUNCE_MS : 0)
+    return () => clearTimeout(timer)
+  }, [preconQuery])
+
+  const reportEmptyBrowse = useEffectEvent(() => {
+    if (feed && feed.status !== "checking" && feed.status !== "failed")
+      captureAnalytics("deck_browse_empty", { system: game, format, status: feed.status })
+  })
+  useEffect(() => {
+    if (browseEmpty && !searchTerm) reportEmptyBrowse()
+  }, [browseEmpty, searchTerm, game, format])
 
   function createBlank() {
     void saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
@@ -1164,94 +1123,75 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
             />
             {browseOffline ? (
               <AlertNote tone="info" text={translate("decks:addDeck.browseOffline")} />
-            ) : searching ? (
+            ) : waitingForDecks ? (
               <Text size="xs" tone="dim" tx="decks:deckLimit.loading" />
-            ) : searchError ? (
+            ) : feed?.status === "failed" && catalog.results.length === 0 ? (
               <View style={themed($inlineStatus)}>
-                <AlertNote text={searchError} />
-                <TextAction
-                  tx="common:retry"
-                  onPress={() => void runCatalogSearch(preconQuery, searchCursor.current)}
-                />
+                <AlertNote text={feed.error} />
+                <TextAction tx="common:retry" onPress={() => void checkFeed(game, format)} />
               </View>
-            ) : catalogDecks.length === 0 &&
-              precons.length === 0 &&
-              !["rate_limited", "unavailable", "refreshing"].includes(catalogStatus) ? (
+            ) : browseEmpty && feed?.status !== "rate_limited" && feed?.status !== "unavailable" ? (
               emptyCatalog
             ) : null}
-            {catalogStatus === "rate_limited" ||
-            catalogStatus === "unavailable" ||
-            catalogStatus === "refreshing" ? (
+            {feed?.status === "rate_limited" || feed?.status === "unavailable" ? (
               <View style={themed($inlineStatus)}>
                 <Text
                   size="sm"
                   text={
-                    catalogStatus === "rate_limited"
+                    feed.status === "rate_limited"
                       ? translate("decks:addDeck.rateLimited", {
-                          count: Math.ceil((retryAfterMs ?? 30_000) / 1000),
+                          count: Math.ceil((feed.retryAfterMs ?? 30_000) / 1000),
                         })
-                      : catalogStatus === "refreshing"
-                        ? translate("decks:addDeck.refreshing")
-                        : translate("decks:addDeck.refreshFailed")
+                      : translate("decks:addDeck.refreshFailed")
                   }
                 />
                 <TextAction
                   tx="decks:addDeck.checkAgain"
-                  disabled={searching}
-                  onPress={() => void runCatalogSearch(preconQuery)}
+                  onPress={() => void checkFeed(game, format)}
                 />
               </View>
             ) : null}
-            {precons.map((deck) => (
-              <TouchableOpacity
-                key={deck.fileName}
-                testID={`precon-result-${deck.fileName}`}
-                accessibilityRole="button"
-                accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
-                activeOpacity={0.75}
-                style={themed($resultRow)}
-                disabled={previewLoading}
-                onPress={() => openPrecon(deck)}
-              >
-                <View style={$flex1}>
-                  <Text weight="medium" text={deck.name} numberOfLines={2} />
-                  {preconDetail(deck) ? (
-                    <Text size="meta" tone="dim" text={preconDetail(deck)} />
-                  ) : null}
-                </View>
-                <TextAction
-                  tx="decks:addDeck.open"
-                  accessible={false}
+            {catalog.results.map((deck) => {
+              const open = () =>
+                deck.source === PRECON_SOURCE
+                  ? openPrecon(catalogPrecon(deck))
+                  : openCatalogDeck(deck)
+              return (
+                <TouchableOpacity
+                  key={deck._id}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
+                  activeOpacity={0.75}
+                  style={themed($resultRow)}
                   disabled={previewLoading}
-                  onPress={() => openPrecon(deck)}
-                />
-              </TouchableOpacity>
-            ))}
-            {catalogDecks.map((deck) => (
-              <TouchableOpacity
-                key={deck._id}
-                accessibilityRole="button"
-                accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
-                activeOpacity={0.75}
-                style={themed($resultRow)}
-                onPress={() => openCatalogDeck(deck)}
-              >
-                <View style={$flex1}>
-                  <Text weight="medium" text={deck.name} numberOfLines={2} />
-                  <Text size="meta" tone="dim" text={catalogDeckDetail(deck)} />
-                </View>
-                <TextAction
-                  tx="decks:addDeck.open"
-                  accessible={false}
-                  onPress={() => openCatalogDeck(deck)}
-                />
-              </TouchableOpacity>
-            ))}
-            {catalogCursor ? (
+                  onPress={open}
+                >
+                  <View style={$flex1}>
+                    <Text weight="medium" text={deck.name} numberOfLines={2} />
+                    <Text
+                      size="meta"
+                      tone="dim"
+                      text={
+                        deck.source === PRECON_SOURCE
+                          ? preconDetail(catalogPrecon(deck))
+                          : catalogDeckDetail(deck)
+                      }
+                    />
+                  </View>
+                  <TextAction
+                    tx="decks:addDeck.open"
+                    accessible={false}
+                    disabled={previewLoading}
+                    onPress={open}
+                  />
+                </TouchableOpacity>
+              )
+            })}
+            {catalog.status === "CanLoadMore" || catalog.status === "LoadingMore" ? (
               <Button
                 tx="decks:addDeck.loadMore"
-                disabled={searching}
-                onPress={() => void runCatalogSearch(preconQuery, catalogCursor)}
+                disabled={catalog.status === "LoadingMore"}
+                onPress={() => catalog.loadMore(CATALOG_PAGE_SIZE)}
               />
             ) : null}
           </View>

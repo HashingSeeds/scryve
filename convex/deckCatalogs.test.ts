@@ -1,6 +1,7 @@
 import { v } from "convex/values"
 import { convexTest } from "convex-test"
 
+import { makeConvexTest } from "../test/convexTest"
 import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import { internalMutation } from "./_generated/server"
@@ -694,4 +695,128 @@ it("refreshing a catalog deck rewrites its cards only when they changed", async 
   const changed = await cardIds(catalogDeckId)
   expect(changed).toHaveLength(1)
   expect(changed).not.toEqual(first)
+})
+
+describe("Browse list", () => {
+  const browsable = DECK_GAME_LIST.filter(
+    ({ id }) => integration(id)?.capabilities.exampleDecks.technical === "available",
+  )
+
+  it.each(browsable.map((game) => [game.id, game] as const))(
+    "lists each %s format's decks from the stored catalog",
+    async (_id, game) => {
+      const t = makeConvexTest()
+      await t.run(async (ctx) => {
+        for (const format of game.formats)
+          await ctx.db.insert("deckCatalogs", {
+            game: game.id,
+            source: "fixture",
+            externalId: format.id,
+            kind: "tournament",
+            name: `Stored ${format.id}`,
+            format: format.id,
+            fetchedAt: 1,
+          })
+      })
+      for (const format of game.formats) {
+        const listed = await t.query(api.deckCatalogs.list, {
+          game: game.id,
+          format: format.id,
+          query: "",
+          paginationOpts: { numItems: 30, cursor: null },
+        })
+        expect(listed.page.map((deck) => deck.name)).toEqual([`Stored ${format.id}`])
+      }
+    },
+  )
+
+  it("puts Magic precons in Browse newest first and keeps them out of older clients' lists", async () => {
+    jest.useFakeTimers()
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
+    try {
+      const t = makeConvexTest()
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [
+          {
+            fileName: "Old_C16",
+            name: "Old Commander",
+            type: "Commander Deck",
+            releaseDate: "2016-11-11",
+          },
+          {
+            fileName: "New_FDC",
+            name: "New Commander",
+            type: "Commander Deck",
+            releaseDate: "2025-11-14",
+          },
+          {
+            fileName: "Theme_M10",
+            name: "Theme Deck",
+            type: "Theme Deck",
+            releaseDate: "2009-07-17",
+          },
+        ],
+      })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      const page = { numItems: 30, cursor: null }
+      const commander = await t.query(api.deckCatalogs.list, {
+        game: "mtg",
+        format: "commander",
+        query: "",
+        paginationOpts: page,
+      })
+      expect(commander.page.map((deck) => [deck.name, deck.kind])).toEqual([
+        ["New Commander", "official"],
+        ["Old Commander", "official"],
+      ])
+      const searched = await t.query(api.deckCatalogs.list, {
+        game: "mtg",
+        format: "constructed",
+        query: "theme",
+        paginationOpts: page,
+      })
+      expect(searched.page.map((deck) => deck.externalId)).toEqual(["Theme_M10"])
+      const legacy = await t.action(api.deckCatalogs.browse, {
+        game: "mtg",
+        format: "commander",
+        query: "",
+        source: "all",
+      })
+      expect(legacy.decks.length).toBeGreaterThan(0)
+      expect(legacy.decks.some((deck) => deck.source === "mtgjson")).toBe(false)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+      jest.useRealTimers()
+    }
+  })
+
+  it("fills precon rows for a deck list stored before they existed", async () => {
+    jest.useFakeTimers()
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
+    try {
+      const t = makeConvexTest()
+      await t.run(async (ctx) => {
+        await ctx.db.insert("preconCatalogs", {
+          fetchedAt: Date.now(),
+          decks: [{ fileName: "AtraxaInfect", name: "Atraxa Infect", type: "Commander Deck" }],
+        })
+      })
+      await expect(
+        t.action(api.deckCatalogs.ensureFresh, { game: "mtg", format: "commander" }),
+      ).resolves.toEqual({ status: "ready" })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      const listed = await t.query(api.deckCatalogs.list, {
+        game: "mtg",
+        format: "commander",
+        query: "atraxa",
+        paginationOpts: { numItems: 30, cursor: null },
+      })
+      expect(listed.page.map((deck) => deck.externalId)).toEqual(["AtraxaInfect"])
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+      jest.useRealTimers()
+    }
+  })
 })

@@ -671,7 +671,6 @@ export default {
       "Actualisation possible dans {{count}} de secondes. Les résultats enregistrés restent disponibles.",
     rateLimited_other:
       "Actualisation possible dans {{count}} secondes. Les résultats enregistrés restent disponibles.",
-    refreshing: "Actualisation des decks. Les résultats enregistrés restent disponibles.",
     refreshFailed:
       "Impossible d’actualiser les decks. Les résultats enregistrés restent disponibles.",
     checkAgain: "Vérifier à nouveau",
