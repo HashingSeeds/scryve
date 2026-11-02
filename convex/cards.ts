@@ -237,38 +237,42 @@ export const search = action({
       return withSeeded(
         includeImages ? providerCached : providerCached.map((card) => catalogWithoutImages(card)),
       )
-    await limitCardLookup(ctx, args.deviceId)
-    const provider = integrationFor(game).capabilities.cardCatalog.provider
-    const startedAt = Date.now()
-    try {
-      const result = await catalog.search(ctx, query, includeImages)
-      if (result.cards.length > 0)
-        await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
-      await recordHealth(ctx, {
-        game,
-        provider,
-        operation: "card-search",
-        startedAt,
-        status: "healthy",
-        httpStatus: result.status,
-        message: `${result.cards.length} cards normalized`,
-      })
-      return withSeeded(result.cards.map((card) => catalogResult(card, includeImages)))
-    } catch (error) {
-      await recordHealth(ctx, {
-        game,
-        provider,
-        operation: "card-search",
-        startedAt,
-        status: "unavailable",
-        ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
-        message: error instanceof Error ? error.message : "Provider search failed",
-      })
-      throw new ConvexError({
-        code: "card_provider_unavailable",
-        message: "Card search is temporarily unavailable",
-      })
+    const searchProvider = async () => {
+      await limitCardLookup(ctx, args.deviceId)
+      const provider = integrationFor(game).capabilities.cardCatalog.provider
+      const startedAt = Date.now()
+      try {
+        const result = await catalog.search(ctx, query, includeImages)
+        if (result.cards.length > 0)
+          await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
+        await recordHealth(ctx, {
+          game,
+          provider,
+          operation: "card-search",
+          startedAt,
+          status: "healthy",
+          httpStatus: result.status,
+          message: `${result.cards.length} cards normalized`,
+        })
+        return withSeeded(result.cards.map((card) => catalogResult(card, includeImages)))
+      } catch (error) {
+        await recordHealth(ctx, {
+          game,
+          provider,
+          operation: "card-search",
+          startedAt,
+          status: "unavailable",
+          ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
+          message: error instanceof Error ? error.message : "Provider search failed",
+        })
+        throw new ConvexError({
+          code: "card_provider_unavailable",
+          message: "Card search is temporarily unavailable",
+        })
+      }
     }
+    if (!seeded.length) return await searchProvider()
+    return await searchProvider().catch(() => withSeeded([]))
   },
 })
 

@@ -1304,8 +1304,8 @@ describe("search by printed name", () => {
     expect(urls[2]).toContain("id=46986414,21296502")
   })
 
-  it("finds bundled Rush Duel cards without the ・ separator", async () => {
-    jest.spyOn(global, "fetch").mockImplementation(() => response({ error: "No card" }, 400))
+  it("finds bundled Rush Duel cards without the ・ separator while YGOPRODeck is down", async () => {
+    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 503))
     const rush = rushCards[0]
 
     const cards = await makeConvexTest().action(api.cards.search, {
