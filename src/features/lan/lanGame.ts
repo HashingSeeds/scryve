@@ -15,6 +15,7 @@ import {
   commanderField,
   commanderLethalDamage,
   isCommanderSlot,
+  lastChangeFor,
 } from "../../../convex/lib/gameRules"
 import {
   isPlayerGridLayoutVariant,
@@ -132,7 +133,7 @@ export type LanGuestMessage =
       systems?: readonly PlaySystemId[]
       variants?: readonly GameVariant[]
     }
-  | { type: "op"; event: ConnectedActionEvent }
+  | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
   | { type: "deck"; deck: LanSeatDeck | null }
   | { type: "ping"; at: number }
@@ -353,11 +354,13 @@ export function endLanRound(game: LanGame, status: "finished" | "abandoned", now
   return { ...game, status, updatedAt: now }
 }
 
-function memoryWriteOf(event: ConnectedActionEvent): MemoryWrite {
+function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined): MemoryWrite {
+  const tap = tappedAt === undefined ? {} : { tappedAt }
   const sent = {
     operationId: event.operationId,
     deviceId: event.deviceId,
     clientCreatedAt: event.clientCreatedAt,
+    ...tap,
   }
   if (event.type === "life.changed")
     return { kind: "life", playerId: event.playerId, delta: event.delta, ...sent }
@@ -378,6 +381,7 @@ function memoryWriteOf(event: ConnectedActionEvent): MemoryWrite {
     resolutionOperationId: event.operationId,
     deviceId: event.deviceId,
     clientCreatedAt: event.clientCreatedAt,
+    ...tap,
   }
 }
 
@@ -391,12 +395,13 @@ export function applyLanWrite(
   senderKey: string,
   event: ConnectedActionEvent,
   now: number,
+  tappedAt?: number,
 ): { game: LanGame; result: MemoryWriteResult } {
   if (!game.memory || event.gameId !== lanRoundId(game)) return { game, result: NOT_STARTED }
   const result = writeMemoryGame(
     game.memory,
     { userId: senderKey, isHost: senderKey === game.hostKey },
-    memoryWriteOf(event),
+    memoryWriteOf(event, tappedAt),
     now,
   )
   if (!result.ok || result.ack.deduplicated) return { game, result }
@@ -506,6 +511,15 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
         }
       : {}),
   }
+  const lastChanged = seatsOf.reduce<(typeof seatsOf)[number] | undefined>(
+    (latest, seat) => ((seat.lastEventAt ?? 0) > (latest?.lastEventAt ?? 0) ? seat : latest),
+    undefined,
+  )
+  const lastChange =
+    game.status === "active"
+      ? lastChangeFor(lastChanged, { userId: viewerKey }, game.hostKey)
+      : undefined
+  if (lastChange) projection.lastChange = lastChange
   const outState = projectionOutState(projection)
   const outcome =
     game.roles && game.status === "active" && viewerKey === game.hostKey
@@ -679,7 +693,10 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
   }
   if (value.type === "op") {
     const event = parseEvent(value.event)
-    return event ? { type: "op", event } : null
+    if (!event) return null
+    return isCount(value.tappedAt)
+      ? { type: "op", event, tappedAt: value.tappedAt }
+      : { type: "op", event }
   }
   return null
 }

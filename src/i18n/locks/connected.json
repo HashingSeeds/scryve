@@ -205,6 +205,8 @@
   "syncStats.p90": "a51089fb4d27",
   "syncStats.p99": "7d14a1bd953b",
   "syncStats.count": "4f0b48d729d0",
+  "syncStats.tapOwn": "a4f20b4b6216",
+  "syncStats.tapCross": "d6468f775f2f",
   "board.checkingSession": "936ae74765d6",
   "board.sessionUnavailable": "8680bfb95262",
   "board.unavailable": "9abc5d054d06",

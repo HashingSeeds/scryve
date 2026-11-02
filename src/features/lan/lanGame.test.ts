@@ -555,3 +555,36 @@ describe("clock pings", () => {
     ).toEqual({ type: "stats", stats: { ping: 3 } })
   })
 })
+
+describe("nearby tap timing", () => {
+  const tapped = (event: ConnectedActionEvent, tappedAt: unknown) => {
+    const message = parseGuestMessage(JSON.stringify({ type: "op", event, tappedAt }))
+    if (message?.type !== "op") throw new Error("not an op")
+    return message
+  }
+
+  it("carries a guest's tap time to every other device, and says when it changed another seat", () => {
+    const message = tapped(life("op-own-000000001", "guest", -2), NOW - 40)
+    const own = applyLanWrite(started(), "guest", message.event, NOW, message.tappedAt).game
+    expect(lanProjection(own, "host").lastChange).toEqual({ tappedAt: NOW - 40, crossSeat: false })
+    expect(lanProjection(own, "guest").lastChange).toBeUndefined()
+
+    const claim = op({
+      type: "commanderDamage.submitted",
+      operationId: "op-claim-0000001",
+      fromPlayerId: "guest",
+      toPlayerId: "host",
+      delta: 3,
+    })
+    const cross = applyLanWrite(own, "guest", claim, NOW, NOW - 25).game
+    expect(lanProjection(cross, "host").lastChange).toEqual({ tappedAt: NOW - 25, crossSeat: true })
+  })
+
+  it("plays a change whose tap time is missing or malformed, with nothing to time", () => {
+    const message = tapped(life("op-bad-tap-00001", "guest", -1), "soon")
+    expect(message).not.toHaveProperty("tappedAt")
+    const { next, result } = write(started(), "guest", message.event)
+    expect(result.ok).toBe(true)
+    expect(lanProjection(next, "host").lastChange).toBeUndefined()
+  })
+})

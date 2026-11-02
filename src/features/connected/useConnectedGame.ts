@@ -5,7 +5,7 @@ import type { FunctionArgs } from "convex/server"
 import type { OutboxAcknowledgement } from "@/features/sync/outbox"
 
 import { createLobbyIdentifiers } from "./identifiers"
-import type { ConnectedActionEvent, PendingLifeAction } from "./model"
+import type { ConnectedActionEvent, PendingLifeAction, SentWrite } from "./model"
 import { connectedDeploymentScope } from "./persistence"
 import {
   useConnectedRuntime,
@@ -83,6 +83,7 @@ export function sendQueuedAction(
   mutations: QueuedActionMutations,
   publicId: string,
   { event }: PendingLifeAction,
+  sent: SentWrite = {},
 ): Promise<OutboxAcknowledgement> {
   if (event.type === "life.changed")
     return mutations.changeLife({
@@ -92,6 +93,7 @@ export function sendQueuedAction(
       delta: event.delta,
       deviceId: event.deviceId,
       clientCreatedAt: event.clientCreatedAt,
+      ...sent,
     })
   if (event.type === "table.action")
     return mutations.tableAction({
@@ -99,6 +101,7 @@ export function sendQueuedAction(
       operationId: event.operationId,
       deviceId: event.deviceId,
       clientCreatedAt: event.clientCreatedAt,
+      ...sent,
       action: event.action,
     })
   if (event.type === "commanderDamage.submitted")
@@ -111,6 +114,7 @@ export function sendQueuedAction(
       delta: event.delta,
       deviceId: event.deviceId,
       clientCreatedAt: event.clientCreatedAt,
+      ...sent,
     })
   const resolve = event.accepted
     ? mutations.confirmCommanderDamage
@@ -121,6 +125,7 @@ export function sendQueuedAction(
     resolutionOperationId: event.operationId,
     deviceId: event.deviceId,
     clientCreatedAt: event.clientCreatedAt,
+    ...sent,
   }).then((claimAcknowledgement) =>
     acknowledgementForQueuedResolution(claimAcknowledgement, event.operationId),
   )
@@ -138,7 +143,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous") {
   const finishMutation = useMutation(api.games.finishGame)
   const abandonMutation = useMutation(api.games.abandonGame)
   const writes: ConnectedWrites = {
-    send: (action) =>
+    send: (action, sent) =>
       sendQueuedAction(
         {
           changeLife,
@@ -149,6 +154,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous") {
         },
         publicId,
         action,
+        sent,
       ),
     finish: async (result) =>
       finishMutation({

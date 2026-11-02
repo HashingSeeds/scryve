@@ -296,6 +296,8 @@ export default {
     p90: "p90",
     p99: "p99",
     count: "संख्या",
+    tapOwn: "टैप",
+    tapCross: "क्रॉस",
   },
   board: {
     checkingSession: "कनेक्टेड सेशन की जाँच हो रही है…",

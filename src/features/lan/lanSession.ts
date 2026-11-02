@@ -196,8 +196,10 @@ export class LanSession {
   }
 
   readonly writes: ConnectedWrites = {
-    send: (action) =>
-      this.state.role === "host" ? this.hostWrite(action) : this.guestWrite(action),
+    send: (action, sent) =>
+      this.state.role === "host"
+        ? this.hostWrite(action, sent?.tappedAt)
+        : this.guestWrite(action, sent?.tappedAt),
     finish: async (result) => this.finish(result),
     abandon: async () => this.leave(),
   }
@@ -409,7 +411,13 @@ export class LanSession {
             code: "rate_limited",
             message: "Too many changes at once",
           })
-        const { game: next, result } = applyLanWrite(game, seatKey, message.event, now)
+        const { game: next, result } = applyLanWrite(
+          game,
+          seatKey,
+          message.event,
+          now,
+          message.tappedAt,
+        )
         this.queueReply(
           seatKey,
           result.ok
@@ -481,11 +489,14 @@ export class LanSession {
     }
   }
 
-  private hostWrite({ event }: PendingLifeAction): Promise<OutboxAcknowledgement> {
+  private hostWrite(
+    { event }: PendingLifeAction,
+    tappedAt: number | undefined,
+  ): Promise<OutboxAcknowledgement> {
     const game = this.game
     const { seatKey } = this.state
     if (!game || !seatKey) return Promise.reject(new Error("No nearby game"))
-    const { game: next, result } = applyLanWrite(game, seatKey, event, Date.now())
+    const { game: next, result } = applyLanWrite(game, seatKey, event, Date.now(), tappedAt)
     if (!result.ok) return Promise.reject(writeFailure(result.error))
     this.publish(next)
     const { status } = result.ack
@@ -496,13 +507,16 @@ export class LanSession {
     )
   }
 
-  private guestWrite({ event }: PendingLifeAction): Promise<OutboxAcknowledgement> {
+  private guestWrite(
+    { event }: PendingLifeAction,
+    tappedAt: number | undefined,
+  ): Promise<OutboxAcknowledgement> {
     const connection = this.connection
     if (!connection || this.state.status !== "connected")
       return Promise.reject(new Error("Not connected to the host"))
     return new Promise((resolve, reject) => {
       this.pendingWrites.set(event.operationId, { resolve, reject })
-      connection.send({ type: "op", event })
+      connection.send({ type: "op", event, ...(tappedAt === undefined ? {} : { tappedAt }) })
     })
   }
 

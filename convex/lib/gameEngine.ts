@@ -18,6 +18,7 @@ import {
   type LifeChangeRequest,
   type SeatActor,
   type SeatOwner,
+  type SeatWrite,
 } from "./gameRules"
 import type { GameWriteErrorCode } from "./gameWriteErrors"
 import { nameFailsGate } from "./nameFilter"
@@ -77,6 +78,7 @@ export interface EngineSeat extends SeatOwner, PlayerTable {
   id: string
   currentLife: number
   eventCount?: number
+  lastWrite?: SeatWrite
 }
 
 export interface CommanderPair {
@@ -121,6 +123,7 @@ export interface SeatPatch {
   currentLife?: number
   eventCount?: number
   lastEventAt?: number
+  lastWrite?: SeatWrite
   counters?: PlayerTable["counters"]
   pokemon?: PlayerTable["pokemon"]
 }
@@ -147,6 +150,8 @@ export interface WriteRequest {
   operationId: string
   deviceId: string
   clientCreatedAt: number
+  /** why: the first tap behind this write on the authority's clock; it only times tap-to-paint, so a bad one is dropped instead of refusing the write. */
+  tappedAt?: number
 }
 
 export type ClaimDecision = "confirmed" | "declined"
@@ -310,10 +315,33 @@ export function* writeGame(
   const invalid = rejectRequest(write) ?? rejectForGame(store.game, write)
   if (invalid) return failed(invalid)
   const actor = { ...identity, deviceId: write.deviceId }
-  if (write.kind === "life") return yield* writeLife(store, actor, write, now)
-  if (write.kind === "table") return yield* writeTable(store, actor, write, now)
-  if (write.kind === "commander.claim") return yield* writeClaim(store, actor, write, now)
-  return yield* writeResolution(store, actor, write, now)
+  const stamped = withLastWrite(store, {
+    actorUserId: actor.userId,
+    deviceId: actor.deviceId,
+    ...(isTapTime(write.tappedAt) ? { tappedAt: write.tappedAt } : {}),
+  })
+  if (write.kind === "life") return yield* writeLife(stamped, actor, write, now)
+  if (write.kind === "table") return yield* writeTable(stamped, actor, write, now)
+  if (write.kind === "commander.claim") return yield* writeClaim(stamped, actor, write, now)
+  return yield* writeResolution(stamped, actor, write, now)
+}
+
+const isTapTime = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0
+
+// why: every seat a write touches names that write, replacing the last one, so a seat never pairs an older tap with a newer change.
+function withLastWrite(store: GameStore, lastWrite: SeatWrite): GameStore {
+  return {
+    ...store,
+    apply: (changes) =>
+      store.apply(
+        changes.map((change) =>
+          change.kind === "seat.patch" && change.patch.lastEventAt !== undefined
+            ? { ...change, patch: { ...change.patch, lastWrite } }
+            : change,
+        ),
+      ),
+  }
 }
 
 export function matchLifeRetry(

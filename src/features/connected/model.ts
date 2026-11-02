@@ -8,7 +8,11 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 
-import { isCommanderSlot, type PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
+import {
+  isCommanderSlot,
+  type LastChange,
+  type PARTNER_COMMANDER,
+} from "../../../convex/lib/gameRules"
 import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
@@ -129,6 +133,7 @@ export interface ConnectedProjection {
   rematchPublicId?: string
   eventSequence: number
   serverUpdatedAt: number
+  lastChange?: LastChange
   recentOperationIds: string[]
   /** Optional so projections from before commander damage remain readable. */
   commanderDamage?: ConnectedCommanderDamageProjection
@@ -163,6 +168,10 @@ export interface FailedConnectedAction {
   action: PendingConnectedAction
   reason: string
   failedAt: number
+}
+
+export interface SentWrite {
+  tappedAt?: number
 }
 
 export type PendingLifeAction = PendingConnectedAction
@@ -345,6 +354,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       : {}),
     eventSequence: value.eventSequence,
     serverUpdatedAt: value.serverUpdatedAt,
+    ...lastChangeOf(value.lastChange),
     recentOperationIds: value.recentOperationIds
       .filter((operationId: unknown): operationId is string => typeof operationId === "string")
       .slice(0, CONNECTED_RECENT_OPERATION_LIMIT),
@@ -353,6 +363,14 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     ...(invitation ? { invitation } : {}),
     players,
   }
+}
+
+function lastChangeOf(value: unknown): { lastChange?: LastChange } {
+  if (!isRecord(value)) return {}
+  const { tappedAt, crossSeat } = value
+  return typeof tappedAt === "number" && Number.isFinite(tappedAt) && typeof crossSeat === "boolean"
+    ? { lastChange: { tappedAt, crossSeat } }
+    : {}
 }
 
 function treacheryOutcomeOf(value: unknown): { treacheryOutcome?: TreacheryOutcome<string> } {

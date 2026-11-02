@@ -303,6 +303,10 @@ const connected = {
     p99: "p99",
     // How many changes were timed.
     count: "n",
+    // Median time from a tap on another phone to the change showing here, for a change to the tapper's own seat. Keep very short.
+    tapOwn: "tap",
+    // Median time from a tap on another phone to the change showing here, for a change the tapper made to someone else's seat. Keep very short.
+    tapCross: "cross",
   },
   board: {
     checkingSession: "Checking connected session…",

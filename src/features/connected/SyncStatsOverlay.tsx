@@ -11,7 +11,7 @@ import { storage } from "@/utils/storage"
 
 import type { PeerLatency, SyncLatency } from "./syncLatency"
 
-const COLUMNS = ["ping", "p50", "p90", "p99", "count"] as const
+const COLUMNS = ["ping", "p50", "p90", "p99", "count", "tapOwn", "tapCross"] as const
 
 export function SyncStatsOverlay(props: { latency: SyncLatency; peers?: () => PeerLatency[] }) {
   const [settings] = useMMKVString(LOCAL_KEYS.settings, storage)
@@ -46,19 +46,20 @@ function SyncStatsTable({ latency, peers }: { latency: SyncLatency; peers?: () =
           />
         ))}
       </View>
-      {rows.map(({ name, summary: { ping, delivery } }, index) => (
+      {rows.map(({ name, summary: { ping, delivery, tapOwn, tapCross } }, index) => (
         <View key={`${index}:${name}`} style={$row}>
           <Text size="xxs" text={name} numberOfLines={1} style={$name} />
-          {[ping, delivery?.p50, delivery?.p90, delivery?.p99, delivery?.count].map(
-            (value, column) => (
-              <Text
-                key={COLUMNS[column]}
-                size="xxs"
-                text={value?.toString() ?? "–"}
-                style={$cell}
-              />
-            ),
-          )}
+          {[
+            ping,
+            delivery?.p50,
+            delivery?.p90,
+            delivery?.p99,
+            delivery?.count,
+            tapOwn?.p50,
+            tapCross?.p50,
+          ].map((value, column) => (
+            <Text key={COLUMNS[column]} size="xxs" text={value?.toString() ?? "–"} style={$cell} />
+          ))}
         </View>
       ))}
     </View>
@@ -78,7 +79,7 @@ const $row: ViewStyle = { flexDirection: "row" }
 const $name: TextStyle = { width: 72, color: "#FFFFFF" }
 
 const $cell: TextStyle = {
-  width: 40,
+  width: 36,
   textAlign: "right",
   color: "#FFFFFF",
   fontVariant: ["tabular-nums"],

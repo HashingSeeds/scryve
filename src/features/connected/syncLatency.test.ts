@@ -127,4 +127,26 @@ describe("SyncLatency", () => {
       ack_p99: 45,
     })
   })
+
+  it("times a tap on another device to this paint, split by whose seat it changed", () => {
+    const { latency, at } = meter()
+    latency.clockSample(1_000, 1_020, 11_010)
+    expect(latency.authorityTime(2_000)).toBe(12_000)
+    latency.remoteChange(12_050, 1, { tappedAt: 12_000, crossSeat: false })
+    latency.remoteChange(12_090, 2, { tappedAt: 12_030, crossSeat: true })
+    at(2_120)
+    latency.painted(2)
+    latency.remoteChange(50_000, 3, { tappedAt: 12_000, crossSeat: false })
+    at(40_000)
+    latency.painted(3)
+    expect(latency.summary()).toMatchObject({
+      tapOwn: { count: 1, p50: 120 },
+      tapCross: { count: 1, p50: 90 },
+    })
+    latency.report()
+    expect(captureAnalytics).toHaveBeenLastCalledWith(
+      "sync_latency",
+      expect.objectContaining({ e2e_own_p50: 120, e2e_cross_count: 1, e2e_cross_p99: 90 }),
+    )
+  })
 })

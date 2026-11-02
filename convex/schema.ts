@@ -167,6 +167,13 @@ export default defineSchema({
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
     eventCount: v.optional(v.number()),
     lastEventAt: v.optional(v.number()),
+    lastWrite: v.optional(
+      v.object({
+        actorUserId: v.id("users"),
+        deviceId: v.string(),
+        tappedAt: v.optional(v.number()),
+      }),
+    ),
     // Optional during the Phase 2→3 staged migration; migrateMyGameMemberships backfills it.
     resumable: v.optional(v.boolean()),
     joinedAt: v.number(),
