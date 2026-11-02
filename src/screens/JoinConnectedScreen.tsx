@@ -141,6 +141,7 @@ export function JoinConnectedScreen({
         manualCode: manualCode ?? undefined,
         systems: PLAYABLE_SYSTEMS,
         variants: PLAYABLE_VARIANTS,
+        editsAnySeat: true,
       })
       if ("invalid" in lookup) throw new Error(translate("connected:join.invalidInvite"))
       const seats = lookup.seats

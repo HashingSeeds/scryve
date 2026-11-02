@@ -401,6 +401,12 @@ export default {
     },
   },
   lobby: {
+    outdatedApps_one:
+      "{{names}} doit mettre à jour Scryve pour que tout le monde puisse modifier n'importe quelle place. Vous pouvez commencer maintenant. Chaque joueur ne modifiera que sa propre place.",
+    outdatedApps_many:
+      "{{names}} doivent mettre à jour Scryve pour que tout le monde puisse modifier n'importe quelle place. Vous pouvez commencer maintenant. Chaque joueur ne modifiera que sa propre place.",
+    outdatedApps_other:
+      "{{names}} doivent mettre à jour Scryve pour que tout le monde puisse modifier n'importe quelle place. Vous pouvez commencer maintenant. Chaque joueur ne modifiera que sa propre place.",
     title: "Salon",
     loadingLabel: "Chargement du salon",
     loading: "Chargement du salon…",

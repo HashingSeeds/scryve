@@ -367,6 +367,8 @@ export default {
     },
   },
   lobby: {
+    outdatedApps_other:
+      "{{names}}님은 모든 플레이어의 자리를 변경하려면 Scryve를 업데이트해야 합니다. 지금 시작할 수 있습니다. 각 플레이어는 자신의 자리만 변경할 수 있습니다.",
     title: "로비",
     loadingLabel: "로비 불러오는 중",
     loading: "로비 불러오는 중…",

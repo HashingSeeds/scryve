@@ -93,6 +93,7 @@ export interface LanSeat {
   name: string
   connected: boolean
   deck?: LanSeatDeck
+  editsAnySeat?: boolean
 }
 
 export type LanStatus = "lobby" | "active" | "finished" | "abandoned"
@@ -132,6 +133,7 @@ export type LanGuestMessage =
       pass?: LanSeatPass
       systems?: readonly PlaySystemId[]
       variants?: readonly GameVariant[]
+      editsAnySeat?: boolean
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
@@ -141,7 +143,7 @@ export type LanGuestMessage =
 
 export type LanHostMessage =
   // why: a host from before partners drops the slot and lands a partner's damage on the first commander, so guests offer partners only when the welcome says so. A flag keeps mixed tables playing where a LAN_PROTOCOL bump would split them.
-  | { type: "welcome"; pass: LanSeatPass; partners?: boolean }
+  | { type: "welcome"; pass: LanSeatPass; partners?: boolean; editsAnySeat?: boolean }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
   | { type: "state"; lobby: LanLobby; projection: ConnectedProjection }
@@ -175,7 +177,7 @@ export function createLanGame(
     status: "lobby",
     round: 0,
     setup,
-    seats: [{ key: hostKey, seat: 1, name, connected: true }],
+    seats: [{ key: hostKey, seat: 1, name, connected: true, editsAnySeat: true }],
     recentOperationIds: [],
     updatedAt: now,
   }
@@ -232,9 +234,15 @@ export function admitLanGuest(
   const owned = pass && game.seats.some((seat) => seat.key === pass.key)
   if (pass && (pass.key === game.hostKey || (owned && tokens.get(pass.key) !== pass.token)))
     return { rejected: LAN_REJECTIONS.seatTaken }
+  const editsAnySeat = join.editsAnySeat ? { editsAnySeat: true } : {}
   if (pass && owned)
     return {
-      game: withSeat(game, pass.key, (seat) => ({ ...seat, name: join.name, connected: true })),
+      game: withSeat(game, pass.key, ({ editsAnySeat: _before, ...seat }) => ({
+        ...seat,
+        ...editsAnySeat,
+        name: join.name,
+        connected: true,
+      })),
       pass,
     }
   if (game.status !== "lobby") return { rejected: LAN_REJECTIONS.started }
@@ -244,6 +252,7 @@ export function admitLanGuest(
     seat: game.seats.length + 1,
     name: join.name,
     connected: true,
+    ...editsAnySeat,
   }
   return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
 }
@@ -320,6 +329,7 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
       status: "active",
       system: setup.system,
       format: setup.format,
+      ...(game.seats.every((seat) => seat.editsAnySeat) ? { lifeEditing: "anyone" as const } : {}),
       designations: {},
       seats: new Map(
         game.seats.map((seat) => [
@@ -481,6 +491,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
     ...(setup.layout ? { layout: setup.layout } : {}),
     ...(setup.variant ? { variant: setup.variant } : {}),
     isHost: viewerKey === game.hostKey,
+    ...(memory?.lifeEditing === "anyone" ? { lifeEditing: "anyone" as const } : {}),
     eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
     serverUpdatedAt: game.updatedAt,
     // why: a viewer only reconciles its own pending changes, and every id is bytes the host base64-encodes in JS for every guest on every broadcast.
@@ -495,6 +506,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
       ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
       controlledByMe: seat.key === viewerKey,
+      ...(seat.editsAnySeat ? { editsAnySeat: true } : {}),
       ...(seat.deck ? { deckVersionId: seat.deck.versionId } : {}),
       ...roleFor(seat.key),
     })),
@@ -680,6 +692,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(Array.isArray(value.variants)
         ? { variants: value.variants.filter((variant) => variant === "treachery") }
         : {}),
+      ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }
@@ -727,6 +740,7 @@ function parseLobby(value: unknown): LanLobby | null {
       name: seat.name.slice(0, MAX_PLAYER_NAME_LENGTH),
       connected: seat.connected,
       ...(deck ? { deck } : {}),
+      ...(seat.editsAnySeat === true ? { editsAnySeat: true } : {}),
     })
   }
   return { id: value.id, status, round: value.round, setup, seats }
@@ -742,6 +756,7 @@ export function parseHostMessage(line: string): LanHostMessage | null {
       type: "welcome",
       pass: { key: value.pass.key, token: value.pass.token },
       ...(value.partners === true ? { partners: true } : {}),
+      ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
     }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {

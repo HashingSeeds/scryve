@@ -392,6 +392,12 @@ export default {
     },
   },
   lobby: {
+    outdatedApps_one:
+      "{{names}} necesita actualizar Scryve para que todos puedan editar cualquier asiento. Puedes empezar ahora. Cada jugador cambiará solo su propio asiento.",
+    outdatedApps_many:
+      "{{names}} necesitan actualizar Scryve para que todos puedan editar cualquier asiento. Puedes empezar ahora. Cada jugador cambiará solo su propio asiento.",
+    outdatedApps_other:
+      "{{names}} necesitan actualizar Scryve para que todos puedan editar cualquier asiento. Puedes empezar ahora. Cada jugador cambiará solo su propio asiento.",
     title: "Sala",
     loadingLabel: "Cargando sala",
     loading: "Cargando sala…",

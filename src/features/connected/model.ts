@@ -41,6 +41,7 @@ export interface ConnectedPlayerProjection {
   foil?: boolean
   currentLife: number
   controlledByMe: boolean
+  editsAnySeat?: boolean
   role?: TreacheryRole
   roleRevealed?: boolean
 }
@@ -129,6 +130,7 @@ export interface ConnectedProjection {
   lifeStep?: number
   ruleset: string
   isHost: boolean
+  lifeEditing?: "anyone"
   treacheryOutcome?: TreacheryOutcome<string>
   rematchPublicId?: string
   eventSequence: number
@@ -238,6 +240,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       ...(player.foil === true ? { foil: true } : {}),
       currentLife: player.currentLife,
       controlledByMe: player.controlledByMe,
+      ...(player.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(isTreacheryRole(player.role) ? { role: player.role } : {}),
       ...(typeof player.roleRevealed === "boolean" ? { roleRevealed: player.roleRevealed } : {}),
     })
@@ -348,6 +351,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       : {}),
     ruleset: value.ruleset,
     isHost: value.isHost,
+    ...(value.lifeEditing === "anyone" ? { lifeEditing: "anyone" as const } : {}),
     ...treacheryOutcomeOf(value.treacheryOutcome),
     ...(typeof value.rematchPublicId === "string" && value.rematchPublicId
       ? { rematchPublicId: value.rematchPublicId }

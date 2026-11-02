@@ -67,6 +67,7 @@ export interface LobbyViewProps {
   lobby: LobbyViewLobby
   heading?: { text: string; label: string }
   online: boolean
+  outdatedNames?: readonly string[]
   offlineNotice: string
   exitOfflineNotice?: string
   error?: string
@@ -107,6 +108,7 @@ export function LobbyView({
   lobby,
   heading,
   online,
+  outdatedNames = [],
   offlineNotice,
   exitOfflineNotice,
   error,
@@ -323,6 +325,16 @@ export function LobbyView({
       </ScrollView>
       <BottomActionBar endsWithLink style={themed($surface)}>
         {error && !openExitCopy ? <AlertNote testID="connected-action-error" text={error} /> : null}
+        {outdatedNames.length > 0 ? (
+          <AlertNote
+            testID="lobby-outdated-apps"
+            tone="info"
+            text={translate("connected:lobby.outdatedApps", {
+              names: outdatedNames.join(", "),
+              count: outdatedNames.length,
+            })}
+          />
+        ) : null}
         {lobby.isHost && !online ? (
           <AlertNote testID="connected-start-offline" text={offlineNotice} />
         ) : null}

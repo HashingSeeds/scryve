@@ -86,4 +86,12 @@ describe("LobbyView", () => {
     fireEvent.press(screen.getByTestId("leave-connected-lobby-button"))
     expect(screen.getByTestId("confirm-connected-lobby-leave-button")).toBeDisabled()
   })
+
+  it("names players whose app is too old to edit any seat, and still lets the host start", () => {
+    view({ outdatedNames: ["Alex", "Sam"] })
+    expect(screen.getByTestId("lobby-outdated-apps")).toHaveTextContent(
+      "Alex, Sam need to update Scryve before everyone can edit any seat. You can start now. Each player will change only their own seat.",
+    )
+    expect(screen.getByTestId("start-connected-game-button")).not.toBeDisabled()
+  })
 })

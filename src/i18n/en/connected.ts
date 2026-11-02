@@ -382,6 +382,11 @@ const connected = {
     },
   },
   lobby: {
+    // {{names}} lists the players, comma separated, whose Scryve is too old to let anyone change any player's seat. Until they update, the game plays the old way: each player changes only their own seat. Starting anyway is fine.
+    outdatedApps_one:
+      "{{names}} needs to update Scryve before everyone can edit any seat. You can start now. Each player will change only their own seat.",
+    outdatedApps_other:
+      "{{names}} need to update Scryve before everyone can edit any seat. You can start now. Each player will change only their own seat.",
     title: "Lobby",
     loadingLabel: "Loading lobby",
     loading: "Loading lobby…",

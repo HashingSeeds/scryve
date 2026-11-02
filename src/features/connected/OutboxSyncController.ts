@@ -434,7 +434,8 @@ export class OutboxSyncController {
       rules: playTableRules(projection.system, projection.format),
       playerIds: projection.players.map((player) => player.playerId),
       lifeOf: (playerId) => playerOf(playerId)?.currentLife,
-      canAct: (playerId) => playerOf(playerId)?.controlledByMe === true,
+      canAct: (playerId) =>
+        projection.lifeEditing === "anyone" || playerOf(playerId)?.controlledByMe === true,
     }
   }
 

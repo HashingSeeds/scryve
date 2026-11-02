@@ -588,3 +588,51 @@ describe("nearby tap timing", () => {
     expect(lanProjection(next, "host").lastChange).toBeUndefined()
   })
 })
+
+describe("nearby games where anyone edits any seat", () => {
+  const updated = (game: LanGame, key: string) => {
+    const pass = { key, token: `token-${key}` }
+    const admitted = admitLanGuest(game, tokens, { ...join(key), editsAnySeat: true }, pass)
+    if ("rejected" in admitted) throw new Error(admitted.rejected)
+    return admitted.game
+  }
+
+  it("lets a guest change the host's life when every seat's app supports it", () => {
+    const game = startLanRound(updated(lobby(), "guest"), NOW)
+    expect(lanProjection(game, "guest").lifeEditing).toBe("anyone")
+    const { next, result } = write(game, "guest", life("op-anyone-000001", "host", -4))
+    expect(result.ok).toBe(true)
+    expect(lifeOf(next, "guest", "host")).toBe(36)
+  })
+
+  it("plays owner-only when a guest's app is too old, and names that guest", () => {
+    const game = started()
+    expect(lanProjection(game, "host").lifeEditing).toBeUndefined()
+    expect(lanProjection(game, "host").players.map((player) => player.editsAnySeat)).toEqual([
+      true,
+      undefined,
+    ])
+    const { result } = write(game, "guest", life("op-owner-0000001", "host", -4))
+    expect(result).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+  })
+
+  it("reads the flag from join and welcome messages and keeps it on the wire lobby", () => {
+    const joinMessage = parseGuestMessage(JSON.stringify({ ...join("guest"), editsAnySeat: true }))
+    expect(joinMessage).toMatchObject({ editsAnySeat: true })
+    const welcome = parseHostMessage(
+      JSON.stringify({ type: "welcome", pass: unused, editsAnySeat: true }),
+    )
+    expect(welcome).toMatchObject({ editsAnySeat: true })
+    const wire = parseHostMessage(
+      JSON.stringify({
+        type: "state",
+        lobby: lanLobbyOf(updated(lobby(), "guest")),
+        projection: lanProjection(started(), "host"),
+      }),
+    )
+    expect(wire?.type === "state" && wire.lobby.seats.map((seat) => seat.editsAnySeat)).toEqual([
+      true,
+      true,
+    ])
+  })
+})

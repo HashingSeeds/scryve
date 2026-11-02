@@ -201,7 +201,7 @@ describe("nearby host", () => {
     expect(resumed.getState()).toMatchObject({ role: "host", status: "connected" })
     expect(roundOf(resumed)).toBe(roundOf(session))
     expect(lifeOf(resumed, pass.key)).toBe(35)
-    expect(back.sent[0]).toEqual({ type: "welcome", pass, partners: true })
+    expect(back.sent[0]).toEqual({ type: "welcome", pass, partners: true, editsAnySeat: true })
   })
 
   it("saves a foreground host's game as the round starts, then once for a burst of taps", async () => {
@@ -403,7 +403,12 @@ describe("nearby host", () => {
       })
 
     expect(session.getState().partners).toBe(true)
-    expect(bob.sent[0]).toEqual({ type: "welcome", pass: bob.pass(), partners: true })
+    expect(bob.sent[0]).toEqual({
+      type: "welcome",
+      pass: bob.pass(),
+      partners: true,
+      editsAnySeat: true,
+    })
     bob.send({ type: "op", event: claim("claim-operation-0001", attacker) })
     void session.writes.send({
       event: claim("claim-operation-0002", hostKey, { commander: 1, delta: 6 }),
