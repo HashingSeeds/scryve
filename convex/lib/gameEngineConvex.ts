@@ -186,6 +186,12 @@ export async function writeCloudGame(
         .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
         .take(MAX_PENDING_COMMANDER_CLAIMS + 1),
     pairTotal: async (pair) => (await pairDoc(pair))?.total ?? 0,
+    isMember: async () =>
+      seatsRead.some((seat) => seat.userId === user._id) ||
+      (await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
+        .first()) !== null,
     beforeNewWrite: () => limitGameRate(ctx, "gameWrite", user._id),
     async apply(changes) {
       for (const change of changes) await applyChange(change)

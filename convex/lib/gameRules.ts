@@ -1,3 +1,5 @@
+import { v, type Infer } from "convex/values"
+
 import { flooredLifeDelta, formatDefinition } from "./systems"
 
 export const MAX_LIFE_DELTA = 999_999
@@ -25,6 +27,10 @@ export const isCommanderSlot = (value: unknown): value is CommanderSlot =>
 
 export const commanderField = (commander: CommanderSlot) =>
   commander === undefined ? {} : { commander }
+
+export const lifeEditingValidator = v.union(v.literal("anyone"), v.literal("owner"))
+
+export type LifeEditing = Infer<typeof lifeEditingValidator>
 
 export interface SeatOwner {
   userId?: string

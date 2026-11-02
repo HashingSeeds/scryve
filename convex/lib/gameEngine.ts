@@ -17,6 +17,7 @@ import {
   type CommanderSlot,
   type LifeChangeRequest,
   type SeatActor,
+  type LifeEditing,
   type SeatOwner,
   type SeatWrite,
 } from "./gameRules"
@@ -59,12 +60,16 @@ const MISMATCH = writeError(
 )
 
 export const engineGameOf = (
-  game: Pick<Doc<"games">, "status" | "system" | "game" | "format" | "ruleset" | "designations">,
+  game: Pick<
+    Doc<"games">,
+    "status" | "system" | "game" | "format" | "ruleset" | "designations" | "lifeEditing"
+  >,
 ): EngineGame => ({
   status: game.status,
   system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
   format: game.format ?? game.ruleset,
   designations: game.designations ?? {},
+  ...(game.lifeEditing ? { lifeEditing: game.lifeEditing } : {}),
 })
 
 export interface EngineGame {
@@ -72,6 +77,7 @@ export interface EngineGame {
   system: unknown
   format: string | undefined
   designations: TableState["designations"]
+  lifeEditing?: LifeEditing
 }
 
 export interface EngineSeat extends SeatOwner, PlayerTable {
@@ -197,6 +203,7 @@ export interface GameStore {
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
+  isMember(): Read<boolean>
   beforeNewWrite?(): Read<void>
   apply(changes: readonly GameChange[]): Read<void>
 }
@@ -291,14 +298,17 @@ const failed = (error: EngineError): GameWriteResult => ({ ok: false, error })
 
 const acknowledged = (ack: GameAck): GameWriteResult => ({ ok: true, ack })
 
-function* ownedSeat(
+// why: a game where anyone can edit still turns away accounts that hold no seat in it.
+function* editableSeat(
   store: GameStore,
   id: string,
   actor: SeatActor,
   message = "Seat-owner permission required",
 ) {
   const seat = yield* read(store.seat(id))
-  return seat && controlsSeat(seat, actor) ? seat : writeError("seat_owner_required", message)
+  if (seat && controlsSeat(seat, actor)) return seat
+  if (seat && store.game.lifeEditing === "anyone" && (yield* read(store.isMember()))) return seat
+  return writeError("seat_owner_required", message)
 }
 
 function* admitNewWrite(store: GameStore) {
@@ -392,7 +402,7 @@ function* writeLife(
   write: WriteOf<"life">,
   now: number,
 ): GameSteps<GameWriteResult> {
-  const seat = yield* ownedSeat(store, write.playerId, actor)
+  const seat = yield* editableSeat(store, write.playerId, actor)
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request = { ...write, playerId: seat.id, actorUserId: actor.userId }
@@ -542,7 +552,7 @@ function* writeTable(
   now: number,
 ): GameSteps<GameWriteResult> {
   const action = gatedTableAction(write.action)
-  const seat = yield* ownedSeat(store, action.playerId, actor)
+  const seat = yield* editableSeat(store, action.playerId, actor)
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request = {
@@ -643,7 +653,7 @@ function* writeClaim(
 ): GameSteps<GameWriteResult> {
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
-  const source = yield* ownedSeat(
+  const source = yield* editableSeat(
     store,
     write.fromPlayerId,
     actor,
@@ -817,7 +827,7 @@ function* writeResolution(
     claim.resolutionOperationId !== resolutionOperationId
   )
     return failed(MISMATCH)
-  const target = yield* ownedSeat(
+  const target = yield* editableSeat(
     store,
     claim.toPlayerId,
     actor,
