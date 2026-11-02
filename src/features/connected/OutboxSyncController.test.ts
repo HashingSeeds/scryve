@@ -1094,4 +1094,27 @@ describe("outbox sync controller", () => {
     controller.latency.painted(4)
     expect(controller.latency.summary().delivery).toBeUndefined()
   })
+
+  it("times another device's tap while this device still has a write in flight", async () => {
+    const { clock, controller } = harness({ send: () => new Promise(() => {}) })
+    controller.latency.setAuthority()
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(projection(0, 20))
+    controller.changeLife("player-1", 5)
+    await settle()
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+
+    clock.time = 1_000
+    controller.onRemoteProjection({
+      ...projection(1, 20),
+      serverUpdatedAt: 960,
+      lastChange: { tappedAt: 900, crossSeat: true },
+    })
+    clock.time = 1_030
+    controller.latency.painted(1)
+    expect(controller.latency.summary()).toMatchObject({
+      delivery: { count: 1, p50: 70 },
+      tapCross: { count: 1, p50: 130 },
+    })
+  })
 })
