@@ -1272,11 +1272,13 @@ describe("search by printed name", () => {
     ])
   })
 
-  it("finds Yu-Gi-Oh cards typed in hiragana and stores their English names", async () => {
+  it("finds Yu-Gi-Oh cards typed in hiragana without ・ and stores their English names", async () => {
     const urls: string[] = []
     jest.spyOn(global, "fetch").mockImplementation((input) => {
       const url = requestUrl(input)
       urls.push(url)
+      if (url.includes("language=ja") && !url.includes("%"))
+        return response({ error: "No card" }, 400)
       return url.includes("language=ja")
         ? response({
             data: [
@@ -1294,11 +1296,12 @@ describe("search by printed name", () => {
 
     const cards = await makeConvexTest().action(api.cards.search, {
       game: "ygo",
-      query: "ぶらっく・まじしゃん",
+      query: "ぶらっくまじしゃん",
     })
 
     expect(cards.map((card) => card.name)).toEqual(["Dark Magician", "Toon Dark Magician"])
-    expect(urls[1]).toContain("id=46986414,21296502")
+    expect(urls[1]).toContain("fname=ぶ%ら%っ%く%ま%じ%し%ゃ%ん&")
+    expect(urls[2]).toContain("id=46986414,21296502")
   })
 
   it("finds bundled Rush Duel cards without the ・ separator", async () => {

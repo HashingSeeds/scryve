@@ -116,18 +116,22 @@ async function request(ctx: ActionCtx, path: string) {
   })
 }
 
+async function japaneseCandidates(ctx: ActionCtx, query: string) {
+  const separatorFree = [...query.normalize("NFKC").replace(/[\s\p{P}\p{S}]/gu, "")].join("%")
+  for (const fname of new Set([query, separatorFree])) {
+    const response = await request(
+      ctx,
+      `/cardinfo.php?fname=${encodeURIComponent(fname)}&language=ja&num=${JAPANESE_CANDIDATES}&offset=0`,
+    )
+    if (response.status === 400) continue
+    if (!response.ok) throw Object.assign(new Error("YGOPRODeck search failed"), { response })
+    return normalizeYgoCards((await response.json()) as unknown)
+  }
+  return []
+}
+
 async function searchYgoJapanese(ctx: ActionCtx, query: string, includeImages: boolean) {
-  const response = await request(
-    ctx,
-    `/cardinfo.php?fname=${encodeURIComponent(query)}&language=ja&num=${JAPANESE_CANDIDATES}&offset=0`,
-  )
-  if (response.status === 400) return { cards: [], status: response.status }
-  if (!response.ok) throw Object.assign(new Error("YGOPRODeck search failed"), { response })
-  const ids = rankByName(
-    normalizeYgoCards((await response.json()) as unknown),
-    query,
-    (card) => card.name,
-  )
+  const ids = rankByName(await japaneseCandidates(ctx, query), query, (card) => card.name)
     .slice(0, SEARCH_RESULTS)
     .map((card) => card.cardId)
   const english = await cardsByYgoIds(ctx, ids, includeImages)
