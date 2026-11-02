@@ -70,9 +70,10 @@ describe("JoinConnectedScreen", () => {
     fireEvent.press(view.getByTestId("claim-seat-button"))
     await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
     expect(mockClaimSeat).toHaveBeenCalledWith(
-      expect.objectContaining(
-        invite.kind === "code" ? { manualCode: invite.code } : { token: invite.token },
-      ),
+      expect.objectContaining({
+        ...(invite.kind === "code" ? { manualCode: invite.code } : { token: invite.token }),
+        editsAnySeat: true,
+      }),
     )
   })
 
