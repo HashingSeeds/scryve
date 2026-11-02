@@ -1,0 +1,7 @@
+executionPrerequisite: >-
+  goldie restarted the app after the screenshots, so it reopens on the six seat Commander game
+  that store-07-six-players left on the board, signed in as the store account.
+steps:
+  - echo: Runs off camera so the preview opens on the board, not the splash
+  - await: { visible: { id: life-card-seat-6 }, timeout: 30000 }
+  - await: { idle: true }

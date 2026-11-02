@@ -114,6 +114,8 @@ const config: GoldieConfig = {
     {
       kind: "preview",
       id: "preview",
+      // why: published goldie ignores this key; the mchisolm0/goldie fork runs it off camera.
+      prepare: "store-preview-00-ready",
       segments: [
         { id: "connect", flow: "store-preview-01-connect" },
         { id: "join", flow: "store-preview-02-join" },
