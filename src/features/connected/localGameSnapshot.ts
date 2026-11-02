@@ -118,6 +118,7 @@ export interface LocalGameSnapshot {
   }[]
   table?: TableState
   layout?: PlayerGridLayoutVariant
+  editsAnySeat: true
 }
 
 export interface LocalGameSnapshotInput {
@@ -194,6 +195,7 @@ export function buildLocalGameSnapshot({
     ...(commanderTotals ? { commanderTotals } : {}),
     ...(table ? { table } : {}),
     ...(game.layout ? { layout: game.layout } : {}),
+    editsAnySeat: true,
   }
 }
 
