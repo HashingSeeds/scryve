@@ -6,6 +6,7 @@ import type PostHog from "posthog-react-native"
 import { DICE_TOOLS, type DiceTool } from "@/features/game/dice"
 import { createClientId } from "@/features/game/domain"
 import { isPlaySystemId, playSystemFormats } from "@/features/game/playSystems"
+import { buildEnvironment } from "@/utils/buildEnvironment"
 import { loadString, saveString, storage } from "@/utils/storage"
 import type { TelemetryAdapter } from "@/utils/telemetry"
 
@@ -183,6 +184,8 @@ export function analyticsProperties(event: string, properties: Record<string, un
     if (typeof properties[key] === "string") result[key] = properties[key]
   result.consent_source = loadString(SOURCE_KEY) === "first_use" ? "first_use" : "settings"
   result.platform = Platform.OS
+  // why: beta and production share one PostHog project; this is the same value Sentry tags as environment.
+  result.environment = buildEnvironment()
   // why: an OTA update carries the newer config version; the binary's own version is the one installed.
   result.app_version =
     Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? "unknown"
