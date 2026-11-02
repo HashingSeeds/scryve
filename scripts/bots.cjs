@@ -242,6 +242,7 @@ class Bot {
       hostDisplayName: this.name,
       hostColor: COLORS[0],
       deviceId: this.deviceId,
+      editsAnySeat: true,
     })
     this.publicId = lobby.publicId
     this.watch()
@@ -257,6 +258,8 @@ class Bot {
       deviceId: this.deviceId,
       systems: SYSTEM_IDS,
       variants: ["treachery"],
+      // why: bots play as current apps, so a table of bots lets anyone edit any seat.
+      editsAnySeat: true,
     })
     this.publicId = seat.publicId
     this.report(this, "joined", { seat: seat.seat })
