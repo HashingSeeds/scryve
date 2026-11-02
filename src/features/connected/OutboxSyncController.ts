@@ -30,6 +30,7 @@ import type {
   FailedLifeAction,
   PendingLifeAction,
   ConnectedOperationStatus,
+  SentWrite,
 } from "./model"
 import { toConnectedProjection } from "./model"
 import type { ConnectedGameRepository, ConnectedOutbox } from "./persistence"
@@ -67,7 +68,7 @@ export interface OutboxSyncControllerOptions {
   publicId: string
   ownerId: string
   deviceId: DeviceId
-  send: (action: PendingLifeAction) => Promise<OutboxAcknowledgement>
+  send: (action: PendingLifeAction, sent: SentWrite) => Promise<OutboxAcknowledgement>
   finishGame: (result?: ConnectedGameResult) => Promise<unknown>
   abandonGame: () => Promise<unknown>
   latency?: SyncLatency
@@ -255,11 +256,15 @@ export class OutboxSyncController {
     // why: the first fresh projection after mounting or reconnecting is a catch-up that measures time away (a replay of the cached one is not fresh), and one carrying this device's own write was painted before it was sent.
     if (
       this.timingLive &&
-      pending.length === 0 &&
+      (pending.length === 0 || incoming.lastChange) &&
       this.confirmed &&
       incoming.eventSequence > this.confirmed.eventSequence
     )
-      this.latency.remoteChange(incoming.serverUpdatedAt, incoming.eventSequence)
+      this.latency.remoteChange(
+        incoming.serverUpdatedAt,
+        incoming.eventSequence,
+        incoming.lastChange,
+      )
     if (fresh && this.environment.isWebSocketConnected) this.timingLive = true
     const merged = mergeConfirmedProjection(this.confirmed, incoming)
     this.options.repository.saveProjection(merged)
@@ -579,7 +584,11 @@ export class OutboxSyncController {
     action: PendingLifeAction,
     sentAt: number,
   ): Promise<OutboxAcknowledgement> {
-    const acknowledgement = await this.options.send(action)
+    const tappedAt = this.latency.authorityTime(action.event.clientCreatedAt)
+    const acknowledgement = await this.options.send(
+      action,
+      tappedAt === undefined ? {} : { tappedAt },
+    )
     // why: a retry of a write whose reply was lost pairs this send's timing with the first send's server time.
     if (
       this.options.awaitProjectionBarrier &&

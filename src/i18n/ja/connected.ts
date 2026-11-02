@@ -286,6 +286,8 @@ export default {
     p90: "90%",
     p99: "99%",
     count: "件数",
+    tapOwn: "自席",
+    tapCross: "他席",
   },
   board: {
     checkingSession: "通信対戦のセッションを確認中…",

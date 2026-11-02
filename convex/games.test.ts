@@ -3488,3 +3488,34 @@ describe("player-facing connected errors", () => {
     expect(received).toMatchObject({ data: { code: "forbidden", message: "Game unavailable" } })
   })
 })
+
+describe("tap-to-paint timing", () => {
+  it("shows other devices when the latest change was tapped, but not the device that tapped it", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const args = lifeArgs(game.publicId, game.hostPlayerId, "operation-tap-00001", -2)
+    await game.host.mutation(api.games.changeLife, { ...args, tappedAt: 1_700_000_000_040 })
+
+    const joiner = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+      deviceId: "device-joiner-001",
+    })
+    expect(joiner.lastChange).toEqual({ tappedAt: 1_700_000_000_040, crossSeat: false })
+    const host = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+      deviceId: "device-host-0001",
+    })
+    expect(host.lastChange).toBeUndefined()
+  })
+
+  it("applies a change whose tap time is unusable, with nothing to time", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const args = lifeArgs(game.publicId, game.hostPlayerId, "operation-tap-00002", -2)
+    await game.host.mutation(api.games.changeLife, { ...args, tappedAt: -5 })
+
+    const joiner = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(joiner.players[0].currentLife).toBe(38)
+    expect(joiner.lastChange).toBeUndefined()
+  })
+})

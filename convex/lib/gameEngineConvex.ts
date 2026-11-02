@@ -129,7 +129,13 @@ export async function writeCloudGame(
 
   async function applyChange(change: GameChange) {
     if (change.kind === "seat.patch") {
-      await ctx.db.patch(seatId(change.seatId), change.patch)
+      const { lastWrite, ...patch } = change.patch
+      await ctx.db.patch(seatId(change.seatId), {
+        ...patch,
+        ...(lastWrite
+          ? { lastWrite: { ...lastWrite, actorUserId: userId(lastWrite.actorUserId) } }
+          : {}),
+      })
     } else if (change.kind === "event.insert") {
       const id = await ctx.db.insert("gameEvents", eventRow(change.event))
       insertedEvents.set(change.event.operationId, id)

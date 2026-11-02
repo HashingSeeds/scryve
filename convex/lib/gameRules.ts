@@ -41,6 +41,30 @@ export const controlsSeat = (seat: SeatOwner, actor: SeatActor) =>
   (seat.userId === undefined ? actor.isHost : seat.userId === actor.userId) &&
   (seat.deviceId === undefined || seat.deviceId === actor.deviceId)
 
+export interface SeatWrite {
+  actorUserId: string
+  deviceId: string
+  tappedAt?: number
+}
+
+export interface LastChange {
+  tappedAt: number
+  crossSeat: boolean
+}
+
+export function lastChangeFor(
+  seat: (SeatOwner & { lastWrite?: SeatWrite }) | undefined,
+  viewer: { userId: string; deviceId?: string },
+  hostUserId: string | undefined,
+): LastChange | undefined {
+  if (!seat?.lastWrite) return undefined
+  const { actorUserId, deviceId, tappedAt } = seat.lastWrite
+  if (tappedAt === undefined) return undefined
+  if (actorUserId === viewer.userId && (viewer.deviceId ?? deviceId) === deviceId) return undefined
+  const actor = { userId: actorUserId, deviceId, isHost: actorUserId === hostUserId }
+  return { tappedAt, crossSeat: !controlsSeat(seat, actor) }
+}
+
 export interface LifeChangeRequest {
   playerId: string
   actorUserId: string

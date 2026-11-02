@@ -305,6 +305,8 @@ export default {
     p90: "p90",
     p99: "p99",
     count: "n",
+    tapOwn: "propio",
+    tapCross: "cruzado",
   },
   board: {
     checkingSession: "Comprobando sesión conectada…",

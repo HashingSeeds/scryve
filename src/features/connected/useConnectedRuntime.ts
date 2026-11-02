@@ -19,6 +19,7 @@ import type {
   ConnectionStatus,
   FailedLifeAction,
   PendingLifeAction,
+  SentWrite,
 } from "./model"
 import {
   OutboxSyncController,
@@ -64,7 +65,7 @@ export const CONNECTED_GAME_UNAVAILABLE_MS = 1_500
 const rematchesAwaitingStart = new Set<string>()
 
 export interface ConnectedWrites {
-  send: (action: PendingLifeAction) => Promise<OutboxAcknowledgement>
+  send: (action: PendingLifeAction, sent?: SentWrite) => Promise<OutboxAcknowledgement>
   finish: (result?: ConnectedGameResult) => Promise<unknown>
   abandon: () => Promise<unknown>
 }
@@ -104,7 +105,7 @@ export function useConnectedSession({
         publicId,
         ownerId,
         deviceId,
-        send: (action) => latestWrites.current.send(action),
+        send: (action, sent) => latestWrites.current.send(action, sent),
         finishGame: (result) => latestWrites.current.finish(result),
         abandonGame: () => latestWrites.current.abandon(),
         awaitProjectionBarrier,

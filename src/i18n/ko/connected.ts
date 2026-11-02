@@ -282,6 +282,8 @@ export default {
     p90: "p90",
     p99: "p99",
     count: "횟수",
+    tapOwn: "탭",
+    tapCross: "교차",
   },
   board: {
     checkingSession: "연결 세션 확인 중…",

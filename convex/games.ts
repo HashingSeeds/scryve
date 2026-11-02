@@ -49,6 +49,7 @@ import {
   isLifeDelta,
   isSameCommanderClaim,
   isSameCommanderResolution,
+  lastChangeFor,
   MAX_COMMANDER_DAMAGE,
   MAX_PENDING_COMMANDER_CLAIMS,
   MAX_SNAPSHOT_LIFE,
@@ -1899,6 +1900,15 @@ export const lobbyProjection = query({
       (latest, player) => Math.max(latest, player.lastEventAt ?? 0),
       game.updatedAt,
     )
+    const lastChanged = players.reduce<Doc<"gamePlayers"> | undefined>(
+      (latest, player) =>
+        (player.lastEventAt ?? 0) > (latest?.lastEventAt ?? 0) ? player : latest,
+      undefined,
+    )
+    const lastChange =
+      game.status === "active"
+        ? lastChangeFor(lastChanged, { userId: user._id, deviceId: args.deviceId }, game.hostUserId)
+        : undefined
     return {
       schemaVersion: 1 as const,
       publicId: game.publicId,
@@ -1920,6 +1930,7 @@ export const lobbyProjection = query({
         ? { operationStatus: await statusForOperation(ctx, game, user, eventCount, args.operation) }
         : {}),
       serverUpdatedAt,
+      ...(lastChange ? { lastChange } : {}),
       recentOperationIds: recentEvents.map((event) => event.operationId),
       invitation:
         invite && inviteIsUsable(invite, Date.now())
@@ -2410,6 +2421,7 @@ export const changeLife = mutation({
     delta: v.number(),
     deviceId: v.string(),
     clientCreatedAt: v.number(),
+    tappedAt: v.optional(v.number()),
   },
   handler: async (ctx, { publicId, ...sent }) => {
     const write: GameWrite = { kind: "life", ...sent }
@@ -2437,6 +2449,7 @@ export const tableAction = mutation({
     operationId: v.string(),
     deviceId: v.string(),
     clientCreatedAt: v.number(),
+    tappedAt: v.optional(v.number()),
     action: tableActionValidator,
   },
   handler: async (ctx, { publicId, ...sent }) => {
@@ -2462,6 +2475,7 @@ export const submitCommanderDamage = mutation({
     delta: v.number(),
     deviceId: v.string(),
     clientCreatedAt: v.number(),
+    tappedAt: v.optional(v.number()),
   },
   handler: async (ctx, { publicId, ...sent }) => {
     const write: GameWrite = { kind: "commander.claim", ...sent }
@@ -2501,6 +2515,7 @@ async function resolveCommanderClaim(
     deviceId: string
     clientCreatedAt: number
     resolutionOperationId?: string
+    tappedAt?: number
   },
   decision: ClaimDecision,
 ) {
@@ -2525,6 +2540,7 @@ export const confirmCommanderDamage = mutation({
     deviceId: v.string(),
     clientCreatedAt: v.number(),
     resolutionOperationId: v.optional(v.string()),
+    tappedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => resolveCommanderClaim(ctx, args, "confirmed"),
 })
@@ -2536,6 +2552,7 @@ export const declineCommanderDamage = mutation({
     deviceId: v.string(),
     clientCreatedAt: v.number(),
     resolutionOperationId: v.optional(v.string()),
+    tappedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => resolveCommanderClaim(ctx, args, "declined"),
 })

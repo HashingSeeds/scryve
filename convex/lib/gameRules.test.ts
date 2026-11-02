@@ -5,6 +5,7 @@ import {
   controlsSeat,
   isSameCommanderClaim,
   isSameLifeChange,
+  lastChangeFor,
   MAX_PENDING_COMMANDER_CLAIMS,
 } from "./gameRules"
 
@@ -85,5 +86,34 @@ describe("game rules", () => {
       currentLife: -3,
     })
     expect(confirmCommanderClaim({ total: 95, life: 40, delta: 5 })).toBeNull()
+  })
+})
+
+describe("lastChangeFor", () => {
+  const lastWrite = { actorUserId: "player", deviceId: "phone", tappedAt: 500 }
+  const seat = { userId: "player", deviceId: "phone", lastWrite }
+
+  it("times another device's tap, and marks a change to a seat that device doesn't hold", () => {
+    expect(lastChangeFor(seat, { userId: "host", deviceId: "tablet" }, "host")).toEqual({
+      tappedAt: 500,
+      crossSeat: false,
+    })
+    expect(
+      lastChangeFor(
+        { ...seat, lastWrite: { ...lastWrite, actorUserId: "host" } },
+        { userId: "other" },
+        "host",
+      ),
+    ).toEqual({ tappedAt: 500, crossSeat: true })
+    expect(lastChangeFor(seat, { userId: "player", deviceId: "laptop" }, "host")).toMatchObject({
+      tappedAt: 500,
+    })
+  })
+
+  it("leaves out this device's own taps and changes sent without one", () => {
+    expect(lastChangeFor(seat, { userId: "player", deviceId: "phone" }, "host")).toBeUndefined()
+    expect(lastChangeFor(seat, { userId: "player" }, "host")).toBeUndefined()
+    const untimed = { ...seat, lastWrite: { actorUserId: "player", deviceId: "phone" } }
+    expect(lastChangeFor(untimed, { userId: "host" }, "host")).toBeUndefined()
   })
 })
