@@ -32,11 +32,11 @@ import { BoardPressable } from "./BoardPressable"
 import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
+  ATTACK_SHADE,
   CommanderDamageCardControls,
   shadowReached,
   SWAP_MS,
   CommanderTakeoverBackdrop,
-  deepShade,
   SHADOW_INK,
   PulseRing,
   TAKEOVER_LAYERS,
@@ -653,7 +653,7 @@ export const LifeCard = memo(function LifeCard({
           takeover={floodedBy.takeover}
           wave={floodedBy.wave}
           cardSize={cardSize}
-          floodColor={floodedBy.attacker?.color ? deepShade(color) : foreground}
+          floodColor={floodedBy.attacker?.color ? ATTACK_SHADE : foreground}
           defenderColor={color}
         />
       ) : null}
