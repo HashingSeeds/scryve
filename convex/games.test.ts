@@ -3554,12 +3554,36 @@ describe("games where anyone edits any seat", () => {
           4,
         ),
       ),
-    ).resolves.toMatchObject({ status: "pending" })
+    ).resolves.toMatchObject({ status: "confirmed" })
 
     const projection = await game.host.query(api.games.lobbyProjection, { publicId: game.publicId })
     expect(projection.lifeEditing).toBe("anyone")
-    expect(projection.players[0].currentLife).toBe(37)
+    expect(projection.players[0].currentLife).toBe(33)
     expect(projection.table?.players[game.hostPlayerId]).toEqual({ counters: { poison: 1 } })
+  })
+
+  it("lands commander damage at once, with no claim left for the defender to confirm", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, undefined, everyone)
+    const args = commanderArgs(
+      game.publicId,
+      game.hostPlayerId,
+      game.joinerPlayerId,
+      "claim-direct-00001",
+      6,
+    )
+    await game.host.mutation(api.games.submitCommanderDamage, args)
+    await expect(game.host.mutation(api.games.submitCommanderDamage, args)).resolves.toMatchObject({
+      status: "confirmed",
+      deduplicated: true,
+    })
+
+    const defender = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(defender.players[1].currentLife).toBe(34)
+    expect(defender.commanderDamage).toMatchObject({
+      totals: [{ fromPlayerId: game.hostPlayerId, toPlayerId: game.joinerPlayerId, total: 6 }],
+      pendingClaims: [],
+    })
   })
 
   it("still turns away accounts without a seat", async () => {

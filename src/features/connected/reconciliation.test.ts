@@ -183,6 +183,42 @@ describe("connected reconciliation", () => {
     ).toEqual(["claim-waiting-00001"])
   })
 
+  it("shows queued commander damage at once where anyone can edit, and waits where the defender confirms", () => {
+    const hit: PendingLifeAction = {
+      schemaVersion: 1,
+      event: {
+        type: "commanderDamage.submitted",
+        operationId: asOperationId("claim-direct-00001"),
+        gameId: asGameId("game-public"),
+        fromPlayerId: asPlayerId("player-2"),
+        toPlayerId: asPlayerId("player-1"),
+        delta: 4,
+        actorId: asActorId("user-1"),
+        deviceId: asDeviceId("device-1"),
+        clientCreatedAt: 2,
+      },
+      queuedAt: 2,
+      attempts: 0,
+    }
+    const commander: ConnectedProjection = {
+      ...projection,
+      commanderDamage: {
+        totals: [{ fromPlayerId: "player-2", toPlayerId: "player-1", total: 3 }],
+        pendingClaims: [],
+        eliminatedPlayerIds: [],
+      },
+    }
+
+    const direct = overlayPendingDeltas({ ...commander, lifeEditing: "anyone" }, [hit])
+    expect(direct.players[0]).toMatchObject({ currentLife: 16, pendingDelta: -4 })
+    expect(direct.commanderDamage?.totals).toEqual([
+      { fromPlayerId: "player-2", toPlayerId: "player-1", total: 7 },
+    ])
+    const confirmedByDefender = overlayPendingDeltas(commander, [hit])
+    expect(confirmedByDefender.players[0]).toMatchObject({ currentLife: 20, pendingDelta: 0 })
+    expect(confirmedByDefender.commanderDamage?.totals[0]?.total).toBe(3)
+  })
+
   it("never lets an older or reordered subscription replace a newer projection", () => {
     const newer = { ...projection, eventSequence: 8, serverUpdatedAt: 200 }
     expect(mergeConfirmedProjection(newer, projection)).toBe(newer)

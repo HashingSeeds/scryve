@@ -146,10 +146,11 @@ export async function writeCloudGame(
       const id = await ctx.db.insert("gameCommanderClaims", claimRow(change.claim))
       insertedClaims.set(change.claim.operationId, id)
     } else if (change.kind === "claim.patch") {
-      const claim = await claimDoc(change.operationId)
+      const claimId =
+        insertedClaims.get(change.operationId) ?? (await claimDoc(change.operationId))?._id
       const { resolvedByUserId, ...patch } = change.patch
-      if (claim)
-        await ctx.db.patch(claim._id, {
+      if (claimId)
+        await ctx.db.patch(claimId, {
           ...patch,
           ...(resolvedByUserId === undefined ? {} : { resolvedByUserId: userId(resolvedByUserId) }),
         })

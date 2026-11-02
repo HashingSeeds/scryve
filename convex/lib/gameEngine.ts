@@ -683,8 +683,44 @@ function* writeClaim(
   })
   if (status === "declined" && (yield* read(store.event(declinedClaimOperationId(operationId)))))
     return failed(MISMATCH)
-  yield* read(store.apply(submitClaim(pair, status, target, request, now)))
-  return acknowledged({ operationId, deduplicated: false, status })
+  const submitted = submitClaim(pair, status, target, request, now)
+  if (status === "declined" || store.game.lifeEditing !== "anyone") {
+    yield* read(store.apply(submitted))
+    return acknowledged({ operationId, deduplicated: false, status })
+  }
+  const confirmed = confirmAtOnce(submitted, total, target, request, now)
+  if (isEngineError(confirmed)) return failed(confirmed)
+  yield* read(store.apply([...submitted, ...confirmed.changes]))
+  return acknowledged({
+    operationId,
+    deduplicated: false,
+    status: "confirmed",
+    total: confirmed.total,
+    currentLife: confirmed.currentLife,
+  })
+}
+
+// why: where anyone may change any seat, the defender has nothing to approve, so a claim lands the moment it arrives.
+function confirmAtOnce(
+  submitted: readonly GameChange[],
+  pairTotal: number,
+  target: EngineSeat,
+  request: CommanderClaimRequest,
+  now: number,
+) {
+  const inserted = submitted.find((change) => change.kind === "claim.insert")
+  if (!inserted) return rejected("Commander damage claim was not recorded")
+  const outcome = resolveClaim(
+    inserted.claim,
+    "confirmed",
+    pairTotal,
+    { ...target, eventCount: (target.eventCount ?? 0) + 1 },
+    request,
+    now,
+  )
+  if (isEngineError(outcome)) return outcome
+  const { total = pairTotal, currentLife = target.currentLife, changes } = outcome
+  return { total, currentLife, changes }
 }
 
 export interface ResolutionRequest extends WriteRequest {
