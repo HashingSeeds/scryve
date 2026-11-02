@@ -178,9 +178,8 @@ http.route({
       const data = asRecord(event.data)
       if (!data) return new Response("Clerk user event is missing its data", { status: 400 })
       const clerkUserId = typeof data.id === "string" ? data.id : undefined
-      const username = typeof data.username === "string" ? data.username : undefined
-      if (!clerkUserId || !username)
-        return new Response("Clerk user is missing a required username", { status: 400 })
+      if (!clerkUserId) return new Response("Clerk user event is missing its id", { status: 400 })
+      const username = typeof data.username === "string" ? data.username : ""
       const firstName = typeof data.first_name === "string" ? data.first_name : ""
       const lastName = typeof data.last_name === "string" ? data.last_name : ""
       const displayName = `${firstName} ${lastName}`.trim() || username
