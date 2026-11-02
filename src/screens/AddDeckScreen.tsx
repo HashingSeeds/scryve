@@ -387,18 +387,17 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
   >({})
   // why: Convex drops a result once nothing subscribes to it, so formats seen on this visit stay subscribed and switching back renders at once.
   const catalogQueries = useMemo(
-    () =>
-      mode === "precon"
-        ? {
-            ...Object.fromEntries(
-              Object.entries(browsedFormats).map(([key, args]) => [
-                key,
-                { query: api.deckCatalogs.list, args: { ...args, query: "" } },
-              ]),
-            ),
-            current: { query: api.deckCatalogs.list, args: { game, format, query: searchTerm } },
-          }
-        : {},
+    () => ({
+      ...Object.fromEntries(
+        Object.entries(browsedFormats).map(([key, args]) => [
+          key,
+          { query: api.deckCatalogs.list, args: { ...args, query: "" } },
+        ]),
+      ),
+      ...(mode === "precon"
+        ? { current: { query: api.deckCatalogs.list, args: { game, format, query: searchTerm } } }
+        : {}),
+    }),
     [browsedFormats, format, game, mode, searchTerm],
   )
   const catalogResult: CatalogDeck[] | Error | undefined = useQueries(catalogQueries).current
