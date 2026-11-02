@@ -91,8 +91,11 @@ async function limit(
     })
 }
 
-async function postCard(ctx: MutationCtx, requestId: Id<"feedbackRequests">) {
-  await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, { requestId })
+async function postCard(ctx: MutationCtx, requestId: Id<"feedbackRequests">, reopen = false) {
+  await ctx.scheduler.runAfter(0, internal.feedback.postApolloCard, {
+    requestId,
+    ...(reopen ? { reopen } : {}),
+  })
 }
 
 function ownItem(request: Doc<"feedbackRequests">) {
@@ -226,7 +229,7 @@ export const reply = mutation({
       body: cleanText(body, FEEDBACK_LIMITS.message, "Message"),
     })
     await ctx.db.patch(requestId, { updatedAt: Date.now() })
-    await postCard(ctx, requestId)
+    await postCard(ctx, requestId, true)
     return null
   },
 })
@@ -359,12 +362,13 @@ export const postApolloCard = internalAction({
   args: {
     requestId: v.id("feedbackRequests"),
     deleted: v.optional(v.boolean()),
+    reopen: v.optional(v.boolean()),
     attempt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const apollo = apolloConfig()
     if (!apollo) return null
-    const { requestId, deleted } = args
+    const { requestId, deleted, reopen } = args
     const input = deleted
       ? null
       : await ctx.runQuery(internal.feedback.apolloCardInput, { requestId })
@@ -374,7 +378,7 @@ export const postApolloCard = internalAction({
       method: "POST",
       signal: AbortSignal.timeout(APOLLO_TIMEOUT_MS),
       headers: { "Authorization": `Bearer ${apollo.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(card),
+      body: JSON.stringify(reopen ? { ...card, reopen } : card),
     }).then(
       (response) => response.status,
       () => 0,

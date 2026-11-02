@@ -197,6 +197,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
             repeat: true,
           },
       { id: "link_issue", label: "Link issue", input: "text", repeat: true },
+      { id: "archive", label: "Archive" },
     ],
   } as const
 }
