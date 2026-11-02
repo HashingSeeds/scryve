@@ -59,10 +59,16 @@ export const syncFromClerk = internalMutation({
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
       .unique()
     const sync = await usernameForSync(ctx, args.username, args.clerkUserId)
-    // why: Clerk usernames are unique, so the holder's copy is stale. This user gets the name on its next sync.
-    if (sync.action === "keep" && sync.heldBy)
+    // why: a held name is stale on the holder and a removal may be a late older event, so Clerk's current profile decides.
+    const refreshFor =
+      sync.action === "keep"
+        ? sync.heldBy
+        : sync.action === "clear" && existing?.username
+          ? args.clerkUserId
+          : undefined
+    if (refreshFor)
       await ctx.scheduler.runAfter(0, internal.users.refreshUsernameFromClerk, {
-        clerkUserId: sync.heldBy,
+        clerkUserId: refreshFor,
       })
     const username = sync.action === "store" ? sync.username : undefined
     const now = Date.now()
@@ -73,10 +79,7 @@ export const syncFromClerk = internalMutation({
       updatedAt: now,
     }
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        ...value,
-        ...(sync.action === "clear" ? { username: undefined, usernameNormalized: undefined } : {}),
-      })
+      await ctx.db.patch(existing._id, value)
       // Re-checked on every sync, not just at signup: a rename in Clerk's own UI arrives here.
       if (username) await enforceUsernameFilter(ctx, existing._id, username)
       await applyStoredRevenueCatState(ctx, existing)

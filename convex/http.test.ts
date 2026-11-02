@@ -83,26 +83,41 @@ describe("Clerk webhook user sync", () => {
     expect(await users(t)).toEqual([])
   })
 
-  it("syncs a signed user event without a username and clears a username Clerk removed", async () => {
+  it("syncs a signed user event without a username and lets Clerk decide whether to clear a stored one", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
     const t = makeConvexTest()
-    await fetchSigned(t, { type: "user.created", data: { id: "clerk_named", username: "named" } })
 
     for (const username of [undefined, null, ""]) {
-      for (const id of ["clerk_never_named", "clerk_named"]) {
+      const named = `clerk_named_${String(username)}`
+      await fetchSigned(t, {
+        type: "user.created",
+        data: { id: named, username: `named-${username}` },
+      })
+      for (const id of [`clerk_never_named_${String(username)}`, named]) {
         const response = await fetchSigned(t, {
           type: "user.updated",
           data: { id, username, first_name: "Nameless" },
         })
         expect(response.status).toBe(200)
       }
-    }
-    const rows = await users(t)
-    expect(rows).toHaveLength(2)
-    for (const row of rows) {
-      expect(row).toMatchObject({ displayName: "Nameless" })
-      expect(row).not.toHaveProperty("username")
-      expect(row).not.toHaveProperty("usernameNormalized")
+      const rows = await users(t)
+      const neverNamed = rows.find(
+        (row) => row.clerkUserId === `clerk_never_named_${String(username)}`,
+      )
+      expect(neverNamed).toMatchObject({ displayName: "Nameless" })
+      expect(neverNamed).not.toHaveProperty("username")
+      // why: an older event can arrive after a rename, so the stored name stays until Clerk's current profile says otherwise.
+      expect(rows.find((row) => row.clerkUserId === named)).toMatchObject({
+        displayName: "Nameless",
+        username: `named-${username}`,
+      })
+      const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())
+      expect(
+        scheduled.some(
+          (job) =>
+            job.name.includes("refreshUsernameFromClerk") && job.args[0]?.clerkUserId === named,
+        ),
+      ).toBe(true)
     }
   })
 
