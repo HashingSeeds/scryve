@@ -8,7 +8,7 @@ const palette = {
   neutral500: "#978F8A",
   neutral400: "#564E4A",
   neutral300: "#3C3836",
-  neutral200: "#191015",
+  neutral200: "#1C1C1C",
   neutral100: "#000000",
 
   primary600: "#F4E0D9",
@@ -51,7 +51,7 @@ export const colors = {
   error: palette.angry500,
   errorBackground: palette.angry100,
   surface: palette.neutral100,
-  field: "#1C1C1C",
+  field: palette.neutral200,
   surfaceRaised: palette.neutral300,
   overlay: palette.overlay50,
   shadow: palette.neutral100,

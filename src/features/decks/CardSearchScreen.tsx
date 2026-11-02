@@ -924,7 +924,11 @@ export function CardSearch({
           )}
         >
           <Text preset="subheading" tx="decks:filters.label" />
-          <ScrollView contentContainerStyle={$filterBody} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={themed($filterScroll)}
+            contentContainerStyle={themed($filterBody)}
+            keyboardShouldPersistTaps="handled"
+          >
             <FilterGroup heading={translate("decks:cardSearch.colors")}>
               {SEARCH_COLORS.map((color) => (
                 <FilterPill
@@ -1096,7 +1100,12 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 
 const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
 const $queryField: ViewStyle = { flex: 1 }
-const $filterBody: ViewStyle = { gap: 16 }
+// why: without bleeding into the dialog padding, the iOS scroll indicator covers full-width rows.
+const $filterScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginHorizontal: -spacing.lg })
+const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.md,
+  paddingHorizontal: spacing.lg,
+})
 const $filterSection: ViewStyle = { gap: 8 }
 
 const $searchHeader: ViewStyle = { paddingBottom: 4 }
