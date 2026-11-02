@@ -6,10 +6,13 @@ const GITHUB_API = "https://api.github.com"
 /** why: main and production use staging or prod, so a preview for them came from a build that raced a newer merge. */
 const PERMANENT_BRANCHES = new Set(["main", "production"])
 
-function isStale({ branch, branchExists, prStates }) {
+/** why: a branch that was never pushed looks deleted, so without a grace period any merge's sweep kills its preview mid-test. */
+const UNPUSHED_GRACE_MS = 24 * 60 * 60 * 1000
+
+function isStale({ branch, branchExists, prStates, idleMs }) {
   if (PERMANENT_BRANCHES.has(branch)) return true
-  if (!branchExists) return true
-  return prStates.length > 0 && !prStates.includes("open")
+  if (prStates.length > 0) return !branchExists || !prStates.includes("open")
+  return !branchExists && idleMs > UNPUSHED_GRACE_MS
 }
 
 function branchForPreview(identifier, branches) {
@@ -58,7 +61,14 @@ async function main() {
   const previews = await listing.json()
   const branches = await listBranches(repo, githubToken)
 
-  for (const { name, deploymentType, projectId: owningProject, previewIdentifier } of previews) {
+  for (const {
+    name,
+    deploymentType,
+    projectId: owningProject,
+    previewIdentifier,
+    createTime,
+    lastDeployTime,
+  } of previews) {
     /** why: the token can delete prod and staging too, so never trust the listing filter alone. */
     if (deploymentType !== "preview" || String(owningProject) !== projectId || !previewIdentifier)
       continue
@@ -77,6 +87,7 @@ async function main() {
       branch,
       branchExists: branchResponse.status !== 404,
       prStates: prs.map((pr) => pr.state),
+      idleMs: Date.now() - (lastDeployTime ?? createTime),
     })
     if (!stale) {
       console.log(`keep   ${name} (${branch})`)
@@ -95,4 +106,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { branchForPreview, isStale }
+module.exports = { branchForPreview, isStale, UNPUSHED_GRACE_MS }
