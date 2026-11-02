@@ -1,3 +1,4 @@
+/** why: ids are stored in games and sent to installed clients, so a redrawn mark keeps its id. "heart" draws a leaf and "triangle" a rosette; builds from before the redraw still draw a heart and a triangle. */
 export const CONNECTED_PLAYER_MARK_SHAPES = [
   "heart",
   "triangle",

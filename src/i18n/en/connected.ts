@@ -152,8 +152,10 @@ const connected = {
     opensPro: "Opens Scryve Pro",
     pro: "Pro",
     shapes: {
-      heart: "heart",
-      triangle: "triangle",
+      // A plant leaf, the player mark's shape.
+      heart: "leaf",
+      // A scalloped round badge, like a prize ribbon's seal.
+      triangle: "rosette",
       square: "square",
       diamond: "diamond",
       star: "star",

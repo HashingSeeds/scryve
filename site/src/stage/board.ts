@@ -306,11 +306,14 @@ function phoneRows(game: DemoGame) {
 // onto opponents, and taps Done. Afterwards each seat that took damage shows its CommanderStrip,
 // a mini map of the board with one cell per player at that player's seat position.
 
-// The app's mark shapes (src/components/PlayerMark.tsx), drawn on a 44 unit box.
+const SITE_LEAF =
+  "M22 7.5C29.5 12 33.5 18.5 32.8 25.2 32.2 30.6 27.8 33.6 22 33.6 16.2 33.6 11.8 30.6 11.2 25.2 10.5 18.5 14.5 12 22 7.5ZM21.1 33h1.8v3.5a.9.9 0 0 1-1.8 0Z"
+
+// The app's mark shapes (src/components/PlayerMark.tsx), drawn on a 44 unit box. "heart" draws a leaf and "triangle" a rosette, as in the app.
 const APP_MARK_SHAPES: Record<SiteMarkShape, string> = {
   circle: '<circle cx="22" cy="22" r="12"/>',
   triangle:
-    '<path d="M19.83 9.82a2.5 2.5 0 0 1 4.34 0l11.91 20.94a2.5 2.5 0 0 1-2.18 3.74H10.1a2.5 2.5 0 0 1-2.18-3.74Z"/>',
+    '<path d="M25.4 11.54A3.7 3.7 0 0 1 30.9 15.53 3.7 3.7 0 0 1 33 22 3.7 3.7 0 0 1 30.9 28.47 3.7 3.7 0 0 1 25.4 32.46 3.7 3.7 0 0 1 18.6 32.46 3.7 3.7 0 0 1 13.1 28.47 3.7 3.7 0 0 1 11 22 3.7 3.7 0 0 1 13.1 15.53 3.7 3.7 0 0 1 18.6 11.54 3.7 3.7 0 0 1 25.4 11.54Z"/>',
   square: '<rect x="11" y="11" width="22" height="22" rx="3"/>',
   diamond:
     '<path d="M20.23 9.77a2.5 2.5 0 0 1 3.54 0l10.46 10.46a2.5 2.5 0 0 1 0 3.54L23.77 34.23a2.5 2.5 0 0 1-3.54 0L9.77 23.77a2.5 2.5 0 0 1 0-3.54Z"/>',
@@ -320,8 +323,12 @@ const APP_MARK_SHAPES: Record<SiteMarkShape, string> = {
   plus: '<path d="M17 10.5A2.5 2.5 0 0 1 19.5 8h5a2.5 2.5 0 0 1 2.5 2.5V16a1 1 0 0 0 1 1h5.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5H28a1 1 0 0 0-1 1v5.5a2.5 2.5 0 0 1-2.5 2.5h-5a2.5 2.5 0 0 1-2.5-2.5V28a1 1 0 0 0-1-1h-5.5A2.5 2.5 0 0 1 8 24.5v-5a2.5 2.5 0 0 1 2.5-2.5H16a1 1 0 0 0 1-1Z"/>',
   shield:
     '<path d="M21.04 8.4a2.5 2.5 0 0 1 1.92 0l9.5 3.96A2.5 2.5 0 0 1 34 14.67V23c0 6-5 10-12 14-7-4-12-8-12-14v-8.33a2.5 2.5 0 0 1 1.54-2.31Z"/>',
-  heart:
-    '<path d="M22 34.84 19.97 32.99C12.76 26.45 8 22.14 8 16.85 8 12.54 11.39 9.15 15.7 9.15c2.44 0 4.77 1.13 6.3 2.93 1.53-1.8 3.86-2.93 6.3-2.93 4.31 0 7.7 3.39 7.7 7.7 0 5.29-4.76 9.6-11.97 16.14Z"/>',
+  heart: `<path fill-rule="evenodd" d="${SITE_LEAF}M21.2 13.5h1.6v18.5h-1.6Z"/>`,
+}
+
+// The sword covers the leaf's rib, as the app's solid marks do.
+const SWORD_MARK_SHAPES: Partial<Record<SiteMarkShape, string>> = {
+  heart: `<path d="${SITE_LEAF}"/>`,
 }
 
 // Each shape's drawn edges on its 44 unit box (PlayerMark's MARK_ART_BOUNDS).
@@ -330,14 +337,14 @@ const MARK_ART_BOUNDS: Record<
   { top: number; bottom: number; left: number; right: number }
 > = {
   circle: { top: 10, bottom: 34, left: 10, right: 34 },
-  triangle: { top: 8.56, bottom: 34.5, left: 7.59, right: 36.41 },
+  triangle: { top: 9.3, bottom: 34.7, left: 9.74, right: 34.26 },
   square: { top: 11, bottom: 33, left: 11, right: 33 },
   diamond: { top: 9.04, bottom: 34.96, left: 9.04, right: 34.96 },
   star: { top: 8.43, bottom: 35.06, left: 8.08, right: 35.92 },
   hexagon: { top: 8.39, bottom: 35.61, left: 9.88, right: 34.12 },
   plus: { top: 8, bottom: 36, left: 8, right: 36 },
   shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
-  heart: { top: 9.15, bottom: 34.84, left: 8, right: 36 },
+  heart: { top: 7.5, bottom: 37.4, left: 11.12, right: 32.88 },
 }
 
 // A mark cropped to its drawn edges, so the shape itself, not its box, lines up with what sits
@@ -355,11 +362,11 @@ const SWORD_INSETS: Record<SiteMarkShape, { centerY: number; size: number }> = {
   square: { centerY: 22, size: 15 },
   diamond: { centerY: 22, size: 14 },
   hexagon: { centerY: 22, size: 16 },
-  triangle: { centerY: 25, size: 14 },
+  triangle: { centerY: 22, size: 15 },
   star: { centerY: 23, size: 12 },
   plus: { centerY: 22, size: 12 },
   shield: { centerY: 21.5, size: 15 },
-  heart: { centerY: 22.5, size: 13 },
+  heart: { centerY: 21.5, size: 14 },
 }
 
 // The sword glyph from src/components/Sword.tsx, on a 24 unit box.
@@ -372,7 +379,8 @@ function appMarkSvg(shape: SiteMarkShape, color: string, sword?: string): string
   const inset = sword
     ? `<g fill="${sword}" transform="translate(${22 - size / 2} ${centerY - size / 2}) scale(${size / 24})">${SWORD_PATHS}</g>`
     : ""
-  return `<svg viewBox="0 0 44 44" aria-hidden="true"><g fill="${color}">${APP_MARK_SHAPES[shape]}</g>${inset}</svg>`
+  const art = (sword && SWORD_MARK_SHAPES[shape]) || APP_MARK_SHAPES[shape]
+  return `<svg viewBox="0 0 44 44" aria-hidden="true"><g fill="${color}">${art}</g>${inset}</svg>`
 }
 
 // The board's seats row by row, empty cells dropped (the app's strip centers each row).

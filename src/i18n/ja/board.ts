@@ -212,8 +212,8 @@ export default {
     addGames_other: "{{count}}件のゲームを追加",
   },
   shape: {
-    heart: "ハート",
-    triangle: "三角",
+    heart: "葉",
+    triangle: "ロゼット",
     square: "四角",
     diamond: "ひし形",
     star: "星",

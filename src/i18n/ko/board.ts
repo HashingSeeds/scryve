@@ -211,8 +211,8 @@ export default {
     addGames_other: "게임 {{count}}개 추가",
   },
   shape: {
-    heart: "하트",
-    triangle: "삼각형",
+    heart: "나뭇잎",
+    triangle: "로제트",
     square: "사각형",
     diamond: "마름모",
     star: "별",
