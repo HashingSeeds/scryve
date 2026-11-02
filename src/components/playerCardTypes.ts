@@ -94,9 +94,9 @@ export function cornerStep(
 // why: Reanimated reads the system setting only at startup, so the live preference gates this instead.
 const CORNER_SLIDE = LinearTransition.duration(220).reduceMotion(ReduceMotion.Never)
 
-/** why: corner chrome slides back when the first-player tabs leave instead of jumping. */
+/** why: corner chrome slides back when the first-player tabs leave instead of jumping. Web layout transitions animate a size change by scaling the row, which stretches the name whenever a chip comes or goes, so web moves it at once. */
 export function useCornerSlide() {
-  return useReducedMotion() === false ? CORNER_SLIDE : undefined
+  return useReducedMotion() === false && Platform.OS !== "web" ? CORNER_SLIDE : undefined
 }
 
 export const LIFE_GLYPH_LINE_HEIGHT = 50

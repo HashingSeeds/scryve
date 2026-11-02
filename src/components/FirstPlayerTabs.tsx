@@ -38,19 +38,19 @@ const TAB_SLIDE_MS = 200
 
 /** why: a tab slides out of its edge when it appears and back into it when it goes, while the marks beside it slide into the room it leaves. Reanimated reads the system setting only at startup, so the live preference gates these instead. */
 function edgeSlides(edge: BoardEdge) {
-  const tucked = {
+  const tuckedBy = (share: number) => ({
     transform: [
-      { translateX: edge === "left" ? -TAB_DEPTH : edge === "right" ? TAB_DEPTH : 0 },
-      { translateY: edge === "top" ? -TAB_DEPTH : edge === "bottom" ? TAB_DEPTH : 0 },
+      { translateX: (edge === "left" ? -TAB_DEPTH : edge === "right" ? TAB_DEPTH : 0) * share },
+      { translateY: (edge === "top" ? -TAB_DEPTH : edge === "bottom" ? TAB_DEPTH : 0) * share },
     ],
-  }
-  const out = { transform: [{ translateX: 0 }, { translateY: 0 }] }
+  })
   return {
-    entering: new Keyframe({ 0: tucked, 100: { ...out, easing: Easing.out(Easing.quad) } })
+    // why: web keyframes only take named ease-in curves, so the ease-out is drawn as a midpoint: an ease-out quad has three quarters of the way behind it halfway through.
+    entering: new Keyframe({ 0: tuckedBy(1), 50: tuckedBy(0.25), 100: tuckedBy(0) })
       .delay(TAB_ENTER_DELAY_MS)
       .duration(TAB_SLIDE_MS)
       .reduceMotion(ReduceMotion.Never),
-    exiting: new Keyframe({ 0: out, 100: { ...tucked, easing: Easing.in(Easing.quad) } })
+    exiting: new Keyframe({ 0: tuckedBy(0), 100: { ...tuckedBy(1), easing: Easing.quad } })
       .duration(TAB_SLIDE_MS)
       .reduceMotion(ReduceMotion.Never),
   }
