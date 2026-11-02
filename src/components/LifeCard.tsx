@@ -653,7 +653,7 @@ export const LifeCard = memo(function LifeCard({
           takeover={floodedBy.takeover}
           wave={floodedBy.wave}
           cardSize={cardSize}
-          floodColor={floodedBy.attacker?.color ? ATTACK_SHADE : foreground}
+          floodColor={ATTACK_SHADE}
           defenderColor={color}
         />
       ) : null}
