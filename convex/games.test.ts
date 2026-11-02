@@ -3577,6 +3577,35 @@ describe("games where anyone edits any seat", () => {
         }),
       ),
     ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+    await expect(
+      stranger.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(
+          game.publicId,
+          game.joinerPlayerId,
+          game.hostPlayerId,
+          "claim-stranger-01",
+          2,
+        ),
+      ),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+  })
+
+  it("stops a player who left the game from editing other seats", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, undefined, everyone)
+    await game.joiner.mutation(api.games.leaveMyGame, { publicId: game.publicId })
+    await expect(
+      game.joiner.mutation(
+        api.games.tableAction,
+        tableArgs(game.publicId, "table-leaver-000001", {
+          kind: "counter.changed",
+          playerId: game.hostPlayerId,
+          counterId: "poison",
+          delta: 1,
+        }),
+      ),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
   })
 
   it("plays owner-only when any seat's app is too old, and says whose", async () => {
@@ -3603,6 +3632,15 @@ describe("games where anyone edits any seat", () => {
     await expect(
       host.query(api.games.lobbyProjection, { publicId: created.publicId }),
     ).resolves.toMatchObject({ lifeEditing: "anyone" })
+  })
+
+  it("ignores a support report once the game has started", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, undefined, { host: true, joiner: false })
+    await game.joiner.mutation(api.games.noteAnySeatSupport, { publicId: game.publicId })
+    const projection = await game.host.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(projection.lifeEditing).toBeUndefined()
+    expect(projection.players[1].editsAnySeat).toBeUndefined()
   })
 
   it("keeps editing any seat for a rematch", async () => {

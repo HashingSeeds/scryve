@@ -2333,10 +2333,7 @@ export const noteAnySeatSupport = mutation({
       .take(MAX_PLAYERS_PER_GAME_READ)
     const behind = seats.filter(
       (seat) =>
-        !seat.editsAnySeat &&
-        (seat.deviceId === undefined ||
-          args.deviceId === undefined ||
-          seat.deviceId === args.deviceId),
+        !seat.editsAnySeat && (seat.deviceId === undefined || seat.deviceId === args.deviceId),
     )
     if (behind.length === 0) return
     await limitGameRate(ctx, "gameWrite", user._id)
