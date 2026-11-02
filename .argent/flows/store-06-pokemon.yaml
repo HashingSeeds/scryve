@@ -1,0 +1,94 @@
+steps:
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - echo: Switch the fresh game to game-type-pokemon-standard through Game setup
+  - tap: { id: game-menu-button }
+  - tap: { id: setup-button }
+  - await: { visible: { id: game-tab-pokemon } }
+  - tap: { id: game-tab-pokemon }
+  - tap: { id: game-type-pokemon-standard }
+  - echo: Seat count carries over between games; pin it to 2 (the stepper clamps at 2 and 6)
+  - tap: { id: setup-change-button }
+  - await: { visible: { id: player-count-decrement } }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: setup-options-done }
+  - await: { idle: true }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }
+  - await: { visible: { id: pokemon-place-active-seat-2 } }
+  - echo: Mark seat 2 as going first before placing Actives
+  - tap: { id: dice-chip-2-claim }
+  - await: { idle: true }
+  - echo: >-
+      Seat 2 Active is Charizard ex (needs the preview backend). Queries skip
+      spaces because the space key sits under the iPad home indicator. Only the top hit shows
+      while the keypad is up.
+  - tap: { id: pokemon-place-active-seat-2 }
+  - echo: The first tap after the flip can land while its overlay closes; retry once if still empty
+  - await: { idle: true }
+  - when: { visible: { id: pokemon-place-active-seat-2 } }
+    steps:
+      - tap: { id: pokemon-place-active-seat-2 }
+  - await: { visible: { id: pokemon-edit-active-seat-2 } }
+  - tap: { id: pokemon-edit-active-seat-2 }
+  - await: { visible: { id: pokemon-key-c-seat-2 } }
+  - tap: { id: pokemon-key-c-seat-2 }
+  - tap: { id: pokemon-key-h-seat-2 }
+  - tap: { id: pokemon-key-a-seat-2 }
+  - tap: { id: pokemon-key-r-seat-2 }
+  - tap: { id: pokemon-key-i-seat-2 }
+  - tap: { id: pokemon-key-z-seat-2 }
+  - tap: { id: pokemon-key-a-seat-2 }
+  - tap: { id: pokemon-key-r-seat-2 }
+  - tap: { id: pokemon-key-d-seat-2 }
+  - echo: The store account plays a Charizard ex deck, so its own card is the top hit
+  - await: { visible: { text: Charizard ex }, timeout: 15000 }
+  - tap: { text: Charizard ex }
+  - await: { visible: { id: pokemon-damage-seat-2-10 } }
+  - echo: >-
+      Seat 1 Active is Pikachu. Its upside-down sheet is short, so hide the keypad and take the
+      first hit, which is on screen on every device.
+  - tap: { id: pokemon-place-active-seat-1 }
+  - tap: { id: pokemon-edit-active-seat-1 }
+  - await: { visible: { id: pokemon-key-p-seat-1 } }
+  - tap: { id: pokemon-key-p-seat-1 }
+  - tap: { id: pokemon-key-i-seat-1 }
+  - tap: { id: pokemon-key-k-seat-1 }
+  - tap: { id: pokemon-key-a-seat-1 }
+  - tap: { id: pokemon-key-c-seat-1 }
+  - tap: { id: pokemon-key-h-seat-1 }
+  - tap: { id: pokemon-key-u-seat-1 }
+  - await: { idle: true }
+  - tap: { id: pokemon-key-hide-keypad-seat-1 }
+  - echo: The hide tap can land mid-layout on Android; retry once if the keypad is still up
+  - await: { idle: true }
+  - when: { visible: { id: pokemon-key-hide-keypad-seat-1 } }
+    steps:
+      - tap: { id: pokemon-key-hide-keypad-seat-1 }
+  - await: { visible: { id: pokemon-result-fut2020-1 }, timeout: 15000 }
+  - tap: { id: pokemon-result-fut2020-1 }
+  - await: { visible: { id: pokemon-damage-seat-1-10 } }
+  - await: { idle: true }
+  - echo: >-
+      Damage zones ignore id taps, so these are points. Seat 1 is upside down; its
+      add-damage half is the right side of the top card. Seat 2 adds damage on its left half.
+  - echo: Aim at the HP row; on Pixel the name and Edit row sits at y 0.25
+  - wait: 1000
+  - tap: { x: 0.85, y: 0.31 }
+  - wait: 250
+  - tap: { x: 0.85, y: 0.31 }
+  - wait: 250
+  - tap: { x: 0.85, y: 0.31 }
+  - wait: 250
+  - tap: { x: 0.15, y: 0.72 }
+  - tap: { x: 0.15, y: 0.72 }
+  - tap: { x: 0.15, y: 0.72 }
+  - tap: { x: 0.15, y: 0.72 }
+  - tap: { x: 0.15, y: 0.72 }
+  - tap: { x: 0.15, y: 0.72 }
+  - wait: 2500
+  - await: { idle: true }

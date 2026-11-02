@@ -1,0 +1,73 @@
+steps:
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - echo: Switch the fresh game to game-type-commander through Game setup
+  - tap: { id: game-menu-button }
+  - tap: { id: setup-button }
+  - await: { visible: { id: game-tab-mtg } }
+  - tap: { id: game-tab-mtg }
+  - tap: { id: game-type-commander }
+  - echo: Seat count carries over between games; pin it to 6 (the stepper clamps at 2 and 6)
+  - tap: { id: setup-change-button }
+  - await: { visible: { id: player-count-increment } }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: setup-options-done }
+  - await: { idle: true }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }
+  - echo: Spread the life totals so the table reads mid-game
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-1--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: life-seat-3--1 }
+  - tap: { id: life-seat-3--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-5--1 }
+  - tap: { id: life-seat-6-1 }
+  - tap: { id: life-seat-6-1 }
+  - tap: { id: life-seat-6-1 }
+  - wait: 2500
+  - await: { idle: true }

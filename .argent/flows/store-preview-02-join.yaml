@@ -1,0 +1,8 @@
+executionPrerequisite: The store account's six seat game is connected and its invite sheet is open.
+steps:
+  - echo: Bots claim the five open seats one at a time while the invite stays up
+  - script: { path: scripts/table-join.mjs, timeout: 120000 }
+  - wait: 600
+  - tap: { text: Close }
+  - await: { idle: true }
+  - wait: 1200

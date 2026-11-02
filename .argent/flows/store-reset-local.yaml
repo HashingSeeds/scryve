@@ -1,0 +1,43 @@
+steps:
+  - echo: >-
+      Fragment run right after launch. Ends any local game that has changes (Abandon deals a
+      fresh game with the same setup) and leaves the board idle with the menu closed.
+  - echo: Reopening an abandoned connected game shows "Lobby closed"; OK returns to the board
+  - wait: 2500
+  - when: { visible: { text: Lobby closed } }
+    steps:
+      - tap: { text: OK }
+      - await: { idle: true }
+      - when: { visible: { id: host-connected-button } }
+        steps:
+          - tap: { text: Back }
+  - echo: Android reopens a connected game that ended elsewhere on its Finished summary
+  - when: { visible: { text: Finished } }
+    steps:
+      - tap: { text: Back }
+      - await: { idle: true }
+  - await: { visible: { id: game-menu-button }, timeout: 30000 }
+  - await: { idle: true }
+  - tap: { id: game-menu-button }
+  - when: { visible: { id: end-game-button } }
+    steps:
+      - tap: { id: end-game-button }
+      - wait: 1000
+      - when: { visible: { id: abandon-game-button } }
+        steps:
+          - tap: { id: abandon-game-button }
+      - echo: A connected game ends through "Who won?", whose Abandon has no id
+      - when: { visible: { text: Abandon } }
+        steps:
+          - tap: { text: Abandon }
+      - await: { idle: true }
+      - echo: Abandoning a connected game opens New game; Back returns to the local board
+      - when: { visible: { id: host-connected-button } }
+        steps:
+          - tap: { text: Back }
+          - await: { idle: true }
+  - when: { visible: { id: connect-button } }
+    steps:
+      - tap: { id: game-menu-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }

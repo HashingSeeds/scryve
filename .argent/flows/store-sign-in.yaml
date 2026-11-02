@@ -1,0 +1,56 @@
+steps:
+  - echo: >-
+      Fragment run on a board. Signs in the store account (goldie/seed.cjs) when signed out, then
+      relaunches. The flow runner cannot match the iOS Clerk sheet's ids, so iOS taps points
+      taken from `argent run describe` on the 6.9" sheet.
+  - tap: { id: game-menu-button }
+  - tap: { id: utility-menu-button }
+  - await: { visible: { id: utility-account-button } }
+  - when: { platform: ios }
+    steps:
+      - when: { visible: { text: Sign in } }
+        steps:
+          - tap: { id: utility-account-button }
+          - wait: 4000
+          - echo: Email field, then Continue
+          - tap: { x: 0.5, y: 0.305 }
+          - wait: 800
+          - tool: keyboard
+            args: { text: "riley+clerk_test@sow.care" }
+          - wait: 800
+          - tap: { x: 0.5, y: 0.385 }
+          - wait: 4000
+          - echo: Password field, then Continue
+          - tap: { x: 0.46, y: 0.29 }
+          - wait: 800
+          - tool: keyboard
+            args: { text: "{{secret:GOLDIE_STORE_PASSWORD}}" }
+          - wait: 800
+          - tap: { x: 0.5, y: 0.36 }
+          - wait: 5000
+  - when: { platform: android }
+    steps:
+      - when: { visible: { text: Sign in } }
+        steps:
+          - tap: { id: utility-account-button }
+          - await: { visible: { text: Enter your email or username }, timeout: 20000 }
+          - type: { into: { text: Enter your email or username }, text: "riley+clerk_test@sow.care", submit: false }
+          - wait: 800
+          - tap: { text: Continue }
+          - await: { visible: { text: Enter your password }, timeout: 20000 }
+          - type: { into: { text: Enter your password }, text: "{{secret:GOLDIE_STORE_PASSWORD}}", submit: false }
+          - wait: 800
+          - tap: { text: Continue }
+          - echo: Clerk asks a new install for an email code; test addresses take 424242
+          - await: { visible: { text: Check your email }, timeout: 20000 }
+          - tap: { x: 0.5, y: 0.406 }
+          - wait: 500
+          - tool: keyboard
+            args: { text: "424242" }
+          - await: { hidden: { text: Check your email }, timeout: 20000 }
+  - launch: com.sowinghope.count.preview
+  - when: { visible: { id: accept-legal-button } }
+    steps:
+      - tap: { id: accept-legal-button }
+  - await: { visible: { id: game-menu-button }, timeout: 30000 }
+  - await: { idle: true }

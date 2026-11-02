@@ -1,0 +1,53 @@
+steps:
+  - echo: >-
+      Abandon any game the store account still hosts on the preview, so the app opens on a local
+      board with Connect in its menu.
+  - script: { path: scripts/table-reset.mjs, timeout: 60000 }
+  - launch: com.sowinghope.count.preview
+  - echo: Reopening an abandoned connected game shows "Lobby closed"; OK returns to the board
+  - wait: 2500
+  - when: { visible: { text: Lobby closed } }
+    steps:
+      - tap: { text: OK }
+      - await: { idle: true }
+      - when: { visible: { id: host-connected-button } }
+        steps:
+          - tap: { text: Back }
+  - echo: A fresh install lands on "What do you play?"; Commander starts a 4 seat game at 40
+  - when: { visible: { id: what-you-play-start } }
+    steps:
+      - await: { idle: true }
+      - tap: { id: game-type-commander }
+      - await: { idle: true }
+      - tap: { id: what-you-play-start }
+  - when: { visible: { id: accept-legal-button } }
+    steps:
+      - tap: { id: accept-legal-button }
+  - await: { visible: { id: game-menu-button }, timeout: 30000 }
+  - await: { idle: true }
+  - run: store-sign-in
+  - run: store-reset-local
+  - echo: Host a 4 seat Commander lobby, then seat bots from the preview by its invite code
+  - tap: { id: game-menu-button }
+  - tap: { id: connect-button }
+  - await: { visible: { id: host-connected-button } }
+  - tap: { id: host-connected-button }
+  - await: { visible: { id: start-connected-game-button }, timeout: 20000 }
+  - script: { path: scripts/table-join.mjs, timeout: 60000 }
+  - await: { visible: { text: 4 of 4 ready }, timeout: 30000 }
+  - tap: { text: Lorehold Spirits }
+  - await: { idle: true }
+  - tap: { id: start-connected-game-button }
+  - await: { visible: { id: connected-game-board }, timeout: 20000 }
+  - await: { idle: true }
+  - echo: Bots take damage on their own phones (29, 34, 22) while riley drops to 33
+  - script: { path: scripts/table-play.mjs, timeout: 60000 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - tap: { id: life-seat-4--1 }
+  - wait: 3000
+  - await: { idle: true }

@@ -1,0 +1,10 @@
+executionPrerequisite: The store account's connected six seat game is on the board with bots seated.
+steps:
+  - echo: Bots change their own life on their phones, and riley's board follows
+  - script: { path: scripts/table-play-live.mjs, timeout: 60000 }
+  - tap: { id: life-seat-6--1 }
+  - wait: 250
+  - tap: { id: life-seat-6--1 }
+  - wait: 250
+  - tap: { id: life-seat-6--1 }
+  - wait: 1500

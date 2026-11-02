@@ -1,0 +1,9 @@
+steps:
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - tap: { id: game-menu-button }
+  - tap: { id: utility-menu-button }
+  - await: { visible: { id: utility-history-button } }
+  - tap: { id: utility-history-button }
+  - await: { visible: { id: history-list }, timeout: 20000 }
+  - await: { idle: true }

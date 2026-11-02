@@ -1,0 +1,24 @@
+steps:
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - echo: Arm Player 1's commander at power 6, then tap each opponent to deal it
+  - tap: { id: commander-mark-seat-1 }
+  - await: { visible: { id: commander-power-up-seat-1 } }
+  - tap: { id: commander-power-up-seat-1 }
+  - tap: { id: commander-power-up-seat-1 }
+  - tap: { id: commander-power-up-seat-1 }
+  - tap: { id: commander-power-up-seat-1 }
+  - tap: { id: commander-power-up-seat-1 }
+  - tap: { id: commander-hit-seat-3 }
+  - wait: 400
+  - tap: { id: commander-hit-seat-3 }
+  - wait: 400
+  - tap: { id: commander-hit-seat-3 }
+  - wait: 400
+  - tap: { id: commander-hit-seat-2 }
+  - wait: 400
+  - tap: { id: commander-hit-seat-4 }
+  - wait: 400
+  - tap: { id: commander-hit-seat-4 }
+  - wait: 1500
+  - await: { idle: true }

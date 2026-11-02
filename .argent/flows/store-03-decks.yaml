@@ -1,0 +1,11 @@
+steps:
+  - script: { path: scripts/table-reset.mjs, timeout: 60000 }
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - echo: Decks seeded by goldie/seed.cjs, each with a record from published local games
+  - tap: { id: game-menu-button }
+  - tap: { id: utility-menu-button }
+  - await: { visible: { id: utility-decks-button } }
+  - tap: { id: utility-decks-button }
+  - await: { visible: { text: Ur-Dragon }, timeout: 20000 }
+  - await: { idle: true }

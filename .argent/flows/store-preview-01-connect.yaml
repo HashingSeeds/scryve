@@ -1,0 +1,18 @@
+executionPrerequisite: >-
+  goldie restarted the app after the screenshots, so it reopens on the six seat Commander game
+  that store-07-six-players left on the board, signed in as the store account.
+steps:
+  - await: { visible: { id: life-card-seat-6 }, timeout: 30000 }
+  - await: { idle: true }
+  - wait: 900
+  - tap: { id: game-menu-button }
+  - wait: 500
+  - tap: { id: setup-button }
+  - await: { visible: { id: connect-local-button } }
+  - wait: 700
+  - tap: { id: connect-local-button }
+  - await: { visible: { text: Player 1 } }
+  - wait: 600
+  - tap: { text: Player 1 }
+  - await: { visible: { text: Invite players }, timeout: 20000 }
+  - wait: 1200

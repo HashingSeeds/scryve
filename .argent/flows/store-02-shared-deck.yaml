@@ -1,0 +1,17 @@
+steps:
+  - echo: A friend's deck opened from its share link; goldie/seed.cjs shares it from mara and writes the link fragment
+  - launch: com.sowinghope.count.preview
+  - run: store-reset-local
+  - run: store-shared-deck-link
+  - wait: 2500
+  - echo: iOS may ask "Open in Scryve (Preview)?"; flow taps can't reach system UI, so gesture-tap hits Open
+  - when: { platform: ios }
+    steps:
+      - when: { hidden: { id: shared-deck-name } }
+        steps:
+          - tool: gesture-tap
+            args: { x: 0.668, y: 0.539 }
+  - await: { visible: { id: shared-deck-name }, timeout: 30000 }
+  - await: { visible: { id: shared-deck-play }, timeout: 20000 }
+  - wait: 2500
+  - await: { idle: true }
