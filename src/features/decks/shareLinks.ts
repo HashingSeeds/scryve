@@ -11,7 +11,12 @@ export function shareUrl(origin: string, token: string) {
   return normalized && isShareToken(token) ? `${normalized}/deck/${token}` : undefined
 }
 
+// why: invite links already open by the app's own scheme, which works where web links aren't verified yet.
+const APP_SCHEME_DECK_LINK = /^(?:scryve|count)(?:-dev|-preview)?:\/\/\/?deck\/([A-Za-z0-9_-]{43})$/
+
 export function sharedDeckToken(link: string, trustedOrigin: string | undefined) {
+  const schemeToken = APP_SCHEME_DECK_LINK.exec(link)?.[1]
+  if (schemeToken) return schemeToken
   const origin = normalizeHttpsOrigin(trustedOrigin)
   if (!origin) return undefined
   try {

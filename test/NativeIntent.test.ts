@@ -34,6 +34,12 @@ describe("connected invite native intent", () => {
     expect(redirectSystemPath({ path: "https://count.example/deck/short", initial: true })).toBe(
       "/",
     )
+    expect(redirectSystemPath({ path: `scryve-preview:///deck/${token}`, initial: false })).toBe(
+      `/deck/${token}`,
+    )
+    expect(redirectSystemPath({ path: `scryve://deck/${token}`, initial: true })).toBe(
+      `/deck/${token}`,
+    )
   })
   it("fails closed for malformed initial URLs", () =>
     expect(redirectSystemPath({ path: "%%%", initial: true })).toBe("/"))
