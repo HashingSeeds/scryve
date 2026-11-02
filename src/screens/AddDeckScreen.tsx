@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
   type ReactElement,
@@ -11,7 +12,7 @@ import {
 } from "react"
 import type { ViewStyle } from "react-native"
 import { Keyboard, Linking, TouchableOpacity, View } from "react-native"
-import { useAction, usePaginatedQuery, useQuery } from "convex/react"
+import { useAction, useQueries, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -201,14 +202,12 @@ type PreconstructedDeckOutline = {
   cards: PreviewCard[]
 }
 
-type CatalogDeck = FunctionReturnType<typeof api.deckCatalogs.list>["page"][number]
+type CatalogDeck = FunctionReturnType<typeof api.deckCatalogs.list>[number]
 
 type FeedCheck =
   | FunctionReturnType<typeof api.deckCatalogs.ensureFresh>
   | { status: "checking" }
   | { status: "failed"; error: string }
-
-const CATALOG_PAGE_SIZE = 30
 
 // why: MTGJSON names deck files `<Name>_<SET>`, so the set code survives without a column for it.
 function catalogPrecon(deck: CatalogDeck): PreconstructedDeck {
@@ -382,13 +381,37 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     pastedDraft.format === format
   const [preconQuery, setPreconQuery] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
-  const catalog = usePaginatedQuery(
-    api.deckCatalogs.list,
-    mode === "precon" ? { game, format, query: searchTerm } : "skip",
-    { initialNumItems: CATALOG_PAGE_SIZE },
+  const browseKey = `${game}:${format}`
+  const [browsedFormats, setBrowsedFormats] = useState<
+    Record<string, { game: string; format: string }>
+  >({})
+  // why: Convex drops a result once nothing subscribes to it, so formats seen on this visit stay subscribed and switching back renders at once.
+  const catalogQueries = useMemo(
+    () =>
+      mode === "precon"
+        ? {
+            ...Object.fromEntries(
+              Object.entries(browsedFormats).map(([key, args]) => [
+                key,
+                { query: api.deckCatalogs.list, args: { ...args, query: "" } },
+              ]),
+            ),
+            current: { query: api.deckCatalogs.list, args: { game, format, query: searchTerm } },
+          }
+        : {},
+    [browsedFormats, format, game, mode, searchTerm],
   )
+  const catalogResult: CatalogDeck[] | Error | undefined = useQueries(catalogQueries).current
+  const catalogError = catalogResult instanceof Error ? catalogResult : undefined
+  const catalogDecks = catalogResult instanceof Error ? [] : (catalogResult ?? [])
+  useEffect(() => {
+    if (mode === "precon")
+      setBrowsedFormats((browsed) =>
+        browseKey in browsed ? browsed : { ...browsed, [browseKey]: { game, format } },
+      )
+  }, [browseKey, format, game, mode])
   const [feedChecks, setFeedChecks] = useState<Record<string, FeedCheck>>({})
-  const feed: FeedCheck | undefined = feedChecks[`${game}:${format}`]
+  const feed: FeedCheck | undefined = feedChecks[browseKey]
   const [selectedCatalogDeck, setSelectedCatalogDeck] = useState<CatalogDeck>()
   const [selectedPrecon, setSelectedPrecon] = useState<PreconstructedDeck>()
   const [preconOutline, setPreconOutline] = useState<PreconstructedDeckOutline>()
@@ -405,13 +428,14 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
   const [error, setError] = useState<string>()
   const online = useConvexOnline()
   const waitingForDecks =
-    catalog.status === "LoadingFirstPage" ||
-    (catalog.results.length === 0 && (!feed || feed.status === "checking"))
+    catalogResult === undefined ||
+    (catalogDecks.length === 0 && (!feed || feed.status === "checking"))
   const browseOffline = !online && waitingForDecks
   const browseEmpty =
     mode === "precon" &&
     !waitingForDecks &&
-    catalog.results.length === 0 &&
+    !catalogError &&
+    catalogDecks.length === 0 &&
     feed?.status !== "failed"
   const [previewError, setPreviewError] = useState<string>()
   const [previewRetryAfterMs, setPreviewRetryAfterMs] = useState<number>()
@@ -1125,7 +1149,11 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
               <AlertNote tone="info" text={translate("decks:addDeck.browseOffline")} />
             ) : waitingForDecks ? (
               <Text size="xs" tone="dim" tx="decks:deckLimit.loading" />
-            ) : feed?.status === "failed" && catalog.results.length === 0 ? (
+            ) : catalogError ? (
+              <AlertNote
+                text={convexErrorMessage(catalogError, translate("decks:addDeck.loadDecksFailed"))}
+              />
+            ) : feed?.status === "failed" && catalogDecks.length === 0 ? (
               <View style={themed($inlineStatus)}>
                 <AlertNote text={feed.error} />
                 <TextAction tx="common:retry" onPress={() => void checkFeed(game, format)} />
@@ -1151,7 +1179,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
                 />
               </View>
             ) : null}
-            {catalog.results.map((deck) => {
+            {catalogDecks.map((deck) => {
               const open = () =>
                 deck.source === PRECON_SOURCE
                   ? openPrecon(catalogPrecon(deck))
@@ -1187,13 +1215,6 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
                 </TouchableOpacity>
               )
             })}
-            {catalog.status === "CanLoadMore" || catalog.status === "LoadingMore" ? (
-              <Button
-                tx="decks:addDeck.loadMore"
-                disabled={catalog.status === "LoadingMore"}
-                onPress={() => catalog.loadMore(CATALOG_PAGE_SIZE)}
-              />
-            ) : null}
           </View>
         ) : null}
 

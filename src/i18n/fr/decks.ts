@@ -675,7 +675,6 @@ export default {
       "Impossible d’actualiser les decks. Les résultats enregistrés restent disponibles.",
     checkAgain: "Vérifier à nouveau",
     open: "Ouvrir",
-    loadMore: "Charger plus",
     startingPoint: "Point de départ",
     importSource: "Source d’import",
     pasteText: "Coller du texte",

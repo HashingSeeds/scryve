@@ -637,7 +637,6 @@ export default {
     refreshFailed: "デッキを更新できませんでした。保存済みの結果は引き続き利用できます。",
     checkAgain: "再確認",
     open: "開く",
-    loadMore: "さらに読み込む",
     startingPoint: "開始時の状態",
     importSource: "インポート元",
     pasteText: "テキストを貼り付け",

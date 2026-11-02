@@ -723,9 +723,8 @@ describe("Browse list", () => {
           game: game.id,
           format: format.id,
           query: "",
-          paginationOpts: { numItems: 30, cursor: null },
         })
-        expect(listed.page.map((deck) => deck.name)).toEqual([`Stored ${format.id}`])
+        expect(listed.map((deck) => deck.name)).toEqual([`Stored ${format.id}`])
       }
     },
   )
@@ -758,14 +757,12 @@ describe("Browse list", () => {
         ],
       })
       await t.finishAllScheduledFunctions(() => jest.runAllTimers())
-      const page = { numItems: 30, cursor: null }
       const commander = await t.query(api.deckCatalogs.list, {
         game: "mtg",
         format: "commander",
         query: "",
-        paginationOpts: page,
       })
-      expect(commander.page.map((deck) => [deck.name, deck.kind])).toEqual([
+      expect(commander.map((deck) => [deck.name, deck.kind])).toEqual([
         ["New Commander", "official"],
         ["Old Commander", "official"],
       ])
@@ -773,9 +770,8 @@ describe("Browse list", () => {
         game: "mtg",
         format: "constructed",
         query: "theme",
-        paginationOpts: page,
       })
-      expect(searched.page.map((deck) => deck.externalId)).toEqual(["Theme_M10"])
+      expect(searched.map((deck) => deck.externalId)).toEqual(["Theme_M10"])
       const legacy = await t.action(api.deckCatalogs.browse, {
         game: "mtg",
         format: "commander",
@@ -810,9 +806,8 @@ describe("Browse list", () => {
         game: "mtg",
         format: "commander",
         query: "atraxa",
-        paginationOpts: { numItems: 30, cursor: null },
       })
-      expect(listed.page.map((deck) => deck.externalId)).toEqual(["AtraxaInfect"])
+      expect(listed.map((deck) => deck.externalId)).toEqual(["AtraxaInfect"])
       expect(fetchSpy).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()

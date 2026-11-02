@@ -35,6 +35,7 @@ import { SYSTEMS } from "./lib/systems"
 
 const FEED_TTL_MS = 24 * 60 * 60 * 1000
 export const KEPT_FEED_DECKS = 50
+const BROWSE_LIMIT = 100
 const PRUNE_BATCH = 20
 
 function deckFeed(game: string) {
@@ -116,19 +117,14 @@ async function searchRows(
 }
 
 export const list = query({
-  args: {
-    game: v.string(),
-    format: v.string(),
-    query: v.string(),
-    paginationOpts: paginationOptsValidator,
-  },
+  args: { game: v.string(), format: v.string(), query: v.string() },
   handler: async (ctx, args) => {
     const game = assertGameSystem(args.game)
     await requireReleasedCapability(ctx, game, "exampleDecks")
     const format = assertDeckGameFormat(game, args.format)
     const term = args.query.trim()
-    if (term.length > 120) return { page: [], isDone: true, continueCursor: "" }
-    return await catalogQuery(ctx, { game, format, query: term }).paginate(args.paginationOpts)
+    if (term.length > 120) return []
+    return await catalogQuery(ctx, { game, format, query: term }).take(BROWSE_LIMIT)
   },
 })
 

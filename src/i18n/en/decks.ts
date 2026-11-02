@@ -708,7 +708,6 @@ const decks = {
     refreshFailed: "Could not refresh decks. Saved results remain available.",
     checkAgain: "Check again",
     open: "Open",
-    loadMore: "Load more",
     startingPoint: "Starting point",
     importSource: "Import source",
     pasteText: "Paste text",

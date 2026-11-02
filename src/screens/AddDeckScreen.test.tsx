@@ -81,13 +81,9 @@ const mockExplorers: MockCatalogDeck = {
 }
 const defaultCatalogRows = (args: MockCatalogArgs) => (args.game === "mtg" ? [mockExplorers] : [])
 const mockCatalogRows = jest.fn(defaultCatalogRows)
-const mockCatalogStatus = { value: "Exhausted" }
-const mockLoadMore = jest.fn()
-const mockListCatalog = jest.fn((args: MockCatalogArgs) => ({
-  results: mockCatalogRows(args),
-  status: mockCatalogStatus.value,
-  loadMore: mockLoadMore,
-}))
+const mockListCatalog = jest.fn((args: MockCatalogArgs) => mockCatalogRows(args))
+// why: like Convex, a list answers after the render that subscribes to it and is forgotten once unsubscribed.
+const mockCatalogServer = { answered: new Set<string>(), answering: false }
 const defaultFreshness = async (_args: unknown) => ({
   status: "ready",
   retryAfterMs: undefined as number | undefined,
@@ -179,12 +175,27 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => mockConnection,
   useMutation: (reference: string) =>
     reference === "decks.importGuest" ? mockImportGuest : jest.fn(),
-  useQueries: (queries: Record<string, unknown>) =>
-    "capacity" in queries ? { capacity: mockCapacity.value } : {},
-  usePaginatedQuery: (_reference: string, args: MockCatalogArgs | "skip") =>
-    args === "skip"
-      ? { results: [], status: "LoadingFirstPage", loadMore: mockLoadMore }
-      : mockListCatalog(args),
+  useQueries: (queries: Record<string, { query: string; args: MockCatalogArgs }>) => {
+    const { useReducer } = jest.requireActual<typeof import("react")>("react")
+    const [, answer] = useReducer((count: number) => count + 1, 0)
+    if ("capacity" in queries) return { capacity: mockCapacity.value }
+    if (!Object.values(queries).some(({ query }) => query === "deckCatalogs.list")) return {}
+    const subscribed = new Set(Object.values(queries).map(({ args }) => JSON.stringify(args)))
+    for (const token of mockCatalogServer.answered)
+      if (!subscribed.has(token)) mockCatalogServer.answered.delete(token)
+    const pending = [...subscribed].filter((token) => !mockCatalogServer.answered.has(token))
+    if (pending.length && mockCatalogServer.answering)
+      void Promise.resolve().then(() => {
+        for (const token of pending) mockCatalogServer.answered.add(token)
+        answer()
+      })
+    return Object.fromEntries(
+      Object.entries(queries).map(([key, { args }]) => [
+        key,
+        mockCatalogServer.answered.has(JSON.stringify(args)) ? mockListCatalog(args) : undefined,
+      ]),
+    )
+  },
   useQuery: (reference: string) => {
     if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
     if (reference === "integrationManifest.list") return mockManifest.value
@@ -271,7 +282,8 @@ describe("AddDeckScreen", () => {
     mockConnection.isWebSocketConnected = true
     mockCapacity.value = undefined
     mockCatalogRows.mockReset().mockImplementation(defaultCatalogRows)
-    mockCatalogStatus.value = "Exhausted"
+    mockCatalogServer.answered.clear()
+    mockCatalogServer.answering = true
     mockEnsureFresh.mockReset().mockImplementation(defaultFreshness)
   })
 
@@ -1370,37 +1382,35 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("No decks here yet")).toBeTruthy()
   })
 
-  it("keeps deck previews available during refresh limits and loads the next page", async () => {
+  it("keeps deck previews available during refresh limits", async () => {
     mockCatalogRows.mockReturnValue([
       { _id: "cached", game: "ygo", name: "Cached deck", kind: "tournament", format: "advanced" },
     ])
-    mockCatalogStatus.value = "CanLoadMore"
     mockEnsureFresh.mockResolvedValue({ status: "rate_limited", retryAfterMs: 5000 })
     const view = renderAddDeck()
     chooseGame(view, "ygo")
     await act(async () => jest.advanceTimersByTime(400))
     expect(view.getByText("Cached deck")).toBeTruthy()
     expect(view.getByText(/Refresh available in 5 seconds/)).toBeTruthy()
-    fireEvent.press(view.getByText("Load more"))
-    expect(mockLoadMore).toHaveBeenCalledWith(30)
     fireEvent.press(view.getByText("Cached deck"))
     expect(view.getByTestId("import-build")).toBeTruthy()
   })
 
   it("waits for Browse to answer before saying a format has no decks", async () => {
     mockCatalogRows.mockReturnValue([])
-    mockCatalogStatus.value = "LoadingFirstPage"
+    mockCatalogServer.answering = false
     const view = renderAddDeck()
     chooseFormat(view, "commander")
     await act(async () => jest.advanceTimersByTime(400))
     expect(view.getByText("Loading decks…")).toBeTruthy()
     expect(view.queryByText("No decks here yet")).toBeNull()
-    mockCatalogStatus.value = "Exhausted"
+    mockCatalogServer.answering = true
     view.rerender(
       <ThemeProvider initialContext="light">
         <AddDeckInPlace onBack={jest.fn()} onCreated={jest.fn()} />
       </ThemeProvider>,
     )
+    await act(async () => jest.advanceTimersByTime(100))
     expect(view.getByText("No decks here yet")).toBeTruthy()
     expect(captureAnalytics).toHaveBeenCalledWith("deck_browse_empty", {
       system: "mtg",
@@ -1411,7 +1421,7 @@ describe("AddDeckScreen", () => {
 
   it("shows an offline note instead of loading forever and checks decks on reconnect", async () => {
     mockConnection.isWebSocketConnected = false
-    mockCatalogStatus.value = "LoadingFirstPage"
+    mockCatalogServer.answering = false
     const view = renderAddDeck()
     chooseGame(view, "ygo")
     await act(async () => jest.advanceTimersByTime(400))
@@ -1421,16 +1431,33 @@ describe("AddDeckScreen", () => {
     mockCatalogRows.mockReturnValue([
       { _id: "back", game: "ygo", name: "Back online deck", kind: "tournament" },
     ])
-    mockCatalogStatus.value = "Exhausted"
+    mockCatalogServer.answering = true
     mockConnection.isWebSocketConnected = true
     view.rerender(
       <ThemeProvider initialContext="light">
         <AddDeckInPlace onBack={jest.fn()} onCreated={jest.fn()} />
       </ThemeProvider>,
     )
-    await waitFor(() => expect(view.getByText("Back online deck")).toBeTruthy())
+    await act(async () => jest.advanceTimersByTime(100))
+    expect(view.getByText("Back online deck")).toBeTruthy()
     expect(view.queryByText(/You're offline/)).toBeNull()
     expect(mockEnsureFresh).toHaveBeenCalledWith({ game: "ygo", format: "advanced" })
+  })
+
+  it("shows a format's decks at once when switching back to it", async () => {
+    mockCatalogRows.mockImplementation((args) =>
+      args.game === "ygo"
+        ? [{ _id: "ygo-deck", game: "ygo", name: "Loaded deck", kind: "tournament" }]
+        : [],
+    )
+    const view = renderAddDeck()
+    chooseGame(view, "ygo")
+    await act(async () => jest.advanceTimersByTime(400))
+    chooseGame(view, "mtg")
+    await act(async () => jest.advanceTimersByTime(400))
+    chooseGame(view, "ygo")
+    expect(view.getByText("Loaded deck")).toBeTruthy()
+    expect(view.queryByText("Loading decks…")).toBeNull()
   })
 
   it("checks each format's decks once, so switching back reuses the answer", async () => {

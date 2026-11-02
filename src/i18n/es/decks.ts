@@ -668,7 +668,6 @@ export default {
       "No se pudieron actualizar los mazos. Los resultados guardados siguen disponibles.",
     checkAgain: "Comprobar de nuevo",
     open: "Abrir",
-    loadMore: "Cargar más",
     startingPoint: "Punto de partida",
     importSource: "Origen de importación",
     pasteText: "Pegar texto",
