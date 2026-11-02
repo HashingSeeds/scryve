@@ -1,7 +1,7 @@
 steps:
   - launch: com.sowinghope.count.preview
   - echo: A reinstall signs Android out, and a capture of this scene alone has no earlier sign-in
-  - await: { visible: { id: game-menu-button }, timeout: 30000 }
+  - run: store-reset-local
   - run: store-sign-in
   - run: store-reset-local
   - tap: { id: game-menu-button }
