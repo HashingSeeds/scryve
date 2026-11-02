@@ -1,5 +1,7 @@
 steps:
   - echo: Five seat Commander on the default bottom focus layout, the front board of the multi-game tile
+  - echo: The connected scene leaves a game in play; finish it as a win before the reset below abandons it
+  - script: { path: scripts/table-reset.mjs, timeout: 60000 }
   - launch: com.sowinghope.count.preview
   - run: store-reset-local
   - tap: { id: game-menu-button }
