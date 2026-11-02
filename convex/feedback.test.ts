@@ -339,6 +339,27 @@ describe("feedback", () => {
     }
   })
 
+  it("reopens an archived card when the player replies", async () => {
+    process.env.APOLLO_CLOUD_URL = "https://apollo.test"
+    process.env.APOLLO_FEEDBACK_TOKEN = "feedback-token"
+    try {
+      const t = makeConvexTest()
+      const bodies: { reopen?: boolean }[] = []
+      jest.spyOn(global, "fetch").mockImplementation(async (_, init) => {
+        bodies.push(JSON.parse(String(init?.body)))
+        return new Response("{}", { status: 200 })
+      })
+      const requestId = await submit(t)
+      await t.mutation(api.feedback.reply, { key: ME, requestId, body: "Still broken" })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      expect(bodies.map((body) => body.reopen)).toEqual([undefined, true])
+    } finally {
+      delete process.env.APOLLO_CLOUD_URL
+      delete process.env.APOLLO_FEEDBACK_TOKEN
+      jest.restoreAllMocks()
+    }
+  })
+
   it("links a bug's Sentry report on its Apollo card", async () => {
     const t = makeConvexTest()
     const requestId = await t.mutation(api.feedback.submit, {
@@ -565,7 +586,12 @@ describe("feedbackCard", () => {
       meta: { from: "Anonymous" },
     })
     expect(card.body).toBe(`${request.body}\n\nPlayer: http://a.test`)
-    expect(card.actions.map(({ id }) => id)).toEqual(["reply", "file_issue", "link_issue"])
+    expect(card.actions.map(({ id }) => id)).toEqual([
+      "reply",
+      "file_issue",
+      "link_issue",
+      "archive",
+    ])
   })
 
   it("pushes a generic line for a new request, never the player's text", () => {
@@ -599,7 +625,7 @@ describe("feedbackCard", () => {
   it("links the issue once Matthew names it", () => {
     const card = feedbackCard({ request: { ...request, issue: 123 }, messages: [] })
     expect(card.meta).toMatchObject({ issue: "#123" })
-    expect(card.actions.map(({ id }) => id)).toEqual(["reply", "issue", "link_issue"])
+    expect(card.actions.map(({ id }) => id)).toEqual(["reply", "issue", "link_issue", "archive"])
     expect(card.actions[1]).toMatchObject({
       label: "#123",
       url: "https://github.com/HashingSeeds/scryve/issues/123",
