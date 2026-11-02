@@ -121,6 +121,32 @@ export function normalizeCardName(name: string) {
   return name.trim().toLocaleLowerCase("en").replace(/\s+/g, " ")
 }
 
+const JAPANESE_SCRIPT = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
+
+export const hasJapaneseScript = (text: string) => JAPANESE_SCRIPT.test(text)
+
+export function nameSearchKey(name: string) {
+  return name
+    .normalize("NFKC")
+    .toLocaleLowerCase("en")
+    .replace(/[ぁ-ゖ]/g, (kana) => String.fromCharCode(kana.charCodeAt(0) + 0x60))
+    .replace(/[\s\p{P}\p{S}]/gu, "")
+}
+
+export function rankByName<T>(items: readonly T[], query: string, name: (item: T) => string) {
+  const key = nameSearchKey(query)
+  const rank = (item: T) => {
+    const itemKey = nameSearchKey(name(item))
+    if (itemKey === key) return 0
+    if (itemKey.startsWith(key)) return 1
+    return itemKey.includes(key) ? 2 : 3
+  }
+  return items
+    .map((item) => ({ item, rank: rank(item) }))
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ item }) => item)
+}
+
 export function compact<T>(values: Array<T | undefined>): T[] {
   return values.filter((value): value is T => value !== undefined)
 }
