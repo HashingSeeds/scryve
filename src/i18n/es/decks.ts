@@ -664,12 +664,10 @@ export default {
       "Actualización disponible en {{count}} segundos. Los resultados guardados siguen disponibles.",
     rateLimited_other:
       "Actualización disponible en {{count}} segundos. Los resultados guardados siguen disponibles.",
-    refreshing: "Actualizando mazos. Los resultados guardados siguen disponibles.",
     refreshFailed:
       "No se pudieron actualizar los mazos. Los resultados guardados siguen disponibles.",
     checkAgain: "Comprobar de nuevo",
     open: "Abrir",
-    loadMore: "Cargar más",
     startingPoint: "Punto de partida",
     importSource: "Origen de importación",
     pasteText: "Pegar texto",

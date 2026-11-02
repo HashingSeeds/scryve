@@ -82,6 +82,8 @@ export const PRECON_FORMATS = [
   "constructed",
 ] as const
 
+export const PRECON_SOURCE = "mtgjson"
+
 export function preconstructedFormat(type: string | undefined) {
   const value = type?.toLocaleLowerCase() ?? ""
   if (value.includes("commander")) return "commander"

@@ -625,11 +625,9 @@ export default {
     browseOffline: "오프라인 상태입니다. 다시 연결되면 덱을 불러옵니다.",
     rateLimited_other:
       "{{count}}초 후 새로고침할 수 있습니다. 저장된 결과는 계속 사용할 수 있습니다.",
-    refreshing: "덱 새로고침 중. 저장된 결과는 계속 사용할 수 있습니다.",
     refreshFailed: "덱을 새로고침할 수 없습니다. 저장된 결과는 계속 사용할 수 있습니다.",
     checkAgain: "다시 확인",
     open: "열기",
-    loadMore: "더 보기",
     startingPoint: "시작점",
     importSource: "가져오기 소스",
     pasteText: "텍스트 붙여넣기",
