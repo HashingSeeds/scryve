@@ -1,7 +1,12 @@
 import { playTableRules } from "@/features/game/playSystems"
 import { convexErrorCode } from "@/utils/convexError"
 
-import type { ConnectedDisplayProjection, ConnectedProjection, PendingLifeAction } from "./model"
+import type {
+  ConnectedCommanderDamageTotal,
+  ConnectedDisplayProjection,
+  ConnectedProjection,
+  PendingLifeAction,
+} from "./model"
 import { PERMANENT_GAME_WRITE_CODES } from "../../../convex/lib/gameWriteErrors"
 import { applyTableAction, EMPTY_TABLE } from "../../../convex/lib/table"
 
@@ -37,6 +42,12 @@ export function overlayPendingDeltas(
   const rules = playTableRules(confirmed.system, confirmed.format)
   let table = confirmed.table ?? EMPTY_TABLE
   const resolvingClaims = new Set<string>()
+  const commanderHits: {
+    fromPlayerId: string
+    toPlayerId: string
+    commander?: 1
+    delta: number
+  }[] = []
   for (const action of pending) {
     const { event } = action
     if (event.gameId !== confirmed.publicId) continue
@@ -55,17 +66,21 @@ export function overlayPendingDeltas(
       table = change.table
       for (const life of change.life) addDelta(life.playerId, life.delta)
     }
-    // Commander damage only moves life once the defender confirms it, so queued
-    // claims and resolutions contribute no optimistic delta.
+    // why: where a seat's owner must confirm commander damage, a queued claim moves no life until they do.
+    if (event.type === "commanderDamage.submitted" && confirmed.lifeEditing === "anyone") {
+      addDelta(event.toPlayerId, -event.delta)
+      commanderHits.push(event)
+    }
     if (event.type === "commanderDamage.resolved") resolvingClaims.add(event.claimOperationId)
   }
   const { commanderDamage } = confirmed
   return {
     ...confirmed,
-    ...(commanderDamage && resolvingClaims.size > 0
+    ...(commanderDamage && (resolvingClaims.size > 0 || commanderHits.length > 0)
       ? {
           commanderDamage: {
             ...commanderDamage,
+            totals: withCommanderHits(commanderDamage.totals, commanderHits),
             pendingClaims: commanderDamage.pendingClaims.filter(
               (claim) => !resolvingClaims.has(claim.operationId),
             ),
@@ -78,6 +93,30 @@ export function overlayPendingDeltas(
       return { ...player, currentLife: player.currentLife + pendingDelta, pendingDelta }
     }),
   }
+}
+
+function withCommanderHits(
+  totals: readonly ConnectedCommanderDamageTotal[],
+  hits: readonly { fromPlayerId: string; toPlayerId: string; commander?: 1; delta: number }[],
+): ConnectedCommanderDamageTotal[] {
+  const next = totals.map((total) => ({ ...total }))
+  for (const hit of hits) {
+    const total = next.find(
+      (candidate) =>
+        candidate.fromPlayerId === hit.fromPlayerId &&
+        candidate.toPlayerId === hit.toPlayerId &&
+        candidate.commander === hit.commander,
+    )
+    if (total) total.total += hit.delta
+    else
+      next.push({
+        fromPlayerId: hit.fromPlayerId,
+        toPlayerId: hit.toPlayerId,
+        ...(hit.commander ? { commander: hit.commander } : {}),
+        total: hit.delta,
+      })
+  }
+  return next
 }
 
 export function oldestFirst(actions: readonly PendingLifeAction[]): PendingLifeAction[] {
