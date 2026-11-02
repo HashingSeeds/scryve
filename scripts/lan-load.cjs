@@ -24,9 +24,9 @@ function guest(index) {
   let active = false
   let buffer = ""
   let tapper
-  const socket = net.connect(Number(port), host, () =>
-    socket.write(`${JSON.stringify({ type: "join", protocol: 2, name: `Load ${index}` })}\n`),
-  )
+  // why: one seat without editsAnySeat makes the whole table owner-only, so load guests join like current apps.
+  const join = { type: "join", protocol: 2, name: `Load ${index}`, editsAnySeat: true }
+  const socket = net.connect(Number(port), host, () => socket.write(`${JSON.stringify(join)}\n`))
   socket.setEncoding("utf8")
   socket.setNoDelay(true)
   socket.on("data", (chunk) => {
