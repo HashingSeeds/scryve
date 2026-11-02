@@ -65,7 +65,7 @@ describe("Clerk webhook user sync", () => {
     expect(await users(t)).toEqual([])
   })
 
-  it("returns 400 for a signed user event whose data is missing, not an object, or has no username", async () => {
+  it("returns 400 for a signed user event whose data is missing, not an object, or has no id", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
     const t = makeConvexTest()
 
@@ -74,11 +74,25 @@ describe("Clerk webhook user sync", () => {
       { type: "user.created", data: null },
       { type: "user.updated", data: "not-an-object" },
       { type: "user.updated", data: ["not", "a", "record"] },
-      { type: "user.created", data: { id: "clerk_missing_username", first_name: "Missing" } },
+      { type: "user.created", data: { username: "no-id" } },
     ]
     for (const event of malformedEvents) {
       const response = await fetchSigned(t, event)
       expect(response.status).toBe(400)
+    }
+    expect(await users(t)).toEqual([])
+  })
+
+  it("returns 200 for a signed user event without a username so Svix stops retrying it", async () => {
+    process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
+    const t = makeConvexTest()
+
+    for (const username of [undefined, null, ""]) {
+      const response = await fetchSigned(t, {
+        type: "user.updated",
+        data: { id: "clerk_no_username", username, first_name: "Missing" },
+      })
+      expect(response.status).toBe(200)
     }
     expect(await users(t)).toEqual([])
   })
@@ -140,6 +154,52 @@ describe("Clerk webhook user sync", () => {
       username: "after",
       avatarUrl: "https://images.example.test/after.png",
     })
+  })
+
+  it("returns 200 for permanent data problems so Svix never retries them into disabling the endpoint", async () => {
+    process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
+    const t = makeConvexTest()
+    const created = (id: string, data: Record<string, unknown>) =>
+      fetchSigned(t, { type: "user.created", data: { id, ...data } })
+    await created("clerk_holder", { username: "taken" })
+    await created("clerk_existing", { username: "mine" })
+
+    const cases: [string, Record<string, unknown>, Record<string, unknown>][] = [
+      ["clerk_short", { username: "ab", first_name: "Short" }, { displayName: "Short" }],
+      ["clerk_chars", { username: "has space", first_name: "Chars" }, { displayName: "Chars" }],
+      ["clerk_conflict", { username: "TAKEN", first_name: "Late" }, { displayName: "Late" }],
+      ["clerk_existing", { username: "taken", first_name: "Kept" }, { username: "mine" }],
+      [
+        "clerk_long",
+        { username: "long-name", first_name: "x".repeat(100) },
+        { displayName: "x".repeat(32) },
+      ],
+      [
+        "clerk_avatar",
+        { username: "avatar", image_url: "http://insecure.test/a.png" },
+        { username: "avatar" },
+      ],
+    ]
+    for (const [id, data, expected] of cases) {
+      // why: Svix redelivers, so the replay must also succeed without adding a row.
+      expect((await created(id, data)).status).toBe(200)
+      expect((await created(id, data)).status).toBe(200)
+      const row = (await users(t)).find((user) => user.clerkUserId === id)
+      expect(row).toMatchObject(expected)
+    }
+    const rows = await users(t)
+    expect(rows).toHaveLength(7)
+    expect(rows.find((user) => user.clerkUserId === "clerk_holder")?.username).toBe("taken")
+    expect(rows.find((user) => user.clerkUserId === "clerk_conflict")?.username).toBeUndefined()
+    expect(rows.find((user) => user.clerkUserId === "clerk_avatar")).not.toHaveProperty("avatarUrl")
+    const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())
+    expect(
+      scheduled.filter(
+        (job) =>
+          job.name.includes("refreshUsernameFromClerk") &&
+          job.args[0]?.clerkUserId === "clerk_holder",
+      ).length,
+    ).toBeGreaterThan(0)
   })
 
   it("returns 200 for a signed unrelated event and leaves users untouched", async () => {

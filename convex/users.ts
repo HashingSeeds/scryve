@@ -13,6 +13,7 @@ import {
   assertDisplayName,
   assertUsername,
   HISTORY_MIGRATION_VERSION,
+  MAX_DISPLAY_NAME_LENGTH,
   MEMBERSHIP_MIGRATION_VERSION,
   normalizeUsername,
 } from "./lib/policy"
@@ -50,32 +51,31 @@ export const syncFromClerk = internalMutation({
     username: v.string(),
     avatarUrl: v.optional(v.string()),
   },
+  // why: Clerk retries any throw for days and then disables the webhook, so bad data is kept or clamped, never thrown.
   handler: async (ctx, args) => {
     if (await hasAccountDeletion(ctx, args.clerkUserId)) return null
-    const username = assertUsername(args.username)
-    const usernameNormalized = normalizeUsername(username)
-    const conflicting = await ctx.db
-      .query("users")
-      .withIndex("by_username_normalized", (q) => q.eq("usernameNormalized", usernameNormalized))
-      .unique()
     const existing = await ctx.db
       .query("users")
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
       .unique()
-    if (conflicting && conflicting._id !== existing?._id)
-      throw new Error("Clerk username conflicts with an existing Scryve account")
+    const sync = await usernameForSync(ctx, args.username, args.clerkUserId)
+    // why: Clerk usernames are unique, so the other account's copy is stale and a refresh frees it.
+    if (sync.action === "keep" && sync.heldBy)
+      await ctx.scheduler.runAfter(0, internal.users.refreshUsernameFromClerk, {
+        clerkUserId: sync.heldBy,
+      })
+    const username = sync.action === "store" ? sync.username : undefined
     const now = Date.now()
     const value = {
-      displayName: assertDisplayName(args.displayName),
-      username,
-      usernameNormalized,
-      avatarUrl: assertAvatarUrl(args.avatarUrl),
+      displayName: args.displayName.trim().slice(0, MAX_DISPLAY_NAME_LENGTH) || "Player",
+      ...(username ? { username, usernameNormalized: normalizeUsername(username) } : {}),
+      ...(validAvatarUrl(args.avatarUrl) ? { avatarUrl: args.avatarUrl } : {}),
       updatedAt: now,
     }
     if (existing) {
       await ctx.db.patch(existing._id, value)
       // Re-checked on every sync, not just at signup: a rename in Clerk's own UI arrives here.
-      await enforceUsernameFilter(ctx, existing._id, username)
+      if (username) await enforceUsernameFilter(ctx, existing._id, username)
       await applyStoredRevenueCatState(ctx, existing)
       return existing._id
     }
@@ -86,14 +86,23 @@ export const syncFromClerk = internalMutation({
       historyMigrationVersion: HISTORY_MIGRATION_VERSION,
       createdAt: now,
     })
-    await enforceUsernameFilter(ctx, userId, username)
+    if (username) await enforceUsernameFilter(ctx, userId, username)
     const user = await ctx.db.get(userId)
     if (user) await applyStoredRevenueCatState(ctx, user)
     return userId
   },
 })
 
-type UsernameSync = { action: "store"; username: string } | { action: "clear" } | { action: "keep" }
+type UsernameSync =
+  { action: "store"; username: string } | { action: "clear" } | { action: "keep"; heldBy?: string }
+
+function validAvatarUrl(avatarUrl: string | undefined): avatarUrl is string {
+  try {
+    return assertAvatarUrl(avatarUrl) !== undefined
+  } catch {
+    return false
+  }
+}
 
 async function usernameForSync(
   ctx: MutationCtx,
@@ -113,7 +122,8 @@ async function usernameForSync(
       q.eq("usernameNormalized", normalizeUsername(value)),
     )
     .unique()
-  if (conflicting && conflicting.clerkUserId !== clerkUserId) return { action: "keep" }
+  if (conflicting && conflicting.clerkUserId !== clerkUserId)
+    return { action: "keep", heldBy: conflicting.clerkUserId }
   return { action: "store", username: value }
 }
 
