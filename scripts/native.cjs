@@ -1,5 +1,7 @@
 const { spawnSync } = require("node:child_process")
+const crypto = require("node:crypto")
 const fs = require("node:fs")
+const os = require("node:os")
 const path = require("node:path")
 const util = require("node:util")
 
@@ -131,6 +133,10 @@ function main() {
     fs.mkdirSync(path.dirname(options.buildPath), { recursive: true })
     run(buildCommand(options), {
       ...process.env,
+      // why: EAS defaults to the OS temp dir, a RAM tmpfs on some Linux machines that a 4 GB build fills or OOMs.
+      EAS_LOCAL_BUILD_WORKINGDIR:
+        process.env.EAS_LOCAL_BUILD_WORKINGDIR ??
+        path.join(os.homedir(), ".cache", "eas-build-local", crypto.randomUUID()),
       ...buildEnv(options),
       ...(offMainVersion ? { SCRYVE_APP_VERSION: offMainVersion } : {}),
     })
