@@ -1,5 +1,7 @@
 steps:
   - echo: A friend's deck opened from its share link; goldie/seed.cjs shares it from mara and writes the link fragment
+  - echo: The connected scene leaves a game in play; finish it as a win so History shows a result, not "Abandoned"
+  - script: { path: scripts/table-reset.mjs, timeout: 60000 }
   - launch: com.sowinghope.count.preview
   - run: store-reset-local
   - run: store-shared-deck-link

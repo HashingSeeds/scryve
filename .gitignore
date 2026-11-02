@@ -119,3 +119,4 @@ build-*.tar.gz
 # goldie renders store assets here
 goldie/out/
 .argent/flows/store-shared-deck-link.yaml
+.argent/recordings/
