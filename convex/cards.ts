@@ -8,7 +8,13 @@ import { action, internalMutation, internalQuery, query } from "./_generated/ser
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { cardImageCandidates } from "./lib/cardImageFallback"
 import { limitCardLookup } from "./lib/deckRateLimits"
-import type { CardCatalog, CatalogCard, NormalizedCard } from "./lib/games/cards"
+import {
+  nameSearchKey,
+  rankByName,
+  type CardCatalog,
+  type CatalogCard,
+  type NormalizedCard,
+} from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { pokemonCardByReference } from "./lib/games/pokemon"
 import { GAME_PROVIDERS } from "./lib/games/providers"
@@ -116,6 +122,48 @@ async function recordHealth(
   })
 }
 
+function scryfallSearchFailed(status: number): never {
+  throw new ConvexError({
+    code: "scryfall_unavailable",
+    message: `Card search is temporarily unavailable (${status})`,
+  })
+}
+
+async function scryfallSearchData(ctx: ActionCtx, query: string): Promise<unknown[]> {
+  const path = `/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
+  const response = await fetchScryfall(ctx, path)
+  if (response.status === 404) return []
+  if (!response.ok) scryfallSearchFailed(response.status)
+  const payload = objectRecord((await response.json()) as unknown)
+  return Array.isArray(payload?.data) ? payload.data : []
+}
+
+function printedName(card: unknown) {
+  const record = objectRecord(card)
+  const name = record?.printed_name ?? record?.name
+  return typeof name === "string" ? name : ""
+}
+
+const oracleId = (card: unknown) => {
+  const id = objectRecord(card)?.oracle_id
+  return typeof id === "string" ? id : undefined
+}
+
+async function englishPrintings(ctx: ActionCtx, cards: unknown[]): Promise<unknown[]> {
+  const oracleIds = [...new Set(cards.flatMap((card) => oracleId(card) ?? []))]
+  if (!oracleIds.length) return []
+  const response = await fetchScryfall(ctx, "/cards/collection", {
+    method: "POST",
+    body: JSON.stringify({ identifiers: oracleIds.map((oracle_id) => ({ oracle_id })) }),
+  })
+  if (!response.ok) scryfallSearchFailed(response.status)
+  const payload = objectRecord((await response.json()) as unknown)
+  const data: unknown[] = Array.isArray(payload?.data) ? payload.data : []
+  const order = new Map(oracleIds.map((id, index) => [id, index]))
+  const rank = (card: unknown) => order.get(oracleId(card) ?? "") ?? oracleIds.length
+  return data.sort((a, b) => rank(a) - rank(b))
+}
+
 async function searchScryfall(
   ctx: ActionCtx,
   query: string,
@@ -129,16 +177,14 @@ async function searchScryfall(
   if (query.length < 2) return []
   await requireActionCapability(ctx, "mtg", "cardCatalog")
   await limitCardLookup(ctx, deviceId)
-  const path = `/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
-  const response = await fetchScryfall(ctx, path)
-  if (response.status === 404) return []
-  if (!response.ok)
-    throw new ConvexError({
-      code: "scryfall_unavailable",
-      message: `Card search is temporarily unavailable (${response.status})`,
-    })
-  const payload = objectRecord((await response.json()) as unknown)
-  const data = Array.isArray(payload?.data) ? payload.data : []
+  let data = await scryfallSearchData(ctx, query)
+  if (!data.length && !/\blang:/i.test(query)) {
+    const printed = await scryfallSearchData(ctx, `(${query}) lang:any`)
+    data = await englishPrintings(
+      ctx,
+      rankByName(printed, query, printedName).slice(0, MAX_SEARCH_RESULTS),
+    )
+  }
   const cards = data
     .map(normalizeScryfallCard)
     .filter((card): card is CardReference => card !== null)
@@ -168,8 +214,29 @@ export const search = action({
       limit: MAX_SEARCH_RESULTS,
     })
     const catalog = GAME_PROVIDERS[game].catalog
-    if (catalog.bulk || (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage))))
-      return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
+    const key = nameSearchKey(query)
+    const seeded = key
+      ? (catalog.seeded?.cards ?? [])
+          .filter((card) => nameSearchKey(card.name).includes(key))
+          .map((card) => catalogResult(card, includeImages))
+      : []
+    const withSeeded = (cards: CatalogCard[]) => {
+      if (!seeded.length) return cards
+      const ids = new Set(seeded.map((card) => card.cardId))
+      return rankByName(
+        [...seeded, ...cards.filter((card) => !ids.has(card.cardId))],
+        query,
+        (card) => card.name,
+      ).slice(0, MAX_SEARCH_RESULTS)
+    }
+    const providerCached = cached.filter((card) => !catalog.seeded?.owns(card.cardId))
+    if (
+      catalog.bulk ||
+      (providerCached.length > 0 && (!includeImages || providerCached.every(hasCatalogImage)))
+    )
+      return withSeeded(
+        includeImages ? providerCached : providerCached.map((card) => catalogWithoutImages(card)),
+      )
     await limitCardLookup(ctx, args.deviceId)
     const provider = integrationFor(game).capabilities.cardCatalog.provider
     const startedAt = Date.now()
@@ -186,7 +253,7 @@ export const search = action({
         httpStatus: result.status,
         message: `${result.cards.length} cards normalized`,
       })
-      return result.cards.map((card) => catalogResult(card, includeImages))
+      return withSeeded(result.cards.map((card) => catalogResult(card, includeImages)))
     } catch (error) {
       await recordHealth(ctx, {
         game,

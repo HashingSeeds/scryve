@@ -1214,3 +1214,102 @@ describe("cached physical card faces", () => {
     })
   })
 })
+
+describe("search by printed name", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  const requestUrl = (input: Parameters<typeof fetch>[0]) =>
+    decodeURIComponent(input instanceof Request ? input.url : input.toString())
+
+  it("finds Magic cards by a Japanese name and returns their English printings", async () => {
+    const scryfallCard = (id: string, oracleId: string, name: string, printed?: string) => ({
+      id,
+      oracle_id: oracleId,
+      name,
+      ...(printed ? { printed_name: printed, lang: "ja" } : { lang: "en" }),
+    })
+    const arc = "00000000-0000-4000-8000-00000000000a"
+    const bolt = "00000000-0000-4000-8000-00000000000b"
+    const collectionBodies: unknown[] = []
+    jest.spyOn(global, "fetch").mockImplementation((input, init) => {
+      const url = requestUrl(input)
+      if (url.includes("/cards/collection")) {
+        collectionBodies.push(JSON.parse(String(init?.body)))
+        return response({
+          data: [
+            scryfallCard(arc, "oracle-arc", "Arc Lightning"),
+            scryfallCard(bolt, "oracle-bolt", "Lightning Bolt"),
+          ],
+        })
+      }
+      if (!url.includes("lang:any")) return response({ object: "error" }, 404)
+      return response({
+        data: [
+          scryfallCard(
+            "10000000-0000-4000-8000-00000000000a",
+            "oracle-arc",
+            "Arc Lightning",
+            "弧状の稲妻",
+          ),
+          scryfallCard(
+            "10000000-0000-4000-8000-00000000000b",
+            "oracle-bolt",
+            "Lightning Bolt",
+            "稲妻",
+          ),
+        ],
+      })
+    })
+
+    const cards = await makeConvexTest().action(api.cards.search, { query: "稲妻" })
+
+    expect(cards.map((card) => [card.name, "scryfallId" in card && card.scryfallId])).toEqual([
+      ["Lightning Bolt", bolt],
+      ["Arc Lightning", arc],
+    ])
+    expect(collectionBodies).toEqual([
+      { identifiers: [{ oracle_id: "oracle-bolt" }, { oracle_id: "oracle-arc" }] },
+    ])
+  })
+
+  it("finds Yu-Gi-Oh cards typed in hiragana and stores their English names", async () => {
+    const urls: string[] = []
+    jest.spyOn(global, "fetch").mockImplementation((input) => {
+      const url = requestUrl(input)
+      urls.push(url)
+      return url.includes("language=ja")
+        ? response({
+            data: [
+              { id: 21296502, name: "トゥーン・ブラック・マジシャン" },
+              { id: 46986414, name: "ブラック・マジシャン" },
+            ],
+          })
+        : response({
+            data: [
+              { id: 21296502, name: "Toon Dark Magician" },
+              { id: 46986414, name: "Dark Magician" },
+            ],
+          })
+    })
+
+    const cards = await makeConvexTest().action(api.cards.search, {
+      game: "ygo",
+      query: "ぶらっく・まじしゃん",
+    })
+
+    expect(cards.map((card) => card.name)).toEqual(["Dark Magician", "Toon Dark Magician"])
+    expect(urls[1]).toContain("id=46986414,21296502")
+  })
+
+  it("finds bundled Rush Duel cards without the ・ separator", async () => {
+    jest.spyOn(global, "fetch").mockImplementation(() => response({ error: "No card" }, 400))
+    const rush = rushCards[0]
+
+    const cards = await makeConvexTest().action(api.cards.search, {
+      game: "ygo",
+      query: rush.name.replace(/・/g, ""),
+    })
+
+    expect(cards).toMatchObject([{ cardId: rush.cardId, name: rush.name }])
+  })
+})

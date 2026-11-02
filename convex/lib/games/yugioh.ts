@@ -2,8 +2,10 @@ import {
   compact,
   facet,
   finiteNumber,
+  hasJapaneseScript,
   normalizeCardName,
   objectRecord,
+  rankByName,
   stringValue,
   type CardCatalog,
   type NormalizedCard,
@@ -18,6 +20,8 @@ const BASE_URL = "https://db.ygoprodeck.com/api/v7"
 const DEFAULT_IMAGE_BASE_URL = "https://ygo-images.scryve.sow.care"
 const REQUEST_INTERVAL_MS = 100
 const REQUEST_TIMEOUT_MS = 10_000
+const SEARCH_RESULTS = 20
+const JAPANESE_CANDIDATES = 50
 
 function records(value: unknown) {
   const envelope = objectRecord(value)
@@ -112,10 +116,35 @@ async function request(ctx: ActionCtx, path: string) {
   })
 }
 
-export async function searchYgo(ctx: ActionCtx, query: string, includeImages = true) {
+async function searchYgoJapanese(ctx: ActionCtx, query: string, includeImages: boolean) {
   const response = await request(
     ctx,
-    `/cardinfo.php?fname=${encodeURIComponent(query)}&num=20&offset=0`,
+    `/cardinfo.php?fname=${encodeURIComponent(query)}&language=ja&num=${JAPANESE_CANDIDATES}&offset=0`,
+  )
+  if (response.status === 400) return { cards: [], status: response.status }
+  if (!response.ok) throw Object.assign(new Error("YGOPRODeck search failed"), { response })
+  const ids = rankByName(
+    normalizeYgoCards((await response.json()) as unknown),
+    query,
+    (card) => card.name,
+  )
+    .slice(0, SEARCH_RESULTS)
+    .map((card) => card.cardId)
+  const english = await cardsByYgoIds(ctx, ids, includeImages)
+  const order = new Map(ids.map((id, index) => [id, index]))
+  return {
+    cards: english.cards.sort(
+      (a, b) => (order.get(a.cardId) ?? ids.length) - (order.get(b.cardId) ?? ids.length),
+    ),
+    status: english.status,
+  }
+}
+
+export async function searchYgo(ctx: ActionCtx, query: string, includeImages = true) {
+  if (hasJapaneseScript(query)) return await searchYgoJapanese(ctx, query, includeImages)
+  const response = await request(
+    ctx,
+    `/cardinfo.php?fname=${encodeURIComponent(query)}&num=${SEARCH_RESULTS}&offset=0`,
   )
   if (response.status === 400) return { cards: [], status: response.status }
   if (!response.ok) throw Object.assign(new Error("YGOPRODeck search failed"), { response })
