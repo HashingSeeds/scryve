@@ -67,15 +67,17 @@ describe("RiftHunt normalizer", () => {
 })
 
 describe("RiftHunt sync", () => {
-  beforeEach(() =>
+  let modified: string
+  beforeEach(() => {
+    modified = "Mon, 26 Oct 2026 00:00:00 GMT"
     jest
       .spyOn(global, "fetch")
       .mockImplementation(async (_url, init) =>
         init?.method === "HEAD"
-          ? new Response(null, { headers: { "Last-Modified": "Mon, 26 Oct 2026 00:00:00 GMT" } })
+          ? new Response(null, { headers: { "Last-Modified": modified } })
           : new Response(JSON.stringify(riftHunt)),
-      ),
-  )
+      )
+  })
   afterEach(() => {
     jest.restoreAllMocks()
     delete process.env.RIFTBOUND_CARDS
@@ -107,6 +109,30 @@ describe("RiftHunt sync", () => {
       { name: "Fury Rune", section: "runes" },
       { name: "Pouty Poro", section: "main" },
     ])
+  })
+
+  it("moves a synced card to the printing the next export leads with", async () => {
+    const t = await synced()
+    await t.run(async (ctx) => {
+      const poro = (await ctx.db.query("gameCards").collect()).find(
+        ({ name }) => name === "Pouty Poro",
+      )
+      const ogn = (await ctx.db.query("cardPrintings").collect()).find(
+        (printing) => printing.gameCardId === poro?._id && printing.setCode === "OGN",
+      )
+      if (!ogn) throw new Error("Missing OGN Pouty Poro")
+      const { _id, _creationTime, ...value } = ogn
+      await ctx.db.delete(_id)
+      await ctx.db.insert("cardPrintings", value)
+    })
+    const lead = async () =>
+      (await t.query(internal.cardCatalog.cachedByName, { game: "riftbound", name: "Pouty Poro" }))
+        ?.setCode
+    expect(await lead()).not.toBe("OGN")
+
+    modified = "Tue, 27 Oct 2026 00:00:00 GMT"
+    await synced(t)
+    expect(await lead()).toBe("OGN")
   })
 
   it("keeps only RIFTBOUND_CARDS when set, and drops cards already synced", async () => {

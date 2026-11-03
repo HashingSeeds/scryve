@@ -113,7 +113,12 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard, fromDataset = 
           .withIndex("by_game_card_id", (query) => query.eq("gameCardId", existing._id))
           .take(MAX_SWEPT_PRINTINGS)
       : []
-  const ownById = new Map(ownPrintings.map((printing) => [printing.printingId, printing]))
+  // why: projectedCard shows a card's oldest printing, so a dataset that leads with another printing rewrites them in its order.
+  const reorder = ownPrintings.length > 0 && ownPrintings[0].printingId !== printings[0].printingId
+  if (reorder) for (const printing of ownPrintings) await ctx.db.delete(printing._id)
+  const ownById = new Map(
+    reorder ? [] : ownPrintings.map((printing) => [printing.printingId, printing]),
+  )
   for (const printing of printings) {
     const stored =
       ownById.get(printing.printingId) ??
@@ -130,7 +135,7 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard, fromDataset = 
       await ctx.db.replace(stored._id, value)
   }
   const kept = new Set(printings.map((printing) => printing.printingId))
-  for (const printing of ownPrintings)
+  for (const printing of reorder ? [] : ownPrintings)
     if (!kept.has(printing.printingId)) await ctx.db.delete(printing._id)
   return gameCardId
 }
