@@ -532,21 +532,20 @@ function NewGameForm({
   const hasStatusDetails = cloudMode
     ? Boolean(connectedGames.length || connected?.blockedReason || connected?.error)
     : Boolean(localGame) || connectedBlocksLocal
-  const statusText =
-    nearbyMode || resumeConnected
-      ? ""
-      : connectedMode
-        ? (connected?.error ??
-          connected?.blockedReason ??
-          (connectedGames.length ? translate("play:newGame.gamesInProgress") : ""))
-        : localGame?.match
-          ? translate("play:newGame.matchStatus", {
-              context: matchContextLabel(localGame),
-              bestOf: localGame.match.bestOf,
-            })
-          : connectedBlocksLocal
-            ? translate("play:newGame.gamesInProgress")
-            : ""
+  const statusText = nearbyMode
+    ? ""
+    : connectedMode
+      ? (connected?.error ??
+        connected?.blockedReason ??
+        (connectedGames.length ? translate("play:newGame.gamesInProgress") : ""))
+      : localGame?.match
+        ? translate("play:newGame.matchStatus", {
+            context: matchContextLabel(localGame),
+            bestOf: localGame.match.bestOf,
+          })
+        : connectedBlocksLocal
+          ? translate("play:newGame.gamesInProgress")
+          : ""
 
   async function submit() {
     if (!valid || busy || pinningRef.current) return

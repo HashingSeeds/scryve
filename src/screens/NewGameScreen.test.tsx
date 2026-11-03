@@ -220,6 +220,21 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("setup-back")).toHaveTextContent("Game")
     fireEvent.press(view.getByTestId("setup-back"))
     expect(onBack).toHaveBeenCalledTimes(1)
+
+    const hosted = {
+      publicId: "hosted",
+      status: "active" as const,
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const connected = { ...readyHost, activeGames: [hosted] }
+    const onResumeConnected = jest.fn()
+    for (const localGame of [runningLocalGame(), undefined]) {
+      const withConnected = setup({ localGame, connected, onResumeConnected })
+      expect(withConnected.getByTestId("setup-status")).toHaveTextContent("Games in progress")
+    }
   })
 
   it("surfaces a hosted live game in local setup only", () => {
