@@ -75,7 +75,8 @@ export function SegmentedControl({
 
   function measureTrack(event: LayoutChangeEvent) {
     const width = event.nativeEvent.layout.width - (TRACK_INSET + TRACK_BORDER_WIDTH) * 2
-    setTrackWidth(width)
+    // why: a screen hidden behind another lays out at 0 wide, and a negative width makes gesture-handler throw on hitSlop.
+    setTrackWidth(Math.max(width, 0))
   }
 
   const dragging = dragIndex !== null
