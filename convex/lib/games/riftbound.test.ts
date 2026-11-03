@@ -24,7 +24,7 @@ describe("RiftHunt normalizer", () => {
       identityNamespace: "riftbound-card",
       cardId: "pouty-poro",
       category: "Unit",
-      printings: [{ setCode: "OGN" }, { setCode: "OPP" }, { setCode: "UNL" }],
+      printings: [{ setCode: "OGN" }, { setCode: "UNL" }, { setCode: "OPP" }],
     })
   })
 
@@ -40,6 +40,24 @@ describe("RiftHunt normalizer", () => {
     expect(promo).toMatchObject({ setCode: "JDG", faces: [{ imageUrl: undefined }] })
   })
 
+  it("leads with an imaged variant over a plain printing without an image", () => {
+    const [annie] = normalizeRiftHuntCards({
+      cards: [
+        { id: "annie-opp", name: "Annie, Dark Child", set: "OPP", num: 1, type: "Legend" },
+        {
+          id: "annie-ogs",
+          name: "Annie, Dark Child (Starter)",
+          set: "OGS",
+          num: 17,
+          type: "Legend",
+          imgUrl: "https://cmsassets.rgpub.io/annie.png",
+        },
+      ],
+    })
+    expect(annie.name).toBe("Annie, Dark Child")
+    expect(annie.printings.map(({ setCode }) => setCode)).toEqual(["OGS", "OPP"])
+  })
+
   it("keeps line breaks and turns shortcodes into tokens", () => {
     expect(card("Svellsongur").printings[0].faces[0].text).toBe(
       "[Equip] {1}{calm} ({1}{calm}: Attach this to a unit you control.)\nAs this is attached to a unit, copy that unit's text to this Equipment's effect text for as long as this is attached to it.",
@@ -49,15 +67,17 @@ describe("RiftHunt normalizer", () => {
 })
 
 describe("RiftHunt sync", () => {
-  beforeEach(() =>
+  let modified: string
+  beforeEach(() => {
+    modified = "Mon, 26 Oct 2026 00:00:00 GMT"
     jest
       .spyOn(global, "fetch")
       .mockImplementation(async (_url, init) =>
         init?.method === "HEAD"
-          ? new Response(null, { headers: { "Last-Modified": "Mon, 26 Oct 2026 00:00:00 GMT" } })
+          ? new Response(null, { headers: { "Last-Modified": modified } })
           : new Response(JSON.stringify(riftHunt)),
-      ),
-  )
+      )
+  })
   afterEach(() => {
     jest.restoreAllMocks()
     delete process.env.RIFTBOUND_CARDS
@@ -89,6 +109,30 @@ describe("RiftHunt sync", () => {
       { name: "Fury Rune", section: "runes" },
       { name: "Pouty Poro", section: "main" },
     ])
+  })
+
+  it("moves a synced card to the printing the next export leads with", async () => {
+    const t = await synced()
+    await t.run(async (ctx) => {
+      const poro = (await ctx.db.query("gameCards").collect()).find(
+        ({ name }) => name === "Pouty Poro",
+      )
+      const ogn = (await ctx.db.query("cardPrintings").collect()).find(
+        (printing) => printing.gameCardId === poro?._id && printing.setCode === "OGN",
+      )
+      if (!ogn) throw new Error("Missing OGN Pouty Poro")
+      const { _id, _creationTime, ...value } = ogn
+      await ctx.db.delete(_id)
+      await ctx.db.insert("cardPrintings", value)
+    })
+    const lead = async () =>
+      (await t.query(internal.cardCatalog.cachedByName, { game: "riftbound", name: "Pouty Poro" }))
+        ?.setCode
+    expect(await lead()).not.toBe("OGN")
+
+    modified = "Tue, 27 Oct 2026 00:00:00 GMT"
+    await synced(t)
+    expect(await lead()).toBe("OGN")
   })
 
   it("keeps only RIFTBOUND_CARDS when set, and drops cards already synced", async () => {

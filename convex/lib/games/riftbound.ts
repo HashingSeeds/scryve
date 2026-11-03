@@ -97,7 +97,7 @@ export function normalizeRiftHuntCards(value: unknown, only = cardAllowlist()): 
   }
   const order = ({ card }: { card: Record<string, unknown> }) =>
     [
-      (VARIANT_SUFFIX.test(String(card.name)) ? 2 : 0) + (imageUrl(card.imgUrl) ? 0 : 1),
+      (imageUrl(card.imgUrl) ? 0 : 2) + (VARIANT_SUFFIX.test(String(card.name)) ? 1 : 0),
       released.get(String(card.set)) ?? "",
       finiteNumber(card.num) ?? 0,
     ] as const
