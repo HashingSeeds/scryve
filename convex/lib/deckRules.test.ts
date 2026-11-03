@@ -143,7 +143,7 @@ describe("Magic", () => {
       rats,
       dwarves,
       card("sideboard", "Lightning Bolt", 1),
-      card("sideboard", "Smash to Smithereens", 16),
+      card("sideboard", "Smash to Smithereens", 16, mtg({ typeLine: "Instant" })),
     ]
     expect(mtgIssues("modern", deck)).toEqual([
       { code: "size", sections: ["sideboard"], count: 17, target: 15, exact: false },
@@ -153,6 +153,11 @@ describe("Magic", () => {
     expect(mtgIssues("modern", [card("main", "Mountain", 59)])).toEqual([
       { code: "size", sections: ["main"], count: 59, target: 60, exact: false },
     ])
+  })
+
+  it("waits for card text before counting copies, since it can raise the limit", () => {
+    const unloaded = card("main", "Relentless Rats", 20)
+    expect(mtgIssues("modern", [unloaded, card("main", "Mountain", 40)])).toEqual([])
   })
 
   it("Commander needs 100 singleton cards inside the commanders' colors and legal in Commander", () => {

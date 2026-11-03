@@ -62,10 +62,10 @@ const NUMBER_WORDS: Partial<Record<string, number>> = {
   ten: 10,
 }
 
-/** why: basic lands and cards like Relentless Rats or Seven Dwarves set their own copy limit in Magic. */
+/** why: basic lands and cards like Relentless Rats or Seven Dwarves set their own copy limit in Magic; unknown until the card text loads. */
 function mtgCopyLimit(name: string, facets: CardFacets | undefined, max: number) {
   if (MTG_BASIC_LAND.test(name.trim())) return Infinity
-  if (!facets) return max
+  if (!facets) return undefined
   if (/\bBasic\b/.test(facetValue(facets, "typeLine") ?? "")) return Infinity
   const text = facetValue(facets, "oracleText") ?? ""
   if (/a deck can have any number of cards named/i.test(text)) return Infinity
@@ -163,7 +163,9 @@ function ruleIssues<Card extends RuleCard>(
       return namedCounts(cards.filter((card) => rule.sections.includes(sectionOf(card)))).flatMap(
         ({ card, count }) => {
           const max = rule.allowance ? mtgCopyLimit(card.name, facetsFor(card), rule.max) : rule.max
-          return count > max ? [{ code: "copies" as const, name: card.name, count, max }] : []
+          return max !== undefined && count > max
+            ? [{ code: "copies" as const, name: card.name, count, max }]
+            : []
         },
       )
     case "unique":
