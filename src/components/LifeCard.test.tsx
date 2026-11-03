@@ -611,7 +611,7 @@ describe("LifeCard", () => {
     })
     const progress = view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" })
     const circumference = 2 * Math.PI * progress.props.r
-    expect(progress.props.strokeDashoffset).toBeCloseTo(circumference * (1 - 6 / 21))
+    expect(progress.props.animatedProps.strokeDashoffset).toBeCloseTo(circumference * (1 - 6 / 21))
   })
 
   it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
@@ -619,9 +619,9 @@ describe("LifeCard", () => {
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
       nativeEvent: { layout: { width: 193, height: 420 } },
     })
-    expect(view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" }).props.stroke).toBe(
-      "#FFFFFF",
-    )
+    expect(
+      StyleSheet.flatten(view.getByTestId("commander-target-pulse-seat-2").props.style),
+    ).toMatchObject({ borderColor: "#FFFFFF" })
   })
 
   it("sizes the life total in JavaScript rather than relying on native auto-shrink", () => {

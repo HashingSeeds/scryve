@@ -82,7 +82,7 @@ describe("commander damage board layout", () => {
     expect(reach(1)?.distance).toBeCloseTo(540)
   })
 
-  it("starts the damage arc toward the attacker and knocks the card away", () => {
+  it("knocks the card away from the attacker", () => {
     const takeover = commanderTakeover({
       card: { width: 390, height: 420 },
       rotation: 0,
@@ -90,7 +90,6 @@ describe("commander damage board layout", () => {
       ink: lifeInk(148, 2),
       reach: { x: 0, y: -424, card: { width: 390, height: 420 }, distance: 900 },
     })
-    expect(takeover.angle).toBeCloseTo(-Math.PI / 2)
     expect(takeover.knock.x).toBeCloseTo(0)
     expect(takeover.knock.y).toBeCloseTo(1)
     expect(takeover.flood).toEqual({
@@ -102,7 +101,7 @@ describe("commander damage board layout", () => {
     })
   })
 
-  it("reads the attacker's direction in a sideways seat's own orientation", () => {
+  it("knocks a sideways seat away from the attacker in the card's own space", () => {
     const takeover = commanderTakeover({
       card: { width: 193, height: 420 },
       rotation: 90,
@@ -110,7 +109,6 @@ describe("commander damage board layout", () => {
       ink: lifeInk(104, 2),
       reach: { x: 0, y: -424, card: { width: 390, height: 420 }, distance: 900 },
     })
-    expect(Math.cos(takeover.angle)).toBeCloseTo(-1)
     expect(takeover.knock.x).toBeCloseTo(0)
     expect(takeover.knock.y).toBeCloseTo(1)
   })
