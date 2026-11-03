@@ -59,7 +59,7 @@ import {
   outReason,
   type OutState,
 } from "../../../convex/lib/outReason"
-import { flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
+import { attachesDecks, flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
 import {
   applyTableAction,
   EMPTY_TABLE,
@@ -201,7 +201,9 @@ export function createLocalGame(input: {
     events: [],
     createdAt: now,
     updatedAt: now,
-    ...(input.account ? { account: localGameAccount(players, input.account) } : {}),
+    ...(input.account
+      ? { account: accountForSystem(system, localGameAccount(players, input.account)) }
+      : {}),
     ...(input.match ? { match: newMatch(input.match.bestOf, players.length, now) } : {}),
     ...(isRoundClockSetup(input.clock) ? { clock: startRoundClock(input.clock, now) } : {}),
   }
@@ -313,6 +315,12 @@ export function localGameAccount(
     ...(me && account.deckFingerprint ? { deckFingerprint: account.deckFingerprint } : {}),
     ...(me && account.deckName ? { deckName: account.deckName } : {}),
   }
+}
+
+export function accountForSystem(system: unknown, account: LocalGameAccount): LocalGameAccount {
+  if (attachesDecks(system)) return account
+  const { ownerId, mePlayerId } = account
+  return { ownerId, ...(mePlayerId ? { mePlayerId } : {}) }
 }
 
 export function meSeatOf(game: Pick<LocalGame, "players" | "account">): number | undefined {

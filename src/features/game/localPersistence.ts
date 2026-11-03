@@ -4,6 +4,7 @@ import { storage as mmkvStorage } from "@/utils/storage"
 import { recordReviewCompletion } from "@/utils/storeReview"
 
 import {
+  accountForSystem,
   asActorId,
   asDeviceId,
   asGameId,
@@ -322,10 +323,10 @@ function parseEvent(value: unknown): GameEvent | null {
   }
 }
 
-function parseAccount(value: unknown): LocalGameAccount | undefined {
+function parseAccount(value: unknown, system: unknown): LocalGameAccount | undefined {
   if (!isRecord(value) || typeof value.ownerId !== "string" || !value.ownerId) return undefined
   const deckVersionId = typeof value.deckVersionId === "string" ? value.deckVersionId : undefined
-  return {
+  return accountForSystem(system, {
     ownerId: value.ownerId,
     ...(typeof value.mePlayerId === "string" ? { mePlayerId: asPlayerId(value.mePlayerId) } : {}),
     ...(deckVersionId ? { deckVersionId } : {}),
@@ -334,7 +335,7 @@ function parseAccount(value: unknown): LocalGameAccount | undefined {
       ? { deckFingerprint: value.deckFingerprint }
       : {}),
     ...(typeof value.deckName === "string" ? { deckName: value.deckName } : {}),
-  }
+  })
 }
 
 const MATCH_OUTCOMES: readonly MatchSeatOutcome[] = ["win", "loss", "draw"]
@@ -441,7 +442,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const result = parseResult(value.result)
   const commanderDamage = parseCommanderDamage(value.commanderDamage)
   const table = parseTableState(value.table)
-  const account = parseAccount(value.account)
+  const account = parseAccount(value.account, value.system)
   const match = parseMatch(value.match, players.length)
   const clock = parseRoundClock(value.clock)
   return {
@@ -555,7 +556,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
     return null
   const players = parsePlayers(value.players)
   const result = parseResult(value.result)
-  const account = parseAccount(value.account)
+  const account = parseAccount(value.account, value.system)
   const skippedBy = parseSkippedBy(value.skippedBy)
   const match = players ? parseMatch(value.match, players.length) : undefined
   const seatPassHashes = players ? parseSeatPassHashes(value.seatPassHashes, players) : undefined
@@ -810,7 +811,9 @@ export class LocalGameRepository {
     this.saveActiveGame({
       ...game,
       players: nextPlayers,
-      ...(account ? { account: localGameAccount(nextPlayers, account) } : {}),
+      ...(account
+        ? { account: accountForSystem(game.system, localGameAccount(nextPlayers, account)) }
+        : {}),
       updatedAt: Date.now(),
     })
   }
@@ -832,7 +835,8 @@ export class LocalGameRepository {
     ownerId?: string,
   ): LocalGameSummary | null {
     if (game.status === "active" || game.finishedAt === undefined) return null
-    const account = game.account ?? (ownerId ? { ownerId } : undefined)
+    const claimed = game.account ?? (ownerId ? { ownerId } : undefined)
+    const account = claimed && accountForSystem(game.system, claimed)
     const summary: LocalGameSummary = {
       schemaVersion: 1,
       id: game.id,

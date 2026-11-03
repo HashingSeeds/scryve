@@ -85,7 +85,7 @@ export function DeckPlay<VersionId extends string>({
                     <Text size="meta" tone="dim" text={version.detail} numberOfLines={1} />
                   ) : null}
                 </View>
-                {version.record ? (
+                {tracked && version.record ? (
                   <TrailingNumber
                     tone={version.record.games ? undefined : "dim"}
                     value={recordText(version.record)}

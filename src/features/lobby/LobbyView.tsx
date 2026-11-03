@@ -49,6 +49,7 @@ import {
   shownMarkShape,
   type PlayerAppearance,
 } from "../../../convex/lib/appearance"
+import { attachesDecks } from "../../../convex/lib/systems"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
 
 export interface LobbyViewLobby {
@@ -123,7 +124,7 @@ export function LobbyView({
   onChangePlayerCount,
   onChangeDeckRequired,
   invite,
-  decks,
+  decks: deckChoices,
   appearance,
   onReport,
   children,
@@ -143,12 +144,15 @@ export function LobbyView({
   // why: on iOS the paywall can only present once the picker's modal has finished dismissing.
   const [paywall, setPaywall] = useState<"closed" | "waitingForDismiss" | "open">("closed")
 
+  const usesDecks = attachesDecks(lobby.system)
+  const decks = usesDecks ? deckChoices : undefined
+  const deckRequired = usesDecks && Boolean(lobby.deckRequired)
   const claimedSeats = lobby.players.length
   const openSeats = Math.max(0, lobby.playerCount - claimedSeats)
   const everySeatClaimed = claimedSeats === lobby.playerCount
-  const missingDeck = lobby.deckRequired && lobby.players.some((player) => !player.deckVersionId)
+  const missingDeck = deckRequired && lobby.players.some((player) => !player.deckVersionId)
   const readyPlayers = lobby.players.filter(
-    (player) => !player.away && (!lobby.deckRequired || Boolean(player.deckVersionId)),
+    (player) => !player.away && (!deckRequired || Boolean(player.deckVersionId)),
   ).length
   const someoneAway = lobby.players.some((player) => player.away)
   const exitAction: LobbyExitAction = lobby.isHost ? "abandon" : "leave"
@@ -209,7 +213,7 @@ export function LobbyView({
         onAddDeck={decks?.onAddDeck}
         versionLabel={deckVersionLabel}
         selectingDeckSeats={decks?.selectingSeats}
-        deckRequired={Boolean(lobby.deckRequired)}
+        deckRequired={deckRequired}
         onSelectVersion={decks?.onSelect}
         onEditAppearance={
           appearance
@@ -264,7 +268,7 @@ export function LobbyView({
           </View>
           {heading ? <Text size="xs" style={themed($dimmed)} text={detail} /> : null}
         </View>
-        {lobby.isHost && (onChangePlayerCount || (onChangeDeckRequired && lobby.deckRequired)) ? (
+        {lobby.isHost && (onChangePlayerCount || (onChangeDeckRequired && deckRequired)) ? (
           <View style={themed($section)}>
             <Text preset="subheading" accessibilityRole="header" tx="connected:lobby.players" />
             {onChangePlayerCount ? (
@@ -285,11 +289,11 @@ export function LobbyView({
                 onSelect={(count) => onChangePlayerCount(Number(count))}
               />
             ) : null}
-            {onChangeDeckRequired && lobby.deckRequired ? (
+            {onChangeDeckRequired && deckRequired ? (
               <Switch
                 testID="lobby-require-decks"
                 labelTx="connected:decksRequired"
-                value={Boolean(lobby.deckRequired)}
+                value={deckRequired}
                 disabled={!online || savingSettings || starting}
                 onValueChange={onChangeDeckRequired}
               />
@@ -317,7 +321,7 @@ export function LobbyView({
               ]}
             />
           </View>
-          {!lobby.isHost && decks && lobby.deckRequired ? (
+          {!lobby.isHost && decks && deckRequired ? (
             <Text size="xxs" style={themed($dimmed)} tx="connected:decksRequired" />
           ) : null}
           {decks ? decks.source(seatList) : seatList()}
