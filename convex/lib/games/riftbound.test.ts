@@ -24,7 +24,7 @@ describe("RiftHunt normalizer", () => {
       identityNamespace: "riftbound-card",
       cardId: "pouty-poro",
       category: "Unit",
-      printings: [{ setCode: "OGN" }, { setCode: "OPP" }, { setCode: "UNL" }],
+      printings: [{ setCode: "OGN" }, { setCode: "UNL" }, { setCode: "OPP" }],
     })
   })
 
@@ -38,6 +38,24 @@ describe("RiftHunt normalizer", () => {
     })
     expect(first.faces[0].imageUrl).toMatch(/^https:\/\/cmsassets\.rgpub\.io\//)
     expect(promo).toMatchObject({ setCode: "JDG", faces: [{ imageUrl: undefined }] })
+  })
+
+  it("leads with an imaged variant over a plain printing without an image", () => {
+    const [annie] = normalizeRiftHuntCards({
+      cards: [
+        { id: "annie-opp", name: "Annie, Dark Child", set: "OPP", num: 1, type: "Legend" },
+        {
+          id: "annie-ogs",
+          name: "Annie, Dark Child (Starter)",
+          set: "OGS",
+          num: 17,
+          type: "Legend",
+          imgUrl: "https://cmsassets.rgpub.io/annie.png",
+        },
+      ],
+    })
+    expect(annie.name).toBe("Annie, Dark Child")
+    expect(annie.printings.map(({ setCode }) => setCode)).toEqual(["OGS", "OPP"])
   })
 
   it("keeps line breaks and turns shortcodes into tokens", () => {
