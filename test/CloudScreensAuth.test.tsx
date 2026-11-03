@@ -42,6 +42,8 @@ jest.mock("@/features/lan/NearbyGameList", () => ({ NearbyGameList: () => null }
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => ({}),
+  useNavigation: () => ({ getState: () => ({ routes: [] }) }),
+  useRoute: () => ({ key: "decks" }),
   useFocusEffect: (effect: () => void) => {
     jest.requireActual<typeof import("react")>("react").useEffect(effect, [effect])
   },

@@ -19,7 +19,7 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { ExtendedEdge, useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
-import { IconTypes, PressableIcon } from "./Icon"
+import { Icon, IconTypes, PressableIcon } from "./Icon"
 import { Text, TextProps } from "./Text"
 
 export interface HeaderProps {
@@ -237,6 +237,39 @@ export function HeaderIcon({
   )
 }
 
+/** why: a back action that names what's behind the screen ("Game", "Play"), for screens that sit in front of the board. Pass as `LeftActionComponent`. */
+export function HeaderBack({
+  label,
+  onPress,
+  testID,
+}: {
+  label: string
+  onPress: () => void
+  testID?: string
+}) {
+  const { themed, theme } = useAppTheme()
+  return (
+    <TouchableOpacity
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={themed($backAction)}
+    >
+      <Icon icon="back" size={24} color={theme.colors.tint} style={isRTL ? $flipped : undefined} />
+      <Text
+        weight="medium"
+        size="md"
+        text={label}
+        numberOfLines={1}
+        maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
+        style={themed($actionText)}
+      />
+    </TouchableOpacity>
+  )
+}
+
 function HeaderAction({ onLayout, ...props }: HeaderActionProps) {
   return (
     <View onLayout={onLayout} style={$actionSlot}>
@@ -330,6 +363,16 @@ const $actionTextContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $actionText: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.tint,
+})
+
+const $backAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  height: "100%",
+  paddingStart: spacing.sm,
+  paddingEnd: spacing.md,
+  gap: spacing.xxxs,
+  zIndex: 2,
 })
 
 const $actionIconContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({

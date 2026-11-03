@@ -132,7 +132,7 @@ function shelf(
   return (
     <ThemeProvider initialContext={theme}>
       <DecksScreen
-        onPlay={jest.fn()}
+        back={{ label: "Play", onPress: jest.fn() }}
         onSelect={jest.fn()}
         onAddDeck={jest.fn()}
         onHistory={jest.fn()}
@@ -457,17 +457,16 @@ describe("DecksScreen", () => {
     mockTotals = []
   })
 
-  it("puts app navigation at the bottom and returns to the active game", () => {
-    const onPlay = jest.fn()
-    const view = renderShelf({ hasCurrentGame: true, onPlay })
+  it("puts app navigation at the bottom and names the game it returns to", () => {
+    const onPress = jest.fn()
+    const view = renderShelf({ back: { label: "Game", onPress } })
 
-    expect(view.getByText("Return to game")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
     expect(StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style).bottom).toBe(
       spacing.md,
     )
-    fireEvent.press(view.getByLabelText("Return to game"))
-    expect(onPlay).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByLabelText("Game"))
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 
   it("renders mixed-system decks as quiet ledger rows instead of card artwork", () => {
@@ -811,15 +810,14 @@ describe("DecksScreen", () => {
       capacity: { used: 2, limit: 100, premium: true, canCreate: true },
       analyticsLocked: false,
     }
-    const onBack = jest.fn()
-    const view = renderShelf({ initialSystem: "mtg", onBack })
+    const back = { label: "Lobby", onPress: jest.fn() }
+    const view = renderShelf({ initialSystem: "mtg", back })
     expect(view.getByText("Existing Deck")).toBeTruthy()
     view.rerender(
       <ThemeProvider initialContext="light">
         <DecksScreen
           initialSystem="pokemon"
-          onBack={onBack}
-          onPlay={jest.fn()}
+          back={back}
           onSelect={jest.fn()}
           onAddDeck={jest.fn()}
           onHistory={jest.fn()}
@@ -833,7 +831,7 @@ describe("DecksScreen", () => {
     expect(view.getByText("Lucario Hariyama")).toBeTruthy()
     expect(loadString("decks.game")).toBe("pokemon")
     fireEvent.press(view.getByTestId("decks-back"))
-    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(back.onPress).toHaveBeenCalledTimes(1)
   })
   test("offers Sync for decks only on this device above the one list", () => {
     for (let index = 0; index < 3; index++)

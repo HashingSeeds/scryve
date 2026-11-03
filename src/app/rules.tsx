@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { router, useLocalSearchParams } from "expo-router"
 
+import { useBackToBoard } from "@/features/game/useBackToBoard"
 import { GAME_RULES, gameRules, openRules } from "@/features/rules/gameRules"
 import { RulesScreen } from "@/screens/RulesScreen"
 
@@ -13,6 +14,7 @@ export default function RulesRoute() {
     glossary?: string
   }>()
   const rules = gameRules(system)
+  const back = useBackToBoard()
   useEffect(() => {
     if (rules?.kind !== "link") return
     openRules(rules)
@@ -27,7 +29,7 @@ export default function RulesRoute() {
       source={source}
       ruleId={rule}
       glossary={glossary !== undefined}
-      onBack={leave}
+      back={back}
       onOpenRule={(id) => router.push({ pathname: "/rules", params: { ...params, rule: id } })}
       onOpenGlossary={() =>
         router.push({ pathname: "/rules", params: { ...params, glossary: "1" } })

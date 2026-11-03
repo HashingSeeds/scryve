@@ -2,11 +2,12 @@ import { useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
-import { Header } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import type { BackAction } from "@/features/game/useBackToBoard"
 import {
   findRules,
   ruleReferences,
@@ -34,7 +35,7 @@ export interface RulesScreenProps {
   source: TextRules
   ruleId?: string
   glossary?: boolean
-  onBack: () => void
+  back: BackAction
   onOpenRule: (id: string) => void
   onOpenGlossary: () => void
   onCards?: () => void
@@ -82,7 +83,7 @@ export function RulesScreen({
   source,
   ruleId,
   glossary,
-  onBack,
+  back,
   onOpenRule,
   onOpenGlossary,
   onCards,
@@ -199,8 +200,7 @@ export function RulesScreen({
     >
       <Header
         title={title}
-        leftTx="common:back"
-        onLeftPress={onBack}
+        LeftActionComponent={<HeaderBack testID="rules-back" {...back} />}
         rightTx={onCards ? "play:rules.cards" : undefined}
         onRightPress={onCards}
       />

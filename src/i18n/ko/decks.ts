@@ -528,9 +528,7 @@ export default {
   },
   shelf: {
     title: "덱",
-    backToLobby: "로비로 돌아가기",
     addDeck: "덱 추가",
-    cards: "카드",
     collectionAll: "전체",
     collectionFavorites: "즐겨찾기",
     collectionRecent: "최근",

@@ -13,6 +13,8 @@ let mockParams: { system?: string } = {}
 jest.mock("expo-router", () => ({
   router: { back: () => mockBack(), canGoBack: () => true, push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => mockParams,
+  useNavigation: () => ({ getState: () => ({ routes: [] }) }),
+  useRoute: () => ({ key: "rules" }),
 }))
 
 jest.mock("@/screens/RulesScreen", () => ({

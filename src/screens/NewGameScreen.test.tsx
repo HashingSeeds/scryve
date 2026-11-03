@@ -180,7 +180,7 @@ describe("NewGameScreen", () => {
     expect(view.queryByTestId("resume-connected-arriving")).toBeNull()
     expect(within(form).getByText("3 seats · 20 life")).toBeTruthy()
     expect(within(form).queryByText("Games in progress")).toBeNull()
-    fireEvent.press(view.getByTestId("setup-status"))
+    fireEvent.press(view.getByTestId("setup-back"))
     expect(props.onResumeConnected).toHaveBeenCalledWith(
       expect.objectContaining({ publicId: "arriving" }),
     )
@@ -210,10 +210,16 @@ describe("NewGameScreen", () => {
     ).toBeNull()
   })
 
-  it("drops the empty status row from a fresh setup", () => {
+  it("returns to a running game from the header, keeping the footer the same height", () => {
     expect(setup().queryByTestId("setup-status")).toBeNull()
     expect(setup({ mode: "connected" }).queryByTestId("setup-status")).toBeNull()
-    expect(setup({ localGame: runningLocalGame() }).getByTestId("setup-status")).toBeTruthy()
+    expect(setup().getByTestId("setup-back")).toHaveTextContent("Play")
+    const onBack = jest.fn()
+    const view = setup({ localGame: runningLocalGame(), onBack })
+    expect(view.queryByTestId("setup-status")).toBeNull()
+    expect(view.getByTestId("setup-back")).toHaveTextContent("Game")
+    fireEvent.press(view.getByTestId("setup-back"))
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 
   it("surfaces a hosted live game in local setup only", () => {
@@ -900,7 +906,7 @@ describe("NewGameScreen", () => {
       onResumeConnected,
     })
     expect(view.getByText("End current game…")).toBeTruthy()
-    fireEvent.press(view.getByTestId("setup-status"))
+    fireEvent.press(view.getByTestId("setup-back"))
     expect(onResumeConnected).toHaveBeenCalledWith(game)
 
     fireEvent.press(view.getByTestId("start-game-button"))
