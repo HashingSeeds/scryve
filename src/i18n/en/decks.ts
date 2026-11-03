@@ -503,6 +503,35 @@ const decks = {
     saved: "Saved",
     addCards: "+ Add cards",
   },
+  // Deck building warnings shown above the card list. They never stop a save. Each says what is wrong, then how to fix it. Riftbound terms (Legend, Champion unit, Signature) and domain names (Fury, Calm, Mind, Body, Chaos, Order) follow the publisher's official wording.
+  issues: {
+    // {{sections}} is a deck section, or several joined with " + ". {{have}} is how many cards it holds, e.g. "Main deck: 38 of 40. Add 2."
+    sizeUnder: "{{sections}}: {{have}} of {{target}}. Add {{diff}}.",
+    // e.g. "Rune deck: 13 of 12. Remove 1."
+    sizeOver: "{{sections}}: {{have}} of {{target}}. Remove {{diff}}.",
+    sizeAtLeast: "{{sections}}: {{have}}, at least {{target}}. Add {{diff}}.",
+    // e.g. "Sideboard: 12, at most 10. Remove 2."
+    sizeAtMost: "{{sections}}: {{have}}, at most {{target}}. Remove {{diff}}.",
+    // Too many copies of one card by name, e.g. "Ahri, Alluring has 4 copies. Remove 1 to get to 3."
+    copies: "{{card}} has {{have}} copies. Remove {{diff}} to get to {{max}}.",
+    // A section where every card must have a different name, e.g. "Battlefields must all differ. Remove 1 Altar to Unity."
+    unique: "{{section}} must all differ. Remove {{diff}} {{card}}.",
+    // {{domains}} and {{identity}} are domain names separated by commas, e.g. "Svellsongur is Calm, outside your Legend's Fury, Chaos. Remove it."
+    domain: "{{card}} is {{domains}}, outside your Legend's {{identity}}. Remove it.",
+    // The Chosen Champion must be a Champion unit of the Legend's champion, e.g. "Darius, Trifarian isn't a Jinx Champion unit. Choose one that is."
+    champion: "{{card}} isn't a {{champion}} Champion unit. Choose one that is.",
+    championUnit: "{{card}} isn't a Champion unit. Choose one that is.",
+    // A deck holds at most 3 Signature cards in total.
+    signatureCount: "{{have}} Signature cards, at most {{max}}. Remove {{diff}}.",
+    signatureChampion: "{{card}} is another champion's Signature card. Remove it.",
+    // {{format}} is a format name, e.g. "Mana Crypt is banned in Commander. Remove it."
+    banned: "{{card}} is banned in {{format}}. Remove it.",
+    notLegal: "{{card}} isn't legal in {{format}}. Remove it.",
+    // Magic color identity as color letters (W, U, B, R, G), e.g. "Lightning Bolt is R, outside your commander's WU. Remove it."
+    colorIdentity: "{{card}} is {{colors}}, outside your commander's {{identity}}. Remove it.",
+    // Stands in for {{identity}} when the commander has no colors.
+    colorless: "colorless",
+  },
   play: {
     // Heading over the deck's versions. The player picks the one they bring to their next games.
     bringing: "Bringing",

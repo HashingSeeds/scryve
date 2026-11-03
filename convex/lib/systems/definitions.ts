@@ -30,15 +30,43 @@ export type CounterDefinition = {
   readonly flooredAtZero?: true
 }
 
+export type DeckCheckId = "riftboundIdentity" | "commanderIdentity"
+
+export type DeckRule<Section extends string = string> =
+  | {
+      readonly kind: "size"
+      readonly sections: readonly Section[]
+      readonly min?: number
+      readonly max?: number
+    }
+  | {
+      readonly kind: "copies"
+      readonly sections: readonly Section[]
+      readonly max: number
+      readonly allowance?: "mtgCardText"
+    }
+  | { readonly kind: "unique"; readonly section: Section }
+  | { readonly kind: "legal"; readonly format: string }
+  | { readonly kind: "check"; readonly check: DeckCheckId }
+
 export type FormatDefinition = {
   readonly id: string
   readonly label: string
   readonly blurb?: string
   readonly sections: readonly DeckSection[]
+  readonly rules?: readonly DeckRule[]
   readonly startingValue?: number
   readonly multiplayerStartingValue?: number
   readonly commanderDamage?: { readonly lethal: number }
   readonly singleton?: boolean
+}
+
+/** why: `satisfies SystemDefinition` cannot see which sections a format has, so a rule naming a missing section would type-check without this. */
+function withDeckRules<const Sections extends readonly DeckSection[]>(
+  sections: Sections,
+  rules: readonly DeckRule<Sections[number]["id"]>[],
+) {
+  return { sections, rules }
 }
 
 export const CAPABILITY_KEYS = [
@@ -200,7 +228,13 @@ export const SYSTEMS = {
         id: "commander",
         label: "Commander",
         blurb: "100 cards, singleton",
-        sections: MTG_COMMANDER_SECTIONS,
+        ...withDeckRules(MTG_COMMANDER_SECTIONS, [
+          { kind: "size", sections: ["commander"], min: 1, max: 2 },
+          { kind: "size", sections: ["commander", "main"], min: 100, max: 100 },
+          { kind: "copies", sections: ["commander", "main"], max: 1, allowance: "mtgCardText" },
+          { kind: "legal", format: "commander" },
+          { kind: "check", check: "commanderIdentity" },
+        ]),
         startingValue: 40,
         commanderDamage: { lethal: 21 },
         singleton: true,
@@ -221,7 +255,11 @@ export const SYSTEMS = {
         id: "modern",
         label: "Modern",
         blurb: "8th Edition forward",
-        sections: MTG_CONSTRUCTED_SECTIONS,
+        ...withDeckRules(MTG_CONSTRUCTED_SECTIONS, [
+          { kind: "size", sections: ["main"], min: 60 },
+          { kind: "size", sections: ["sideboard"], max: 15 },
+          { kind: "copies", sections: ["main", "sideboard"], max: 4, allowance: "mtgCardText" },
+        ]),
       },
       {
         id: "legacy",
@@ -556,7 +594,17 @@ export const SYSTEMS = {
         id: "constructed",
         label: "Constructed",
         blurb: "40 cards, 3 copies",
-        sections: RIFTBOUND_SECTIONS,
+        ...withDeckRules(RIFTBOUND_SECTIONS, [
+          { kind: "size", sections: ["legend"], min: 1, max: 1 },
+          { kind: "size", sections: ["champion"], min: 1, max: 1 },
+          { kind: "size", sections: ["champion", "main"], min: 40, max: 40 },
+          { kind: "size", sections: ["battlefields"], min: 3, max: 3 },
+          { kind: "size", sections: ["runes"], min: 12, max: 12 },
+          { kind: "size", sections: ["sideboard"], max: 10 },
+          { kind: "copies", sections: ["champion", "main", "sideboard"], max: 3 },
+          { kind: "unique", section: "battlefields" },
+          { kind: "check", check: "riftboundIdentity" },
+        ]),
       },
     ],
     table: { counters: [], designations: [] },

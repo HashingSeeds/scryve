@@ -480,6 +480,25 @@ export default {
     saved: "Enregistré",
     addCards: "+ Ajouter des cartes",
   },
+  issues: {
+    sizeUnder: "{{sections}} : {{have}} sur {{target}}. Ajoutez-en {{diff}}.",
+    sizeOver: "{{sections}} : {{have}} sur {{target}}. Retirez-en {{diff}}.",
+    sizeAtLeast: "{{sections}} : {{have}}, au moins {{target}}. Ajoutez-en {{diff}}.",
+    sizeAtMost: "{{sections}} : {{have}}, au plus {{target}}. Retirez-en {{diff}}.",
+    copies: "{{card}} compte {{have}} exemplaires. Retirez-en {{diff}} pour arriver à {{max}}.",
+    unique: "{{section}} : toutes les cartes doivent être différentes. Retirez {{diff}} {{card}}.",
+    domain:
+      "{{card}} est {{domains}}, hors de l'identité {{identity}} de votre Légende. Retirez-la.",
+    champion: "{{card}} n'est pas une unité Champion {{champion}}. Choisissez-en une qui l'est.",
+    championUnit: "{{card}} n'est pas une unité Champion. Choisissez-en une qui l'est.",
+    signatureCount: "{{have}} cartes Signature, au plus {{max}}. Retirez-en {{diff}}.",
+    signatureChampion: "{{card}} est la carte Signature d'un autre champion. Retirez-la.",
+    banned: "{{card}} est banni en {{format}}. Retirez-la.",
+    notLegal: "{{card}} n'est pas légale en {{format}}. Retirez-la.",
+    colorIdentity:
+      "{{card}} est {{colors}}, hors de l'identité couleur de votre commandant ({{identity}}). Retirez-la.",
+    colorless: "incolore",
+  },
   play: {
     bringing: "Joué avec",
     results: "Résultats",

@@ -27,6 +27,7 @@ import { DeckCardListSkeleton, DeckCardRow, DeckCardSectionHeader } from "./Deck
 import { printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel, deckNameWarning } from "./deckCopy"
 import { canChooseCommander, isCommanderPick } from "./deckDraft"
+import { DeckIssues, useDeckIssues } from "./DeckIssues"
 import type { GuestDeckPayload } from "./guestDeck"
 import { lineCardName, type ImportProblem } from "./importLines"
 import { SaveDestination, type SaveDestinationState } from "./SaveDestination"
@@ -102,6 +103,7 @@ export function ImportBuild({
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const shown = cards ?? []
   const analysis = useDeckAnalysis(game, format, editable ? shown : [])
+  const issues = useDeckIssues(game, format, editable ? shown : [])
   const [listFinal, setListFinal] = useState(false)
   if (!listFinal && cards && editable && !analysis?.detailsPending) setListFinal(true)
   const nameIndex = useCardNameIndex(
@@ -292,6 +294,15 @@ export function ImportBuild({
                 </View>
               )
             })}
+            {listFinal && shown.length > 0 ? (
+              <DeckIssues
+                game={game}
+                issues={issues}
+                sectionLabel={(id) =>
+                  deckSections.find((section) => section.id === id)?.label ?? id
+                }
+              />
+            ) : null}
             {listFinal ? null : (
               <View>
                 <DeckCardListSkeleton

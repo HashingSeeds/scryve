@@ -658,6 +658,7 @@ const cardDetailsValidator = v.object({
   oracleText: v.optional(v.string()),
   keywords: v.optional(v.string()),
   faceDetails: v.optional(v.string()),
+  facets: v.optional(v.string()),
   setName: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
   rarity: v.optional(v.string()),
@@ -751,6 +752,7 @@ export const detailsBatch = query({
               ? { collectorNumber: cached.collectorNumber }
               : {}),
             ...(cached.rarity !== undefined ? { rarity: cached.rarity } : {}),
+            facets: JSON.stringify(cached.facets),
           },
         })
       }

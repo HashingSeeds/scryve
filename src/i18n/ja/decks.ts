@@ -452,6 +452,28 @@ export default {
     saved: "保存済み",
     addCards: "+ カードを追加",
   },
+  issues: {
+    sizeUnder: "{{sections}}: {{target}}枚中{{have}}枚です。{{diff}}枚追加してください。",
+    sizeOver: "{{sections}}: {{target}}枚中{{have}}枚です。{{diff}}枚減らしてください。",
+    sizeAtLeast:
+      "{{sections}}: {{have}}枚です。{{target}}枚以上必要です。{{diff}}枚追加してください。",
+    sizeAtMost: "{{sections}}: {{have}}枚です。{{target}}枚までです。{{diff}}枚減らしてください。",
+    copies: "{{card}}が{{have}}枚入っています。{{max}}枚になるよう{{diff}}枚減らしてください。",
+    unique: "{{section}}は同じカードを入れられません。{{card}}を{{diff}}枚減らしてください。",
+    domain: "{{card}}は{{domains}}で、レジェンドの{{identity}}の範囲外です。取り除いてください。",
+    champion:
+      "{{card}}は{{champion}}のチャンピオンユニットではありません。該当するものを選んでください。",
+    championUnit:
+      "{{card}}はチャンピオンユニットではありません。チャンピオンユニットを選んでください。",
+    signatureCount:
+      "シグネチャーカードが{{have}}枚です。{{max}}枚までです。{{diff}}枚減らしてください。",
+    signatureChampion: "{{card}}は別のチャンピオンのシグネチャーカードです。取り除いてください。",
+    banned: "{{card}}は{{format}}で禁止されています。削除してください。",
+    notLegal: "{{card}}は{{format}}で使用できません。削除してください。",
+    colorIdentity:
+      "{{card}}は{{colors}}で、統率者の固有色{{identity}}の範囲外です。削除してください。",
+    colorless: "無色",
+  },
   play: {
     bringing: "持っていくデッキ",
     results: "結果",

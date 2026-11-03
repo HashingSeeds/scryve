@@ -24,6 +24,7 @@ import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { cardSection, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { cardCountLabel } from "./deckCopy"
 import { isCommanderPick, moveTarget, sideboardSection } from "./deckDraft"
+import { DeckIssues, useDeckIssues } from "./DeckIssues"
 import { useHostDeckSearch, type DeckSearchHost } from "./deckSearchHost"
 import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
 import { tracksResults } from "../../../convex/lib/systems"
@@ -164,6 +165,7 @@ export function DeckView({
     })
   }
   const shownCards = building ? cards : savedCards
+  const issues = useDeckIssues(game, format, shownCards)
   const side = sideboardSection({ game, format })
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
   const mainCount = totalQuantity(shownCards) - sideCount
@@ -259,6 +261,13 @@ export function DeckView({
               play
             )}
             {cardsMessage}
+            {building && !cardsUnavailable && shownCards.length > 0 ? (
+              <DeckIssues
+                game={game}
+                issues={issues}
+                sectionLabel={(id) => sectionLabel(id) ?? id}
+              />
+            ) : null}
           </>
         }
         renderSectionHeader={({ section }) => (

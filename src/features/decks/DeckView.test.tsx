@@ -282,3 +282,17 @@ describe("analysis sheet", () => {
     expect(view.queryByTestId("deck-analysis-choose-commander")).toBeNull()
   })
 })
+
+it("lists deck rule warnings with their fix while building, never blocking the save", () => {
+  const poro = { name: "Pouty Poro", quantity: 4, section: "main", cardId: "pouty-poro" }
+  const view = renderDeckView({
+    game: "riftbound",
+    format: "constructed",
+    cards: [poro],
+    changes: 1,
+  })
+
+  expect(view.getByText("Chosen Champion + Main deck: 4 of 40. Add 36.")).toBeTruthy()
+  expect(view.getByText("Pouty Poro has 4 copies. Remove 1 to get to 3.")).toBeTruthy()
+  expect(view.getByTestId("save-version-button")).toBeEnabled()
+})

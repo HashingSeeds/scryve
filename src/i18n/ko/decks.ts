@@ -445,6 +445,26 @@ export default {
     saved: "저장됨",
     addCards: "+ 카드 추가",
   },
+  issues: {
+    sizeUnder: "{{sections}}: {{target}}장 중 {{have}}장입니다. {{diff}}장을 추가하세요.",
+    sizeOver: "{{sections}}: {{target}}장 중 {{have}}장입니다. {{diff}}장을 제거하세요.",
+    sizeAtLeast: "{{sections}}: {{have}}장, 최소 {{target}}장 필요합니다. {{diff}}장을 추가하세요.",
+    sizeAtMost:
+      "{{sections}}: {{have}}장, 최대 {{target}}장까지 가능합니다. {{diff}}장을 제거하세요.",
+    copies: "{{card}}의 사본이 {{have}}장입니다. {{max}}장이 되도록 {{diff}}장을 제거하세요.",
+    unique: "{{section}}의 카드는 모두 이름이 달라야 합니다. {{card}} {{diff}}장을 제거하세요.",
+    domain: "{{card}}은(는) {{domains}}이며, 레전드의 {{identity}} 범위를 벗어납니다. 제거하세요.",
+    champion: "{{card}}은(는) {{champion}} 챔피언 유닛이 아닙니다. 챔피언 유닛을 선택하세요.",
+    championUnit: "{{card}}은(는) 챔피언 유닛이 아닙니다. 챔피언 유닛을 선택하세요.",
+    signatureCount:
+      "시그니처 카드가 {{have}}장입니다. 최대 {{max}}장까지 가능합니다. {{diff}}장을 제거하세요.",
+    signatureChampion: "{{card}}은(는) 다른 챔피언의 시그니처 카드입니다. 제거하세요.",
+    banned: "{{card}} 카드는 {{format}}에서 금지되어 있습니다. 제거하세요.",
+    notLegal: "{{card}} 카드는 {{format}}에서 사용할 수 없습니다. 제거하세요.",
+    colorIdentity:
+      "{{card}} 카드는 {{colors}}이며 커맨더의 {{identity}} 색 정체성을 벗어납니다. 제거하세요.",
+    colorless: "무색",
+  },
   play: {
     bringing: "사용할 버전",
     results: "결과",

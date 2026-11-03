@@ -1,21 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef } from "react"
 import { ScrollView, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
-import { useConvex } from "convex/react"
 
 import { SectionHeader } from "@/components/NumberLane"
 import { Sheet } from "@/components/Sheet"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
-import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
-import { fetchCardDetails, loadCardDetails } from "./cardDetailsCache"
 import { analyzeDeck, CURVE_BUCKETS, type DeckAnalysis, type ManaColor } from "./deckAnalysis"
-import { cardDetailsKey, type DeckCard } from "./deckCards"
+import type { DeckCard } from "./deckCards"
+import { useDeckCardDetails } from "./useDeckCardDetails"
 import { systemDefinition } from "../../../convex/lib/systems"
 
 const MANA_DOT: Record<ManaColor, string> = {
@@ -30,39 +28,18 @@ const CURVE_HEIGHT = 72
 
 export function useDeckAnalysis(game: string, format: string, cards: DeckCard[]) {
   const enabled = systemDefinition(game)?.deckAnalysis === true
-  const client = useConvex()
-  const online = useConvexOnline()
-  const [details, setDetails] = useState(loadCardDetails)
-  const [settled, setSettled] = useState<ReadonlySet<string>>(() => new Set())
-  const requested = useRef(new Set<string>())
-  useEffect(() => {
-    if (!enabled || !online) return
-    const pending = cards.filter((card) => {
-      const key = cardDetailsKey(card, game)
-      if (requested.current.has(key)) return false
-      requested.current.add(key)
-      return true
-    })
-    if (pending.length === 0) return
-    const keys = pending.map((card) => cardDetailsKey(card, game))
-    fetchCardDetails(client, game, pending)
-      .then(() => setDetails(loadCardDetails()))
-      .catch(() => {
-        for (const key of keys) requested.current.delete(key)
-      })
-      .finally(() => setSettled((previous) => new Set([...previous, ...keys])))
-  }, [client, enabled, game, cards, online])
-  return useMemo(() => {
-    if (!enabled) return undefined
-    const detailsFor = (card: DeckCard) => details[cardDetailsKey(card, game)]
-    const detailsPending =
-      online && cards.some((card) => !detailsFor(card) && !settled.has(cardDetailsKey(card, game)))
-    return {
-      detailsFor,
-      detailsPending,
-      analysis: analyzeDeck({ cards, format, details: detailsFor }),
-    }
-  }, [enabled, cards, format, details, game, online, settled])
+  const { detailsFor, detailsPending } = useDeckCardDetails(game, cards, enabled)
+  return useMemo(
+    () =>
+      enabled
+        ? {
+            detailsFor,
+            detailsPending,
+            analysis: analyzeDeck({ cards, format, details: detailsFor }),
+          }
+        : undefined,
+    [enabled, cards, format, detailsFor, detailsPending],
+  )
 }
 
 export function DeckAnalysisSheet({
