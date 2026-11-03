@@ -93,7 +93,7 @@ import {
 } from "./lib/policy"
 import { recordGameResults, recordPlayerResult, refreshGameOpponents } from "./lib/results"
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
-import { startingValueRange, systemDefinition, tableRules } from "./lib/systems"
+import { attachesDecks, startingValueRange, systemDefinition, tableRules } from "./lib/systems"
 import {
   canonicalJson,
   isValidTableSnapshot,
@@ -119,6 +119,12 @@ const MAX_COMMANDER_DAMAGE_ROWS = MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_G
 const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
 const NO_GAME_SYSTEM = "none"
+const NO_SEAT_DECK = {
+  deckVersionId: undefined,
+  deckKey: undefined,
+  deckFingerprint: undefined,
+  deckLabel: undefined,
+}
 
 async function findGameByPublicId(ctx: QueryCtx, publicId: string) {
   assertPublicId(publicId)
@@ -674,9 +680,11 @@ async function terminalizeGame(
           : "loss"
   const now = Date.now()
   const finishedAt = options.finishedAt ?? now
+  const decks = attachesDecks(gameDeckRules(game)[0])
   const summaryPlayers = await Promise.all(
     players
       .sort((a, b) => a.seat - b.seat)
+      .map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK }))
       .map(async (player) => {
         const user = player.userId ? await ctx.db.get(player.userId) : null
         const version = player.deckVersionId ? await ctx.db.get(player.deckVersionId) : null
@@ -765,7 +773,8 @@ async function terminalizeGame(
   }
   await recordGameResults(ctx, summary)
   await ctx.db.patch(game._id, { status, updatedAt: now })
-  for (const player of players) await ctx.db.patch(player._id, { resumable: false })
+  for (const player of players)
+    await ctx.db.patch(player._id, { resumable: false, ...(decks ? {} : NO_SEAT_DECK) })
   return summary
 }
 
@@ -851,7 +860,9 @@ export const createLobby = mutation({
       startingLife: args.startingLife,
       ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
       ruleset,
-      ...(args.deckRequired === undefined ? {} : { deckRequired: args.deckRequired }),
+      ...(args.deckRequired === undefined || !attachesDecks(gameSystem)
+        ? {}
+        : { deckRequired: args.deckRequired }),
       game: gameSystem,
       system: gameSystem,
       ...(format ? { format } : {}),
@@ -1397,7 +1408,11 @@ export const publishFinishedLocalGame = mutation({
     const user = await requireUser(ctx)
     assertPublicId(args.publicId)
     const { gameSystem, ruleset, format } = await resolveLocalGameSetup(ctx, args)
-    const { localIds } = assertSnapshotPlayers(args.players)
+    const decks = attachesDecks(gameSystem)
+    const players = decks
+      ? args.players
+      : args.players.map((player) => ({ ...player, ...NO_SEAT_DECK, deckName: undefined }))
+    const { localIds } = assertSnapshotPlayers(players)
     const firstPlayerLocalId =
       args.firstPlayerLocalId !== undefined && localIds.has(args.firstPlayerLocalId)
         ? args.firstPlayerLocalId
@@ -1417,18 +1432,18 @@ export const publishFinishedLocalGame = mutation({
       args.eventCount > MAX_LOCAL_EVENT_COUNT
     )
       throw new Error("Event count is out of range")
-    const meSeats = args.players.filter((player) => player.me)
+    const meSeats = players.filter((player) => player.me)
     if (meSeats.length > 1) throw new Error("Only one seat can be yours")
     if (
-      args.players.some(
+      players.some(
         (player) =>
           (player.deckVersionId || player.deckKey || player.deckFingerprint) && !player.me,
       )
     )
       throw new Error("Only your seat can record a deck")
-    const seatPassHashes = args.players.flatMap(({ seatPassHash }) => seatPassHash ?? [])
+    const seatPassHashes = players.flatMap(({ seatPassHash }) => seatPassHash ?? [])
     if (
-      args.players.some((player) => player.me && player.seatPassHash !== undefined) ||
+      players.some((player) => player.me && player.seatPassHash !== undefined) ||
       !seatPassHashes.every(isSeatPassHash) ||
       new Set(seatPassHashes).size !== seatPassHashes.length
     )
@@ -1502,7 +1517,7 @@ export const publishFinishedLocalGame = mutation({
           }
     const deckLabels = new Map(
       await Promise.all(
-        args.players.map(
+        players.map(
           async (player) =>
             [player.localId, await assertDeckLabel(ctx, gameSystem, player.deckLabel)] as const,
         ),
@@ -1513,7 +1528,7 @@ export const publishFinishedLocalGame = mutation({
       hostUserId: user._id,
       mode: "local",
       status: "active",
-      playerCount: args.players.length,
+      playerCount: players.length,
       startingLife: args.startingLife,
       ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
       ruleset,
@@ -1527,10 +1542,7 @@ export const publishFinishedLocalGame = mutation({
       eventSequence: args.eventCount,
     })
     const playerIdsByLocalId = new Map<string, Id<"gamePlayers">>()
-    for (const player of resolvePlayerAppearances(
-      args.players,
-      ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
-    )) {
+    for (const player of resolvePlayerAppearances(players, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)) {
       const deckLabel = deckLabels.get(player.localId)
       const playerId = await ctx.db.insert("gamePlayers", {
         gameId,
@@ -1557,7 +1569,7 @@ export const publishFinishedLocalGame = mutation({
           id: gameId,
           system: gameSystem,
           ...(format ? { format } : {}),
-          seats: args.players.map((player) => ({
+          seats: players.map((player) => ({
             seat: player.seat,
             displayName: player.displayName,
             deckLabel: deckLabels.get(player.localId),
@@ -1576,9 +1588,9 @@ export const publishFinishedLocalGame = mutation({
       : undefined
     if (matchId && args.match)
       await ctx.db.patch(gameId, { matchId, matchGameNumber: args.match.gameNumber })
-    if (matchId) {
+    if (matchId && decks) {
       const match = await ctx.db.get(matchId)
-      for (const player of args.players) {
+      for (const player of players) {
         const locked = match?.seats.find((seat) => seat.seat === player.seat)
         if (locked)
           await ctx.db.patch(playerIdsByLocalId.get(player.localId)!, {
@@ -1613,7 +1625,7 @@ export const publishFinishedLocalGame = mutation({
           [...playerIdsByLocalId].map(([localId, playerId]) => [playerId, localId]),
         ),
         deckNames: new Map(
-          args.players.flatMap((player) =>
+          players.flatMap((player) =>
             player.me && player.deckName?.trim()
               ? [[playerIdsByLocalId.get(player.localId)!, player.deckName.trim().slice(0, 80)]]
               : [],
@@ -1728,11 +1740,14 @@ export const claimNearbySeat = mutation({
         message: "You already hold a seat in this game",
       })
     const identity = { userId: user._id, usernameAtJoin: user.username }
-    const sharedDeck = await claimableSharedDeck(ctx, args, user._id, game)
+    const decks = attachesDecks(gameDeckRules(game)[0])
+    const sharedDeck = decks ? await claimableSharedDeck(ctx, args, user._id, game) : undefined
     const chosen =
       sharedDeck?.kind === "owned"
         ? sharedDeck
-        : await claimableDeck(ctx, args.deckVersionId, user._id, game)
+        : decks
+          ? await claimableDeck(ctx, args.deckVersionId, user._id, game)
+          : undefined
     const shared = sharedDeck?.kind === "shared" ? sharedDeck : undefined
     await ctx.db.patch(seat._id, {
       ...identity,
@@ -1903,6 +1918,7 @@ export const lobbyProjection = query({
     const players = await playersForGame(ctx, game._id)
     if (!players.some((player) => player.userId === user._id)) throw gameUnavailable()
     const isHost = game.hostUserId === user._id
+    const decks = attachesDecks(gameDeckRules(game)[0])
     const recentEvents =
       args.includeRecentOperationIds !== false && game.status === "active"
         ? await ctx.db
@@ -1941,7 +1957,7 @@ export const lobbyProjection = query({
       startingLife: game.startingLife,
       ...(game.lifeStep === undefined ? {} : { lifeStep: game.lifeStep }),
       ruleset: game.ruleset,
-      deckRequired: game.deckRequired ?? false,
+      deckRequired: decks && (game.deckRequired ?? false),
       game: game.game ?? DEFAULT_DECK_GAME,
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
@@ -1968,6 +1984,7 @@ export const lobbyProjection = query({
       players: await Promise.all(
         players
           .sort((a, b) => a.seat - b.seat)
+          .map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK }))
           .map(async (p) => ({
             playerId: p._id,
             seat: p.seat,
@@ -2210,7 +2227,9 @@ export const updateLobbySettings = mutation({
         code: "lobby_settings_not_allowed",
         message: "Lobby settings can only change in a lobby",
       })
-    assertDeckRequirementSupported(game.system ?? game.game ?? DEFAULT_DECK_GAME, args.deckRequired)
+    const system = gameDeckRules(game)[0]
+    assertDeckRequirementSupported(system, args.deckRequired)
+    const deckRequired = attachesDecks(system) ? args.deckRequired : undefined
     if (args.playerCount !== undefined) {
       try {
         assertPlayerCount(args.playerCount)
@@ -2231,12 +2250,12 @@ export const updateLobbySettings = mutation({
     }
     await ctx.db.patch(game._id, {
       ...(args.playerCount === undefined ? {} : { playerCount: args.playerCount }),
-      ...(args.deckRequired === undefined ? {} : { deckRequired: args.deckRequired }),
+      ...(deckRequired === undefined ? {} : { deckRequired }),
       updatedAt: Date.now(),
     })
     return {
       playerCount: args.playerCount ?? game.playerCount,
-      deckRequired: args.deckRequired ?? game.deckRequired ?? false,
+      deckRequired: attachesDecks(system) && (deckRequired ?? game.deckRequired ?? false),
     }
   },
 })
@@ -2262,7 +2281,8 @@ export const startGame = mutation({
         code: "seats_unclaimed",
         message: "All configured seats (2–6) must be claimed before starting",
       })
-    if (game.deckRequired === true) {
+    const decks = attachesDecks(gameDeckRules(game)[0])
+    if (decks && game.deckRequired === true) {
       for (const player of players) {
         if (
           !sharedSeatKey(player) &&
@@ -2284,7 +2304,7 @@ export const startGame = mutation({
       ...lifeEditingFor(players),
     })
     for (const [index, player] of resolvePlayerAppearances(
-      players,
+      players.map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK })),
       ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
     ).entries()) {
       const invalidSinceSelection =
@@ -2299,6 +2319,7 @@ export const startGame = mutation({
         resumable: true,
         color: player.color,
         shape: player.shape,
+        ...(decks ? {} : NO_SEAT_DECK),
         ...(invalidSinceSelection
           ? { deckVersionId: undefined, deckKey: undefined, deckFingerprint: undefined }
           : player.deckVersionId
@@ -2408,8 +2429,11 @@ export const labelGuestSeatDeck = mutation({
         code: "guest_seat_required",
         message: "Only a guest seat can be labeled",
       })
+    const [system] = gameDeckRules(game)
     await ctx.db.patch(player._id, {
-      deckLabel: await assertDeckLabel(ctx, gameDeckRules(game)[0], args.deckLabel ?? undefined),
+      deckLabel: attachesDecks(system)
+        ? await assertDeckLabel(ctx, system, args.deckLabel ?? undefined)
+        : undefined,
     })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return null
@@ -2672,7 +2696,11 @@ async function startRematch(
   })
   const game = (await ctx.db.get(gameId))!
   const roles = rolesFor(game, players.length)
-  for (const [index, player] of players.sort((left, right) => left.seat - right.seat).entries()) {
+  const decks = attachesDecks(gameDeckRules(game)[0])
+  for (const [index, player] of players
+    .sort((left, right) => left.seat - right.seat)
+    .map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK }))
+    .entries()) {
     const deckVersionId =
       player.deckVersionId && (await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         ? player.deckVersionId

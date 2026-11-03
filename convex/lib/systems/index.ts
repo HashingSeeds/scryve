@@ -27,6 +27,11 @@ export function tracksResults(system: unknown): boolean {
   return systemDefinition(system)?.resultTracking ?? true
 }
 
+/** why: a deck's identity next to a winner is matchup data, so systems that keep no results attach no decks to games either. */
+export function attachesDecks(system: unknown): boolean {
+  return tracksResults(system)
+}
+
 export function formatDefinition(system: unknown, format: unknown): FormatDefinition | undefined {
   return systemDefinition(system)?.formats.find((candidate) => candidate.id === format)
 }

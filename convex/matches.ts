@@ -21,6 +21,7 @@ import {
   MIN_PLAYERS,
 } from "./lib/policy"
 import { recordMatchResult, removeMatchResult } from "./lib/results"
+import { attachesDecks } from "./lib/systems"
 
 const outcomeValidator = v.union(
   v.literal("win"),
@@ -114,33 +115,40 @@ export const recordManualMatch = mutation({
     }
     if (!(await hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit)))
       await limitResultRate(ctx, "manualResult", user._id)
-    if (args.me.deckKey !== undefined) assertDeckKey(args.me.deckKey)
-    if (args.me.deckFingerprint !== undefined) assertDeckFingerprint(args.me.deckFingerprint)
     const now = Date.now()
     const finishedAt = assertMatchFinishedAt(args.finishedAt, now)
     assertSeatNumbers([args.me, ...args.opponents])
     assertGameScores([args.me, ...args.opponents], args.bestOf)
-    const attached = args.me.deckVersionId
-      ? await ownedDeckVersion(ctx, user._id, args.me.deckVersionId)
-      : undefined
+    const named = args.system === undefined ? undefined : assertGameSystem(args.system)
+    const found =
+      args.me.deckVersionId && attachesDecks(named)
+        ? await ownedDeckVersion(ctx, user._id, args.me.deckVersionId)
+        : undefined
     let system: string | undefined
     let format: string | undefined
-    if (args.system !== undefined) {
-      system = assertGameSystem(args.system)
+    if (named !== undefined) {
+      system = named
       format = args.format === undefined ? undefined : assertDeckGameFormat(system, args.format)
     } else if (args.format !== undefined) {
       throw new Error("Format requires a game system")
-    } else if (attached) {
-      system = attached.deck.game ?? DEFAULT_DECK_GAME
-      format = attached.deck.format
+    } else if (found) {
+      system = found.deck.game ?? DEFAULT_DECK_GAME
+      format = found.deck.format
     }
+    const decks = attachesDecks(system)
+    const attached = decks ? found : undefined
+    const me = decks
+      ? args.me
+      : { ...args.me, deckKey: undefined, deckFingerprint: undefined, deckName: undefined }
+    if (me.deckKey !== undefined) assertDeckKey(me.deckKey)
+    if (me.deckFingerprint !== undefined) assertDeckFingerprint(me.deckFingerprint)
     // why: the app sends the match date's local midnight, so the list stays known through that day.
     const listKeptSinceMatchDay =
       attached &&
       (attached.version.updatedAt ?? attached.version.createdAt) <=
         finishedAt + MATCH_FINISHED_AT_GRACE_MS
     const deckFingerprint =
-      args.me.deckFingerprint ??
+      me.deckFingerprint ??
       (listKeptSinceMatchDay
         ? (await pinnedDeck(ctx, attached.version._id)).deckFingerprint
         : undefined)
@@ -158,8 +166,8 @@ export const recordManualMatch = mutation({
         userId: user._id,
         ...(attached
           ? { deckKey: attached.deck.deckKey }
-          : args.me.deckKey
-            ? { deckKey: args.me.deckKey }
+          : me.deckKey
+            ? { deckKey: me.deckKey }
             : {}),
         ...(deckFingerprint ? { deckFingerprint } : {}),
         ...(attached
@@ -168,8 +176,8 @@ export const recordManualMatch = mutation({
               deckVersionId: attached.version._id,
               deckName: attached.deck.name,
             }
-          : args.me.deckKey && args.me.deckName?.trim()
-            ? { deckName: assertDeckName(args.me.deckName) }
+          : me.deckKey && me.deckName?.trim()
+            ? { deckName: assertDeckName(me.deckName) }
             : {}),
         ...scoreFields(args.me),
         outcome: args.me.outcome,
@@ -178,10 +186,10 @@ export const recordManualMatch = mutation({
         args.opponents.map(async (opponent) => ({
           seat: opponent.seat,
           displayName: assertDisplayName(opponent.displayName),
-          ...(opponent.deckName === undefined || opponent.deckName.trim() === ""
+          ...(!decks || opponent.deckName === undefined || opponent.deckName.trim() === ""
             ? {}
             : { deckName: assertDeckName(opponent.deckName) }),
-          deckLabel: await assertDeckLabel(ctx, system, opponent.deckLabel),
+          deckLabel: decks ? await assertDeckLabel(ctx, system, opponent.deckLabel) : undefined,
           ...scoreFields(opponent),
           outcome: opponent.outcome,
         })),
@@ -319,10 +327,11 @@ export async function linkPublishedGameToMatch(
   const mySeat = meSeatOf(game.seats)
   if (
     lockedSeat?.seat !== mySeat?.seat ||
-    lockedSeat?.deckVersionId !== mySeat?.deckVersionId ||
-    (lockedSeat?.deckKey !== undefined &&
-      mySeat?.deckKey !== undefined &&
-      lockedSeat.deckKey !== mySeat.deckKey)
+    (attachesDecks(game.system) &&
+      (lockedSeat?.deckVersionId !== mySeat?.deckVersionId ||
+        (lockedSeat?.deckKey !== undefined &&
+          mySeat?.deckKey !== undefined &&
+          lockedSeat.deckKey !== mySeat.deckKey)))
   )
     throw new Error("A match keeps the same seat and deck for every game")
   if (existing.gameIds.includes(game.id)) return existing._id

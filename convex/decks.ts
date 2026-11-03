@@ -56,6 +56,7 @@ import {
   MAX_PREMIUM_DECKS,
 } from "./lib/policy"
 import { resultDeckKey } from "./lib/results"
+import { attachesDecks } from "./lib/systems"
 
 const boardValidator = v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))
 const cardValidator = v.object({
@@ -1708,6 +1709,11 @@ export const selectForSeat = mutation({
       })
     const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
     await limitGameRate(ctx, "gameWrite", user._id)
+    const lobbyGame = game.system ?? game.game ?? DEFAULT_DECK_GAME
+    if (!attachesDecks(lobbyGame)) {
+      await ctx.db.patch(player._id, NO_SEAT_DECK)
+      return { deckId: null, deckVersionId: null }
+    }
     if (args.deckVersionId !== undefined && args.shareToken !== undefined)
       throw new ConvexError({
         code: "invalid_deck_selection",
@@ -1723,7 +1729,6 @@ export const selectForSeat = mutation({
       await ctx.db.patch(game._id, { updatedAt: Date.now() })
       return { deckId: null, deckVersionId: null }
     }
-    const lobbyGame = game.system ?? game.game ?? DEFAULT_DECK_GAME
     const lobbyFormat = game.format ?? game.ruleset
     const shared =
       args.shareToken === undefined

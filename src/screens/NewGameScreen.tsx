@@ -102,6 +102,7 @@ import { isCommanderFormat } from "../../convex/lib/gameRules"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
 import {
+  attachesDecks,
   identitySection,
   isSystemId,
   startingValueRange,
@@ -482,6 +483,10 @@ function NewGameForm({
         system: choice.system,
         format: choice.format,
       })
+      return
+    }
+    if (!attachesDecks(system)) {
+      wantedDeckId.current = undefined
       return
     }
     if (!account) return
@@ -948,7 +953,7 @@ function NewGameForm({
                     }))}
                     onSelect={chooseMeSeat}
                   />
-                  {effectiveMeSeat !== undefined && system ? (
+                  {effectiveMeSeat !== undefined && system && attachesDecks(system) ? (
                     <SelectField
                       testID="me-deck"
                       label={translate("play:newGame.yourDeck")}
