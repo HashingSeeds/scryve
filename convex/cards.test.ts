@@ -770,7 +770,10 @@ describe("card details batch", () => {
     ).toEqual([
       {
         key: "ygo:rush",
-        details: expect.objectContaining({ typeLine: expect.any(String) }),
+        details: expect.objectContaining({
+          typeLine: expect.any(String),
+          facets: JSON.stringify(card.facets),
+        }),
       },
     ])
     expect(fetchSpy).not.toHaveBeenCalled()

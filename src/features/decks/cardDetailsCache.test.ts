@@ -1,6 +1,7 @@
 import { storage } from "@/utils/storage"
 
 import {
+  fetchCardDetails,
   loadCardDetails,
   prefetchCardDetails,
   readCardDetail,
@@ -166,5 +167,25 @@ describe("card details cache", () => {
       store,
     )
     expect(query).toHaveBeenCalledTimes(2)
+  })
+
+  it("refetches cached cards saved before facets for games whose deck rules read them", async () => {
+    const store = memoryStore()
+    const poro = { name: "Pouty Poro", quantity: 3, cardId: "pouty-poro" }
+    const ring = { name: "Sol Ring", quantity: 1, scryfallId: "ring-id" }
+    saveCardDetails({ "riftbound:pouty-poro:": { typeLine: "Unit" }, "ring-id": solRing }, store)
+    const facets = JSON.stringify([{ key: "domains", value: "Fury" }])
+    const query = jest.fn(async () => [{ key: "riftbound:pouty-poro:", details: { facets } }])
+
+    await fetchCardDetails({ query }, "riftbound", [poro], store)
+    await fetchCardDetails({ query }, "riftbound", [poro], store)
+    await fetchCardDetails({ query }, "mtg", [ring], store)
+
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(query).toHaveBeenCalledWith(expect.anything(), {
+      game: "riftbound",
+      items: [{ key: "riftbound:pouty-poro:", catalogCardId: "pouty-poro" }],
+    })
+    expect(readCardDetail("riftbound:pouty-poro:", store)?.facets).toBe(facets)
   })
 })

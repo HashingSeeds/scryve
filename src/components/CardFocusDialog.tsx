@@ -45,6 +45,7 @@ export type FocusedCardDetails = {
   commanderLegality?: string
   colorIdentity?: string
   faceDetails?: string
+  facets?: string
   keywords?: string
   commanderRulesUpdatedAt?: string
   power?: string

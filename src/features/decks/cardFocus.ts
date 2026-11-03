@@ -8,6 +8,7 @@ export function catalogCardDetails(card: {
   setCode?: string
   collectorNumber?: string
   rarity?: string
+  facets?: readonly { key: string; value: string }[]
 }): FocusedCardDetails {
   return {
     imageUrl: card.imageUrl,
@@ -17,5 +18,6 @@ export function catalogCardDetails(card: {
     setName: card.setCode,
     collectorNumber: card.collectorNumber,
     rarity: card.rarity,
+    facets: card.facets && JSON.stringify(card.facets),
   }
 }

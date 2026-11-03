@@ -7,6 +7,7 @@ import { storage } from "@/utils/storage"
 import { readCardFaces } from "./cardFaces"
 import { cardDetailsKey, type DeckCard } from "./deckCards"
 import { api } from "../../../convex/_generated/api"
+import { readsCardDetails } from "../../../convex/lib/deckRules"
 
 export interface CardDetailStore {
   getString(key: string): string | undefined
@@ -106,9 +107,12 @@ function lookupFor(
   card: DeckCard,
   game: string,
   cached: Record<string, FocusedCardDetails>,
+  wantsFacets: boolean,
 ): DetailLookup | undefined {
   const key = cardDetailsKey(card, game)
-  if (cached[key]) return undefined
+  const entry = cached[key]
+  // why: only catalog cards send facets; Scryfall details never have them, so asking again would loop.
+  if (entry && (!wantsFacets || card.scryfallId || entry.facets !== undefined)) return undefined
   if (card.scryfallId) return { key, scryfallId: card.scryfallId }
   const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
   if (catalogCardId) return { key, catalogCardId }
@@ -122,16 +126,36 @@ export async function fetchCardDetails(
   store: CardDetailStore = storage,
 ) {
   const cached = loadCardDetails(store)
-  const items = [
+  const wantsFacets = readsCardDetails(game)
+  const lookups = [
     ...new Map(
-      cards.flatMap((card) => lookupFor(card, game, cached) ?? []).map((item) => [item.key, item]),
+      cards
+        .flatMap((card) => lookupFor(card, game, cached, wantsFacets) ?? [])
+        .map((item) => [item.key, item]),
     ).values(),
   ]
-  if (items.length === 0) return []
-  const found = await client.query(api.cards.detailsBatch, { game, items })
-  saveCardDetails(Object.fromEntries(found.map((entry) => [entry.key, entry.details])), store)
-  return found
+  const waiting = lookups.flatMap((item) => inFlight.get(item.key) ?? [])
+  const items = lookups.filter((item) => !inFlight.has(item.key))
+  if (items.length === 0) {
+    await Promise.allSettled(waiting)
+    return []
+  }
+  const request = client.query(api.cards.detailsBatch, { game, items }).then((found) => {
+    saveCardDetails(Object.fromEntries(found.map((entry) => [entry.key, entry.details])), store)
+    return found
+  })
+  for (const item of items) inFlight.set(item.key, request)
+  try {
+    const found = await request
+    await Promise.allSettled(waiting)
+    return found
+  } finally {
+    for (const item of items) inFlight.delete(item.key)
+  }
 }
+
+/** why: a deck screen loads details for its analysis and its rule warnings at once, and each would ask for the same cards. */
+const inFlight = new Map<string, Promise<unknown>>()
 
 const warmedVersions = new Set<string>()
 
