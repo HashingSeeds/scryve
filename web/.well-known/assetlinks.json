@@ -1,0 +1,17 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.sowinghope.count",
+      "sha256_cert_fingerprints": [
+        "CC:59:B2:9C:C1:37:2B:39:F3:D6:60:5F:54:79:65:80:1A:64:C5:2D:FD:4E:B6:25:2C:02:F9:61:40:B4:7E:1F",
+        "E9:3C:61:0E:0B:69:AB:6E:B2:98:9A:DA:F7:09:A5:24:71:D1:9F:92:4A:A8:10:F5:85:51:E7:B6:43:F9:1F:DC",
+        "FB:4A:2F:74:CB:DA:FD:32:D0:3E:63:42:1E:91:99:F6:48:CC:96:8F:98:C8:D6:7B:B0:44:39:C0:58:F4:D9:EE"
+      ]
+    }
+  }
+]
