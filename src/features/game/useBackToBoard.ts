@@ -1,5 +1,6 @@
 import { useMemo } from "react"
-import { useNavigation, useRoute } from "expo-router"
+import { useRoute } from "expo-router"
+import { useNavigationState } from "expo-router/react-navigation"
 
 import { translate } from "@/i18n/translate"
 import { goBack } from "@/utils/navigation"
@@ -13,11 +14,12 @@ export type BackAction = { label: string; onPress: () => void }
 
 /** why: screens opened over the board name what's behind them beside the back chevron ("Game", "Play", "Rules", "Lobby"), read from the stack route under this one. With nothing under it, back lands on Play. */
 export function useBackToBoard(): BackAction {
-  const navigation = useNavigation()
   const { key } = useRoute()
+  // why: a pushed screen's first render can read the stack before it holds this route, so subscribe instead of reading it once.
+  const below = useNavigationState(
+    ({ routes }) => routes[routes.findIndex((route) => route.key === key) - 1]?.name,
+  )
   return useMemo(() => {
-    const routes = navigation.getState()?.routes ?? []
-    const below = routes[routes.findIndex((route) => route.key === key) - 1]?.name
     const label =
       below === undefined || below === "index"
         ? localGameRepository.loadActiveGame()
@@ -31,5 +33,5 @@ export function useBackToBoard(): BackAction {
               ? translate("common:appNavigation.rules")
               : translate("common:back")
     return { label, onPress: () => goBack({ pathname: "/", params: { destination: "play" } }) }
-  }, [navigation, key])
+  }, [below])
 }

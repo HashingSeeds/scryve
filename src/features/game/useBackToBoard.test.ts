@@ -9,8 +9,11 @@ let mockRoutes: { key: string; name: string }[] = []
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn() },
-  useNavigation: () => ({ getState: () => ({ routes: mockRoutes }) }),
   useRoute: () => ({ key: "here" }),
+}))
+jest.mock("expo-router/react-navigation", () => ({
+  useNavigationState: <T>(select: (state: { routes: typeof mockRoutes }) => T) =>
+    select({ routes: mockRoutes }),
 }))
 
 function labelOver(below?: string) {
