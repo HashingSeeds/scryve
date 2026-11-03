@@ -33,9 +33,13 @@ const common = {
   },
   appNavigation: {
     decks: "Decks",
-    returnToGame: "Return to game",
+    // Floating button on the deck shelf that opens card lookup.
+    cards: "Cards",
     play: "Play",
-    backToLobby: "Back to lobby",
+    // The labels below sit beside a back chevron and name the screen it returns to.
+    game: "Game",
+    lobby: "Lobby",
+    rules: "Rules",
   },
   openUrl: {
     failed: "Couldn't open this link",

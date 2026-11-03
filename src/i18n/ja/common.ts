@@ -36,9 +36,11 @@ export default {
   },
   appNavigation: {
     decks: "デッキ",
-    returnToGame: "ゲームに戻る",
+    cards: "カード",
     play: "プレイ",
-    backToLobby: "ロビーに戻る",
+    game: "ゲーム",
+    lobby: "ロビー",
+    rules: "ルール",
   },
   openUrl: {
     failed: "このリンクを開けませんでした",

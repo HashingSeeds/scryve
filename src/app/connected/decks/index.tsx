@@ -4,16 +4,28 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
 import { useAccountEntry } from "@/features/auth/useAccountEntry"
-import { localGameRepository } from "@/features/game/localPersistence"
+import { useBackToBoard } from "@/features/game/useBackToBoard"
 import { translate } from "@/i18n/translate"
 import { DecksScreen } from "@/screens/DecksScreen"
 import { captureAnalytics } from "@/utils/analytics"
 
 export default function DecksRoute() {
   const { lobbyId, system } = useLocalSearchParams<{ lobbyId?: string; system?: string }>()
-  const returnToLobby = lobbyId
-    ? () => router.dismissTo({ pathname: "/connected/lobby/[gameId]", params: { gameId: lobbyId } })
-    : undefined
+  const boardBack = useBackToBoard()
+  const back = useMemo(
+    () =>
+      lobbyId
+        ? {
+            label: translate("common:appNavigation.lobby"),
+            onPress: () =>
+              router.dismissTo({
+                pathname: "/connected/lobby/[gameId]",
+                params: { gameId: lobbyId },
+              }),
+          }
+        : boardBack,
+    [boardBack, lobbyId],
+  )
   useFocusEffect(
     useCallback(() => {
       captureAnalytics("deck_used", { feature: "library" })
@@ -21,17 +33,11 @@ export default function DecksRoute() {
   )
   const auth = useAuthAccess()
   const account = useAccountEntry()
-  const hasCurrentGame = useMemo(() => localGameRepository.loadActiveGame() !== null, [])
   const screen = (access?: CloudAccess) => (
     <DecksScreen
       access={access}
       initialSystem={system}
-      onBack={returnToLobby}
-      onPlay={
-        returnToLobby ??
-        (() => router.dismissTo({ pathname: "/", params: { destination: "play" } }))
-      }
-      hasCurrentGame={hasCurrentGame}
+      back={back}
       onHistory={() => router.push("/history")}
       onSettings={() => router.push("/settings")}
       onSupport={() => router.push("/support")}

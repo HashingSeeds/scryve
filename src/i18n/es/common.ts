@@ -36,9 +36,11 @@ export default {
   },
   appNavigation: {
     decks: "Mazos",
-    returnToGame: "Volver a la partida",
+    cards: "Cartas",
     play: "Jugar",
-    backToLobby: "Volver a la sala",
+    game: "Partida",
+    lobby: "Sala",
+    rules: "Reglas",
   },
   openUrl: {
     failed: "No se pudo abrir este enlace",

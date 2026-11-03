@@ -36,9 +36,11 @@ export default {
   },
   appNavigation: {
     decks: "덱",
-    returnToGame: "게임으로 돌아가기",
+    cards: "카드",
     play: "플레이",
-    backToLobby: "로비로 돌아가기",
+    game: "게임",
+    lobby: "로비",
+    rules: "규칙",
   },
   openUrl: {
     failed: "이 링크를 열 수 없습니다",

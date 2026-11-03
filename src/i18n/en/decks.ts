@@ -608,10 +608,7 @@ const decks = {
   },
   shelf: {
     title: "Decks",
-    backToLobby: "Back to lobby",
     addDeck: "Add deck",
-    // Header button that opens card lookup.
-    cards: "Cards",
     collectionAll: "All",
     collectionFavorites: "Favorites",
     collectionRecent: "Recent",

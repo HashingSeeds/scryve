@@ -40,7 +40,13 @@ jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
   },
 }))
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn(), replace: jest.fn() },
+  router: {
+    back: jest.fn(),
+    canGoBack: jest.fn(() => true),
+    dismissTo: jest.fn(),
+    push: jest.fn(),
+    replace: jest.fn(),
+  },
   useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (effect: () => void) => {
     jest.requireActual<typeof import("react")>("react").useEffect(effect, [effect])
@@ -240,8 +246,9 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     expect(view.getByText("End current game…")).toBeTruthy()
-    fireEvent.press(view.getByTestId("setup-status"))
-    expect(router.replace).toHaveBeenCalledWith("/game/current")
+    fireEvent.press(view.getByTestId("setup-back"))
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it("continues an unfinished match from setup instead of replacing it, and can end it", () => {
@@ -269,7 +276,7 @@ describe("new local game route", () => {
     expect(view.getByText("Continue match")).toBeTruthy()
     expect(view.getByText("Game 2 · 1-0 · Best of 3")).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
-    expect(router.replace).toHaveBeenCalledWith("/game/current")
+    expect(router.back).toHaveBeenCalledTimes(1)
     expect(localGameRepository.loadActiveGame()?.match).toMatchObject({
       id: first.match?.id,
       gameNumber: 2,

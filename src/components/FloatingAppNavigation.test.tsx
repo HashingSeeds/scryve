@@ -52,7 +52,7 @@ describe("FloatingAppNavigation", () => {
       const view = render(
         <ThemeProvider initialContext="dark">
           <FloatingAppNavigation
-            destination={{ kind: "returnToGame", onPress: jest.fn() }}
+            destination={{ kind: "cards", onPress: jest.fn() }}
             onHistory={jest.fn()}
             onSettings={jest.fn()}
             onSupport={jest.fn()}

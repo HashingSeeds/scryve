@@ -535,9 +535,7 @@ export default {
   },
   shelf: {
     title: "デッキ",
-    backToLobby: "ロビーに戻る",
     addDeck: "デッキを追加",
-    cards: "カード",
     collectionAll: "すべて",
     collectionFavorites: "お気に入り",
     collectionRecent: "最近",

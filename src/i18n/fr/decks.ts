@@ -567,9 +567,7 @@ export default {
   },
   shelf: {
     title: "Decks",
-    backToLobby: "Retour au salon",
     addDeck: "Ajouter un deck",
-    cards: "Cartes",
     collectionAll: "Tous",
     collectionFavorites: "Favoris",
     collectionRecent: "Récents",

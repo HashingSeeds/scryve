@@ -13,7 +13,7 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
-import { Header } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -517,8 +517,17 @@ function NewGameForm({
   const footerRow =
     (canConnectLocal || Boolean(localMatchEnd)) && fontScale <= FOOTER_ROW_MAX_FONT_SCALE
   const joinInFooter = connectedMode && Boolean(onJoin)
-  const directResume =
-    localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
+  // why: a running game sits "behind" setup, so the header's back action names it and returns to it, and ending a game doesn't change the footer's height. Setup opens over the local board, so going back reaches a local game.
+  const resumeConnected =
+    localGame || !onResumeConnected
+      ? undefined
+      : resumeGame && connected?.ready && !connected.error
+        ? () => onResumeConnected(resumeGame)
+        : singleBlockingConnected
+          ? () => onResumeConnected(singleBlockingConnected)
+          : undefined
+  const resume = localGame ? onBack : resumeConnected
+  const statusResumesMatch = !connectedMode && Boolean(localGame?.match)
 
   const hasStatusDetails = cloudMode
     ? Boolean(connectedGames.length || connected?.blockedReason || connected?.error)
@@ -526,23 +535,17 @@ function NewGameForm({
   const statusText = nearbyMode
     ? ""
     : connectedMode
-      ? directResume
-        ? translate("play:newGame.resumeCurrentGame")
-        : (connected?.error ??
-          connected?.blockedReason ??
-          (connectedGames.length ? translate("play:newGame.gamesInProgress") : ""))
+      ? (connected?.error ??
+        connected?.blockedReason ??
+        (connectedGames.length ? translate("play:newGame.gamesInProgress") : ""))
       : localGame?.match
         ? translate("play:newGame.matchStatus", {
             context: matchContextLabel(localGame),
             bestOf: localGame.match.bestOf,
           })
-        : localGame
-          ? translate("play:newGame.resumeCurrentGame")
-          : connectedBlocksLocal
-            ? singleBlockingConnected
-              ? translate("play:newGame.resumeCurrentGame")
-              : translate("play:newGame.gamesInProgress")
-            : ""
+        : connectedBlocksLocal
+          ? translate("play:newGame.gamesInProgress")
+          : ""
 
   async function submit() {
     if (!valid || busy || pinningRef.current) return
@@ -796,9 +799,14 @@ function NewGameForm({
       <View style={themed($setupHeader)}>
         <Header
           titleTx={onSavePlayers ? "play:newGame.setupTitle" : "play:newGame.newTitle"}
-          leftTx="common:back"
+          LeftActionComponent={
+            <HeaderBack
+              testID="setup-back"
+              label={translate(resume ? "common:appNavigation.game" : "common:appNavigation.play")}
+              onPress={resume ?? onBack}
+            />
+          }
           backgroundColor={colors.surface}
-          onLeftPress={onBack}
         />
         <View
           style={{
@@ -1108,8 +1116,8 @@ function NewGameForm({
                     accessibilityRole={hasStatusDetails ? "button" : "text"}
                     accessibilityLabel={statusText}
                     accessibilityHint={
-                      directResume
-                        ? translate("play:newGame.resumeHint")
+                      statusResumesMatch
+                        ? translate("play:newGame.continueMatchHint")
                         : hasStatusDetails
                           ? translate("play:newGame.statusDetailsHint")
                           : undefined
@@ -1117,19 +1125,11 @@ function NewGameForm({
                     disabled={!hasStatusDetails}
                     style={[
                       themed($statusRow),
-                      directResume || (connectedMode && hasStatusDetails)
+                      statusResumesMatch || (connectedMode && hasStatusDetails)
                         ? themed($resumeAction)
                         : $styles.flex1,
                     ]}
-                    onPress={
-                      localGameBlocksStart
-                        ? onResumeLocal
-                        : directResume && resumeGame
-                          ? () => onResumeConnected?.(resumeGame)
-                          : singleBlockingConnected && onResumeConnected
-                            ? () => onResumeConnected(singleBlockingConnected)
-                            : () => setShowStatus(true)
-                    }
+                    onPress={statusResumesMatch ? onResumeLocal : () => setShowStatus(true)}
                   >
                     <Text
                       accessibilityLiveRegion="polite"
@@ -1138,7 +1138,7 @@ function NewGameForm({
                       maxFontSizeMultiplier={FOOTER_MAX_FONT_SCALE}
                       text={statusText}
                       style={themed(
-                        directResume || (connectedMode && hasStatusDetails)
+                        statusResumesMatch || (connectedMode && hasStatusDetails)
                           ? $resumeText
                           : $statusText,
                       )}

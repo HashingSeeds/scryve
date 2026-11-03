@@ -10,7 +10,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { type AccountEntry, AppUtilityMenu } from "./AppUtilityMenu"
 import { Text } from "./Text"
 
-export type AppDestination = "decks" | "returnToGame" | "play" | "backToLobby"
+export type AppDestination = "decks" | "cards"
 
 export function FloatingAppNavigation({
   destination,

@@ -134,7 +134,7 @@ export default function NewLocalGameRoute() {
         localGame={blocking ? activeGame : undefined}
         localMatchEnd={matchEndGame ? { game: matchEndGame, onEnd: endMatch } : undefined}
         account={ownerId ? { ownerId, defaultMeSeat, decks } : undefined}
-        onResumeLocal={() => router.replace("/game/current")}
+        onResumeLocal={() => goBack("/game/current")}
         onEndLocal={endLocal}
         onAbandonLocal={() => endLocal()}
         // why: Play opens plain /game/new before its stored-game state catches up, so a running game's edits must persist on every entry.

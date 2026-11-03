@@ -12,7 +12,7 @@ import { CardSymbolText } from "@/components/CardSymbolText"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack, HeaderIcon } from "@/components/Header"
 import { NUMBER_LANE_WIDTH, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
@@ -41,6 +41,7 @@ import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncHeader } from "@/features/decks/LocalDeckSyncHeader"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { isSystemVisible } from "@/features/game/systemVisibility"
+import type { BackAction } from "@/features/game/useBackToBoard"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
@@ -565,10 +566,8 @@ function DeckShelf({
 }
 
 export function DecksScreen({
-  onBack,
+  back,
   initialSystem,
-  onPlay,
-  hasCurrentGame = false,
   onSelect,
   onAddDeck,
   onCards,
@@ -580,10 +579,8 @@ export function DecksScreen({
   unavailableMessage,
   access,
 }: {
-  onBack?: () => void
+  back: BackAction
   initialSystem?: string
-  onPlay: () => void
-  hasCurrentGame?: boolean
   onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
   onCards?: (game?: string) => void
@@ -697,18 +694,7 @@ export function DecksScreen({
         titleAccessory={
           (access?.ready ?? true) && !unavailableMessage ? <DeckCount access={access} /> : undefined
         }
-        LeftActionComponent={
-          onBack ? (
-            <HeaderIcon
-              testID="decks-back"
-              icon="back"
-              label={translate("decks:shelf.backToLobby")}
-              onPress={onBack}
-            />
-          ) : undefined
-        }
-        leftTx={onCards ? "decks:shelf.cards" : undefined}
-        onLeftPress={onCards && (() => onCards(system === ALL_SYSTEMS ? undefined : system))}
+        LeftActionComponent={<HeaderBack testID="decks-back" {...back} />}
         backgroundColor={theme.colors.surface}
         RightActionComponent={
           <HeaderIcon
@@ -842,10 +828,12 @@ export function DecksScreen({
         </ConvexQueryBoundary>
       ) : null}
       <FloatingAppNavigation
-        destination={{
-          kind: onBack ? "backToLobby" : hasCurrentGame ? "returnToGame" : "play",
-          onPress: onPlay,
-        }}
+        destination={
+          onCards && {
+            kind: "cards",
+            onPress: () => onCards(system === ALL_SYSTEMS ? undefined : system),
+          }
+        }
         accountEntry={accountEntry}
         onHistory={onHistory}
         onSettings={onSettings}

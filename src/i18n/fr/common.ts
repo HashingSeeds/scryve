@@ -36,9 +36,11 @@ export default {
   },
   appNavigation: {
     decks: "Decks",
-    returnToGame: "Retour à la partie",
+    cards: "Cartes",
     play: "Jouer",
-    backToLobby: "Retour au salon",
+    game: "Partie",
+    lobby: "Salon",
+    rules: "Règles",
   },
   openUrl: {
     failed: "Impossible d'ouvrir ce lien",

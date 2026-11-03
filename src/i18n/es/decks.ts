@@ -561,9 +561,7 @@ export default {
   },
   shelf: {
     title: "Mazos",
-    backToLobby: "Volver a la sala",
     addDeck: "Añadir mazo",
-    cards: "Cartas",
     collectionAll: "Todos",
     collectionFavorites: "Favoritos",
     collectionRecent: "Recientes",

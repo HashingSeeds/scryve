@@ -36,9 +36,11 @@ export default {
   },
   appNavigation: {
     decks: "डेक",
-    returnToGame: "गेम पर लौटें",
+    cards: "कार्ड",
     play: "खेलें",
-    backToLobby: "लॉबी पर वापस जाएँ",
+    game: "गेम",
+    lobby: "लॉबी",
+    rules: "नियम",
   },
   openUrl: {
     failed: "यह लिंक नहीं खुल सका",

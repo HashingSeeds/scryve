@@ -540,9 +540,7 @@ export default {
   },
   shelf: {
     title: "डेक",
-    backToLobby: "लॉबी पर वापस जाएँ",
     addDeck: "डेक जोड़ें",
-    cards: "कार्ड",
     collectionAll: "सभी",
     collectionFavorites: "पसंदीदा",
     collectionRecent: "हाल के",
