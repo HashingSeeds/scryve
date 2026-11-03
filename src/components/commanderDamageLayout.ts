@@ -163,8 +163,6 @@ export interface CommanderTakeover {
   fit: number
   discOffset: { x: number; y: number }
   cardDiscOffset: { x: number; y: number }
-  // why: toward the attacker in the card's upright content space, where the damage arc starts.
-  angle: number
   // why: a hit knocks the card away from the attacker, in the card's own space.
   knock: { x: number; y: number }
   // why: the attacker's card in this card's own space, from its top-left corner. `discGap` is how far that card must grow to cover the disc's center.
@@ -276,7 +274,6 @@ export function commanderTakeover(input: {
     fit,
     discOffset,
     cardDiscOffset,
-    angle,
     knock: { x: -outward.x, y: -outward.y },
     flood: reach &&
       floodAt && {

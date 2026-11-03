@@ -5,6 +5,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   runOnJS,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -260,8 +261,8 @@ export function deepShade(color: string) {
   return mixColorsInLinearLight(color, "#000000", 0.87)
 }
 
-// why: every defender floods the same dark red, so being targeted reads as danger and never as the grey dimming of a seat that is out.
-export const ATTACK_SHADE = "#4A0610"
+// why: every defender floods the same dark oxblood, so being targeted reads as danger and never as the grey dimming of a seat that is out, while staying dark enough not to fight the life discs' colors.
+export const ATTACK_SHADE = "#26080D"
 
 // why: every shadow is dark enough for white ink, so a defender's controls and commander strip read in white over it whatever the attacker's color.
 export const SHADOW_INK = "#FFFFFF"
@@ -416,8 +417,6 @@ function DefenderControls({
   const discX = content.width / 2 + (takeover?.discOffset.x ?? 0)
   const discY = content.height / 2 + (takeover?.discOffset.y ?? 0)
   const ring = (disc + DISC_RING) * 2
-  const progressRadius = disc + DISC_RING / 2
-  const circumference = 2 * Math.PI * progressRadius
   const lead = Math.max(...totals)
 
   return (
@@ -441,40 +440,19 @@ function DefenderControls({
       />
       <View pointerEvents="none" style={contentBox}>
         {takeover ? (
-          // why: the damage arc starts on the attacker's side of the ring.
-          <Svg
-            width={ring}
-            height={ring}
-            style={[
-              $centeredAt(discX - ring / 2, discY - ring / 2),
-              { transform: [{ rotate: `${(takeover.angle * 180) / Math.PI}deg` }] },
-            ]}
-          >
-            <Circle
-              testID={`commander-progress-seat-${seatNumber}`}
-              cx={ring / 2}
-              cy={ring / 2}
-              r={progressRadius}
-              stroke={SHADOW_INK}
-              strokeWidth={DISC_RING}
-              strokeLinecap="round"
-              strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={circumference * (1 - Math.min(lead, mode.lethal) / mode.lethal)}
-              fill="none"
-            />
-          </Svg>
+          <DamageArc
+            seatNumber={seatNumber}
+            size={ring}
+            fraction={Math.min(lead, mode.lethal) / mode.lethal}
+            style={$centeredAt(discX - ring / 2, discY - ring / 2)}
+          />
         ) : null}
         {!mode.acted ? (
-          <View
-            style={[
-              $centered,
-              $centeredAt(discX - disc, discY - disc),
-              { width: disc * 2, height: disc * 2 },
-            ]}
-          >
+          <View style={$centeredAt(discX - ring / 2, discY - ring / 2)}>
             <PulseRing
               testID={`commander-target-pulse-seat-${seatNumber}`}
-              size={disc * 2 + 12}
+              size={ring}
+              width={DISC_RING}
               color={SHADOW_INK}
             />
           </View>
@@ -599,29 +577,105 @@ const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber
 
 const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, left, top })
 
-/** why: the board's one moving ring marks the next step: the targets until the first hit, then the attacker's mark to finish. */
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+// why: the ink of a hit, bright enough to read on the gutter ring over any shade.
+const DAMAGE_INK = "#FF4D5A"
+const TRACK_OPACITY = 0.18
+// why: a hit eases the arc forward rather than snapping, so the defender sees how much it just took.
+const FILL_MS = 520
+
+/** why: damage toward lethal reads as a red arc filling a faint full ring, clockwise from the top of the seat's own upright view. */
+function DamageArc({
+  seatNumber,
+  size,
+  fraction,
+  style,
+}: {
+  seatNumber: number
+  size: number
+  fraction: number
+  style: ViewStyle
+}) {
+  const reducedMotion = useReducedMotion()
+  const fill = useSharedValue(fraction)
+  const radius = size / 2 - DISC_RING / 2
+  const circumference = 2 * Math.PI * radius
+
+  useEffect(() => {
+    fill.value = withTiming(fraction, {
+      duration: motionDuration(reducedMotion, FILL_MS),
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+    })
+  }, [fill, fraction, reducedMotion])
+
+  // why: a round cap draws a dot even at zero length, so an empty arc hides.
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - fill.value),
+    strokeOpacity: fill.value > 0 ? 1 : 0,
+  }))
+
+  return (
+    <Svg width={size} height={size} style={[style, $fromTop]}>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={SHADOW_INK}
+        strokeOpacity={TRACK_OPACITY}
+        strokeWidth={DISC_RING}
+        fill="none"
+      />
+      <AnimatedCircle
+        testID={`commander-progress-seat-${seatNumber}`}
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={DAMAGE_INK}
+        strokeWidth={DISC_RING + 1}
+        strokeLinecap="round"
+        strokeDasharray={`${circumference} ${circumference}`}
+        fill="none"
+        animatedProps={animatedProps}
+      />
+    </Svg>
+  )
+}
+
+// why: an SVG circle's stroke starts at three o'clock.
+const $fromTop: ViewStyle = { transform: [{ rotate: "-90deg" }] }
+
+const BREATH_MS = 1200
+const BREATHS = 3
+const REST_OPACITY = 0.2
+const PEAK_OPACITY = 0.65
+
+/** why: the board's one moving ring marks the next step: the targets' damage rings until the first hit, then the attacker's mark to finish. It brightens in place a few times and then rests faint, so the cue never turns into noise. */
 export function PulseRing({
   testID,
   size,
+  width = 3,
   color,
 }: {
   testID: string
   size: number
+  width?: number
   color: string
 }) {
-  const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const ring = useSharedValue(0)
+  const breath = useSharedValue(0)
 
   useEffect(() => {
     if (reducedMotion !== false) return
-    ring.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1)
-    return () => cancelAnimation(ring)
-  }, [reducedMotion, ring])
+    const half = { duration: BREATH_MS, easing: Easing.inOut(Easing.sin) }
+    breath.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), BREATHS)
+    return () => cancelAnimation(breath)
+  }, [reducedMotion, breath])
 
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: reducedMotion === false ? 0.7 * (1 - ring.value) : 0.5,
-    transform: [{ scale: reducedMotion === false ? 0.75 + ring.value * 0.7 : 1.05 }],
+    opacity:
+      reducedMotion === false
+        ? REST_OPACITY + (PEAK_OPACITY - REST_OPACITY) * breath.value
+        : PEAK_OPACITY,
   }))
 
   return (
@@ -629,8 +683,8 @@ export function PulseRing({
       testID={testID}
       pointerEvents="none"
       style={[
-        themed($ring),
-        { width: size, height: size, borderRadius: size, borderColor: color },
+        $absolute,
+        { width: size, height: size, borderRadius: size, borderWidth: width, borderColor: color },
         ringStyle,
       ]}
     />
@@ -812,8 +866,6 @@ function freeCorner(
   return awayFromMenu ?? free[0] ?? open[0] ?? CORNERS[0]
 }
 
-const $centered: ViewStyle = { justifyContent: "center", alignItems: "center" }
-
 const $absolute: ViewStyle = { position: "absolute" }
 
 // why: the disc's ring matches the board's gutter between cards, and the damage arc runs along it.
@@ -857,11 +909,6 @@ const $attackerCenter: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,
   alignItems: "center",
   justifyContent: "center",
-})
-
-const $ring: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  borderWidth: 3,
 })
 
 const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
