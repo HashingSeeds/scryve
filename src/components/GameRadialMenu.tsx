@@ -129,6 +129,7 @@ export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 
 const ACTION_WIDTH = 116
 const ACTION_HEIGHT = 52
+const ACTION_ELEVATION = 12
 
 const TOOL_SIZE = 44
 const TOOL_RADIUS = TOOL_SIZE / 2
@@ -977,6 +978,10 @@ function RadialToolBag({
       { scale: BAG_CLOSED_SCALE + (1 - BAG_CLOSED_SCALE) * progress.value },
     ],
   }))
+  // why: Android draws a child's elevation shadow at full strength under a fading parent, so the closing bag's shadow lingers over the pill unless it shrinks too.
+  const bagShadowStyle = useAnimatedStyle(() => ({
+    elevation: ACTION_ELEVATION * Math.max(progress.value, 0),
+  }))
 
   const [inner, outer] = getRadialToolOffsets(pose)
   const slot = (offset: number) => ({ left: ACTION_WIDTH / 2 + offset - TOOL_RADIUS })
@@ -1034,9 +1039,9 @@ function RadialToolBag({
           accessibilityElementsHidden={!bagOpen}
           importantForAccessibility={bagOpen ? "auto" : "no-hide-descendants"}
         >
-          <View
+          <Animated.View
             testID={bagOpen ? `${kind}-bag-open` : undefined}
-            style={[themed($action), $bag, { backgroundColor: background }]}
+            style={[themed($action), $bag, { backgroundColor: background }, bagShadowStyle]}
           >
             {bag.tools.map((tool) => (
               <BagTool
@@ -1047,7 +1052,7 @@ function RadialToolBag({
                 background={background}
               />
             ))}
-          </View>
+          </Animated.View>
         </Animated.View>
       ) : null}
     </>
@@ -1217,7 +1222,7 @@ const $action: ThemedStyle<ViewStyle> = ({ colors }) => ({
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.35,
   shadowRadius: 7,
-  elevation: 12,
+  elevation: ACTION_ELEVATION,
 })
 const $actionText: ThemedStyle<TextStyle> = () => ({
   fontSize: 16,
