@@ -1,4 +1,5 @@
 import {
+  isGzip,
   isJpeg,
   type MirrorTarget,
   printingIdFromKey,
@@ -9,6 +10,10 @@ import {
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_REQUEST_BYTES = 8 * 1024
+const MAX_DATASET_BYTES = 16 * 1024 * 1024
+const DATASET_PATH = "/datasets/mtg/cards.json"
+const DATASET_KEY = "datasets/mtg/cards.json"
+const DATASET_CACHE = "public, max-age=86400"
 const FETCH_TIMEOUT_MS = 10_000
 const BROWSER_CACHE = "public, max-age=3600"
 const CDN_CACHE = "public, max-age=86400"
@@ -37,7 +42,7 @@ function noStoreJson(value: unknown, status = 200) {
   return Response.json(value, { status, headers: noStoreHeaders() })
 }
 
-function imageNotFound() {
+function notFound() {
   return new Response("Not found", { status: 404, headers: noStoreHeaders(CORS_HEADERS) })
 }
 
@@ -50,6 +55,15 @@ function imageHeaders(object: R2Object) {
   headers.set("cloudflare-cdn-cache-control", CDN_CACHE)
   const printingId = printingIdFromKey(object.key)
   if (printingId) headers.set("cache-tag", `scryve-ygo-image-${printingId}`)
+  return headers
+}
+
+function datasetHeaders(object: R2Object) {
+  const headers = new Headers(CORS_HEADERS)
+  object.writeHttpMetadata(headers)
+  headers.set("etag", object.httpEtag)
+  headers.set("content-length", String(object.size))
+  headers.set("cache-control", DATASET_CACHE)
   return headers
 }
 
@@ -108,21 +122,49 @@ async function jsonBody(request: Request): Promise<unknown> {
   }
 }
 
-async function serveObject(request: Request, env: Env, key: string): Promise<Response> {
+async function serveObject(
+  request: Request,
+  env: Env,
+  key: string,
+  headersFor: (object: R2Object) => Headers,
+): Promise<Response> {
   if (request.method === "HEAD") {
     const object = await env.YGO_IMAGES.head(key)
-    if (!object) return imageNotFound()
-    return new Response(null, { headers: imageHeaders(object) })
+    if (!object) return notFound()
+    return new Response(null, { headers: headersFor(object) })
   }
 
   const object = await env.YGO_IMAGES.get(key)
-  if (!object) return imageNotFound()
-  const headers = imageHeaders(object)
+  if (!object) return notFound()
+  const headers = headersFor(object)
 
   if (request.headers.get("if-none-match") === object.httpEtag) {
     return new Response(null, { status: 304, headers })
   }
-  return new Response(object.body, { headers })
+  /** why: an object stored with content-encoding is already compressed; "automatic" would compress it again. */
+  const encodeBody = headers.has("content-encoding") ? "manual" : "automatic"
+  return new Response(object.body, { headers, encodeBody })
+}
+
+async function putDataset(request: Request, env: Env): Promise<Response> {
+  requireAuthorization(request, env)
+  const declaredLength = Number(request.headers.get("content-length"))
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_DATASET_BYTES) {
+    throw new RequestFailure(413, "Dataset is too large")
+  }
+  const bytes = await readBoundedBody(request.body, MAX_DATASET_BYTES, "Dataset is too large")
+  if (!isGzip(bytes)) throw new RequestFailure(415, "Dataset must be gzip")
+
+  const object = await env.YGO_IMAGES.put(DATASET_KEY, bytes, {
+    httpMetadata: {
+      contentType: "application/json",
+      contentEncoding: "gzip",
+      cacheControl: DATASET_CACHE,
+    },
+    customMetadata: { uploadedAt: new Date().toISOString() },
+  })
+  log("info", "dataset_uploaded", { key: DATASET_KEY, bytes: object.size })
+  return noStoreJson({ key: DATASET_KEY, bytes: object.size, etag: object.httpEtag })
 }
 
 async function fetchAndStoreImage(env: Env, input: MirrorTarget) {
@@ -254,6 +296,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   if (request.method === "OPTIONS" && url.pathname.startsWith("/images/")) {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
+  if (url.pathname === DATASET_PATH) {
+    if (request.method === "OPTIONS")
+      return new Response(null, { status: 204, headers: CORS_HEADERS })
+    if (request.method === "GET" || request.method === "HEAD") {
+      return await serveObject(request, env, DATASET_KEY, datasetHeaders)
+    }
+    if (request.method === "PUT") return await putDataset(request, env)
+  }
   if (request.method === "POST" && url.pathname === "/mirror") {
     return await mirrorImage(request, env)
   }
@@ -261,7 +311,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const key = decodeImageKey(url.pathname)
     if (!key) throw new RequestFailure(400, "Invalid image key")
     if (request.method === "GET" || request.method === "HEAD") {
-      return await serveObject(request, env, key)
+      return await serveObject(request, env, key, imageHeaders)
     }
     if (request.method === "DELETE") return await deleteImage(request, env, key)
   }

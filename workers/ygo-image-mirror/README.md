@@ -45,4 +45,6 @@ Repository variable `YGO_IMAGE_SYNC_ENABLED` controls the weekly sync. Keep it `
 
 Use the manual `deploy Yu-Gi-Oh image mirror` workflow for production deployments. Use `sync Yu-Gi-Oh images` for a dry run, limited seed, or full seed. The weekly schedule is idempotent because the Worker checks R2 before downloading an image.
 
+`sync Magic dataset` runs weekly and uploads a slim gzip copy of Scryfall's oracle cards to `/datasets/mtg/cards.json`, which the app downloads for local Magic search. The Worker stores it gzipped and serves it with `content-encoding: gzip`. Run it locally with `pnpm sync:mtg-dataset -- --dry-run` to see the card count and sizes without uploading.
+
 Use `remove Yu-Gi-Oh image` for a takedown. It deletes the R2 object and purges the exact URL from Cloudflare's CDN. A browser that already cached the image can retain it for at most one hour.

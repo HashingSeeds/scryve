@@ -100,3 +100,58 @@ describe("Yu-Gi-Oh image mirror Worker runtime", () => {
     await expect(env.YGO_IMAGES.head(KEY)).resolves.toBeNull()
   })
 })
+
+describe("Magic dataset", () => {
+  const DATASET_URL = "https://images.example/datasets/mtg/cards.json"
+  const DATASET = Uint8Array.from([0x1f, 0x8b, 0x08, 0x00])
+
+  function put(body: BodyInit, token = "test-token") {
+    return worker.fetch(
+      new Request(DATASET_URL, {
+        method: "PUT",
+        headers: { authorization: `Bearer ${token}` },
+        body,
+      }),
+      env,
+    )
+  }
+
+  afterEach(async () => {
+    await env.YGO_IMAGES.delete("datasets/mtg/cards.json")
+  })
+
+  it("serves an uploaded dataset gzip-encoded with CORS and a daily cache", async () => {
+    expect((await put(DATASET)).status).toBe(200)
+
+    const response = await worker.fetch(new Request(DATASET_URL), env)
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-type")).toBe("application/json")
+    expect(response.headers.get("content-encoding")).toBe("gzip")
+    expect(response.headers.get("content-length")).toBe(String(DATASET.byteLength))
+    expect(response.headers.get("cache-control")).toBe("public, max-age=86400")
+    expect(response.headers.get("access-control-allow-origin")).toBe("*")
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(DATASET)
+  })
+
+  it("accepts uploads only with the mirror token and a gzip body", async () => {
+    expect((await put(DATASET, "wrong")).status).toBe(401)
+    expect((await put("{}")).status).toBe(415)
+    await expect(env.YGO_IMAGES.head("datasets/mtg/cards.json")).resolves.toBeNull()
+
+    const missing = await worker.fetch(new Request(DATASET_URL), env)
+    expect(missing.status).toBe(404)
+    expect(missing.headers.get("cache-control")).toBe("no-store")
+  })
+
+  it("serves no other dataset key", async () => {
+    const other = await worker.fetch(
+      new Request("https://images.example/datasets/mtg/other.json", {
+        method: "PUT",
+        headers: { authorization: "Bearer test-token" },
+        body: DATASET,
+      }),
+      env,
+    )
+    expect(other.status).toBe(404)
+  })
+})
