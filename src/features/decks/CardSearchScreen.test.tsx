@@ -4,11 +4,12 @@ import { ConvexError } from "convex/values"
 import { ThemeProvider } from "@/theme/context"
 import { remove } from "@/utils/storage"
 
-import { clearCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { clearCardDetails, loadCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { cardNameIndex, type CardNameIndex } from "./cardNameMatch"
 import { CardSearch, CardSearchScreen, scryfallQuery } from "./CardSearchScreen"
 import type { DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
+import { parseMagicCards, type MagicCards } from "./localMagicSearch"
 
 const mockDetailsAction = jest.fn()
 const mockAction = jest.fn()
@@ -23,6 +24,8 @@ jest.mock("convex/react", () => ({
 
 let mockNameIndex: CardNameIndex | undefined
 jest.mock("./useCardNameIndex", () => ({ useCardNameIndex: () => mockNameIndex }))
+let mockMagicCards: MagicCards | undefined
+jest.mock("./useMagicCards", () => ({ useMagicCards: () => mockMagicCards }))
 
 const eligible = {
   commanderEligibility: "eligible",
@@ -69,6 +72,7 @@ async function pickColors(view: ReturnType<typeof render>, ...colors: string[]) 
 beforeEach(() => {
   jest.clearAllMocks()
   mockNameIndex = undefined
+  mockMagicCards = undefined
   clearCardDetails()
   remove("scryve.cards.keyword-abilities.v1")
   mockDetailsAction.mockResolvedValue({
@@ -636,6 +640,58 @@ describe("with the device's card name list", () => {
       expect(mockAction).toHaveBeenCalledTimes(1)
     },
   )
+})
+
+describe("with the device's Magic card file", () => {
+  const { commanderRulesUpdatedAt: _, ...withoutRules } = searchCard
+  const shivan = {
+    ...withoutRules,
+    name: "Shivan Dragon",
+    scryfallId: "shivan",
+    colorIdentity: "R",
+  }
+
+  async function searchFor(text: string) {
+    mockMagicCards = parseMagicCards(JSON.stringify({ version: "1", cards: [shivan] }))
+    const onAdd = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSearchScreen game="mtg" format="modern" onAdd={onAdd} onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+    jest.useFakeTimers()
+    fireEvent.changeText(view.getByTestId("card-search-input"), text)
+    await act(async () => jest.advanceTimersByTime(400))
+    jest.useRealTimers()
+    return { view, onAdd }
+  }
+
+  it("answers on the device, and an added card fetches its rules text", async () => {
+    mockAction.mockResolvedValue({
+      ...shivan,
+      oracleText: "Flying",
+      commanderRulesUpdatedAt: "now",
+    })
+    const { view, onAdd } = await searchFor("dragon")
+    fireEvent.press(view.getByLabelText("Add Shivan Dragon to deck"))
+    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ scryfallId: "shivan" }))
+    expect(mockAction).toHaveBeenCalledTimes(1)
+    expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+      scryfallId: "shivan",
+      deviceId: expect.any(String),
+    })
+    await waitFor(() => expect(loadCardDetails().shivan?.oracleText).toBe("Flying"))
+  })
+
+  it("still sends Scryfall syntax to Scryfall", async () => {
+    mockAction.mockResolvedValue([])
+    await searchFor("t:dragon")
+    expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+      game: "mtg",
+      deviceId: expect.any(String),
+      query: "t:dragon",
+    })
+  })
 })
 
 it("looks cards up without a deck: no adding, and a tapped card opens its sheet", async () => {

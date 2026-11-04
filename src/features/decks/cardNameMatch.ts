@@ -21,7 +21,7 @@ export type CardNameIndex = {
 
 export type CardNameMatch = { name: string; similarity: number; printedName?: string }
 
-function matchKey(text: string) {
+export function matchKey(text: string) {
   return text
     .normalize("NFD")
     .replace(/\p{M}/gu, "")

@@ -43,7 +43,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
-import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { loadCardDetails, partialMagicDetails, saveCardDetails } from "./cardDetailsCache"
 import { searchCardNames } from "./cardNameMatch"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import {
@@ -63,8 +63,10 @@ import {
 import { isCommanderPick, sideboardSection } from "./deckDraft"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
+import { localMagicSearch, NAME_MATCHES, SCRYFALL_SYNTAX } from "./localMagicSearch"
 import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
+import { useMagicCards } from "./useMagicCards"
 import { api } from "../../../convex/_generated/api"
 import {
   isSystemId,
@@ -83,8 +85,6 @@ const COLOR_MATCH_OPERATOR = {
   additional: ">=",
   within: "<=",
 } as const satisfies Record<ColorMatch, string>
-const NAME_MATCHES = 20
-const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 
 export function scryfallQuery({
   text,
@@ -198,6 +198,7 @@ export function CardSearch({
   const [scanning, setScanning] = useState(false)
   const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
   const nameIndex = useCardNameIndex(game, deviceId, scanning || query.trim().length > 0)
+  const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
@@ -375,7 +376,18 @@ export function CardSearch({
   ])
 
   useEffect(() => {
-    if (searchError?.retryAfterMs && !offline) return
+    const text = query.trim()
+    const local =
+      searchRequested && !offline
+        ? localMagicSearch(magicCards, nameIndex, {
+            text,
+            commander: choosingCommander,
+            colors: colorFilters,
+            colorMatch,
+            keywords,
+          })
+        : undefined
+    if (searchError?.retryAfterMs && !offline && !local) return
     let active = true
     setSearchError(undefined)
     setMessage(undefined)
@@ -407,7 +419,12 @@ export function CardSearch({
       return
     }
     setOfflineResults(undefined)
-    const text = query.trim()
+    if (local) {
+      setNameResults(local.named)
+      setResults(local.found)
+      setBusy(false)
+      return
+    }
     const timer = setTimeout(async () => {
       try {
         if (!convex) throw new Error("Card search unavailable")
@@ -473,6 +490,7 @@ export function CardSearch({
     searchError?.retryAfterMs,
     deviceId,
     nameIndex,
+    magicCards,
   ])
 
   function searchEntry(card: SearchCard, to = section) {
@@ -501,6 +519,17 @@ export function CardSearch({
     setCachedRules((current) => ({ ...current, [card.scryfallId]: card }))
   }
 
+  /** why: a card from the device's Magic file has no rules text, so the deck's analysis and card view need its full details. */
+  function completeDetails(scryfallId: string) {
+    convex?.action(api.cards.byId, { scryfallId, deviceId }).then(
+      (details) => {
+        saveCardDetails({ [scryfallId]: details })
+        setCachedRules((current) => ({ ...current, [scryfallId]: details }))
+      },
+      () => {},
+    )
+  }
+
   function add(card: SearchCard, to = section) {
     remember(card)
     if (choosingCommander || !onAdd) {
@@ -508,6 +537,8 @@ export function CardSearch({
       return undefined
     }
     const error = onAdd(searchEntry(card, to))
+    if (!error && "scryfallId" in card && partialMagicDetails(card))
+      completeDetails(card.scryfallId)
     setMessage(error ?? translate("decks:cardSearch.added", { card: card.name }))
     return error
   }

@@ -97,11 +97,17 @@ export function clearCardDetails(store: CardDetailStore = storage): void {
   }
 }
 
+/** why: the device's Magic card file leaves out rules text. Only Magic details carry commander rules, and only server ones date them. */
+export function partialMagicDetails(details: FocusedCardDetails) {
+  return details.commanderEligibility !== undefined && details.commanderRulesUpdatedAt === undefined
+}
+
 /**
  * why: Lorcana text cached before the catalog resynced keeps its printed line wraps. Resynced lines are whole
  * abilities, so a line that runs on into lowercase or a "+1", or a long line cut off mid-sentence, marks the old text.
  */
 export function staleCardDetails(game: string, details: FocusedCardDetails) {
+  if (partialMagicDetails(details)) return true
   if (game !== "lorcana") return false
   const lines = (details.oracleText ?? "").split("\n")
   return lines
