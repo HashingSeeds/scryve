@@ -22,7 +22,7 @@ function wait(milliseconds: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
 }
 
-function scryfallRateLimited(retryAfterMs: number): never {
+export function scryfallRateLimited(retryAfterMs: number): never {
   throw new ConvexError({
     code: "scryfall_rate_limited",
     message: "Scryfall requests are paused. Try again shortly.",

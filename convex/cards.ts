@@ -3,7 +3,7 @@ import { ConvexError, v, type Infer } from "convex/values"
 
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
-import type { ActionCtx, MutationCtx } from "./_generated/server"
+import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery, query } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { cardImageCandidates } from "./lib/cardImageFallback"
@@ -24,6 +24,7 @@ import {
   requireReleasedCapability,
   type GameSystemId,
 } from "./lib/integrations"
+import { lookupKey } from "./lib/pastedDeckList"
 import {
   type CardReference,
   fetchScryfall,
@@ -32,6 +33,11 @@ import {
   officialRulings,
   SCRYFALL_BASE_URL,
 } from "./lib/scryfall"
+import {
+  resolveScryfallCards,
+  SCRYFALL_COLLECTION_SIZE,
+  type ScryfallCardLookup,
+} from "./lib/scryfallCards"
 
 const MAX_SEARCH_RESULTS = 20
 const MAX_CATALOG_QUERY_LENGTH = 120
@@ -323,7 +329,6 @@ const MAX_CARD_NAMES_BYTES = 900_000
 const CARD_NAME_CATALOG_MAX_AGE_MS = 86_400_000
 const CARD_NAME_CATALOG_REFRESH_CLAIM_MS = 120_000
 const MAX_ALTERNATE_NAME_PAGES = 10
-const SCRYFALL_COLLECTION_SIZE = 75
 const MAX_CACHED_PRINTINGS_PER_NAME = 8
 
 const cardNameCatalogValidator = v.object({
@@ -893,17 +898,58 @@ export const imageFallbacks = action({
   },
 })
 
-export const cachedByNames = internalQuery({
-  args: { names: v.array(v.string()) },
-  handler: async (ctx, { names }) => {
-    const found: Doc<"cardReferences">[] = []
-    for (const name of names) {
-      const printings = await ctx.db
-        .query("cardReferences")
-        .withIndex("by_name", (q) => q.eq("name", name))
-        .take(MAX_CACHED_PRINTINGS_PER_NAME)
-      const complete = printings.find(isCompleteReference)
-      if (complete) found.push(complete)
+const MAX_CACHED_PRINTINGS_PER_LOOKUP = 32
+
+function samePrinting(card: Doc<"cardReferences">, lookup: ScryfallCardLookup) {
+  const same = (cached: string | undefined, wanted: string | undefined) =>
+    wanted === undefined || cached?.toLowerCase() === wanted.toLowerCase()
+  return same(card.setCode, lookup.setCode) && same(card.collectorNumber, lookup.collectorNumber)
+}
+
+async function cachedLookup(ctx: QueryCtx, lookup: ScryfallCardLookup) {
+  const { scryfallId } = lookup
+  if (scryfallId) {
+    const card = await ctx.db
+      .query("cardReferences")
+      .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", scryfallId.toLowerCase()))
+      .unique()
+    return card && isCompleteReference(card) ? card : undefined
+  }
+  const limit = lookup.setCode ? MAX_CACHED_PRINTINGS_PER_LOOKUP : MAX_CACHED_PRINTINGS_PER_NAME
+  const matches = (card: Doc<"cardReferences">) =>
+    isCompleteReference(card) && samePrinting(card, lookup)
+  const named = await ctx.db
+    .query("cardReferences")
+    .withIndex("by_name", (q) => q.eq("name", lookup.name))
+    .take(limit)
+  const hit = named.find(matches)
+  if (hit || lookup.name.includes(" // ")) return hit
+  /** why: Arena and MTGO exports name a two-part card by its front face, but the cache stores the full name. */
+  const twoPart = await ctx.db
+    .query("cardReferences")
+    .withIndex("by_name", (q) =>
+      q.gte("name", `${lookup.name} // `).lt("name", `${lookup.name} //!`),
+    )
+    .take(limit)
+  return twoPart.find(matches)
+}
+
+export const cachedLookups = internalQuery({
+  args: {
+    lookups: v.array(
+      v.object({
+        name: v.string(),
+        scryfallId: v.optional(v.string()),
+        setCode: v.optional(v.string()),
+        collectorNumber: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, { lookups }) => {
+    const found: { key: string; card: CardReference }[] = []
+    for (const lookup of lookups) {
+      const card = await cachedLookup(ctx, lookup)
+      if (card) found.push({ key: lookupKey(lookup), card: toCardReference(card) })
     }
     return found
   },
@@ -918,42 +964,13 @@ export const byNames = action({
     if (names.length > SCRYFALL_COLLECTION_SIZE)
       throw new ConvexError({ code: "too_many_names", message: "Look up fewer cards at once." })
     await requireActionCapability(ctx, "mtg", "cardCatalog")
-    const cachedDocs: Doc<"cardReferences">[] = await ctx.runQuery(internal.cards.cachedByNames, {
-      names,
-    })
-    const cached = cachedDocs.map(toCardReference)
-    const cachedNames = new Set(cached.map((card) => card.name))
-    const missing = names.filter((name) => !cachedNames.has(name))
-    if (!missing.length) return { cards: cached, lookupFailed: false }
-    try {
-      await limitCardLookup(ctx, args.deviceId)
-      const response = await fetchScryfall(ctx, "/cards/collection", {
-        method: "POST",
-        body: JSON.stringify({
-          identifiers: [...new Set(missing.map((name) => name.split(" // ")[0]))].map((name) => ({
-            name,
-          })),
-        }),
-      })
-      if (!response.ok)
-        throw new ConvexError({
-          code: "scryfall_unavailable",
-          message: `Card lookup is temporarily unavailable (${response.status})`,
-        })
-      const payload = objectRecord((await response.json()) as unknown)
-      if (!Array.isArray(payload?.data))
-        throw new ConvexError({
-          code: "scryfall_invalid_response",
-          message: "Card service returned an invalid response",
-        })
-      const fetched = payload.data
-        .map(normalizeScryfallCard)
-        .filter((card): card is CardReference => card !== null)
-      if (fetched.length) await ctx.runMutation(internal.cards.cacheMany, { cards: fetched })
-      return { cards: [...cached, ...fetched], lookupFailed: false }
-    } catch (cause) {
-      if (!cached.length) throw cause
-      return { cards: cached, lookupFailed: true }
-    }
+    const { found, failure } = await resolveScryfallCards(
+      ctx,
+      names.map((name) => ({ name })),
+      { beforeFetch: () => limitCardLookup(ctx, args.deviceId) },
+    )
+    const cards = [...new Map([...found.values()].map((card) => [card.scryfallId, card])).values()]
+    if (failure && !cards.length) throw failure
+    return { cards, lookupFailed: failure !== undefined }
   },
 })

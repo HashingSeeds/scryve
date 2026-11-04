@@ -1,13 +1,14 @@
 import { ConvexError } from "convex/values"
 
 import type { ActionCtx } from "../../_generated/server"
-import { boundedText, deckSourceUrl, fetchDeckSource, invalidSourceDeck } from "../deckSources"
+import { deckSourceUrl, fetchDeckSource, invalidSourceDeck } from "../deckSources"
+import { lookupKey } from "../pastedDeckList"
 import { MAX_DECK_CARDS } from "../policy"
-import { type CardReference, fetchScryfall, normalizeScryfallCard, objectRecord } from "../scryfall"
+import { type CardReference, objectRecord } from "../scryfall"
+import { resolveScryfallCards } from "../scryfallCards"
 import { hasCommandZone } from "../systems"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const SCRYFALL_COLLECTION_SIZE = 75
 const FORMATS = new Map([
   [1, "standard"],
   [2, "modern"],
@@ -189,40 +190,15 @@ export async function resolveArchidektDeck(
   deck: ReturnType<typeof parseArchidektDeck>,
 ) {
   const { entries, ...metadata } = deck
-  const resolved = new Map<string, CardReference>()
-  const ids = [...new Set(entries.map((entry) => entry.scryfallId))]
-  for (let offset = 0; offset < ids.length; offset += SCRYFALL_COLLECTION_SIZE) {
-    const response = await fetchScryfall(ctx, "/cards/collection", {
-      method: "POST",
-      body: JSON.stringify({
-        identifiers: ids.slice(offset, offset + SCRYFALL_COLLECTION_SIZE).map((id) => ({ id })),
-      }),
-    })
-    if (!response.ok)
-      throw new ConvexError({
-        code: "scryfall_unavailable",
-        message: "Card resolution is temporarily unavailable.",
-      })
-    const result = objectRecord(
-      archidektJson(await boundedText(response, "archidekt_invalid_response")),
-    )
-    if (!Array.isArray(result?.data) || result.data.length > SCRYFALL_COLLECTION_SIZE)
-      throw new ConvexError({
-        code: "scryfall_unavailable",
-        message: "Card resolution returned an invalid response.",
-      })
-    for (const value of result.data) {
-      const card = normalizeScryfallCard(value)
-      if (card) resolved.set(card.scryfallId.toLowerCase(), card)
-    }
-  }
+  const { found, failure } = await resolveScryfallCards(ctx, entries)
+  if (failure) throw failure
   const cards: (CardReference & {
     quantity: number
     board: "main" | "sideboard" | "commander"
   })[] = []
   const unresolved: string[] = []
   for (const entry of entries) {
-    const card = resolved.get(entry.scryfallId)
+    const card = found.get(lookupKey(entry))
     if (!card || card.oracleId.toLowerCase() !== entry.oracleId) unresolved.push(entry.name)
     else cards.push({ ...card, quantity: entry.quantity, board: entry.board })
   }

@@ -308,7 +308,6 @@ describe("MTG pasted deck resolution", () => {
         identifiers: [
           { set: "m21", collector_number: "265" },
           { set: "m21", collector_number: "266" },
-          { set: "m21", collector_number: "265" },
           { set: "m21", collector_number: "999" },
         ],
       })
@@ -325,6 +324,66 @@ describe("MTG pasted deck resolution", () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+})
+
+describe("MTG card cache", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("resolves a cold precon from cached cards while Scryfall is rate limited", async () => {
+    stepClock()
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.cache, {
+      scryfallId: preconCardId,
+      oracleId: "11111111-1111-1111-1111-111111111111",
+      name: "Captain America, Team Leader",
+      setName: "Marvel's Spider-Man",
+    })
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) =>
+        String(input).includes("mtgjson.com")
+          ? resolvedPreconResponse(String(input))
+          : Promise.resolve(new Response("{}", { status: 429 })),
+      )
+    await expect(
+      t
+        .withIdentity({ subject: "cached-precon-user" })
+        .action(api.deckImports.resolvePreconstructed, { fileName: "AvengersAssemble" }),
+    ).resolves.toMatchObject({
+      cards: [{ scryfallId: preconCardId, board: "commander" }],
+      unresolved: [],
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it("finds a cached two-part card by its front face", async () => {
+    stepClock()
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.cache, {
+      scryfallId: preconCardId,
+      oracleId: "11111111-1111-1111-1111-111111111111",
+      name: "Delver of Secrets // Insectile Aberration",
+      setName: "Innistrad",
+    })
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("{}", { status: 429 }))
+    await expect(
+      t.action(api.deckImports.resolvePasted, { list: "1 Delver of Secrets" }),
+    ).resolves.toMatchObject({
+      cards: [{ name: "Delver of Secrets // Insectile Aberration", quantity: 1 }],
+      unresolved: [],
+    })
+  })
+
+  it("asks to retry later instead of reporting real cards as unmatched", async () => {
+    stepClock()
+    const t = makeConvexTest()
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("{}", { status: 429 }))
+    await expect(
+      t.action(api.deckImports.resolvePasted, { list: "1 Sol Ring" }),
+    ).rejects.toMatchObject({
+      data: { code: "scryfall_rate_limited", retryAfterMs: expect.any(Number) },
+    })
   })
 })
 
@@ -879,12 +938,12 @@ describe("preconstructed catalog caching", () => {
         fileName: "AvengersAssemble.json",
         claimId,
       })
-      expect(fetchSpy).toHaveBeenCalledTimes(4)
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
       const refreshed = await actor.action(api.deckImports.resolvePreconstructed, {
         fileName: "AvengersAssemble",
       })
       expect(refreshed.name).toBe("Avengers Assemble Updated")
-      expect(fetchSpy).toHaveBeenCalledTimes(4)
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
     } finally {
       nowSpy.mockRestore()
       fetchSpy.mockRestore()

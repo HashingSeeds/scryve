@@ -34,12 +34,8 @@ import {
   readPastedDeckList,
 } from "./lib/pastedDeckList"
 import { MAX_DECK_CARDS } from "./lib/policy"
-import {
-  type CardReference,
-  fetchScryfall,
-  normalizeScryfallCard,
-  objectRecord,
-} from "./lib/scryfall"
+import { type CardReference, objectRecord } from "./lib/scryfall"
+import { resolveScryfallCards } from "./lib/scryfallCards"
 import { hasCommandZone } from "./lib/systems"
 
 export type ResolvedDeckCard = CardReference & {
@@ -84,7 +80,6 @@ const PRECON_REFRESH_LEASE_MS = 5 * 60 * 1000
 const PRECON_COLD_FETCH_LEASE_MS = 15 * 1000
 const PRECON_COLD_FETCH_POLL_MAX_MS = 500
 const MAX_CACHE_PRUNE = 500
-const SCRYFALL_COLLECTION_SIZE = 75
 
 const preconDeckValidator = v.object({
   fileName: v.string(),
@@ -445,75 +440,16 @@ async function resolveEntries(ctx: ActionCtx, entries: PastedDeckEntry[]) {
       code: "deck_too_large",
       message: `A deck may contain at most ${MAX_DECK_CARDS} entries`,
     })
-  const resolved = new Map<string, CardReference>()
-  const unresolved = new Set<string>()
-  const lookupGroups = new Map<string, PastedDeckEntry[]>()
-  for (const entry of entries) {
-    const scope =
-      entry.scryfallId || entry.collectorNumber ? "exact" : entry.setCode ? "set" : "name"
-    const group = lookupGroups.get(scope) ?? []
-    group.push(entry)
-    lookupGroups.set(scope, group)
-  }
-  for (const [scope, group] of lookupGroups) {
-    for (let offset = 0; offset < group.length; offset += SCRYFALL_COLLECTION_SIZE) {
-      const batch = group.slice(offset, offset + SCRYFALL_COLLECTION_SIZE)
-      const response = await fetchScryfall(ctx, "/cards/collection", {
-        method: "POST",
-        body: JSON.stringify({
-          identifiers: batch.map((entry) =>
-            entry.scryfallId
-              ? { id: entry.scryfallId }
-              : entry.setCode && entry.collectorNumber
-                ? { set: entry.setCode, collector_number: entry.collectorNumber }
-                : { name: entry.name, ...(entry.setCode ? { set: entry.setCode } : {}) },
-          ),
-        }),
-      })
-      if (!response.ok)
-        throw new ConvexError({
-          code: "scryfall_unavailable",
-          message: `Card resolution is temporarily unavailable (${response.status})`,
-        })
-      const payload = objectRecord((await response.json()) as unknown)
-      const cards = Array.isArray(payload?.data) ? payload.data : []
-      for (const value of cards) {
-        const card = normalizeScryfallCard(value)
-        if (!card) continue
-        const names = [card.name, ...card.name.split(" // ")]
-        if (scope === "name") {
-          for (const name of names) resolved.set(lookupKey({ name }), card)
-        } else if (scope === "set") {
-          if (card.setCode)
-            for (const name of names) resolved.set(lookupKey({ name, setCode: card.setCode }), card)
-        } else {
-          resolved.set(lookupKey({ name: card.name, scryfallId: card.scryfallId }), card)
-          if (card.setCode && card.collectorNumber)
-            resolved.set(
-              lookupKey({
-                name: card.name,
-                setCode: card.setCode,
-                collectorNumber: card.collectorNumber,
-              }),
-              card,
-            )
-        }
-      }
-    }
-  }
+  const { found, failure } = await resolveScryfallCards(ctx, entries)
+  /** why: a refused lookup would list real cards as unmatched, and a precon would cache that broken copy for every user. */
+  if (failure) throw failure
   const cards: ResolvedDeckCard[] = []
+  const unresolved = new Set<string>()
   for (const entry of entries) {
-    const card = resolved.get(lookupKey(entry))
-    if (!card) {
-      unresolved.add(entry.originalReference ?? entry.name)
-      continue
-    }
-    cards.push({ ...card, quantity: entry.quantity, board: entry.board })
+    const card = found.get(lookupKey(entry))
+    if (card) cards.push({ ...card, quantity: entry.quantity, board: entry.board })
+    else unresolved.add(entry.originalReference ?? entry.name)
   }
-  const unique = new Map<string, CardReference>()
-  for (const card of resolved.values()) unique.set(card.scryfallId, card)
-  if (unique.size > 0)
-    await ctx.runMutation(internal.cards.cacheMany, { cards: [...unique.values()] })
   return { cards, unresolved: [...unresolved].sort() }
 }
 
