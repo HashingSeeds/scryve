@@ -119,7 +119,8 @@ LUCIDE = {
 PHOSPHOR_SKULL = "M128,16C70.65,16,24,60.86,24,116c0,34.1,18.27,66,48,84.28V216a16,16,0,0,0,16,16h8a4,4,0,0,0,4-4V200.27a8.17,8.17,0,0,1,7.47-8.25,8,8,0,0,1,8.53,8v28a4,4,0,0,0,4,4h16a4,4,0,0,0,4-4V200.27a8.17,8.17,0,0,1,7.47-8.25,8,8,0,0,1,8.53,8v28a4,4,0,0,0,4,4h8a16,16,0,0,0,16-16V200.28C213.73,182,232,150.1,232,116,232,60.86,185.35,16,128,16ZM92,152a20,20,0,1,1,20-20A20,20,0,0,1,92,152Zm72,0a20,20,0,1,1,20-20A20,20,0,0,1,164,152Z"
 
 COIN_ICONS = ["sun", "waves", "skull", "flame", "leaf", "diamond", "redo", "undo", "zap", "snowflake", "brain", "shield"]
-COIN_TEXTS = [str(n) for n in range(21)] + ["X", "Y", "Z"]
+# why: 100 and 1000000 are printed on Un-cards (Mox Lotus, Gleemax); other numbers above 20 never are.
+COIN_TEXTS = [str(n) for n in range(21)] + ["100", "1000000", "X", "Y", "Z"]
 LINE_ICONS = ["sword", "shield", "heart", "wind", "brain", "redo", "undo"]
 
 
@@ -206,7 +207,13 @@ def coin_icon(name):
 
 
 def coin_text(text):
-    return union(rubik_text(text, "SemiBold", 14, 12 + optical_nudge(text), 16.9))
+    """Digits at 14 units, shrunk to fit 18 units wide, with their cap height centered in the coin."""
+    font = TTFont(RUBIK / "Rubik-SemiBold.ttf")
+    cmap, hmtx = font.getBestCmap(), font["hmtx"]
+    width = sum(hmtx[cmap[ord(char)]][0] for char in text) * 14 / font["head"].unitsPerEm
+    size = 14 * min(1, 18 / width)
+    half_cap = font["OS/2"].sCapHeight / font["head"].unitsPerEm * size / 2
+    return union(rubik_text(text, "SemiBold", size, 12 + optical_nudge(text), 12 + half_cap))
 
 
 UPPER = svg_path("M0 0H24L0 24Z", affine(1, 0, 0))

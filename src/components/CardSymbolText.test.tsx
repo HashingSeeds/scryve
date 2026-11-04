@@ -18,6 +18,7 @@ describe("spokenCardText", () => {
     expect(spokenCardText("mtg", "{1}{B}{B}, {T}: Draw a card.")).toBe(
       "1 generic mana black mana black mana, tap: Draw a card.",
     )
+    expect(spokenCardText("mtg", "{100}{X}")).toBe("100 generic mana X generic mana")
     expect(spokenCardText("mtg", "{W/U}{2/R}{G/P}{W/U/P}")).toBe(
       "white mana or blue mana 2 generic mana or red mana green mana or 2 life white mana or blue mana or 2 life",
     )
