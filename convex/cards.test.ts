@@ -69,9 +69,10 @@ describe("card provider caching and health", () => {
     await expect(t.action(api.cards.search, { query: "Dragon" })).resolves.toEqual([
       expect.objectContaining({ scryfallId: shivan.id, name: "Shivan Dragon" }),
     ])
-    await expect(t.action(api.cards.search, { query: "Dragon id<=r" })).rejects.toMatchObject({
-      data: { code: "scryfall_rate_limited" },
-    })
+    for (const query of ["Dragon id<=r", "-Dragon"])
+      await expect(t.action(api.cards.search, { query })).rejects.toMatchObject({
+        data: { code: "scryfall_rate_limited" },
+      })
   })
 
   it("serves Rush card text from its own catalog and never sends Rush IDs to YGOPRODeck", async () => {

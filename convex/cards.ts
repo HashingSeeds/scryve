@@ -40,6 +40,7 @@ import {
 } from "./lib/scryfallCards"
 
 const MAX_SEARCH_RESULTS = 20
+const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 const MAX_CATALOG_QUERY_LENGTH = 120
 
 function catalogWithoutImages(card: CatalogCard): CatalogCard {
@@ -196,7 +197,7 @@ async function searchScryfall(
     data = await scryfallSearchData(ctx, query)
   } catch (error) {
     /** why: saved cards match by name only, so a filtered search would show cards its filters exclude. */
-    if (!(error instanceof ConvexError) || words !== query) throw error
+    if (!(error instanceof ConvexError) || SCRYFALL_SYNTAX.test(query)) throw error
     const saved: CardReference[] = await ctx.runQuery(internal.cards.searchSaved, { query })
     if (!saved.length) throw error
     return saved
