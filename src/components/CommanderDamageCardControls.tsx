@@ -577,12 +577,26 @@ const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber
 
 const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, left, top })
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+const AnimatedPath = Animated.createAnimatedComponent(Path)
 // why: the ink of a hit, bright enough to read on the gutter ring over any shade.
 const DAMAGE_INK = "#FF4D5A"
 const TRACK_OPACITY = 0.18
 // why: a hit eases the arc forward rather than snapping, so the defender sees how much it just took.
 const FILL_MS = 520
+// why: the arc's stroke is a pixel wider than the ring it sits on, so its canvas bleeds past the ring's box to keep the outer edge unclipped.
+const ARC_BLEED = 1
+// why: a single SVG arc cannot close on itself; stopping a hair short leaves a gap the round caps cover.
+const FULL_SWEEP = 0.9999
+
+/** why: an open arc clockwise from twelve o'clock, so both ends are real path ends and every renderer draws their round caps. A dashed circle leaves the cap at its seam to the renderer, and iOS draws it square. */
+function arcPath(center: number, radius: number, fraction: number) {
+  "worklet"
+  const angle = 2 * Math.PI * Math.min(fraction, FULL_SWEEP)
+  const x = center + radius * Math.sin(angle)
+  const y = center - radius * Math.cos(angle)
+  const large = angle > Math.PI ? 1 : 0
+  return `M ${center} ${center - radius} A ${radius} ${radius} 0 ${large} 1 ${x} ${y}`
+}
 
 /** why: damage toward lethal reads as a red arc filling a faint full ring, clockwise from the top of the seat's own upright view. */
 function DamageArc({
@@ -599,7 +613,8 @@ function DamageArc({
   const reducedMotion = useReducedMotion()
   const fill = useSharedValue(fraction)
   const radius = size / 2 - DISC_RING / 2
-  const circumference = 2 * Math.PI * radius
+  const canvas = size + ARC_BLEED * 2
+  const center = canvas / 2
 
   useEffect(() => {
     fill.value = withTiming(fraction, {
@@ -610,30 +625,26 @@ function DamageArc({
 
   // why: a round cap draws a dot even at zero length, so an empty arc hides.
   const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - fill.value),
+    d: arcPath(center, radius, fill.value),
     strokeOpacity: fill.value > 0 ? 1 : 0,
   }))
 
   return (
-    <Svg width={size} height={size} style={[style, $fromTop]}>
+    <Svg width={canvas} height={canvas} style={[style, $bleed]}>
       <Circle
-        cx={size / 2}
-        cy={size / 2}
+        cx={center}
+        cy={center}
         r={radius}
         stroke={SHADOW_INK}
         strokeOpacity={TRACK_OPACITY}
         strokeWidth={DISC_RING}
         fill="none"
       />
-      <AnimatedCircle
+      <AnimatedPath
         testID={`commander-progress-seat-${seatNumber}`}
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
         stroke={DAMAGE_INK}
         strokeWidth={DISC_RING + 1}
         strokeLinecap="round"
-        strokeDasharray={`${circumference} ${circumference}`}
         fill="none"
         animatedProps={animatedProps}
       />
@@ -641,8 +652,7 @@ function DamageArc({
   )
 }
 
-// why: an SVG circle's stroke starts at three o'clock.
-const $fromTop: ViewStyle = { transform: [{ rotate: "-90deg" }] }
+const $bleed: ViewStyle = { margin: -ARC_BLEED }
 
 const BREATH_MS = 1200
 const BREATHS = 3
