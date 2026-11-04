@@ -37,10 +37,12 @@ function startGameOnBoard() {
       { name: "Grace", color: "#111" },
     ],
   })
-  localGameRepository.saveActiveGame({
+  const started = {
     ...game,
     players: game.players.map((player, index) => ({ ...player, life: index ? 20 : 18 })),
-  })
+  }
+  localGameRepository.saveActiveGame(started)
+  return started
 }
 
 const renderToast = () => (
@@ -70,6 +72,18 @@ describe("UpdateReadyToastWithForegroundChecks", () => {
   it("announces the update on a board between games", () => {
     mockPathname = "/"
     expect(render(renderToast()).getByTestId("update-ready-toast")).toBeTruthy()
+  })
+
+  it("announces the update when a game on the board ends", () => {
+    const game = startGameOnBoard()
+    mockPathname = "/"
+    const view = render(renderToast())
+    expect(view.queryByTestId("update-ready-toast")).toBeNull()
+
+    act(() => {
+      localGameRepository.archiveGame({ ...game, status: "finished", finishedAt: Date.now() })
+    })
+    expect(view.getByTestId("update-ready-toast")).toBeTruthy()
   })
 
   it("keeps the notice for later when the player returns to a game before it closes", () => {

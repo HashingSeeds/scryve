@@ -39,6 +39,12 @@ export function UpdateReadyToastWithForegroundChecks() {
   const update = useAppUpdate()
   const [visible, setVisible] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  // why: a game ends and the next begins without leaving "/", so the hold is rechecked when one ends.
+  const [, setGamesEnded] = useState(0)
+  useEffect(
+    () => localGameRepository.onHistoryChanged(() => setGamesEnded((count) => count + 1)),
+    [],
+  )
 
   const readyId = update.status === "ready" ? update.updateId : undefined
   const held = readyId ? isNoticeHeldOn(pathname) : true
