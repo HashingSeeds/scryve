@@ -89,6 +89,7 @@ import type * as lib_policy from "../lib/policy.js";
 import type * as lib_results from "../lib/results.js";
 import type * as lib_revenueCat from "../lib/revenueCat.js";
 import type * as lib_scryfall from "../lib/scryfall.js";
+import type * as lib_scryfallCards from "../lib/scryfallCards.js";
 import type * as lib_seatPass from "../lib/seatPass.js";
 import type * as lib_systems_definitions from "../lib/systems/definitions.js";
 import type * as lib_systems_index from "../lib/systems/index.js";
@@ -192,6 +193,7 @@ declare const fullApi: ApiFromModules<{
   "lib/results": typeof lib_results;
   "lib/revenueCat": typeof lib_revenueCat;
   "lib/scryfall": typeof lib_scryfall;
+  "lib/scryfallCards": typeof lib_scryfallCards;
   "lib/seatPass": typeof lib_seatPass;
   "lib/systems/definitions": typeof lib_systems_definitions;
   "lib/systems/index": typeof lib_systems_index;
