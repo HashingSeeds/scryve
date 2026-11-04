@@ -192,10 +192,14 @@ describe("card details cache", () => {
   it("refetches Lorcana text cached with its printed line wraps", async () => {
     const store = memoryStore()
     const hook = { name: "Fish Hook", quantity: 1, cardId: "fish-hook" }
+    const necklace = { name: "Ursula's Shell Necklace", quantity: 1, cardId: "necklace" }
     const tamatoa = { name: "Tamatoa", quantity: 1, cardId: "tamatoa" }
     saveCardDetails(
       {
         "lorcana:fish-hook:": { oracleText: "Gets +3 ¤ until the start of your next\nturn." },
+        "lorcana:necklace:": {
+          oracleText: "NOW, SING! Whenever you play a song, you may pay\n1 ⬡ to draw a card.",
+        },
         "lorcana:tamatoa:": {
           oracleText: "Shift 4\nGRABBY When you play this character, draw a card.",
         },
@@ -207,15 +211,24 @@ describe("card details cache", () => {
         key: "lorcana:fish-hook:",
         details: { oracleText: "Gets +3 ¤ until the start of your next turn." },
       },
+      {
+        key: "lorcana:necklace:",
+        details: {
+          oracleText: "NOW, SING! Whenever you play a song, you may pay 1 ⬡ to draw a card.",
+        },
+      },
     ])
 
-    await fetchCardDetails({ query }, "lorcana", [hook, tamatoa], store)
-    await fetchCardDetails({ query }, "lorcana", [hook, tamatoa], store)
+    await fetchCardDetails({ query }, "lorcana", [hook, necklace, tamatoa], store)
+    await fetchCardDetails({ query }, "lorcana", [hook, necklace, tamatoa], store)
 
     expect(query).toHaveBeenCalledTimes(1)
     expect(query).toHaveBeenCalledWith(expect.anything(), {
       game: "lorcana",
-      items: [{ key: "lorcana:fish-hook:", catalogCardId: "fish-hook" }],
+      items: [
+        { key: "lorcana:fish-hook:", catalogCardId: "fish-hook" },
+        { key: "lorcana:necklace:", catalogCardId: "necklace" },
+      ],
     })
   })
 })

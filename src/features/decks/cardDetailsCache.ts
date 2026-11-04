@@ -97,9 +97,20 @@ export function clearCardDetails(store: CardDetailStore = storage): void {
   }
 }
 
-/** why: Lorcana text cached before the catalog resynced keeps its printed line wraps, and only wrapped lines start lowercase. */
+/**
+ * why: Lorcana text cached before the catalog resynced keeps its printed line wraps. Resynced lines are whole
+ * abilities, so a line that runs on into lowercase, or a long line cut off mid-sentence, marks the old text.
+ */
 export function staleCardDetails(game: string, details: FocusedCardDetails) {
-  return game === "lorcana" && /\n[a-z]/.test(details.oracleText ?? "")
+  if (game !== "lorcana") return false
+  const lines = (details.oracleText ?? "").split("\n")
+  return lines
+    .slice(1)
+    .some(
+      (next, index) =>
+        /^[a-z]/.test(next) ||
+        (!/[.)!?:"”]$/.test(lines[index]) && lines[index].split(" ").length > 5),
+    )
 }
 
 type DetailLookup = {
