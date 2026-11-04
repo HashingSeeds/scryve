@@ -6,7 +6,7 @@ const SETTLE_MS = 1500
 
 type Search = { query: string; results: readonly string[] }
 
-/** why: rules search runs on device on every keystroke, so a search counts once typing settles, a result is opened, or the screen closes; opens are numbered within it so a wrong first pick shows up as a second open. */
+/** why: rules search runs on device on every keystroke, so a search counts once typing settles, a result is opened, or the screen closes (clearing it first drops it); opens are numbered within it so a wrong first pick shows up as a second open. */
 export function useRulesSearchAnalytics(system: string, search: Search | undefined) {
   const latest = useRef({ system, search })
   latest.current = { system, search }
@@ -32,14 +32,9 @@ export function useRulesSearchAnalytics(system: string, search: Search | undefin
 
   const key = search ? `${search.query}\n${search.results.join(",")}` : ""
   useEffect(() => {
-    const current = latest.current.search
-    if (!current) {
-      flush()
-      return
-    }
     clearTimeout(timer.current)
-    pending.current = current
-    timer.current = setTimeout(flush, SETTLE_MS)
+    pending.current = latest.current.search
+    if (pending.current) timer.current = setTimeout(flush, SETTLE_MS)
   }, [key, flush])
   useEffect(() => flush, [flush])
 

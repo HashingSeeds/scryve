@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import type { ComprehensiveRules } from "@/features/rules/comprehensiveRules"
 import { GAME_RULES } from "@/features/rules/gameRules"
@@ -130,4 +130,22 @@ it("reports a search once, numbers each result opened from it, and keeps only a 
     ["rules_opened", { system: "mtg", rank: 3, open_count: 2 }],
     ["rules_search", { system: "mtg", result_count: 0, top_results: "", query: "Banding" }],
   ])
+})
+
+it("reports a search after typing settles, and drops one cleared before then", () => {
+  jest.useFakeTimers()
+  const capture = jest.mocked(captureAnalytics)
+  capture.mockClear()
+  const view = renderRules()
+  const field = view.getByTestId("rules-search")
+  fireEvent.changeText(field, "Blo")
+  fireEvent.changeText(field, "")
+  act(() => jest.advanceTimersByTime(2000))
+  expect(capture).not.toHaveBeenCalled()
+  fireEvent.changeText(field, "Block")
+  act(() => jest.advanceTimersByTime(1500))
+  expect(capture).toHaveBeenCalledTimes(1)
+  view.unmount()
+  expect(capture).toHaveBeenCalledTimes(1)
+  jest.useRealTimers()
 })
