@@ -1,6 +1,8 @@
 import * as Updates from "expo-updates"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { createLocalGame } from "@/features/game/domain"
+import { localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 import { storage } from "@/utils/storage"
 
@@ -27,6 +29,20 @@ jest.mock("expo-updates", () => ({
   }),
 }))
 
+function startGameOnBoard() {
+  const game = createLocalGame({
+    startingLife: 20,
+    players: [
+      { name: "Ada", color: "#000" },
+      { name: "Grace", color: "#111" },
+    ],
+  })
+  localGameRepository.saveActiveGame({
+    ...game,
+    players: game.players.map((player, index) => ({ ...player, life: index ? 20 : 18 })),
+  })
+}
+
 const renderToast = () => (
   <ThemeProvider initialContext="dark">
     <UpdateReadyToastWithForegroundChecks />
@@ -37,7 +53,8 @@ describe("UpdateReadyToastWithForegroundChecks", () => {
   beforeEach(() => storage.clearAll())
   afterEach(() => jest.useRealTimers())
 
-  it("waits until the player leaves the board, then announces the update once", () => {
+  it("waits until the player leaves a game in progress, then announces the update once", () => {
+    startGameOnBoard()
     mockPathname = "/"
     const view = render(renderToast())
     expect(view.queryByTestId("update-ready-toast")).toBeNull()
@@ -50,8 +67,14 @@ describe("UpdateReadyToastWithForegroundChecks", () => {
     expect(render(renderToast()).queryByTestId("update-ready-toast")).toBeNull()
   })
 
-  it("keeps the notice for later when the player returns to the board before it closes", () => {
+  it("announces the update on a board between games", () => {
+    mockPathname = "/"
+    expect(render(renderToast()).getByTestId("update-ready-toast")).toBeTruthy()
+  })
+
+  it("keeps the notice for later when the player returns to a game before it closes", () => {
     jest.useFakeTimers()
+    startGameOnBoard()
     mockPathname = "/connected/decks"
     const view = render(renderToast())
     expect(view.getByTestId("update-ready-toast")).toBeTruthy()
