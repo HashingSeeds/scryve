@@ -5,6 +5,31 @@ import { ThemeProvider } from "@/theme/context"
 import { CardFocusDialog } from "./CardFocusDialog"
 
 jest.mock("convex/react", () => ({ useConvex: () => undefined }))
+jest.mock("@/features/rules/rulesSource", () => ({
+  loadStoredRules: () => ({
+    url: "rules.txt",
+    rules: {
+      chapters: [
+        {
+          id: "7",
+          title: "Additional Rules",
+          sections: [
+            {
+              id: "702",
+              title: "Keyword Abilities",
+              rules: [
+                { id: "702.9", text: "Flying", examples: [] },
+                { id: "702.9a", text: "Flying is an evasion ability.", examples: [] },
+              ],
+            },
+          ],
+        },
+      ],
+      glossary: [{ term: "Flying", text: "Restricts blocking. See rule 702.9." }],
+      notice: [],
+    },
+  }),
+}))
 
 const card = {
   name: "Llanowar Elves",
@@ -40,6 +65,19 @@ function renderDialog(props: Partial<Parameters<typeof CardFocusDialog>[0]> = {}
 }
 
 describe("CardFocusDialog", () => {
+  it("defines a Magic keyword in place when you tap it", () => {
+    const view = renderDialog({
+      card: { ...card, game: "mtg" },
+      details: { ...details, oracleText: "Flying, vigilance", keywords: "Flying\nVigilance" },
+    })
+    expect(view.queryByTestId("card-focus-keyword")).toBeNull()
+    fireEvent.press(view.getByText("Flying"))
+    expect(view.getByText("Restricts blocking.")).toBeTruthy()
+    expect(view.getByText("Flying is an evasion ability.")).toBeTruthy()
+    fireEvent.press(view.getAllByText("Flying")[0])
+    expect(view.queryByTestId("card-focus-keyword")).toBeNull()
+  })
+
   it("shows the focused card image with rules, printing, and deck context", () => {
     const view = renderDialog()
     expect(view.getByTestId("card-focus-dialog")).toBeTruthy()

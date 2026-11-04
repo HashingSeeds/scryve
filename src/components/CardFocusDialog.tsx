@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { Pressable, ScrollView, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -17,6 +17,9 @@ import { readCardFaces } from "@/features/decks/cardFaces"
 import { isBackground } from "@/features/decks/commanderSelection"
 import type { CommanderColor } from "@/features/decks/deckCards"
 import { commanderNameWarning } from "@/features/decks/deckCopy"
+import { gameRules } from "@/features/rules/gameRules"
+import type { KeywordRule } from "@/features/rules/magicKeywords"
+import { loadStoredRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -130,6 +133,22 @@ export function CardFocusDialog({
   const { themed } = useAppTheme()
   const [commanderColor, setCommanderColor] = useState(card.commanderColor)
   const [faceIndex, setFaceIndex] = useState(0)
+  const [glossary, setGlossary] = useState<{ define: (name: string) => KeywordRule | undefined }>()
+  const [keyword, setKeyword] = useState<string>()
+  useEffect(() => {
+    const source = gameRules(card.game)
+    if (source?.kind !== "text" || !source.keyword) return
+    const rules = loadStoredRules(source)?.rules
+    const define = source.keyword
+    setGlossary(rules && { define: (name) => define(rules, name) })
+  }, [card.game])
+  const keywordRules = new Map(
+    (details?.keywords?.split("\n") ?? []).flatMap((name): [string, KeywordRule][] => {
+      const rule = glossary?.define(name)
+      return rule ? [[name, rule]] : []
+    }),
+  )
+  const keywordRule = keyword ? keywordRules.get(keyword) : undefined
   const faces = readCardFaces(details?.faceDetails)
   const face = faces[faceIndex]
   const visibleDetails = face ?? details
@@ -223,7 +242,19 @@ export function CardFocusDialog({
           ) : null}
           {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
           {visibleDetails?.oracleText ? (
-            <CardSymbolText game={card.game} selectable text={visibleDetails.oracleText} />
+            <CardSymbolText
+              game={card.game}
+              selectable
+              text={visibleDetails.oracleText}
+              keywords={[...keywordRules.keys()]}
+              activeKeyword={keyword}
+              onPressKeyword={(name) =>
+                setKeyword((current) => (current === name ? undefined : name))
+              }
+            />
+          ) : null}
+          {keyword && keywordRule ? (
+            <KeywordDefinition key={keyword} name={keyword} rule={keywordRule} />
           ) : null}
           {printing ? <Text size="xs" tone="dim" text={printing} /> : null}
           {imageCredit ? <Text size="xxs" tone="dim" text={imageCredit} /> : null}
@@ -300,6 +331,39 @@ export function CardFocusDialog({
   )
 }
 
+function KeywordDefinition({ name, rule }: { name: string; rule: KeywordRule }) {
+  const { themed } = useAppTheme()
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <View style={themed($keyword)} testID="card-focus-keyword">
+      <View style={themed($keywordHeader)}>
+        <Text size="sm" weight="medium" style={$name} text={name} />
+        <Text size="xs" tone="dim" text={rule.id} />
+      </View>
+      {rule.definition ? <Text size="xs" text={rule.definition} /> : null}
+      {(expanded ? rule.rules : rule.rules.slice(0, 2)).map((sub) => (
+        <View key={sub.id} style={$keywordRule}>
+          <Text size="xs" style={$keywordRuleId} text={sub.id} />
+          <Text size="xs" tone="dim" style={$flex} text={sub.text} />
+        </View>
+      ))}
+      {rule.rules.length > 2 ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setExpanded((current) => !current)}
+          style={$moreRules}
+        >
+          <Text
+            size="xs"
+            style={themed($link)}
+            tx={expanded ? "decks:cardFocus.fewerRules" : "decks:cardFocus.allRules"}
+          />
+        </Pressable>
+      ) : null}
+    </View>
+  )
+}
+
 const $scrollBody: ViewStyle = { flex: 1 }
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
@@ -349,3 +413,20 @@ const $quantityButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.sm,
 })
+const $keyword: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xxs,
+  paddingVertical: spacing.xs,
+  paddingStart: spacing.sm,
+  borderStartWidth: 2,
+  borderStartColor: colors.tint,
+})
+const $keywordHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "baseline",
+  gap: spacing.sm,
+})
+const $keywordRule: ViewStyle = { flexDirection: "row" }
+const $keywordRuleId: TextStyle = { width: 80, fontVariant: ["tabular-nums"] }
+const $flex: TextStyle = { flex: 1 }
+const $moreRules: ViewStyle = { alignSelf: "flex-start", minHeight: 44, justifyContent: "center" }
+const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })

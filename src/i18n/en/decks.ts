@@ -272,6 +272,12 @@ const decks = {
     // The back face of a double-faced card, not navigation.
     back: "Back",
     loadingDetails: "Loading details…",
+    // Screen reader action that shows what a card's keyword ability (such as Flying) means.
+    defineKeyword: "Define {{keyword}}",
+    // Expands a keyword's definition to list every Comprehensive Rules entry for it.
+    allRules: "Show all rules",
+    // Collapses a keyword's definition back to its first rules.
+    fewerRules: "Show fewer rules",
     commanderColor: "Commander color",
     setCommander: "Set as commander",
     quantityIn: "{{quantity}}× in {{section}}",
