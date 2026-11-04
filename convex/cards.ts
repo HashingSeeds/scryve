@@ -915,11 +915,23 @@ async function cachedLookup(ctx: QueryCtx, lookup: ScryfallCardLookup) {
       .unique()
     return card && isCompleteReference(card) ? card : undefined
   }
-  const printings = await ctx.db
+  const limit = lookup.setCode ? MAX_CACHED_PRINTINGS_PER_LOOKUP : MAX_CACHED_PRINTINGS_PER_NAME
+  const matches = (card: Doc<"cardReferences">) =>
+    isCompleteReference(card) && samePrinting(card, lookup)
+  const named = await ctx.db
     .query("cardReferences")
     .withIndex("by_name", (q) => q.eq("name", lookup.name))
-    .take(lookup.setCode ? MAX_CACHED_PRINTINGS_PER_LOOKUP : MAX_CACHED_PRINTINGS_PER_NAME)
-  return printings.find((card) => isCompleteReference(card) && samePrinting(card, lookup))
+    .take(limit)
+  const hit = named.find(matches)
+  if (hit || lookup.name.includes(" // ")) return hit
+  /** why: Arena and MTGO exports name a two-part card by its front face, but the cache stores the full name. */
+  const twoPart = await ctx.db
+    .query("cardReferences")
+    .withIndex("by_name", (q) =>
+      q.gte("name", `${lookup.name} // `).lt("name", `${lookup.name} //!`),
+    )
+    .take(limit)
+  return twoPart.find(matches)
 }
 
 export const cachedLookups = internalQuery({

@@ -357,6 +357,24 @@ describe("MTG card cache", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
+  it("finds a cached two-part card by its front face", async () => {
+    stepClock()
+    const t = makeConvexTest()
+    await t.mutation(internal.cards.cache, {
+      scryfallId: preconCardId,
+      oracleId: "11111111-1111-1111-1111-111111111111",
+      name: "Delver of Secrets // Insectile Aberration",
+      setName: "Innistrad",
+    })
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("{}", { status: 429 }))
+    await expect(
+      t.action(api.deckImports.resolvePasted, { list: "1 Delver of Secrets" }),
+    ).resolves.toMatchObject({
+      cards: [{ name: "Delver of Secrets // Insectile Aberration", quantity: 1 }],
+      unresolved: [],
+    })
+  })
+
   it("asks to retry later instead of reporting real cards as unmatched", async () => {
     stepClock()
     const t = makeConvexTest()
