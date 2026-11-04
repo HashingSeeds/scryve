@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
+import { localGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -21,8 +22,8 @@ import { UpdateDetailsDialog, UpdateInfoButton } from "./UpdateDetails"
 const VISIBLE_MS = 8_000
 
 function isNoticeHeldOn(pathname: string) {
+  if (pathname === "/") return localGameRepository.hasRunningGame()
   return (
-    pathname === "/" ||
     pathname === "/game/current" ||
     pathname.startsWith("/connected/game/") ||
     pathname === "/settings"
@@ -37,9 +38,14 @@ export function UpdateReadyToastWithForegroundChecks() {
   const update = useAppUpdate()
   const [visible, setVisible] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [, setGamesEnded] = useState(0)
+  useEffect(
+    () => localGameRepository.onHistoryChanged(() => setGamesEnded((count) => count + 1)),
+    [],
+  )
 
   const readyId = update.status === "ready" ? update.updateId : undefined
-  const held = isNoticeHeldOn(pathname)
+  const held = readyId ? isNoticeHeldOn(pathname) : true
   useEffect(() => {
     if (!readyId || held || wasUpdateNoticed(readyId)) return
     markUpdateNoticed(readyId)
