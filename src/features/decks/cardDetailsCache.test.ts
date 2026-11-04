@@ -1,6 +1,7 @@
 import { storage } from "@/utils/storage"
 
 import {
+  completeCardDetails,
   fetchCardDetails,
   loadCardDetails,
   prefetchCardDetails,
@@ -187,6 +188,66 @@ describe("card details cache", () => {
       items: [{ key: "riftbound:pouty-poro:", catalogCardId: "pouty-poro" }],
     })
     expect(readCardDetail("riftbound:pouty-poro:", store)?.facets).toBe(facets)
+  })
+
+  it("refetches Magic details saved from the device's card file, which lack rules text", async () => {
+    const store = memoryStore()
+    const ring = { name: "Sol Ring", quantity: 1, scryfallId: "ring-id" }
+    const full = { ...solRing, commanderEligibility: "ineligible", commanderRulesUpdatedAt: "now" }
+    saveCardDetails(
+      { "ring-id": { typeLine: "Artifact", commanderEligibility: "ineligible" } },
+      store,
+    )
+    const query = jest.fn(async () => [{ key: "ring-id", details: full }])
+
+    await fetchCardDetails({ query }, "mtg", [ring], store)
+    await fetchCardDetails({ query }, "mtg", [ring], store)
+
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(readCardDetail("ring-id", store)?.oracleText).toBe(solRing.oracleText)
+  })
+
+  it("waits for a card's details still loading instead of asking the server", async () => {
+    const store = memoryStore()
+    const ring = { name: "Sol Ring", quantity: 1, scryfallId: "ring-id" }
+    let finish = (_details: typeof solRing) => {}
+    const loading = completeCardDetails(
+      "ring-id",
+      () => new Promise((resolve) => (finish = resolve)),
+      store,
+    )
+    const query = jest.fn(async () => [])
+    const fetched = fetchCardDetails({ query }, "mtg", [ring], store)
+    finish(solRing)
+    await Promise.all([loading, fetched])
+
+    expect(query).not.toHaveBeenCalled()
+    expect(readCardDetail("ring-id", store)).toEqual(solRing)
+  })
+
+  it("shares one load per card, and looks the card up again when that load fails", async () => {
+    const store = memoryStore()
+    const ring = { name: "Sol Ring", quantity: 1, scryfallId: "ring-id" }
+    const full = { ...solRing, commanderEligibility: "ineligible", commanderRulesUpdatedAt: "now" }
+    saveCardDetails(
+      { "ring-id": { typeLine: "Artifact", commanderEligibility: "ineligible" } },
+      store,
+    )
+    let fail = () => {}
+    const loading = completeCardDetails(
+      "ring-id",
+      () => new Promise((_, reject) => (fail = () => reject(new Error("offline")))),
+      store,
+    )
+    expect(completeCardDetails("ring-id", () => Promise.resolve(full), store)).toBe(loading)
+    const query = jest.fn(async () => [{ key: "ring-id", details: full }])
+    const fetched = fetchCardDetails({ query }, "mtg", [ring], store)
+    fail()
+
+    await expect(loading).rejects.toThrow("offline")
+    await fetched
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(readCardDetail("ring-id", store)?.oracleText).toBe(solRing.oracleText)
   })
 
   it("refetches Lorcana text cached with its printed line wraps", async () => {

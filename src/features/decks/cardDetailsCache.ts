@@ -1,5 +1,6 @@
 import { Image } from "expo-image"
 import type { ConvexReactClient } from "convex/react"
+import type { FunctionReturnType } from "convex/server"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { storage } from "@/utils/storage"
@@ -97,11 +98,17 @@ export function clearCardDetails(store: CardDetailStore = storage): void {
   }
 }
 
+/** why: the device's Magic card file leaves out rules text. Only Magic details carry commander rules, and only server ones date them. */
+export function partialMagicDetails(details: FocusedCardDetails) {
+  return details.commanderEligibility !== undefined && details.commanderRulesUpdatedAt === undefined
+}
+
 /**
  * why: Lorcana text cached before the catalog resynced keeps its printed line wraps. Resynced lines are whole
  * abilities, so a line that runs on into lowercase or a "+1", or a long line cut off mid-sentence, marks the old text.
  */
 export function staleCardDetails(game: string, details: FocusedCardDetails) {
+  if (partialMagicDetails(details)) return true
   if (game !== "lorcana") return false
   const lines = (details.oracleText ?? "").split("\n")
   return lines
@@ -145,7 +152,8 @@ export async function fetchCardDetails(
   game: string,
   cards: readonly DeckCard[],
   store: CardDetailStore = storage,
-) {
+  retry = true,
+): Promise<DetailBatch> {
   const cached = loadCardDetails(store)
   const wantsFacets = readsCardDetails(game)
   const lookups = [
@@ -157,26 +165,53 @@ export async function fetchCardDetails(
   ]
   const waiting = lookups.flatMap((item) => inFlight.get(item.key) ?? [])
   const items = lookups.filter((item) => !inFlight.has(item.key))
-  if (items.length === 0) {
-    await Promise.allSettled(waiting)
-    return []
+  /** why: a failed request another screen started leaves its cards stale, so look them up again once. */
+  const retryFailed = async (found: DetailBatch) => {
+    const settled = await Promise.allSettled(waiting)
+    if (!retry || settled.every((result) => result.status === "fulfilled")) return found
+    return [...found, ...(await fetchCardDetails(client, game, cards, store, false))]
   }
+  if (items.length === 0) return await retryFailed([])
   const request = client.query(api.cards.detailsBatch, { game, items }).then((found) => {
     saveCardDetails(Object.fromEntries(found.map((entry) => [entry.key, entry.details])), store)
     return found
   })
   for (const item of items) inFlight.set(item.key, request)
   try {
-    const found = await request
-    await Promise.allSettled(waiting)
-    return found
+    return await retryFailed(await request)
   } finally {
-    for (const item of items) inFlight.delete(item.key)
+    for (const item of items) if (inFlight.get(item.key) === request) inFlight.delete(item.key)
   }
 }
 
 /** why: a deck screen loads details for its analysis and its rule warnings at once, and each would ask for the same cards. */
+type DetailBatch = FunctionReturnType<typeof api.cards.detailsBatch>
+
 const inFlight = new Map<string, Promise<unknown>>()
+const completing = new Map<string, Promise<FocusedCardDetails>>()
+
+/** why: a deck screen that asks for this card meanwhile waits for it instead of finding nothing on the server. */
+export function completeCardDetails(
+  key: string,
+  load: () => Promise<FocusedCardDetails>,
+  store: CardDetailStore = storage,
+) {
+  const existing = completing.get(key)
+  if (existing) return existing
+  const request = load().then((details) => {
+    saveCardDetails({ [key]: details }, store)
+    return details
+  })
+  completing.set(key, request)
+  inFlight.set(key, request)
+  void request
+    .catch(() => {})
+    .finally(() => {
+      completing.delete(key)
+      if (inFlight.get(key) === request) inFlight.delete(key)
+    })
+  return request
+}
 
 const warmedVersions = new Set<string>()
 
