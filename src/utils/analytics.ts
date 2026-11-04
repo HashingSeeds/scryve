@@ -5,6 +5,7 @@ import type PostHog from "posthog-react-native"
 
 import { DICE_TOOLS, type DiceTool } from "@/features/game/dice"
 import { createClientId } from "@/features/game/domain"
+import type { GameShape } from "@/features/game/gameShape"
 import { isPlaySystemId, playSystemFormats } from "@/features/game/playSystems"
 import { buildEnvironment } from "@/utils/buildEnvironment"
 import { loadString, saveString, storage } from "@/utils/storage"
@@ -35,6 +36,7 @@ const values = {
   role: ["host", "guest"],
   scope: ["event"],
   peak_heat: ["nominal", "fair", "serious", "critical"],
+  result: ["win", "draw", "none"],
 } as const
 
 const LATENCY_KEYS = [
@@ -58,8 +60,26 @@ const SCAN_COUNT_KEYS = [
   "read_count",
   "outlined_read_count",
 ] as const
+const GAME_SHAPE_NUMBER_KEYS = ["idle_ms", "change_count", "undo_count", "lowest_life_pct"] as const
+const GAME_SHAPE_KEYS = [
+  "duration_ms",
+  ...GAME_SHAPE_NUMBER_KEYS,
+  "result",
+  "seat_out",
+  "commander_damage_used",
+  "counters_used",
+  "clock_used",
+] as const satisfies readonly (keyof GameShape)[]
+const BOOLEAN_KEYS = new Set<string>([
+  "first_player_known",
+  "seat_out",
+  "commander_damage_used",
+  "counters_used",
+  "clock_used",
+])
 const NUMBER_KEYS = new Set<string>([
   "duration_ms",
+  ...GAME_SHAPE_NUMBER_KEYS,
   "attempt_count",
   "since_roll_ms",
   ...LATENCY_KEYS,
@@ -78,7 +98,9 @@ type GameProperties = {
 type Events = {
   app_opened: Record<string, never>
   game_started: GameProperties
-  game_completed: GameProperties & { end_source?: GameEndSource; first_player_known?: boolean }
+  game_completed: GameProperties &
+    Partial<GameShape> & { end_source?: GameEndSource; first_player_known?: boolean }
+  game_abandoned: GameProperties & Partial<GameShape> & { end_source?: GameEndSource }
   connection_attempt: {
     action: "create" | "join"
     stage: "started" | "succeeded" | "failed"
@@ -113,7 +135,16 @@ type Events = {
 const eventKeys: Record<keyof Events, readonly string[]> = {
   app_opened: [],
   game_started: ["system", "format", "player_count", "mode"],
-  game_completed: ["system", "format", "player_count", "mode", "end_source", "first_player_known"],
+  game_completed: [
+    "system",
+    "format",
+    "player_count",
+    "mode",
+    "end_source",
+    "first_player_known",
+    ...GAME_SHAPE_KEYS,
+  ],
+  game_abandoned: ["system", "format", "player_count", "mode", "end_source", ...GAME_SHAPE_KEYS],
   connection_attempt: ["action", "stage", "reason"],
   deck_used: ["feature"],
   stats_viewed: ["surface"],
@@ -168,7 +199,7 @@ export function analyticsProperties(event: string, properties: Record<string, un
     } else if (NUMBER_KEYS.has(key)) {
       if (typeof value === "number" && Number.isFinite(value) && value >= 0)
         result[key] = Math.round(value)
-    } else if (key === "first_player_known") {
+    } else if (BOOLEAN_KEYS.has(key)) {
       if (typeof value === "boolean") result[key] = value
     } else if (event === "deck_sync" && key === "action") {
       if (typeof value === "string" && values.deck_sync_action.some((action) => action === value))
@@ -184,6 +215,10 @@ export function analyticsProperties(event: string, properties: Record<string, un
     if (typeof properties[key] === "string") result[key] = properties[key]
   result.consent_source = loadString(SOURCE_KEY) === "first_use" ? "first_use" : "settings"
   result.platform = Platform.OS
+  // why: timestamps are UTC and geoip is off, so the device's own clock is the only way to see when people play.
+  const now = new Date()
+  result.local_hour = now.getHours()
+  result.weekday = now.getDay()
   // why: beta and production share one PostHog project; this is the same value Sentry tags as environment.
   result.environment = buildEnvironment()
   // why: an OTA update carries the newer config version; the binary's own version is the one installed.
@@ -366,13 +401,14 @@ export function initAnalytics() {
 }
 
 export function captureGame(
-  event: "game_started" | "game_completed",
+  event: "game_started" | "game_completed" | "game_abandoned",
   game: {
     id: string
     system?: string
     format?: string
     playerCount: number
     firstPlayerId?: string
+    shape?: GameShape
   },
   mode: GameProperties["mode"],
   endSource: GameEndSource = "unknown",
@@ -396,7 +432,7 @@ export function captureGame(
         format: game.format,
         player_count: game.playerCount,
         mode,
-        ...(event === "game_completed" ? { end_source: endSource } : {}),
+        ...(event === "game_started" ? {} : { end_source: endSource, ...game.shape }),
         ...(event === "game_completed" && mode === "local"
           ? { first_player_known: Boolean(game.firstPlayerId) }
           : {}),

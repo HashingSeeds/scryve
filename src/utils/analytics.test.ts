@@ -366,6 +366,37 @@ it("accepts only boolean turn order coverage on game completion", () => {
   )
 })
 
+it("keeps how a finished or abandoned game went, and the device's local hour and weekday", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  const shape = {
+    duration_ms: 1200.4,
+    idle_ms: 30,
+    result: "win",
+    change_count: 12,
+    undo_count: 2,
+    lowest_life_pct: 0,
+    seat_out: true,
+    commander_damage_used: false,
+    counters_used: true,
+    clock_used: false,
+  }
+  for (const event of ["game_completed", "game_abandoned"])
+    expect(analyticsProperties(event, shape)).toEqual(
+      expect.objectContaining({ ...shape, duration_ms: 1200 }),
+    )
+  const junk = analyticsProperties("game_completed", {
+    result: "private",
+    undo_count: -1,
+    seat_out: "yes",
+  })
+  for (const key of ["result", "undo_count", "seat_out"]) expect(junk).not.toHaveProperty(key)
+  expect(analyticsProperties("game_started", shape)).not.toHaveProperty("undo_count")
+  const now = new Date()
+  expect(analyticsProperties("app_opened", {})).toEqual(
+    expect.objectContaining({ local_hour: now.getHours(), weekday: now.getDay() }),
+  )
+})
+
 it("sends local turn order coverage once per completed game without player or game ids", async () => {
   jest.useFakeTimers()
   global.fetch = fetchMock

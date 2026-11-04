@@ -202,13 +202,21 @@ Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a re
 - Use a separate development PostHog project to check opt-in, offline capture followed by reconnect, and opt-out with queued events. Never use the live analytics project for development checks.
 - Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. SDK initialization and event processing are scheduled after the current task, but that is not a measured performance guarantee.
 
-The explicit events are `app_opened`, `game_started`, `game_completed`,
+The explicit events are `app_opened`, `game_started`, `game_completed`, `game_abandoned`,
 `connection_attempt`, `deck_used`, `stats_viewed`, `dice_armed`, `dice_rolled`, `deck_browse_empty`, and `card_scan_completed`. A local start means the first
 accepted gameplay action, not rendering the fresh board. Completed local games include
 `end_source`: `game_menu`, `new_game_prompt`, or `stale_game_prompt`. A cancelled
 prompt does not label a later manual finish. Connected completion observations
 use `unknown` because the observing client does not know the finishing player's
-entry point. This describes the UI path, not the player's motivation. Connected starts and
+entry point. This describes the UI path, not the player's motivation. Local
+`game_completed` and `game_abandoned` (a started game discarded instead of finished)
+also say how the game went: `duration_ms` from the first life change to the end,
+`idle_ms` since the last one, `change_count` and `undo_count`, `result` (`win`,
+`draw`, `none`), `lowest_life_pct` and `seat_out` for the seat nearest defeat, and
+whether commander damage, counters, or the round clock were used. A stale-prompted
+game with a long `idle_ms` and `seat_out` was likely finished but never closed. Every
+event carries the device's `local_hour` and `weekday`, since timestamps are UTC
+and geoip is off. Connected starts and
 completions count observations per consenting installation, not unique games or
 all players at the table. Historical views do not emit game events. Stats events
 mean a visit to history or a loaded deck page showing its record, not proof the

@@ -18,6 +18,7 @@ import {
   MAX_COMMANDER_DAMAGE,
   validatePlayerNames,
 } from "./domain"
+import { gameShape } from "./gameShape"
 import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
 import { isSeatOrder, playerGridLayoutForCount } from "./playerLayouts"
 import {
@@ -873,16 +874,13 @@ export class LocalGameRepository {
     this.saveHistory([summary, ...current], current)
     const active = this.loadActiveGame()
     if (active?.id === game.id) this.clearActiveGame()
+    const analyticsGame = { ...game, playerCount: game.players.length, shape: gameShape(game) }
     if (game.status === "finished") {
       recordReviewCompletion(`local:${game.id}`)
-      captureGame(
-        "game_completed",
-        { ...game, playerCount: game.players.length },
-        "local",
-        endSource,
-      )
+      captureGame("game_completed", analyticsGame, "local", endSource)
       this.finishListeners.forEach((listener) => listener())
-    }
+    } else if (hasLocalGameStarted(game))
+      captureGame("game_abandoned", analyticsGame, "local", endSource)
     this.notifyHistoryChanged()
     return summary
   }
