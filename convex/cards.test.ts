@@ -62,11 +62,15 @@ describe("card provider caching and health", () => {
       .mockImplementationOnce(() => response({ data: [shivan] }))
       .mockImplementationOnce(() => response({ object: "error" }, 429))
     const t = makeConvexTest()
-    const otherPrinting = normalizeScryfallCatalogCard({
-      ...shivan,
-      id: "33333333-3333-3333-3333-333333333333",
-    })
-    if (otherPrinting) await t.mutation(internal.cardCatalog.cacheMany, { cards: [otherPrinting] })
+    const catalogOnly = [
+      ...Array.from({ length: 20 }, (_, n) => ({
+        id: `catalog-only-${n}`,
+        oracle_id: `catalog-only-oracle-${n}`,
+        name: `Dragon Whelp ${n}`,
+      })),
+      { ...shivan, id: "33333333-3333-3333-3333-333333333333" },
+    ].flatMap((card) => normalizeScryfallCatalogCard(card) ?? [])
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: catalogOnly })
     await t.action(api.cards.search, { query: "Shivan" })
     await expect(t.action(api.cards.search, { query: "Ancestral" })).rejects.toMatchObject({
       data: { code: "scryfall_unavailable" },
