@@ -43,7 +43,12 @@ import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
-import { loadCardDetails, partialMagicDetails, saveCardDetails } from "./cardDetailsCache"
+import {
+  completeCardDetails,
+  loadCardDetails,
+  partialMagicDetails,
+  saveCardDetails,
+} from "./cardDetailsCache"
 import { searchCardNames } from "./cardNameMatch"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import {
@@ -521,11 +526,11 @@ export function CardSearch({
 
   /** why: a card from the device's Magic file has no rules text, so the deck's analysis and card view need its full details. */
   function completeDetails(scryfallId: string) {
-    convex?.action(api.cards.byId, { scryfallId, deviceId }).then(
-      (details) => {
-        saveCardDetails({ [scryfallId]: details })
-        setCachedRules((current) => ({ ...current, [scryfallId]: details }))
-      },
+    if (!convex) return
+    completeCardDetails(scryfallId, () =>
+      convex.action(api.cards.byId, { scryfallId, deviceId }),
+    ).then(
+      (details) => setCachedRules((current) => ({ ...current, [scryfallId]: details })),
       () => {},
     )
   }

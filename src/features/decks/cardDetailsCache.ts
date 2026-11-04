@@ -184,6 +184,21 @@ export async function fetchCardDetails(
 /** why: a deck screen loads details for its analysis and its rule warnings at once, and each would ask for the same cards. */
 const inFlight = new Map<string, Promise<unknown>>()
 
+/** why: a deck screen that asks for this card meanwhile waits for it instead of finding nothing on the server. */
+export function completeCardDetails(
+  key: string,
+  load: () => Promise<FocusedCardDetails>,
+  store: CardDetailStore = storage,
+) {
+  const request = load().then((details) => {
+    saveCardDetails({ [key]: details }, store)
+    return details
+  })
+  inFlight.set(key, request)
+  void request.catch(() => {}).finally(() => inFlight.delete(key))
+  return request
+}
+
 const warmedVersions = new Set<string>()
 
 export async function prefetchCardDetails(

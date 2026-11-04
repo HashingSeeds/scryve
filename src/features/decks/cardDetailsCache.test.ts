@@ -1,6 +1,7 @@
 import { storage } from "@/utils/storage"
 
 import {
+  completeCardDetails,
   fetchCardDetails,
   loadCardDetails,
   prefetchCardDetails,
@@ -204,6 +205,24 @@ describe("card details cache", () => {
 
     expect(query).toHaveBeenCalledTimes(1)
     expect(readCardDetail("ring-id", store)?.oracleText).toBe(solRing.oracleText)
+  })
+
+  it("waits for a card's details still loading instead of asking the server", async () => {
+    const store = memoryStore()
+    const ring = { name: "Sol Ring", quantity: 1, scryfallId: "ring-id" }
+    let finish = (_details: typeof solRing) => {}
+    const loading = completeCardDetails(
+      "ring-id",
+      () => new Promise((resolve) => (finish = resolve)),
+      store,
+    )
+    const query = jest.fn(async () => [])
+    const fetched = fetchCardDetails({ query }, "mtg", [ring], store)
+    finish(solRing)
+    await Promise.all([loading, fetched])
+
+    expect(query).not.toHaveBeenCalled()
+    expect(readCardDetail("ring-id", store)).toEqual(solRing)
   })
 
   it("refetches Lorcana text cached with its printed line wraps", async () => {
