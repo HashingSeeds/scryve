@@ -26,6 +26,7 @@ import {
 import { RULES_TEXT_IN_APP, type TextRules } from "@/features/rules/gameRules"
 import { recentRules, rememberRule } from "@/features/rules/recentRules"
 import { useComprehensiveRules } from "@/features/rules/rulesSource"
+import { useRulesSearchAnalytics } from "@/features/rules/useRulesSearchAnalytics"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -47,6 +48,7 @@ type Row =
 
 export interface RulesScreenProps {
   source: TextRules
+  system: string
   ruleId?: string
   glossary?: boolean
   back: BackAction
@@ -109,6 +111,7 @@ function homeRows(
 
 export function RulesScreen({
   source,
+  system,
   ruleId,
   glossary,
   back,
@@ -144,6 +147,17 @@ export function RulesScreen({
   const title = section ? `${section.id}. ${section.title}` : translate("play:rules.title")
   const home = !ruleId
   const searching = home && Boolean(query.trim())
+  const searchResults = rows.flatMap((row) =>
+    row.kind === "result" ? [row.rule.id] : row.kind === "term" ? ["glossary"] : [],
+  )
+  const searchOpened = useRulesSearchAnalytics(
+    system,
+    searching && rules ? { query, results: searchResults } : undefined,
+  )
+  const openResult = (id: string, index: number) => {
+    if (searching) searchOpened(index + 1)
+    onOpenRule(id)
+  }
 
   const toggleChapter = (id: string) =>
     setOpen((current) => {
@@ -156,7 +170,7 @@ export function RulesScreen({
       current?.rule === rule && current.reference === reference ? undefined : { rule, reference },
     )
 
-  function renderRow({ item }: { item: Row }) {
+  function renderRow({ item, index }: { item: Row; index: number }) {
     switch (item.kind) {
       case "chapter":
         return (
@@ -224,7 +238,7 @@ export function RulesScreen({
             <RuleText
               reference={source.references}
               text={item.entry.text}
-              onPressReference={onOpenRule}
+              onPressReference={(id) => openResult(id, index)}
               dim
             />
           </View>
@@ -234,7 +248,7 @@ export function RulesScreen({
         return (
           <Pressable
             accessibilityRole="link"
-            onPress={() => onOpenRule(item.rule.id)}
+            onPress={() => openResult(item.rule.id, index)}
             style={themed($entry)}
             testID={`rule-${item.rule.id}`}
           >

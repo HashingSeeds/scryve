@@ -27,6 +27,7 @@ export default function RulesRoute() {
     <RulesScreen
       key={source.cacheKey}
       source={source}
+      system={rules && system ? system : "mtg"}
       ruleId={rule}
       glossary={glossary !== undefined}
       back={back}

@@ -1,11 +1,16 @@
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { CardFocusDialog } from "./CardFocusDialog"
 
 const mockAction = jest.fn()
 jest.mock("convex/react", () => ({ useConvex: () => ({ action: mockAction }) }))
+jest.mock("@/utils/analytics", () => ({
+  ...jest.requireActual("@/utils/analytics"),
+  captureAnalytics: jest.fn(),
+}))
 jest.mock("@/features/rules/rulesSource", () => ({
   loadStoredRules: () => ({
     url: "rules.txt",
@@ -93,6 +98,7 @@ describe("CardFocusDialog", () => {
   })
 
   it("defines a Magic keyword when you tap it, with its rules collapsed", () => {
+    jest.mocked(captureAnalytics).mockClear()
     const view = renderDialog({
       card: { ...card, game: "mtg" },
       details: { ...details, oracleText: "Flying, vigilance", keywords: "Flying\nVigilance" },
@@ -105,6 +111,9 @@ describe("CardFocusDialog", () => {
     expect(view.getByText("Flying is an evasion ability.")).toBeTruthy()
     fireEvent.press(view.getAllByText("Flying")[0])
     expect(view.queryByTestId("card-focus-keyword")).toBeNull()
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
+      ["keyword_viewed", { system: "mtg", rule: expect.stringMatching(/^702\./) }],
+    ])
   })
 
   it("shows the focused card image with rules, printing, and deck context", () => {

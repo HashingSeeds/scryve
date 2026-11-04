@@ -203,7 +203,7 @@ Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a re
 - Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. SDK initialization and event processing are scheduled after the current task, but that is not a measured performance guarantee.
 
 The explicit events are `app_opened`, `game_started`, `game_completed`, `game_abandoned`,
-`connection_attempt`, `deck_used`, `stats_viewed`, `dice_armed`, `dice_rolled`, `deck_browse_empty`, and `card_scan_completed`. A local start means the first
+`connection_attempt`, `deck_used`, `stats_viewed`, `dice_armed`, `dice_rolled`, `deck_browse_empty`, `card_scan_completed`, `rules_search`, `rules_opened`, and `keyword_viewed`. A local start means the first
 accepted gameplay action, not rendering the fresh board. Completed local games include
 `end_source`: `game_menu`, `new_game_prompt`, or `stale_game_prompt`. A cancelled
 prompt does not label a later manual finish. Connected completion observations
@@ -229,6 +229,15 @@ wanted several rolls in a row. `deck_browse_empty` fires when an unsearched Brow
 list answers with no decks, naming the game, format, and catalog status, so an empty
 Browse screen can be told apart from a format that really has no lists.
 `card_scan_completed` fires when the card scanner closes (prerelease builds only). It carries counts, never card names: cards added (including any later fixed with Wrong card), not added, skipped as already in the deck, fixed, reads, reads where the card was outlined, the session length, and the phone's peak heat (`nominal` to `critical`).
+Rules search runs on the device, so these events are the only record of it.
+`rules_search` fires once a search settles (1.5s without typing), when a result is opened, or
+when the rules screen closes. It carries the system, `result_count` (capped at 50), and
+`top_results`, the first three rule ids (`glossary` for a glossary term). Only a search with
+no results carries `query`, lowercased and cut to 40 characters. Each result opened from a search sends
+`rules_opened` with its `rank` and `open_count`, the number of results opened from that
+search so far, so `open_count` 2 or more means the first pick was wrong. A glossary term
+answers in place, so a search with no open is not always a miss. `keyword_viewed` fires when
+a Magic keyword on a card opens its definition, naming the keyword's rule id.
 
 Use `consent_source = first_use` for activation cohorts from the optional, unchecked
 choice on the first-use legal screen. `consent_source = settings` includes existing

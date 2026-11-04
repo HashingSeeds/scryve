@@ -3,6 +3,7 @@ import { fireEvent, render } from "@testing-library/react-native"
 import type { ComprehensiveRules } from "@/features/rules/comprehensiveRules"
 import { GAME_RULES } from "@/features/rules/gameRules"
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 import { storage } from "@/utils/storage"
 
 import { RulesScreen } from "./RulesScreen"
@@ -50,6 +51,10 @@ const mockRules: ComprehensiveRules = {
   notice: [],
 }
 
+jest.mock("@/utils/analytics", () => ({
+  ...jest.requireActual("@/utils/analytics"),
+  captureAnalytics: jest.fn(),
+}))
 jest.mock("@/features/rules/rulesSource", () => ({
   useComprehensiveRules: () => ({ rules: mockRules, failed: false, retry: jest.fn() }),
 }))
@@ -63,6 +68,7 @@ function renderRules(props: { ruleId?: string; onOpenRule?: (id: string) => void
     <ThemeProvider initialContext="dark">
       <RulesScreen
         source={GAME_RULES.mtg}
+        system="mtg"
         back={{ label: "Game", onPress: jest.fn() }}
         onOpenRule={props.onOpenRule ?? jest.fn()}
         ruleId={props.ruleId}
@@ -104,4 +110,24 @@ it("lists rules you opened under Recent", () => {
   renderRules({ ruleId: "509.1" }).unmount()
   const view = renderRules()
   expect(view.getByTestId("rules-recent-509.1")).toBeTruthy()
+})
+
+it("reports a search once, numbers each result opened from it, and keeps only a fruitless query", () => {
+  const capture = jest.mocked(captureAnalytics)
+  capture.mockClear()
+  const view = renderRules()
+  fireEvent.changeText(view.getByTestId("rules-search"), "Block")
+  fireEvent.press(view.getByTestId("rule-509.1a"))
+  fireEvent.press(view.getByTestId("rule-733.2"))
+  fireEvent.changeText(view.getByTestId("rules-search"), "Banding")
+  view.unmount()
+  expect(capture.mock.calls).toEqual([
+    [
+      "rules_search",
+      { system: "mtg", result_count: 3, top_results: "509.1,509.1a,733.2", query: "Block" },
+    ],
+    ["rules_opened", { system: "mtg", rank: 2, open_count: 1 }],
+    ["rules_opened", { system: "mtg", rank: 3, open_count: 2 }],
+    ["rules_search", { system: "mtg", result_count: 0, top_results: "", query: "Banding" }],
+  ])
 })
