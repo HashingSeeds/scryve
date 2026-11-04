@@ -32,8 +32,7 @@ export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenPro
       header={{
         title: document.title,
         backgroundColor,
-        leftTx: "common:back",
-        onLeftPress: onBack,
+        onBack: onBack,
       }}
       contentContainerStyle={themed($scrollContent)}
       ScrollViewProps={{ testID: "legal-document-scroll" }}

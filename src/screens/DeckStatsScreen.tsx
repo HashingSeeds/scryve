@@ -7,7 +7,7 @@ import { usePaginatedQuery, useQuery } from "convex/react"
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { EmptyState } from "@/components/EmptyState"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { SectionHeader } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -63,10 +63,9 @@ export function DeckStatsScreen(props: Props) {
       <Header
         title={props.deckName}
         LeftActionComponent={
-          <HeaderIcon
+          <HeaderBack
             testID="header-back"
-            icon="back"
-            label={translate("common:back")}
+            fallback="connected/decks/index"
             onPress={props.onBack}
           />
         }

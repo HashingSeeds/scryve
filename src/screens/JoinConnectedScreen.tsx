@@ -215,13 +215,7 @@ export function JoinConnectedScreen({
       backgroundColor={embedded ? colors.surface : undefined}
       contentContainerStyle={themed($screen)}
     >
-      {!embedded ? (
-        <Header
-          title={titleVisible ? title : ""}
-          leftTx={onBack ? "common:back" : undefined}
-          onLeftPress={onBack}
-        />
-      ) : null}
+      {!embedded ? <Header title={titleVisible ? title : ""} onBack={onBack} /> : null}
       <ScrollView
         style={$styles.flex1}
         contentContainerStyle={[themed($content), embedded && themed($embeddedContent)]}

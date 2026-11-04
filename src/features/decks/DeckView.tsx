@@ -6,7 +6,7 @@ import { router } from "expo-router"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button, PlusAccessory } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack, HeaderIcon } from "@/components/Header"
 import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
@@ -186,9 +186,7 @@ export function DeckView({
       <Header
         titleTx={guest ? "decks:deckView.guestTitle" : "decks:deckView.title"}
         backgroundColor={theme.colors.surface}
-        LeftActionComponent={
-          <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
-        }
+        LeftActionComponent={<HeaderBack fallback="connected/decks/index" onPress={onBack} />}
         RightActionComponent={
           <HeaderIcon
             icon="more"

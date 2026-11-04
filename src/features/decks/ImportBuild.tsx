@@ -5,7 +5,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { SectionHeader } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
@@ -166,7 +166,7 @@ export function ImportBuild({
           titleTx="decks:importBuild.title"
           backgroundColor={theme.colors.surface}
           LeftActionComponent={
-            <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+            <HeaderBack label={translate("decks:shelf.addDeck")} onPress={onBack} />
           }
         />
         {listFinal ? null : progress}

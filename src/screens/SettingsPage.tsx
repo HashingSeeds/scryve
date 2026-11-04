@@ -23,7 +23,7 @@ export function SettingsPage({ titleTx, onBack, children, scrollTestID }: Settin
     <Screen
       preset="scroll"
       safeAreaEdges={["bottom"]}
-      header={{ titleTx, leftTx: "common:back", onLeftPress: onBack }}
+      header={{ titleTx, onBack }}
       contentContainerStyle={themed($scrollContent)}
       ScrollViewProps={{ testID: scrollTestID }}
     >

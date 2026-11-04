@@ -7,7 +7,7 @@ import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -112,9 +112,7 @@ function SharedDeckHeader({ onBack }: { onBack: () => void }) {
     <Header
       titleTx="decks:shared.title"
       backgroundColor={theme.colors.surface}
-      LeftActionComponent={
-        <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
-      }
+      LeftActionComponent={<HeaderBack fallback="connected/decks/index" onPress={onBack} />}
     />
   )
 }

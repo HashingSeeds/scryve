@@ -420,8 +420,7 @@ export function HistoryScreen({
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header
         title={titleVisible ? translate("play:history.title") : ""}
-        leftTx="common:back"
-        onLeftPress={onBack}
+        onBack={onBack}
         rightTx={onAddMatch ? "play:history.addResult" : undefined}
         onRightPress={onAddMatch}
       />

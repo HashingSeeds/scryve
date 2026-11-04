@@ -8,7 +8,7 @@ import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { EmptyState } from "@/components/EmptyState"
-import { Header } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { RemoteValue } from "@/features/async/remoteState"
@@ -149,8 +149,7 @@ export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMa
       <Header
         titleTx="play:manualMatch.title"
         backgroundColor={theme.colors.surface}
-        leftTx="common:back"
-        onLeftPress={busy ? undefined : onBack}
+        LeftActionComponent={<HeaderBack onPress={busy ? undefined : onBack} />}
       />
       {!access.ready && !access.loading ? (
         <EmptyState

@@ -44,8 +44,7 @@ export default function FoilSupporterRoute() {
         header={{
           titleTx: "account:foil.title",
           collapseTitle: false,
-          leftTx: "common:back",
-          onLeftPress: () => router.dismissTo("/"),
+          onBack: () => router.dismissTo("/"),
         }}
       >
         <View style={$content}>

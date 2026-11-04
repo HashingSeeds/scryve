@@ -26,11 +26,7 @@ import { api } from "../../convex/_generated/api"
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
     <Screen preset="auto" safeAreaEdges={["bottom"]}>
-      <Header
-        titleTx="account:deleteAccount.title"
-        leftTx="common:back"
-        onLeftPress={() => router.back()}
-      />
+      <Header titleTx="account:deleteAccount.title" onBack={() => router.back()} />
       <Text accessibilityRole="alert" tx="account:deleteAccount.route.statusCheckFailed" />
       <Button tx="common:tryAgain" preset="primary" onPress={() => void retry()} />
       <Button
@@ -69,11 +65,7 @@ export default function DeleteAccountRoute() {
     else
       return (
         <Screen preset="auto" safeAreaEdges={["bottom"]}>
-          <Header
-            titleTx="account:deleteAccount.title"
-            leftTx="common:back"
-            onLeftPress={() => router.back()}
-          />
+          <Header titleTx="account:deleteAccount.title" onBack={() => router.back()} />
           <Text accessibilityRole="alert" text={signInPrompt} />
           {auth.configured ? (
             <Button tx="account:signIn" preset="primary" onPress={auth.openAuth} />
@@ -105,11 +97,7 @@ function SignedOutDeletionReceipt({
   if (receipt === undefined || receipt === null)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header
-          titleTx="account:deleteAccount.title"
-          leftTx="common:back"
-          onLeftPress={() => router.back()}
-        />
+        <Header titleTx="account:deleteAccount.title" onBack={() => router.back()} />
         <Text tx="account:deleteAccount.route.checkingReceipt" accessibilityLiveRegion="polite" />
         <Button
           tx="account:openPlay"
@@ -146,22 +134,14 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
   if (isLoading || !isUserLoaded)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header
-          titleTx="account:deleteAccount.title"
-          leftTx="common:back"
-          onLeftPress={() => router.back()}
-        />
+        <Header titleTx="account:deleteAccount.title" onBack={() => router.back()} />
         <Text tx="account:deleteAccount.route.checkingAccount" />
       </Screen>
     )
   if (!isAuthenticated)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header
-          titleTx="account:deleteAccount.title"
-          leftTx="common:back"
-          onLeftPress={() => router.back()}
-        />
+        <Header titleTx="account:deleteAccount.title" onBack={() => router.back()} />
         <Text accessibilityRole="alert" tx="account:deleteAccount.route.reconnect" />
         <Button
           tx="account:openPlay"

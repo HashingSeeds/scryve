@@ -241,9 +241,8 @@ export function LobbyView({
     >
       <Header
         title={titleVisible ? translate("connected:lobby.title") : ""}
-        leftTx={onBack ? "common:back" : undefined}
         backgroundColor={colors.surface}
-        onLeftPress={onBack}
+        onBack={onBack}
       />
       <ScrollView
         style={$styles.flex1}
@@ -544,12 +543,7 @@ export function LobbyStatusScreen({
       backgroundColor={theme.colors.surface}
       contentContainerStyle={themed($screen)}
     >
-      <Header
-        title=""
-        leftTx={onBack ? "common:back" : undefined}
-        backgroundColor={theme.colors.surface}
-        onLeftPress={onBack}
-      />
+      <Header title="" backgroundColor={theme.colors.surface} onBack={onBack} />
       <ScrollView
         style={$styles.flex1}
         contentContainerStyle={themed($content)}

@@ -417,7 +417,7 @@ describe("AddDeckScreen", () => {
         }),
       ),
     )
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     expect(view.getByLabelText("Deck list").props.value).toBe(
       "2 Forest\n1 Island (M21) 265\n0 Mountain",
     )
@@ -553,7 +553,7 @@ describe("AddDeckScreen", () => {
         expect.objectContaining({ cards: [expect.objectContaining(known)] }),
       ),
     )
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     expect(view.getByLabelText("Deck list").props.value).toBe(source)
   })
 
@@ -562,7 +562,7 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterPasted(view, "2 Forest\n1 Forst")
     await waitFor(() => expect(view.getByLabelText("2× Forest")).toBeTruthy())
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     fireEvent.changeText(view.getByLabelText("Deck list"), "3 Forest")
     mockResolvePasted.mockRejectedValueOnce(new Error("Unavailable"))
     fireEvent.press(view.getByTestId("review-import-button"))
@@ -595,7 +595,7 @@ describe("AddDeckScreen", () => {
     expect(view.queryByTestId("mode-picker-options")).toBeNull()
     expect(view.queryByTestId("deck-note-input")).toBeNull()
     expect(view.getByTestId("save-import-button")).toBeEnabled()
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     expect(view.queryByTestId("import-build")).toBeNull()
     expect(view.queryByTestId("save-import-button")).toBeNull()
     expect(view.getByTestId("deck-name-input").props.value).toBe("Reviewed deck")
@@ -676,7 +676,7 @@ describe("AddDeckScreen", () => {
         }
       }
       expectSections()
-      fireEvent.press(view.getByRole("button", { name: "Back" }))
+      fireEvent.press(view.getByRole("button", { name: "Add deck" }))
       fireEvent.press(view.getByTestId("review-import-button"))
       await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
       expectSections()
@@ -849,7 +849,7 @@ describe("AddDeckScreen", () => {
     expect(view.getByLabelText("2× Island")).toBeTruthy()
     expect(view.queryByLabelText("1× Island")).toBeNull()
     expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     expect(view.getByLabelText("Deck list").props.value).toBe(
       "2 Island (M21) 265\n1 Island (DMU) 278",
     )
@@ -895,7 +895,7 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterPasted(view)
     await waitFor(() => expect(view.getByTestId("import-build")).toBeTruthy())
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     let finish: ((result: typeof resolvedForest) => void) | undefined
     mockResolvePasted.mockImplementationOnce(
       () =>
@@ -998,7 +998,7 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
     expect(mockCardById).toHaveBeenCalledTimes(2)
     expect(mockSaveDeck).not.toHaveBeenCalled()
-    fireEvent.press(view.getByRole("button", { name: "Back", includeHiddenElements: true }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck", includeHiddenElements: true }))
     expect(view.queryByTestId("card-focus-dialog")).toBeNull()
     expect(view.getByLabelText("Deck list").props.value).toBe(
       "2 Island (M21) 265\n1 Island (DMU) 278",
@@ -1224,7 +1224,7 @@ describe("AddDeckScreen", () => {
     enterLink(view)
     await waitFor(() => expect(view.getByLabelText("2× Forest")).toBeTruthy())
     expect(view.getByText("Modern · 2 cards")).toBeTruthy()
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     chooseFormat(view, "standard")
     expect(view.queryByTestId("save-import-button")).toBeNull()
     fireEvent.press(view.getByTestId("review-import-button"))
@@ -1248,7 +1248,7 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterLink(view)
     await waitFor(() => expect(view.getByTestId("import-card-commander-0")).toBeTruthy())
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     chooseFormat(view, "modern")
     fireEvent.press(view.getByTestId("review-import-button"))
     await waitFor(() => expect(mockResolveLink).toHaveBeenCalledTimes(2))
@@ -1318,7 +1318,7 @@ describe("AddDeckScreen", () => {
     expect(view.queryByTestId("deck-link-input")).toBeNull()
     expect(view.queryByTestId("deck-note-input")).toBeNull()
     fireEvent.press(view.getByLabelText("Increase Forest"))
-    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    fireEvent.press(view.getByRole("button", { name: "Add deck" }))
     expect(view.queryByTestId("import-build")).toBeNull()
     expect(view.queryByTestId("save-import-button")).toBeNull()
     expect(view.getByTestId("deck-link-input").props.value).toBe(resolvedArchidekt.sourceUrl)
@@ -1982,7 +1982,7 @@ describe("AddDeckScreen", () => {
     await act(async () => jest.advanceTimersByTime(400))
     fireEvent.press(view.getByText("Explorers of the Deep"))
     await waitFor(() => expect(view.getByText("Retrying in 3s")).toBeTruthy())
-    if (exit === "close") fireEvent.press(view.getByLabelText("Back"))
+    if (exit === "close") fireEvent.press(view.getByLabelText("Add deck"))
     else view.unmount()
     await act(async () => jest.advanceTimersByTime(4000))
     expect(mockResolvePrecon).toHaveBeenCalledTimes(1)

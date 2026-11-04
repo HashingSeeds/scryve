@@ -47,7 +47,7 @@ export function AccountScreen({
 
   return (
     <View style={$fill}>
-      <Header titleTx="account:profile.title" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="account:profile.title" onBack={onBack} />
       <ScrollView contentContainerStyle={themed($content)}>
         <View style={themed($identity)}>
           <Avatar name={name} email={email} avatarUrl={avatarUrl} />

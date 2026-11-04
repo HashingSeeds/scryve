@@ -30,6 +30,7 @@ jest.mock("@/features/connected/ConnectedSummarySource", () => ({
 }))
 jest.mock("@/features/game/localPersistence", () => ({
   localGameRepository: {
+    loadActiveGame: () => undefined,
     loadHistory: () => [],
     loadHistoryDetail: () => null,
     onHistoryChanged: () => () => undefined,

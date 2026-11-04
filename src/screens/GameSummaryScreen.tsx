@@ -137,7 +137,7 @@ function SummaryLoadingShell({ onBack }: { onBack: () => void }) {
   const { themed } = useAppTheme()
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($fixedScreen)}>
-      <Header titleTx="play:gameSummary" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="play:gameSummary" onBack={onBack} />
       <ScrollView style={$styles.flex1} contentContainerStyle={themed($screen)}>
         <View
           testID="summary-loading-shell"
@@ -225,7 +225,7 @@ export function GameSummaryScreen({
   if (summary.status === "unavailable") {
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-        <Header titleTx="play:gameSummary" leftTx="common:back" onLeftPress={onBack} />
+        <Header titleTx="play:gameSummary" onBack={onBack} />
         <EmptyState
           headingTx="play:summary.unavailableHeading"
           contentTx="play:summary.unavailableContent"
@@ -241,7 +241,7 @@ export function GameSummaryScreen({
   if (!model) {
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-        <Header titleTx="play:gameSummary" leftTx="common:back" onLeftPress={onBack} />
+        <Header titleTx="play:gameSummary" onBack={onBack} />
         <EmptyState
           headingTx="play:summary.notFoundHeading"
           contentTx="play:summary.notFoundContent"
@@ -267,11 +267,7 @@ export function GameSummaryScreen({
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($fixedScreen)}>
-      <Header
-        title={titleVisible ? translate("play:gameSummary") : ""}
-        leftTx="common:back"
-        onLeftPress={onBack}
-      />
+      <Header title={titleVisible ? translate("play:gameSummary") : ""} onBack={onBack} />
       <ScrollView
         style={$styles.flex1}
         contentContainerStyle={themed($screen)}

@@ -20,7 +20,7 @@ import { Button } from "@/components/Button"
 import { CardFocusDialog, colorLabel } from "@/components/CardFocusDialog"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { FilterPill } from "@/components/FilterPill"
-import { HeaderIcon } from "@/components/Header"
+import { HeaderBack } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
@@ -1106,7 +1106,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
         titleTx: "decks:shelf.addDeck",
         collapseTitle: false,
         LeftActionComponent: (
-          <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
+          <HeaderBack fallback="connected/decks/index" onPress={onBack} />
         ),
       }}
     >

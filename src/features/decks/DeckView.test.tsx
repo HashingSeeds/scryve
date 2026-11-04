@@ -69,7 +69,7 @@ it("keeps the back action available", () => {
   const onBack = jest.fn()
   const view = renderDeckView({ cards: [], onBack })
 
-  fireEvent.press(view.getByLabelText("Back"))
+  fireEvent.press(view.getByLabelText("Decks"))
   expect(onBack).toHaveBeenCalledTimes(1)
 })
 
