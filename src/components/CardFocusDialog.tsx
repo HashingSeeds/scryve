@@ -6,6 +6,7 @@ import { type ImageStyle } from "expo-image"
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
+import { CardRulings } from "@/components/CardRulings"
 import { CardSymbolText, spokenCardText } from "@/components/CardSymbolText"
 import { PressableIcon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
@@ -165,6 +166,12 @@ export function CardFocusDialog({
   const nameWarning =
     onSetCommander && !commanderProblem ? commanderNameWarning(card.name) : undefined
   const printing = details ? printingLine(details) : ""
+  const rulingsId =
+    systemDefinition(card.game)?.integration.capabilities.cardCatalog.provider === "scryfall" &&
+    card.cardId &&
+    /^[0-9a-f-]{36}$/i.test(card.cardId)
+      ? card.cardId
+      : undefined
   const imageCredit = systemDefinition(card.game)?.integration.rights.imageCredit
   const colorIdentity = cardColorIdentityLabel(details, card.name)
   const smallImageUrl = face ? face.smallImageUrl : (details?.smallImageUrl ?? card.smallImageUrl)
@@ -256,6 +263,7 @@ export function CardFocusDialog({
           {keyword && keywordRule ? (
             <KeywordDefinition key={keyword} name={keyword} rule={keywordRule} />
           ) : null}
+          {rulingsId ? <CardRulings scryfallId={rulingsId} /> : null}
           {printing ? <Text size="xs" tone="dim" text={printing} /> : null}
           {imageCredit ? <Text size="xxs" tone="dim" text={imageCredit} /> : null}
           {!details && !detailsError ? (

@@ -251,3 +251,18 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
     ...(colorIdentity !== undefined ? { colorIdentity } : {}),
   }
 }
+
+const MAX_RULINGS = 100
+
+export function officialRulings(body: unknown) {
+  const data = objectRecord(body)?.data
+  if (!Array.isArray(data)) return undefined
+  return data
+    .flatMap((item) => {
+      const ruling = objectRecord(item)
+      const comment = stringField(ruling, "comment")
+      const publishedAt = stringField(ruling, "published_at")
+      return ruling?.source === "wotc" && comment && publishedAt ? [{ publishedAt, comment }] : []
+    })
+    .slice(0, MAX_RULINGS)
+}

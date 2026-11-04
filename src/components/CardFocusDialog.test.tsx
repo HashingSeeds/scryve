@@ -4,7 +4,8 @@ import { ThemeProvider } from "@/theme/context"
 
 import { CardFocusDialog } from "./CardFocusDialog"
 
-jest.mock("convex/react", () => ({ useConvex: () => undefined }))
+const mockAction = jest.fn()
+jest.mock("convex/react", () => ({ useConvex: () => ({ action: mockAction }) }))
 jest.mock("@/features/rules/rulesSource", () => ({
   loadStoredRules: () => ({
     url: "rules.txt",
@@ -65,6 +66,18 @@ function renderDialog(props: Partial<Parameters<typeof CardFocusDialog>[0]> = {}
 }
 
 describe("CardFocusDialog", () => {
+  it("loads a Magic card's official rulings when you open them", async () => {
+    mockAction.mockResolvedValue([{ publishedAt: "2009-10-01", comment: "Protection applies." }])
+    const view = renderDialog({
+      card: { ...card, game: "mtg", cardId: "4bd3014b-94bb-4a9f-92cf-239a2dcc7e97" },
+    })
+    expect(view.queryByText("Protection applies.")).toBeNull()
+    fireEvent.press(view.getByTestId("card-rulings"))
+    expect(await view.findByText("Protection applies.")).toBeTruthy()
+    expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+      scryfallId: "4bd3014b-94bb-4a9f-92cf-239a2dcc7e97",
+      deviceId: expect.any(String),
+    })
   it("defines a Magic keyword in place when you tap it", () => {
     const view = renderDialog({
       card: { ...card, game: "mtg" },

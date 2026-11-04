@@ -1332,3 +1332,28 @@ describe("search by printed name", () => {
     expect(cards).toMatchObject([{ cardId: rush.cardId, name: rush.name }])
   })
 })
+
+describe("cards.rulings", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("returns only Wizards of the Coast's rulings for a card", async () => {
+    const id = "4bd3014b-94bb-4a9f-92cf-239a2dcc7e97"
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() =>
+      response({
+        object: "list",
+        data: [
+          {
+            source: "wotc",
+            published_at: "2009-10-01",
+            comment: "Protection from Demons applies.",
+          },
+          { source: "scryfall", published_at: "2020-01-01", comment: "A Scryfall note." },
+        ],
+      }),
+    )
+    await expect(makeConvexTest().action(api.cards.rulings, { scryfallId: id })).resolves.toEqual([
+      { publishedAt: "2009-10-01", comment: "Protection from Demons applies." },
+    ])
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(`https://api.scryfall.com/cards/${id}/rulings`)
+  })
+})

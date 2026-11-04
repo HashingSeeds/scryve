@@ -29,6 +29,7 @@ import {
   fetchScryfall,
   normalizeScryfallCard,
   objectRecord,
+  officialRulings,
   SCRYFALL_BASE_URL,
 } from "./lib/scryfall"
 
@@ -641,6 +642,34 @@ export const byId = action({
       if (cached && isCompleteReference(cached)) return toCardReference(cached)
       throw cause
     }
+  },
+})
+
+export const rulings = action({
+  args: { scryfallId: v.string(), deviceId: v.optional(v.string()) },
+  returns: v.array(v.object({ publishedAt: v.string(), comment: v.string() })),
+  handler: async (ctx, args) => {
+    if (!/^[0-9a-f-]{36}$/i.test(args.scryfallId))
+      throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
+    await limitCardLookup(ctx, args.deviceId)
+    const response = await fetchScryfall(
+      ctx,
+      `/cards/${encodeURIComponent(args.scryfallId)}/rulings`,
+    )
+    if (response.status === 404)
+      throw new ConvexError({ code: "card_not_found", message: "Card not found" })
+    if (!response.ok)
+      throw new ConvexError({
+        code: "scryfall_unavailable",
+        message: `Card rulings are temporarily unavailable (${response.status})`,
+      })
+    const official = officialRulings((await response.json()) as unknown)
+    if (!official)
+      throw new ConvexError({
+        code: "scryfall_invalid_response",
+        message: "Card service returned an invalid response",
+      })
+    return official
   },
 })
 
