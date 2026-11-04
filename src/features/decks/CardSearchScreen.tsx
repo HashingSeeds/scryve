@@ -392,7 +392,18 @@ export function CardSearch({
             keywords,
           })
         : undefined
-    if (searchError?.retryAfterMs && !offline && !local) return
+    const remoteQuery = scryfallQuery({
+      text,
+      commander: choosingCommander,
+      colors: colorFilters,
+      colorMatch,
+      keywords,
+    })
+    const answered =
+      local && (local.named.length || local.found.length || remoteQuery.length < 2)
+        ? local
+        : undefined
+    if (searchError?.retryAfterMs && !offline && !answered) return
     let active = true
     setSearchError(undefined)
     setMessage(undefined)
@@ -424,16 +435,9 @@ export function CardSearch({
       return
     }
     setOfflineResults(undefined)
-    const remoteQuery = scryfallQuery({
-      text,
-      commander: choosingCommander,
-      colors: colorFilters,
-      colorMatch,
-      keywords,
-    })
-    if (local && (local.named.length || local.found.length || remoteQuery.length < 2)) {
-      setNameResults(local.named)
-      setResults(local.found)
+    if (answered) {
+      setNameResults(answered.named)
+      setResults(answered.found)
       setBusy(false)
       return
     }

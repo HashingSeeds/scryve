@@ -693,6 +693,22 @@ describe("with the device's Magic card file", () => {
     })
   })
 
+  it("waits out a pause when a name the file lacks gets rate limited", async () => {
+    mockAction.mockRejectedValue(
+      new ConvexError({
+        code: "scryfall_rate_limited",
+        message: "Scryfall requests are paused. Try again shortly.",
+        retryAfterMs: 3000,
+      }),
+    )
+    const { view } = await searchFor("Ancestral")
+    jest.useFakeTimers()
+    await act(async () => jest.advanceTimersByTime(1500))
+    jest.useRealTimers()
+    expect(view.getByText(/Retrying in/)).toBeTruthy()
+    expect(mockAction).toHaveBeenCalledTimes(1)
+  })
+
   it("still sends Scryfall syntax to Scryfall", async () => {
     mockAction.mockResolvedValue([])
     await searchFor("t:dragon")
