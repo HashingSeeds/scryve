@@ -21,7 +21,6 @@ import { UpdateDetailsDialog, UpdateInfoButton } from "./UpdateDetails"
 
 const VISIBLE_MS = 8_000
 
-// why: players sit on the board at "/" between games too, so holding it there always hid the notice.
 function isNoticeHeldOn(pathname: string) {
   if (pathname === "/") return localGameRepository.hasRunningGame()
   return (
@@ -39,7 +38,6 @@ export function UpdateReadyToastWithForegroundChecks() {
   const update = useAppUpdate()
   const [visible, setVisible] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  // why: a game ends and the next begins without leaving "/", so the hold is rechecked when one ends.
   const [, setGamesEnded] = useState(0)
   useEffect(
     () => localGameRepository.onHistoryChanged(() => setGamesEnded((count) => count + 1)),
