@@ -334,7 +334,7 @@ export function CurrentGameScreen({
   function abandonGame() {
     setEndSource(undefined)
     if (match) {
-      runtime.restartMatchGame()
+      runtime.restartMatchGame(endSource)
       return
     }
     if (!onGameAbandoned) return

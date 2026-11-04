@@ -822,7 +822,13 @@ export class LocalGameRepository {
   /** why: clearActiveGame also runs when a game moves elsewhere (published, match ended), so only a player throwing a started game away says how far it got. */
   discardActiveGame(endSource: GameEndSource): void {
     const game = this.loadActiveGame()
-    if (game?.status === "active" && hasLocalGameStarted(game))
+    if (game) this.reportAbandoned(game, endSource)
+    this.clearActiveGame()
+  }
+
+  /** why: a match game restarted mid-way is thrown away too, but its board is replaced rather than cleared. */
+  reportAbandoned(game: LocalGame, endSource: GameEndSource): void {
+    if (game.status === "active" && hasLocalGameStarted(game))
       captureGame(
         "game_abandoned",
         {
@@ -833,7 +839,6 @@ export class LocalGameRepository {
         "local",
         endSource,
       )
-    this.clearActiveGame()
   }
 
   clearActiveGame(): void {

@@ -241,8 +241,11 @@ export function useLocalGame(
   )
 
   const restartMatchGameBoard = useCallback(
-    () => replaceBoard(restartMatchGame(gameRef.current)),
-    [replaceBoard],
+    (endSource: GameEndSource = "game_menu") => {
+      repository.reportAbandoned(gameRef.current, endSource)
+      return replaceBoard(restartMatchGame(gameRef.current))
+    },
+    [replaceBoard, repository],
   )
 
   const endMatch = useCallback(
