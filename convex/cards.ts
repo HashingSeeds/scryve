@@ -190,8 +190,17 @@ async function searchScryfall(
   if (query.length < 2) return []
   await requireActionCapability(ctx, "mtg", "cardCatalog")
   await limitCardLookup(ctx, deviceId)
-  let data = await scryfallSearchData(ctx, query)
   const words = scryfallWords(query)
+  let data: unknown[]
+  try {
+    data = await scryfallSearchData(ctx, query)
+  } catch (error) {
+    /** why: saved cards match by name only, so a filtered search would show cards its filters exclude. */
+    if (!(error instanceof ConvexError) || words !== query) throw error
+    const saved: CardReference[] = await ctx.runQuery(internal.cards.searchSaved, { query })
+    if (!saved.length) throw error
+    return saved
+  }
   if (!data.length && !/\blang:/i.test(query) && /[^\p{ASCII}]/u.test(words)) {
     const printed = await scryfallSearchData(ctx, `(${query}) lang:any`)
     data = await englishPrintings(
@@ -792,6 +801,33 @@ export const detailsBatch = query({
       }
     }
     return found
+  },
+})
+
+/** why: earlier searches save each result to both tables; the search index lives on gameCards, the full card on cardReferences. */
+export const searchSaved = internalQuery({
+  args: { query: v.string() },
+  handler: async (ctx, args): Promise<CardReference[]> => {
+    const cards = await ctx.db
+      .query("gameCards")
+      .withSearchIndex("search_name", (search) =>
+        search.search("name", args.query).eq("game", "mtg"),
+      )
+      .take(MAX_SEARCH_RESULTS)
+    const references = await Promise.all(
+      cards.map(async (card) => {
+        const printing = await ctx.db
+          .query("cardPrintings")
+          .withIndex("by_game_card_id", (q) => q.eq("gameCardId", card._id))
+          .first()
+        if (!printing) return null
+        return await ctx.db
+          .query("cardReferences")
+          .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", printing.printingId))
+          .unique()
+      }),
+    )
+    return references.flatMap((reference) => (reference ? [toCardReference(reference)] : []))
   },
 })
 

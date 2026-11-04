@@ -48,6 +48,32 @@ describe("card provider caching and health", () => {
     expect(timeoutSpy).toHaveBeenCalledWith(10_000)
   })
 
+  it("answers a Magic name search from saved cards while Scryfall is paused", async () => {
+    const shivan = {
+      id: "11111111-1111-1111-1111-111111111111",
+      oracle_id: "22222222-2222-2222-2222-222222222222",
+      name: "Shivan Dragon",
+      type_line: "Creature — Dragon",
+      color_identity: ["R"],
+    }
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(() => response({ data: [shivan] }))
+      .mockImplementationOnce(() => response({ object: "error" }, 429))
+    const t = makeConvexTest()
+    await t.action(api.cards.search, { query: "Shivan" })
+    await expect(t.action(api.cards.search, { query: "Ancestral" })).rejects.toMatchObject({
+      data: { code: "scryfall_unavailable" },
+    })
+
+    await expect(t.action(api.cards.search, { query: "Dragon" })).resolves.toEqual([
+      expect.objectContaining({ scryfallId: shivan.id, name: "Shivan Dragon" }),
+    ])
+    await expect(t.action(api.cards.search, { query: "Dragon id<=r" })).rejects.toMatchObject({
+      data: { code: "scryfall_rate_limited" },
+    })
+  })
+
   it("serves Rush card text from its own catalog and never sends Rush IDs to YGOPRODeck", async () => {
     const t = makeConvexTest()
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected provider"))
