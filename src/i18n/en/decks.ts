@@ -746,7 +746,6 @@ const decks = {
     rateLimited_other: "Refresh available in {{count}} seconds. Saved results remain available.",
     refreshFailed: "Could not refresh decks. Saved results remain available.",
     checkAgain: "Check again",
-    open: "Open",
     startingPoint: "Starting point",
     importSource: "Import source",
     pasteText: "Paste text",

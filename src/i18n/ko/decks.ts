@@ -653,7 +653,6 @@ export default {
       "{{count}}초 후 새로고침할 수 있습니다. 저장된 결과는 계속 사용할 수 있습니다.",
     refreshFailed: "덱을 새로고침할 수 없습니다. 저장된 결과는 계속 사용할 수 있습니다.",
     checkAgain: "다시 확인",
-    open: "열기",
     startingPoint: "시작점",
     importSource: "가져오기 소스",
     pasteText: "텍스트 붙여넣기",

@@ -2,11 +2,12 @@
 import { ConvexError, v } from "convex/values"
 
 import { internal } from "./_generated/api"
-import type { Doc } from "./_generated/dataModel"
+import type { Doc, Id } from "./_generated/dataModel"
 import type { ActionCtx } from "./_generated/server"
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
-import { PRECON_SOURCE, preconstructedFormat } from "./lib/deckGames"
+import { DEFAULT_DECK_GAME, PRECON_SOURCE, preconstructedFormat } from "./lib/deckGames"
+import { magicDeckIdentity } from "./lib/deckIdentity"
 import { limitDeckImport } from "./lib/deckRateLimits"
 import type { DeckSource } from "./lib/deckSources"
 import { archidektDeckLink, loadArchidektDeck, resolveArchidektDeck } from "./lib/games/archidekt"
@@ -39,6 +40,7 @@ import {
   normalizeScryfallCard,
   objectRecord,
 } from "./lib/scryfall"
+import { hasCommandZone } from "./lib/systems"
 
 export type ResolvedDeckCard = CardReference & {
   quantity: number
@@ -75,6 +77,7 @@ const MAX_PRECON_RESULTS = 30
 const MAX_PRECON_CATALOG = 4000
 const PRECON_CATALOG_TTL_MS = 24 * 60 * 60 * 1000
 const PRECON_ROW_BATCH = 200
+const PRECON_IDENTITY_PAGE = 100
 const RESOLVED_PRECON_TTL_MS = 24 * 60 * 60 * 1000
 const RESOLVED_PRECON_RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const PRECON_REFRESH_LEASE_MS = 5 * 60 * 1000
@@ -371,6 +374,31 @@ function preconFromValue(value: unknown): PreconstructedDeck | null {
   }
 }
 
+function mtgJsonBoards(deck: Record<string, unknown>): Array<[PastedDeckBoard, unknown]> {
+  return [
+    ["commander", deck.commander],
+    ["main", deck.mainBoard],
+    ["sideboard", deck.sideBoard],
+  ]
+}
+
+/** why: MTGJSON cards carry their own color identity, so a precon's colors need no Scryfall lookup. */
+export function mtgJsonIdentity(format: string, payload: unknown) {
+  const deck = objectRecord(objectRecord(payload)?.data)
+  if (!deck) return undefined
+  const cards = mtgJsonBoards(deck).flatMap(([board, value]) =>
+    (Array.isArray(value) ? value : []).flatMap((item) => {
+      const card = objectRecord(item)
+      if (!card || typeof card.name !== "string") return []
+      const colors = Array.isArray(card.colorIdentity)
+        ? card.colorIdentity.filter((color): color is string => typeof color === "string")
+        : undefined
+      return [{ name: card.name, board, ...(colors ? { colorIdentity: colors.join("") } : {}) }]
+    }),
+  )
+  return magicDeckIdentity(format, cards).identityColors
+}
+
 function mtgJsonEntries(payload: unknown) {
   const envelope = objectRecord(payload)
   const deck = objectRecord(envelope?.data)
@@ -379,11 +407,7 @@ function mtgJsonEntries(payload: unknown) {
       code: "precon_invalid_response",
       message: "The official deck service returned an invalid response",
     })
-  const groups: Array<[PastedDeckBoard, unknown]> = [
-    ["commander", deck.commander],
-    ["main", deck.mainBoard],
-    ["sideboard", deck.sideBoard],
-  ]
+  const groups = mtgJsonBoards(deck)
   const entries = new Map<string, PastedDeckEntry>()
   for (const [board, value] of groups) {
     if (!Array.isArray(value)) continue
@@ -773,6 +797,68 @@ export const syncPreconRows = internalMutation({
   },
 })
 
+export const preconIdentityPage = internalQuery({
+  args: { cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db
+      .query("deckCatalogs")
+      .withIndex("by_game_and_source_and_external_id", (q) =>
+        q.eq("game", DEFAULT_DECK_GAME).eq("source", PRECON_SOURCE),
+      )
+      .paginate({ cursor, numItems: PRECON_IDENTITY_PAGE })
+    return {
+      missing: page.page.flatMap(({ _id, externalId, format, identityColors }) =>
+        identityColors === undefined && hasCommandZone(DEFAULT_DECK_GAME, format) && format
+          ? [{ id: _id, fileName: externalId, format }]
+          : [],
+      ),
+      cursor: page.isDone ? null : page.continueCursor,
+    }
+  },
+})
+
+export const storePreconIdentity = internalMutation({
+  args: { id: v.id("deckCatalogs"), identityColors: v.array(v.string()) },
+  handler: async (ctx, { id, identityColors }) => {
+    const row = await ctx.db.get(id)
+    if (row && row.identityColors === undefined) await ctx.db.patch(id, { identityColors })
+    return null
+  },
+})
+
+/**
+ * why: MTGJSON's deck list carries no colors, so each command-zone precon's own file is read once.
+ * Rows that already have colors are skipped, and a failed fetch is retried on the next scheduled refresh.
+ */
+export const fillPreconIdentity = internalAction({
+  args: { cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { cursor }): Promise<null> => {
+    const page: {
+      missing: Array<{ id: Id<"deckCatalogs">; fileName: string; format: string }>
+      cursor: string | null
+    } = await ctx.runQuery(internal.deckImports.preconIdentityPage, { cursor })
+    for (const row of page.missing) {
+      const identityColors = await fetchMtgJsonDeck(
+        ctx,
+        withPreconstructedExtension(row.fileName),
+      ).then(
+        (payload) => mtgJsonIdentity(row.format, payload),
+        () => undefined,
+      )
+      if (identityColors)
+        await ctx.runMutation(internal.deckImports.storePreconIdentity, {
+          id: row.id,
+          identityColors,
+        })
+    }
+    if (page.cursor !== null)
+      await ctx.scheduler.runAfter(0, internal.deckImports.fillPreconIdentity, {
+        cursor: page.cursor,
+      })
+    return null
+  },
+})
+
 export const startPreconRowSync = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -890,6 +976,16 @@ async function fetchAndCachePreconstructedOutline(
     const cached = await cachedPreconstructedOutline(ctx, fileName)
     if (cached) return cached
   }
+  const deck = mtgJsonEntries(await fetchMtgJsonDeck(ctx, fileName))
+  const outline = { name: deck.name, cards: deck.entries }
+  await ctx.runMutation(internal.deckImports.storePreconstructedOutline, {
+    fileName,
+    ...outline,
+  })
+  return outline
+}
+
+async function fetchMtgJsonDeck(ctx: ActionCtx, fileName: string): Promise<unknown> {
   const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
     bucket: "mtgjson:decks",
     intervalMs: 100,
@@ -908,13 +1004,7 @@ async function fetchAndCachePreconstructedOutline(
       code: "precon_import_unavailable",
       message: `Official deck import is temporarily unavailable (${response.status})`,
     })
-  const deck = mtgJsonEntries((await response.json()) as unknown)
-  const outline = { name: deck.name, cards: deck.entries }
-  await ctx.runMutation(internal.deckImports.storePreconstructedOutline, {
-    fileName,
-    ...outline,
-  })
-  return outline
+  return (await response.json()) as unknown
 }
 
 async function fetchAndCachePreconstructed(

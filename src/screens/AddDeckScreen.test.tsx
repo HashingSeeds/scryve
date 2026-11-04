@@ -68,8 +68,9 @@ type MockCatalogDeck = {
   format?: string
   source?: string
   externalId?: string
+  identityColors?: string[]
 }
-type MockCatalogArgs = { game: string; format: string; query: string }
+type MockCatalogArgs = { game: string; format: string; query: string; colors?: string[] }
 const mockExplorers: MockCatalogDeck = {
   _id: "precon-explorers",
   game: "mtg",
@@ -1507,6 +1508,38 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("No decks here yet")).toBeTruthy()
     fireEvent.press(view.getByText("Start empty"))
     expect(view.getByTestId("deck-name-input")).toBeTruthy()
+  })
+
+  it("shows a Commander deck's colors and narrows Browse to the picked identity", async () => {
+    mockCatalogRows.mockImplementation((args) =>
+      args.game === "mtg" ? [{ ...mockExplorers, identityColors: ["U", "G"] }] : [],
+    )
+    const view = renderAddDeck()
+    await waitFor(() =>
+      expect(
+        view.getByLabelText("Open Explorers of the Deep. Color identity: Blue, Green"),
+      ).toBeTruthy(),
+    )
+    expect(view.queryByText("Open")).toBeNull()
+    fireEvent.press(view.getByTestId("precon-color-G"))
+    fireEvent.press(view.getByTestId("precon-color-U"))
+    await waitFor(() =>
+      expect(mockListCatalog).toHaveBeenLastCalledWith({
+        game: "mtg",
+        format: "commander",
+        query: "",
+        colors: ["G", "U"],
+      }),
+    )
+    chooseFormat(view, "standard")
+    expect(view.queryByTestId("precon-color-G")).toBeNull()
+    await waitFor(() =>
+      expect(mockListCatalog).toHaveBeenLastCalledWith({
+        game: "mtg",
+        format: "standard",
+        query: "",
+      }),
+    )
   })
 
   it("opens an official deck as an unsaved deck in Build", async () => {

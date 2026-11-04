@@ -10343,6 +10343,7 @@
     "source": "wizards-examples",
     "externalId": "wizards-scd-first-flight",
     "kind": "example",
+    "identityColors": ["W", "U"],
     "entries": [
       {
         "name": "Isperia, Supreme Judge",
@@ -11219,6 +11220,7 @@
     "source": "wizards-examples",
     "externalId": "wizards-scd-token-triumph",
     "kind": "example",
+    "identityColors": ["W", "G"],
     "entries": [
       {
         "name": "Emmara, Soul of the Accord",
@@ -12671,6 +12673,7 @@
     "source": "wizards-examples",
     "externalId": "wizards-eld-brawl-wild_bounty",
     "kind": "example",
+    "identityColors": ["W", "U", "G"],
     "entries": [
       {
         "name": "Faerie Formation",
@@ -13259,6 +13262,7 @@
     "source": "wizards-examples",
     "externalId": "wizards-eld-brawl-knights_charge",
     "kind": "example",
+    "identityColors": ["W", "B", "R"],
     "entries": [
       {
         "name": "Silverwing Squadron",

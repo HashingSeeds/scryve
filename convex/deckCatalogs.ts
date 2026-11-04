@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax -- each system's deck provider still branches here until it moves to convex/lib/games. */
 import { paginationOptsValidator } from "convex/server"
-import { ConvexError, v } from "convex/values"
+import { ConvexError, v, type Infer } from "convex/values"
 
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
@@ -61,6 +61,19 @@ const entryValidator = v.object({
   smallImageUrl: v.optional(v.string()),
 })
 
+const catalogDeckValidator = v.object({
+  game: v.string(),
+  source: v.string(),
+  externalId: v.string(),
+  kind: v.string(),
+  name: v.string(),
+  format: v.optional(v.string()),
+  sourceUrl: v.optional(v.string()),
+  publishedAt: v.optional(v.number()),
+  identityColors: v.optional(v.array(v.string())),
+  entries: v.array(entryValidator),
+})
+
 function catalogQuery(
   ctx: QueryCtx,
   args: { game: string; query: string; format?: string; kind?: string },
@@ -116,15 +129,26 @@ async function searchRows(
   return await legacyCatalogQuery(ctx, args).take(30)
 }
 
+const IDENTITY_COLORS = ["W", "U", "B", "R", "G"]
+
 export const list = query({
-  args: { game: v.string(), format: v.string(), query: v.string() },
+  args: {
+    game: v.string(),
+    format: v.string(),
+    query: v.string(),
+    // why: an exact identity; "C" alone asks for colorless decks.
+    colors: v.optional(v.array(v.string())),
+  },
   handler: async (ctx, args) => {
     const game = assertGameSystem(args.game)
     await requireReleasedCapability(ctx, game, "exampleDecks")
     const format = assertDeckGameFormat(game, args.format)
     const term = args.query.trim()
     if (term.length > 120) return []
-    return await catalogQuery(ctx, { game, format, query: term }).take(BROWSE_LIMIT)
+    const rows = catalogQuery(ctx, { game, format, query: term })
+    if (!args.colors?.length) return await rows.take(BROWSE_LIMIT)
+    const identity = IDENTITY_COLORS.filter((color) => args.colors?.includes(color))
+    return await rows.filter((q) => q.eq(q.field("identityColors"), identity)).take(BROWSE_LIMIT)
   },
 })
 
@@ -148,17 +172,7 @@ export const browseCached = internalQuery({
 })
 
 export const upsert = internalMutation({
-  args: {
-    game: v.string(),
-    source: v.string(),
-    externalId: v.string(),
-    kind: v.string(),
-    name: v.string(),
-    format: v.optional(v.string()),
-    sourceUrl: v.optional(v.string()),
-    publishedAt: v.optional(v.number()),
-    entries: v.array(entryValidator),
-  },
+  args: catalogDeckValidator.fields,
   handler: async (ctx, args) => {
     const game = assertGameSystem(args.game)
     await requireReleasedCapability(ctx, game, "exampleDecks")
@@ -180,6 +194,7 @@ export const upsert = internalMutation({
       ...(args.format ? { format: args.format } : {}),
       ...(args.sourceUrl ? { sourceUrl: args.sourceUrl } : {}),
       ...(args.publishedAt === undefined ? {} : { publishedAt: args.publishedAt }),
+      ...(args.identityColors ? { identityColors: args.identityColors } : {}),
       fetchedAt,
     }
     const catalogDeckId = existing?._id ?? (await ctx.db.insert("deckCatalogs", parent))
@@ -269,7 +284,7 @@ export const backfillLimitlessSourceUrls = internalMutation({
   },
 })
 
-const exampleDecks = [
+const exampleDecks: Infer<typeof catalogDeckValidator>[] = [
   ...magicExamples.map((deck) => ({
     game: "mtg",
     source: "mtgo-examples",
@@ -309,10 +324,12 @@ async function seedDecks(
         q.eq("game", deck.game).eq("source", deck.source).eq("externalId", deck.externalId),
       )
       .unique()
-    if (existing && !args.overwrite) continue
+    // why: an existing row reseeds once when its source gains colors, so older rows pick them up.
+    const sameIdentity = existing?.identityColors?.join("") === deck.identityColors?.join("")
+    if (existing && !args.overwrite && sameIdentity) continue
     await ctx.runMutation(internal.deckCatalogs.upsert, deck)
     const seeded = isProviderGame(deck.game) ? GAME_PROVIDERS[deck.game].catalog.seeded : undefined
-    if (seeded?.format === deck.format) {
+    if (seeded && seeded.format === deck.format) {
       for (let offset = 0; offset < seeded.cards.length; offset += MAX_CATALOG_BATCH)
         await ctx.runMutation(internal.cardCatalog.cacheMany, {
           cards: seeded.cards.slice(offset, offset + MAX_CATALOG_BATCH),
@@ -601,8 +618,10 @@ export const refreshScheduled = internalAction({
   args: {},
   handler: async (ctx) => {
     if (env.CARD_CATALOG_SYNC === "off") return null
-    if (await actionCapabilityEnabled(ctx, "mtg", "exampleDecks"))
+    if (await actionCapabilityEnabled(ctx, "mtg", "exampleDecks")) {
       await ctx.runMutation(internal.deckCatalogs.seedMagicExamples, {})
+      await ctx.scheduler.runAfter(0, internal.deckImports.fillPreconIdentity, { cursor: null })
+    }
     for (const game of GAME_SYSTEM_IDS.filter(isProviderGame)) {
       for (const format of GAME_PROVIDERS[game].deckFeed?.formats ?? []) {
         if (!(await actionCapabilityEnabled(ctx, game, "exampleDecks"))) continue

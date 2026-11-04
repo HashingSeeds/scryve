@@ -7,7 +7,7 @@ import Svg, { Path } from "react-native-svg"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
-import { COMMANDER_COLORS, colorLabel } from "@/components/CardFocusDialog"
+import { colorLabel } from "@/components/CardFocusDialog"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
@@ -24,6 +24,7 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import {
   COLOR_MATCHES,
+  identityLabel,
   matchesColors,
   SEARCH_COLORS,
   toggleColor,
@@ -119,14 +120,6 @@ function deckMarkerColor(game: string, { gameMenu: { actions } }: Theme["colors"
     riftbound: actions.connect,
   } satisfies Record<SystemId, string>
   return markers[isSystemId(game) ? game : DEFAULT_DECK_GAME]
-}
-
-/** why: the color pips sit inside the row's button, so VoiceOver only hears them through its label. */
-function identityLabel(identity: readonly string[]) {
-  const names = identity.length
-    ? COMMANDER_COLORS.filter((color) => identity.includes(color)).map(colorLabel)
-    : [colorLabel("C")]
-  return translate("decks:colors.identity", { identity: names.join(", ") })
 }
 
 function matchesSearch(deck: ShelfDeck, search: string) {
