@@ -18,6 +18,7 @@ import {
   MAX_COMMANDER_DAMAGE,
   validatePlayerNames,
 } from "./domain"
+import { gameShape } from "./gameShape"
 import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
 import { isSeatOrder, playerGridLayoutForCount } from "./playerLayouts"
 import {
@@ -818,6 +819,28 @@ export class LocalGameRepository {
     })
   }
 
+  /** why: clearActiveGame also runs when a game moves elsewhere (published, match ended), so only a player throwing a started game away says how far it got. */
+  discardActiveGame(endSource: GameEndSource): void {
+    const game = this.loadActiveGame()
+    if (game) this.reportAbandoned(game, endSource)
+    this.clearActiveGame()
+  }
+
+  /** why: a match game restarted mid-way is thrown away too, but its board is replaced rather than cleared. */
+  reportAbandoned(game: LocalGame, endSource: GameEndSource): void {
+    if (game.status === "active" && hasLocalGameStarted(game))
+      captureGame(
+        "game_abandoned",
+        {
+          ...game,
+          playerCount: game.players.length,
+          shape: gameShape({ ...game, finishedAt: Date.now() }),
+        },
+        "local",
+        endSource,
+      )
+  }
+
   clearActiveGame(): void {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
     const chunkCount =
@@ -873,16 +896,13 @@ export class LocalGameRepository {
     this.saveHistory([summary, ...current], current)
     const active = this.loadActiveGame()
     if (active?.id === game.id) this.clearActiveGame()
+    const analyticsGame = { ...game, playerCount: game.players.length, shape: gameShape(game) }
     if (game.status === "finished") {
       recordReviewCompletion(`local:${game.id}`)
-      captureGame(
-        "game_completed",
-        { ...game, playerCount: game.players.length },
-        "local",
-        endSource,
-      )
+      captureGame("game_completed", analyticsGame, "local", endSource)
       this.finishListeners.forEach((listener) => listener())
-    }
+    } else if (hasLocalGameStarted(game))
+      captureGame("game_abandoned", analyticsGame, "local", endSource)
     this.notifyHistoryChanged()
     return summary
   }

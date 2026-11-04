@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-10-28",
-  effectiveDate: "October 28, 2026",
+  version: "2026-11-04",
+  effectiveDate: "November 4, 2026",
   sections: [
     {
       blocks: [
@@ -211,7 +211,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Usage sharing is optional and off by default, including when you use Scryve without an account. Accepting this Privacy Policy or signing in does not enable it. If you enable optional usage sharing during first use or in Settings, we use PostHog to understand game starts and completions, systems, formats, player counts, connected-game creation and joining attempts, use of decks and stats, and how long connected-game joins and actions take to sync. Events include their time, app version, platform, and a random analytics identifier for this installation. This identifier lets us measure return visits; it is not linked to your Scryve account. These events are pseudonymous, not anonymous.",
+          text: "Usage sharing is optional and off by default, including when you use Scryve without an account. Accepting this Privacy Policy or signing in does not enable it. If you enable optional usage sharing during first use or in Settings, we use PostHog to understand how Scryve's features are used: games (system, format, player count, length, outcome, and which board tools were used), rules and card lookups (which results were shown and opened), decks and stats, connected play, and how long connected-game joins and actions take to sync. When a rules search finds nothing, we also send the search text, shortened and lowercased, so we can fill the gap. Events include their time, the local hour and weekday on your device, app version, platform, and a random analytics identifier for this installation. This identifier lets us measure return visits; it is not linked to your Scryve account. These events are pseudonymous, not anonymous.",
         },
         {
           type: "paragraph",

@@ -340,3 +340,30 @@ it("keeps unsaved taps when the route rereads the last good save", () => {
   expect(result.current.game.players[0].name).toBe("Lovelace")
   jest.mocked(Alert.alert).mockRestore()
 })
+
+it("reports a started match game that is restarted instead of finished", () => {
+  jest.mocked(captureGame).mockClear()
+  const repository = new LocalGameRepository(new MemoryStorage())
+  const initial = createLocalGame({
+    now: 1,
+    startingLife: 20,
+    players: [
+      { name: "Ada", color: "#000" },
+      { name: "Grace", color: "#111" },
+    ],
+    match: { bestOf: 3 },
+  })
+  const { result } = renderHook(() => useLocalGame(initial, repository))
+  act(() => {
+    result.current.changeLife(initial.players[0].id, -1)
+  })
+  act(() => {
+    result.current.restartMatchGame("stale_game_prompt")
+  })
+  expect(captureGame).toHaveBeenCalledWith(
+    "game_abandoned",
+    expect.objectContaining({ shape: expect.objectContaining({ change_count: 1 }) }),
+    "local",
+    "stale_game_prompt",
+  )
+})

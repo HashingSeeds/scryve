@@ -1,3 +1,5 @@
+import * as analytics from "@/utils/analytics"
+
 import {
   applyGameCommand,
   asDeviceId,
@@ -41,6 +43,24 @@ function tap(game: LocalGame) {
 }
 
 describe("LocalGameRepository", () => {
+  it("reports a started game the player throws away, but not an untouched board", () => {
+    const capture = jest.spyOn(analytics, "captureGame").mockImplementation(() => undefined)
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(makeGame())
+    repository.discardActiveGame("new_game_prompt")
+    expect(capture).not.toHaveBeenCalled()
+    repository.saveActiveGame(tap(makeGame()))
+    repository.discardActiveGame("stale_game_prompt")
+    expect(repository.loadActiveGame()).toBeNull()
+    expect(capture).toHaveBeenCalledWith(
+      "game_abandoned",
+      expect.objectContaining({ shape: expect.objectContaining({ change_count: 1 }) }),
+      "local",
+      "stale_game_prompt",
+    )
+    capture.mockRestore()
+  })
+
   it("keeps a swapped seat order and drops one that does not cover every player", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const game = makeGame()
