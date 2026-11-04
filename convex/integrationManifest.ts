@@ -18,6 +18,7 @@ const capabilityKeyValidator = v.union(
   v.literal("images"),
   v.literal("playTracking"),
   v.literal("aggregateMetagameStats"),
+  v.literal("rules"),
 )
 
 const releaseValidator = v.union(

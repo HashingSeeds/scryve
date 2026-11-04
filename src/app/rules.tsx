@@ -2,7 +2,7 @@ import { useEffect } from "react"
 import { router, useLocalSearchParams } from "expo-router"
 
 import { useBackToBoard } from "@/features/game/useBackToBoard"
-import { GAME_RULES, gameRules, openRules } from "@/features/rules/gameRules"
+import { GAME_RULES, openRules, useGameRules } from "@/features/rules/gameRules"
 import { RulesScreen } from "@/screens/RulesScreen"
 
 const leave = () => (router.canGoBack() ? router.back() : router.replace("/"))
@@ -13,7 +13,7 @@ export default function RulesRoute() {
     rule?: string
     glossary?: string
   }>()
-  const rules = gameRules(system)
+  const rules = useGameRules(system)
   const back = useBackToBoard()
   useEffect(() => {
     if (rules?.kind !== "link") return
