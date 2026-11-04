@@ -77,6 +77,7 @@ export const CAPABILITY_KEYS = [
   "images",
   "playTracking",
   "aggregateMetagameStats",
+  "rules",
 ] as const
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number]
 export type CapabilityRelease = "enabled" | "permission_required" | "disabled"
@@ -323,6 +324,7 @@ export const SYSTEMS = {
         images: available("scryfall", "Functional card context only."),
         playTracking: available("scryve"),
         aggregateMetagameStats: available("scryve"),
+        rules: available("wizards-of-the-coast", "Comprehensive Rules download to the device."),
       },
       rights: {
         review: "reviewed",
@@ -378,6 +380,11 @@ export const SYSTEMS = {
         images: available("cloudflare-r2", "Functional card context through Scryve's mirror."),
         playTracking: available("scryve"),
         aggregateMetagameStats: available("scryve"),
+        rules: {
+          technical: "unavailable",
+          release: "disabled",
+          note: "The rulebook PDF has no numbered rules, so Rules links out.",
+        },
       },
       rights: {
         review: "reviewed",
@@ -429,6 +436,11 @@ export const SYSTEMS = {
         images: available("tcgdex", "Functional card context only."),
         playTracking: available("scryve"),
         aggregateMetagameStats: available("scryve"),
+        rules: {
+          technical: "unavailable",
+          release: "disabled",
+          note: "The rulebook PDF has no numbered rules and blocks app downloads, so Rules links out.",
+        },
       },
       rights: {
         review: "reviewed",
@@ -480,6 +492,12 @@ export const SYSTEMS = {
         images: available("ravensburger", "Functional card context only."),
         playTracking: available("scryve"),
         aggregateMetagameStats: available("scryve"),
+        rules: {
+          technical: "unavailable",
+          release: "permission_required",
+          provider: "ravensburger",
+          note: "Cloudflare blocks app downloads and Ravensburger's legal notice bars displaying site content, so Rules links out.",
+        },
       },
       rights: {
         review: "reviewed",
@@ -557,6 +575,7 @@ export const SYSTEMS = {
         images: available("legend-story-studios", "Functional card context only."),
         playTracking: available("scryve"),
         aggregateMetagameStats: available("scryve"),
+        rules: available("legend-story-studios", "Comprehensive Rules download to the device."),
       },
       rights: {
         review: "reviewed",
@@ -631,6 +650,12 @@ export const SYSTEMS = {
           technical: "available",
           release: "disabled",
           note: "Riot prohibits publishing or retaining metagame-defining statistics.",
+        },
+        rules: {
+          technical: "unavailable",
+          release: "permission_required",
+          provider: "riot",
+          note: "The Core Rules PDF downloads, but needs a PDF parser and Riot's approval, so Rules links out.",
         },
       },
       rights: {

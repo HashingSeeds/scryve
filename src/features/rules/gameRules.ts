@@ -1,5 +1,7 @@
+import { useMemo } from "react"
 import { Alert, Linking, Platform } from "react-native"
 
+import { useCapabilityReleased } from "@/features/decks/useCapabilityReleased"
 import { translate } from "@/i18n/translate"
 
 import type { ComprehensiveRules } from "./comprehensiveRules"
@@ -64,6 +66,15 @@ export const RULES_TEXT_IN_APP = Platform.OS !== "web"
 
 export function gameRules(system: unknown): GameRules | undefined {
   return isSystemId(system) ? GAME_RULES[system] : undefined
+}
+
+export function useGameRules(system: unknown): GameRules | undefined {
+  const rules = gameRules(system)
+  const shown = useCapabilityReleased("rules")(String(system))
+  return useMemo(
+    () => (rules?.kind === "text" && !shown ? { kind: "link", pageUrl: rules.pageUrl } : rules),
+    [rules, shown],
+  )
 }
 
 export function rulesHref(system: SystemId, rule?: string) {
