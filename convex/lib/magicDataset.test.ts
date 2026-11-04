@@ -53,4 +53,24 @@ describe("magicDatasetCard", () => {
   ])("skips objects that never go in a deck: %o", (override) => {
     expect(magicDatasetCard({ ...card, ...override })).toBeNull()
   })
+
+  it.each([
+    { set_type: "funny" },
+    { border_color: "silver" },
+    { security_stamp: "acorn" },
+    { promo_types: ["playtest"] },
+    { digital: true, legalities: { alchemy: "legal", commander: "not_legal" } },
+    { all_parts: [{ component: "meld_result", name: card.name }] },
+  ])("skips joke, playtest, digital and meld result cards no paper deck allows: %o", (override) => {
+    expect(magicDatasetCard({ ...card, ...override })).toBeNull()
+  })
+
+  it.each([
+    { digital: true, legalities: { vintage: "legal" } },
+    { set_type: "funny", legalities: { commander: "legal" } },
+    { legalities: { standard: "not_legal", commander: "not_legal" } },
+    { all_parts: [{ component: "meld_part", name: card.name }] },
+  ])("keeps real cards, including ones not yet legal: %o", (override) => {
+    expect(magicDatasetCard({ ...card, ...override })).not.toBeNull()
+  })
 })
