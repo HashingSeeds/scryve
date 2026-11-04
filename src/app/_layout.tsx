@@ -1,11 +1,14 @@
 import "react-native-url-polyfill/auto"
 
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import type { ViewStyle } from "react-native"
 import { AppMetrics, ObserveRoot } from "expo-observe"
 import {
+  DarkTheme,
+  DefaultTheme,
   SplashScreen,
   Stack,
+  ThemeProvider as NavigationThemeProvider,
   useNavigationContainerRef,
   type ErrorBoundaryProps,
 } from "expo-router"
@@ -98,20 +101,28 @@ const $root: ViewStyle = { flex: 1 }
 const BOARD_OPTIONS = { statusBarHidden: true, gestureEnabled: false }
 
 function AppStack() {
-  const { themeContext } = useAppTheme()
+  const { theme, themeContext } = useAppTheme()
+  // why: the native stack paints its container with the navigation theme's background, which shows through screen corners mid-swipe.
+  const navigationTheme = useMemo(() => {
+    const base = themeContext === "dark" ? DarkTheme : DefaultTheme
+    return { ...base, colors: { ...base.colors, background: theme.colors.background } }
+  }, [theme, themeContext])
+
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        freezeOnBlur: true,
-        // why: once a board sets statusBarHidden, react-native-screens styles every screen's bar itself, white unless told otherwise.
-        statusBarStyle: themeContext === "dark" ? "light" : "dark",
-      }}
-    >
-      <Stack.Screen name="index" options={BOARD_OPTIONS} />
-      <Stack.Screen name="game/current" options={BOARD_OPTIONS} />
-      <Stack.Screen name="connected/game/[gameId]" options={BOARD_OPTIONS} />
-    </Stack>
+    <NavigationThemeProvider value={navigationTheme}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          freezeOnBlur: true,
+          // why: once a board sets statusBarHidden, react-native-screens styles every screen's bar itself, white unless told otherwise.
+          statusBarStyle: themeContext === "dark" ? "light" : "dark",
+        }}
+      >
+        <Stack.Screen name="index" options={BOARD_OPTIONS} />
+        <Stack.Screen name="game/current" options={BOARD_OPTIONS} />
+        <Stack.Screen name="connected/game/[gameId]" options={BOARD_OPTIONS} />
+      </Stack>
+    </NavigationThemeProvider>
   )
 }
 
