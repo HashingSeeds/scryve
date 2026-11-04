@@ -863,13 +863,6 @@ export const LifeCard = memo(function LifeCard({
             onPress={commanderCardMode.onSubmit}
             style={[themed($overviewClose), identityCorner.position]}
           >
-            {commanderCardMode.acted ? (
-              <PulseRing
-                testID={`commander-finish-pulse-seat-${seatNumber}`}
-                size={identityMetrics.mark * 1.15}
-                color={foreground}
-              />
-            ) : null}
             {/* why: hits already count in a local game, so finishing only closes and stays an X; a connected game's check sends hits that have not landed yet. */}
             <View
               testID={`commander-exit-${commanderCardMode.submit === "send" ? "check" : "x"}-seat-${seatNumber}`}
@@ -879,6 +872,15 @@ export const LifeCard = memo(function LifeCard({
                 markArt.trim,
               ]}
             >
+              {/* why: the ring lives in the glyph box, not the trimmed button, so it centers on the X itself. */}
+              {commanderCardMode.acted ? (
+                <PulseRing
+                  testID={`commander-finish-pulse-seat-${seatNumber}`}
+                  size={identityMetrics.mark}
+                  from={0.6}
+                  color={foreground}
+                />
+              ) : null}
               <Icon
                 icon={commanderCardMode.submit === "send" ? "check" : "x"}
                 color={foreground}
