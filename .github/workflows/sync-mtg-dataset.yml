@@ -1,0 +1,56 @@
+name: sync Magic dataset
+
+on:
+  schedule:
+    - cron: "41 11 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build the dataset without uploading it
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: sync-mtg-dataset-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ygo-image-mirror-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync Magic dataset
+        shell: bash
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          YGO_MIRROR_BASE_URL: https://ygo-images.scryve.sow.care
+          YGO_MIRROR_TOKEN: ${{ secrets.YGO_MIRROR_TOKEN }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ "$DRY_RUN" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+          pnpm sync:mtg-dataset -- "${args[@]}"
