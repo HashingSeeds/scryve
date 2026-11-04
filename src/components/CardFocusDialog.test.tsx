@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -66,6 +66,18 @@ function renderDialog(props: Partial<Parameters<typeof CardFocusDialog>[0]> = {}
 }
 
 describe("CardFocusDialog", () => {
+  it("keeps Rulings closed when you collapse them before they load", async () => {
+    let resolve: (rulings: unknown) => void = () => {}
+    mockAction.mockReturnValue(new Promise((done) => (resolve = done)))
+    const view = renderDialog({
+      card: { ...card, game: "mtg", cardId: "11111111-2222-3333-4444-555555555555" },
+    })
+    fireEvent.press(view.getByTestId("card-rulings"))
+    fireEvent.press(view.getByTestId("card-rulings"))
+    await act(async () => resolve([{ publishedAt: "2020-01-01", comment: "Late ruling." }]))
+    expect(view.queryByText("Late ruling.")).toBeNull()
+  })
+
   it("loads a Magic card's official rulings when you open them", async () => {
     mockAction.mockResolvedValue([{ publishedAt: "2009-10-01", comment: "Protection applies." }])
     const view = renderDialog({
@@ -78,6 +90,8 @@ describe("CardFocusDialog", () => {
       scryfallId: "4bd3014b-94bb-4a9f-92cf-239a2dcc7e97",
       deviceId: expect.any(String),
     })
+  })
+
   it("defines a Magic keyword in place when you tap it", () => {
     const view = renderDialog({
       card: { ...card, game: "mtg" },

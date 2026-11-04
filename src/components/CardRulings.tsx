@@ -48,6 +48,9 @@ export function CardRulings({ scryfallId }: { scryfallId: string }) {
   const [state, setState] = useState<Rulings>({ kind: "closed" })
   const open = state.kind !== "closed"
 
+  const settle = (next: Rulings) =>
+    setState((current) => (current.kind === "closed" ? current : next))
+
   function fetchRulings() {
     const cached = cachedRulings(scryfallId)
     if (cached) return setState({ kind: "loaded", rulings: cached })
@@ -56,10 +59,10 @@ export function CardRulings({ scryfallId }: { scryfallId: string }) {
       .action(api.cards.rulings, { scryfallId, deviceId: localGameRepository.getDeviceId() })
       .then((rulings) => {
         save(cacheKey(scryfallId), { fetchedAt: Date.now(), rulings })
-        setState({ kind: "loaded", rulings })
+        settle({ kind: "loaded", rulings })
       })
       .catch((error: unknown) =>
-        setState({
+        settle({
           kind: "failed",
           message: convexErrorMessage(error, translate("decks:cardFocus.rulingsFailed")),
           retryAfterMs: convexRetryAfterMs(error),
