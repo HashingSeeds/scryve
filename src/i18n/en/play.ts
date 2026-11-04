@@ -376,7 +376,14 @@ const play = {
     // Header button that opens card lookup.
     cards: "Cards",
     search: "Search rules",
+    // Tab listing rules the player opened recently.
+    recent: "Recent",
+    // Tab listing the rules' chapters and sections, like a table of contents.
+    contents: "Contents",
     glossary: "Glossary",
+    noRecent: "Rules you open show up here.",
+    // Link that opens the rule being previewed inline.
+    open: "Open",
     effective: "Comprehensive Rules, effective {{date}}",
     official: "Official rules",
     openFailed: "Couldn't open the official rules",

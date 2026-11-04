@@ -1,4 +1,4 @@
-import { findRules, ruleReferences, searchRules } from "./comprehensiveRules"
+import { findRules, matchExcerpt, ruleReferences, searchRules } from "./comprehensiveRules"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
 
 const SOURCE = [
@@ -113,4 +113,23 @@ it("ruleReferences links rule numbers and bare sections named as rules", () => {
   expect(ruleReferences("A starting life total of 100.", MAGIC_RULE_REFERENCE)).toEqual([
     "A starting life total of 100.",
   ])
+})
+
+describe("matchExcerpt", () => {
+  it("starts a long rule near the match, at a word", () => {
+    const text = `${"Blocking creatures ".repeat(5)}must be untapped.`
+    expect(matchExcerpt(text, "UNTAPPED", 20)).toEqual({
+      before: "…creatures must be ",
+      match: "untapped",
+      after: ".",
+    })
+  })
+
+  it("keeps the whole text when the match is a rule number", () => {
+    expect(matchExcerpt("Trample is a static ability.", "702.19")).toEqual({
+      before: "Trample is a static ability.",
+      match: "",
+      after: "",
+    })
+  })
 })
