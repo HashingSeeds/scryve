@@ -51,3 +51,23 @@ export function ruleReferences(text: string, reference: RegExp) {
   parts.push(text.slice(last))
   return parts.filter((part) => part !== "")
 }
+
+export function adjacentSections(rules: ComprehensiveRules, id: string) {
+  const sections = rules.chapters.flatMap((chapter) => chapter.sections)
+  const index = sections.findIndex((section) => section.id === id)
+  if (index < 0) return {}
+  return { previous: index > 0 ? sections[index - 1] : undefined, next: sections.at(index + 1) }
+}
+
+export function matchExcerpt(text: string, query: string, lead = 60) {
+  const needle = query.trim().toLowerCase()
+  const at = needle ? text.toLowerCase().indexOf(needle) : -1
+  if (at < 0) return { before: text, match: "", after: "" }
+  const space = text.indexOf(" ", at - lead)
+  const start = at > lead && space >= 0 && space < at ? space + 1 : 0
+  return {
+    before: `${start > 0 ? "…" : ""}${text.slice(start, at)}`,
+    match: text.slice(at, at + needle.length),
+    after: text.slice(at + needle.length),
+  }
+}
