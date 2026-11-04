@@ -2,6 +2,7 @@ import { makeConvexTest } from "../test/convexTest"
 import { stepClock } from "../test/steppingClock"
 import { api, internal } from "./_generated/api"
 import { deckRateLimiter } from "./lib/deckRateLimits"
+import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { normalizePokemonCards } from "./lib/games/pokemon"
 import rushCards from "./lib/games/rushCards.json"
 
@@ -61,6 +62,11 @@ describe("card provider caching and health", () => {
       .mockImplementationOnce(() => response({ data: [shivan] }))
       .mockImplementationOnce(() => response({ object: "error" }, 429))
     const t = makeConvexTest()
+    const otherPrinting = normalizeScryfallCatalogCard({
+      ...shivan,
+      id: "33333333-3333-3333-3333-333333333333",
+    })
+    if (otherPrinting) await t.mutation(internal.cardCatalog.cacheMany, { cards: [otherPrinting] })
     await t.action(api.cards.search, { query: "Shivan" })
     await expect(t.action(api.cards.search, { query: "Ancestral" })).rejects.toMatchObject({
       data: { code: "scryfall_unavailable" },
@@ -69,7 +75,7 @@ describe("card provider caching and health", () => {
     await expect(t.action(api.cards.search, { query: "Dragon" })).resolves.toEqual([
       expect.objectContaining({ scryfallId: shivan.id, name: "Shivan Dragon" }),
     ])
-    for (const query of ["Dragon id<=r", "-Dragon"])
+    for (const query of ["Dragon id<=r", "-Dragon", "Dragon Angel"])
       await expect(t.action(api.cards.search, { query })).rejects.toMatchObject({
         data: { code: "scryfall_rate_limited" },
       })
