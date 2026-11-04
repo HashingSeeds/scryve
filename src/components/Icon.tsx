@@ -140,6 +140,7 @@ const GLYPH_SIZE = 24
 /** why: header and row actions need these, and stroked SVG stays crisp at any size without @2x/@3x assets. */
 const glyphRegistry = {
   back: () => <Path d="m15 18-6-6 6-6" />,
+  arrowBack: () => <Path d="M19 12H5m7 7-7-7 7-7" />,
   more: () => (
     <>
       <Circle cx={5} cy={12} r={1} />

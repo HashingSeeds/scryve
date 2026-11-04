@@ -50,7 +50,7 @@ function NearbyOnlyJoin({ code }: { code?: string }) {
   const { themed } = useAppTheme()
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$styles.flex1}>
-      <Header leftTx="common:back" onLeftPress={() => router.back()} />
+      <Header onBack={() => router.back()} />
       <ScrollView style={$styles.flex1} contentContainerStyle={themed($content)}>
         <NearbyGameList code={code} onJoin={openNearbyLobby} />
       </ScrollView>

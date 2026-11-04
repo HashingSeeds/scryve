@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { router } from "expo-router"
 
 import { Button } from "@/components/Button"
-import { Header } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { AccountProfile } from "@/features/auth/AccountControls"
@@ -25,7 +25,7 @@ export default function AccountRoute() {
   if (signedOutHere)
     return (
       <Screen preset="fixed">
-        <Header titleTx="account:profile.title" leftTx="common:back" />
+        <Header titleTx="account:profile.title" LeftActionComponent={<HeaderBack />} />
       </Screen>
     )
   if (!auth.configured || !auth.isSignedIn) {
@@ -33,11 +33,7 @@ export default function AccountRoute() {
     const prompt = auth.configurationMessage || translate("account:profile.signInPrompt")
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header
-          titleTx="account:profile.title"
-          leftTx="common:back"
-          onLeftPress={() => router.back()}
-        />
+        <Header titleTx="account:profile.title" onBack={leaveAccount} />
         <Text accessibilityRole="alert" text={prompt} />
         {auth.configured && !auth.isSignedIn ? (
           <Button tx="account:profile.reauthenticate" preset="primary" onPress={auth.openAuth} />

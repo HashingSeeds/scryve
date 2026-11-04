@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DeckActionsSheet, type DeckAction } from "@/components/DeckActionsSheet"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useSheetPresence } from "@/components/useSheetPresence"
@@ -243,9 +243,7 @@ export function GuestDeckDetailScreen({
       >
         <Header
           titleTx="decks:deckView.guestTitle"
-          LeftActionComponent={
-            <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
-          }
+          LeftActionComponent={<HeaderBack fallback="connected/decks/index" onPress={onBack} />}
         />
         <View style={themed($empty)}>
           <Text preset="subheading" tx="decks:guestDetail.unavailable" />

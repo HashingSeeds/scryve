@@ -40,12 +40,7 @@ export function EventFrame({
   const waiting = loading || access?.loading
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$frame}>
-      <Header
-        title={title}
-        leftTx="common:back"
-        onLeftPress={onBack}
-        RightActionComponent={headerAction}
-      />
+      <Header title={title} onBack={onBack} RightActionComponent={headerAction} />
       {blocked ? (
         <>
           <EmptyState

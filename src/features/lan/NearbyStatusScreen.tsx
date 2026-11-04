@@ -40,12 +40,7 @@ export function NearbyStatusScreen({
       backgroundColor={theme.colors.surface}
       contentContainerStyle={themed($screen)}
     >
-      <Header
-        title=""
-        leftTx="common:back"
-        backgroundColor={theme.colors.surface}
-        onLeftPress={onBack}
-      />
+      <Header title="" backgroundColor={theme.colors.surface} onBack={onBack} />
       <View style={themed($center)}>
         {busy ? <ActivityIndicator color={theme.colors.textDim} /> : null}
         {title ? (

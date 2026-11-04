@@ -6,7 +6,7 @@ import { useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
@@ -56,10 +56,9 @@ export function DeckCompareScreen(props: Props) {
       <Header
         titleTx="decks:stats.compare"
         LeftActionComponent={
-          <HeaderIcon
+          <HeaderBack
             testID="header-back"
-            icon="back"
-            label={translate("common:back")}
+            fallback="connected/decks/index"
             onPress={props.onBack}
           />
         }

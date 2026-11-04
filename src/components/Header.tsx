@@ -2,6 +2,7 @@ import { createContext, ReactElement, ReactNode, useContext, useState } from "re
 import {
   ImageStyle,
   LayoutChangeEvent,
+  Platform,
   StyleProp,
   TextStyle,
   TouchableOpacity,
@@ -17,6 +18,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { type BackRoute, fitBackLabel, useBackLabel } from "@/utils/useBackLabel"
 import { ExtendedEdge, useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { Icon, IconTypes, PressableIcon } from "./Icon"
@@ -60,6 +62,7 @@ export interface HeaderProps {
   LeftActionComponent?: ReactElement
   leftTxOptions?: TextProps["txOptions"]
   onLeftPress?: TouchableOpacityProps["onPress"]
+  onBack?: () => void
   rightIcon?: IconTypes
   rightIconColor?: string
   /**
@@ -112,6 +115,7 @@ export function Header(props: HeaderProps) {
     leftTx,
     leftTxOptions,
     onLeftPress,
+    onBack,
     onRightPress,
     RightActionComponent,
     rightIcon,
@@ -161,7 +165,7 @@ export function Header(props: HeaderProps) {
           onPress={onLeftPress}
           txOptions={leftTxOptions}
           backgroundColor={backgroundColor}
-          ActionComponent={LeftActionComponent}
+          ActionComponent={LeftActionComponent ?? (onBack && <HeaderBack onPress={onBack} />)}
         />
 
         {!!titleContent && (
@@ -237,31 +241,53 @@ export function HeaderIcon({
   )
 }
 
-/** why: a back action that names what's behind the screen ("Game", "Play"), for screens that sit in front of the board. Pass as `LeftActionComponent`. */
-export function HeaderBack({
-  label,
-  onPress,
-  testID,
-}: {
-  label: string
-  onPress: () => void
+export interface HeaderBackProps {
+  onPress?: () => void
+  label?: string
+  /** why: match the caller's `goBack` fallback, or a deep link names a screen back won't reach. */
+  fallback?: BackRoute
   testID?: string
-}) {
+}
+
+/** why: back drawn the platform's way. Android gets Material's bare arrow in a 48dp target; iOS and web get a chevron naming the screen it returns to. */
+export function HeaderBack({ onPress, label, fallback, testID }: HeaderBackProps) {
   const { themed, theme } = useAppTheme()
+  const destination = useBackLabel(fallback)
+  const disabled = !onPress
+  if (Platform.OS === "android") {
+    return (
+      <PressableIcon
+        testID={testID}
+        icon="arrowBack"
+        size={24}
+        color={theme.colors.tint}
+        accessibilityRole="button"
+        accessibilityLabel={translate("common:back")}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={onPress}
+        containerStyle={[themed($materialBack), disabled && $disabledIcon]}
+        style={isRTL ? $flipped : undefined}
+      />
+    )
+  }
+  const text = label === undefined ? destination : fitBackLabel(label)
   return (
     <TouchableOpacity
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={text}
+      accessibilityState={{ disabled }}
       activeOpacity={0.8}
+      disabled={disabled}
       onPress={onPress}
-      style={themed($backAction)}
+      style={[themed($backAction), disabled && $disabledIcon]}
     >
       <Icon icon="back" size={24} color={theme.colors.tint} style={isRTL ? $flipped : undefined} />
       <Text
         weight="medium"
         size="md"
-        text={label}
+        text={text}
         numberOfLines={1}
         maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
         style={themed($actionText)}
@@ -372,6 +398,15 @@ const $backAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingStart: spacing.sm,
   paddingEnd: spacing.md,
   gap: spacing.xxxs,
+  zIndex: 2,
+})
+
+const $materialBack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: 48,
+  height: 48,
+  marginStart: spacing.xxs,
+  alignItems: "center",
+  justifyContent: "center",
   zIndex: 2,
 })
 

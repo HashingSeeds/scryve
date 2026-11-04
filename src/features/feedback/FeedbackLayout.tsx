@@ -39,8 +39,7 @@ export function FeedbackLayout({
       safeAreaEdges={["bottom"]}
       header={{
         title: titleVisible || !heading ? title : undefined,
-        leftTx: "common:back",
-        onLeftPress: onBack,
+        onBack: onBack,
       }}
       contentContainerStyle={$fill}
     >

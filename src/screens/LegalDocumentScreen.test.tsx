@@ -66,7 +66,7 @@ describe("LegalDocumentScreen", () => {
     scrollTo(view, 0)
     expect(view.getAllByText("Privacy Policy")).toHaveLength(1)
 
-    fireEvent.press(view.getByText("Back"))
+    fireEvent.press(view.getByText("Play"))
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 })

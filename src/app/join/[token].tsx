@@ -13,11 +13,7 @@ export default function InviteRoute() {
   if (!isInviteToken(token ?? "")) {
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-        <Header
-          titleTx="connected:invalidInvite.header"
-          leftTx="common:back"
-          onLeftPress={() => router.dismissTo("/")}
-        />
+        <Header titleTx="connected:invalidInvite.header" onBack={() => router.dismissTo("/")} />
         <Text preset="heading" accessibilityRole="header" tx="connected:invalidInvite.title" />
         <Text accessibilityRole="alert" tx="connected:invalidInvite.message" />
         <Button

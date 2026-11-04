@@ -49,6 +49,7 @@ jest.mock("convex/react", () => ({
 }))
 jest.mock("@/features/game/localPersistence", () => ({
   LocalGameRepository: jest.fn(() => ({ resetAnalyticsId: mockResetAnalyticsId })),
+  localGameRepository: { loadActiveGame: () => undefined },
 }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({

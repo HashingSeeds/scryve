@@ -11,8 +11,7 @@ export function FeedbackUnavailable() {
       contentInset="standard"
       header={{
         titleTx: "feedback:mine.title",
-        leftTx: "common:back",
-        onLeftPress: () => (router.canGoBack() ? router.back() : router.replace("/")),
+        onBack: () => (router.canGoBack() ? router.back() : router.replace("/")),
       }}
     >
       <Text tx="feedback:unavailable" />

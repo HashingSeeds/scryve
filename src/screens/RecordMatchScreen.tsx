@@ -6,7 +6,7 @@ import { useConvex } from "convex/react"
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button, PlusAccessory } from "@/components/Button"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text, type TextProps } from "@/components/Text"
@@ -122,14 +122,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       <Header
         titleTx="play:recordMatch.title"
         backgroundColor={theme.colors.surface}
-        LeftActionComponent={
-          <HeaderIcon
-            testID="header-back"
-            icon="back"
-            label={translate("common:back")}
-            onPress={onBack}
-          />
-        }
+        LeftActionComponent={<HeaderBack testID="header-back" onPress={onBack} />}
       />
       <ScrollView
         contentContainerStyle={themed($content)}

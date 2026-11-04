@@ -13,7 +13,7 @@ import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack, HeaderIcon } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Sheet } from "@/components/Sheet"
@@ -182,9 +182,7 @@ function DeckDetailPlaceholder({
       <Header
         title=""
         backgroundColor={theme.colors.surface}
-        LeftActionComponent={
-          <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
-        }
+        LeftActionComponent={<HeaderBack fallback="connected/decks/index" onPress={onBack} />}
         RightActionComponent={
           <HeaderIcon icon="more" label={translate("decks:deckView.details")} disabled />
         }

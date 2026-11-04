@@ -1,9 +1,9 @@
-import { Dimensions, StyleSheet } from "react-native"
+import { Dimensions, Platform, StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { Header } from "./Header"
+import { Header, HeaderBack } from "./Header"
 
 describe("Header", () => {
   it("exposes translated text actions as buttons with explicit state", () => {
@@ -51,5 +51,43 @@ describe("Header", () => {
 
     expect(titleInset()).toBe(73)
     act(() => Dimensions.set({ window }))
+  })
+})
+
+describe("HeaderBack", () => {
+  it("names where back lands beside the chevron on iOS", () => {
+    const onBack = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <Header title="Settings" onBack={onBack} />
+      </ThemeProvider>,
+    )
+    // why: outside a navigator nothing is under the screen, so back falls back to Play.
+    fireEvent.press(view.getByRole("button", { name: "Play" }))
+    expect(view.getByText("Play")).toBeTruthy()
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it("reads Back when a caller's label is too long for the chevron", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <HeaderBack label="Ajouter un deck" onPress={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Back")).toBeTruthy()
+    expect(view.queryByText("Ajouter un deck")).toBeNull()
+  })
+
+  it("draws Material's bare arrow in a 48dp target on Android", () => {
+    jest.replaceProperty(Platform, "OS", "android")
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <HeaderBack />
+      </ThemeProvider>,
+    )
+    const back = view.getByRole("button", { name: "Back" })
+    expect(view.queryByText("Play")).toBeNull()
+    expect(back.props.accessibilityState).toEqual({ disabled: true })
+    expect(StyleSheet.flatten(back.props.style)).toMatchObject({ width: 48, height: 48 })
   })
 })

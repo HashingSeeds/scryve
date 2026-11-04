@@ -63,7 +63,7 @@ export function DeleteAccountScreen({
       : translate("account:deleteAccount.intro")
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header titleTx="account:deleteAccount.title" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="account:deleteAccount.title" onBack={onBack} />
       <View style={themed($content)}>
         <Text tx="account:deleteAccount.eyebrow" preset="formLabel" style={themed($eyebrow)} />
         <Text
@@ -160,7 +160,7 @@ export function AccountDeletionReceiptScreen({
       : statusDescription(status)
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header titleTx="account:deleteAccount.title" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="account:deleteAccount.title" onBack={onBack} />
       <View style={themed($content)}>
         <Text tx="account:deleteAccount.eyebrow" preset="formLabel" style={themed($eyebrow)} />
         <Text
