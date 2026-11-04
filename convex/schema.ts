@@ -543,6 +543,7 @@ export default defineSchema({
     sourceUrl: v.optional(v.string()),
     publishedAt: v.optional(v.number()),
     fetchedAt: v.number(),
+    identityColors: v.optional(v.array(v.string())),
   })
     .index("by_game_and_source_and_external_id", ["game", "source", "externalId"])
     .index("by_game_and_fetched_at", ["game", "fetchedAt"])

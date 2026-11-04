@@ -17,8 +17,10 @@ import type { FunctionReturnType } from "convex/server"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { CardFocusDialog } from "@/components/CardFocusDialog"
-import { Header, HeaderIcon } from "@/components/Header"
+import { CardFocusDialog, colorLabel } from "@/components/CardFocusDialog"
+import { CardSymbolText } from "@/components/CardSymbolText"
+import { FilterPill } from "@/components/FilterPill"
+import { HeaderIcon } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
@@ -32,6 +34,7 @@ import { useSheetPresence } from "@/components/useSheetPresence"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
+import { identityLabel, SEARCH_COLORS, toggleColor } from "@/features/decks/colorMatch"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { deckNameWarning } from "@/features/decks/deckCopy"
@@ -66,7 +69,7 @@ import {
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
 import type { ProviderGame } from "../../convex/lib/games/providers"
-import { isSystemId, type SystemId } from "../../convex/lib/systems"
+import { hasCommandZone, isSystemId, type SystemId } from "../../convex/lib/systems"
 
 const DECK_LIST_HELPERS = {
   mtg: "decks:addDeck.listHelperMtg",
@@ -381,6 +384,9 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     pastedDraft.format === format
   const [preconQuery, setPreconQuery] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
+  const [pickedColors, setPickedColors] = useState<string[]>([])
+  const filtersColors = game === DEFAULT_DECK_GAME && hasCommandZone(game, format)
+  const catalogColors = filtersColors ? pickedColors : NO_COLORS
   const browseKey = `${game}:${format}`
   const [browsedFormats, setBrowsedFormats] = useState<
     Record<string, { game: string; format: string }>
@@ -395,10 +401,20 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
         ]),
       ),
       ...(mode === "precon"
-        ? { current: { query: api.deckCatalogs.list, args: { game, format, query: searchTerm } } }
+        ? {
+            current: {
+              query: api.deckCatalogs.list,
+              args: {
+                game,
+                format,
+                query: searchTerm,
+                ...(catalogColors.length ? { colors: catalogColors } : {}),
+              },
+            },
+          }
         : {}),
     }),
-    [browsedFormats, format, game, mode, searchTerm],
+    [browsedFormats, catalogColors, format, game, mode, searchTerm],
   )
   const catalogResult: CatalogDeck[] | Error | undefined = useQueries(catalogQueries).current
   const catalogError = catalogResult instanceof Error ? catalogResult : undefined
@@ -868,12 +884,16 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     <View style={themed($stack)}>
       <Text
         weight="bold"
-        tx={preconQuery.trim() ? "decks:addDeck.noMatches" : "decks:addDeck.noDecksHere"}
+        tx={
+          preconQuery.trim() || catalogColors.length
+            ? "decks:addDeck.noMatches"
+            : "decks:addDeck.noDecksHere"
+        }
       />
       <Text
         size="sm"
         text={
-          preconQuery.trim()
+          preconQuery.trim() || catalogColors.length
             ? translate("decks:addDeck.noMatchesDetail")
             : translate("decks:addDeck.noListsYet", { format: deckFormatLabel(game, format) })
         }
@@ -1078,13 +1098,18 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
   }
 
   const browse = (
-    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
-      <Header
-        titleTx="decks:shelf.addDeck"
-        LeftActionComponent={
+    <Screen
+      preset="scroll"
+      safeAreaEdges={["bottom"]}
+      contentInset="standard"
+      header={{
+        titleTx: "decks:shelf.addDeck",
+        collapseTitle: false,
+        LeftActionComponent: (
           <HeaderIcon icon="back" label={translate("common:back")} onPress={onBack} />
-        }
-      />
+        ),
+      }}
+    >
       <View style={themed($stack)}>
         <View style={themed($configRow)}>
           <View style={$flex1}>
@@ -1144,6 +1169,19 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
               clearable
               onChangeText={setPreconQuery}
             />
+            {filtersColors ? (
+              <View style={themed($colorFilters)}>
+                {SEARCH_COLORS.map((color) => (
+                  <FilterPill
+                    key={color}
+                    testID={`precon-color-${color}`}
+                    label={colorLabel(color)}
+                    selected={pickedColors.includes(color)}
+                    onPress={() => setPickedColors((current) => toggleColor(current, color))}
+                  />
+                ))}
+              </View>
+            ) : null}
             {browseOffline ? (
               <AlertNote tone="info" text={translate("decks:addDeck.browseOffline")} />
             ) : waitingForDecks ? (
@@ -1183,11 +1221,18 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
                 deck.source === PRECON_SOURCE
                   ? openPrecon(catalogPrecon(deck))
                   : openCatalogDeck(deck)
+              const identity = deck.game === DEFAULT_DECK_GAME ? deck.identityColors : undefined
               return (
                 <TouchableOpacity
                   key={deck._id}
+                  testID={`catalog-deck-${deck.externalId}`}
                   accessibilityRole="button"
-                  accessibilityLabel={translate("decks:addDeck.openDeck", { card: deck.name })}
+                  accessibilityLabel={[
+                    translate("decks:addDeck.openDeck", { card: deck.name }),
+                    identity ? identityLabel(identity) : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(". ")}
                   activeOpacity={0.75}
                   style={themed($resultRow)}
                   disabled={previewLoading}
@@ -1205,12 +1250,15 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
                       }
                     />
                   </View>
-                  <TextAction
-                    tx="decks:addDeck.open"
-                    accessible={false}
-                    disabled={previewLoading}
-                    onPress={open}
-                  />
+                  {identity ? (
+                    <CardSymbolText
+                      game={DEFAULT_DECK_GAME}
+                      size="xs"
+                      text={(identity.length ? identity : ["C"])
+                        .map((color) => `{${color}}`)
+                        .join("")}
+                    />
+                  ) : null}
                 </TouchableOpacity>
               )
             })}
@@ -1339,6 +1387,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
   return { browse, review, leavePreview: leaveImport }
 }
 
+const NO_COLORS: string[] = []
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginTop: spacing.sm,
@@ -1347,6 +1396,11 @@ const $flex1 = { flex: 1 } as const
 const $importScreen: ViewStyle = { flex: 1, width: "100%" }
 const $configRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
+  gap: spacing.xs,
+})
+const $colorFilters: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
   gap: spacing.xs,
 })
 const $inlineStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({

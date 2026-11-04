@@ -663,7 +663,6 @@ export default {
     rateLimited_other: "{{count}} सेकंड में रीफ़्रेश उपलब्ध होगा। सहेजे गए नतीजे उपलब्ध रहेंगे।",
     refreshFailed: "डेक रीफ़्रेश नहीं हो सके। सहेजे गए नतीजे उपलब्ध रहेंगे।",
     checkAgain: "फिर जाँचें",
-    open: "खोलें",
     startingPoint: "शुरुआती बिंदु",
     importSource: "इंपोर्ट स्रोत",
     pasteText: "टेक्स्ट पेस्ट करें",

@@ -824,6 +824,98 @@ describe("Browse list", () => {
     }
   })
 
+  it("fills command-zone precon colors from each deck file and filters Browse by exact identity", async () => {
+    const files: Record<string, unknown> = {
+      "Gisa_FDC.json": { commander: [{ name: "Ghoulcaller Gisa", colorIdentity: ["B"] }] },
+      "Atraxa_C16.json": {
+        commander: [{ name: "Atraxa, Praetors' Voice", colorIdentity: ["G", "W", "U", "B"] }],
+        mainBoard: [{ name: "Mountain", colorIdentity: ["R"] }],
+      },
+    }
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+      const file = String(input).split("/").pop() ?? ""
+      return new Response(JSON.stringify({ data: files[file] }), { status: 200 })
+    })
+    try {
+      const t = makeConvexTest()
+      await t.run(async (ctx) => {
+        for (const [externalId, format] of [
+          ["Gisa_FDC", "commander"],
+          ["Atraxa_C16", "commander"],
+          ["Theme_M10", "constructed"],
+        ])
+          await ctx.db.insert("deckCatalogs", {
+            game: "mtg",
+            source: "mtgjson",
+            externalId,
+            kind: "official",
+            name: externalId,
+            format,
+            fetchedAt: 1,
+          })
+      })
+      await t.action(internal.deckImports.fillPreconIdentity, { cursor: null })
+      await t.action(internal.deckImports.fillPreconIdentity, { cursor: null })
+      expect(fetchSpy.mock.calls.map(([input]) => String(input).split("/").pop())).toEqual([
+        "Atraxa_C16.json",
+        "Gisa_FDC.json",
+      ])
+      const browse = async (colors?: string[]) =>
+        (
+          await t.query(api.deckCatalogs.list, {
+            game: "mtg",
+            format: "commander",
+            query: "",
+            ...(colors ? { colors } : {}),
+          })
+        ).map((deck) => [deck.externalId, deck.identityColors])
+      expect(await browse()).toEqual(
+        expect.arrayContaining([
+          ["Gisa_FDC", ["B"]],
+          ["Atraxa_C16", ["W", "U", "B", "G"]],
+        ]),
+      )
+      expect(await browse(["B"])).toEqual([["Gisa_FDC", ["B"]]])
+      expect(await browse(["G", "B", "U", "W"])).toEqual([["Atraxa_C16", ["W", "U", "B", "G"]]])
+      expect(await browse(["C"])).toEqual([])
+      const theme = await t.run(
+        async (ctx) =>
+          await ctx.db
+            .query("deckCatalogs")
+            .withIndex("by_game_and_source_and_external_id", (q) =>
+              q.eq("game", "mtg").eq("source", "mtgjson").eq("externalId", "Theme_M10"),
+            )
+            .unique(),
+      )
+      expect(theme?.identityColors).toBeUndefined()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("gives an already seeded curated Commander deck its colors", async () => {
+    const t = makeConvexTest()
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deckCatalogs", {
+        game: "mtg",
+        source: "wizards-examples",
+        externalId: "wizards-scd-first-flight",
+        kind: "example",
+        name: "First Flight Starter Commander",
+        format: "commander",
+        fetchedAt: 1,
+      })
+    })
+    await t.mutation(internal.deckCatalogs.seedCuratedDecks, { game: "mtg", format: "commander" })
+    const listed = await t.query(api.deckCatalogs.list, {
+      game: "mtg",
+      format: "commander",
+      query: "",
+      colors: ["W", "U"],
+    })
+    expect(listed.map((deck) => deck.externalId)).toEqual(["wizards-scd-first-flight"])
+  })
+
   it("fills precon rows for a deck list stored before they existed", async () => {
     jest.useFakeTimers()
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))

@@ -699,7 +699,6 @@ export default {
     refreshFailed:
       "Impossible d’actualiser les decks. Les résultats enregistrés restent disponibles.",
     checkAgain: "Vérifier à nouveau",
-    open: "Ouvrir",
     startingPoint: "Point de départ",
     importSource: "Source d’import",
     pasteText: "Coller du texte",

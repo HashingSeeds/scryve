@@ -691,7 +691,6 @@ export default {
     refreshFailed:
       "No se pudieron actualizar los mazos. Los resultados guardados siguen disponibles.",
     checkAgain: "Comprobar de nuevo",
-    open: "Abrir",
     startingPoint: "Punto de partida",
     importSource: "Origen de importación",
     pasteText: "Pegar texto",
