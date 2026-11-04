@@ -188,4 +188,34 @@ describe("card details cache", () => {
     })
     expect(readCardDetail("riftbound:pouty-poro:", store)?.facets).toBe(facets)
   })
+
+  it("refetches Lorcana text cached with its printed line wraps", async () => {
+    const store = memoryStore()
+    const hook = { name: "Fish Hook", quantity: 1, cardId: "fish-hook" }
+    const tamatoa = { name: "Tamatoa", quantity: 1, cardId: "tamatoa" }
+    saveCardDetails(
+      {
+        "lorcana:fish-hook:": { oracleText: "Gets +3 ¤ until the start of your next\nturn." },
+        "lorcana:tamatoa:": {
+          oracleText: "Shift 4\nGRABBY When you play this character, draw a card.",
+        },
+      },
+      store,
+    )
+    const query = jest.fn(async () => [
+      {
+        key: "lorcana:fish-hook:",
+        details: { oracleText: "Gets +3 ¤ until the start of your next turn." },
+      },
+    ])
+
+    await fetchCardDetails({ query }, "lorcana", [hook, tamatoa], store)
+    await fetchCardDetails({ query }, "lorcana", [hook, tamatoa], store)
+
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(query).toHaveBeenCalledWith(expect.anything(), {
+      game: "lorcana",
+      items: [{ key: "lorcana:fish-hook:", catalogCardId: "fish-hook" }],
+    })
+  })
 })
