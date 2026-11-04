@@ -193,12 +193,16 @@ describe("card details cache", () => {
     const store = memoryStore()
     const hook = { name: "Fish Hook", quantity: 1, cardId: "fish-hook" }
     const necklace = { name: "Ursula's Shell Necklace", quantity: 1, cardId: "necklace" }
+    const dodo = { name: "The Dodo", quantity: 1, cardId: "dodo" }
     const tamatoa = { name: "Tamatoa", quantity: 1, cardId: "tamatoa" }
     saveCardDetails(
       {
         "lorcana:fish-hook:": { oracleText: "Gets +3 ¤ until the start of your next\nturn." },
         "lorcana:necklace:": {
           oracleText: "NOW, SING! Whenever you play a song, you may pay\n1 ⬡ to draw a card.",
+        },
+        "lorcana:dodo:": {
+          oracleText: "EXTRAORDINARY SITUATION This character gets\n+1 ¤ for each 1 damage on him.",
         },
         "lorcana:tamatoa:": {
           oracleText: "Shift 4\nGRABBY When you play this character, draw a card.",
@@ -217,10 +221,16 @@ describe("card details cache", () => {
           oracleText: "NOW, SING! Whenever you play a song, you may pay 1 ⬡ to draw a card.",
         },
       },
+      {
+        key: "lorcana:dodo:",
+        details: {
+          oracleText: "EXTRAORDINARY SITUATION This character gets +1 ¤ for each 1 damage on him.",
+        },
+      },
     ])
 
-    await fetchCardDetails({ query }, "lorcana", [hook, necklace, tamatoa], store)
-    await fetchCardDetails({ query }, "lorcana", [hook, necklace, tamatoa], store)
+    await fetchCardDetails({ query }, "lorcana", [hook, necklace, dodo, tamatoa], store)
+    await fetchCardDetails({ query }, "lorcana", [hook, necklace, dodo, tamatoa], store)
 
     expect(query).toHaveBeenCalledTimes(1)
     expect(query).toHaveBeenCalledWith(expect.anything(), {
@@ -228,6 +238,7 @@ describe("card details cache", () => {
       items: [
         { key: "lorcana:fish-hook:", catalogCardId: "fish-hook" },
         { key: "lorcana:necklace:", catalogCardId: "necklace" },
+        { key: "lorcana:dodo:", catalogCardId: "dodo" },
       ],
     })
   })

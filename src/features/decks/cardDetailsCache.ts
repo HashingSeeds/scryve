@@ -99,7 +99,7 @@ export function clearCardDetails(store: CardDetailStore = storage): void {
 
 /**
  * why: Lorcana text cached before the catalog resynced keeps its printed line wraps. Resynced lines are whole
- * abilities, so a line that runs on into lowercase, or a long line cut off mid-sentence, marks the old text.
+ * abilities, so a line that runs on into lowercase or a "+1", or a long line cut off mid-sentence, marks the old text.
  */
 export function staleCardDetails(game: string, details: FocusedCardDetails) {
   if (game !== "lorcana") return false
@@ -108,7 +108,7 @@ export function staleCardDetails(game: string, details: FocusedCardDetails) {
     .slice(1)
     .some(
       (next, index) =>
-        /^[a-z]/.test(next) ||
+        /^([a-z]|\+\d)/.test(next) ||
         (!/[.)!?:"”]$/.test(lines[index]) && lines[index].split(" ").length > 5),
     )
 }
