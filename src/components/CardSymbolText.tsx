@@ -18,7 +18,7 @@ import {
 } from "./cardSymbolGlyphs"
 import { isSystemId, type SystemId } from "../../convex/lib/systems"
 
-type Layer = readonly [glyph: string, color: string]
+type Layer = readonly [glyph: string, color?: string]
 type CardSymbol = { layers: readonly Layer[]; label: string }
 type CoinFace = keyof typeof COIN_FACES
 type Coin = { fill: string; face: CoinFace; ink?: string; outline?: string }
@@ -46,7 +46,7 @@ const PHYREXIAN_LAYERS: Layer[] = [
   [SYMBOL_LAYERS.phyrexianHeart, "#E25563"],
 ]
 
-const line = (glyph: keyof typeof LINE_SYMBOLS, color: string): Layer[] => [
+const line = (glyph: keyof typeof LINE_SYMBOLS, color?: string): Layer[] => [
   [LINE_SYMBOLS[glyph], color],
 ]
 
@@ -156,22 +156,41 @@ function magicSymbol(token: string): CardSymbol | undefined {
   }
 }
 
+/** why: printed Lorcana cards draw these in the text's own ink, so they take its color. */
+const LORCANA_SYMBOLS: Partial<
+  Record<string, { glyph: keyof typeof LINE_SYMBOLS; label: TxKeyPath }>
+> = {
+  "⬡": { glyph: "hexagon", label: "decks:cardSymbols.ink" },
+  "◊": { glyph: "diamond", label: "decks:cardSymbols.lore" },
+  "¤": { glyph: "sword", label: "decks:cardSymbols.strength" },
+  "⛉": { glyph: "shield", label: "decks:cardSymbols.willpower" },
+  "⟳": { glyph: "redo", label: "decks:cardSymbols.exert" },
+  "◉": { glyph: "inkwell", label: "decks:cardSymbols.inkwell" },
+}
+
+function lorcanaSymbol(token: string): CardSymbol | undefined {
+  const symbol = LORCANA_SYMBOLS[token]
+  return symbol && { layers: line(symbol.glyph), label: translate(symbol.label) }
+}
+
 const SYMBOL_READERS: Partial<Record<SystemId, (token: string) => CardSymbol | undefined>> = {
   fab: fabSymbol,
+  lorcana: lorcanaSymbol,
   mtg: magicSymbol,
   riftbound: riftboundSymbol,
 }
 
-const TOKEN = /(\{[^}]+\})/
+/** why: LorcanaJSON writes its symbols as these characters, not braced codes. Splitting puts every token at an odd index. */
+const TOKEN = /(\{[^}]+\}|[⬡◊¤⛉⟳◉])/
 
-function readToken(game: string | undefined, part: string): CardSymbol | undefined {
-  if (!isSystemId(game) || !part.startsWith("{") || !part.endsWith("}")) return undefined
-  return SYMBOL_READERS[game]?.(part.slice(1, -1))
+function readToken(game: string | undefined, part: string, index: number) {
+  if (index % 2 === 0 || !isSystemId(game)) return undefined
+  return SYMBOL_READERS[game]?.(part.startsWith("{") ? part.slice(1, -1) : part)
 }
 
 export function spokenCardText(game: string | undefined, text: string) {
-  return text.split(TOKEN).reduce((spoken, part) => {
-    const label = readToken(game, part)?.label
+  return text.split(TOKEN).reduce((spoken, part, index) => {
+    const label = readToken(game, part, index)?.label
     if (label === undefined) return spoken + part
     return spoken === "" || /\s$/.test(spoken) ? spoken + label : `${spoken} ${label}`
   }, "")
@@ -223,7 +242,7 @@ export function CardSymbolText({
       {...rest}
     >
       {text.split(TOKEN).map((part, index) => {
-        const symbol = readToken(game, part)
+        const symbol = readToken(game, part, index)
         if (!symbol && pattern)
           return (
             <Fragment key={index}>
@@ -246,7 +265,7 @@ export function CardSymbolText({
         return (
           <RNText key={index} style={$symbolFont}>
             {symbol.layers.map(([glyph, color], layer) => (
-              <RNText key={layer} style={{ color }}>
+              <RNText key={layer} style={color && { color }}>
                 {glyph}
               </RNText>
             ))}

@@ -328,6 +328,12 @@ export default {
     exhaust: "agotar",
     domainPower: "poder de {{domain}}",
     anyPower: "poder de cualquier dominio",
+    ink: "tinta",
+    lore: "leyenda",
+    strength: "fuerza",
+    willpower: "voluntad",
+    exert: "agotar",
+    inkwell: "símbolo de tintero",
   },
   cardRow: {
     remove: "Quitar {{card}}",

@@ -122,6 +122,8 @@ COIN_ICONS = ["sun", "waves", "skull", "flame", "leaf", "diamond", "redo", "undo
 # why: 100 and 1000000 are printed on Un-cards (Mox Lotus, Gleemax); other numbers above 20 never are.
 COIN_TEXTS = [str(n) for n in range(21)] + ["100", "1000000", "X", "Y", "Z"]
 LINE_ICONS = ["sword", "shield", "heart", "wind", "brain", "redo", "undo"]
+# why: appended after the original glyphs so their code points stay put.
+LATER_LINE_ICONS = ["hexagon", "diamond"]
 
 
 def affine(scale, dx, dy):
@@ -241,6 +243,10 @@ def build_shapes():
     hexagon = stroked(LUCIDE["hexagon"], affine(1, 0, 0), 2)
     for letter in ["R", "X"]:
         shapes[f"line:hexagon{letter}"] = union(hexagon, rubik_text(letter, "Bold", 10, 12, 15.6))
+    for name in LATER_LINE_ICONS:
+        shapes[f"line:{name}"] = union(stroked(LUCIDE[name], affine(1, 0, 0), 2))
+    ring = op(circle(12, 12, 10), circle(12, 12, 8), pathops.PathOp.DIFFERENCE)
+    shapes["line:inkwell"] = union(ring, circle(12, 12, 3.5))
     return shapes
 
 
@@ -345,7 +351,10 @@ def write_ts(chars):
         "} as const",
         "",
         "export const LINE_SYMBOLS = {",
-        *[entry(name, f"line:{name}") for name in [*LINE_ICONS, "hexagonR", "hexagonX"]],
+        *[
+            entry(name, f"line:{name}")
+            for name in [*LINE_ICONS, "hexagonR", "hexagonX", *LATER_LINE_ICONS, "inkwell"]
+        ],
         "} as const",
         "",
     ]

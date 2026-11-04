@@ -65,4 +65,7 @@ export const LINE_SYMBOLS = {
   undo: "\uE07F",
   hexagonR: "\uE080",
   hexagonX: "\uE081",
+  hexagon: "\uE082",
+  diamond: "\uE083",
+  inkwell: "\uE084",
 } as const

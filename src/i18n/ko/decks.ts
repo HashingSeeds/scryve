@@ -303,6 +303,12 @@ export default {
     exhaust: "소진",
     domainPower: "{{domain}} 파워",
     anyPower: "모든 도메인의 파워",
+    ink: "잉크",
+    lore: "로어",
+    strength: "힘",
+    willpower: "의지력",
+    exert: "기력 소모",
+    inkwell: "잉크 우물 기호",
   },
   cardRow: {
     remove: "{{card}} 제거",

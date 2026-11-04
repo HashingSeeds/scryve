@@ -307,6 +307,12 @@ export default {
     exhaust: "疲労",
     domainPower: "{{domain}}パワー",
     anyPower: "任意のドメインのパワー",
+    ink: "インク",
+    lore: "ロア",
+    strength: "強さ",
+    willpower: "意思",
+    exert: "消耗",
+    inkwell: "インクウェルのシンボル",
   },
   cardRow: {
     remove: "{{card}}を削除",

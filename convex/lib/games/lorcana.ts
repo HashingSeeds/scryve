@@ -28,6 +28,13 @@ function lorcanaLegality(value: unknown) {
   return stringValue(rule.bannedSinceDate) ? "banned" : "not-legal"
 }
 
+/** why: LorcanaJSON keeps each card's printed line wraps inside an ability, so only bullets start a new line. */
+function lorcanaText(card: Record<string, unknown>) {
+  const sections = stringList(card.fullTextSections)
+  if (sections.length === 0) return stringValue(card.fullText)
+  return sections.map((section) => section.replace(/\s*\n(?!•)\s*/g, " ")).join("\n")
+}
+
 function lorcanaPrinting(card: Record<string, unknown>, id: number) {
   const name = stringValue(card.fullName)
   const type = stringValue(card.type)
@@ -48,7 +55,7 @@ function lorcanaPrinting(card: Record<string, unknown>, id: number) {
       {
         index: 0,
         name,
-        text: stringValue(card.fullText),
+        text: lorcanaText(card),
         imageUrl: httpsUrl(images?.full),
         smallImageUrl: httpsUrl(images?.thumbnail),
       },
@@ -102,17 +109,20 @@ export function normalizeLorcanaJsonCards(value: unknown): DatasetCard[] {
   })
 }
 
+// why: changing how cards are normalized must resync cards that LorcanaJSON has not republished.
+const NORMALIZED = "text:unwrapped"
+
 export const LORCANA_JSON_DATASET = {
   version: async () => {
     const metadata = objectRecord(await fetchDatasetJson(`${LORCANA_JSON_URL}/metadata.json`))
     const generatedOn = stringValue(metadata?.generatedOn)
     if (!generatedOn) throw new Error("LorcanaJSON metadata has no generatedOn")
-    return generatedOn
+    return `${generatedOn} ${NORMALIZED}`
   },
   load: async (version) => {
     const allCards = await fetchDatasetJson(`${LORCANA_JSON_URL}/allCards.json`)
     const generatedOn = stringValue(objectRecord(objectRecord(allCards)?.metadata)?.generatedOn)
-    if (generatedOn !== version)
+    if (`${generatedOn} ${NORMALIZED}` !== version)
       throw new Error(`LorcanaJSON allCards is ${generatedOn ?? "unversioned"}, not ${version}`)
     return normalizeLorcanaJsonCards(allCards)
   },

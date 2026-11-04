@@ -55,6 +55,27 @@ describe("LorcanaJSON normalizer", () => {
     })
   })
 
+  it("joins each ability's printed line wraps but keeps abilities and bullets on their own lines", () => {
+    expect(card("Hades - King of Olympus").printings[0].faces[0].text).toBe(
+      "Shift 6 (You may pay 6 ⬡ to play this on top of one of your characters named Hades.)\n" +
+        "SINISTER PLOT This character gets +1 ◊ for each other Villain character you have in play.",
+    )
+    const [fishHook] = normalizeLorcanaJsonCards({
+      cards: [
+        {
+          id: 568,
+          fullName: "Maui's Fish Hook - The Mighty Hook",
+          fullTextSections: [
+            "SHAPESHIFT ⟳, 2 ⬡ — Choose one:\n• Chosen character gains Evasive until the start of your next\nturn.\n• Chosen character gets +3 ¤ this turn.",
+          ],
+        },
+      ],
+    })
+    expect(fishHook.printings[0].faces[0].text).toBe(
+      "SHAPESHIFT ⟳, 2 ⬡ — Choose one:\n• Chosen character gains Evasive until the start of your next turn.\n• Chosen character gets +3 ¤ this turn.",
+    )
+  })
+
   it("puts stats and ink in facets", () => {
     expect(facets("Hades - King of Olympus")).toMatchObject({
       cost: "8",
@@ -103,7 +124,7 @@ describe("LorcanaJSON normalizer", () => {
       )
     try {
       const version = await LORCANA_JSON_DATASET.version()
-      expect(version).toBe(lorcanaJson.metadata.generatedOn)
+      expect(version).toContain(lorcanaJson.metadata.generatedOn)
       await expect(LORCANA_JSON_DATASET.load(version)).resolves.toHaveLength(5)
       await expect(LORCANA_JSON_DATASET.load("2099-01-01T00:00:00")).rejects.toThrow(
         "not 2099-01-01T00:00:00",

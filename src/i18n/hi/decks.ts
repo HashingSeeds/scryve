@@ -312,6 +312,12 @@ export default {
     exhaust: "एग्ज़ॉस्ट",
     domainPower: "{{domain}} पावर",
     anyPower: "किसी भी डोमेन की पावर",
+    ink: "इंक",
+    lore: "लोर",
+    strength: "स्ट्रेंथ",
+    willpower: "विलपावर",
+    exert: "एग्ज़र्ट",
+    inkwell: "इंकवेल चिह्न",
   },
   cardRow: {
     remove: "{{card}} हटाएँ",
