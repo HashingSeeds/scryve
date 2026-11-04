@@ -4,7 +4,6 @@ export const MAGIC_DATASET_URL = "https://ygo-images.scryve.sow.care/datasets/mt
 
 export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRulesUpdatedAt">
 
-/** why: version is Scryfall's bulk `updated_at`, so clients can skip a download they already have. */
 export type MagicDataset = { version: string; cards: MagicDatasetCard[] }
 
 const NON_DECK_LAYOUTS = new Set([
