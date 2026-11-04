@@ -41,6 +41,13 @@ describe("useCapabilityReleased", () => {
     expect(render(withExampleDecks("riftbound", "enabled"), true)("riftbound")).toBe(true)
   })
 
+  it("uses the static definition for a capability an older server doesn't list", () => {
+    const { rules: _rules, ...capabilities } = integrationFor("mtg").capabilities
+    jest.mocked(useQuery).mockReturnValue([{ ...integrationFor("mtg"), capabilities }])
+    jest.mocked(useConvexOnline).mockReturnValue(true)
+    expect(renderHook(() => useCapabilityReleased("rules")).result.current("mtg")).toBe(true)
+  })
+
   it("offline, only turns things off", () => {
     expect(render(withExampleDecks("mtg", "disabled"), false)("mtg")).toBe(false)
     expect(render(withExampleDecks("riftbound", "enabled"), false)("riftbound")).toBe(false)

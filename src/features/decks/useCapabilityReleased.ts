@@ -21,7 +21,8 @@ export function useCapabilityReleased(key: CapabilityKey) {
     if (!definition) return false
     const local = released(definition.integration.capabilities, key)
     const live = manifest?.find(({ id }) => id === game)
-    const remote = live && released(live.capabilities, key)
+    // why: a backend older than this client omits capability keys it doesn't know yet.
+    const remote = live && key in live.capabilities ? released(live.capabilities, key) : undefined
     return online ? (remote ?? local) : local && remote !== false
   }
 }
