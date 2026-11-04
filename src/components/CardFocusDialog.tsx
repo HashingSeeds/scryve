@@ -337,7 +337,7 @@ function KeywordDefinition({ name, rule }: { name: string; rule: KeywordRule }) 
   return (
     <View style={themed($keyword)} testID="card-focus-keyword">
       <View style={themed($keywordHeader)}>
-        <Text size="sm" weight="medium" style={$name} text={name} />
+        <Text size="sm" weight="medium" style={themed($name)} text={name} />
         <Text size="xs" tone="dim" text={rule.id} />
       </View>
       {rule.definition ? <Text size="xs" text={rule.definition} /> : null}
