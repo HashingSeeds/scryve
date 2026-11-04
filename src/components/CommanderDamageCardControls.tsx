@@ -448,7 +448,9 @@ function DefenderControls({
           />
         ) : null}
         {!mode.acted ? (
-          <View style={$centeredAt(discX - ring / 2, discY - ring / 2)}>
+          <View
+            style={[$centeredAt(discX - ring / 2, discY - ring / 2), { width: ring, height: ring }]}
+          >
             <PulseRing
               testID={`commander-target-pulse-seat-${seatNumber}`}
               size={ring}
@@ -654,51 +656,72 @@ function DamageArc({
 
 const $bleed: ViewStyle = { margin: -ARC_BLEED }
 
-const BREATH_MS = 1200
-const BREATHS = 3
-const REST_OPACITY = 0.2
+const PULSE_MS = 1600
+const PULSES = 3
 const PEAK_OPACITY = 0.65
 
-/** why: the board's one moving ring marks the next step: the targets' damage rings until the first hit, then the attacker's mark to finish. It brightens in place a few times and then rests faint, so the cue never turns into noise. */
+/** why: one beat of a pulse at `t` from 0 to 1. The ring grows from `from` of its size to its full size and is invisible at both ends, so between and after pulses nothing rests on screen. */
+export function pulseFrame(t: number, from: number) {
+  "worklet"
+  return { opacity: PEAK_OPACITY * Math.sin(Math.PI * t), scale: from + (1 - from) * t }
+}
+
+/** why: the board's one moving ring marks the next step: the targets' damage rings until the first hit, then the attacker's mark to finish. It centers on its parent, pulses a few times, and then fades out, so the cue never turns into noise. `size` is its full diameter; with reduced motion it holds still at that size. */
 export function PulseRing({
   testID,
   size,
+  from = 1,
   width = 3,
   color,
 }: {
   testID: string
   size: number
+  from?: number
   width?: number
   color: string
 }) {
   const reducedMotion = useReducedMotion()
-  const breath = useSharedValue(0)
+  const beat = useSharedValue(0)
 
   useEffect(() => {
     if (reducedMotion !== false) return
-    const half = { duration: BREATH_MS, easing: Easing.inOut(Easing.sin) }
-    breath.value = withRepeat(withSequence(withTiming(1, half), withTiming(0, half)), BREATHS)
-    return () => cancelAnimation(breath)
-  }, [reducedMotion, breath])
+    beat.value = withRepeat(
+      withTiming(1, { duration: PULSE_MS, easing: Easing.out(Easing.quad) }),
+      PULSES,
+    )
+    return () => cancelAnimation(beat)
+  }, [reducedMotion, beat])
 
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity:
-      reducedMotion === false
-        ? REST_OPACITY + (PEAK_OPACITY - REST_OPACITY) * breath.value
-        : PEAK_OPACITY,
-  }))
+  const ringStyle = useAnimatedStyle(() => {
+    if (reducedMotion !== false) return { opacity: PEAK_OPACITY }
+    const { opacity, scale } = pulseFrame(beat.value, from)
+    return { opacity, transform: [{ scale }] }
+  })
 
   return (
-    <Animated.View
-      testID={testID}
-      pointerEvents="none"
-      style={[
-        $absolute,
-        { width: size, height: size, borderRadius: size, borderWidth: width, borderColor: color },
-        ringStyle,
-      ]}
-    />
+    <View pointerEvents="none" style={$pulseCenter}>
+      <Animated.View
+        testID={testID}
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: width,
+            borderColor: color,
+          },
+          ringStyle,
+        ]}
+      />
+    </View>
   )
+}
+
+// why: the ring may be larger than its parent, so it centers on it and overflows evenly.
+const $pulseCenter: ViewStyle = {
+  ...StyleSheet.absoluteFill,
+  alignItems: "center",
+  justifyContent: "center",
 }
 
 /** why: the attacker's power reads as a creature's power box, and its left and right ends lower and raise it, as a card's halves do for life. The commander's name sits under the number; for partners the number and name are one big target that benches or returns that partner. */
