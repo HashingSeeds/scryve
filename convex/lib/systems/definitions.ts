@@ -638,6 +638,7 @@ export const SYSTEMS = {
         basis: "fair_use",
         imageUse: "functional_card_context",
         requiredNotices: [
+          "Riftbound support is a preview, available only in Scryve test builds while Scryve awaits approval from Riot Games. Riftbound card data in this preview comes from RiftHunt.",
           "Riftbound, card names, card text, card artwork, characters, and related marks are property of Riot Games. Scryve is not affiliated with, endorsed, or sponsored by Riot Games.",
         ],
       },

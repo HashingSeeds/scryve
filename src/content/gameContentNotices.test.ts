@@ -1,3 +1,5 @@
+import { isSystemVisible } from "@/features/game/systemVisibility"
+
 import { gameContentNotices } from "./gameContentNotices"
 import { SYSTEM_IDS, SYSTEMS } from "../../convex/lib/systems"
 
@@ -9,9 +11,9 @@ describe("required game notices", () => {
     expect(SYSTEMS.mtg.integration.rights.requiredNotices).toEqual([FAN_CONTENT_POLICY_NOTICE])
   })
 
-  const shipped = SYSTEM_IDS.filter((id) => SYSTEMS[id].release !== "alpha")
+  const shown = SYSTEM_IDS.filter(isSystemVisible)
 
-  it.each(shipped)("shows %s's required notices in the game content notices", (id) => {
+  it.each(shown)("shows %s's required notices in the game content notices", (id) => {
     const notices = SYSTEMS[id].integration.rights.requiredNotices
     const paragraphs = gameContentNotices.sections.flatMap((section) =>
       section.blocks.map((block) => block.text),
