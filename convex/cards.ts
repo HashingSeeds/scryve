@@ -816,9 +816,9 @@ export const searchSaved = internalQuery({
         search.search("name", args.query).eq("game", "mtg"),
       )
       .take(MAX_SEARCH_RESULTS * 4)
-    const matching = cards
-      .filter((card) => words.every((word) => nameSearchKey(card.name).includes(word)))
-      .slice(0, MAX_SEARCH_RESULTS)
+    const matching = cards.filter((card) =>
+      words.every((word) => nameSearchKey(card.name).includes(word)),
+    )
     const references = await Promise.all(
       matching.map(async (card) => {
         const printings = await ctx.db
@@ -835,7 +835,9 @@ export const searchSaved = internalQuery({
         return null
       }),
     )
-    return references.flatMap((reference) => (reference ? [toCardReference(reference)] : []))
+    return references
+      .flatMap((reference) => (reference ? [toCardReference(reference)] : []))
+      .slice(0, MAX_SEARCH_RESULTS)
   },
 })
 
