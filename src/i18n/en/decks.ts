@@ -274,10 +274,12 @@ const decks = {
     loadingDetails: "Loading details…",
     // Screen reader action that shows what a card's keyword ability (such as Flying) means.
     defineKeyword: "Define {{keyword}}",
-    // Expands a keyword's definition to list every Comprehensive Rules entry for it.
-    allRules: "Show all rules",
-    // Collapses a keyword's definition back to its first rules.
-    fewerRules: "Show fewer rules",
+    // Expands a keyword's definition to list its numbered Comprehensive Rules entries.
+    showRules: "Show rules",
+    // Hides a keyword's numbered Comprehensive Rules entries again.
+    hideRules: "Hide rules",
+    // Screen reader label for the button that closes a keyword's definition.
+    closeKeyword: "Close definition",
     // Official rulings from Wizards of the Coast that clarify how this card works.
     rulings: "Rulings",
     loadingRulings: "Loading rulings…",

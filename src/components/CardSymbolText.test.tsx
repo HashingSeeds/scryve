@@ -76,6 +76,6 @@ describe("CardSymbolText keywords", () => {
       </ThemeProvider>,
     )
     fireEvent.press(view.getByText("For Mirrodin!"))
-    expect(onPressKeyword).toHaveBeenCalledWith("For Mirrodin!")
+    expect(onPressKeyword.mock.calls[0]?.[0]).toBe("For Mirrodin!")
   })
 })

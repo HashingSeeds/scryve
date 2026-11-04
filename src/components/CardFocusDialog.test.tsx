@@ -92,7 +92,7 @@ describe("CardFocusDialog", () => {
     })
   })
 
-  it("defines a Magic keyword in place when you tap it", () => {
+  it("defines a Magic keyword when you tap it, with its rules collapsed", () => {
     const view = renderDialog({
       card: { ...card, game: "mtg" },
       details: { ...details, oracleText: "Flying, vigilance", keywords: "Flying\nVigilance" },
@@ -100,6 +100,8 @@ describe("CardFocusDialog", () => {
     expect(view.queryByTestId("card-focus-keyword")).toBeNull()
     fireEvent.press(view.getByText("Flying"))
     expect(view.getByText("Restricts blocking.")).toBeTruthy()
+    expect(view.queryByText("Flying is an evasion ability.")).toBeNull()
+    fireEvent.press(view.getByText("Show rules"))
     expect(view.getByText("Flying is an evasion ability.")).toBeTruthy()
     fireEvent.press(view.getAllByText("Flying")[0])
     expect(view.queryByTestId("card-focus-keyword")).toBeNull()
