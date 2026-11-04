@@ -17,6 +17,7 @@ const BACK_LABELS = {
   "cards": "common:appNavigation.cards",
   "connected/decks/index": "common:appNavigation.decks",
   "settings/index": "common:appMenu.settings",
+  "settings/about": "account:settings.about",
   "support": "common:appMenu.support",
   "account": "common:appMenu.account",
   "history/index": "common:appMenu.history",
@@ -49,7 +50,11 @@ export function useBackLabel(fallback: BackRoute = "index") {
       name === "index" && localGameRepository.loadActiveGame()
         ? "common:appNavigation.game"
         : BACK_LABEL_KEYS.get(name)
-    const label = key ? translate(key) : undefined
-    return label && label.length <= MAX_BACK_LABEL_LENGTH ? label : translate("common:back")
+    return fitBackLabel(key ? translate(key) : undefined)
   }, [below, fallback])
+}
+
+/** why: a label too long to sit beside the chevron reads "Back", as iOS does, whether it came from the stack or the caller. */
+export function fitBackLabel(label: string | undefined) {
+  return label && label.length <= MAX_BACK_LABEL_LENGTH ? label : translate("common:back")
 }

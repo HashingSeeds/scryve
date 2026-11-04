@@ -68,6 +68,16 @@ describe("HeaderBack", () => {
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 
+  it("reads Back when a caller's label is too long for the chevron", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <HeaderBack label="Ajouter un deck" onPress={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Back")).toBeTruthy()
+    expect(view.queryByText("Ajouter un deck")).toBeNull()
+  })
+
   it("draws Material's bare arrow in a 48dp target on Android", () => {
     jest.replaceProperty(Platform, "OS", "android")
     const view = render(

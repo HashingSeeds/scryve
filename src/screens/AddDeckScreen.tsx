@@ -57,6 +57,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
+import { useBackLabel } from "@/utils/useBackLabel"
 
 import { api } from "../../convex/_generated/api"
 import {
@@ -344,6 +345,8 @@ export function useAddDeckFlow() {
 
 function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: AddDeckProps) {
   const { themed } = useAppTheme()
+  // why: read here, above the flow's nested stack, so back names the screen that opened Add deck (Decks or a lobby).
+  const backLabel = useBackLabel("connected/decks/index")
   const destination = useSaveDestination(access)
   const saveNewDeck = useSaveNewDeck(destination.access?.ownerId)
   const [saving, setSaving] = useState(false)
@@ -1105,9 +1108,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
       header={{
         titleTx: "decks:shelf.addDeck",
         collapseTitle: false,
-        LeftActionComponent: (
-          <HeaderBack fallback="connected/decks/index" onPress={onBack} />
-        ),
+        LeftActionComponent: <HeaderBack label={backLabel} onPress={onBack} />,
       }}
     >
       <View style={themed($stack)}>

@@ -33,7 +33,7 @@ export default function AccountRoute() {
     const prompt = auth.configurationMessage || translate("account:profile.signInPrompt")
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
-        <Header titleTx="account:profile.title" onBack={() => router.back()} />
+        <Header titleTx="account:profile.title" onBack={leaveAccount} />
         <Text accessibilityRole="alert" text={prompt} />
         {auth.configured && !auth.isSignedIn ? (
           <Button tx="account:profile.reauthenticate" preset="primary" onPress={auth.openAuth} />

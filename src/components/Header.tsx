@@ -18,7 +18,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
-import { type BackRoute, useBackLabel } from "@/utils/useBackLabel"
+import { type BackRoute, fitBackLabel, useBackLabel } from "@/utils/useBackLabel"
 import { ExtendedEdge, useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { Icon, IconTypes, PressableIcon } from "./Icon"
@@ -271,7 +271,7 @@ export function HeaderBack({ onPress, label, fallback, testID }: HeaderBackProps
       />
     )
   }
-  const text = label ?? destination
+  const text = label === undefined ? destination : fitBackLabel(label)
   return (
     <TouchableOpacity
       testID={testID}
