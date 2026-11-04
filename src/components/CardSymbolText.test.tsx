@@ -1,9 +1,10 @@
-import { Dimensions } from "react-native"
+import { Children, type ReactElement } from "react"
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
-import Svg from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
 
+import { CARD_SYMBOL_FONT, COIN_FACES, SYMBOL_ADVANCE, SYMBOL_LAYERS } from "./cardSymbolGlyphs"
 import { CardSymbolText, spokenCardText } from "./CardSymbolText"
 
 describe("spokenCardText", () => {
@@ -47,18 +48,30 @@ describe("CardSymbolText", () => {
     expect(view.queryByText(/\{T\}|\{G\}/)).toBeNull()
   })
 
-  it("grows glyphs with the system font size up to the text's cap", () => {
-    const window = Dimensions.get("window")
-    Dimensions.set({ window: { ...window, fontScale: 2 } })
+  it("draws each symbol as stacked glyphs in the symbol font, then one advance", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
-        <CardSymbolText game="mtg" text="{T}" />
-        <CardSymbolText game="mtg" text="{T}" maxFontSizeMultiplier={1.5} />
+        <CardSymbolText game="mtg" text="Pay {G/W/P}." />
       </ThemeProvider>,
     )
-    const widths = view.UNSAFE_getAllByType(Svg).map((svg) => svg.props.width)
-    Dimensions.set({ window })
-    expect(widths).toEqual([35, 26])
+    const [symbol] = view.UNSAFE_root.findAll(
+      (node) => StyleSheet.flatten(node.props.style)?.fontFamily === CARD_SYMBOL_FONT,
+    )
+    const layers = Children.toArray(symbol.props.children)
+    expect(layers.at(-1)).toBe(SYMBOL_ADVANCE)
+    expect(
+      layers.slice(0, -1).map((layer) => {
+        const { props } = layer as ReactElement<{ children: string; style: { color: string } }>
+        return [props.children, props.style.color]
+      }),
+    ).toEqual([
+      [SYMBOL_LAYERS.discUpper, "#5FB97A"],
+      [COIN_FACES.leaf.upper, "#140D10"],
+      [SYMBOL_LAYERS.discLower, "#F2E6C9"],
+      [COIN_FACES.sun.lower, "#140D10"],
+      [SYMBOL_LAYERS.phyrexianDot, "#140D10"],
+      [SYMBOL_LAYERS.phyrexianHeart, "#E25563"],
+    ])
   })
 })
 

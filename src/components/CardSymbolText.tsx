@@ -1,122 +1,122 @@
 import { Fragment } from "react"
-import {
-  useWindowDimensions,
-  View,
-  type GestureResponderEvent,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native"
-import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from "react-native-svg"
+// why: glyph spans must inherit the paragraph's size and line height, and the Text wrapper resets both to its presets.
+// eslint-disable-next-line no-restricted-imports
+import { Text as RNText, type GestureResponderEvent, type TextStyle } from "react-native"
 
-import { $sizeStyles, Text, type TextProps } from "@/components/Text"
+import { Text, type TextProps } from "@/components/Text"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { typography } from "@/theme/typography"
 
-import { LUCIDE, PHOSPHOR, type IconName } from "./cardSymbolIcons"
+import {
+  CARD_SYMBOL_FONT,
+  COIN_FACES,
+  LINE_SYMBOLS,
+  SYMBOL_ADVANCE,
+  SYMBOL_LAYERS,
+} from "./cardSymbolGlyphs"
 import { isSystemId, type SystemId } from "../../convex/lib/systems"
 
-type LineArt = { kind: "line"; icon: IconName; color: string; letter?: string }
-type CoinArt = {
-  kind: "coin"
-  fill: string
-  icon?: IconName
-  text?: string
-  ink?: string
-  outline?: string
-}
-type HybridArt = { kind: "hybrid"; halves: readonly [CoinArt, CoinArt] }
-type SymbolArt = LineArt | CoinArt | HybridArt | { kind: "phyrexian"; base: CoinArt | HybridArt }
-type CardSymbol = { art: SymbolArt; label: string }
+type Layer = readonly [glyph: string, color: string]
+type CardSymbol = { layers: readonly Layer[]; label: string }
+type CoinFace = keyof typeof COIN_FACES
+type Coin = { fill: string; face: CoinFace; ink?: string; outline?: string }
 
 const INK = "#140D10"
 const GENERIC_FILL = "#CFC8C3"
 const TAP_FILL = "#D7CEC9"
 
-const FAB_SYMBOLS: Partial<Record<string, { art: LineArt; label: TxKeyPath }>> = {
-  p: { art: { kind: "line", icon: "sword", color: "#E8743B" }, label: "decks:cardSymbols.power" },
-  d: {
-    art: { kind: "line", icon: "shield", color: "#7FA6C9" },
-    label: "decks:cardSymbols.defense",
-  },
-  h: { art: { kind: "line", icon: "heart", color: "#E25563" }, label: "decks:cardSymbols.life" },
-  r: {
-    art: { kind: "line", icon: "hexagon", color: "#F2B544", letter: "R" },
-    label: "decks:cardSymbols.resource",
-  },
-  c: { art: { kind: "line", icon: "wind", color: "#5CC3B0" }, label: "decks:cardSymbols.chi" },
-  i: {
-    art: { kind: "line", icon: "brain", color: "#A38BD6" },
-    label: "decks:cardSymbols.intellect",
-  },
-  t: { art: { kind: "line", icon: "redo", color: TAP_FILL }, label: "decks:cardSymbols.tap" },
-  u: { art: { kind: "line", icon: "undo", color: TAP_FILL }, label: "decks:cardSymbols.untap" },
-  x: {
-    art: { kind: "line", icon: "hexagon", color: "#F2B544", letter: "X" },
-    label: "decks:cardSymbols.variableResource",
-  },
+function coinLayers({ fill, face, ink = INK, outline }: Coin): Layer[] {
+  const ring: Layer[] = outline ? [[SYMBOL_LAYERS.ring, outline]] : []
+  return [[SYMBOL_LAYERS.disc, fill], ...ring, [COIN_FACES[face].whole, ink]]
 }
 
-const MAGIC_SYMBOLS: Partial<Record<string, { art: CoinArt; label: TxKeyPath }>> = {
-  W: { art: { kind: "coin", fill: "#F2E6C9", icon: "sun" }, label: "decks:cardSymbols.white" },
-  U: { art: { kind: "coin", fill: "#6FA8DC", icon: "waves" }, label: "decks:cardSymbols.blue" },
-  B: { art: { kind: "coin", fill: "#9C948F", icon: "skull" }, label: "decks:cardSymbols.black" },
-  R: { art: { kind: "coin", fill: "#E5604A", icon: "flame" }, label: "decks:cardSymbols.red" },
-  G: { art: { kind: "coin", fill: "#5FB97A", icon: "leaf" }, label: "decks:cardSymbols.green" },
-  C: {
-    art: { kind: "coin", fill: GENERIC_FILL, icon: "diamond" },
-    label: "decks:cardSymbols.colorless",
-  },
-  T: { art: { kind: "coin", fill: TAP_FILL, icon: "redo" }, label: "decks:cardSymbols.tap" },
+function hybridLayers(upper: Coin, lower: Coin): Layer[] {
+  return [
+    [SYMBOL_LAYERS.discUpper, upper.fill],
+    [COIN_FACES[upper.face].upper, upper.ink ?? INK],
+    [SYMBOL_LAYERS.discLower, lower.fill],
+    [COIN_FACES[lower.face].lower, lower.ink ?? INK],
+  ]
+}
+
+const PHYREXIAN_LAYERS: Layer[] = [
+  [SYMBOL_LAYERS.phyrexianDot, INK],
+  [SYMBOL_LAYERS.phyrexianHeart, "#E25563"],
+]
+
+const line = (glyph: keyof typeof LINE_SYMBOLS, color: string): Layer[] => [
+  [LINE_SYMBOLS[glyph], color],
+]
+
+const isCoinText = (part: string): part is CoinFace =>
+  /^(\d+|X|Y|Z)$/.test(part) && part in COIN_FACES
+
+const FAB_SYMBOLS: Partial<Record<string, { layers: Layer[]; label: TxKeyPath }>> = {
+  p: { layers: line("sword", "#E8743B"), label: "decks:cardSymbols.power" },
+  d: { layers: line("shield", "#7FA6C9"), label: "decks:cardSymbols.defense" },
+  h: { layers: line("heart", "#E25563"), label: "decks:cardSymbols.life" },
+  r: { layers: line("hexagonR", "#F2B544"), label: "decks:cardSymbols.resource" },
+  c: { layers: line("wind", "#5CC3B0"), label: "decks:cardSymbols.chi" },
+  i: { layers: line("brain", "#A38BD6"), label: "decks:cardSymbols.intellect" },
+  t: { layers: line("redo", TAP_FILL), label: "decks:cardSymbols.tap" },
+  u: { layers: line("undo", TAP_FILL), label: "decks:cardSymbols.untap" },
+  x: { layers: line("hexagonX", "#F2B544"), label: "decks:cardSymbols.variableResource" },
+}
+
+const MAGIC_SYMBOLS: Partial<Record<string, { coin: Coin; label: TxKeyPath }>> = {
+  W: { coin: { fill: "#F2E6C9", face: "sun" }, label: "decks:cardSymbols.white" },
+  U: { coin: { fill: "#6FA8DC", face: "waves" }, label: "decks:cardSymbols.blue" },
+  B: { coin: { fill: "#9C948F", face: "skull" }, label: "decks:cardSymbols.black" },
+  R: { coin: { fill: "#E5604A", face: "flame" }, label: "decks:cardSymbols.red" },
+  G: { coin: { fill: "#5FB97A", face: "leaf" }, label: "decks:cardSymbols.green" },
+  C: { coin: { fill: GENERIC_FILL, face: "diamond" }, label: "decks:cardSymbols.colorless" },
+  T: { coin: { fill: TAP_FILL, face: "redo" }, label: "decks:cardSymbols.tap" },
   Q: {
-    art: { kind: "coin", fill: INK, ink: TAP_FILL, outline: TAP_FILL, icon: "undo" },
+    coin: { fill: INK, ink: TAP_FILL, outline: TAP_FILL, face: "undo" },
     label: "decks:cardSymbols.untap",
   },
-  E: { art: { kind: "coin", fill: "#F2C94C", icon: "zap" }, label: "decks:cardSymbols.energy" },
-  S: { art: { kind: "coin", fill: "#BFE3F2", icon: "snowflake" }, label: "decks:cardSymbols.snow" },
+  E: { coin: { fill: "#F2C94C", face: "zap" }, label: "decks:cardSymbols.energy" },
+  S: { coin: { fill: "#BFE3F2", face: "snowflake" }, label: "decks:cardSymbols.snow" },
 }
 
 function fabSymbol(token: string): CardSymbol | undefined {
   const symbol = FAB_SYMBOLS[token]
-  return symbol && { art: symbol.art, label: translate(symbol.label) }
+  return symbol && { layers: symbol.layers, label: translate(symbol.label) }
 }
 
-const RIFTBOUND_DOMAINS: Partial<Record<string, CoinArt>> = {
-  fury: { kind: "coin", fill: "#E5604A", icon: "flame" },
-  calm: { kind: "coin", fill: "#5FB97A", icon: "leaf" },
-  mind: { kind: "coin", fill: "#6FA8DC", icon: "brain" },
-  body: { kind: "coin", fill: "#E89A3C", icon: "shield" },
-  chaos: { kind: "coin", fill: "#A07AD1", icon: "zap" },
-  order: { kind: "coin", fill: "#F2C94C", icon: "sun" },
+const RIFTBOUND_DOMAINS: Partial<Record<string, Coin>> = {
+  fury: { fill: "#E5604A", face: "flame" },
+  calm: { fill: "#5FB97A", face: "leaf" },
+  mind: { fill: "#6FA8DC", face: "brain" },
+  body: { fill: "#E89A3C", face: "shield" },
+  chaos: { fill: "#A07AD1", face: "zap" },
+  order: { fill: "#F2C94C", face: "sun" },
 }
 
 function riftboundSymbol(token: string): CardSymbol | undefined {
-  if (/^\d+$/.test(token))
+  if (isCoinText(token))
     return {
-      art: { kind: "coin", fill: GENERIC_FILL, text: token },
+      layers: coinLayers({ fill: GENERIC_FILL, face: token }),
       label: translate("decks:cardSymbols.energyAmount", { amount: token }),
     }
   if (token === "might")
-    return {
-      art: { kind: "line", icon: "sword", color: "#E8743B" },
-      label: translate("decks:cardSymbols.might"),
-    }
+    return { layers: line("sword", "#E8743B"), label: translate("decks:cardSymbols.might") }
   if (token === "exhaust")
     return {
-      art: { kind: "coin", fill: TAP_FILL, icon: "redo" },
+      layers: coinLayers({ fill: TAP_FILL, face: "redo" }),
       label: translate("decks:cardSymbols.exhaust"),
     }
   if (token === "rainbow")
     return {
-      art: { kind: "coin", fill: GENERIC_FILL, icon: "diamond" },
+      layers: coinLayers({ fill: GENERIC_FILL, face: "diamond" }),
       label: translate("decks:cardSymbols.anyPower"),
     }
   const domain = RIFTBOUND_DOMAINS[token]
   return (
     domain && {
-      art: domain,
+      layers: coinLayers(domain),
       label: translate("decks:cardSymbols.domainPower", {
         domain: token[0].toUpperCase() + token.slice(1),
       }),
@@ -124,15 +124,15 @@ function riftboundSymbol(token: string): CardSymbol | undefined {
   )
 }
 
-function magicMana(part: string): { art: CoinArt; label: string } | undefined {
-  if (/^(\d+|X|Y|Z)$/.test(part)) {
+function magicMana(part: string): { coin: Coin; label: string } | undefined {
+  if (isCoinText(part)) {
     return {
-      art: { kind: "coin", fill: GENERIC_FILL, text: part },
+      coin: { fill: GENERIC_FILL, face: part },
       label: translate("decks:cardSymbols.generic", { amount: part }),
     }
   }
   const symbol = MAGIC_SYMBOLS[part]
-  return symbol && { art: symbol.art, label: translate(symbol.label) }
+  return symbol && { coin: symbol.coin, label: translate(symbol.label) }
 }
 
 function magicSymbol(token: string): CardSymbol | undefined {
@@ -143,15 +143,15 @@ function magicSymbol(token: string): CardSymbol | undefined {
   const [first, second] = mana
   if (!first || mana.length > 2 || mana.some((part) => !part)) return undefined
 
-  const paid: { art: CoinArt | HybridArt; label: string } = second
+  const paid: CardSymbol = second
     ? {
-        art: { kind: "hybrid", halves: [first.art, second.art] },
+        layers: hybridLayers(first.coin, second.coin),
         label: translate("decks:cardSymbols.either", { first: first.label, second: second.label }),
       }
-    : first
+    : { layers: coinLayers(first.coin), label: first.label }
   if (!phyrexian) return paid
   return {
-    art: { kind: "phyrexian", base: paid.art },
+    layers: [...paid.layers, ...PHYREXIAN_LAYERS],
     label: translate("decks:cardSymbols.orLife", { mana: paid.label }),
   }
 }
@@ -177,117 +177,6 @@ export function spokenCardText(game: string | undefined, text: string) {
   }, "")
 }
 
-const isPhosphor = (icon: IconName): icon is keyof typeof PHOSPHOR => icon in PHOSPHOR
-
-function Icon({ icon, color, width = 2 }: { icon: IconName; color: string; width?: number }) {
-  if (isPhosphor(icon)) {
-    return (
-      <G transform="scale(0.09375)">
-        <Path d={PHOSPHOR[icon]} fill={color} />
-      </G>
-    )
-  }
-  return (
-    <G stroke={color} strokeWidth={width} fill="none" strokeLinecap="round" strokeLinejoin="round">
-      {LUCIDE[icon].map((d) => (
-        <Path key={d} d={d} />
-      ))}
-    </G>
-  )
-}
-
-/** why: Rubik draws "1" with its flag on the left, so centering the advance width leaves the ink off-center. */
-function opticalNudge(text: string) {
-  if (text === "1") return 0.36
-  return text.startsWith("1") ? 0.22 : 0
-}
-
-function CoinFace({ coin }: { coin: CoinArt }) {
-  const ink = coin.ink ?? INK
-  return (
-    <>
-      <Circle cx={12} cy={12} r={12} fill={coin.fill} />
-      {coin.outline ? (
-        <Circle cx={12} cy={12} r={11.25} fill="none" stroke={coin.outline} strokeWidth={1.5} />
-      ) : null}
-      {coin.icon ? (
-        <G transform="translate(12 12) scale(0.62) translate(-12 -12)">
-          <Icon icon={coin.icon} color={ink} width={2.6} />
-        </G>
-      ) : (
-        <SvgText
-          x={12 + opticalNudge(coin.text ?? "")}
-          y={16.9}
-          textAnchor="middle"
-          fontSize={14}
-          fontFamily={typography.primary.semiBold}
-          fill={ink}
-        >
-          {coin.text}
-        </SvgText>
-      )}
-    </>
-  )
-}
-
-function HybridFace({ halves }: { halves: HybridArt["halves"] }) {
-  return (
-    <>
-      <Defs>
-        <ClipPath id="upper">
-          <Path d="M0 0H24L0 24Z" />
-        </ClipPath>
-        <ClipPath id="lower">
-          <Path d="M24 0V24H0Z" />
-        </ClipPath>
-      </Defs>
-      <G clipPath="url(#upper)">
-        <CoinFace coin={halves[0]} />
-      </G>
-      <G clipPath="url(#lower)">
-        <CoinFace coin={halves[1]} />
-      </G>
-    </>
-  )
-}
-
-function SymbolGlyph({ art }: { art: SymbolArt }) {
-  switch (art.kind) {
-    case "line":
-      return (
-        <>
-          <Icon icon={art.icon} color={art.color} />
-          {art.letter ? (
-            <SvgText
-              x={12}
-              y={15.6}
-              textAnchor="middle"
-              fontSize={10}
-              fontFamily={typography.primary.bold}
-              fill={art.color}
-            >
-              {art.letter}
-            </SvgText>
-          ) : null}
-        </>
-      )
-    case "coin":
-      return <CoinFace coin={art} />
-    case "hybrid":
-      return <HybridFace halves={art.halves} />
-    case "phyrexian":
-      return (
-        <>
-          <SymbolGlyph art={art.base} />
-          <Circle cx={19} cy={19} r={5} fill={INK} />
-          <G transform="translate(19 19.3) scale(0.3) translate(-12 -12)">
-            <Icon icon="heart" color="#E25563" width={4} />
-          </G>
-        </>
-      )
-  }
-}
-
 export interface CardSymbolTextProps extends Omit<TextProps, "children" | "tx"> {
   game: string | undefined
   text: string
@@ -304,13 +193,7 @@ function keywordPattern(keywords: readonly string[] | undefined) {
   return new RegExp(`\\b(${names.join("|")})(?!\\w)`, "i")
 }
 
-/** why: Text grows with the system font size but inline Views do not, so glyphs must apply the same scale and cap. */
-function textScale(fontScale: number, maxFontSizeMultiplier: number | null | undefined) {
-  return maxFontSizeMultiplier && maxFontSizeMultiplier >= 1
-    ? Math.min(fontScale, maxFontSizeMultiplier)
-    : fontScale
-}
-
+/** why: symbols are font glyphs because inline views landed at different heights per platform and per line. */
 export function CardSymbolText({
   game,
   text,
@@ -320,21 +203,10 @@ export function CardSymbolText({
   onPressKeyword,
   ...rest
 }: CardSymbolTextProps) {
-  const { fontScale } = useWindowDimensions()
   const { themed } = useAppTheme()
   const pattern = onPressKeyword ? keywordPattern(keywords) : undefined
   const keywordOf = (match: string) =>
     keywords?.find((keyword) => keyword.toLowerCase() === match.toLowerCase()) ?? match
-  const glyphSize = Math.round(
-    $sizeStyles[size ?? "sm"].fontSize * 1.1 * textScale(fontScale, rest.maxFontSizeMultiplier),
-  )
-  const $glyph: ViewStyle = {
-    width: glyphSize,
-    height: glyphSize,
-    marginHorizontal: 1,
-    transform: [{ translateY: glyphSize * 0.18 }],
-  }
-  const parts = text.split(TOKEN)
   return (
     <Text
       size={size}
@@ -350,7 +222,7 @@ export function CardSymbolText({
       onAccessibilityAction={(event) => onPressKeyword?.(event.nativeEvent.actionName)}
       {...rest}
     >
-      {parts.map((part, index) => {
+      {text.split(TOKEN).map((part, index) => {
         const symbol = readToken(game, part)
         if (!symbol && pattern)
           return (
@@ -372,17 +244,21 @@ export function CardSymbolText({
           )
         if (!symbol) return <Fragment key={index}>{part}</Fragment>
         return (
-          <View key={index} style={$glyph}>
-            <Svg width={glyphSize} height={glyphSize} viewBox="0 0 24 24">
-              <SymbolGlyph art={symbol.art} />
-            </Svg>
-          </View>
+          <RNText key={index} style={$symbolFont}>
+            {symbol.layers.map(([glyph, color], layer) => (
+              <RNText key={layer} style={{ color }}>
+                {glyph}
+              </RNText>
+            ))}
+            {SYMBOL_ADVANCE}
+          </RNText>
         )
       })}
     </Text>
   )
 }
 
+const $symbolFont: TextStyle = { fontFamily: CARD_SYMBOL_FONT }
 const $keyword: ThemedStyle<TextStyle> = ({ colors }) => ({
   textDecorationLine: "underline",
   textDecorationStyle: "dotted",
