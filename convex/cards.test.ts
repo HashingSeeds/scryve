@@ -2,6 +2,7 @@ import { makeConvexTest } from "../test/convexTest"
 import { stepClock } from "../test/steppingClock"
 import { api, internal } from "./_generated/api"
 import { deckRateLimiter } from "./lib/deckRateLimits"
+import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { normalizePokemonCards } from "./lib/games/pokemon"
 import rushCards from "./lib/games/rushCards.json"
 
@@ -46,6 +47,42 @@ describe("card provider caching and health", () => {
       makeConvexTest().action(api.cards.search, { query: "Llanowar Elves" }),
     ).rejects.toMatchObject({ data: { code: "scryfall_unavailable" } })
     expect(timeoutSpy).toHaveBeenCalledWith(10_000)
+  })
+
+  it("answers a Magic name search from saved cards while Scryfall is paused", async () => {
+    const shivan = {
+      id: "11111111-1111-1111-1111-111111111111",
+      oracle_id: "22222222-2222-2222-2222-222222222222",
+      name: "Shivan Dragon",
+      type_line: "Creature — Dragon",
+      color_identity: ["R"],
+    }
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(() => response({ data: [shivan] }))
+      .mockImplementationOnce(() => response({ object: "error" }, 429))
+    const t = makeConvexTest()
+    const catalogOnly = [
+      ...Array.from({ length: 20 }, (_, n) => ({
+        id: `catalog-only-${n}`,
+        oracle_id: `catalog-only-oracle-${n}`,
+        name: `Dragon Whelp ${n}`,
+      })),
+      { ...shivan, id: "33333333-3333-3333-3333-333333333333" },
+    ].flatMap((card) => normalizeScryfallCatalogCard(card) ?? [])
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: catalogOnly })
+    await t.action(api.cards.search, { query: "Shivan" })
+    await expect(t.action(api.cards.search, { query: "Ancestral" })).rejects.toMatchObject({
+      data: { code: "scryfall_unavailable" },
+    })
+
+    await expect(t.action(api.cards.search, { query: "Dragon" })).resolves.toEqual([
+      expect.objectContaining({ scryfallId: shivan.id, name: "Shivan Dragon" }),
+    ])
+    for (const query of ["Dragon id<=r", "-Dragon", "Dragon Angel"])
+      await expect(t.action(api.cards.search, { query })).rejects.toMatchObject({
+        data: { code: "scryfall_rate_limited" },
+      })
   })
 
   it("serves Rush card text from its own catalog and never sends Rush IDs to YGOPRODeck", async () => {

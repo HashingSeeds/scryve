@@ -40,6 +40,7 @@ import {
 } from "./lib/scryfallCards"
 
 const MAX_SEARCH_RESULTS = 20
+const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 const MAX_CATALOG_QUERY_LENGTH = 120
 
 function catalogWithoutImages(card: CatalogCard): CatalogCard {
@@ -190,8 +191,18 @@ async function searchScryfall(
   if (query.length < 2) return []
   await requireActionCapability(ctx, "mtg", "cardCatalog")
   await limitCardLookup(ctx, deviceId)
-  let data = await scryfallSearchData(ctx, query)
   const words = scryfallWords(query)
+  let data: unknown[]
+  try {
+    data = await scryfallSearchData(ctx, query)
+  } catch (error) {
+    if (!(error instanceof ConvexError) || SCRYFALL_SYNTAX.test(query)) throw error
+    const saved: CardReference[] = await ctx
+      .runQuery(internal.cards.searchSaved, { query })
+      .catch(() => [])
+    if (!saved.length) throw error
+    return saved
+  }
   if (!data.length && !/\blang:/i.test(query) && /[^\p{ASCII}]/u.test(words)) {
     const printed = await scryfallSearchData(ctx, `(${query}) lang:any`)
     data = await englishPrintings(
@@ -792,6 +803,41 @@ export const detailsBatch = query({
       }
     }
     return found
+  },
+})
+
+export const searchSaved = internalQuery({
+  args: { query: v.string() },
+  handler: async (ctx, args): Promise<CardReference[]> => {
+    const words = args.query.split(/\s+/).map(nameSearchKey).filter(Boolean)
+    const cards = await ctx.db
+      .query("gameCards")
+      .withSearchIndex("search_name", (search) =>
+        search.search("name", args.query).eq("game", "mtg"),
+      )
+      .take(MAX_SEARCH_RESULTS * 4)
+    const matching = cards.filter((card) =>
+      words.every((word) => nameSearchKey(card.name).includes(word)),
+    )
+    const references = await Promise.all(
+      matching.map(async (card) => {
+        const printings = await ctx.db
+          .query("cardPrintings")
+          .withIndex("by_game_card_id", (q) => q.eq("gameCardId", card._id))
+          .take(MAX_CACHED_PRINTINGS_PER_NAME)
+        for (const printing of printings) {
+          const reference = await ctx.db
+            .query("cardReferences")
+            .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", printing.printingId))
+            .unique()
+          if (reference) return reference
+        }
+        return null
+      }),
+    )
+    return references
+      .flatMap((reference) => (reference ? [toCardReference(reference)] : []))
+      .slice(0, MAX_SEARCH_RESULTS)
   },
 })
 
