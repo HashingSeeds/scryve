@@ -12,6 +12,7 @@ Run it after changing a shape:
     /tmp/card-symbols/bin/python scripts/card-symbols-font.py
 """
 
+import hashlib
 import pathlib
 import subprocess
 
@@ -256,7 +257,13 @@ def tt_glyph(path):
     return pen.glyph()
 
 
-def build_font(shapes):
+def font_name(shapes):
+    """why: Android keeps a loaded font by name until the app restarts, so a JS update that changes glyphs needs a new name."""
+    outlines = repr([(name, list(shape.segments)) for name, shape in shapes.items()])
+    return f"CardSymbols-{hashlib.sha256(outlines.encode()).hexdigest()[:8]}"
+
+
+def build_font(shapes, family):
     names = list(shapes)
     glyph_names = {name: f"g{index}" for index, name in enumerate(names)}
     chars = {name: 0xE001 + index for index, name in enumerate(names)}
@@ -285,11 +292,11 @@ def build_font(shapes):
     fb.setupNameTable(
         {
             "copyright": "Copyright 2026 Scryve. Includes outlines from Rubik (Copyright 2015 The Rubik Project Authors), Lucide and Phosphor.",
-            "familyName": "CardSymbols",
+            "familyName": family,
             "styleName": "Regular",
-            "uniqueFontIdentifier": "CardSymbols-Regular-1.0",
-            "fullName": "CardSymbols",
-            "psName": "CardSymbols",
+            "uniqueFontIdentifier": f"{family}-Regular",
+            "fullName": family,
+            "psName": family,
             "version": "Version 1.0",
             "licenseDescription": "This Font Software is licensed under the SIL Open Font License, Version 1.1.",
             "licenseInfoURL": "https://openfontlicense.org",
@@ -320,7 +327,7 @@ def ts_string(code):
     return f'"\\u{code:04X}"'
 
 
-def write_ts(chars):
+def write_ts(chars, family):
     def entry(key, name):
         return f"  {key}: {ts_string(chars[name])},"
 
@@ -337,7 +344,7 @@ def write_ts(chars):
     lines = [
         "// why: generated with assets/fonts/CardSymbols.ttf by scripts/card-symbols-font.py, so hand edits drift from the font.",
         "",
-        'export const CARD_SYMBOL_FONT = "CardSymbols"',
+        f'export const CARD_SYMBOL_FONT = "{family}"',
         "",
         "/** why: every other glyph has no advance so a symbol's layers stack; this one moves the pen past them. */",
         f"export const SYMBOL_ADVANCE = {ts_string(0xE000)}",
@@ -363,5 +370,7 @@ def write_ts(chars):
 
 
 if __name__ == "__main__":
-    write_ts(build_font(build_shapes()))
+    shapes = build_shapes()
+    family = font_name(shapes)
+    write_ts(build_font(shapes, family), family)
     print(f"wrote {FONT_OUT.relative_to(ROOT)} and {TS_OUT.relative_to(ROOT)}")
