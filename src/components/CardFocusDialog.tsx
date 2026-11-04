@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
-import { Pressable, ScrollView, View } from "react-native"
+import { useEffect, useRef, useState } from "react"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import { ScrollView, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -9,6 +9,12 @@ import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { CardRulings } from "@/components/CardRulings"
 import { CardSymbolText, spokenCardText } from "@/components/CardSymbolText"
 import { PressableIcon } from "@/components/Icon"
+import {
+  KEYWORD_GAP,
+  KeywordPopover,
+  popoverScroll,
+  type KeywordAnchor,
+} from "@/components/KeywordPopover"
 import { RetryableError } from "@/components/RetryableError"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
@@ -135,7 +141,17 @@ export function CardFocusDialog({
   const [commanderColor, setCommanderColor] = useState(card.commanderColor)
   const [faceIndex, setFaceIndex] = useState(0)
   const [glossary, setGlossary] = useState<{ define: (name: string) => KeywordRule | undefined }>()
-  const [keyword, setKeyword] = useState<string>()
+  const [keyword, setKeyword] = useState<{ name: string; anchor?: KeywordAnchor }>()
+  const scroll = useRef<ScrollView>(null)
+  const content = useRef<View>(null)
+  const viewport = useRef({ scrolled: 0, visible: 0 })
+  const [popoverHeight, setPopoverHeight] = useState(0)
+  useEffect(() => {
+    const top = keyword?.anchor?.top
+    if (top === undefined || popoverHeight === 0) return
+    const y = popoverScroll({ top, height: popoverHeight, ...viewport.current })
+    if (y !== undefined) scroll.current?.scrollTo({ y, animated: true })
+  }, [keyword, popoverHeight])
   useEffect(() => {
     const source = gameRules(card.game)
     if (source?.kind !== "text" || !source.keyword) return
@@ -149,7 +165,19 @@ export function CardFocusDialog({
       return rule ? [[name, rule]] : []
     }),
   )
-  const keywordRule = keyword ? keywordRules.get(keyword) : undefined
+  const keywordRule = keyword ? keywordRules.get(keyword.name) : undefined
+  const openKeyword = (name: string, event?: GestureResponderEvent) => {
+    if (keyword?.name === name) return setKeyword(undefined)
+    setPopoverHeight(0)
+    const tap = event?.nativeEvent
+    if (!tap || !content.current) return setKeyword({ name })
+    content.current.measureInWindow((x, y) =>
+      setKeyword({
+        name,
+        anchor: { top: tap.pageY - y + KEYWORD_GAP, left: tap.pageX - x },
+      }),
+    )
+  }
   const faces = readCardFaces(details?.faceDetails)
   const face = faces[faceIndex]
   const visibleDetails = face ?? details
@@ -222,65 +250,84 @@ export function CardFocusDialog({
         </View>
       ) : null}
       <ScrollView
+        ref={scroll}
         style={$scrollBody}
-        contentContainerStyle={themed($scrollContent)}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={64}
+        onScroll={(event) => (viewport.current.scrolled = event.nativeEvent.contentOffset.y)}
+        onLayout={(event) => (viewport.current.visible = event.nativeEvent.layout.height)}
       >
-        <CardImage
-          game={card.game}
-          cardId={faceIndex === 0 ? card.cardId : undefined}
-          testID="card-focus-image"
-          accessibilityLabel={imageAccessibilityLabel}
-          source={displayImageUrl}
-          placeholder={cachedThumbnailUrl}
-          style={themed($cardImage)}
-        />
-        <View style={themed($details)}>
-          {visibleDetails?.manaCost ? (
-            <CardSymbolText
-              game={card.game}
-              size="sm"
-              style={themed($dimText)}
-              text={visibleDetails.manaCost}
-            />
-          ) : null}
-          {visibleDetails?.typeLine ? (
-            <Text size="sm" tone="dim" text={visibleDetails.typeLine} />
-          ) : null}
-          {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
-          {visibleDetails?.oracleText ? (
-            <CardSymbolText
-              game={card.game}
-              selectable
-              text={visibleDetails.oracleText}
-              keywords={[...keywordRules.keys()]}
-              activeKeyword={keyword}
-              onPressKeyword={(name) =>
-                setKeyword((current) => (current === name ? undefined : name))
-              }
-            />
-          ) : null}
-          {keyword && keywordRule ? (
-            <KeywordDefinition key={keyword} name={keyword} rule={keywordRule} />
-          ) : null}
-          {rulingsId ? <CardRulings scryfallId={rulingsId} /> : null}
-          {printing ? <Text size="xs" tone="dim" text={printing} /> : null}
-          {imageCredit ? <Text size="xxs" tone="dim" text={imageCredit} /> : null}
-          {!details && !detailsError ? (
-            <Text size="sm" tone="dim" tx="decks:cardFocus.loadingDetails" />
-          ) : null}
-          {detailsError ? (
-            onRetryDetails ? (
-              <RetryableError
-                message={detailsError}
-                retryAfterMs={detailsRetryAfterMs}
-                onRetry={onRetryDetails}
-                testID="retry-card-details"
+        <View ref={content} style={themed($scrollContent)}>
+          <CardImage
+            game={card.game}
+            cardId={faceIndex === 0 ? card.cardId : undefined}
+            testID="card-focus-image"
+            accessibilityLabel={imageAccessibilityLabel}
+            source={displayImageUrl}
+            placeholder={cachedThumbnailUrl}
+            style={themed($cardImage)}
+          />
+          <View style={themed($details)}>
+            {visibleDetails?.manaCost ? (
+              <CardSymbolText
+                game={card.game}
+                size="sm"
+                style={themed($dimText)}
+                text={visibleDetails.manaCost}
               />
-            ) : (
-              <AlertNote text={detailsError} />
-            )
+            ) : null}
+            {visibleDetails?.typeLine ? (
+              <Text size="sm" tone="dim" text={visibleDetails.typeLine} />
+            ) : null}
+            {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
+            {visibleDetails?.oracleText ? (
+              <CardSymbolText
+                game={card.game}
+                selectable
+                text={visibleDetails.oracleText}
+                keywords={[...keywordRules.keys()]}
+                activeKeyword={keyword?.name}
+                onPressKeyword={openKeyword}
+              />
+            ) : null}
+            {keyword && keywordRule && !keyword.anchor ? (
+              <KeywordPopover
+                key={keyword.name}
+                name={keyword.name}
+                rule={keywordRule}
+                onClose={() => setKeyword(undefined)}
+              />
+            ) : null}
+            {rulingsId ? <CardRulings scryfallId={rulingsId} /> : null}
+            {printing ? <Text size="xs" tone="dim" text={printing} /> : null}
+            {imageCredit ? <Text size="xxs" tone="dim" text={imageCredit} /> : null}
+            {!details && !detailsError ? (
+              <Text size="sm" tone="dim" tx="decks:cardFocus.loadingDetails" />
+            ) : null}
+            {detailsError ? (
+              onRetryDetails ? (
+                <RetryableError
+                  message={detailsError}
+                  retryAfterMs={detailsRetryAfterMs}
+                  onRetry={onRetryDetails}
+                  testID="retry-card-details"
+                />
+              ) : (
+                <AlertNote text={detailsError} />
+              )
+            ) : null}
+          </View>
+          {keyword?.anchor && keywordRule ? (
+            <KeywordPopover
+              key={keyword.name}
+              name={keyword.name}
+              rule={keywordRule}
+              anchor={keyword.anchor}
+              onClose={() => setKeyword(undefined)}
+              onHeight={setPopoverHeight}
+            />
           ) : null}
+          {keyword?.anchor ? <View style={{ height: popoverHeight }} /> : null}
         </View>
       </ScrollView>
       {onSetCommander ? (
@@ -339,39 +386,6 @@ export function CardFocusDialog({
   )
 }
 
-function KeywordDefinition({ name, rule }: { name: string; rule: KeywordRule }) {
-  const { themed } = useAppTheme()
-  const [expanded, setExpanded] = useState(false)
-  return (
-    <View style={themed($keyword)} testID="card-focus-keyword">
-      <View style={themed($keywordHeader)}>
-        <Text size="sm" weight="medium" style={themed($name)} text={name} />
-        <Text size="xs" tone="dim" text={rule.id} />
-      </View>
-      {rule.definition ? <Text size="xs" text={rule.definition} /> : null}
-      {(expanded ? rule.rules : rule.rules.slice(0, 2)).map((sub) => (
-        <View key={sub.id} style={$keywordRule}>
-          <Text size="xs" style={$keywordRuleId} text={sub.id} />
-          <Text size="xs" tone="dim" style={$flex} text={sub.text} />
-        </View>
-      ))}
-      {rule.rules.length > 2 ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setExpanded((current) => !current)}
-          style={$moreRules}
-        >
-          <Text
-            size="xs"
-            style={themed($link)}
-            tx={expanded ? "decks:cardFocus.fewerRules" : "decks:cardFocus.allRules"}
-          />
-        </Pressable>
-      ) : null}
-    </View>
-  )
-}
-
 const $scrollBody: ViewStyle = { flex: 1 }
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
@@ -421,20 +435,3 @@ const $quantityButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.sm,
 })
-const $keyword: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  gap: spacing.xxs,
-  paddingVertical: spacing.xs,
-  paddingStart: spacing.sm,
-  borderStartWidth: 2,
-  borderStartColor: colors.tint,
-})
-const $keywordHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "baseline",
-  gap: spacing.sm,
-})
-const $keywordRule: ViewStyle = { flexDirection: "row" }
-const $keywordRuleId: TextStyle = { width: 80, fontVariant: ["tabular-nums"] }
-const $flex: TextStyle = { flex: 1 }
-const $moreRules: ViewStyle = { alignSelf: "flex-start", minHeight: 44, justifyContent: "center" }
-const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })

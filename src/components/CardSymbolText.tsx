@@ -1,5 +1,11 @@
 import { Fragment } from "react"
-import { useWindowDimensions, View, type TextStyle, type ViewStyle } from "react-native"
+import {
+  useWindowDimensions,
+  View,
+  type GestureResponderEvent,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native"
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from "react-native-svg"
 
 import { $sizeStyles, Text, type TextProps } from "@/components/Text"
@@ -287,7 +293,7 @@ export interface CardSymbolTextProps extends Omit<TextProps, "children" | "tx"> 
   text: string
   keywords?: readonly string[]
   activeKeyword?: string
-  onPressKeyword?: (keyword: string) => void
+  onPressKeyword?: (keyword: string, event?: GestureResponderEvent) => void
 }
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -357,7 +363,7 @@ export function CardSymbolText({
                     key={pieceIndex}
                     size={size}
                     style={[themed($keyword), keyword === activeKeyword && themed($activeKeyword)]}
-                    onPress={() => onPressKeyword?.(keyword)}
+                    onPress={(event) => onPressKeyword?.(keyword, event)}
                     text={piece}
                   />
                 )
