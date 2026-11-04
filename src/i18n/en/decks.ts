@@ -278,6 +278,11 @@ const decks = {
     allRules: "Show all rules",
     // Collapses a keyword's definition back to its first rules.
     fewerRules: "Show fewer rules",
+    // Official rulings from Wizards of the Coast that clarify how this card works.
+    rulings: "Rulings",
+    loadingRulings: "Loading rulings…",
+    noRulings: "No rulings for this card yet.",
+    rulingsFailed: "Couldn't load rulings.",
     commanderColor: "Commander color",
     setCommander: "Set as commander",
     quantityIn: "{{quantity}}× in {{section}}",
