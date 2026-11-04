@@ -47,7 +47,10 @@ const mockRules: ComprehensiveRules = {
       ],
     },
   ],
-  glossary: [],
+  glossary: [
+    { term: "Illegal Action", text: "An action that breaks the rules. See rule 733.2." },
+    { term: "Illegal Target", text: "A target that can't be chosen." },
+  ],
   notice: [],
 }
 
@@ -104,6 +107,15 @@ it("peeks from the referenced subrule, not the start of its group", () => {
   expect(
     view.queryByText("509.1 First, the defending player declares blockers (see rule 733)."),
   ).toBeNull()
+})
+
+it("opens the rule a glossary entry cites from anywhere on its row", () => {
+  const onOpenRule = jest.fn()
+  const view = renderRules({ onOpenRule })
+  fireEvent.changeText(view.getByTestId("rules-search"), "Illegal")
+  fireEvent.press(view.getByTestId("rules-term-Illegal Action"))
+  expect(onOpenRule).toHaveBeenCalledWith("733.2")
+  expect(view.queryByTestId("rules-term-Illegal Target")).toBeNull()
 })
 
 it("lists rules you opened under Recent", () => {
