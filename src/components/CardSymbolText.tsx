@@ -295,7 +295,7 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\
 function keywordPattern(keywords: readonly string[] | undefined) {
   if (!keywords?.length) return undefined
   const names = [...keywords].sort((a, b) => b.length - a.length).map(escapeRegExp)
-  return new RegExp(`\\b(${names.join("|")})\\b`, "i")
+  return new RegExp(`\\b(${names.join("|")})(?!\\w)`, "i")
 }
 
 /** why: Text grows with the system font size but inline Views do not, so glyphs must apply the same scale and cap. */

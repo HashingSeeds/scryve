@@ -15,6 +15,7 @@ const rules: ComprehensiveRules = {
             { id: "702.9a", text: "Flying is an evasion ability.", examples: [] },
             { id: "702.9b", text: "A creature with flying can't be blocked.", examples: [] },
             { id: "702.10", text: "Haste", examples: [] },
+            { id: "702.33", text: "Kicker", examples: [] },
           ],
         },
       ],
@@ -24,6 +25,10 @@ const rules: ComprehensiveRules = {
     {
       term: "Flying",
       text: "A keyword ability that restricts how a creature may be blocked. See rule 702.9, “Flying.”",
+    },
+    {
+      term: "Kicker, Kicked",
+      text: "A keyword ability that represents an optional cost. See rule 702.33.",
     },
   ],
   notice: [],
@@ -39,4 +44,10 @@ it("defines a keyword from its glossary entry and its subrules", () => {
 
 it("skips words that are not a keyword ability or action", () => {
   expect(magicKeyword(rules, "Landfall")).toBeUndefined()
+})
+
+it("finds a glossary entry whose heading lists variants", () => {
+  expect(magicKeyword(rules, "Kicker")?.definition).toBe(
+    "A keyword ability that represents an optional cost.",
+  )
 })

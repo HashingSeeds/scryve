@@ -16,7 +16,7 @@ export function magicKeyword(rules: ComprehensiveRules, keyword: string) {
   return {
     id: rule.id,
     definition: rules.glossary
-      .find((entry) => entry.term.toLowerCase() === name)
+      .find((entry) => entry.term.toLowerCase().split(/,\s*/).includes(name))
       ?.text.replace(SEE_RULE, ""),
     rules: findRules(rules, rule.id)?.rules.filter((sub) => sub.id !== rule.id) ?? [],
   }
