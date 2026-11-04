@@ -1,5 +1,5 @@
 import { Dimensions } from "react-native"
-import { render } from "@testing-library/react-native"
+import { fireEvent, render } from "@testing-library/react-native"
 import Svg from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
@@ -59,5 +59,23 @@ describe("CardSymbolText", () => {
     const widths = view.UNSAFE_getAllByType(Svg).map((svg) => svg.props.width)
     Dimensions.set({ window })
     expect(widths).toEqual([35, 26])
+  })
+})
+
+describe("CardSymbolText keywords", () => {
+  it("links keywords that end in punctuation", () => {
+    const onPressKeyword = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSymbolText
+          game="mtg"
+          text="For Mirrodin! (When this Equipment enters, create a 2/2 red Rebel.)"
+          keywords={["For Mirrodin!"]}
+          onPressKeyword={onPressKeyword}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByText("For Mirrodin!"))
+    expect(onPressKeyword).toHaveBeenCalledWith("For Mirrodin!")
   })
 })

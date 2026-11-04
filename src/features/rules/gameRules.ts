@@ -6,6 +6,7 @@ import { translate } from "@/i18n/translate"
 
 import type { ComprehensiveRules } from "./comprehensiveRules"
 import { FAB_RULE_REFERENCE, parseFabRules } from "./fabRules"
+import { magicKeyword, type KeywordRule } from "./magicKeywords"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
 import { isSystemId, type SYSTEMS, type SystemId } from "../../../convex/lib/systems"
 
@@ -21,6 +22,7 @@ export type TextRules = {
   parse: (text: string) => ComprehensiveRules | undefined
   references: RegExp
   revalidate?: true
+  keyword?: (rules: ComprehensiveRules, name: string) => KeywordRule | undefined
   tableItemRules: Readonly<Partial<Record<string, string>>>
 }
 export type GameRules = TextRules | { kind: "link"; pageUrl: string }
@@ -34,6 +36,7 @@ export const GAME_RULES = {
     cacheKey: "scryve.rules",
     parse: parseMagicRules,
     references: MAGIC_RULE_REFERENCE,
+    keyword: magicKeyword,
     tableItemRules: {
       poison: "104.3d",
       energy: "107.14",

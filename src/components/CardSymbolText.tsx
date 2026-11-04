@@ -1,10 +1,12 @@
 import { Fragment } from "react"
-import { useWindowDimensions, View, type ViewStyle } from "react-native"
+import { useWindowDimensions, View, type TextStyle, type ViewStyle } from "react-native"
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from "react-native-svg"
 
 import { $sizeStyles, Text, type TextProps } from "@/components/Text"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
+import { useAppTheme } from "@/theme/context"
+import type { ThemedStyle } from "@/theme/types"
 import { typography } from "@/theme/typography"
 
 import { LUCIDE, PHOSPHOR, type IconName } from "./cardSymbolIcons"
@@ -283,6 +285,17 @@ function SymbolGlyph({ art }: { art: SymbolArt }) {
 export interface CardSymbolTextProps extends Omit<TextProps, "children" | "tx"> {
   game: string | undefined
   text: string
+  keywords?: readonly string[]
+  activeKeyword?: string
+  onPressKeyword?: (keyword: string) => void
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+function keywordPattern(keywords: readonly string[] | undefined) {
+  if (!keywords?.length) return undefined
+  const names = [...keywords].sort((a, b) => b.length - a.length).map(escapeRegExp)
+  return new RegExp(`\\b(${names.join("|")})(?!\\w)`, "i")
 }
 
 /** why: Text grows with the system font size but inline Views do not, so glyphs must apply the same scale and cap. */
@@ -292,8 +305,20 @@ function textScale(fontScale: number, maxFontSizeMultiplier: number | null | und
     : fontScale
 }
 
-export function CardSymbolText({ game, text, size, ...rest }: CardSymbolTextProps) {
+export function CardSymbolText({
+  game,
+  text,
+  size,
+  keywords,
+  activeKeyword,
+  onPressKeyword,
+  ...rest
+}: CardSymbolTextProps) {
   const { fontScale } = useWindowDimensions()
+  const { themed } = useAppTheme()
+  const pattern = onPressKeyword ? keywordPattern(keywords) : undefined
+  const keywordOf = (match: string) =>
+    keywords?.find((keyword) => keyword.toLowerCase() === match.toLowerCase()) ?? match
   const glyphSize = Math.round(
     $sizeStyles[size ?? "sm"].fontSize * 1.1 * textScale(fontScale, rest.maxFontSizeMultiplier),
   )
@@ -305,9 +330,40 @@ export function CardSymbolText({ game, text, size, ...rest }: CardSymbolTextProp
   }
   const parts = text.split(TOKEN)
   return (
-    <Text size={size} accessibilityLabel={spokenCardText(game, text)} {...rest}>
+    <Text
+      size={size}
+      accessibilityLabel={spokenCardText(game, text)}
+      accessibilityActions={
+        pattern
+          ? keywords?.map((keyword) => ({
+              name: keyword,
+              label: translate("decks:cardFocus.defineKeyword", { keyword }),
+            }))
+          : undefined
+      }
+      onAccessibilityAction={(event) => onPressKeyword?.(event.nativeEvent.actionName)}
+      {...rest}
+    >
       {parts.map((part, index) => {
         const symbol = readToken(game, part)
+        if (!symbol && pattern)
+          return (
+            <Fragment key={index}>
+              {part.split(pattern).map((piece, pieceIndex) => {
+                if (pieceIndex % 2 === 0) return piece
+                const keyword = keywordOf(piece)
+                return (
+                  <Text
+                    key={pieceIndex}
+                    size={size}
+                    style={[themed($keyword), keyword === activeKeyword && themed($activeKeyword)]}
+                    onPress={() => onPressKeyword?.(keyword)}
+                    text={piece}
+                  />
+                )
+              })}
+            </Fragment>
+          )
         if (!symbol) return <Fragment key={index}>{part}</Fragment>
         return (
           <View key={index} style={$glyph}>
@@ -320,3 +376,10 @@ export function CardSymbolText({ game, text, size, ...rest }: CardSymbolTextProp
     </Text>
   )
 }
+
+const $keyword: ThemedStyle<TextStyle> = ({ colors }) => ({
+  textDecorationLine: "underline",
+  textDecorationStyle: "dotted",
+  textDecorationColor: colors.tint,
+})
+const $activeKeyword: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
