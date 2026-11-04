@@ -30,6 +30,7 @@ import { loadStoredRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { systemDefinition } from "../../convex/lib/systems"
 
@@ -168,6 +169,8 @@ export function CardFocusDialog({
   const keywordRule = keyword ? keywordRules.get(keyword.name) : undefined
   const openKeyword = (name: string, event?: GestureResponderEvent) => {
     if (keyword?.name === name) return setKeyword(undefined)
+    const rule = keywordRules.get(name)?.id
+    if (rule && card.game) captureAnalytics("keyword_viewed", { system: card.game, rule })
     setPopoverHeight(0)
     const tap = event?.nativeEvent
     if (!tap || !content.current) return setKeyword({ name })

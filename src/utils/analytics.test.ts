@@ -397,6 +397,42 @@ it("keeps how a finished or abandoned game went, and the device's local hour and
   )
 })
 
+it("keeps rule ids from rules lookups and search text only when nothing matched", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  expect(
+    analyticsProperties("rules_search", {
+      system: "mtg",
+      result_count: 0,
+      top_results: "",
+      query: "  How   does BANDING work with a really long question at the end  ",
+    }),
+  ).toEqual(
+    expect.objectContaining({
+      system: "mtg",
+      result_count: 0,
+      query: "how does banding work with a really long",
+    }),
+  )
+  const found = analyticsProperties("rules_search", {
+    system: "fab",
+    result_count: 3,
+    top_results: "702.19,glossary,1.3.2a",
+    query: "private",
+  })
+  expect(found).toEqual(expect.objectContaining({ top_results: "702.19,glossary,1.3.2a" }))
+  expect(found).not.toHaveProperty("query")
+  expect(
+    analyticsProperties("rules_search", { result_count: 1, top_results: "private,702.19" }),
+  ).not.toHaveProperty("top_results")
+  expect(analyticsProperties("keyword_viewed", { system: "mtg", rule: "702.9" })).toEqual(
+    expect.objectContaining({ rule: "702.9" }),
+  )
+  expect(analyticsProperties("keyword_viewed", { rule: "Flying" })).not.toHaveProperty("rule")
+  expect(analyticsProperties("rules_opened", { rank: 2, open_count: 1 })).toEqual(
+    expect.objectContaining({ rank: 2, open_count: 1 }),
+  )
+})
+
 it("sends local turn order coverage once per completed game without player or game ids", async () => {
   jest.useFakeTimers()
   global.fetch = fetchMock
