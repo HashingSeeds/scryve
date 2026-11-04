@@ -12,6 +12,25 @@ import type { ThemedStyle } from "@/theme/types"
 export type KeywordAnchor = { top: number; left: number }
 
 const ARROW = 12
+export const KEYWORD_GAP = 16
+
+export function popoverScroll({
+  top,
+  height,
+  scrolled,
+  visible,
+}: {
+  top: number
+  height: number
+  scrolled: number
+  visible: number
+}) {
+  const wordTop = top - KEYWORD_GAP * 2
+  if (wordTop < scrolled) return Math.max(0, wordTop)
+  const bottom = top + height + KEYWORD_GAP
+  if (bottom > scrolled + visible) return Math.min(bottom - visible, wordTop)
+  return undefined
+}
 
 export function KeywordPopover({
   name,

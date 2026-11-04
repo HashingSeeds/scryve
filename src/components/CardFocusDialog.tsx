@@ -9,7 +9,12 @@ import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { CardRulings } from "@/components/CardRulings"
 import { CardSymbolText, spokenCardText } from "@/components/CardSymbolText"
 import { PressableIcon } from "@/components/Icon"
-import { KeywordPopover, type KeywordAnchor } from "@/components/KeywordPopover"
+import {
+  KEYWORD_GAP,
+  KeywordPopover,
+  popoverScroll,
+  type KeywordAnchor,
+} from "@/components/KeywordPopover"
 import { RetryableError } from "@/components/RetryableError"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
@@ -72,7 +77,6 @@ export interface CardFocusDialogProps {
 }
 
 const CARD_ASPECT_RATIO = 488 / 680
-const KEYWORD_LINE_OFFSET = 16
 
 export const COMMANDER_COLORS = ["W", "U", "B", "R", "G"] as const
 
@@ -140,15 +144,13 @@ export function CardFocusDialog({
   const [keyword, setKeyword] = useState<{ name: string; anchor?: KeywordAnchor }>()
   const scroll = useRef<ScrollView>(null)
   const content = useRef<View>(null)
-  const viewport = useRef({ top: 0, height: 0 })
+  const viewport = useRef({ scrolled: 0, visible: 0 })
   const [popoverHeight, setPopoverHeight] = useState(0)
   useEffect(() => {
     const top = keyword?.anchor?.top
     if (top === undefined || popoverHeight === 0) return
-    const bottom = top + popoverHeight + KEYWORD_LINE_OFFSET
-    const { top: scrolled, height: visible } = viewport.current
-    if (bottom > scrolled + visible)
-      scroll.current?.scrollTo({ y: bottom - visible, animated: true })
+    const y = popoverScroll({ top, height: popoverHeight, ...viewport.current })
+    if (y !== undefined) scroll.current?.scrollTo({ y, animated: true })
   }, [keyword, popoverHeight])
   useEffect(() => {
     const source = gameRules(card.game)
@@ -166,12 +168,13 @@ export function CardFocusDialog({
   const keywordRule = keyword ? keywordRules.get(keyword.name) : undefined
   const openKeyword = (name: string, event?: GestureResponderEvent) => {
     if (keyword?.name === name) return setKeyword(undefined)
+    setPopoverHeight(0)
     const tap = event?.nativeEvent
     if (!tap || !content.current) return setKeyword({ name })
     content.current.measureInWindow((x, y) =>
       setKeyword({
         name,
-        anchor: { top: tap.pageY - y + KEYWORD_LINE_OFFSET, left: tap.pageX - x },
+        anchor: { top: tap.pageY - y + KEYWORD_GAP, left: tap.pageX - x },
       }),
     )
   }
@@ -251,8 +254,8 @@ export function CardFocusDialog({
         style={$scrollBody}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={64}
-        onScroll={(event) => (viewport.current.top = event.nativeEvent.contentOffset.y)}
-        onLayout={(event) => (viewport.current.height = event.nativeEvent.layout.height)}
+        onScroll={(event) => (viewport.current.scrolled = event.nativeEvent.contentOffset.y)}
+        onLayout={(event) => (viewport.current.visible = event.nativeEvent.layout.height)}
       >
         <View ref={content} style={themed($scrollContent)}>
           <CardImage
