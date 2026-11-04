@@ -610,8 +610,11 @@ describe("LifeCard", () => {
       nativeEvent: { layout: { width: 193, height: 420 } },
     })
     const progress = view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" })
-    const circumference = 2 * Math.PI * progress.props.r
-    expect(progress.props.animatedProps.strokeDashoffset).toBeCloseTo(circumference * (1 - 6 / 21))
+    const [startX, startY, radius, , , , , endX, endY] = progress.props.animatedProps.d
+      .match(/-?[\d.]+/g)
+      .map(Number)
+    const sweep = Math.atan2(endX - startX, startY + radius - endY) / (2 * Math.PI)
+    expect(sweep).toBeCloseTo(6 / 21)
   })
 
   it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
