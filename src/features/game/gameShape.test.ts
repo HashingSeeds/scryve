@@ -58,3 +58,12 @@ it("measures play from the first life change, idle time before the end, undos, a
     clock_used: false,
   })
 })
+
+it("counts a seat killed by commander damage as out", () => {
+  const [a, b] = start.players
+  const game = play(
+    [{ type: "commanderDamage.assign", fromPlayerId: a.id, toPlayerId: b.id, delta: 21 }],
+    [1000],
+  )
+  expect(gameShape(game).seat_out).toBe(true)
+})

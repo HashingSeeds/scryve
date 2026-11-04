@@ -23,7 +23,7 @@ export function startEventMatch(
     router.push("/game/current")
     return true
   }
-  if (replace) localGameRepository.clearActiveGame()
+  if (replace) localGameRepository.discardActiveGame("unknown")
   const meSeat = view.myPlayerId ? table.playerIds.indexOf(view.myPlayerId) : -1
   return startLocalGame({
     ...setup,

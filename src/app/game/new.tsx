@@ -109,7 +109,7 @@ export default function NewLocalGameRoute() {
         defaultCommandContext(localGameRepository.getDeviceId()),
       )
       localGameRepository.archiveGame(ended, "new_game_prompt", ownerId)
-    } else localGameRepository.clearActiveGame()
+    } else localGameRepository.discardActiveGame("new_game_prompt")
     setActiveGame(null)
   }
 

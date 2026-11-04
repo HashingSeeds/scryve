@@ -819,6 +819,23 @@ export class LocalGameRepository {
     })
   }
 
+  /** why: clearActiveGame also runs when a game moves elsewhere (published, match ended), so only a player throwing a started game away says how far it got. */
+  discardActiveGame(endSource: GameEndSource): void {
+    const game = this.loadActiveGame()
+    if (game?.status === "active" && hasLocalGameStarted(game))
+      captureGame(
+        "game_abandoned",
+        {
+          ...game,
+          playerCount: game.players.length,
+          shape: gameShape({ ...game, finishedAt: Date.now() }),
+        },
+        "local",
+        endSource,
+      )
+    this.clearActiveGame()
+  }
+
   clearActiveGame(): void {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
     const chunkCount =

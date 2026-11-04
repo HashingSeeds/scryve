@@ -302,8 +302,8 @@ export function useLocalGame(
       return matchId ? latestMatchGame(matchId) : undefined
     },
     holdMatchEnd: (matchId: string) => repository.savePendingMatchEnd(matchId),
-    discard: () => {
-      repository.clearActiveGame()
+    discard: (endSource: GameEndSource = "game_menu") => {
+      repository.discardActiveGame(endSource)
       return gameRef.current
     },
   }

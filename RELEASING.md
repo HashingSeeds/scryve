@@ -213,7 +213,8 @@ entry point. This describes the UI path, not the player's motivation. Local
 also say how the game went: `duration_ms` from the first life change to the end,
 `idle_ms` since the last one, `change_count` and `undo_count`, `result` (`win`,
 `draw`, `none`), `lowest_life_pct` and `seat_out` for the seat nearest defeat, and
-whether commander damage, counters, or the round clock were used. A stale-prompted
+whether commander damage was used and whether counters or the round clock were on
+the board at the end. A stale-prompted
 game with a long `idle_ms` and `seat_out` was likely finished but never closed. Every
 event carries the device's `local_hour` and `weekday`, since timestamps are UTC
 and geoip is off. Connected starts and

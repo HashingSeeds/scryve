@@ -338,7 +338,7 @@ export function CurrentGameScreen({
       return
     }
     if (!onGameAbandoned) return
-    runtime.discard()
+    runtime.discard(endSource)
     setTimeout(onGameAbandoned, 0)
   }
 

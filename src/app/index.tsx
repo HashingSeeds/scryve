@@ -211,7 +211,7 @@ export default function Index() {
             tx="play:abandon"
             style={themed($secondaryAction)}
             onPress={() => {
-              localGameRepository.clearActiveGame()
+              localGameRepository.discardActiveGame("stale_game_prompt")
               setDismissedGameId(activeGame.id)
             }}
           />
