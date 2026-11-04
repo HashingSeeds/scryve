@@ -46,7 +46,6 @@ function isMagicDataset(value: unknown): value is MagicDataset {
 export function parseMagicCards(text: string): MagicCards {
   const dataset: unknown = JSON.parse(text)
   if (!isMagicDataset(dataset)) throw new Error("Magic card file is malformed")
-  // why: sorted once here so a search can stop at its first matches and still list A to Z.
   const cards = dataset.cards.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
   return {
     cards,
@@ -55,7 +54,6 @@ export function parseMagicCards(text: string): MagicCards {
   }
 }
 
-/** why: mirrors the Scryfall query scryfallQuery builds, so local and Scryfall results agree. */
 function matchesSearch(card: MagicDatasetCard, search: MagicSearch) {
   const choosesColor = search.commander && card.commanderEligibility === "color-choice"
   return (
@@ -72,12 +70,10 @@ export function localMagicSearch(
   nameIndex: CardNameIndex | undefined,
   search: MagicSearch,
 ) {
-  // why: Japanese and other printed names (#871) only resolve through Scryfall.
   if (!magicCards || SCRYFALL_SYNTAX.test(search.text) || /[^\p{ASCII}]/u.test(search.text))
     return undefined
   const filtered = search.commander || search.colors.length > 0 || search.keywords.length > 0
   const key = matchKey(search.text)
-  // why: like scryfallQuery, a single letter alongside filters is dropped rather than searched.
   const words = key.length >= 2 || !filtered ? key.split(" ").filter(Boolean) : []
   if (!words.length && !filtered) return { named: [], found: [] }
 

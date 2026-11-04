@@ -194,7 +194,6 @@ jest.mock("expo-network", () => ({
   useNetworkState: jest.fn(() => ({})),
 }))
 
-// why: the real hook downloads the 21 MB Magic card file whenever card search renders.
 jest.mock("@/features/decks/useMagicCards", () => ({ useMagicCards: () => undefined }))
 
 declare global {

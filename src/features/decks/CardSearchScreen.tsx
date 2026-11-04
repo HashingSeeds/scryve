@@ -424,7 +424,14 @@ export function CardSearch({
       return
     }
     setOfflineResults(undefined)
-    if (local) {
+    const remoteQuery = scryfallQuery({
+      text,
+      commander: choosingCommander,
+      colors: colorFilters,
+      colorMatch,
+      keywords,
+    })
+    if (local && (local.named.length || local.found.length || remoteQuery.length < 2)) {
       setNameResults(local.named)
       setResults(local.found)
       setBusy(false)
@@ -445,13 +452,7 @@ export function CardSearch({
           convex.action(api.cards.search, {
             game,
             deviceId,
-            query: scryfallQuery({
-              text,
-              commander: choosingCommander,
-              colors: colorFilters,
-              colorMatch,
-              keywords,
-            }),
+            query: remoteQuery,
           }),
           names.length
             ? convex.action(api.cards.byNames, { names, deviceId }).then(

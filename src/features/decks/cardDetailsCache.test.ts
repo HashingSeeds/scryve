@@ -225,6 +225,31 @@ describe("card details cache", () => {
     expect(readCardDetail("ring-id", store)).toEqual(solRing)
   })
 
+  it("shares one load per card, and looks the card up again when that load fails", async () => {
+    const store = memoryStore()
+    const ring = { name: "Sol Ring", quantity: 1, scryfallId: "ring-id" }
+    const full = { ...solRing, commanderEligibility: "ineligible", commanderRulesUpdatedAt: "now" }
+    saveCardDetails(
+      { "ring-id": { typeLine: "Artifact", commanderEligibility: "ineligible" } },
+      store,
+    )
+    let fail = () => {}
+    const loading = completeCardDetails(
+      "ring-id",
+      () => new Promise((_, reject) => (fail = () => reject(new Error("offline")))),
+      store,
+    )
+    expect(completeCardDetails("ring-id", () => Promise.resolve(full), store)).toBe(loading)
+    const query = jest.fn(async () => [{ key: "ring-id", details: full }])
+    const fetched = fetchCardDetails({ query }, "mtg", [ring], store)
+    fail()
+
+    await expect(loading).rejects.toThrow("offline")
+    await fetched
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(readCardDetail("ring-id", store)?.oracleText).toBe(solRing.oracleText)
+  })
+
   it("refetches Lorcana text cached with its printed line wraps", async () => {
     const store = memoryStore()
     const hook = { name: "Fish Hook", quantity: 1, cardId: "fish-hook" }

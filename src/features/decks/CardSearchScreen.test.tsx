@@ -683,6 +683,16 @@ describe("with the device's Magic card file", () => {
     await waitFor(() => expect(loadCardDetails().shivan?.oracleText).toBe("Flying"))
   })
 
+  it("asks Scryfall for a name the device's file doesn't have yet", async () => {
+    mockAction.mockResolvedValue([])
+    await searchFor("Ancestral")
+    expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+      game: "mtg",
+      deviceId: expect.any(String),
+      query: "Ancestral",
+    })
+  })
+
   it("still sends Scryfall syntax to Scryfall", async () => {
     mockAction.mockResolvedValue([])
     await searchFor("t:dragon")

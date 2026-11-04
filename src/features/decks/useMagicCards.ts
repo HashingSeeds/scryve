@@ -68,7 +68,6 @@ function loadMagicCards() {
   return loading
 }
 
-/** why: loading starts when search opens, so the file is usually parsed by the time a search is typed. */
 export function useMagicCards(game: string) {
   const scryfallCatalog =
     systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
