@@ -1,3 +1,5 @@
+import { isSystemVisible } from "@/features/game/systemVisibility"
+
 import type { LegalDocumentContent } from "./legal"
 import { SYSTEMS, type SystemId } from "../../convex/lib/systems"
 
@@ -10,8 +12,8 @@ const requiredNotices = (system: SystemId) =>
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
-  version: "2026-10-17",
-  effectiveDate: "October 17, 2026",
+  version: "2026-11-03",
+  effectiveDate: "November 3, 2026",
   sections: [
     {
       blocks: [
@@ -87,6 +89,9 @@ export const gameContentNotices = {
         },
       ],
     },
+    ...(isSystemVisible("riftbound")
+      ? [{ heading: "Riftbound", blocks: requiredNotices("riftbound") }]
+      : []),
     {
       heading: "Open source",
       blocks: [
