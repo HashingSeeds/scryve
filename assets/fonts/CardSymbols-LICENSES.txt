@@ -1,4 +1,4 @@
-Card symbol shapes in cardSymbolIcons.ts are copied from these icon sets.
+Shapes in CardSymbols.ttf are built by scripts/card-symbols-font.py from these sources. The font is licensed under the SIL Open Font License 1.1 because its digits and letters are Rubik outlines; see Rubik-OFL.txt. The icon outlines are copied from these icon sets.
 
 Lucide (https://lucide.dev): sword, shield, heart, hexagon, wind, brain, redo, undo, sun, diamond, waves, flame, leaf, zap, snowflake
 
