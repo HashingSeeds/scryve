@@ -334,6 +334,12 @@ export default {
     exhaust: "épuiser",
     domainPower: "puissance {{domain}}",
     anyPower: "puissance de n'importe quel domaine",
+    ink: "encre",
+    lore: "Lore",
+    strength: "force",
+    willpower: "volonté",
+    exert: "épuiser",
+    inkwell: "symbole d'encrier",
   },
   cardRow: {
     remove: "Retirer {{card}}",

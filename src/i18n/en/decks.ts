@@ -334,6 +334,18 @@ const decks = {
     domainPower: "{{domain}} power",
     // Riftbound: a power cost payable with any domain.
     anyPower: "power of any domain",
+    // Lorcana: the resource paid for costs, as in "pay 3 ink".
+    ink: "ink",
+    // Lorcana: points a character earns when it quests.
+    lore: "lore",
+    // Lorcana: a character's damage stat.
+    strength: "strength",
+    // Lorcana: a character's toughness stat.
+    willpower: "willpower",
+    // Lorcana: turn the card sideways to use it, like tapping.
+    exert: "exert",
+    // Lorcana: the inkwell mark on cards that can be put into the inkwell.
+    inkwell: "inkwell symbol",
   },
   cardRow: {
     remove: "Remove {{card}}",

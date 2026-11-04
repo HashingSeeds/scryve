@@ -12,6 +12,7 @@ Run it after changing a shape:
     /tmp/card-symbols/bin/python scripts/card-symbols-font.py
 """
 
+import hashlib
 import pathlib
 import subprocess
 
@@ -122,6 +123,8 @@ COIN_ICONS = ["sun", "waves", "skull", "flame", "leaf", "diamond", "redo", "undo
 # why: 100 and 1000000 are printed on Un-cards (Mox Lotus, Gleemax); other numbers above 20 never are.
 COIN_TEXTS = [str(n) for n in range(21)] + ["100", "1000000", "X", "Y", "Z"]
 LINE_ICONS = ["sword", "shield", "heart", "wind", "brain", "redo", "undo"]
+# why: appended after the original glyphs so their code points stay put.
+LATER_LINE_ICONS = ["hexagon", "diamond"]
 
 
 def affine(scale, dx, dy):
@@ -241,6 +244,10 @@ def build_shapes():
     hexagon = stroked(LUCIDE["hexagon"], affine(1, 0, 0), 2)
     for letter in ["R", "X"]:
         shapes[f"line:hexagon{letter}"] = union(hexagon, rubik_text(letter, "Bold", 10, 12, 15.6))
+    for name in LATER_LINE_ICONS:
+        shapes[f"line:{name}"] = union(stroked(LUCIDE[name], affine(1, 0, 0), 2))
+    ring = op(circle(12, 12, 10), circle(12, 12, 8), pathops.PathOp.DIFFERENCE)
+    shapes["line:inkwell"] = union(ring, circle(12, 12, 3.5))
     return shapes
 
 
@@ -250,7 +257,13 @@ def tt_glyph(path):
     return pen.glyph()
 
 
-def build_font(shapes):
+def font_name(shapes):
+    """why: Android keeps a loaded font by name until the app restarts, so a JS update that changes glyphs needs a new name."""
+    outlines = repr([(name, list(shape.segments)) for name, shape in shapes.items()])
+    return f"CardSymbols-{hashlib.sha256(outlines.encode()).hexdigest()[:8]}"
+
+
+def build_font(shapes, family):
     names = list(shapes)
     glyph_names = {name: f"g{index}" for index, name in enumerate(names)}
     chars = {name: 0xE001 + index for index, name in enumerate(names)}
@@ -279,11 +292,11 @@ def build_font(shapes):
     fb.setupNameTable(
         {
             "copyright": "Copyright 2026 Scryve. Includes outlines from Rubik (Copyright 2015 The Rubik Project Authors), Lucide and Phosphor.",
-            "familyName": "CardSymbols",
+            "familyName": family,
             "styleName": "Regular",
-            "uniqueFontIdentifier": "CardSymbols-Regular-1.0",
-            "fullName": "CardSymbols",
-            "psName": "CardSymbols",
+            "uniqueFontIdentifier": f"{family}-Regular",
+            "fullName": family,
+            "psName": family,
             "version": "Version 1.0",
             "licenseDescription": "This Font Software is licensed under the SIL Open Font License, Version 1.1.",
             "licenseInfoURL": "https://openfontlicense.org",
@@ -314,7 +327,7 @@ def ts_string(code):
     return f'"\\u{code:04X}"'
 
 
-def write_ts(chars):
+def write_ts(chars, family):
     def entry(key, name):
         return f"  {key}: {ts_string(chars[name])},"
 
@@ -331,7 +344,7 @@ def write_ts(chars):
     lines = [
         "// why: generated with assets/fonts/CardSymbols.ttf by scripts/card-symbols-font.py, so hand edits drift from the font.",
         "",
-        'export const CARD_SYMBOL_FONT = "CardSymbols"',
+        f'export const CARD_SYMBOL_FONT = "{family}"',
         "",
         "/** why: every other glyph has no advance so a symbol's layers stack; this one moves the pen past them. */",
         f"export const SYMBOL_ADVANCE = {ts_string(0xE000)}",
@@ -345,7 +358,10 @@ def write_ts(chars):
         "} as const",
         "",
         "export const LINE_SYMBOLS = {",
-        *[entry(name, f"line:{name}") for name in [*LINE_ICONS, "hexagonR", "hexagonX"]],
+        *[
+            entry(name, f"line:{name}")
+            for name in [*LINE_ICONS, "hexagonR", "hexagonX", *LATER_LINE_ICONS, "inkwell"]
+        ],
         "} as const",
         "",
     ]
@@ -354,5 +370,7 @@ def write_ts(chars):
 
 
 if __name__ == "__main__":
-    write_ts(build_font(build_shapes()))
+    shapes = build_shapes()
+    family = font_name(shapes)
+    write_ts(build_font(shapes, family), family)
     print(f"wrote {FONT_OUT.relative_to(ROOT)} and {TS_OUT.relative_to(ROOT)}")

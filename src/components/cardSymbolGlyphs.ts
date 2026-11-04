@@ -1,6 +1,6 @@
 // why: generated with assets/fonts/CardSymbols.ttf by scripts/card-symbols-font.py, so hand edits drift from the font.
 
-export const CARD_SYMBOL_FONT = "CardSymbols"
+export const CARD_SYMBOL_FONT = "CardSymbols-dc8563b4"
 
 /** why: every other glyph has no advance so a symbol's layers stack; this one moves the pen past them. */
 export const SYMBOL_ADVANCE = "\uE000"
@@ -65,4 +65,7 @@ export const LINE_SYMBOLS = {
   undo: "\uE07F",
   hexagonR: "\uE080",
   hexagonX: "\uE081",
+  hexagon: "\uE082",
+  diamond: "\uE083",
+  inkwell: "\uE084",
 } as const

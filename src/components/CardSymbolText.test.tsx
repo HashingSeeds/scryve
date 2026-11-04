@@ -4,7 +4,13 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { CARD_SYMBOL_FONT, COIN_FACES, SYMBOL_ADVANCE, SYMBOL_LAYERS } from "./cardSymbolGlyphs"
+import {
+  CARD_SYMBOL_FONT,
+  COIN_FACES,
+  LINE_SYMBOLS,
+  SYMBOL_ADVANCE,
+  SYMBOL_LAYERS,
+} from "./cardSymbolGlyphs"
 import { CardSymbolText, spokenCardText } from "./CardSymbolText"
 
 describe("spokenCardText", () => {
@@ -30,10 +36,17 @@ describe("spokenCardText", () => {
     )
   })
 
+  it("reads Lorcana's symbol characters as words", () => {
+    expect(spokenCardText("lorcana", "Shift 3 ⬡. ⟳: +1 ◊, -2 ¤, +2 ⛉ to cards with ◉.")).toBe(
+      "Shift 3 ink. exert: +1 lore, -2 strength, +2 willpower to cards with inkwell symbol.",
+    )
+  })
+
   it("leaves unknown tokens and other systems' text as printed", () => {
     expect(spokenCardText("mtg", "{CHAOS}: Add {H}.")).toBe("{CHAOS}: Add {H}.")
     expect(spokenCardText("ygo", "{T}: Add {G}.")).toBe("{T}: Add {G}.")
     expect(spokenCardText(undefined, "{r}")).toBe("{r}")
+    expect(spokenCardText("mtg", "Pay 3 ⬡.")).toBe("Pay 3 ⬡.")
   })
 })
 
@@ -72,6 +85,26 @@ describe("CardSymbolText", () => {
       [COIN_FACES.sun.lower, "#140D10"],
       [SYMBOL_LAYERS.phyrexianDot, "#140D10"],
       [SYMBOL_LAYERS.phyrexianHeart, "#E25563"],
+    ])
+  })
+})
+
+describe("CardSymbolText Lorcana", () => {
+  it("draws Lorcana symbols in the text's own color", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSymbolText game="lorcana" text="Pay 3 ⬡." />
+      </ThemeProvider>,
+    )
+    const [symbol] = view.UNSAFE_root.findAll(
+      (node) => StyleSheet.flatten(node.props.style)?.fontFamily === CARD_SYMBOL_FONT,
+    )
+    const [layer, advance] = Children.toArray(symbol.props.children)
+    const { props } = layer as ReactElement<{ children: string; style?: unknown }>
+    expect([props.children, props.style, advance]).toEqual([
+      LINE_SYMBOLS.hexagon,
+      undefined,
+      SYMBOL_ADVANCE,
     ])
   })
 })

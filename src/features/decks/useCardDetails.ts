@@ -7,7 +7,12 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
-import { loadCardDetails, readCardDetail, saveCardDetails } from "./cardDetailsCache"
+import {
+  loadCardDetails,
+  readCardDetail,
+  saveCardDetails,
+  staleCardDetails,
+} from "./cardDetailsCache"
 import { catalogCardDetails } from "./cardFocus"
 import { api } from "../../../convex/_generated/api"
 
@@ -71,10 +76,12 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
           : undefined)
       const enrichmentKey = `${detailKey}:${attempt}`
       const needsFaces = game === "mtg" && name.includes(" // ")
+      const stale = warmed !== undefined && staleCardDetails(game, warmed)
       if (
         warmed &&
         (offline ||
-          ((!needsFaces || warmed.faceDetails !== undefined) &&
+          (!stale &&
+            (!needsFaces || warmed.faceDetails !== undefined) &&
             (!requireCommanderRules ||
               (warmed.commanderEligibility &&
                 warmed.commanderLegality &&
@@ -101,7 +108,8 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
               ? catalogCardDetails(await byPokemonReference({ name, originalReference, deviceId }))
               : undefined
         if (!active) return
-        if (requireCommanderRules || needsFaces) enrichmentAttempts.current.add(enrichmentKey)
+        if (requireCommanderRules || needsFaces || stale)
+          enrichmentAttempts.current.add(enrichmentKey)
         if (details) {
           setFailure(undefined)
           saveCardDetails({ [detailKey]: details })

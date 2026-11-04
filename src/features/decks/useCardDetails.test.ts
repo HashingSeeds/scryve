@@ -204,3 +204,33 @@ test("keeps legacy multi-face info usable without repeatedly fetching an older b
   expect(result.current.details?.oracleText).toBe("Saved rules")
   expect(mockLookup).toHaveBeenCalledTimes(1)
 })
+
+test("refetches Lorcana text cached with printed line wraps once online, and keeps it offline", async () => {
+  const wrapped = "Shift 3 ⬡ (You may pay 3 ⬡ to play this on top of\none of your characters.)"
+  const unwrapped = "Shift 3 ⬡ (You may pay 3 ⬡ to play this on top of one of your characters.)"
+  const card = {
+    detailKey: "lorcana:negaduck:",
+    name: "Negaduck",
+    game: "lorcana",
+    catalogCardId: "negaduck",
+  }
+  saveCardDetails({ [card.detailKey]: { oracleText: wrapped } })
+  mockLookup.mockReset()
+  mockConnectionState.isWebSocketConnected = false
+  try {
+    const { result } = renderHook(() => useCardDetails(card))
+    await waitFor(() => expect(result.current.details?.oracleText).toBe(wrapped))
+    expect(mockLookup).not.toHaveBeenCalled()
+  } finally {
+    mockConnectionState.isWebSocketConnected = true
+  }
+  mockLookup.mockResolvedValue({ text: wrapped })
+  const stillStale = renderHook(() => useCardDetails(card))
+  await waitFor(() => expect(mockLookup).toHaveBeenCalledTimes(1))
+  expect(stillStale.result.current.details?.oracleText).toBe(wrapped)
+  stillStale.unmount()
+  mockLookup.mockResolvedValue({ text: unwrapped })
+  const { result } = renderHook(() => useCardDetails(card))
+  await waitFor(() => expect(result.current.details?.oracleText).toBe(unwrapped))
+  expect(mockLookup).toHaveBeenCalledTimes(2)
+})

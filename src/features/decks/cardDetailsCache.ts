@@ -97,6 +97,22 @@ export function clearCardDetails(store: CardDetailStore = storage): void {
   }
 }
 
+/**
+ * why: Lorcana text cached before the catalog resynced keeps its printed line wraps. Resynced lines are whole
+ * abilities, so a line that runs on into lowercase or a "+1", or a long line cut off mid-sentence, marks the old text.
+ */
+export function staleCardDetails(game: string, details: FocusedCardDetails) {
+  if (game !== "lorcana") return false
+  const lines = (details.oracleText ?? "").split("\n")
+  return lines
+    .slice(1)
+    .some(
+      (next, index) =>
+        /^([a-z]|\+\d)/.test(next) ||
+        (!/[.)!?:"”]$/.test(lines[index]) && lines[index].split(" ").length > 5),
+    )
+}
+
 type DetailLookup = {
   key: string
   scryfallId?: string
@@ -112,7 +128,12 @@ function lookupFor(
   const key = cardDetailsKey(card, game)
   const entry = cached[key]
   // why: only catalog cards send facets; Scryfall details never have them, so asking again would loop.
-  if (entry && (!wantsFacets || card.scryfallId || entry.facets !== undefined)) return undefined
+  if (
+    entry &&
+    !staleCardDetails(game, entry) &&
+    (!wantsFacets || card.scryfallId || entry.facets !== undefined)
+  )
+    return undefined
   if (card.scryfallId) return { key, scryfallId: card.scryfallId }
   const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
   if (catalogCardId) return { key, catalogCardId }
