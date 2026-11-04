@@ -23,6 +23,10 @@ const mockRules: ComprehensiveRules = {
               text: "First, the defending player declares blockers (see rule 733).",
               examples: [],
             },
+            { id: "509.1a", text: "The defending player chooses blockers.", examples: [] },
+            { id: "509.1b", text: "Check restrictions.", examples: [] },
+            { id: "509.1c", text: "Check requirements.", examples: [] },
+            { id: "509.1d", text: "Determine costs.", examples: [] },
           ],
         },
       ],
@@ -34,7 +38,10 @@ const mockRules: ComprehensiveRules = {
         {
           id: "733",
           title: "Handling Illegal Actions",
-          rules: [{ id: "733.1", text: "The entire action is reversed.", examples: [] }],
+          rules: [
+            { id: "733.1", text: "The entire action is reversed.", examples: [] },
+            { id: "733.2", text: "Blocking requirements are in 509.1d.", examples: [] },
+          ],
         },
       ],
     },
@@ -82,6 +89,15 @@ it("peeks at a referenced rule without leaving the section", () => {
   expect(onOpenRule).not.toHaveBeenCalled()
   fireEvent.press(view.getByText("Open"))
   expect(onOpenRule).toHaveBeenCalledWith("733")
+})
+
+it("peeks from the referenced subrule, not the start of its group", () => {
+  const view = renderRules({ ruleId: "733" })
+  fireEvent.press(view.getByText("509.1d"))
+  expect(view.getByText("509.1d Determine costs.")).toBeTruthy()
+  expect(
+    view.queryByText("509.1 First, the defending player declares blockers (see rule 733)."),
+  ).toBeNull()
 })
 
 it("lists rules you opened under Recent", () => {

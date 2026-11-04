@@ -462,6 +462,7 @@ function RulePeek({
 }) {
   const { themed } = useAppTheme()
   const found = findRules(rules, id)
+  const start = Math.max(0, found?.rules.findIndex((rule) => rule.id === id) ?? 0)
   return (
     <View style={themed($peek)} testID={`rule-peek-${id}`}>
       {found ? (
@@ -477,7 +478,7 @@ function RulePeek({
               <Text size="xs" style={themed($link)} tx="play:rules.open" />
             </Pressable>
           </View>
-          {found.rules.slice(0, 3).map((rule) => (
+          {found.rules.slice(start, start + 3).map((rule) => (
             <Text
               key={rule.id}
               size="xs"
