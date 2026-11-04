@@ -709,6 +709,16 @@ describe("with the device's Magic card file", () => {
     expect(mockAction).toHaveBeenCalledTimes(1)
   })
 
+  it("keeps a card's saved rules text when its device-file copy is added", async () => {
+    saveCardDetails({
+      shivan: { ...shivan, oracleText: "Flying", commanderRulesUpdatedAt: "now" },
+    })
+    const { view } = await searchFor("dragon")
+    fireEvent.press(view.getByLabelText("Add Shivan Dragon to deck"))
+    expect(loadCardDetails().shivan?.oracleText).toBe("Flying")
+    expect(mockAction).not.toHaveBeenCalled()
+  })
+
   it("still sends Scryfall syntax to Scryfall", async () => {
     mockAction.mockResolvedValue([])
     await searchFor("t:dragon")

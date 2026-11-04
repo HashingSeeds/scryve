@@ -47,6 +47,7 @@ import {
   completeCardDetails,
   loadCardDetails,
   partialMagicDetails,
+  readCardDetail,
   saveCardDetails,
 } from "./cardDetailsCache"
 import { searchCardNames } from "./cardNameMatch"
@@ -525,8 +526,11 @@ export function CardSearch({
 
   function remember(card: SearchCard) {
     if (!("scryfallId" in card)) return
-    saveCardDetails({ [card.scryfallId]: card })
-    setCachedRules((current) => ({ ...current, [card.scryfallId]: card }))
+    const cached = readCardDetail(card.scryfallId)
+    const details =
+      partialMagicDetails(card) && cached && !partialMagicDetails(cached) ? cached : card
+    if (details === card) saveCardDetails({ [card.scryfallId]: card })
+    setCachedRules((current) => ({ ...current, [card.scryfallId]: details }))
   }
 
   /** why: a card from the device's Magic file has no rules text, so the deck's analysis and card view need its full details. */
@@ -547,7 +551,11 @@ export function CardSearch({
       return undefined
     }
     const error = onAdd(searchEntry(card, to))
-    if (!error && "scryfallId" in card && partialMagicDetails(card))
+    if (
+      !error &&
+      "scryfallId" in card &&
+      partialMagicDetails(readCardDetail(card.scryfallId) ?? card)
+    )
       completeDetails(card.scryfallId)
     setMessage(error ?? translate("decks:cardSearch.added", { card: card.name }))
     return error
