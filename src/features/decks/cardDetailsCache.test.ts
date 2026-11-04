@@ -189,6 +189,23 @@ describe("card details cache", () => {
     expect(readCardDetail("riftbound:pouty-poro:", store)?.facets).toBe(facets)
   })
 
+  it("refetches Magic details saved from the device's card file, which lack rules text", async () => {
+    const store = memoryStore()
+    const ring = { name: "Sol Ring", quantity: 1, scryfallId: "ring-id" }
+    const full = { ...solRing, commanderEligibility: "ineligible", commanderRulesUpdatedAt: "now" }
+    saveCardDetails(
+      { "ring-id": { typeLine: "Artifact", commanderEligibility: "ineligible" } },
+      store,
+    )
+    const query = jest.fn(async () => [{ key: "ring-id", details: full }])
+
+    await fetchCardDetails({ query }, "mtg", [ring], store)
+    await fetchCardDetails({ query }, "mtg", [ring], store)
+
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(readCardDetail("ring-id", store)?.oracleText).toBe(solRing.oracleText)
+  })
+
   it("refetches Lorcana text cached with its printed line wraps", async () => {
     const store = memoryStore()
     const hook = { name: "Fish Hook", quantity: 1, cardId: "fish-hook" }
