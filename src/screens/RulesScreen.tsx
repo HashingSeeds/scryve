@@ -231,9 +231,12 @@ export function RulesScreen({
             />
           </Pressable>
         )
-      case "term":
-        return (
-          <View style={themed($entry)}>
+      case "term": {
+        const firstCitedRule = ruleReferences(item.entry.text, source.references).find(
+          (part) => typeof part !== "string",
+        )
+        const body = (
+          <>
             <Text size="sm" weight="medium" text={item.entry.term} />
             <RuleText
               reference={source.references}
@@ -241,15 +244,28 @@ export function RulesScreen({
               onPressReference={(id) => openResult(id, index)}
               dim
             />
-          </View>
+          </>
         )
+        return firstCitedRule ? (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => openResult(firstCitedRule.id, index)}
+            style={({ pressed }) => [themed($entry), pressed && $pressed]}
+            testID={`rules-term-${item.entry.term}`}
+          >
+            {body}
+          </Pressable>
+        ) : (
+          <View style={themed($entry)}>{body}</View>
+        )
+      }
       case "result": {
         const { before, match, after } = matchExcerpt(item.rule.text, query)
         return (
           <Pressable
             accessibilityRole="link"
             onPress={() => openResult(item.rule.id, index)}
-            style={themed($entry)}
+            style={({ pressed }) => [themed($entry), pressed && $pressed]}
             testID={`rule-${item.rule.id}`}
           >
             <View style={themed($resultHeader)}>
@@ -551,6 +567,7 @@ const $recentId: TextStyle = { width: 72, fontVariant: ["tabular-nums"] }
 const $gutter: TextStyle = { width: 60, paddingTop: 2, fontVariant: ["tabular-nums"] }
 const $caretOpen = { transform: [{ rotate: "90deg" }] }
 const $active: TextStyle = { textDecorationLine: "underline" }
+const $pressed: ViewStyle = { opacity: 0.7 }
 const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
   paddingBottom: spacing.xl,
