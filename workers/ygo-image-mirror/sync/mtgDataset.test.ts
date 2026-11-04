@@ -61,7 +61,7 @@ describe("Magic dataset sync", () => {
 
     const dryRun = fetcherFor([cardLine("a")])
     await syncMagicDataset({
-      mirrorBaseUrl: "https://images.example",
+      mirrorBaseUrl: "",
       mirrorToken: "",
       dryRun: true,
       minCards: 1,

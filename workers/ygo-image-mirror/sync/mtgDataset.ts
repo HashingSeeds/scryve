@@ -77,7 +77,6 @@ export async function buildMagicDataset(fetcher: Fetch = fetch): Promise<MagicDa
 export async function syncMagicDataset(options: SyncOptions) {
   const fetcher = options.fetch ?? fetch
   const report = options.report ?? ((entry) => console.log(JSON.stringify(entry)))
-  const origin = mirrorOrigin(options.mirrorBaseUrl)
   const minCards = options.minCards ?? MIN_CARDS
 
   const dataset = await buildMagicDataset(fetcher)
@@ -97,6 +96,7 @@ export async function syncMagicDataset(options: SyncOptions) {
     )
   }
   if (options.dryRun) return result
+  const origin = mirrorOrigin(options.mirrorBaseUrl)
   if (!options.mirrorToken) throw new Error("YGO_MIRROR_TOKEN is required")
 
   const response = await fetcher(`${origin}${DATASET_PATH}`, {
