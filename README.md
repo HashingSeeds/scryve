@@ -81,7 +81,7 @@ needed.
 ## Static checks
 
 ```bash
-pnpm run compile
+pnpm compile
 pnpm run lint:check
 pnpm test --runInBand
 ```
