@@ -129,7 +129,6 @@ jobs:
         if: matrix.platform == 'ios'
         uses: ./.github/actions/setup-eas-cli
 
-      # why: DerivedData lives in EAS's throwaway working copy, so only pod downloads carry over.
       - name: Restore CocoaPods cache
         if: matrix.platform == 'ios'
         uses: actions/cache@v4
@@ -199,8 +198,6 @@ jobs:
           fi
           [ "$embedded" = "$FINGERPRINT" ] || { echo "::error::built $embedded, planned $FINGERPRINT"; exit 1; }
 
-      # why: `builds get` checks the downloaded file with `gh attestation verify`, so a file put in
-      # R2 by anything other than this workflow fails, even with the R2 keys.
       - name: Attest build provenance
         id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
