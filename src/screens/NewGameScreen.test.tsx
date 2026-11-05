@@ -1626,6 +1626,44 @@ describe("NewGameScreen", () => {
     expect(screen.getByTestId("match-best-of-5").props.accessibilityState.selected).toBe(true)
   })
 
+  it("keeps the deck of an unstarted game when the player count drops", async () => {
+    const players = ["Ada", "Grace", "Linus", "Ken"].map((name) => ({ name, color: "#FF0000" }))
+    const game = createLocalGame({
+      players,
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "v1", deckName: "Partners" },
+    })
+    const onStartLocal = jest.fn()
+    setup({
+      initialGame: game,
+      account: { ownerId: "owner-a" },
+      onStartLocal,
+      recentSetups: [
+        {
+          savedAt: 1,
+          mode: "local",
+          game: { players, startingLife: 40, system: "mtg", format: "commander" },
+        },
+      ],
+    })
+    openOptions()
+    fireEvent.press(screen.getByTestId("player-count-decrement"))
+    fireEvent.press(screen.getByTestId("player-count-decrement"))
+    closeOptions()
+
+    expect(screen.getByLabelText("Your deck, Partners")).toBeTruthy()
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "Ada" }), expect.objectContaining({ name: "Grace" })],
+      40,
+      expect.objectContaining({
+        account: expect.objectContaining({ meSeat: 0, deckVersionId: "v1" }),
+      }),
+    )
+  })
+
   it("locks the seat and deck once a match is under way", () => {
     const first = createLocalGame({
       players: [

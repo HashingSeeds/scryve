@@ -211,8 +211,15 @@ const CLOCK_MODES = [
 ] as const
 type ClockMode = (typeof CLOCK_MODES)[number]["id"]
 
-function newestRecent(props: Pick<NewGameScreenProps, "localGame" | "recentSetups" | "mode">) {
-  return props.localGame ? undefined : props.recentSetups?.find(({ mode }) => mode === props.mode)
+/** why: a recent row keeps no deck, so an unstarted game that already holds one seeds the form itself. */
+function newestRecent(
+  props: Pick<NewGameScreenProps, "localGame" | "initialGame" | "recentSetups" | "mode">,
+) {
+  const deckChosen =
+    props.initialGame?.account?.deckKey ?? props.initialGame?.account?.deckVersionId
+  return props.localGame || deckChosen
+    ? undefined
+    : props.recentSetups?.find(({ mode }) => mode === props.mode)
 }
 
 export function NewGameScreen(props: NewGameScreenProps) {
