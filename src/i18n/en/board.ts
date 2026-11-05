@@ -226,6 +226,10 @@ const board = {
     matchSaved: "Match saved",
     summary: "Summary",
   },
+  abandonedToast: {
+    // Shown after a game is thrown away without a result, next to an Undo button, until the next game is played.
+    message: "Game abandoned",
+  },
   saveFailed: {
     // Shown once when the device refuses to store the game, usually because storage is full.
     title: "Can't save this game",

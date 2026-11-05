@@ -155,7 +155,7 @@ describe("NewGameScreen", () => {
     const form = view.UNSAFE_getByType(Screen)
     expect(view.queryByTestId("setup-status")).toBeNull()
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     view.rerender(
       themed(
@@ -379,7 +379,7 @@ describe("NewGameScreen", () => {
     )
 
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     fireEvent.press(view.getByTestId("player-appearance-1"))
     fireEvent.press(view.getByTestId("appearance-color-117b9c"))
@@ -432,8 +432,7 @@ describe("NewGameScreen", () => {
       aspectRatio: width / height,
     })
     expect(view.queryByTestId("player-layout-tabletop")).toBeNull()
-    fireEvent.press(view.getByTestId("player-count-increment"))
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-4"))
 
     expect(view.getByTestId("player-layout-tabletop")).toBeTruthy()
     expect(view.queryByTestId("player-layout-featured-first")).toBeNull()
@@ -500,7 +499,7 @@ describe("NewGameScreen", () => {
     const edited = { onBack: jest.fn(), onStartLocal: jest.fn() }
     setup(edited)
     openOptions()
-    fireEvent.press(screen.getByTestId("player-count-increment"))
+    fireEvent.press(screen.getByTestId("player-count-3"))
     closeOptions()
     fireEvent.press(screen.getByTestId("setup-back"))
     await waitFor(() => expect(edited.onStartLocal).toHaveBeenCalledTimes(1))
@@ -613,7 +612,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("appearance-shape-square"))
     fireEvent.press(view.getByTestId("save-local-appearance-button"))
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     fireEvent.press(view.getByTestId("start-game-button"))
 
@@ -625,18 +624,21 @@ describe("NewGameScreen", () => {
     expect(new Set(players.map(({ shape }) => shape)).size).toBe(3)
   })
 
-  it("uses the Life box as the starting value and saves a per-game change amount", () => {
+  it("picks a life preset or types one, and saves a per-game change amount", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
 
     fireEvent.press(view.getByTestId("game-tab-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     openOptions()
-    expect(view.getByLabelText("Increase Life by 1")).toBeTruthy()
-    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    expect(view.queryByTestId("starting-counter-50")).toBeNull()
+    fireEvent.press(view.getByTestId("starting-counter-30"))
     fireEvent.press(view.getByTestId("life-step"))
     fireEvent.press(view.getByTestId("life-step-option-5"))
-    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("starting-counter-custom"))
+    fireEvent.changeText(view.getByTestId("starting-counter-custom-input"), "2a6")
+    fireEvent(view.getByTestId("starting-counter-custom-input"), "blur")
+    expect(view.getByTestId("starting-counter-custom").props.accessibilityState.selected).toBe(true)
     closeOptions()
     fireEvent.press(view.getByTestId("start-game-button"))
 
@@ -648,20 +650,34 @@ describe("NewGameScreen", () => {
     })
   })
 
+  it("shows no life row for a game with one fixed start", () => {
+    const view = setup()
+    fireEvent.press(view.getByTestId("game-tab-mtg"))
+    fireEvent.press(view.getByTestId("game-type-commander"))
+    openOptions()
+    expect(view.getByTestId("starting-counter-40").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("starting-counter-50")).toBeTruthy()
+    closeOptions()
+    fireEvent.press(view.getByTestId("game-tab-pokemon"))
+    fireEvent.press(view.getByTestId("game-type-pokemon-standard"))
+    openOptions()
+    expect(view.queryByTestId("starting-counter")).toBeNull()
+  })
+
   it("preserves custom life when changing formats", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
     fireEvent.press(view.getByTestId("game-tab-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     openOptions()
-    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("starting-counter-30"))
     closeOptions()
     fireEvent.press(view.getByTestId("game-tab-mtg"))
     fireEvent.press(view.getByTestId("game-type-commander"))
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(onStartLocal).toHaveBeenCalledWith(
       expect.any(Array),
-      21,
+      30,
       expect.objectContaining({ format: "commander", lifeStep: 1 }),
     )
   })
@@ -681,8 +697,7 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("game-type-mtg-brawl").props.accessibilityState.selected).toBe(true)
     expect(view.getByText("2 players · 25 life")).toBeTruthy()
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-4"))
     closeOptions()
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(onStartLocal).toHaveBeenCalledWith(
@@ -751,8 +766,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("game-tab-mtg"))
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-4"))
     closeOptions()
     fireEvent.press(view.getByTestId("game-tab-mtg"))
     fireEvent.press(view.getByTestId("game-type-commander"))
@@ -805,7 +819,7 @@ describe("NewGameScreen", () => {
 
     rerender("local")
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-decrement"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     rerender("connected")
     expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
@@ -832,7 +846,7 @@ describe("NewGameScreen", () => {
     })
 
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     fireEvent.press(view.getByTestId("join-with-code-button"))
     expect(onJoin).toHaveBeenCalledTimes(1)
@@ -876,7 +890,7 @@ describe("NewGameScreen", () => {
       ),
     )
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     fireEvent.press(view.getByTestId("host-connected-button"))
     expect(host).not.toHaveBeenCalled()
@@ -924,7 +938,7 @@ describe("NewGameScreen", () => {
     expect(onStartLocal).not.toHaveBeenCalled()
   })
 
-  it("changes a running game's type only through the end prompt", () => {
+  it("changes a running game's type only through the end prompt, keeping the pick if it closes", () => {
     const onStartLocal = jest.fn()
     const onAbandonLocal = jest.fn()
     const view = setup({
@@ -936,10 +950,10 @@ describe("NewGameScreen", () => {
     })
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     fireEvent.press(view.getByTestId("end-game-backdrop"))
-    expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("game-type-mtg-standard").props.accessibilityState.selected).toBe(true)
     expect(onStartLocal).not.toHaveBeenCalled()
 
-    fireEvent.press(view.getByTestId("game-type-mtg-standard"))
+    fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("abandon-game-button"))
     expect(onAbandonLocal).toHaveBeenCalledTimes(1)
     expect(onStartLocal).toHaveBeenCalledWith(
@@ -975,7 +989,7 @@ describe("NewGameScreen", () => {
     expect(onBack).toHaveBeenCalledTimes(1)
 
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     fireEvent.press(view.getByTestId("setup-back"))
     expect(onBack).toHaveBeenCalledTimes(1)
@@ -1027,7 +1041,7 @@ describe("NewGameScreen", () => {
     })
 
     openOptions()
-    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-3"))
     closeOptions()
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("end-connected-hosted-game"))
@@ -1120,17 +1134,15 @@ describe("NewGameScreen", () => {
     fireEvent.press(screen.getByTestId("game-tab-mtg"))
     fireEvent.press(screen.getByTestId("game-type-mtg-standard"))
     openOptions()
-    fireEvent.press(screen.getByTestId("player-count-increment"))
-    fireEvent.press(screen.getByTestId("player-count-increment"))
-    fireEvent.press(screen.getByTestId("starting-counter-increment"))
-    fireEvent.press(screen.getByTestId("starting-counter-increment"))
+    fireEvent.press(screen.getByTestId("player-count-4"))
+    fireEvent.press(screen.getByTestId("starting-counter-30"))
     closeOptions()
     fireEvent.press(screen.getByTestId("host-connected-button"))
     await waitFor(() => expect(onLobbyCreated).toHaveBeenCalled())
     expect(mockCreateLobby).toHaveBeenCalledWith(
       expect.objectContaining({
         playerCount: 4,
-        startingLife: 22,
+        startingLife: 30,
         lifeStep: 1,
         ruleset: "standard",
       }),
@@ -1610,7 +1622,7 @@ describe("NewGameScreen", () => {
   it("keeps match mode off the form while a game is running", () => {
     setup({ localGame: runningLocalGame() })
     openOptions()
-    expect(screen.getByTestId("player-count-increment")).toBeTruthy()
+    expect(screen.getByTestId("player-count")).toBeTruthy()
     expect(screen.queryByTestId("match-mode")).toBeNull()
   })
 
@@ -1619,11 +1631,48 @@ describe("NewGameScreen", () => {
     openOptions()
     fireEvent.press(screen.getByTestId("match-mode-on"))
     expect(screen.getByTestId("match-best-of-3").props.accessibilityState.selected).toBe(true)
-    fireEvent.press(screen.getByTestId("player-count-increment"))
+    fireEvent.press(screen.getByTestId("player-count-3"))
     expect(screen.getByTestId("match-best-of-1").props.accessibilityState.selected).toBe(true)
     fireEvent.press(screen.getByTestId("match-best-of-5"))
-    fireEvent.press(screen.getByTestId("player-count-decrement"))
+    fireEvent.press(screen.getByTestId("player-count-2"))
     expect(screen.getByTestId("match-best-of-5").props.accessibilityState.selected).toBe(true)
+  })
+
+  it("keeps the deck of an unstarted game when the player count drops", async () => {
+    const players = ["Ada", "Grace", "Linus", "Ken"].map((name) => ({ name, color: "#FF0000" }))
+    const game = createLocalGame({
+      players,
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "v1", deckName: "Partners" },
+    })
+    const onStartLocal = jest.fn()
+    setup({
+      initialGame: game,
+      account: { ownerId: "owner-a" },
+      onStartLocal,
+      recentSetups: [
+        {
+          savedAt: 1,
+          mode: "local",
+          game: { players, startingLife: 40, system: "mtg", format: "commander" },
+        },
+      ],
+    })
+    openOptions()
+    fireEvent.press(screen.getByTestId("player-count-2"))
+    closeOptions()
+
+    expect(screen.getByLabelText("Your deck, Partners")).toBeTruthy()
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "Ada" }), expect.objectContaining({ name: "Grace" })],
+      40,
+      expect.objectContaining({
+        account: expect.objectContaining({ meSeat: 0, deckVersionId: "v1" }),
+      }),
+    )
   })
 
   it("locks the seat and deck once a match is under way", () => {

@@ -11,10 +11,12 @@ import {
   type FirstPlayerTab,
 } from "@/components/FirstPlayerTabs"
 import {
+  ANCHOR_LOW_ON_SCREEN,
   GameMenuBackdrop,
   GameMenuCluster,
   GameRadialMenu,
   type GameRadialMenuProps,
+  MENU_BUTTON_SIZE,
 } from "@/components/GameRadialMenu"
 import {
   getPlayerGridFacings,
@@ -22,6 +24,7 @@ import {
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
+import { seatIdentityMetrics } from "@/components/SeatIdentity"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
@@ -40,6 +43,7 @@ export interface GameBoardStageProps {
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   firstPlayer?: FirstPlayerOffer
   windowOverlay?: ReactNode
+  toast?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
   testID?: string
 }
@@ -58,6 +62,7 @@ function PinnedGameBoardStage({
   menu,
   firstPlayer,
   windowOverlay,
+  toast,
   onBoardSizeChange,
   testID = "game-board",
 }: GameBoardStageProps) {
@@ -138,6 +143,11 @@ function PinnedGameBoardStage({
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
+      {toast ? (
+        <BoardToastSlot anchor={holderAnchor} hidden={menu.open || !!menu.exitAction}>
+          {toast}
+        </BoardToastSlot>
+      ) : null}
       {windowOverlay}
     </View>
   )
@@ -150,6 +160,7 @@ function LegacyGameBoardStage({
   menu,
   firstPlayer,
   windowOverlay,
+  toast,
   onBoardSizeChange,
   testID = "game-board",
 }: GameBoardStageProps) {
@@ -191,6 +202,11 @@ function LegacyGameBoardStage({
         compact={playerCount > 2}
       />
       {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
+      {toast ? (
+        <BoardToastSlot anchor={menuAnchor} hidden={menu.open || !!menu.exitAction}>
+          {toast}
+        </BoardToastSlot>
+      ) : null}
       {windowOverlay}
     </Animated.View>
   )
@@ -213,6 +229,48 @@ export function firstPlayerTabs(
   })
 }
 
+// why: seats keep their name and mark at the outer edges, so a toast just past the menu, kept out of the side bands where sideways seats print theirs, never covers one. It stays mounted while the menu is open so a timed toast keeps its clock.
+const SEAT_IDENTITY_BAND = seatIdentityMetrics().edge + seatIdentityMetrics().mark
+const TOAST_MENU_CLEARANCE = MENU_BUTTON_SIZE / 2 + 8
+
+function BoardToastSlot({
+  anchor,
+  hidden,
+  children,
+}: {
+  anchor: { x: number; y: number }
+  hidden: boolean
+  children: ReactNode
+}) {
+  const below = anchor.y <= ANCHOR_LOW_ON_SCREEN
+  return (
+    <View
+      testID="board-toast-slot"
+      pointerEvents={hidden ? "none" : "box-none"}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
+      style={[
+        $toastSlot,
+        below
+          ? { top: `${anchor.y * 100}%`, marginTop: TOAST_MENU_CLEARANCE }
+          : { bottom: `${(1 - anchor.y) * 100}%`, marginBottom: TOAST_MENU_CLEARANCE },
+        hidden && $hidden,
+      ]}
+    >
+      {children}
+    </View>
+  )
+}
+
+const $toastSlot: ViewStyle = {
+  position: "absolute",
+  left: SEAT_IDENTITY_BAND,
+  right: SEAT_IDENTITY_BAND,
+  zIndex: 80,
+  elevation: 80,
+  alignItems: "center",
+}
+const $hidden: ViewStyle = { opacity: 0 }
 const $pinnedBoard: ViewStyle = { position: "absolute", left: 0, top: 0 }
 const $stage: ViewStyle = { flex: 1, width: "100%" }
 const $fill: ViewStyle = StyleSheet.absoluteFill

@@ -3,8 +3,9 @@ import { router, useLocalSearchParams } from "expo-router"
 
 import { useAccountEntry } from "@/features/auth/useAccountEntry"
 import { ConnectedGate } from "@/features/connected/ConnectedGate"
-import { GameSavedToast } from "@/features/game/GameSavedToast"
+import { GameToast } from "@/features/game/GameToast"
 import { rulesHref } from "@/features/rules/gameRules"
+import { translate } from "@/i18n/translate"
 import { ConnectedBoardScreen } from "@/screens/ConnectedBoardScreen"
 
 export default function ConnectedGameRoute() {
@@ -49,8 +50,12 @@ export default function ConnectedGameRoute() {
         onAccount={account.onAccount}
       />
       {savedGameId && savedGameId !== dismissedSavedGameId ? (
-        <GameSavedToast
-          onViewSummary={() =>
+        <GameToast
+          message={translate("board:savedToast.gameSaved")}
+          actionTx="board:savedToast.summary"
+          testID="game-saved-toast"
+          actionTestID="game-saved-summary-button"
+          onAction={() =>
             router.push({
               pathname: "/history/[gameId]",
               params: { gameId: savedGameId, source: "connected" },

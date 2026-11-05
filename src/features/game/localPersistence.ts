@@ -638,6 +638,7 @@ export class LocalGameRepository {
   private readonly finishListeners = new Set<() => void>()
   private readonly historyListeners = new Set<() => void>()
   private readonly claimListeners = new Set<() => void>()
+  private abandoned?: { game: LocalGame; endSource: GameEndSource }
 
   constructor(private readonly storage: StringStorage = mmkvStorage) {}
 
@@ -858,10 +859,37 @@ export class LocalGameRepository {
   }
 
   /** why: clearActiveGame also runs when a game moves elsewhere (published, match ended), so only a player throwing a started game away says how far it got. */
-  discardActiveGame(endSource: GameEndSource): void {
+  discardActiveGame(
+    endSource: GameEndSource,
+    { undoable = false }: { undoable?: boolean } = {},
+  ): void {
     const game = this.loadActiveGame()
-    if (game) this.reportAbandoned(game, endSource)
+    if (game) {
+      if (undoable) this.rememberAbandoned(game, endSource)
+      else this.reportAbandoned(game, endSource)
+    }
     this.clearActiveGame()
+  }
+
+  /** why: Abandon asks nothing first, so the next board offers a started game back until that board's first action. Held in memory only, because that board may sit on another route. Its abandoned report waits for the offer to end, so a game taken back never counts as abandoned. */
+  rememberAbandoned(game: LocalGame, endSource: GameEndSource): void {
+    this.forgetAbandoned()
+    if (hasLocalGameStarted(game)) this.abandoned = { game, endSource }
+  }
+
+  recentlyAbandoned(): LocalGame | undefined {
+    return this.abandoned?.game
+  }
+
+  forgetAbandoned(): void {
+    const abandoned = this.takeBackAbandoned()
+    if (abandoned) this.reportAbandoned(abandoned.game, abandoned.endSource)
+  }
+
+  takeBackAbandoned() {
+    const abandoned = this.abandoned
+    this.abandoned = undefined
+    return abandoned
   }
 
   /** why: a match game restarted mid-way is thrown away too, but its board is replaced rather than cleared. */

@@ -44,6 +44,30 @@ function tap(game: LocalGame) {
 }
 
 describe("LocalGameRepository", () => {
+  it("holds an undoable abandon until it is forgotten, reports it then, and never if taken back", () => {
+    const capture = jest.spyOn(analytics, "captureGame").mockImplementation(() => undefined)
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(tap(makeGame()))
+    repository.discardActiveGame("game_menu", { undoable: true })
+    expect(repository.loadActiveGame()).toBeNull()
+    expect(repository.recentlyAbandoned()).toBeDefined()
+    repository.takeBackAbandoned()
+    expect(capture).not.toHaveBeenCalled()
+
+    repository.saveActiveGame(tap(makeGame()))
+    repository.discardActiveGame("game_menu", { undoable: true })
+    expect(capture).not.toHaveBeenCalled()
+    repository.forgetAbandoned()
+    expect(repository.recentlyAbandoned()).toBeUndefined()
+    expect(capture).toHaveBeenCalledTimes(1)
+    expect(capture).toHaveBeenCalledWith("game_abandoned", expect.anything(), "local", "game_menu")
+
+    repository.saveActiveGame(makeGame())
+    repository.discardActiveGame("game_menu", { undoable: true })
+    expect(repository.recentlyAbandoned()).toBeUndefined()
+    capture.mockRestore()
+  })
+
   it("reports a started game the player throws away, but not an untouched board", () => {
     const capture = jest.spyOn(analytics, "captureGame").mockImplementation(() => undefined)
     const repository = new LocalGameRepository(new MemoryStorage())

@@ -234,6 +234,9 @@ export default {
     matchSaved: "マッチを保存しました",
     summary: "サマリー",
   },
+  abandonedToast: {
+    message: "ゲームを中止しました",
+  },
   saveFailed: {
     title: "このゲームを保存できません",
     message:

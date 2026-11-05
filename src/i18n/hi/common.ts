@@ -80,4 +80,7 @@ export default {
     increase: "{{label}} को {{step}} बढ़ाएँ",
     longPressHint: "इसे {{step}} बदलने के लिए देर तक दबाएँ।",
   },
+  optionGrid: {
+    other: "कोई और मान",
+  },
 } satisfies LocaleNamespace

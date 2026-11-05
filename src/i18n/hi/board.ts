@@ -236,6 +236,9 @@ export default {
     matchSaved: "मैच सेव हो गया",
     summary: "सारांश",
   },
+  abandonedToast: {
+    message: "गेम बिना नतीजे खत्म हुआ",
+  },
   saveFailed: {
     title: "यह गेम सेव नहीं हो सका",
     message:

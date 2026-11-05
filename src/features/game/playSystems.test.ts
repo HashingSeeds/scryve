@@ -3,6 +3,7 @@ import {
   counterHeading,
   counterLabel,
   defaultStartingLife,
+  lifePresets,
   localizedDeckSections,
   PLAY_SYSTEM_IDS,
   playFormatOptions,
@@ -38,6 +39,24 @@ describe("play system defaults", () => {
   it("reports prizes taken for down counters", () => {
     expect(counterDeltaFromStartLabel("pokemon", 4, 6)).toBe("2 prizes taken")
     expect(counterDeltaFromStartLabel("mtg", 18, 20)).toBe("-2 from start")
+  })
+
+  it("offers each format's life presets, including its own default", () => {
+    expect(lifePresets("mtg", "commander")).toEqual([20, 30, 40, 50])
+    expect(lifePresets("mtg", "modern")).toEqual([20, 30])
+    expect(lifePresets("mtg", "brawl")).toEqual([25, 30])
+    expect(lifePresets("ygo", "speed")).toEqual([4000, 8000])
+    expect(lifePresets("fab", "blitz")).toEqual([20, 40])
+    expect(lifePresets("pokemon", "standard")).toEqual([])
+    expect(lifePresets("lorcana")).toEqual([])
+    expect(lifePresets("riftbound")).toEqual([])
+    for (const system of PLAY_SYSTEM_IDS)
+      for (const { id: format } of deckFormats(system)) {
+        const presets = lifePresets(system, format)
+        if (presets.length === 0) continue
+        for (const players of [2, 4])
+          expect(presets).toContain(defaultStartingLife(system, format, players))
+      }
   })
 
   it("keeps other system defaults", () => {

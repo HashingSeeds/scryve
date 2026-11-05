@@ -109,6 +109,26 @@ export function defaultStartingLife(system?: unknown, format?: string, playerCou
   )
 }
 
+// why: the system definitions hold one preset list per game, but setup offers what each format actually starts at. Empty means the game has one fixed start, so setup shows no life row.
+const LIFE_PRESETS: Record<
+  PlaySystemId,
+  { formats?: Record<string, readonly number[]>; rest: readonly number[] }
+> = {
+  mtg: { formats: { commander: [20, 30, 40, 50], brawl: [25, 30] }, rest: [20, 30] },
+  ygo: { rest: [4000, 8000] },
+  fab: { rest: [20, 40] },
+  pokemon: { rest: [] },
+  lorcana: { rest: [] },
+  riftbound: { rest: [] },
+}
+const NO_SYSTEM_LIFE_PRESETS = [20, 30, 40]
+
+export function lifePresets(system: unknown, format?: string): readonly number[] {
+  if (!isPlaySystemId(system)) return NO_SYSTEM_LIFE_PRESETS
+  const presets = LIFE_PRESETS[system]
+  return presets.formats?.[playSystemFormat(system, format)] ?? presets.rest
+}
+
 export function playCommanderLethal(value: unknown, format?: string) {
   return playFormatDefinition(playSystemId(value), format)?.commanderDamage?.lethal
 }

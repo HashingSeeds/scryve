@@ -621,6 +621,51 @@ describe("CurrentGameScreen", () => {
     })
   })
 
+  it("closes the end prompt with Cancel and leaves the game as it was", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const view = renderGame(initial, repository)
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("cancel-end-game-button"))
+
+    expect(view.queryByTestId("end-game-dialog")).toBeNull()
+    expect(repository.loadActiveGame()).toEqual(initial)
+    expect(repository.loadHistory()).toEqual([])
+  })
+
+  it("offers the abandoned game back on the next board, and Undo restores it exactly", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const board = (initialGame: ReturnType<typeof game>) => (
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initialGame}
+          repository={repository}
+          onViewSummary={jest.fn()}
+          onGameAbandoned={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(board(game()))
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    const played = repository.loadActiveGame()
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("abandon-game-button"))
+    expect(repository.loadActiveGame()).toBeNull()
+
+    view.rerender(board(game()))
+    await waitFor(() => expect(view.getByTestId("game-abandoned-toast")).toBeTruthy())
+    fireEvent.press(view.getByTestId("game-abandoned-undo-button"))
+
+    expect(view.queryByTestId("game-abandoned-toast")).toBeNull()
+    expect(repository.loadActiveGame()).toEqual(played)
+    expect(repository.recentlyAbandoned()).toBeUndefined()
+  })
+
   it("keeps Abandon separate and enables End only after choosing a result", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()

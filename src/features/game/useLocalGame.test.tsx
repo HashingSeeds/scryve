@@ -9,6 +9,7 @@ import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { createLocalGame } from "./domain"
 import { LocalGameRepository } from "./localPersistence"
+import { pauseRoundClock, startRoundClock } from "./roundClock"
 import type { LocalGame } from "./types"
 import { useLocalGame } from "./useLocalGame"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
@@ -360,10 +361,101 @@ it("reports a started match game that is restarted instead of finished", () => {
   act(() => {
     result.current.restartMatchGame("stale_game_prompt")
   })
+  expect(captureGame).not.toHaveBeenCalledWith(
+    "game_abandoned",
+    expect.anything(),
+    "local",
+    expect.anything(),
+  )
+  act(() => repository.forgetAbandoned())
   expect(captureGame).toHaveBeenCalledWith(
     "game_abandoned",
     expect.objectContaining({ shape: expect.objectContaining({ change_count: 1 }) }),
     "local",
     "stale_game_prompt",
   )
+})
+
+describe("useLocalGame abandoned offer", () => {
+  function abandonPlayedGame(repository: LocalGameRepository) {
+    const first = game()
+    const { result } = renderHook(() => useLocalGame(first, repository))
+    act(() => result.current.changeLife(first.players[0].id, -1))
+    act(() => {
+      result.current.discard()
+    })
+    return result.current.game
+  }
+
+  it("offers the abandoned game until the next board's first action, then reports it", () => {
+    jest.mocked(captureGame).mockClear()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const abandoned = abandonPlayedGame(repository)
+    const next = game()
+    const { result } = renderHook(() => useLocalGame(next, repository))
+    expect(result.current.abandoned).toEqual(abandoned)
+
+    act(() => result.current.changeLayout("tabletop"))
+    expect(result.current.abandoned).toEqual(abandoned)
+    expect(captureGame).not.toHaveBeenCalledWith(
+      "game_abandoned",
+      expect.anything(),
+      "local",
+      "game_menu",
+    )
+
+    act(() => result.current.markFirstPlayerUsed())
+    expect(result.current.abandoned).toBeUndefined()
+    expect(repository.recentlyAbandoned()).toBeUndefined()
+    expect(captureGame).toHaveBeenCalledWith(
+      "game_abandoned",
+      expect.objectContaining({ id: abandoned.id }),
+      "local",
+      "game_menu",
+    )
+  })
+
+  it("ends the offer on the next board's first clock tap", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    abandonPlayedGame(repository)
+    const timed = { ...game(), clock: startRoundClock({ mode: "stopwatch" }) }
+    const { result } = renderHook(() => useLocalGame(timed, repository))
+    expect(result.current.abandoned).toBeDefined()
+
+    act(() => result.current.changeClock(pauseRoundClock))
+    expect(result.current.abandoned).toBeUndefined()
+    expect(repository.recentlyAbandoned()).toBeUndefined()
+  })
+
+  it("drops the offer when the board moves to a game started after the offer ended", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    abandonPlayedGame(repository)
+    const { result, rerender } = renderHook(
+      ({ stored }: { stored: LocalGame }) => useLocalGame(stored, repository),
+      { initialProps: { stored: game() } },
+    )
+    expect(result.current.abandoned).toBeDefined()
+
+    repository.forgetAbandoned()
+    rerender({ stored: game() })
+    expect(result.current.abandoned).toBeUndefined()
+  })
+
+  it("puts the abandoned game back on Undo without reporting it", () => {
+    jest.mocked(captureGame).mockClear()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const abandoned = abandonPlayedGame(repository)
+    const next = game()
+    const { result } = renderHook(() => useLocalGame(next, repository))
+    act(() => result.current.undoAbandon())
+    expect(result.current.game).toEqual(abandoned)
+    expect(result.current.abandoned).toBeUndefined()
+    expect(repository.loadActiveGame()).toEqual(abandoned)
+    expect(captureGame).not.toHaveBeenCalledWith(
+      "game_abandoned",
+      expect.anything(),
+      "local",
+      expect.anything(),
+    )
+  })
 })

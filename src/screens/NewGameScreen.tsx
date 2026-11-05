@@ -14,6 +14,7 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { Header, HeaderBack } from "@/components/Header"
+import { OptionGrid } from "@/components/OptionGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -64,6 +65,7 @@ import {
   counterHeading,
   counterValueLabel,
   defaultStartingLife,
+  lifePresets,
   NO_PLAY_SYSTEM,
   playSystemFormat,
   playSystemRules,
@@ -211,8 +213,15 @@ const CLOCK_MODES = [
 ] as const
 type ClockMode = (typeof CLOCK_MODES)[number]["id"]
 
-function newestRecent(props: Pick<NewGameScreenProps, "localGame" | "recentSetups" | "mode">) {
-  return props.localGame ? undefined : props.recentSetups?.find(({ mode }) => mode === props.mode)
+/** why: a recent row keeps no deck, so an unstarted game that already holds one seeds the form itself. */
+function newestRecent(
+  props: Pick<NewGameScreenProps, "localGame" | "initialGame" | "recentSetups" | "mode">,
+) {
+  const deckChosen =
+    props.initialGame?.account?.deckKey ?? props.initialGame?.account?.deckVersionId
+  return props.localGame || deckChosen
+    ? undefined
+    : props.recentSetups?.find(({ mode }) => mode === props.mode)
 }
 
 export function NewGameScreen(props: NewGameScreenProps) {
@@ -315,7 +324,7 @@ function NewGameForm({
   const [lifeStep, setLifeStep] = useState(
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
-  const counter = playSystemRules(system).counter
+  const lifeOptions = lifePresets(system, format)
   const claimedGame = replaying ? undefined : initialGame
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
     claimedGame && (claimedGame.account || hasLocalGameStarted(claimedGame))
@@ -394,8 +403,8 @@ function NewGameForm({
   const draftChanged = (from: SetupDraft) =>
     NEW_GAME_FIELDS.some((field) => from[field] !== draft[field])
   const optionsOpenedWith = useRef(draft)
-  // why: iOS drops a modal presented while another is still dismissing, so the end prompt waits for the options sheet to finish closing.
-  const [ending, setEnding] = useState<{ restore?: SetupDraft; afterSheet?: boolean }>()
+  // why: iOS drops a modal presented while another is still dismissing, so the end prompt waits for the options sheet to finish closing. Closing the prompt keeps the staged setup, so the next New game starts it.
+  const [ending, setEnding] = useState<{ afterSheet?: boolean }>()
   const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
   useEffect(() => {
@@ -676,21 +685,6 @@ function NewGameForm({
     void startLocal()
   }
 
-  function restoreDraft(saved: SetupDraft) {
-    setSystem(saved.system)
-    setFormat(saved.format)
-    setStartingLife(saved.startingLife)
-    setLifeStep(saved.lifeStep)
-    setPlayerCount(saved.playerCount)
-    setChosenLayout(saved.chosenLayout)
-    setTreacheryChosen(saved.treacheryChosen)
-    setDeck(saved.deck)
-    setMatchOn(saved.matchOn)
-    setChosenBestOf(saved.chosenBestOf)
-    setClockMode(saved.clockMode)
-    setChosenClockMinutes(saved.chosenClockMinutes)
-  }
-
   function openOptions() {
     optionsOpenedWith.current = draft
     setOptionsOpen(true)
@@ -700,15 +694,14 @@ function NewGameForm({
     setOptionsOpen(false)
     const before = optionsOpenedWith.current
     if (!draftChanged(before)) return
-    if (changeEndsGame) setEnding({ restore: before, afterSheet: Platform.OS === "ios" })
+    if (changeEndsGame) setEnding({ afterSheet: Platform.OS === "ios" })
     else setEdited(true)
   }
 
   function pickGameType(type: GameType) {
     if (type.id === selectedTypeId) return
-    const before = draft
     chooseGameType(type)
-    if (changeEndsGame) setEnding({ restore: before })
+    if (changeEndsGame) setEnding({})
     else setEdited(true)
   }
 
@@ -1278,34 +1271,26 @@ function NewGameForm({
         testID="setup-options-dialog"
       >
         <ScrollView style={$sheetScroll} contentContainerStyle={themed($statusDetails)}>
-          <View style={themed($valueGrid)}>
-            <View style={themed($playerValue)}>
-              <ValueField
-                testID="player-count"
-                label={
-                  connectedMode
-                    ? translate("play:newGame.seats")
-                    : translate("play:newGame.players")
-                }
-                value={playerCount}
-                min={treachery ? TREACHERY_MIN_SEATS : PLAYER_COUNTS[0]}
-                max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
-                onChange={choosePlayerCount}
-              />
-            </View>
-            <View style={themed($counterValue)}>
-              <ValueField
-                testID="starting-counter"
-                label={counterHeading(system)}
-                value={startingLife}
-                min={startingValueRange(system).min}
-                max={counter.maxStartingValue}
-                longStep={counter.longPressStep}
-                step={lifeStep}
-                onChange={setStartingLife}
-              />
-            </View>
-          </View>
+          <OptionGrid
+            testID="player-count"
+            label={
+              connectedMode ? translate("play:newGame.seats") : translate("play:newGame.players")
+            }
+            options={PLAYER_COUNTS}
+            value={playerCount}
+            isDisabled={treachery ? (count) => !isTreacheryPlayerCount(count) : undefined}
+            onSelect={choosePlayerCount}
+          />
+          {lifeOptions.length > 0 ? (
+            <OptionGrid
+              testID="starting-counter"
+              label={counterHeading(system)}
+              options={lifeOptions}
+              value={startingLife}
+              custom={startingValueRange(system)}
+              onSelect={setStartingLife}
+            />
+          ) : null}
 
           {!connectedMode && !localGame ? (
             <View style={themed($section)}>
@@ -1596,10 +1581,7 @@ function NewGameForm({
       {ending && !ending.afterSheet && localGame && onEndLocal && !matchBlocks ? (
         <LocalGameEndDialog
           game={localGame}
-          onClose={() => {
-            if (ending.restore) restoreDraft(ending.restore)
-            setEnding(undefined)
-          }}
+          onClose={() => setEnding(undefined)}
           onEnd={(result) => endThenStart(() => onEndLocal(result))}
           onAbandon={onAbandonLocal ? () => endThenStart(onAbandonLocal) : undefined}
         />
@@ -1635,12 +1617,6 @@ const $changeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 40,
   paddingVertical: spacing.xxs,
 })
-const $valueGrid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.xs,
-})
-const $playerValue: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $counterValue: ThemedStyle<ViewStyle> = () => ({ flex: 1.45 })
 const $nameList: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
