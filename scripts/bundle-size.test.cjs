@@ -15,7 +15,7 @@ test("measure adds up every chunk per platform", () => {
     web: { "entry-c.js": 100, "index-d.js": 50 },
   }
   for (const [platform, bundles] of Object.entries(files)) {
-    const platformDir = path.join(dir, "_expo", "static", "js", platform)
+    const platformDir = path.join(dir, platform, "_expo", "static", "js", platform)
     fs.mkdirSync(platformDir, { recursive: true })
     for (const [name, size] of Object.entries(bundles))
       fs.writeFileSync(path.join(platformDir, name), "x".repeat(size))
