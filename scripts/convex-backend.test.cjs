@@ -44,9 +44,21 @@ test("a change to convex/, the lockfile, or package.json dependencies is a backe
   }
 })
 
-test("any convex.json counts as a backend change, since it can move the functions", () => {
+test("a convex.json that moves the functions counts as a backend change", () => {
   const config = { ...base, "convex.json": '{ "functions": "backend/" }' }
   const [first, last] = repoWithCommits(config, { "src.ts": "x" })
+  assert.equal(backendMatches(first.sha, last.sha, last.cwd), false)
+})
+
+test("a convex.json that keeps the functions in convex/ still lets app-only changes match", () => {
+  const config = { ...base, "convex.json": '{ "typescriptCompiler": "tsgo" }' }
+  const [first, last] = repoWithCommits(config, { "src.ts": "x" })
+  assert.equal(backendMatches(first.sha, last.sha, last.cwd), true)
+})
+
+test("a convex.json edit counts as a backend change", () => {
+  const config = { ...base, "convex.json": '{ "typescriptCompiler": "tsgo" }' }
+  const [first, last] = repoWithCommits(config, { "convex.json": '{ "typescriptCompiler": "tsc" }' })
   assert.equal(backendMatches(first.sha, last.sha, last.cwd), false)
 })
 
