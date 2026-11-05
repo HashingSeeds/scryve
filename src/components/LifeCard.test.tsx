@@ -884,6 +884,47 @@ describe("LifeCard", () => {
     expect(undo).toHaveProperty("right")
   })
 
+  it("brings an undamaged attacker's − back at its edge while its grid flies home", () => {
+    const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    const timing = jest
+      .spyOn(Reanimated, "withTiming")
+      .mockImplementation((value, config, done) => {
+        setTimeout(() => done?.(true), config?.duration ?? 0)
+        return value
+      })
+    const attacking = (armedPlayerId: (typeof commanderIds)[number] | null) => (
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={11}
+          color="#41476E"
+          commanderDamage={commanderDamage({ players: commanderPlayers, armedPlayerId })}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    try {
+      const view = render(attacking(commanderIds[0]))
+      // why: the grid grown for the attack runs past the middle of the −'s end.
+      const layout = { x: 0, y: 0, width: 120, height: 300 }
+      fireEvent(view.getByTestId("commander-strip-seat-1"), "layout", { nativeEvent: { layout } })
+      fireEvent(view.getByTestId("commander-exit-seat-1"), "layout", { nativeEvent: { layout } })
+
+      view.rerender(attacking(null))
+      fireEvent(view.getByTestId("life-control-zones"), "layout", {
+        nativeEvent: { layout: { width: 200, height: 300 } },
+      })
+
+      expect(view.getByTestId("commander-strip-seat-1")).toBeTruthy()
+      const minus = StyleSheet.flatten(view.getByTestId(lifeControlTestId(1, -1)).props.style)
+      expect(minus.paddingLeft).toBeUndefined()
+    } finally {
+      timing.mockRestore()
+      motion.mockRestore()
+    }
+  })
+
   it("deals a hit with each tap anywhere on a defending card, and takes back the last one", () => {
     const onHit = jest.fn()
     const onUndo = jest.fn()

@@ -469,6 +469,16 @@ export const LifeCard = memo(function LifeCard({
       incoming: commanderDamage.incoming,
       attacked: !!stripAttackerId || sourceShown,
     })
+  // why: a grid grown only for an attack is mid-flight to or from the mark while the − and + fade, so only a grid that stays moves the glyph at its end inward.
+  const stripStays =
+    !!commanderDamage &&
+    commanderStripShown &&
+    commanderGridShown({
+      players: commanderDamage.players ?? [],
+      ownerPlayerId: commanderDamage.ownerPlayerId,
+      incoming: commanderDamage.incoming,
+      attacked: false,
+    })
   const identityMetrics = seatIdentityMetrics(compact)
   const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
   const identityCorner = seatIdentityPlacement({
@@ -705,7 +715,7 @@ export const LifeCard = memo(function LifeCard({
               lifeFontSize={resolvedLifeFontSize}
               lifeDigits={shownDigits}
               obstacle={
-                commanderStripShown && stripBounds
+                stripStays && stripBounds
                   ? { edge: CONTENT_LEFT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
