@@ -57,14 +57,14 @@ describe("SegmentedControl", () => {
     ).toBeUndefined()
   })
 
-  it("splits into rows instead of truncating labels that outgrow one row", () => {
+  it("sizes one row of segments to the thumb, and splits into rows instead of truncating labels", () => {
     const { view } = renderControl("mtg")
     const layout = layoutOf(view)
     const width = () => StyleSheet.flatten(view.getByTestId("system-mtg").props.style).width
 
     layout("system", 308)
     layout("system-ruler", 90)
-    expect(width()).toBeUndefined()
+    expect(width()).toBe(100)
 
     layout("system-ruler", 120)
     expect(width()).toBe(150)
