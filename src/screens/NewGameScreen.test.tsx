@@ -16,11 +16,11 @@ import {
   createLocalGame,
   defaultCommandContext,
 } from "@/features/game/domain"
-import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { deckFingerprint } from "@/features/stats/deckFingerprint"
 import { ThemeProvider } from "@/theme/context"
 
 import { NewGameScreen, type ConnectedHostFeed, type NewGameScreenProps } from "./NewGameScreen"
+import { NO_SYSTEM_SETTINGS } from "../../test/fixtures/localSettings"
 import {
   connectedHarness,
   mockAbandon,
@@ -72,7 +72,7 @@ function setup(overrides: Partial<NewGameScreenProps> = {}) {
   return render(
     <ThemeProvider initialContext="light">
       <NewGameScreen
-        defaults={DEFAULT_LOCAL_SETTINGS}
+        defaults={NO_SYSTEM_SETTINGS}
         mode="local"
         onModeChange={jest.fn()}
         onBack={jest.fn()}
@@ -117,7 +117,7 @@ function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
       <ConnectedHostSource onLobbyCreated={onLobbyCreated}>
         {(connected) => (
           <NewGameScreen
-            defaults={DEFAULT_LOCAL_SETTINGS}
+            defaults={NO_SYSTEM_SETTINGS}
             mode="connected"
             onModeChange={jest.fn()}
             onBack={jest.fn()}
@@ -144,7 +144,7 @@ describe("NewGameScreen", () => {
 
   it("keeps arriving games out of the setup form until requested", () => {
     const props = {
-      defaults: DEFAULT_LOCAL_SETTINGS,
+      defaults: NO_SYSTEM_SETTINGS,
       mode: "connected" as const,
       onModeChange: jest.fn(),
       onBack: jest.fn(),
@@ -280,7 +280,7 @@ describe("NewGameScreen", () => {
     view.rerender(
       <ThemeProvider initialContext="light">
         <NewGameScreen
-          defaults={DEFAULT_LOCAL_SETTINGS}
+          defaults={NO_SYSTEM_SETTINGS}
           mode="local"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
@@ -317,7 +317,7 @@ describe("NewGameScreen", () => {
     const screenWith = (startingValue: number) => (
       <ThemeProvider initialContext="light">
         <NewGameScreen
-          defaults={DEFAULT_LOCAL_SETTINGS}
+          defaults={NO_SYSTEM_SETTINGS}
           mode="local"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
@@ -452,7 +452,7 @@ describe("NewGameScreen", () => {
     const view = setup({
       onStartLocal,
       defaults: {
-        ...DEFAULT_LOCAL_SETTINGS,
+        ...NO_SYSTEM_SETTINGS,
         defaultSystem: "ygo",
         defaultFormat: "advanced",
         defaultStartingLife: 8000,
@@ -481,7 +481,7 @@ describe("NewGameScreen", () => {
     })
     const view = setup({
       initialGame,
-      defaults: { ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg", defaultFormat: "commander" },
+      defaults: { ...NO_SYSTEM_SETTINGS, defaultSystem: "mtg", defaultFormat: "commander" },
     })
 
     expect(view.getByTestId("game-type-none").props.accessibilityState.selected).toBe(true)
@@ -777,7 +777,7 @@ describe("NewGameScreen", () => {
       view.rerender(
         <ThemeProvider initialContext="light">
           <NewGameScreen
-            defaults={DEFAULT_LOCAL_SETTINGS}
+            defaults={NO_SYSTEM_SETTINGS}
             onModeChange={jest.fn()}
             onBack={jest.fn()}
             onStartLocal={jest.fn()}
@@ -855,7 +855,7 @@ describe("NewGameScreen", () => {
       updatedAt: 1,
     }
     const props = {
-      defaults: DEFAULT_LOCAL_SETTINGS,
+      defaults: NO_SYSTEM_SETTINGS,
       mode: "connected" as const,
       onModeChange: jest.fn(),
       onBack: jest.fn(),
@@ -903,7 +903,7 @@ describe("NewGameScreen", () => {
     const view = render(
       themed(
         <NewGameScreen
-          defaults={DEFAULT_LOCAL_SETTINGS}
+          defaults={NO_SYSTEM_SETTINGS}
           mode="connected"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
@@ -1073,7 +1073,7 @@ describe("NewGameScreen", () => {
       const renderSetup = (connected: ConnectedHostFeed) =>
         themed(
           <NewGameScreen
-            defaults={DEFAULT_LOCAL_SETTINGS}
+            defaults={NO_SYSTEM_SETTINGS}
             mode="connected"
             connected={connected}
             onModeChange={jest.fn()}
@@ -1267,7 +1267,7 @@ describe("NewGameScreen", () => {
     const opened = (account: NewGameScreenProps["account"]) => (
       <ThemeProvider initialContext="light">
         <NewGameScreen
-          defaults={DEFAULT_LOCAL_SETTINGS}
+          defaults={NO_SYSTEM_SETTINGS}
           mode="local"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
@@ -1300,7 +1300,7 @@ describe("NewGameScreen", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <NewGameScreen
-          defaults={DEFAULT_LOCAL_SETTINGS}
+          defaults={NO_SYSTEM_SETTINGS}
           mode="local"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
@@ -1318,7 +1318,7 @@ describe("NewGameScreen", () => {
     view.rerender(
       <ThemeProvider initialContext="light">
         <NewGameScreen
-          defaults={DEFAULT_LOCAL_SETTINGS}
+          defaults={NO_SYSTEM_SETTINGS}
           mode="local"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
@@ -1522,7 +1522,7 @@ describe("NewGameScreen", () => {
           view.rerender(
             <ThemeProvider initialContext="light">
               <NewGameScreen
-                defaults={DEFAULT_LOCAL_SETTINGS}
+                defaults={NO_SYSTEM_SETTINGS}
                 mode="local"
                 onModeChange={jest.fn()}
                 onBack={jest.fn()}
@@ -1685,7 +1685,7 @@ describe("NewGameScreen", () => {
   it("keeps an ended game's format selected in the list, not a different recent setup", () => {
     const game = runningLocalGame()
     const props = {
-      defaults: DEFAULT_LOCAL_SETTINGS,
+      defaults: NO_SYSTEM_SETTINGS,
       mode: "local" as const,
       onModeChange: jest.fn(),
       onBack: jest.fn(),

@@ -4,16 +4,13 @@ import * as Clipboard from "expo-clipboard"
 import * as Updates from "expo-updates"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import {
-  DEFAULT_LOCAL_SETTINGS,
-  LOCAL_KEYS,
-  LocalGameRepository,
-} from "@/features/game/localPersistence"
+import { LOCAL_KEYS, LocalGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 import { analyticsId } from "@/utils/analytics"
 
 import { AboutScreen } from "./AboutScreen"
 import { SettingsScreen } from "./SettingsScreen"
+import { NO_SYSTEM_SETTINGS } from "../../test/fixtures/localSettings"
 
 const mockApp = {
   nativeApplicationVersion: "1.2.3" as string | null,
@@ -120,7 +117,7 @@ describe("SettingsScreen", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          initialSettings={NO_SYSTEM_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
           onOpenAbout={onOpenAbout}
@@ -151,7 +148,7 @@ describe("SettingsScreen", () => {
     const renderSettings = () => (
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          initialSettings={NO_SYSTEM_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
           onOpenAbout={jest.fn()}
@@ -204,7 +201,7 @@ describe("SettingsScreen", () => {
       const view = render(
         <ThemeProvider initialContext="dark">
           <SettingsScreen
-            initialSettings={DEFAULT_LOCAL_SETTINGS}
+            initialSettings={NO_SYSTEM_SETTINGS}
             onBack={jest.fn()}
             onSettingsChange={jest.fn()}
             onOpenAbout={jest.fn()}
@@ -230,7 +227,7 @@ describe("SettingsScreen", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          initialSettings={NO_SYSTEM_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
           onOpenAbout={jest.fn()}
@@ -342,7 +339,7 @@ describe("SettingsScreen", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          initialSettings={NO_SYSTEM_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
           onOpenAbout={jest.fn()}
@@ -374,7 +371,7 @@ describe("SettingsScreen", () => {
       const view = render(
         <ThemeProvider initialContext="dark">
           <SettingsScreen
-            initialSettings={DEFAULT_LOCAL_SETTINGS}
+            initialSettings={NO_SYSTEM_SETTINGS}
             onBack={jest.fn()}
             onSettingsChange={jest.fn()}
             onOpenAbout={jest.fn()}
@@ -392,7 +389,7 @@ describe("SettingsScreen", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultPlayerCount: 2 }}
+          initialSettings={{ ...NO_SYSTEM_SETTINGS, defaultPlayerCount: 2 }}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
           onOpenAbout={jest.fn()}
@@ -409,12 +406,12 @@ describe("SettingsScreen", () => {
     )
   })
 
-  it("leaves the default game unset until one is chosen", () => {
+  it("switches the default game between no system and Commander", () => {
     const onSettingsChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          initialSettings={NO_SYSTEM_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
           onOpenAbout={jest.fn()}
@@ -422,8 +419,6 @@ describe("SettingsScreen", () => {
       </ThemeProvider>,
     )
 
-    expect(DEFAULT_LOCAL_SETTINGS.defaultSystem).toBeUndefined()
-    expect(DEFAULT_LOCAL_SETTINGS.defaultFormat).toBeUndefined()
     expect(view.getByLabelText("Game, No system")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("default-game"))
@@ -449,7 +444,7 @@ describe("SettingsScreen", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg" }}
+          initialSettings={{ ...NO_SYSTEM_SETTINGS, defaultSystem: "mtg" }}
           onBack={jest.fn()}
           onSettingsChange={jest.fn()}
           onOpenAbout={jest.fn()}
@@ -471,7 +466,7 @@ describe("SettingsScreen", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          initialSettings={NO_SYSTEM_SETTINGS}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
           onOpenAbout={jest.fn()}
@@ -499,7 +494,7 @@ describe("SettingsScreen", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
-          initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg" }}
+          initialSettings={{ ...NO_SYSTEM_SETTINGS, defaultSystem: "mtg" }}
           onBack={jest.fn()}
           onSettingsChange={onSettingsChange}
           onOpenAbout={jest.fn()}
@@ -527,7 +522,7 @@ describe("SettingsScreen", () => {
       [
         LOCAL_KEYS.settings,
         JSON.stringify({
-          ...DEFAULT_LOCAL_SETTINGS,
+          ...NO_SYSTEM_SETTINGS,
           defaultStartingLife: 20,
           defaultSystem: "mtg",
           defaultFormat: "brawl",

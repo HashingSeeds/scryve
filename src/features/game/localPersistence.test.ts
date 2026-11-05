@@ -18,6 +18,7 @@ import {
   MAX_HISTORY_GAMES,
 } from "./localPersistence"
 import type { LocalGame } from "./types"
+import { NO_SYSTEM_SETTINGS } from "../../../test/fixtures/localSettings"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 function makeGame(now = 1) {
@@ -377,11 +378,91 @@ describe("LocalGameRepository", () => {
     expect(new LocalGameRepository(storage).loadSettings().defaultStartingLife).toBe(20)
   })
 
+  describe("moving the old 2/20 fallback to a Commander pod", () => {
+    const storedByPreviousBuild = (settings: object) => {
+      const storage = new MemoryStorage()
+      storage.set(LOCAL_KEYS.settings, JSON.stringify({ ...settings, brawlLifeMigrated: true }))
+      return storage
+    }
+
+    it("moves untouched settings and keeps everything else, including the active game", () => {
+      const storage = storedByPreviousBuild({
+        ...NO_SYSTEM_SETTINGS,
+        hapticsEnabled: false,
+        themePreference: "dark",
+      })
+      const game = tap(makeGame())
+      new LocalGameRepository(storage).saveActiveGame(game)
+
+      const repository = new LocalGameRepository(storage)
+      expect(repository.loadSettings()).toEqual({
+        ...DEFAULT_LOCAL_SETTINGS,
+        hapticsEnabled: false,
+        themePreference: "dark",
+      })
+      expect(repository.loadActiveGame()).toEqual(game)
+    })
+
+    it.each([
+      { defaultPlayerCount: 3 },
+      { defaultStartingLife: 30 },
+      { defaultSystem: "mtg" },
+      { defaultSystem: "mtg", defaultFormat: "standard" },
+      { defaultSystem: "pokemon", defaultFormat: "standard", defaultStartingLife: 6 },
+    ])("leaves a chosen default alone: %o", (choice) => {
+      const settings = { ...NO_SYSTEM_SETTINGS, ...choice }
+      expect(new LocalGameRepository(storedByPreviousBuild(settings)).loadSettings()).toEqual(
+        settings,
+      )
+    })
+
+    it("keeps a 2/20 chosen after the move", () => {
+      const storage = storedByPreviousBuild(NO_SYSTEM_SETTINGS)
+      const repository = new LocalGameRepository(storage)
+      expect(repository.loadSettings().defaultPlayerCount).toBe(4)
+      repository.saveSettings(NO_SYSTEM_SETTINGS)
+      expect(new LocalGameRepository(storage).loadSettings()).toEqual(NO_SYSTEM_SETTINGS)
+    })
+  })
+
+  it("makes a started game's setup the next default", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    repository.saveSettings({ ...DEFAULT_LOCAL_SETTINGS, hapticsEnabled: false })
+
+    repository.saveDefaultsFrom(
+      createLocalGame({
+        startingLife: 20,
+        system: "mtg",
+        format: "standard",
+        players: [
+          { name: "Ada", color: "#000" },
+          { name: "Grace", color: "#111" },
+          { name: "Linus", color: "#222" },
+        ],
+      }),
+    )
+    expect(repository.loadSettings()).toEqual({
+      ...DEFAULT_LOCAL_SETTINGS,
+      hapticsEnabled: false,
+      defaultFormat: "standard",
+      defaultPlayerCount: 3,
+      defaultStartingLife: 20,
+    })
+
+    repository.saveDefaultsFrom(makeGame())
+    expect(repository.loadSettings()).toEqual({ ...NO_SYSTEM_SETTINGS, hapticsEnabled: false })
+  })
+
   it("stores a default system and format only when both are known", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
-    expect(repository.loadSettings().defaultSystem).toBeUndefined()
-    expect(repository.loadSettings().defaultFormat).toBeUndefined()
+    expect(repository.loadSettings()).toMatchObject({
+      defaultSystem: "mtg",
+      defaultFormat: "commander",
+      defaultPlayerCount: 4,
+      defaultStartingLife: 40,
+    })
 
     repository.saveSettings({
       ...DEFAULT_LOCAL_SETTINGS,
