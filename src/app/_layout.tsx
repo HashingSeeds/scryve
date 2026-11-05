@@ -18,6 +18,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
+import { KeyboardDoneBar } from "@/components/KeyboardDoneBar"
 import { AccountDeletionSessionGuard } from "@/features/auth/AccountDeletionSessionGuard"
 import { CloudProviders } from "@/features/auth/AuthContext"
 import { LocalGameClaimPrompt } from "@/features/game/LocalGameClaimPrompt"
@@ -86,6 +87,7 @@ function Root() {
               <PushDeviceSync />
               <LocalGameClaimPrompt />
               <AppStack />
+              <KeyboardDoneBar />
               <UpdateReadyToastWithForegroundChecks />
               <RestartCurtain />
             </KeyboardProvider>
