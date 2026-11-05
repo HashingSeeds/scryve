@@ -142,7 +142,7 @@ function PinnedGameBoardStage({
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
       {toast ? (
-        <BoardToastSlot anchor={holderAnchor} hidden={menu.open || !!menu.exitAction}>
+        <BoardToastSlot anchor={holderAnchor} hidden={menu.open}>
           {toast}
         </BoardToastSlot>
       ) : null}
@@ -201,7 +201,7 @@ function LegacyGameBoardStage({
       />
       {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
       {toast ? (
-        <BoardToastSlot anchor={menuAnchor} hidden={menu.open || !!menu.exitAction}>
+        <BoardToastSlot anchor={menuAnchor} hidden={menu.open}>
           {toast}
         </BoardToastSlot>
       ) : null}
