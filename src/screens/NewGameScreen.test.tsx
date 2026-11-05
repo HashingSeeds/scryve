@@ -930,6 +930,24 @@ describe("NewGameScreen", () => {
     )
   })
 
+  it("keeps the running game when the new setup can't start", () => {
+    const onAbandonLocal = jest.fn()
+    const onStartLocal = jest.fn()
+    const view = setup({
+      localGame: runningLocalGame(),
+      initialGame: runningLocalGame(),
+      onEndLocal: jest.fn(),
+      onAbandonLocal,
+      onStartLocal,
+    })
+    fireEvent.changeText(view.getByTestId("player-name-2"), "Ada")
+    fireEvent.press(view.getByTestId("game-type-mtg-standard"))
+    fireEvent.press(view.getByTestId("abandon-game-button"))
+    expect(onAbandonLocal).not.toHaveBeenCalled()
+    expect(onStartLocal).not.toHaveBeenCalled()
+    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
+  })
+
   it("starts a touched draft on Back instead of dropping it", () => {
     const onBack = jest.fn()
     const onStartLocal = jest.fn()

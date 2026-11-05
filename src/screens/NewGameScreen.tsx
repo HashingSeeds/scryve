@@ -668,7 +668,10 @@ function NewGameForm({
   }
 
   // why: ending a game here asks for a new one, so on this device it starts with this setup straight away; Connected still hosts by hand.
-  function startAfterEnding() {
+  function endThenStart(end: () => void) {
+    if (!connectedMode && !localReady)
+      throw new Error(nameValidation.errors.find(Boolean) ?? translate("board:endGame.failed"))
+    end()
     setEnding(undefined)
     if (connectedMode) return
     setEdited(true)
@@ -1599,18 +1602,8 @@ function NewGameForm({
             if (ending.restore) restoreDraft(ending.restore)
             setEnding(undefined)
           }}
-          onEnd={(result) => {
-            onEndLocal(result)
-            startAfterEnding()
-          }}
-          onAbandon={
-            onAbandonLocal
-              ? () => {
-                  onAbandonLocal()
-                  startAfterEnding()
-                }
-              : undefined
-          }
+          onEnd={(result) => endThenStart(() => onEndLocal(result))}
+          onAbandon={onAbandonLocal ? () => endThenStart(onAbandonLocal) : undefined}
         />
       ) : null}
     </View>
