@@ -1,9 +1,8 @@
 import type { GameType } from "./gameTypes"
-import type { LocalSettings } from "./localPersistence"
+import { COMMANDER_SEATS, type LocalSettings } from "./localPersistence"
 import { defaultStartingLife } from "./playSystems"
 import { isCommanderFormat } from "../../../convex/lib/gameRules"
 
-export const COMMANDER_SEATS = 4
 const HEAD_TO_HEAD_SEATS = 2
 
 export const whatYouPlaySeats = ({ system, format }: GameType) =>

@@ -49,7 +49,6 @@ import type {
   NewPlayerInput,
   SeatPassHashes,
 } from "./types"
-import { COMMANDER_SEATS } from "./whatYouPlay"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
@@ -95,6 +94,8 @@ export interface LocalSettings {
   askWhatYouPlay?: true
   syncStats?: boolean
 }
+
+export const COMMANDER_SEATS = 4
 
 const COMMANDER_POD = {
   defaultSystem: "mtg",
