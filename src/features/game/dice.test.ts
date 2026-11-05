@@ -66,8 +66,20 @@ describe("dice roll-off", () => {
     const settled = rerollTies(tied, d20s(2, 20))
     expect(diceSeatView(settled, ada)).toMatchObject({ value: 2, attempt: 2, status: "lost" })
     expect(diceSeatView(settled, grace)).toMatchObject({ value: 20, attempt: 2, status: "won" })
-    expect(diceSeatView(settled, kat)).toMatchObject({ value: 3, attempt: 1, status: "lost" })
+    expect(diceSeatView(settled, kat)).toEqual({ kind: "first", status: "lost" })
     expect(rerollTies(settled)).toBe(settled)
+  })
+
+  it("shows only the latest round's rolls once a tie is rerolled", () => {
+    const tied = startRollOff(EMPTY_DICE, [ada, grace, kat], magic, d20s(18, 18, 17))
+    const again = rerollTies(tied, d20s(9, 9))
+    expect(diceSeatView(again, ada)).toMatchObject({ value: 9, attempt: 2, status: "tied" })
+    expect(diceSeatView(again, kat)).toEqual({ kind: "first", status: "lost" })
+
+    const decided = rerollTies(again, d20s(13, 2))
+    expect(diceSeatView(decided, ada)).toMatchObject({ value: 13, status: "won" })
+    expect(diceSeatView(decided, grace)).toMatchObject({ value: 2, status: "lost" })
+    expect(diceSeatView(decided, kat)).toEqual({ kind: "first", status: "lost" })
   })
 
   it("rolls Yu-Gi-Oh!'s d6 for the roll-off and its tie rerolls", () => {
