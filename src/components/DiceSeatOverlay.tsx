@@ -374,7 +374,8 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView) {
 
 // why: once the roll-off has a winner, a tap on any seat puts the dice away and the winner keeps the 1st chip.
 function hint(view: DiceSeatView) {
-  return view.kind === "rolloff" && (view.status === "won" || view.status === "lost")
+  return view.kind === "first" ||
+    (view.kind === "rolloff" && (view.status === "won" || view.status === "lost"))
     ? translate("board:menu.closeDice")
     : translate("board:dice.settlesResult")
 }

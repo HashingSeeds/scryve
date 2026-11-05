@@ -171,6 +171,7 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d205")
     expect(announce).toHaveBeenLastCalledWith("Grace rolled 20, goes first")
     expect(view.getByTestId("dice-seat-1").props.accessibilityHint).toBe("Close dice")
+    expect(view.getByTestId("dice-seat-3").props.accessibilityHint).toBe("Close dice")
 
     fireEvent.press(view.getByTestId("dice-seat-1"))
     act(() => jest.runAllTimers())
