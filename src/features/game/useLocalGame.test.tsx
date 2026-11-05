@@ -9,6 +9,7 @@ import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { createLocalGame } from "./domain"
 import { LocalGameRepository } from "./localPersistence"
+import { pauseRoundClock, startRoundClock } from "./roundClock"
 import type { LocalGame } from "./types"
 import { useLocalGame } from "./useLocalGame"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
@@ -412,6 +413,18 @@ describe("useLocalGame abandoned offer", () => {
       "local",
       "game_menu",
     )
+  })
+
+  it("ends the offer on the next board's first clock tap", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    abandonPlayedGame(repository)
+    const timed = { ...game(), clock: startRoundClock({ mode: "stopwatch" }) }
+    const { result } = renderHook(() => useLocalGame(timed, repository))
+    expect(result.current.abandoned).toBeDefined()
+
+    act(() => result.current.changeClock(pauseRoundClock))
+    expect(result.current.abandoned).toBeUndefined()
+    expect(repository.recentlyAbandoned()).toBeUndefined()
   })
 
   it("drops the offer when the board moves to a game started after the offer ended", () => {

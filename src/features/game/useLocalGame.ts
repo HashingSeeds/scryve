@@ -147,6 +147,12 @@ export function useLocalGame(
     if (timedBoardId) save(gameRef.current)
   }, [save, timedBoardId])
 
+  const [abandoned, setAbandoned] = useState<LocalGame>()
+  const endAbandonOffer = useCallback(() => {
+    setAbandoned(undefined)
+    repository.forgetAbandoned()
+  }, [repository])
+
   // why: clock changes are rare taps (pause, adjust, next turn), so saving each one stays off the per-tick path.
   const changeClock = useCallback(
     (update: (clock: RoundClock) => RoundClock | undefined) => {
@@ -158,8 +164,9 @@ export function useLocalGame(
       save(next)
       gameRef.current = next
       setGame(next)
+      endAbandonOffer()
     },
-    [save],
+    [endAbandonOffer, save],
   )
 
   const changeLife = useCallback(
@@ -248,7 +255,6 @@ export function useLocalGame(
     [replaceBoard, repository],
   )
 
-  const [abandoned, setAbandoned] = useState<LocalGame>()
   // why: setup starts the next game under this board without remounting it, so the offer is read whenever the board's game changes, and a start that ended it takes the toast away.
   useEffect(() => {
     const held = repository.recentlyAbandoned()
@@ -256,10 +262,8 @@ export function useLocalGame(
   }, [game.id, repository])
   const boardTouched = game.firstPlayerOffered === true || hasLocalGameStarted(game)
   useEffect(() => {
-    if (!abandoned || !boardTouched) return
-    setAbandoned(undefined)
-    repository.forgetAbandoned()
-  }, [abandoned, boardTouched, repository])
+    if (abandoned && boardTouched) endAbandonOffer()
+  }, [abandoned, boardTouched, endAbandonOffer])
   const undoAbandon = useCallback(() => {
     const held = repository.takeBackAbandoned()
     setAbandoned(undefined)
