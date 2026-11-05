@@ -1,7 +1,9 @@
 import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
+import { PLAYER_COLORS } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
+import { accessibleForeground, contrastRatio } from "@/utils/colorContrast"
 
 import { glyphClearance, LifeControls } from "./LifeControls"
 
@@ -43,6 +45,24 @@ describe("LifeControls", () => {
       expect(
         StyleSheet.flatten(view.getByTestId(`life-seat-1-${delta}`).props.style),
       ).toMatchObject({ flex: 1 })
+    }
+  })
+
+  it.each(PLAYER_COLORS)("inks the − and + readably on %s", (color) => {
+    const foreground = accessibleForeground(color)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeControls
+          playerName="Ada"
+          contrastCheckedForeground={foreground}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    for (const glyph of ["−", "+"]) {
+      const { color: ink, opacity = 1 } = StyleSheet.flatten(view.getByText(glyph).props.style)
+      expect(opacity).toBe(1)
+      expect(contrastRatio(String(ink), color)).toBeGreaterThanOrEqual(4.5)
     }
   })
 

@@ -417,6 +417,7 @@ export default {
       riftbound: "पॉइंट",
     },
     openCalculator: "{{identity}} के लिए कैलकुलेटर खोलें",
+    undo: "{{identity}} की आखिरी लाइफ़ बदलाव को पूर्ववत करें",
   },
   lifeControls: {
     add: "{{identity}}, {{amount}} जोड़ें",

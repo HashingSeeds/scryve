@@ -5,7 +5,7 @@ import { translate } from "@/i18n/translate"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 
 import type { LifeCardEdge } from "./playerCardTypes"
-import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "./PlayerMark"
+import { MARK_ART_BOUNDS, MARK_BACKING_RADIUS, MARK_VIEW_BOX, PlayerMark } from "./PlayerMark"
 import { Text, type TextProps } from "./Text"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -27,9 +27,18 @@ export function seatIdentityBottomGap(edge: number, inset: number, screenEdge: L
   return screenEdge === "bottom" ? edge / 2 : 0
 }
 
-export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
+const BACKING_LOW = MARK_VIEW_BOX / 2 - MARK_BACKING_RADIUS
+const BACKING_HIGH = MARK_VIEW_BOX / 2 + MARK_BACKING_RADIUS
+const BACKING_BOUNDS = {
+  top: BACKING_LOW,
+  bottom: BACKING_HIGH,
+  left: BACKING_LOW,
+  right: BACKING_HIGH,
+}
+
+export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean, backed?: boolean) {
   const scale = seatIdentityMetrics(compact).mark / MARK_VIEW_BOX
-  const art = MARK_ART_BOUNDS[shape]
+  const art = backed ? BACKING_BOUNDS : MARK_ART_BOUNDS[shape]
   return {
     height: (art.bottom - art.top) * scale,
     trim: {
@@ -57,6 +66,7 @@ export interface SeatIdentityProps {
   color: string
   compact?: boolean
   insetSwordColor?: string
+  backing?: string
   foil?: boolean
   staleSince?: number
   markOnly?: boolean
@@ -71,13 +81,14 @@ export function SeatIdentity({
   color,
   compact,
   insetSwordColor,
+  backing,
   foil,
   staleSince,
   markOnly,
   style,
 }: SeatIdentityProps) {
   const metrics = seatIdentityMetrics(compact)
-  const art = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
+  const art = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact, !!backing)
   return (
     <View testID={`seat-identity-seat-${seatNumber}`} style={[$row, { gap: metrics.gap }, style]}>
       <PlayerMark
@@ -86,8 +97,9 @@ export function SeatIdentity({
         color={color}
         insetSwordColor={insetSwordColor}
         foil={foil}
+        backing={backing}
         size={metrics.mark}
-        style={[$mark, art.trim]}
+        style={[!backing && $mark, art.trim]}
       />
       <View testID={`life-status-seat-${seatNumber}`} style={$text}>
         {markOnly ? null : (

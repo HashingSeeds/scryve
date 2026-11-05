@@ -13,7 +13,7 @@ import {
 } from "@/features/game/domain"
 import { LifeLogContext } from "@/features/game/LifeLog"
 import { playTableRules } from "@/features/game/playSystems"
-import type { LifeChangedEvent } from "@/features/game/types"
+import type { LifeChangedEvent, PlayerId } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
 import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
@@ -180,7 +180,7 @@ describe("LifeCard", () => {
   })
 
   it("starts a new player in the seat clean: no life flash, sheet, or editor from the last game", () => {
-    const seat = (playerId: string, life: number, counters: Record<string, number>) => (
+    const seat = (playerId: PlayerId, life: number, counters: Record<string, number>) => (
       <ThemeProvider initialContext="light">
         <LifeCard
           playerId={playerId}
@@ -201,16 +201,16 @@ describe("LifeCard", () => {
         />
       </ThemeProvider>
     )
-    const view = render(seat("game-1-seat-1", 40, { poison: 2 }))
+    const view = render(seat(asPlayerId("game-1-seat-1"), 40, { poison: 2 }))
     fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
       nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 200 } },
     })
-    view.rerender(seat("game-1-seat-1", 12, { poison: 2 }))
+    view.rerender(seat(asPlayerId("game-1-seat-1"), 12, { poison: 2 }))
     expect(view.getByText("-28")).toBeTruthy()
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
     expect(view.getByTestId("counter-sheet-seat-1")).toBeTruthy()
 
-    view.rerender(seat("game-2-seat-1", 40, {}))
+    view.rerender(seat(asPlayerId("game-2-seat-1"), 40, {}))
 
     expect(view.queryByText("+28")).toBeNull()
     expect(view.queryByText("-28")).toBeNull()
@@ -219,7 +219,7 @@ describe("LifeCard", () => {
     expect(view.getByText("+")).toBeTruthy()
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
-    view.rerender(seat("game-3-seat-1", 40, {}))
+    view.rerender(seat(asPlayerId("game-3-seat-1"), 40, {}))
     expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
   })
 
@@ -1224,6 +1224,73 @@ describe("LifeCard", () => {
     expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
   })
 
+  describe("undo arrow", () => {
+    const ada = asPlayerId("player-1")
+    const tapped: LifeChangedEvent = {
+      type: "life.changed",
+      operationId: asOperationId("op-1"),
+      gameId: asGameId("game"),
+      actorId: asActorId("local"),
+      deviceId: asDeviceId("device"),
+      clientCreatedAt: 1,
+      playerId: ada,
+      delta: -1,
+    }
+    const logged = (undo: jest.Mock, damage?: LifeCardCommanderDamage) => (
+      <LifeLogContext.Provider value={{ kind: "local", events: [tapped], undo }}>
+        <ThemeProvider initialContext="light">
+          <LifeCard
+            playerId={ada}
+            playerName="Ada"
+            seatNumber={1}
+            life={39}
+            color="#41476E"
+            commanderDamage={damage}
+            onChange={jest.fn()}
+          />
+        </ThemeProvider>
+      </LifeLogContext.Provider>
+    )
+
+    it("shows one arrow after a tap, kept up by more taps, that undoes this seat's latest change", () => {
+      const undo = jest.fn()
+      const view = render(logged(undo))
+      const minus = view.getByTestId("life-seat-1--1")
+      expect(view.queryByTestId("life-undo-seat-1")).toBeNull()
+
+      fireEvent.press(minus)
+      act(() => jest.advanceTimersByTime(3000))
+      fireEvent.press(minus)
+      act(() => jest.advanceTimersByTime(3000))
+      expect(view.getAllByTestId("life-undo-seat-1")).toHaveLength(1)
+
+      fireEvent.press(view.getByTestId("life-undo-seat-1"))
+      expect(undo.mock.calls).toEqual([[ada]])
+      act(() => jest.advanceTimersByTime(3999))
+      expect(view.getByTestId("life-undo-seat-1")).toBeTruthy()
+      act(() => jest.advanceTimersByTime(1))
+      expect(view.queryByTestId("life-undo-seat-1")).toBeNull()
+    })
+
+    it("withdraws the arrow when an attack takes the card, so it can't undo a hit", () => {
+      const undo = jest.fn()
+      const resting = commanderDamage({ ownerPlayerId: ada, armedPlayerId: null })
+      const view = render(logged(undo, resting))
+      fireEvent.press(view.getByTestId("life-seat-1--1"))
+      expect(view.getByTestId("life-undo-seat-1")).toBeTruthy()
+
+      view.rerender(logged(undo, { ...resting, armedPlayerId: ada }))
+      view.rerender(logged(undo, resting))
+      expect(view.queryByTestId("life-undo-seat-1")).toBeNull()
+    })
+
+    it("stays hidden without a local life log to undo from", () => {
+      const view = render(card(20))
+      fireEvent.press(view.getByTestId("life-seat-1--1"))
+      expect(view.queryByTestId("life-undo-seat-1")).toBeNull()
+    })
+  })
+
   it("shows a held change right away and records it once on release", () => {
     const onChange = jest.fn()
     const view = render(card(20, onChange))
@@ -1588,7 +1655,11 @@ describe("LifeCard", () => {
     })
     const view = render(
       <LifeLogContext.Provider
-        value={{ kind: "local", events: [change("op-1", -2000), change("op-2", 800)] }}
+        value={{
+          kind: "local",
+          events: [change("op-1", -2000), change("op-2", 800)],
+          undo: jest.fn(),
+        }}
       >
         <ThemeProvider initialContext="dark">
           <LifeCard

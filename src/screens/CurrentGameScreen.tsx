@@ -226,7 +226,8 @@ export function CurrentGameScreen({
   const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
   const playerCount = runtime.game.players.length
   const { events } = runtime.game
-  const lifeLog = useMemo((): LifeLogSource => ({ kind: "local", events }), [events])
+  const { undo } = runtime
+  const lifeLog = useMemo((): LifeLogSource => ({ kind: "local", events, undo }), [events, undo])
   const firstPlayer = useMemo<FirstPlayerOffer | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
     const offer = (run: () => void) => () => {
