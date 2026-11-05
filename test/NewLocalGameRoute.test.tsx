@@ -245,7 +245,7 @@ describe("new local game route", () => {
         <NewLocalGameRoute />
       </ThemeProvider>,
     )
-    expect(view.getByText("End current game…")).toBeTruthy()
+    expect(view.getByText("New game")).toBeTruthy()
     fireEvent.press(view.getByTestId("setup-back"))
     expect(router.back).toHaveBeenCalledTimes(1)
     expect(router.replace).not.toHaveBeenCalled()
@@ -275,6 +275,7 @@ describe("new local game route", () => {
     )
     expect(view.getByText("Continue match")).toBeTruthy()
     expect(view.getByText("Game 2 · 1-0 · Best of 3")).toBeTruthy()
+    expect(view.queryByTestId("setup-change-button")).toBeNull()
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(router.back).toHaveBeenCalledTimes(1)
     expect(localGameRepository.loadActiveGame()?.match).toMatchObject({
@@ -292,7 +293,7 @@ describe("new local game route", () => {
     expect(view.getByTestId("start-game-button")).toBeEnabled()
   })
 
-  it("ends the current game inside setup and preserves the new draft", () => {
+  it("applies a setup change to a running game through one end prompt, then starts it", () => {
     const game = createLocalGame({
       startingLife: 20,
       players: [
@@ -311,31 +312,54 @@ describe("new local game route", () => {
     fireEvent.press(view.getByTestId("setup-change-button"))
     fireEvent.press(view.getByTestId("starting-counter-increment"))
     fireEvent.press(view.getByTestId("setup-options-done"))
-    fireEvent.press(view.getByTestId("mode-connected"))
-    fireEvent.press(view.getByTestId("mode-local"))
-    expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
-    expect(view.getByText(/ 21 life/)).toBeTruthy()
-    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
     fireEvent.press(view.getByTestId("end-game-backdrop"))
     expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
-    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(view.getByText(/ 20 life/)).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("setup-change-button"))
+    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("setup-options-done"))
     fireEvent.press(view.getByTestId("end-game-winner-1"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
-    expect(localGameRepository.loadActiveGame()).toBeNull()
     expect(localGameRepository.loadHistoryDetail(game.id)?.game.result).toEqual({
       kind: "win",
       winnerPlayerIds: [game.players.find((player) => player.seat === 1)!.id],
     })
-    expect(view.queryByTestId("end-game-dialog")).toBeNull()
-    expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
-    expect(view.getByTestId("start-game-button")).toBeEnabled()
-    expect(router.replace).not.toHaveBeenCalled()
-    fireEvent.press(view.getByTestId("start-game-button"))
-    expect(router.dismissTo).toHaveBeenCalledWith(
-      expect.objectContaining({
-        params: expect.objectContaining({ prepared: expect.stringContaining('"startingLife":21') }),
-      }),
+    const started = localGameRepository.loadActiveGame()
+    expect(started?.id).not.toBe(game.id)
+    expect(started).toMatchObject({
+      startingLife: 21,
+      players: [{ name: "Alex" }, { name: "Two" }],
+    })
+    expect(router.dismissTo).toHaveBeenCalledTimes(1)
+  })
+
+  it("starts a fresh game with the same setup from New game", () => {
+    const game = createLocalGame({
+      startingLife: 40,
+      players: Array.from({ length: 4 }, (_, index) => ({
+        name: `P${index + 1}`,
+        color: `#00000${index}`,
+      })),
+      system: "mtg",
+      format: "commander",
+    })
+    game.players[0].life = 31
+    localGameRepository.saveActiveGame(game)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
     )
+    fireEvent.press(view.getByTestId("start-game-button"))
+    fireEvent.press(view.getByTestId("abandon-game-button"))
+    expect(localGameRepository.loadHistoryDetail(game.id)).toBeNull()
+    const started = localGameRepository.loadActiveGame()
+    expect(started?.id).not.toBe(game.id)
+    expect(started).toMatchObject({ startingLife: 40, format: "commander" })
+    expect(started?.players).toHaveLength(4)
+    expect(started?.players[0].life).toBe(40)
   })
 
   it("keeps the current game and confirmation when saving its result fails", () => {
@@ -364,9 +388,8 @@ describe("new local game route", () => {
     expect(view.getByTestId("end-game-dialog")).toBeTruthy()
     archive.mockRestore()
     fireEvent.press(view.getByTestId("abandon-game-button"))
-    expect(localGameRepository.loadActiveGame()).toBeNull()
+    expect(localGameRepository.loadActiveGame()?.id).not.toBe(game.id)
     expect(localGameRepository.loadHistoryDetail(game.id)).toBeNull()
-    expect(view.getByTestId("start-game-button")).toBeEnabled()
   })
 
   it("saves player identity without resetting the active game", () => {
