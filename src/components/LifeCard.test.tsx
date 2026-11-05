@@ -206,7 +206,7 @@ describe("LifeCard", () => {
     })
     view.rerender(seat("game-1-seat-1", 12, { poison: 2 }))
     expect(view.getByText("-28")).toBeTruthy()
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     expect(view.getByTestId("counter-sheet-seat-1")).toBeTruthy()
 
     view.rerender(seat("game-2-seat-1", 40, {}))

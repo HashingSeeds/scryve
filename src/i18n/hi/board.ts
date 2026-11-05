@@ -15,6 +15,9 @@ export default {
     },
     tapToRoll: "रोल करने के लिए टैप करें",
     tapToFlip: "फ़्लिप करने के लिए टैप करें",
+    rollForTable: "पूरी टेबल के लिए रोल करें",
+    moreDice: "और डाइस",
+    openBag: "{{identity}}, डाइस और काउंटर",
     coinFace: {
       Heads: "चित",
       Tails: "पट",

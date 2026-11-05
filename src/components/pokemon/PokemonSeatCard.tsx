@@ -1,5 +1,11 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react"
-import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
+import type {
+  LayoutChangeEvent,
+  LayoutRectangle,
+  StyleProp,
+  TextStyle,
+  ViewStyle,
+} from "react-native"
 import { AccessibilityInfo, Platform, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, {
   cancelAnimation,
@@ -46,6 +52,7 @@ import {
   type PokemonSlot,
 } from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
+import { CounterChips, DICE_ONLY_SEAT, seatBagSize } from "../CounterChips"
 import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
@@ -226,6 +233,17 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const shown = focused ?? board.active
   const asking = takerAsk ? findPokemon(board, takerAsk.pokemonId)?.pokemon : undefined
   const controlsLive = canEdit && !sheetMode
+  // why: the bag sits in the bottom row just before the prizes, so it is placed from where the row and the prizes laid out in the layer.
+  const [bottomRowAt, setBottomRowAt] = useState<LayoutRectangle>()
+  const [prizesAt, setPrizesAt] = useState<LayoutRectangle>()
+  const bagSize = seatBagSize(cramped)
+  const bagAt =
+    bottomRowAt && prizesAt
+      ? {
+          right: layer.width - (bottomRowAt.x + prizesAt.x) + padding,
+          bottom: layer.height - bottomRowAt.y - bottomRowAt.height / 2 - bagSize / 2,
+        }
+      : undefined
 
   useEffect(() => {
     if (!canEdit) {
@@ -647,6 +665,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
         <View
           testID={`pokemon-bottom-row-seat-${seatNumber}`}
+          onLayout={({ nativeEvent }) => setBottomRowAt(nativeEvent.layout)}
           style={[themed($bottomRow), { height: prizeRowHeight, marginBottom: bottomRowLift }]}
         >
           <Animated.View
@@ -680,6 +699,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           ) : null}
           <Animated.View
             testID={`pokemon-prizes-slot-seat-${seatNumber}`}
+            onLayout={({ nativeEvent }) => setPrizesAt(nativeEvent.layout)}
             layout={cornerSlide}
             style={[$prizesSlot, { marginRight: cornerChromeStep("right") }]}
           >
@@ -824,6 +844,22 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         ) : null}
       </View>
 
+      {dice?.bag && bagAt && controlsLive && !diceCovers ? (
+        <CounterChips
+          seat={DICE_ONLY_SEAT}
+          dice={dice.bag}
+          bagAt={bagAt}
+          seatNumber={seatNumber}
+          identity={identity}
+          color={color}
+          foreground={ink}
+          compact={cramped}
+          contentRotation={contentRotation}
+          contentInsets={contentInsets}
+          menuEdgeCenter={menuEdgeCenter}
+          cardSize={cardSize}
+        />
+      ) : null}
       {dice && diceCovers ? (
         <DiceSeatOverlay
           seatNumber={seatNumber}

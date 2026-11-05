@@ -24,6 +24,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
+import type { DiceTool } from "./dice"
 import { GameBoardStage, type GameBoardStageProps } from "./GameBoardStage"
 import { getPlayerGridLayoutOptions, type PlayerGridLayoutVariant } from "./playerLayouts"
 import type { GamePlayer } from "./types"
@@ -84,7 +85,20 @@ export function useBoardChrome({
   const [menuOpen, setMenuOpen] = useState(false)
   const [layoutOpen, setLayoutOpen] = useState(false)
   const [dialogOrigin, setDialogOrigin] = useState<DialogOrigin>()
-  const dice = useDice(players, gameId, system)
+  const seatDice = useDice(players, gameId, system)
+  // why: rolling by hand means the players skipped the first-player offer.
+  const rollFor = stable("bagRoll", (player: GamePlayer, tool: DiceTool) => {
+    onDiceTool?.()
+    seatDice.grid.bag.rollFor(player, tool)
+  })
+  const armForOthers = stable("bagArm", (tool: DiceTool) => {
+    onDiceTool?.()
+    seatDice.grid.bag.armForOthers(tool)
+  })
+  const dice = {
+    ...seatDice,
+    grid: { ...seatDice.grid, bag: { ...seatDice.grid.bag, rollFor, armForOthers } },
+  }
   const rules = gameRules(system)
   useEffect(() => {
     if (rules?.kind === "text") prefetchRules(rules)

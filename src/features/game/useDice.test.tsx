@@ -63,6 +63,10 @@ function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?
         }
         return (
           <View key={player.id}>
+            <Pressable
+              testID={`bag-d6-${index + 1}`}
+              onPress={() => grid.bag.rollFor(player, "d6")}
+            />
             {diceCoversSeat(seat) ? (
               <DiceSeatOverlay
                 seatNumber={index + 1}
@@ -124,6 +128,14 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(false)
     expect(view.queryByLabelText(/Roll a d20 for (Ada|Grace|Katherine)/)).toBeNull()
     expect(announce).toHaveBeenLastCalledWith("Grace, d20, 11")
+  })
+
+  it("rolls at once for just the seat whose bag picked the die", () => {
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderTable()
+    fireEvent.press(view.getByTestId("bag-d6-2"))
+    expect(view.getByTestId("dice-chip-2-d6")).toHaveTextContent("4")
+    expect(view.queryByTestId("dice-chip-1-d6")).toBeNull()
   })
 
   it.each([
