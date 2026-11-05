@@ -130,8 +130,10 @@ const COMPACT_MENU_CLEARANCE = 37
 const CHIP_SIZE = 36
 const COMPACT_CHIP_SIZE = 32
 const COMPACT_CHIP_WIDTH = 28
-/** why: below this column width "+2 Commander tax" no longer fits on one line, so items with a short label use it. */
+/** why: below this column width "0 Commander tax" no longer fits on one line, so items with a short label use it, and counters drop their rule link (their own sheet still has it) so "Poison" does not truncate. */
 const SHORT_LABEL_COLUMN = 180
+/** why: room a rule link like "§903.8" takes beside its option, so the label shortens before it would truncate. */
+const RULE_LINK_WIDTH = 52
 
 type Sheet = { kind: "edit"; counterId: string } | { kind: "add" }
 
@@ -530,13 +532,17 @@ function CounterSheet({
     paddingLeft: gap + contentInset(contentRotation, contentInsets, "left"),
     paddingRight: gap + contentInset(contentRotation, contentInsets, "right"),
   }
-  const shortLabels = (width - padding.paddingLeft - padding.paddingRight) / 2 < SHORT_LABEL_COLUMN
+  const optionColumn = (width - padding.paddingLeft - padding.paddingRight) / 2
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
   const counterLabel = counter ? tableItemLabel(counter) : ""
   const ruleId = counter && seat.tableItemRules?.[counter.id]
   const { openRule } = seat
+  const optionRule = (id: string) => {
+    const rule = seat.tableItemRules?.[id]
+    return rule && openRule ? { id: rule, onPress: () => openRule(rule) } : undefined
+  }
   const firstControl = useRef<View>(null)
   const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
@@ -633,13 +639,15 @@ function CounterSheet({
             {seat.rules.counters.map((option, index) => {
               const current = seat.counters[option.id] ?? 0
               const optionLabel = tableItemLabel(option)
+              const rule = optionColumn < SHORT_LABEL_COLUMN ? undefined : optionRule(option.id)
+              const shortLabel = optionColumn < SHORT_LABEL_COLUMN + (rule ? RULE_LINK_WIDTH : 0)
               return (
                 <SheetOption
                   key={option.id}
                   ref={index === 0 ? firstControl : undefined}
                   testID={`counter-option-${seatNumber}-${option.id}`}
                   id={option.id}
-                  label={shortLabels ? tableItemShortLabel(option) : optionLabel}
+                  label={shortLabel ? tableItemShortLabel(option) : optionLabel}
                   value={current}
                   accessibilityLabel={
                     current > 0
@@ -654,6 +662,8 @@ function CounterSheet({
                         })
                   }
                   ink={ink}
+                  rule={rule}
+                  ruleTestID={`counter-rule-${seatNumber}-${option.id}`}
                   onPress={() => {
                     if (current > 0) return onEdit(option.id)
                     seat.adjustCounter(option.id, option.step)
@@ -665,7 +675,6 @@ function CounterSheet({
             {seat.rules.designations.map((option, index) => {
               const holds = seat.held.includes(option.id)
               const optionLabel = tableItemLabel(option)
-              const optionRule = seat.tableItemRules?.[option.id]
               return (
                 <SheetOption
                   key={option.id}
@@ -679,15 +688,8 @@ function CounterSheet({
                   )}
                   selected={holds}
                   ink={ink}
-                  rule={
-                    optionRule && openRule
-                      ? {
-                          id: optionRule,
-                          testID: `designation-rule-${seatNumber}-${option.id}`,
-                          onPress: () => openRule(optionRule),
-                        }
-                      : undefined
-                  }
+                  rule={optionRule(option.id)}
+                  ruleTestID={`designation-rule-${seatNumber}-${option.id}`}
                   onPress={() => {
                     if (holds) seat.releaseDesignation(option.id)
                     else seat.takeDesignation(option.id)
@@ -764,6 +766,7 @@ function SheetOption({
   selected,
   ink,
   rule,
+  ruleTestID,
   onPress,
 }: {
   ref?: Ref<View>
@@ -774,7 +777,8 @@ function SheetOption({
   accessibilityLabel: string
   selected?: boolean
   ink: string
-  rule?: { id: string; testID: string; onPress: () => void }
+  rule?: { id: string; onPress: () => void }
+  ruleTestID: string
   onPress: () => void
 }) {
   const { themed } = useAppTheme()
@@ -813,7 +817,7 @@ function SheetOption({
       </BoardPressable>
       {rule ? (
         <BoardPressable
-          testID={rule.testID}
+          testID={ruleTestID}
           accessibilityRole="link"
           accessibilityLabel={translate("board:counters.rule", { rule: rule.id })}
           onPress={rule.onPress}

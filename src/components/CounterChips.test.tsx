@@ -85,11 +85,19 @@ describe("CounterChips", () => {
     expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("0Commander tax")
     wide.unmount()
 
-    const narrow = chips(seat(), { cardSize: { width: 320, height: 400 } })
+    const rules = { tableItemRules: { commanderTax: "903.8" }, openRule: jest.fn() }
+    const narrow = chips(seat(rules), { cardSize: { width: 320, height: 400 } })
     fireEvent.press(narrow.getByTestId("counter-add-seat-1"))
     const tax = narrow.getByTestId("counter-option-1-commanderTax")
     expect(tax).toHaveTextContent("0Tax")
     expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
+    expect(narrow.queryByTestId("counter-rule-1-commanderTax")).toBeNull()
+    narrow.unmount()
+
+    const withRule = chips(seat(rules), { cardSize: { width: 460, height: 400 } })
+    fireEvent.press(withRule.getByTestId("counter-add-seat-1"))
+    expect(withRule.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("0Tax")
+    expect(withRule.getByTestId("counter-rule-1-commanderTax")).toBeTruthy()
   })
 
   it("keeps a compact plus's reach off the chip beside it and inside the card", () => {
@@ -166,6 +174,17 @@ describe("CounterChips", () => {
     fireEvent.press(view.getByTestId("counter-close-1"))
     fireEvent(view.getByTestId("counter-chip-1-experience"), "longPress")
     expect(view.queryByTestId("counter-rule-1")).toBeNull()
+  })
+
+  it("opens a counter's rule from the plus sheet without adding to it", () => {
+    const openRule = jest.fn()
+    const table = seat({ tableItemRules: { poison: "104.3d" }, openRule })
+    const view = chips(table, { cardSize: { width: 460, height: 400 } })
+
+    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("counter-rule-1-poison"))
+    expect(openRule).toHaveBeenCalledWith("104.3d")
+    expect(table.adjustCounter).not.toHaveBeenCalled()
   })
 
   it("opens a designation's rule from the plus sheet without taking it", () => {
