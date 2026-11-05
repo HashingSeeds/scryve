@@ -167,7 +167,7 @@ describe("AppUtilityMenu", () => {
     fireEvent.press(view.getByTestId("utility-menu-button"))
 
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
-      width: 148,
+      width: 180,
       height: 216,
     })
   })
@@ -219,7 +219,7 @@ describe("AppUtilityMenu", () => {
     )
     fireEvent.press(view.getByTestId("utility-menu-button"))
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
-      width: 176,
+      width: 208,
       height: 270,
     })
 

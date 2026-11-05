@@ -7,7 +7,6 @@ import {
   TextInputProps,
   TextStyle,
   TouchableOpacity,
-  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native"
@@ -84,7 +83,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     ...TextInputProps
   } = props
   const input = useRef<TextInput>(null)
-  const { fontScale } = useWindowDimensions()
+  const multiline = TextInputProps.multiline ?? false
 
   const {
     themed,
@@ -106,7 +105,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     $styles.row,
     $inputWrapperStyle,
     status === "error" && { borderColor: colors.error },
-    TextInputProps.multiline ? { minHeight: 112 } : $singleLineWrapper,
+    multiline ? { minHeight: 112 } : $singleLineWrapper,
     LeftAccessory && { paddingStart: 0 },
     RightAccessory && { paddingEnd: 0 },
     $inputWrapperStyleOverride,
@@ -114,10 +113,9 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
 
   const $inputStyles: ThemedStyleArray<TextStyle> = [
     $inputStyle,
+    multiline && $multilineInputStyle,
     disabled && { color: colors.textDim },
     isRTL && { textAlign: "right" as TextStyle["textAlign"] },
-    fontScale > 1 && $scaledInputStyle,
-    TextInputProps.multiline && { height: "auto" },
     $inputStyleOverride,
   ]
 
@@ -163,14 +161,14 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
             style={themed($leftAccessoryStyle)}
             status={status}
             editable={!disabled}
-            multiline={TextInputProps.multiline ?? false}
+            multiline={multiline}
           />
         )}
 
         <TextInput
           ref={input}
           underlineColorAndroid={colors.transparent}
-          textAlignVertical="top"
+          textAlignVertical={multiline ? "top" : "center"}
           placeholder={placeholderContent}
           placeholderTextColor={colors.textDim}
           {...TextInputProps}
@@ -197,7 +195,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
             style={themed($rightAccessoryStyle)}
             status={status}
             editable={!disabled}
-            multiline={TextInputProps.multiline ?? false}
+            multiline={multiline}
           />
         )}
       </View>
@@ -231,13 +229,13 @@ const $inputWrapperStyle: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
 
 const $singleLineWrapper: ViewStyle = { minHeight: 44, alignItems: "center" }
 
+/** why: a fixed height left text high on Android; filling the wrapper lets each OS center it at any font scale. */
 const $inputStyle: ThemedStyle<TextStyle> = ({ colors, typography, spacing }) => ({
   flex: 1,
   alignSelf: "stretch",
   fontFamily: typography.primary.normal,
   color: colors.text,
   fontSize: 16,
-  height: 24,
   // https://github.com/facebook/react-native/issues/21720#issuecomment-532642093
   paddingVertical: 0,
   paddingHorizontal: 0,
@@ -245,7 +243,7 @@ const $inputStyle: ThemedStyle<TextStyle> = ({ colors, typography, spacing }) =>
   marginHorizontal: spacing.sm,
 })
 
-const $scaledInputStyle: TextStyle = { height: "auto", minHeight: 24 }
+const $multilineInputStyle: TextStyle = { minHeight: 24 }
 
 const $helperStyle: ThemedStyle<TextStyle> = ({ spacing }) => ({
   marginTop: spacing.xs,

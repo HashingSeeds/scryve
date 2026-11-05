@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import {
   Image,
   ImageStyle,
@@ -8,7 +9,7 @@ import {
   ViewProps,
   ViewStyle,
 } from "react-native"
-import Svg, { Circle, Path } from "react-native-svg"
+import Svg, { Circle, Path, Rect } from "react-native-svg"
 
 import { useAppTheme } from "@/theme/context"
 import { decorativeSvgProps } from "@/utils/decorativeSvgProps"
@@ -93,7 +94,7 @@ function IconImage({
   style?: StyleProp<ImageStyle>
 }) {
   if (icon in glyphRegistry) {
-    const Glyph = glyphRegistry[icon as keyof typeof glyphRegistry]
+    const glyph = glyphRegistry[icon as keyof typeof glyphRegistry]
     const side = size ?? GLYPH_SIZE
     return (
       <Svg
@@ -109,7 +110,7 @@ function IconImage({
         style={style as StyleProp<ViewStyle>}
         {...decorativeSvgProps({ accessible: false })}
       >
-        <Glyph />
+        {glyph(color)}
       </Svg>
     )
   }
@@ -137,7 +138,7 @@ export const iconRegistry = {
 
 const GLYPH_SIZE = 24
 
-/** why: header and row actions need these, and stroked SVG stays crisp at any size without @2x/@3x assets. */
+/** why: stroked SVG stays crisp at any size without @2x/@3x assets. Every glyph shares the Svg's one stroke weight. */
 const glyphRegistry = {
   back: () => <Path d="m15 18-6-6 6-6" />,
   arrowBack: () => <Path d="M19 12H5m7 7-7-7 7-7" />,
@@ -161,7 +162,43 @@ const glyphRegistry = {
       <Path d="M12 16v-4M12 8h.01" />
     </>
   ),
-}
+  decks: () => (
+    <>
+      <Rect x={7} y={3.5} width={12} height={15.5} rx={2} />
+      <Path d="M5 6.5v12a2 2 0 0 0 2 2h9" />
+    </>
+  ),
+  history: () => <Path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4M12 7.5V12l3 2" />,
+  events: () => (
+    <>
+      <Rect x={3.5} y={5} width={17} height={15.5} rx={2} />
+      <Path d="M3.5 10h17M8 3v4m8-4v4" />
+    </>
+  ),
+  nearby: (color) => (
+    <>
+      <Circle cx={12} cy={12} r={2} fill={color} />
+      <Path d="M7.8 7.8a6 6 0 0 0 0 8.4m8.4-8.4a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" />
+    </>
+  ),
+  account: () => (
+    <>
+      <Circle cx={12} cy={8} r={4} />
+      <Path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
+    </>
+  ),
+  support: () => (
+    <Path d="M12 20s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.5a4.3 4.3 0 0 1 7.5 2.5c0 5.6-7.5 10-7.5 10Z" />
+  ),
+  settings: () => (
+    <>
+      <Circle cx={12} cy={12} r={2.5} />
+      <Circle cx={12} cy={12} r={6.5} />
+      <Path d="M12 2.8v2.7m0 13v2.7M2.8 12h2.7m13 0h2.7M5.5 5.5l1.9 1.9m9.2 9.2 1.9 1.9m-13 0 1.9-1.9m9.2-9.2 1.9-1.9" />
+    </>
+  ),
+  update: () => <Path d="M12 4v11m-5-5 5 5 5-5M5 20h14" />,
+} satisfies Record<string, (color: string) => ReactNode>
 
 const $imageStyleBase: ImageStyle = {
   resizeMode: "contain",
