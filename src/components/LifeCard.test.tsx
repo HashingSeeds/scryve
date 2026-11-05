@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 import * as Reanimated from "react-native-reanimated"
+import type { ReactTestInstance } from "react-test-renderer"
 
 import {
   asActorId,
@@ -66,6 +67,14 @@ function card(life: number, onChange = jest.fn()) {
 }
 
 const renderCard = (life: number) => render(card(life))
+
+/** why: how far round its ring an arc's path runs, from its start at twelve o'clock to its end. */
+function arcSweep(path: ReactTestInstance) {
+  const [startX, startY, radius, , , , , endX, endY] = (path.props.animatedProps.d as string)
+    .match(/-?[\d.]+/g)!
+    .map(Number)
+  return Math.atan2(endX - startX, startY + radius - endY) / (2 * Math.PI)
+}
 
 describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())
@@ -359,7 +368,7 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-strip-seat-2")).toHaveProp("pointerEvents", "none")
     expect(view.getByLabelText("6 commander damage from Player 1")).toBeTruthy()
     expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("6")
-    // why: a connected game holds hits until Send, so the lit total follows the attack's running totals, the stronger partner's.
+    // why: a connected game holds hits until Send, so the lit totals follow the attack's running totals, one chip per partner.
     view.rerender(
       defendingCard({
         commanders: [
@@ -368,7 +377,8 @@ describe("LifeCard", () => {
         ],
       }),
     )
-    expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("11")
+    expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("8")
+    expect(view.getByTestId("commander-total-seat-2-partner")).toHaveTextContent("11")
     expect(view.getByTestId("commander-own-seat-2")).toHaveStyle({ opacity: 0.3 })
   })
 
@@ -453,12 +463,22 @@ describe("LifeCard", () => {
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
       nativeEvent: { layout: { width: 193, height: 420 } },
     })
-    const progress = view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" })
-    const [startX, startY, radius, , , , , endX, endY] = progress.props.animatedProps.d
-      .match(/-?[\d.]+/g)
-      .map(Number)
-    const sweep = Math.atan2(endX - startX, startY + radius - endY) / (2 * Math.PI)
-    expect(sweep).toBeCloseTo(6 / 21)
+    expect(arcSweep(view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" }))).toBeCloseTo(
+      6 / 21,
+    )
+  })
+
+  it("previews where the next hit lands toward lethal, and shows nothing when a tap deals nothing", () => {
+    const view = render(defendingCard({ commanders: [{ power: 3, total: 6 }], dealt: 3 }))
+    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 193, height: 420 } },
+    })
+    expect(
+      arcSweep(view.UNSAFE_getByProps({ testID: "commander-hit-preview-seat-2" })),
+    ).toBeCloseTo(9 / 21)
+
+    view.rerender(defendingCard({ commanders: [{ power: 3, total: 21 }], dealt: 0 }))
+    expect(view.UNSAFE_queryAllByProps({ testID: "commander-hit-preview-seat-2" })).toHaveLength(0)
   })
 
   it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
@@ -705,6 +725,49 @@ describe("LifeCard", () => {
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
+  it("opens an attack from a press on the grid's lower chips, which the hidden mark leaves to it", () => {
+    const ids = ["a", "b", "c", "d"].map(asPlayerId)
+    const onPressSword = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          commanderDamage={{
+            ownerPlayerId: ids[0],
+            ...commanderBoardSeats(
+              [
+                [0, 1],
+                [2, 3],
+              ],
+              ids,
+            ),
+            players: ids.map((id, seat) => ({ id, seat, name: id, life: 40, color: "#B85636" })),
+            incoming: { [ids[3]]: 4 },
+            lethal: 21,
+            onPressSword,
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 300 } },
+    })
+
+    const chip = (id: string) =>
+      view.getByTestId(`commander-pip-seat-1-${id}`, { includeHiddenElements: true })
+    fireEvent.press(chip(ids[3]))
+    fireEvent.press(chip(ids[2]))
+    expect(onPressSword).toHaveBeenCalledTimes(2)
+    expect(view.getByTestId("life-identity-seat-1", { includeHiddenElements: true })).toHaveProp(
+      "pointerEvents",
+      "none",
+    )
+  })
+
   it("lets the name run the whole row when no commander strip holds the far corner", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -905,14 +968,14 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-name-seat-1-partner")).toHaveTextContent("Kraum")
   })
 
-  it("turns the attacking card into its mark and commander power", () => {
+  it("turns the attacking card into its mark and commander power, with its life under the power", () => {
     const onPressSword = jest.fn()
-    const onPowerStep = jest.fn()
+    const onPower = jest.fn()
     const damage = commanderDamage({
       players: commanderPlayers,
       armedPlayerId: commanderIds[0],
       commanders: [{ power: 3, total: 0 }],
-      onPowerStep,
+      onPower,
       onPressSword,
     })
     const view = render(
@@ -929,6 +992,7 @@ describe("LifeCard", () => {
     )
 
     expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("3")
+    expect(view.getByTestId("commander-attacker-life-seat-1")).toHaveTextContent("20")
     expect(view.queryByText("Done")).toBeNull()
     expect(
       view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
@@ -939,9 +1003,16 @@ describe("LifeCard", () => {
     ).toHaveProp("pointerEvents", "none")
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
     fireEvent.press(view.getByTestId("commander-power-down-seat-1"))
-    expect(onPowerStep.mock.calls).toEqual([
-      [1, 0],
-      [-1, 0],
+    fireEvent.press(view.getByTestId("commander-power-seat-1"))
+    const field = view.getByTestId("commander-power-input-seat-1")
+    expect(field).toHaveProp("keyboardType", "number-pad")
+    fireEvent.changeText(field, "1x2")
+    fireEvent(field, "blur")
+    expect(view.queryByTestId("commander-power-input-seat-1")).toBeNull()
+    expect(onPower.mock.calls).toEqual([
+      [4, 0],
+      [2, 0],
+      [12, 0],
     ])
     fireEvent.press(view.getByTestId("commander-exit-seat-1"))
     expect(onPressSword).toHaveBeenCalledTimes(1)
@@ -1579,7 +1650,10 @@ describe("LifeCard", () => {
       </ThemeProvider>,
     )
     expect(view.getByTestId("life-eliminated-seat-1")).toBeTruthy()
-    expect(view.getByTestId("life-out-amount-seat-1").props.children).toBe("21")
+    // why: life stays the big number, with the lethal amount small under it.
+    const readout = within(view.getByTestId("life-readout-seat-1"))
+    expect(readout.getAllByText(/^\d+$/).map((text) => text.props.children)).toEqual(["13", "21"])
+    expect(view.getByTestId("life-out-amount-seat-1")).toHaveStyle({ fontSize: 26 })
     const minus = view.getByTestId(lifeControlTestId(1, -1))
     expect(minus).toHaveProp("accessibilityState", { disabled: true })
     expect(minus).toHaveProp("accessibilityHint", "out: commander damage")

@@ -7,7 +7,7 @@ import {
   type AttackChange,
   type AttackState,
 } from "./commanderAttack"
-import { asPlayerId, commanderDamageKey, PARTNER_COMMANDER } from "./domain"
+import { asPlayerId, commanderDamageKey, MAX_COMMANDER_DAMAGE, PARTNER_COMMANDER } from "./domain"
 import type { CommanderSlot, PlayerId } from "./types"
 
 const ada = asPlayerId("ada")
@@ -60,24 +60,26 @@ const press = (playerId: PlayerId): AttackAction => ({ type: "press", playerId }
 const send: AttackAction = { type: "send" }
 
 describe("commander attack", () => {
-  it("commits each partner's power to its own total on one hit, leaving a benched partner out", () => {
+  it("lands a fresh partner attack on the first commander, splits it once the partner is raised, and leaves a partner at 0 out", () => {
     const board = attack({ commanders: [{ power: 2 }, { power: 4 }] })
-    board.run(press(ada), hit(grace), { type: "bench", slot: 0 }, hit(grace))
+    board.run(press(ada), hit(grace), { type: "power", slot: 1, power: 4 }, hit(grace))
+    board.run({ type: "power", slot: 0, power: 0 }, hit(grace))
 
     expect(board.commits).toEqual([
+      [{ toPlayerId: grace, delta: 2 }],
       [
         { toPlayerId: grace, delta: 2 },
         { toPlayerId: grace, commander: PARTNER_COMMANDER, delta: 4 },
       ],
       [{ toPlayerId: grace, commander: PARTNER_COMMANDER, delta: 4 }],
     ])
-    expect(board.view(grace).commanders.map(({ total }) => total)).toEqual([2, 8])
+    expect(board.view(grace).commanders.map(({ total }) => total)).toEqual([4, 8])
   })
 
   it("undoes the last hit, then the current power, and stops at zero", () => {
     const board = attack({ recorded: { [commanderDamageKey(ada, grace)]: 2 } })
-    board.run(press(ada), { type: "power", slot: 0, step: 1 }, { type: "power", slot: 0, step: 1 })
-    board.run(hit(grace), { type: "power", slot: 0, step: -1 }, undo(grace))
+    board.run(press(ada), { type: "power", slot: 0, power: 3 })
+    board.run(hit(grace), { type: "power", slot: 0, power: 2 }, undo(grace))
     expect(board.view(grace).commanders[0].total).toBe(2)
 
     board.run(undo(grace), undo(grace), undo(grace))
@@ -102,7 +104,8 @@ describe("commander attack", () => {
       commanders: [{ power: 2 }, { power: 4 }],
       buffered: true,
     })
-    board.run(press(ada), hit(grace), hit(katherine), undo(katherine))
+    board.run(press(ada), { type: "power", slot: 1, power: 4 })
+    board.run(hit(grace), hit(katherine), undo(katherine))
 
     expect(board.commits).toEqual([])
     expect(board.view(grace).commanders.map(({ total }) => total)).toEqual([2, 23])
@@ -133,16 +136,22 @@ describe("commander attack", () => {
     expect(board.state()).toMatchObject({ armed: katherine, acted: false })
   })
 
-  it("keeps a commander's power between 1 and the cap across attacks, and benches one partner at a time", () => {
-    const board = attack({ commanders: [{ power: 1 }, { power: 3 }] })
-    board.run(press(ada), { type: "power", slot: 0, step: -1 }, { type: "power", slot: 1, step: 1 })
-    board.run({ type: "bench", slot: 0 }, { type: "bench", slot: 1 }, send, press(ada))
+  it("starts at the printed power, lets a partner reach 0 but a lone commander only 1, and keeps a typed power across attacks", () => {
+    const board = attack({ commanders: [{ power: 3 }, { power: 5 }] })
+    board.run(press(ada))
+    expect(board.view(grace).commanders.map(({ power }) => power)).toEqual([3, 0])
 
+    board.run({ type: "power", slot: 0, power: -2 }, { type: "power", slot: 1, power: 7.6 })
+    board.run(send, press(ada))
     expect(board.view(grace).commanders).toEqual([
-      { name: undefined, power: 1, benched: false, total: 0 },
-      { name: undefined, power: 4, benched: false, total: 0 },
+      { name: undefined, power: 0, total: 0 },
+      { name: undefined, power: 7, total: 0 },
     ])
-    board.run({ type: "bench", slot: 0 }, { type: "bench", slot: 1 })
-    expect(board.view(grace).commanders.map(({ benched }) => benched)).toEqual([true, false])
+
+    const lone = attack({ commanders: [{}] })
+    lone.run(press(ada))
+    expect(lone.view(grace).commanders[0].power).toBe(1)
+    lone.run({ type: "power", slot: 0, power: 0 }, { type: "power", slot: 0, power: 500 })
+    expect(lone.view(grace).commanders[0].power).toBe(MAX_COMMANDER_DAMAGE)
   })
 })

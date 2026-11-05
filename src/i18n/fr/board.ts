@@ -371,7 +371,6 @@ export default {
     lowerPower: "Réduire la puissance du commandant",
     raisePowerOf: "Augmenter la puissance de {{name}}",
     lowerPowerOf: "Réduire la puissance de {{name}}",
-    partnerAttacks: "{{name}} attaque",
     unnamed: "Commandant",
     totalFrom: "{{damage}} blessures de commandant infligées par {{name}}",
     amountFrom: "{{amount}} de {{name}}",

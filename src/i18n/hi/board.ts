@@ -357,7 +357,6 @@ export default {
     lowerPower: "कमांडर पावर घटाएँ",
     raisePowerOf: "{{name}} की पावर बढ़ाएँ",
     lowerPowerOf: "{{name}} की पावर घटाएँ",
-    partnerAttacks: "{{name}} अटैक करता है",
     unnamed: "कमांडर",
     totalFrom: "{{name}} से {{damage}} कमांडर डैमेज",
     amountFrom: "{{name}} से {{amount}}",

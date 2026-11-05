@@ -46,10 +46,11 @@ import {
 import {
   commanderTakeover,
   lifeInk,
+  OUT_CAUSE,
   OUT_CAUSE_GAP,
+  OUT_CAUSE_GLYPH,
   OUT_LABEL,
   outInk,
-  STRUCK_LIFE,
   type CommanderBoardSeat,
   type CommanderFacing,
   type CommanderReach,
@@ -95,6 +96,8 @@ import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex
 
 // why: matches the attacker's power boxes swapping in, so the life total and its − and + cross-fade with them.
 const LIFE_FADE_MS = SWAP_MS
+// why: about the number pad's own rise, so the card moves up with it.
+const LIFT_MS = 250
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -103,14 +106,14 @@ export type LifeCardCommanderDamage = {
   ownerPlayerId: PlayerId
   seats: readonly CommanderBoardSeat[]
   incoming: Record<PlayerId, number>
+  split?: Record<PlayerId, readonly number[]>
   lethal: number
   armedPlayerId?: PlayerId | null
   onPressSword?: () => void
   attackerName?: string
   attacker?: CommanderAttacker
   commanders?: readonly ArmedCommander[]
-  onPowerStep?: (step: 1 | -1, index: number) => void
-  onToggleCommander?: (index: number) => void
+  onPower?: (power: number, index: number) => void
   facing?: CommanderFacing
   reach?: CommanderReach
   dealt?: number
@@ -276,8 +279,6 @@ export const LifeCard = memo(function LifeCard({
   const armedCommanders = commanderDamage?.commanders ?? [
     { power: 1, total: (armedCommanderId && commanderDamage?.incoming[armedCommanderId]) || 0 },
   ]
-  const causeFontSize = out && out.cause !== "life" ? fontSizeFor(String(out.amount).length) : 0
-  const causeGlyphSize = Math.round(causeFontSize * 0.5)
   const causeGlyphShown =
     out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
   // why: the disc rings whatever the readout shows, so an out seat's stacked readout gets a disc of its own size.
@@ -290,17 +291,20 @@ export const LifeCard = memo(function LifeCard({
           below: { ...OUT_LABEL, chars: translate("board:lifeCard.outLabel").length },
         })
       : outInk({
-          fontSize: causeFontSize,
-          digits: String(out.amount).length,
-          lead: causeGlyphShown ? causeGlyphSize + OUT_CAUSE_GAP : 0,
-          below: { ...STRUCK_LIFE, chars: shownDigits },
+          fontSize: resolvedLifeFontSize,
+          digits: shownDigits,
+          below: {
+            ...OUT_CAUSE,
+            chars: String(out.amount).length,
+            lead: causeGlyphShown ? OUT_CAUSE_GLYPH + OUT_CAUSE_GAP : 0,
+          },
         })
   const takeover =
     defending && cardSize.width > 0
       ? commanderTakeover({
           card: cardSize,
           rotation: contentRotation,
-          lifeFontSize: out && out.cause !== "life" ? causeFontSize : resolvedLifeFontSize,
+          lifeFontSize: resolvedLifeFontSize,
           ink: readoutInk,
           reach: commanderDamage?.reach,
         })
@@ -309,6 +313,18 @@ export const LifeCard = memo(function LifeCard({
     id: armedCommanderId,
     color: commanderDamage?.attacker?.color,
   })
+  // why: the attacker's power field lifts its card clear of the number pad, straight up the screen whichever way the board is turned.
+  const lift = useSharedValue(0)
+  const liftAxis = {
+    x: -Math.sin((boardRotation * Math.PI) / 180),
+    y: -Math.cos((boardRotation * Math.PI) / 180),
+  }
+  const liftCard = useCallback(
+    (amount: number) => {
+      lift.value = withTiming(amount, { duration: motionDuration(reducedMotion, LIFT_MS) })
+    },
+    [lift, reducedMotion],
+  )
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -317,9 +333,10 @@ export const LifeCard = memo(function LifeCard({
           submit: commanderDamage.armBar?.stagedTargets ? "send" : "done",
           mark: { color, shape, seatNumber },
           commanders: armedCommanders,
+          life: { value: shownLife, label: counterValueLabel(system, life) },
           acted: !!commanderDamage.acted,
-          onPowerStep: commanderDamage.onPowerStep ?? (() => {}),
-          onToggle: commanderDamage.onToggleCommander ?? (() => {}),
+          onPower: commanderDamage.onPower ?? (() => {}),
+          onLift: liftCard,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
         }
       : commanderDamage && defending
@@ -361,7 +378,7 @@ export const LifeCard = memo(function LifeCard({
         flood: shownFlood,
       }
     : undefined
-  // why: a connected game holds hits until the attacker sends them, so the lit total reads the attack's own running totals, the stronger partner's, to move with each tap.
+  // why: a connected game holds hits until the attacker sends them, so the lit totals read the attack's own running totals, one per partner, to move with each tap.
   const stripIncoming =
     defending && armedCommanderId && commanderDamage
       ? {
@@ -369,6 +386,10 @@ export const LifeCard = memo(function LifeCard({
           [armedCommanderId]: Math.max(...armedCommanders.map(({ total }) => total)),
         }
       : undefined
+  const stripSplit =
+    defending && armedCommanderId && commanderDamage
+      ? { ...commanderDamage.split, [armedCommanderId]: armedCommanders.map(({ total }) => total) }
+      : commanderDamage?.split
   // why: a readout too big for its disc shrinks into it as the shadow's edge passes the disc, and grows back as it drains.
   const readoutFit = floodedBy.takeover?.fit ?? 1
   const fitFlood = readoutFit < 1 ? shownFlood : undefined
@@ -425,8 +446,8 @@ export const LifeCard = memo(function LifeCard({
   }
   const knockStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: knock.value * knockDirection.x * KNOCKBACK },
-      { translateY: knock.value * knockDirection.y * KNOCKBACK },
+      { translateX: knock.value * knockDirection.x * KNOCKBACK + lift.value * liftAxis.x },
+      { translateY: knock.value * knockDirection.y * KNOCKBACK + lift.value * liftAxis.y },
     ],
   }))
   const lifeControlsShown =
@@ -608,17 +629,19 @@ export const LifeCard = memo(function LifeCard({
               />
             </View>
           ) : out ? (
+            // why: life stays the big number; the mark or glyph of what knocked the seat out and its lethal amount sit small under it.
             <View style={[$outReadout, contentRotationStyle]}>
-              <View style={$outCause}>
+              {lifeTotal(lifeFontStyle)}
+              <View testID={`life-out-cause-seat-${seatNumber}`} style={$outCause}>
                 {out.cause === "counter" ? (
-                  <TableGlyph id={out.counterId} size={causeGlyphSize} color={foreground} />
+                  <TableGlyph id={out.counterId} size={OUT_CAUSE_GLYPH} color={foreground} />
                 ) : out.attacker ? (
                   <PlayerMark
                     seatNumber={out.attacker.seatNumber}
                     shape={out.attacker.shape}
                     color={foreground}
                     insetSwordColor={color}
-                    size={causeGlyphSize}
+                    size={OUT_CAUSE_GLYPH}
                   />
                 ) : null}
                 <Text
@@ -626,20 +649,11 @@ export const LifeCard = memo(function LifeCard({
                   text={String(out.amount)}
                   weight="bold"
                   accessible={false}
-                  maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
+                  maxFontSizeMultiplier={1}
                   numberOfLines={1}
-                  style={[
-                    themed($life),
-                    $outAmount,
-                    {
-                      fontSize: causeFontSize,
-                      lineHeight: getLifeLineHeight(causeFontSize),
-                      color: foreground,
-                    },
-                  ]}
+                  style={[$outAmount, { color: foreground }]}
                 />
               </View>
-              {lifeTotal(themed($struckLife))}
             </View>
           ) : (
             lifeTotal(lifeFontStyle, contentRotationStyle)
@@ -722,6 +736,7 @@ export const LifeCard = memo(function LifeCard({
           players={commanderDamage.players ?? []}
           seats={commanderDamage.seats}
           incoming={stripIncoming ?? commanderDamage.incoming}
+          split={stripSplit}
           lethal={commanderDamage.lethal}
           foreground={stripAttack ? SHADOW_INK : foreground}
           cardColor={color}
@@ -794,7 +809,8 @@ export const LifeCard = memo(function LifeCard({
           >
             <View
               testID={`life-identity-seat-${seatNumber}`}
-              pointerEvents={cornerTouches}
+              // why: the corner layer draws above the grid, so the hidden mark and name would swallow touches meant for the grid's lower chips.
+              pointerEvents={commanderStripShown ? "none" : cornerTouches}
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
@@ -1165,19 +1181,24 @@ const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
 
 const $outReadout: ViewStyle = { width: "100%", alignItems: "center" }
 
-const $outCause: ViewStyle = { flexDirection: "row", alignItems: "center", gap: OUT_CAUSE_GAP }
+const $outCause: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: OUT_CAUSE_GAP,
+  height: OUT_CAUSE.lineHeight,
+  marginTop: OUT_CAUSE.marginTop,
+}
 
-const $outAmount: TextStyle = { width: "auto" }
+const $outAmount: TextStyle = {
+  fontSize: OUT_CAUSE.fontSize,
+  lineHeight: OUT_CAUSE.lineHeight,
+  fontVariant: ["tabular-nums"],
+}
 
 const $outLabel: ThemedStyle<TextStyle> = () => ({
   ...OUT_LABEL,
   letterSpacing: 2,
   textTransform: "uppercase",
-})
-
-const $struckLife: ThemedStyle<TextStyle> = () => ({
-  ...STRUCK_LIFE,
-  textDecorationLine: "line-through",
 })
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })

@@ -78,6 +78,14 @@ function strongerCommander(
   return incoming
 }
 
+/** why: a seat hit by both partners of one attacker reads each partner's total, since lethal counts per commander. */
+function partnerTotals(first: Record<PlayerId, number>, partner: Record<PlayerId, number>) {
+  const split: Record<PlayerId, readonly number[]> = {}
+  for (const [playerId, total] of Object.entries(partner) as [PlayerId, number][])
+    if (total > 0) split[playerId] = [first[playerId] ?? 0, total]
+  return split
+}
+
 export interface DiceGridBinding {
   armed: LifeCardDice["armed"] | null
   leaving?: LifeCardDice["armed"] | null
@@ -521,6 +529,7 @@ export function PlayerGrid({
                             players: commanderPlayers,
                             seats: boardSeats.seats,
                             incoming: strongerCommander(firstIncoming, partnerIncoming),
+                            split: partnerTotals(firstIncoming, partnerIncoming),
                             lethal: commanderDamage.lethal,
                             armedPlayerId: attack.armedPlayerId,
                             attackerName: armedPlayer?.name,
@@ -533,13 +542,8 @@ export function PlayerGrid({
                             commanders: strike?.commanders,
                             dealt: strike?.dealt,
                             takeBack: strike?.takeBack,
-                            onPowerStep: stable(
-                              `power:${player.id}`,
-                              (step: 1 | -1, slot: number) =>
-                                attack.dispatch({ type: "power", slot, step }),
-                            ),
-                            onToggleCommander: stable(`toggle:${player.id}`, (slot: number) =>
-                              attack.dispatch({ type: "bench", slot }),
+                            onPower: stable(`power:${player.id}`, (power: number, slot: number) =>
+                              attack.dispatch({ type: "power", slot, power }),
                             ),
                             facing:
                               armedIndex >= 0

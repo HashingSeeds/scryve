@@ -1,4 +1,12 @@
-import { memo, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
+import {
+  Fragment,
+  memo,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
@@ -51,6 +59,8 @@ export interface CommanderStripProps {
   players: readonly CommanderBoardPlayer[]
   seats: readonly CommanderBoardSeat[]
   incoming: Record<PlayerId, number>
+  /** why: each partner's total for an attacker whose partners have both dealt damage here, since lethal counts per commander. */
+  split?: Record<PlayerId, readonly number[]>
   lethal: number
   foreground: string
   /** why: the seat's own color, cut into its mark as the sword. */
@@ -106,6 +116,12 @@ export function commanderGridShown({
   return attacked || commanderDamageDealers(players, ownerPlayerId, incoming).length > 0
 }
 
+/** why: an attacker's partners each get a chip once both have dealt damage; otherwise its one total. */
+export function chipTotals(total: number, split?: readonly number[]) {
+  const dealt = split?.filter((amount) => amount > 0) ?? []
+  return dealt.length > 1 ? dealt : [total]
+}
+
 export type CommanderDamageTier = "calm" | "significant" | "nearLethal"
 
 /** why: one attacker's total reads on its cell's ring alone, orange from half of lethal and oxblood within five of it, so a crowded grid gains no extra marks. */
@@ -122,6 +138,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   players,
   seats,
   incoming,
+  split,
   lethal,
   foreground,
   cardColor,
@@ -186,7 +203,9 @@ export const CommanderStrip = memo(function CommanderStrip({
   // why: a seat no one has damaged grows its grid out of its mark only for the attack, and folds it back after.
   const attackOnly = dealt.length === 0
   const grow: Grow = { attackOnly, lit, flight: source?.flight }
-  const ownCell = ownCellCenter(boardRows, ownerPlayerId, { disc, gap: cellGap, pad })
+  const chips = (playerId: PlayerId) =>
+    playerId === ownerPlayerId ? [0] : chipTotals(incoming[playerId] ?? 0, split?.[playerId])
+  const ownCell = ownCellCenter(boardRows, ownerPlayerId, chips, { disc, gap: cellGap, pad })
   const flightFrom =
     markAnchor && ownCell && stripBounds && mapBounds
       ? {
@@ -211,11 +230,10 @@ export const CommanderStrip = memo(function CommanderStrip({
   if (attackOnly && !attackerId && !sourceShown) return null
   const attackerName = players.find(({ id }) => id === attackerId)?.name
   const sources = dealt
-    .map((player) =>
-      translate("board:commander.amountFrom", {
-        amount: incoming[player.id],
-        name: player.name,
-      }),
+    .flatMap((player) =>
+      chips(player.id).map((amount) =>
+        translate("board:commander.amountFrom", { amount, name: player.name }),
+      ),
     )
     .join(", ")
   const finishing = source?.active
@@ -250,14 +268,20 @@ export const CommanderStrip = memo(function CommanderStrip({
         accessibilityState={{ disabled: !!disabled && !finishing }}
         accessible={!attackerId}
         disabled={finishing ? false : disabled || !!attackerId || sourceShown}
+        // why: the grid's slop reaches only toward the card's edges, so it never takes touches from the − and + or the total.
         hitSlop={
           mapBounds
             ? targetSlop(
                 mapBounds,
-                { [corner[0]]: offsets[corner[0]], [corner[1]]: offsets[corner[1]] },
+                {
+                  [corner[0]]: offsets[corner[0]],
+                  [corner[1]]: offsets[corner[1]],
+                  [OPPOSITE[corner[0]]]: 0,
+                  [corner[2]]: 0,
+                },
                 8,
               )
-            : 8
+            : 0
         }
         onPress={finishing ? source.onSubmit : onPress}
         style={({ pressed }) => [themed($map), pressed && { opacity: 0.72 }]}
@@ -265,7 +289,6 @@ export const CommanderStrip = memo(function CommanderStrip({
         {boardRows.map((row, rowIndex) => (
           <View
             key={rowIndex}
-            pointerEvents="none"
             accessibilityElementsHidden={!attackerId}
             importantForAccessibility={attackerId ? "auto" : "no-hide-descendants"}
             style={themed($mapRow)}
@@ -309,22 +332,8 @@ export const CommanderStrip = memo(function CommanderStrip({
                     ) : null}
                   </Eased>
                 )
-              const total = incoming[playerId] ?? 0
               const ink = accessibleForeground(player.color)
               const attacking = playerId === attackerId
-              const restOpacity = sourceShown ? FADED_OPACITY : total === 0 ? IDLE_OPACITY : 1
-              const tier = commanderDamageTier(total, lethal)
-              const restBorder =
-                tier === "calm" ? overlayTint(foreground, RIM_ALPHA) : TIER_RING[tier]
-              const count = (
-                <Text
-                  testID={attacking ? `commander-total-seat-${seatNumber}` : undefined}
-                  text={String(total)}
-                  weight="bold"
-                  maxFontSizeMultiplier={1}
-                  style={[themed(compact ? $compactCount : $count), { color: ink }, glyphRotation]}
-                />
-              )
               const mark = (
                 <PlayerMark
                   seatNumber={playerIndex + 1}
@@ -334,56 +343,83 @@ export const CommanderStrip = memo(function CommanderStrip({
                   size={Math.round(disc * 0.5)}
                 />
               )
-              const pip = (
-                <Pip
-                  key={playerId}
-                  testID={`commander-pip-seat-${seatNumber}-${playerId}`}
-                  accessible={attacking}
-                  accessibilityLabel={
-                    attacking
-                      ? translate("board:commander.totalFrom", {
-                          damage: total,
-                          name: attackerName,
-                        })
-                      : undefined
-                  }
-                  lit={lit}
-                  rest={{ opacity: restOpacity, border: restBorder }}
-                  attacked={
-                    attacking
-                      ? { opacity: 1, border: tier === "calm" ? foreground : restBorder }
-                      : attackerId
-                        ? { opacity: FADED_OPACITY, border: restBorder }
-                        : { opacity: restOpacity, border: restBorder }
-                  }
-                  style={[
-                    themed($disc),
-                    size,
-                    { backgroundColor: player.color },
-                    tier !== "calm" && $tierDisc,
-                  ]}
-                >
-                  {total > 0 ? (
-                    count
-                  ) : attacking ? (
-                    // why: an attacker that has dealt nothing yet turns its mark into its 0 as the shadow reaches the strip.
-                    <>
-                      <Eased lit={lit} rest={1} attacked={0}>
-                        {mark}
-                      </Eased>
-                      <Eased lit={lit} rest={0} attacked={1} style={$overlaid}>
-                        {count}
-                      </Eased>
-                    </>
-                  ) : (
-                    mark
-                  )}
-                </Pip>
-              )
               return (
-                <Grown key={playerId} grow={grow}>
-                  {attacking ? <Pop value={total}>{pip}</Pop> : pip}
-                </Grown>
+                <Fragment key={playerId}>
+                  {chips(playerId).map((total, index) => {
+                    const partner = index > 0
+                    const restOpacity = sourceShown ? FADED_OPACITY : total === 0 ? IDLE_OPACITY : 1
+                    const tier = commanderDamageTier(total, lethal)
+                    const restBorder =
+                      tier === "calm" ? overlayTint(foreground, RIM_ALPHA) : TIER_RING[tier]
+                    const count = (
+                      <Text
+                        testID={
+                          attacking
+                            ? `commander-total-seat-${seatNumber}${partner ? "-partner" : ""}`
+                            : undefined
+                        }
+                        text={String(total)}
+                        weight="bold"
+                        maxFontSizeMultiplier={1}
+                        style={[
+                          themed(compact ? $compactCount : $count),
+                          { color: ink },
+                          glyphRotation,
+                        ]}
+                      />
+                    )
+                    const pip = (
+                      <Pip
+                        testID={`commander-pip-seat-${seatNumber}-${playerId}${partner ? "-partner" : ""}`}
+                        accessible={attacking}
+                        accessibilityLabel={
+                          attacking
+                            ? translate("board:commander.totalFrom", {
+                                damage: total,
+                                name: attackerName,
+                              })
+                            : undefined
+                        }
+                        lit={lit}
+                        rest={{ opacity: restOpacity, border: restBorder }}
+                        attacked={
+                          attacking
+                            ? { opacity: 1, border: tier === "calm" ? foreground : restBorder }
+                            : attackerId
+                              ? { opacity: FADED_OPACITY, border: restBorder }
+                              : { opacity: restOpacity, border: restBorder }
+                        }
+                        style={[
+                          themed($disc),
+                          size,
+                          { backgroundColor: player.color },
+                          tier !== "calm" && $tierDisc,
+                        ]}
+                      >
+                        {total > 0 ? (
+                          count
+                        ) : attacking ? (
+                          // why: an attacker that has dealt nothing yet turns its mark into its 0 as the shadow reaches the strip.
+                          <>
+                            <Eased lit={lit} rest={1} attacked={0}>
+                              {mark}
+                            </Eased>
+                            <Eased lit={lit} rest={0} attacked={1} style={$overlaid}>
+                              {count}
+                            </Eased>
+                          </>
+                        ) : (
+                          mark
+                        )}
+                      </Pip>
+                    )
+                    return (
+                      <Grown key={index} grow={grow}>
+                        {attacking ? <Pop value={total}>{pip}</Pop> : pip}
+                      </Grown>
+                    )
+                  })}
+                </Fragment>
               )
             })}
           </View>
@@ -393,19 +429,23 @@ export const CommanderStrip = memo(function CommanderStrip({
   )
 }, structurallyEqual)
 
-/** why: the own cell's center inside the map, from the same disc, gap, and padding the map lays out with, so the flight lands before the cell could report its own layout. Rows are centered, so a short row starts in by half its missing cells. */
+/** why: the own cell's center inside the map, from the same disc, gap, and padding the map lays out with, so the flight lands before the cell could report its own layout. Rows are centered, so a short row starts in by half its missing chips; a seat whose partners both dealt damage takes two. */
 function ownCellCenter(
   rows: readonly (readonly CommanderBoardSeat[])[],
   ownerPlayerId: PlayerId,
+  chips: (playerId: PlayerId) => readonly number[],
   { disc, gap, pad }: { disc: number; gap: number; pad: number },
 ) {
-  const widest = Math.max(...rows.map((row) => row.length))
+  const widths = rows.map((row) => row.map(({ playerId }) => chips(playerId).length))
+  const length = (counts: readonly number[]) => counts.reduce((sum, count) => sum + count, 0)
+  const widest = Math.max(...widths.map(length))
   const step = disc + gap
   for (const [rowIndex, row] of rows.entries()) {
     const column = row.findIndex(({ playerId }) => playerId === ownerPlayerId)
     if (column < 0) continue
+    const before = length(widths[rowIndex].slice(0, column))
     return {
-      x: pad + ((widest - row.length) * step) / 2 + column * step + disc / 2,
+      x: pad + ((widest - length(widths[rowIndex])) * step) / 2 + before * step + disc / 2,
       y: pad + rowIndex * step + disc / 2,
     }
   }
@@ -542,6 +582,8 @@ function stripDirection(rotation: LifeCardContentRotation): ViewStyle["flexDirec
 }
 
 /** why: the grid takes the corner the seat's mark and name sit in: the edge, the side it starts from, and the side that bounds its run. */
+const OPPOSITE = { top: "bottom", bottom: "top", left: "right", right: "left" } as const
+
 const STRIP_CORNER = {
   0: ["bottom", "left", "right"],
   180: ["top", "right", "left"],

@@ -107,9 +107,8 @@ describe("commander damage board layout", () => {
   it("shrinks a readout too big for its card into the disc", () => {
     const ink = outInk({
       fontSize: 100,
-      digits: 2,
-      lead: 56,
-      below: { fontSize: 22, lineHeight: 28, chars: 2 },
+      digits: 3,
+      below: { fontSize: 26, lineHeight: 30, chars: 2, lead: 36 },
     })
     const { disc, fit } = commanderTakeover({
       card: { width: 390, height: 230 },
