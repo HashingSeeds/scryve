@@ -40,8 +40,15 @@ export interface LifeCardDice {
   leaving?: boolean
   chips?: readonly DiceSeatChip[]
   onPress: () => void
+  bag?: SeatDiceBag
   onChoose?: (order: "first" | "second") => void
   onPressChip?: (chip: DiceSeatChip) => void
+}
+
+export interface SeatDiceBag {
+  tools: readonly DiceTool[]
+  rollFor: (tool: DiceTool) => void
+  armForOthers: (tool: DiceTool) => void
 }
 
 export function diceCoversSeat(dice: LifeCardDice | undefined): boolean {

@@ -33,6 +33,7 @@ function chipsElement(table: SeatTable, props: Partial<CounterChipsProps> = {}) 
         foreground="#FFFFFF"
         contentRotation={0}
         cardSize={{ width: 320, height: 400 }}
+        bagAt={{ right: 16, bottom: 16 }}
         {...props}
       />
     </ThemeProvider>
@@ -63,74 +64,86 @@ describe("CounterChips", () => {
     const table = seat({ held: ["initiative"] })
     const view = chips(table)
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     const tax = view.getByTestId("counter-option-1-commanderTax")
     expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
     fireEvent.press(tax)
     expect(table.adjustCounter).toHaveBeenCalledWith("commanderTax", 2)
     expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     fireEvent.press(view.getByTestId("designation-option-1-monarch"))
     expect(table.takeDesignation).toHaveBeenCalledWith("monarch")
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     fireEvent.press(view.getByLabelText("Give up Initiative"))
     expect(table.releaseDesignation).toHaveBeenCalledWith("initiative")
   })
 
-  it("shortens Commander tax only when the sheet's columns are too narrow for it", () => {
-    const wide = chips(seat(), { cardSize: { width: 460, height: 400 } })
-    fireEvent.press(wide.getByTestId("counter-add-seat-1"))
-    expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("0Commander tax")
+  it("shortens Commander tax only when its column is too narrow, and moves its rule to a long press when the column is narrower still", () => {
+    const rules = { tableItemRules: { commanderTax: "903.8" }, openRule: jest.fn() }
+    const wide = chips(seat(rules), { cardSize: { width: 500, height: 400 } })
+    fireEvent.press(wide.getByTestId("seat-bag-seat-1"))
+    expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("Commander tax")
+    expect(wide.getByTestId("counter-rule-1-commanderTax")).toBeTruthy()
     wide.unmount()
 
-    const rules = { tableItemRules: { commanderTax: "903.8" }, openRule: jest.fn() }
     const narrow = chips(seat(rules), { cardSize: { width: 320, height: 400 } })
-    fireEvent.press(narrow.getByTestId("counter-add-seat-1"))
+    fireEvent.press(narrow.getByTestId("seat-bag-seat-1"))
     const tax = narrow.getByTestId("counter-option-1-commanderTax")
-    expect(tax).toHaveTextContent("0Tax")
+    expect(tax).toHaveTextContent("Tax")
     expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
-    expect(narrow.queryByTestId("counter-rule-1-commanderTax")).toBeNull()
+    expect(narrow.getByTestId("counter-rule-1-commanderTax")).toBeTruthy()
     narrow.unmount()
 
-    const withRule = chips(seat(rules), { cardSize: { width: 460, height: 400 } })
-    fireEvent.press(withRule.getByTestId("counter-add-seat-1"))
-    expect(withRule.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("0Tax")
-    expect(withRule.getByTestId("counter-rule-1-commanderTax")).toBeTruthy()
+    const tight = chips(seat(rules), { cardSize: { width: 240, height: 400 } })
+    fireEvent.press(tight.getByTestId("seat-bag-seat-1"))
+    expect(tight.queryByTestId("counter-rule-1-commanderTax")).toBeNull()
+    fireEvent(tight.getByTestId("counter-option-1-commanderTax"), "longPress")
+    expect(rules.openRule).toHaveBeenCalledWith("903.8")
   })
 
-  it("keeps a compact plus's reach off the chip beside it and inside the card", () => {
-    const view = chips(seat({ counters: { poison: 1 } }), { compact: true })
-    const plus = view.getByTestId("counter-add-seat-1")
-    const { left, top } = plus.props.hitSlop
-    expect(StyleSheet.flatten(plus.props.style).marginLeft).toBe(left)
-    const rowTop = StyleSheet.flatten(view.getByTestId("counter-chips-seat-1").props.style).top
-    expect(top).toBeLessThanOrEqual(rowTop)
-    expect(top + plus.props.hitSlop.bottom + 32).toBe(48)
-  })
-
-  it("reaches down, not into the row above, once the plus wraps", () => {
-    const view = chips(seat({ counters: { poison: 1 } }), { compact: true })
-    const plus = view.getByTestId("counter-add-seat-1")
-    fireEvent(plus, "layout", { nativeEvent: { layout: { x: 0, y: 32, width: 28, height: 32 } } })
-    expect(view.getByTestId("counter-add-seat-1").props.hitSlop).toMatchObject({
-      top: 0,
-      bottom: 16,
-    })
-  })
-
-  it("closes the sheet from the spot the plus opened it", () => {
+  it("opens the bag from the seat's corner and closes it from the same spot", () => {
     const view = chips(seat())
-    const plus = view.getByTestId("counter-add-seat-1")
-    fireEvent(plus, "layout", { nativeEvent: { layout: { x: 142, y: 0, width: 36, height: 36 } } })
-    const rowTop = StyleSheet.flatten(view.getByTestId("counter-chips-seat-1").props.style).top
+    const bag = view.getByTestId("seat-bag-seat-1")
+    expect(StyleSheet.flatten(bag.props.style)).toMatchObject({ right: 16, bottom: 16 })
 
-    fireEvent.press(plus)
+    fireEvent.press(bag)
     const close = view.getByTestId("counter-close-1")
-    expect(StyleSheet.flatten(close.props.style)).toMatchObject({ left: 8 + 142, top: rowTop })
+    const size = StyleSheet.flatten(close.props.style).minHeight
+    expect(StyleSheet.flatten(close.props.style)).toMatchObject({
+      left: 320 - 16 - size,
+      top: 400 - 16 - size,
+    })
     fireEvent.press(close)
     expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
+  })
+
+  it("rolls a die for its own seat on a tap and puts it out for the table on a hold, and more shrinks the trackers to icons until one is tapped", () => {
+    const dice = {
+      tools: ["d4", "d6", "d20", "coin"] as const,
+      rollFor: jest.fn(),
+      armForOthers: jest.fn(),
+    }
+    const view = chips(seat(), { dice })
+
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+    expect(view.queryByTestId("bag-tool-d4-seat-1")).toBeNull()
+    fireEvent.press(view.getByTestId("bag-tool-d20-seat-1"))
+    expect(dice.rollFor).toHaveBeenCalledWith("d20")
+    expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
+
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+    fireEvent.press(view.getByRole("button", { name: "More dice" }))
+    expect(view.getByTestId("counter-option-1-poison")).not.toHaveTextContent("Poison")
+    fireEvent.press(view.getByTestId("counter-option-1-poison"))
+    expect(view.queryByTestId("bag-tool-d4-seat-1")).toBeNull()
+    expect(dice.rollFor).toHaveBeenCalledTimes(1)
+
+    fireEvent.press(view.getByRole("button", { name: "More dice" }))
+    fireEvent(view.getByTestId("bag-tool-d4-seat-1"), "longPress")
+    fireEvent(view.getByTestId("bag-tool-d4-seat-1"), "pressOut")
+    expect(dice.armForOthers).toHaveBeenCalledWith("d4")
   })
 
   it("edits from a held chip: steps never go below zero and remove clears the count", () => {
@@ -151,7 +164,7 @@ describe("CounterChips", () => {
     const table = seat({ counters: { poison: 10 } })
     const view = chips(table)
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     expect(view.getByTestId("counter-option-1-poison")).toHaveTextContent("10Poison")
     fireEvent.press(view.getByLabelText("Edit Poison, 10"))
     expect(table.adjustCounter).not.toHaveBeenCalled()
@@ -181,7 +194,7 @@ describe("CounterChips", () => {
     const table = seat({ tableItemRules: { poison: "104.3d" }, openRule })
     const view = chips(table, { cardSize: { width: 460, height: 400 } })
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     fireEvent.press(view.getByTestId("counter-rule-1-poison"))
     expect(openRule).toHaveBeenCalledWith("104.3d")
     expect(table.adjustCounter).not.toHaveBeenCalled()
@@ -192,8 +205,11 @@ describe("CounterChips", () => {
     const table = seat({ tableItemRules: { monarch: "725", initiative: "726" }, openRule })
     const view = chips(table)
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
-    expect(view.getByTestId("designation-rule-1-initiative")).toHaveTextContent("§726")
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+    expect(view.getByTestId("designation-rule-1-initiative")).toHaveProp(
+      "accessibilityLabel",
+      "Rule 726",
+    )
     fireEvent.press(view.getByLabelText("Rule 725"))
     expect(openRule).toHaveBeenCalledWith("725")
     expect(table.takeDesignation).not.toHaveBeenCalled()
@@ -203,7 +219,7 @@ describe("CounterChips", () => {
     const table = seat({ tableItemRules: { monarch: "725" }, openRule: jest.fn() })
     const view = chips(table)
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     let optionCell = view.getByTestId("designation-option-1-monarch").parent
     while (optionCell && StyleSheet.flatten(optionCell.props.style)?.width !== "50%") {
       optionCell = optionCell.parent
@@ -219,7 +235,7 @@ describe("CounterChips", () => {
       text: "10 of 10",
     })
     expect(view.getByTestId("designation-chip-1-monarch")).toBeTruthy()
-    expect(view.queryByTestId("counter-add-seat-1")).toBeNull()
+    expect(view.queryByTestId("seat-bag-seat-1")).toBeNull()
     fireEvent.press(view.getByTestId("counter-chip-1-poison"))
     expect(table.adjustCounter).not.toHaveBeenCalled()
   })
@@ -263,7 +279,7 @@ describe("CounterChips", () => {
     expect(focus).toHaveBeenCalledTimes(2)
     expect(focus).toHaveBeenLastCalledWith(expect.anything(), "focus")
 
-    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     fireEvent.press(view.getByLabelText("Edit Poison, 2"))
     expect(focus).toHaveBeenCalledTimes(4)
   })

@@ -15,6 +15,9 @@ export default {
     },
     tapToRoll: "Touchez pour lancer",
     tapToFlip: "Touchez pour lancer la pièce",
+    rollForTable: "Lancer pour toute la table",
+    moreDice: "Plus de dés",
+    openBag: "{{identity}}, dés et marqueurs",
     coinFace: {
       Heads: "Face",
       Tails: "Pile",

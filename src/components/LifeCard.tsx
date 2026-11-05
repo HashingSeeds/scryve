@@ -55,7 +55,7 @@ import {
   type CommanderReach,
 } from "./commanderDamageLayout"
 import { CommanderStrip, commanderGridShown, commanderStripCorner } from "./CommanderStrip"
-import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
+import { CounterChips, DICE_ONLY_SEAT, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
@@ -458,6 +458,8 @@ export const LifeCard = memo(function LifeCard({
     screenEdges,
     markHeight: identityMetrics.mark,
   })
+  // why: a seat someone else holds keeps its own bag on its own device.
+  const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
   const markAnchor =
     cardSize.width > 0
       ? identityMarkCenter({
@@ -795,7 +797,7 @@ export const LifeCard = memo(function LifeCard({
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
                 $cornerIdentity,
-                // why: the half-run cap keeps the far corner clear; without it the name runs to the row's limit.
+                // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
                 commanderSeat && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
@@ -887,10 +889,22 @@ export const LifeCard = memo(function LifeCard({
           disabled={disabled}
         />
       ) : null}
-      {seatTable && !claimShown && !diceCovers && !commanderCovers && !sittingOut && !editorOpen ? (
+      {(seatTable || seatBag) &&
+      !claimShown &&
+      !diceCovers &&
+      !commanderCovers &&
+      !sittingOut &&
+      !editorOpen ? (
         <CounterChips
           key={playerId}
-          seat={seatTable}
+          seat={seatTable ?? DICE_ONLY_SEAT}
+          dice={seatBag}
+          bagAt={{
+            right:
+              identityCorner.trailing.right +
+              (calculatorButtonShown ? calculatorButtonSize + identityMetrics.gap : 0),
+            bottom: identityCorner.trailing.bottom,
+          }}
           seatNumber={seatNumber}
           identity={identity}
           color={color}

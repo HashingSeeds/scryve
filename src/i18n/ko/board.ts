@@ -15,6 +15,9 @@ export default {
     },
     tapToRoll: "탭하여 굴리세요",
     tapToFlip: "탭하여 던지세요",
+    rollForTable: "모든 자리에 주사위 굴리기",
+    moreDice: "주사위 더보기",
+    openBag: "{{identity}}, 주사위와 카운터",
     coinFace: {
       Heads: "앞면",
       Tails: "뒷면",

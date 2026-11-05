@@ -238,18 +238,26 @@ export function useDice(
     set(clearFirst(dice))
   })
 
+  function rollSeat(from: DiceState, player: GamePlayer) {
+    const rolled = rollForSeat(from, player.id)
+    if (!rolled) return false
+    announce(rollLabel(player.name, rolled.roll))
+    lastRollAt.current = { gameId, at: Date.now() }
+    captureAnalytics("dice_rolled", { tool: rolled.roll.tool, system: systemId })
+    const settle = (next: DiceState) => settleResult(next, player.id)
+    set(hold(player.id, BLOOM_MS.roll, settle)(rolled.state), {
+      mode: false,
+      leaving: fadePrompts(dice.armed),
+    })
+    return true
+  }
+
+  const rollFor = stable("rollFor", (player: GamePlayer, tool: DiceTool) => {
+    rollSeat(armTool(dice, tool), player)
+  })
+
   const pressSeat = stable("pressSeat", (player: GamePlayer) => {
-    const rolled = rollForSeat(dice, player.id)
-    if (rolled) {
-      announce(rollLabel(player.name, rolled.roll))
-      lastRollAt.current = { gameId, at: Date.now() }
-      captureAnalytics("dice_rolled", { tool: rolled.roll.tool, system: systemId })
-      const settle = (next: DiceState) => settleResult(next, player.id)
-      return set(hold(player.id, BLOOM_MS.roll, settle)(rolled.state), {
-        mode: false,
-        leaving: fadePrompts(dice.armed),
-      })
-    }
+    if (rollSeat(dice, player)) return
     const view = diceSeatView(dice, player.id)
     if (view?.kind === "rolloff" && view.status === "tied") {
       const next = rerollTies(dice)
@@ -311,6 +319,7 @@ export function useDice(
     ask,
     gameStarted,
     grid: {
+      bag: { tools: DICE_TOOLS, rollFor, armForOthers: pick },
       armed,
       leaving: armed ? null : state.leaving,
       seatFor: (player: GamePlayer) => diceSeatView(dice, player.id),

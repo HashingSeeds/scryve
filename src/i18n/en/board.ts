@@ -12,6 +12,12 @@ const board = {
     },
     tapToRoll: "Tap to roll",
     tapToFlip: "Tap to flip",
+    // Screen reader action on a die in the seat's bag: put the die out on every seat, so each player can tap to roll it.
+    rollForTable: "Roll for the table",
+    // Button beside the bag's three quick dice; opens the rest of the dice.
+    moreDice: "More dice",
+    // {{identity}} is the seat, such as "Seat 2, Ana".
+    openBag: "{{identity}}, dice and counters",
     coinFace: { Heads: "Heads", Tails: "Tails" },
     unnamedPlayer: "Player",
     rollResult: "{{name}}, {{tool}}, {{value}}",

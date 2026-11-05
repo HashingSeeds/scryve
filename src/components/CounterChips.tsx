@@ -1,8 +1,10 @@
 import { memo, useEffect, useRef, useState, type Ref } from "react"
-import type { Insets, LayoutRectangle, TextStyle, ViewStyle } from "react-native"
+import type { Insets, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, View } from "react-native"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
 
+import { toolLabel, type DiceTool } from "@/features/game/dice"
 import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
@@ -12,18 +14,24 @@ import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { DiceBagGlyph, DieFace } from "./DiceGlyph"
+import type { SeatDiceBag } from "./DiceSeatOverlay"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
+import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
-import type {
-  LifeCardContentInsets,
-  LifeCardContentRotation,
-  LifeCardEdge,
-  LifeCardMenuEdge,
+import {
+  useCornerSlide,
+  type LifeCardContentInsets,
+  type LifeCardContentRotation,
+  type LifeCardEdge,
+  type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { Text } from "./Text"
 import { targetSlop } from "./touchTarget"
+import { NO_TABLE } from "../../convex/lib/systems"
 import { playerTableOf } from "../../convex/lib/table"
 
 /** why: what one seat shows and may change. The plain parts compare structurally in the memoized card; PlayerGrid keeps the callbacks stable. */
@@ -40,6 +48,17 @@ export interface SeatTable {
 }
 
 const NO_COUNTERS: Readonly<Record<string, number>> = {}
+
+/** why: a seat with no counters or designations still carries a bag for its dice. */
+export const DICE_ONLY_SEAT: SeatTable = {
+  rules: NO_TABLE,
+  counters: NO_COUNTERS,
+  held: [],
+  editable: false,
+  adjustCounter: () => {},
+  takeDesignation: () => {},
+  releaseDesignation: () => {},
+}
 
 export function seatTableState(
   runtime: TableRuntime | undefined,
@@ -117,6 +136,16 @@ export function contentFrame(
   }
 }
 
+/** why: the life − and + ignore a side's safe area and ink about 18 dp in, so the sheet's tracker icons start there too, past a camera hole only where one sits. */
+function sheetSideInset(
+  rotation: LifeCardContentRotation,
+  insets: LifeCardContentInsets | undefined,
+  edge: LifeCardEdge,
+) {
+  const cardEdge = CONTENT_EDGES[rotation][edge]
+  return insets?.cutout?.edge === cardEdge ? insets.cutout.size : SHEET_SIDE
+}
+
 export function contentInset(
   rotation: LifeCardContentRotation,
   insets: LifeCardContentInsets | undefined,
@@ -129,11 +158,17 @@ const MENU_CLEARANCE = 42
 const COMPACT_MENU_CLEARANCE = 37
 const CHIP_SIZE = 36
 const COMPACT_CHIP_SIZE = 32
+
+export function seatBagSize(compact?: boolean) {
+  return compact ? COMPACT_CHIP_SIZE : CHIP_SIZE
+}
 const COMPACT_CHIP_WIDTH = 28
-/** why: below this column width "0 Commander tax" no longer fits on one line, so items with a short label use it, and counters drop their rule link (their own sheet still has it) so "Poison" does not truncate. */
+/** why: below this column width "0 Commander tax" no longer fits on one line, so items with a short label use it. */
 const SHORT_LABEL_COLUMN = 180
-/** why: room a rule link like "§903.8" takes beside its option, so the label shortens before it would truncate. */
-const RULE_LINK_WIDTH = 52
+/** why: room the rule's info button takes beside its option, so the label shortens before it would truncate. */
+const RULE_LINK_WIDTH = 28
+/** why: a column narrower than this gives its label the room instead, and a long press on the option opens its rule. */
+const RULE_BUTTON_COLUMN = 132
 
 type Sheet = { kind: "edit"; counterId: string } | { kind: "add" }
 
@@ -148,6 +183,8 @@ function moveFocus(target: View | null | undefined) {
 
 export interface CounterChipsProps {
   seat: SeatTable
+  dice?: SeatDiceBag
+  bagAt: { right: number; bottom: number }
   seatNumber: number
   identity: string
   color: string
@@ -192,6 +229,8 @@ export const CounterChips = memo(function CounterChips({
   contentInsets,
   menuEdgeCenter,
   cardSize,
+  dice,
+  bagAt,
   onSheetOpenChange,
 }: CounterChipsProps) {
   const {
@@ -199,9 +238,6 @@ export const CounterChips = memo(function CounterChips({
     theme: { spacing },
   } = useAppTheme()
   const [sheet, setSheet] = useState<Sheet | null>(null)
-  const [addTrigger, setAddTrigger] = useState<{ at: LayoutRectangle; frameKey: string } | null>(
-    null,
-  )
   const longPressed = useRef(false)
   const triggers = useRef(new Map<string, View>()).current
   const returnFocusTo = useRef<string | null>(null)
@@ -241,10 +277,8 @@ export const CounterChips = memo(function CounterChips({
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const frame = contentFrame(contentRotation, cardSize)
   const frameWidth = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
-  const frameKey = `${cardSize.width}x${cardSize.height}@${contentRotation}`
-  // why: the chip row unmounts under the sheet, so a card resized while it is open keeps a stale add button position; Close then centers.
-  const addAt = addTrigger?.frameKey === frameKey ? addTrigger.at : undefined
-  const closeSize = addAt?.height ?? (compact ? COMPACT_CHIP_SIZE : CHIP_SIZE)
+  const frameHeight = Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height
+  const bagSize = seatBagSize(compact)
   const glyphSize = compact ? 13 : 15
   const { top } = chipRowOrigin({
     compact,
@@ -253,19 +287,8 @@ export const CounterChips = memo(function CounterChips({
     menuEdgeCenter,
     spacing,
   })
-  // why: the plus, and the Close that takes its spot, draw small but reach a 48 dp target. It stands off the chip before it by its slop, and once wrapped under a row of chips it reaches down instead of up, so a tap on a chip's edge still bumps the chip.
-  const plusSlop = targetSlop(
-    addAt ??
-      (compact
-        ? { width: COMPACT_CHIP_WIDTH, height: COMPACT_CHIP_SIZE }
-        : { width: CHIP_SIZE, height: CHIP_SIZE }),
-    { top: addAt?.y ? 0 : top },
-  )
-  const plusClearance =
-    shown.length + heldDesignations.length > 0
-      ? Math.max(0, (plusSlop.left ?? 0) - (compact ? 0 : spacing.xxxs))
-      : 0
-
+  const bagSlop = targetSlop({ width: bagSize, height: bagSize }, bagAt)
+  const bagShown = editable || !!dice
   return (
     <>
       {Platform.OS === "web" ? (
@@ -276,7 +299,7 @@ export const CounterChips = memo(function CounterChips({
           style={$visuallyHidden}
         />
       ) : null}
-      {!sheetOpen && (shown.length > 0 || heldDesignations.length > 0 || editable) ? (
+      {!sheetOpen && (shown.length > 0 || heldDesignations.length > 0) ? (
         <View
           testID={`counter-chips-frame-seat-${seatNumber}`}
           pointerEvents="box-none"
@@ -398,26 +421,27 @@ export const CounterChips = memo(function CounterChips({
                 )}
               </View>
             ))}
-            {editable ? (
-              <BoardPressable
-                ref={trigger(ADD_TRIGGER)}
-                testID={`counter-add-seat-${seatNumber}`}
-                accessibilityRole="button"
-                accessibilityLabel={translate("board:counters.addLabel", { identity })}
-                hitSlop={plusSlop}
-                onLayout={({ nativeEvent }) => setAddTrigger({ at: nativeEvent.layout, frameKey })}
-                onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
-                style={({ pressed }) => [
-                  themed(compact ? $compactChip : $chip),
-                  themed($addChip),
-                  { marginLeft: plusClearance },
-                  pressed && { backgroundColor: overlayTint(foreground, 0.14) },
-                ]}
-              >
-                <TableGlyph id="plus" size={glyphSize} color={foreground} />
-              </BoardPressable>
-            ) : null}
           </View>
+        </View>
+      ) : null}
+      {!sheetOpen && bagShown ? (
+        <View pointerEvents="box-none" style={[frame, $layer]}>
+          <BoardPressable
+            ref={trigger(ADD_TRIGGER)}
+            testID={`seat-bag-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={translate("board:dice.openBag", { identity })}
+            hitSlop={bagSlop}
+            onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
+            style={({ pressed }) => [
+              themed(compact ? $compactChip : $chip),
+              themed($addChip),
+              { position: "absolute", ...bagAt, width: bagSize, height: bagSize },
+              pressed && { backgroundColor: overlayTint(foreground, 0.14) },
+            ]}
+          >
+            <DiceBagGlyph size={bagSize - 8} color={foreground} />
+          </BoardPressable>
         </View>
       ) : null}
       {sheet ? (
@@ -432,15 +456,14 @@ export const CounterChips = memo(function CounterChips({
           width={frameWidth}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
-          closeSlop={plusSlop}
+          closeSlop={bagSlop}
           closeButton={{
-            left: addAt
-              ? (compact ? spacing.xxs : spacing.xs) + addAt.x
-              : (frameWidth - closeSize) / 2,
-            top: top + (addAt?.y ?? 0),
-            size: closeSize,
-            width: addAt?.width,
+            left: frameWidth - bagAt.right - bagSize,
+            top: frameHeight - bagAt.bottom - bagSize,
+            size: bagSize,
           }}
+          topClearance={top}
+          dice={dice}
           onEdit={(counterId) => setSheet({ kind: "edit", counterId })}
           onClose={() => setSheet(null)}
         />
@@ -500,6 +523,8 @@ function CounterSheet({
   contentInsets,
   closeButton,
   closeSlop,
+  topClearance,
+  dice,
   onEdit,
   onClose,
 }: {
@@ -513,9 +538,11 @@ function CounterSheet({
   width: number
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
-  /** why: Close sits exactly where the chip row's add button was, so the same tap opens and closes the sheet. */
+  /** why: Close sits exactly where the bag was, so the same tap opens and closes the sheet. */
   closeButton: { left: number; top: number; size: number; width?: number }
   closeSlop: Insets
+  topClearance: number
+  dice?: SeatDiceBag
   onEdit: (counterId: string) => void
   onClose: () => void
 }) {
@@ -524,15 +551,25 @@ function CounterSheet({
     theme: { spacing },
   } = useAppTheme()
   const sheetColor = mixColorsInLinearLight(color, "#000000", 0.34)
+  const fade = useReducedMotion() === false
+  const slide = useCornerSlide()
   const ink = accessibleForeground(sheetColor)
   const gap = compact ? spacing.xxs : spacing.xs
+  const trackers = seat.rules.counters.length + seat.rules.designations.length > 0
+  // why: with both, dice take the bag's half of the card and trackers the other, so neither scrolls; only the dice half keeps clear of Close in its corner.
+  const split = !!dice && trackers && sheet.kind === "add"
+  const [allDice, setAllDice] = useState(false)
+  const closeRow = closeButton.size + gap
   const padding = {
-    paddingTop: closeButton.top + closeButton.size + gap,
-    paddingBottom: gap + contentInset(contentRotation, contentInsets, "bottom"),
-    paddingLeft: gap + contentInset(contentRotation, contentInsets, "left"),
-    paddingRight: gap + contentInset(contentRotation, contentInsets, "right"),
+    paddingTop: topClearance,
+    paddingBottom:
+      gap + (split ? 0 : closeRow) + contentInset(contentRotation, contentInsets, "bottom"),
+    paddingLeft: sheetSideInset(contentRotation, contentInsets, "left"),
+    paddingRight: sheetSideInset(contentRotation, contentInsets, "right"),
   }
-  const optionColumn = (width - padding.paddingLeft - padding.paddingRight) / 2
+  const diceWidth = split ? NARROW_DICE_WIDTH + DIVIDER_SPACE : 0
+  const optionColumn = (width - padding.paddingLeft - padding.paddingRight - diceWidth) / 2
+  const roomForRule = optionColumn >= RULE_BUTTON_COLUMN
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
@@ -548,180 +585,376 @@ function CounterSheet({
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
 
   return (
-    <View
-      testID={`counter-sheet-seat-${seatNumber}`}
-      accessibilityViewIsModal
-      style={[frame, $sheet, padding, { backgroundColor: sheetColor }]}
+    // why: a layout animation owns its view's transform, so the fade wraps the turned frame rather than sitting on it.
+    <Animated.View
+      pointerEvents="box-none"
+      entering={fade ? FadeIn.duration(SHEET_FADE_MS) : undefined}
+      exiting={fade ? FadeOut.duration(SHEET_FADE_MS) : undefined}
+      style={[StyleSheet.absoluteFill, $sheet]}
     >
-      {counter ? (
-        <>
-          <View pointerEvents="box-none" style={$halves}>
-            {([-1, 1] as const).map((direction) => (
-              <BoardPressable
-                key={direction}
-                ref={direction < 0 ? firstControl : undefined}
-                testID={`counter-edit-${seatNumber}-${counter.id}-${direction > 0 ? "plus" : "minus"}`}
-                accessibilityRole="button"
-                accessibilityLabel={translate(
-                  direction > 0 ? "board:counters.add" : "board:counters.subtract",
-                  { identity, step: counter.step, label: counterLabel },
-                )}
-                onPress={() =>
-                  seat.adjustCounter(
-                    counter.id,
-                    direction > 0 ? counter.step : -Math.min(counter.step, value),
-                  )
-                }
-                style={({ pressed }) => [
-                  themed($half),
-                  { alignItems: direction > 0 ? "flex-end" : "flex-start" },
-                  pressed && { backgroundColor: overlayTint(ink, 0.14) },
-                ]}
-              >
+      <View
+        testID={`counter-sheet-seat-${seatNumber}`}
+        accessibilityViewIsModal
+        style={[frame, padding, { backgroundColor: sheetColor }]}
+      >
+        {counter ? (
+          <>
+            <View pointerEvents="box-none" style={$halves}>
+              {([-1, 1] as const).map((direction) => (
+                <BoardPressable
+                  key={direction}
+                  ref={direction < 0 ? firstControl : undefined}
+                  testID={`counter-edit-${seatNumber}-${counter.id}-${direction > 0 ? "plus" : "minus"}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate(
+                    direction > 0 ? "board:counters.add" : "board:counters.subtract",
+                    { identity, step: counter.step, label: counterLabel },
+                  )}
+                  onPress={() =>
+                    seat.adjustCounter(
+                      counter.id,
+                      direction > 0 ? counter.step : -Math.min(counter.step, value),
+                    )
+                  }
+                  style={({ pressed }) => [
+                    themed($half),
+                    { alignItems: direction > 0 ? "flex-end" : "flex-start" },
+                    pressed && { backgroundColor: overlayTint(ink, 0.14) },
+                  ]}
+                >
+                  <Text
+                    text={direction > 0 ? "+" : "−"}
+                    style={[themed(compact ? $compactSheetGlyph : $sheetGlyph), { color: ink }]}
+                  />
+                </BoardPressable>
+              ))}
+            </View>
+            <View pointerEvents="box-none" style={themed($sheetHeader)}>
+              <View pointerEvents="none" style={[themed($sheetHeader), $shrink]}>
+                <TableGlyph id={counter.id} size={16} color={ink} />
                 <Text
-                  text={direction > 0 ? "+" : "−"}
-                  style={[themed(compact ? $compactSheetGlyph : $sheetGlyph), { color: ink }]}
+                  text={counterLabel}
+                  weight="bold"
+                  size="xs"
+                  numberOfLines={1}
+                  style={[$shrink, { color: ink }]}
                 />
-              </BoardPressable>
-            ))}
-          </View>
-          <View pointerEvents="box-none" style={themed($sheetHeader)}>
-            <View pointerEvents="none" style={[themed($sheetHeader), $shrink]}>
-              <TableGlyph id={counter.id} size={16} color={ink} />
+              </View>
+              {ruleId && openRule ? (
+                <BoardPressable
+                  testID={`counter-rule-${seatNumber}`}
+                  accessibilityRole="link"
+                  accessibilityLabel={translate("board:counters.rule", { rule: ruleId })}
+                  hitSlop={8}
+                  onPress={() => openRule(ruleId)}
+                >
+                  <Text text={`§${ruleId}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
+                </BoardPressable>
+              ) : null}
+            </View>
+            <View pointerEvents="none" style={$sheetCenter}>
               <Text
-                text={counterLabel}
-                weight="bold"
-                size="xs"
-                numberOfLines={1}
-                style={[$shrink, { color: ink }]}
+                testID={`counter-edit-value-${seatNumber}`}
+                text={String(value)}
+                maxFontSizeMultiplier={1.2}
+                style={[themed(compact ? $compactSheetValue : $sheetValue), { color: ink }]}
               />
             </View>
-            {ruleId && openRule ? (
-              <BoardPressable
-                testID={`counter-rule-${seatNumber}`}
-                accessibilityRole="link"
-                accessibilityLabel={translate("board:counters.rule", { rule: ruleId })}
-                hitSlop={8}
-                onPress={() => openRule(ruleId)}
-              >
-                <Text text={`§${ruleId}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
-              </BoardPressable>
-            ) : null}
-          </View>
-          <View pointerEvents="none" style={$sheetCenter}>
-            <Text
-              testID={`counter-edit-value-${seatNumber}`}
-              text={String(value)}
-              maxFontSizeMultiplier={1.2}
-              style={[themed(compact ? $compactSheetValue : $sheetValue), { color: ink }]}
-            />
-          </View>
-          <View pointerEvents="box-none" style={themed($sheetFooter)}>
-            <SheetTextButton
-              testID={`counter-remove-${seatNumber}`}
-              text={translate("common:remove")}
-              accessibilityLabel={translate("board:counters.remove", { label: counterLabel })}
-              ink={ink}
-              onPress={() => {
-                if (value > 0) seat.adjustCounter(counter.id, -value)
-                onClose()
-              }}
-            />
-          </View>
-        </>
-      ) : (
-        <>
-          {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
-          <ScrollView
-            style={$optionScroll}
-            contentContainerStyle={[$optionScrollContent, themed($options)]}
-          >
-            {seat.rules.counters.map((option, index) => {
-              const current = seat.counters[option.id] ?? 0
-              const optionLabel = tableItemLabel(option)
-              const rule = optionColumn < SHORT_LABEL_COLUMN ? undefined : optionRule(option.id)
-              const shortLabel = optionColumn < SHORT_LABEL_COLUMN + (rule ? RULE_LINK_WIDTH : 0)
-              return (
-                <SheetOption
-                  key={option.id}
-                  ref={index === 0 ? firstControl : undefined}
-                  testID={`counter-option-${seatNumber}-${option.id}`}
-                  id={option.id}
-                  label={shortLabel ? tableItemShortLabel(option) : optionLabel}
-                  value={current}
-                  accessibilityLabel={
-                    current > 0
-                      ? translate("board:counters.editWithValue", {
-                          label: optionLabel,
-                          value: current,
-                        })
-                      : translate("board:counters.add", {
-                          identity,
-                          step: option.step,
-                          label: optionLabel,
-                        })
+            <View pointerEvents="box-none" style={themed($sheetFooter)}>
+              <SheetTextButton
+                testID={`counter-remove-${seatNumber}`}
+                text={translate("common:remove")}
+                accessibilityLabel={translate("board:counters.remove", { label: counterLabel })}
+                ink={ink}
+                onPress={() => {
+                  if (value > 0) seat.adjustCounter(counter.id, -value)
+                  onClose()
+                }}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
+            <View style={split ? $split : $optionScroll}>
+              {trackers ? (
+                <Animated.View layout={slide} style={split && allDice ? $iconStrip : $optionScroll}>
+                  <ScrollView
+                    style={$optionScroll}
+                    contentContainerStyle={[$optionScrollContent, themed($options)]}
+                  >
+                    {seat.rules.counters.map((option, index) => {
+                      const current = seat.counters[option.id] ?? 0
+                      const optionLabel = tableItemLabel(option)
+                      const rule = optionRule(option.id)
+                      const shortLabel =
+                        optionColumn <
+                        SHORT_LABEL_COLUMN + (rule && roomForRule ? RULE_LINK_WIDTH : 0)
+                      return (
+                        <SheetOption
+                          key={option.id}
+                          ref={index === 0 ? firstControl : undefined}
+                          testID={`counter-option-${seatNumber}-${option.id}`}
+                          id={option.id}
+                          label={shortLabel ? tableItemShortLabel(option) : optionLabel}
+                          value={current}
+                          accessibilityLabel={
+                            current > 0
+                              ? translate("board:counters.editWithValue", {
+                                  label: optionLabel,
+                                  value: current,
+                                })
+                              : translate("board:counters.add", {
+                                  identity,
+                                  step: option.step,
+                                  label: optionLabel,
+                                })
+                          }
+                          ink={ink}
+                          rule={rule}
+                          ruleButton={roomForRule}
+                          ruleTestID={`counter-rule-${seatNumber}-${option.id}`}
+                          iconOnly={split && allDice}
+                          slide={slide}
+                          fade={fade}
+                          onPress={() => {
+                            if (split && allDice) return setAllDice(false)
+                            if (current > 0) return onEdit(option.id)
+                            seat.adjustCounter(option.id, option.step)
+                            onClose()
+                          }}
+                        />
+                      )
+                    })}
+                    {seat.rules.designations.map((option, index) => {
+                      const holds = seat.held.includes(option.id)
+                      const optionLabel = tableItemLabel(option)
+                      return (
+                        <SheetOption
+                          key={option.id}
+                          ref={
+                            index === 0 && seat.rules.counters.length === 0
+                              ? firstControl
+                              : undefined
+                          }
+                          testID={`designation-option-${seatNumber}-${option.id}`}
+                          id={option.id}
+                          label={optionLabel}
+                          accessibilityLabel={translate(
+                            holds ? "board:counters.giveUp" : "board:counters.take",
+                            { label: optionLabel },
+                          )}
+                          selected={holds}
+                          ink={ink}
+                          rule={optionRule(option.id)}
+                          ruleButton={roomForRule}
+                          ruleTestID={`designation-rule-${seatNumber}-${option.id}`}
+                          iconOnly={split && allDice}
+                          slide={slide}
+                          fade={fade}
+                          onPress={() => {
+                            if (split && allDice) return setAllDice(false)
+                            if (holds) seat.releaseDesignation(option.id)
+                            else seat.takeDesignation(option.id)
+                            onClose()
+                          }}
+                        />
+                      )
+                    })}
+                  </ScrollView>
+                </Animated.View>
+              ) : null}
+              {split ? (
+                <Animated.View layout={slide} pointerEvents="none" style={$sideDividerSlot}>
+                  <View style={[$sideDivider, { backgroundColor: ink }]} />
+                </Animated.View>
+              ) : null}
+              {dice ? (
+                <Animated.View
+                  layout={slide}
+                  style={
+                    split
+                      ? [
+                          $narrowDice,
+                          allDice ? $diceHalf : { width: NARROW_DICE_WIDTH },
+                          { paddingBottom: closeRow },
+                        ]
+                      : $diceHalf
                   }
-                  ink={ink}
-                  rule={rule}
-                  ruleTestID={`counter-rule-${seatNumber}-${option.id}`}
-                  onPress={() => {
-                    if (current > 0) return onEdit(option.id)
-                    seat.adjustCounter(option.id, option.step)
-                    onClose()
-                  }}
-                />
-              )
-            })}
-            {seat.rules.designations.map((option, index) => {
-              const holds = seat.held.includes(option.id)
-              const optionLabel = tableItemLabel(option)
-              return (
-                <SheetOption
-                  key={option.id}
-                  ref={index === 0 && seat.rules.counters.length === 0 ? firstControl : undefined}
-                  testID={`designation-option-${seatNumber}-${option.id}`}
-                  id={option.id}
-                  label={optionLabel}
-                  accessibilityLabel={translate(
-                    holds ? "board:counters.giveUp" : "board:counters.take",
-                    { label: optionLabel },
-                  )}
-                  selected={holds}
-                  ink={ink}
-                  rule={optionRule(option.id)}
-                  ruleTestID={`designation-rule-${seatNumber}-${option.id}`}
-                  onPress={() => {
-                    if (holds) seat.releaseDesignation(option.id)
-                    else seat.takeDesignation(option.id)
-                    onClose()
-                  }}
-                />
-              )
-            })}
-          </ScrollView>
-        </>
-      )}
-      <BoardPressable
-        testID={`counter-close-${seatNumber}`}
-        accessibilityRole="button"
-        accessibilityLabel={translate("common:close")}
-        hitSlop={closeSlop}
-        onPress={onClose}
-        style={({ pressed }) => [
-          themed(compact ? $compactChip : $chip),
-          {
-            position: "absolute",
-            left: closeButton.left,
-            top: closeButton.top,
-            minHeight: closeButton.size,
-            minWidth: closeButton.width ?? closeButton.size,
-          },
-          pressed && { backgroundColor: overlayTint(ink, 0.14) },
-        ]}
-      >
-        <TableGlyph id="close" size={compact ? 13 : 15} color={ink} />
-      </BoardPressable>
+                >
+                  <DiceSection
+                    seatNumber={seatNumber}
+                    dice={dice}
+                    ink={ink}
+                    compact={compact}
+                    narrow={split}
+                    allDice={allDice}
+                    slide={slide}
+                    fade={fade}
+                    onAllDice={() => setAllDice((open) => !open)}
+                    onRolled={onClose}
+                  />
+                </Animated.View>
+              ) : null}
+            </View>
+          </>
+        )}
+        <BoardPressable
+          testID={`counter-close-${seatNumber}`}
+          accessibilityRole="button"
+          accessibilityLabel={translate("common:close")}
+          hitSlop={closeSlop}
+          onPress={onClose}
+          style={({ pressed }) => [
+            themed(compact ? $compactChip : $chip),
+            {
+              position: "absolute",
+              left: closeButton.left,
+              top: closeButton.top,
+              minHeight: closeButton.size,
+              minWidth: closeButton.width ?? closeButton.size,
+            },
+            pressed && { backgroundColor: overlayTint(ink, 0.14) },
+          ]}
+        >
+          <TableGlyph id="close" size={compact ? 13 : 15} color={ink} />
+        </BoardPressable>
+      </View>
+    </Animated.View>
+  )
+}
+
+type SheetDice = SeatDiceBag
+
+/** why: the dice that earn a spot beside the trackers; the rest open from the more button. */
+const QUICK_DICE: readonly DiceTool[] = ["d20", "d6", "coin"]
+
+/** why: a die rolls for its own seat on a tap, and a hold puts it out for the table, where each seat taps to roll. Beside trackers the bag keeps three dice and a more button, which opens the rest over the trackers. */
+function DiceSection({
+  seatNumber,
+  dice,
+  ink,
+  compact,
+  narrow,
+  allDice,
+  slide,
+  fade,
+  onAllDice,
+  onRolled,
+}: {
+  seatNumber: number
+  dice: SheetDice
+  ink: string
+  compact?: boolean
+  narrow: boolean
+  allDice: boolean
+  slide?: ReturnType<typeof useCornerSlide>
+  fade: boolean
+  onAllDice: () => void
+  onRolled: () => void
+}) {
+  const { themed } = useAppTheme()
+  const tools = narrow && !allDice ? QUICK_DICE : dice.tools
+  return (
+    <View style={themed($diceTools)}>
+      {tools.map((tool) => (
+        <Animated.View
+          key={tool}
+          layout={slide}
+          entering={fade ? FadeIn.duration(SHEET_FADE_MS) : undefined}
+          exiting={fade ? FadeOut.duration(SHEET_FADE_MS) : undefined}
+        >
+          <DieButton
+            seatNumber={seatNumber}
+            tool={tool}
+            dice={dice}
+            ink={ink}
+            compact={compact}
+            onRolled={onRolled}
+          />
+        </Animated.View>
+      ))}
+      {narrow ? (
+        <Animated.View layout={slide}>
+          <BoardPressable
+            testID={`bag-more-dice-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={translate("board:dice.moreDice")}
+            accessibilityState={{ expanded: allDice }}
+            hitSlop={4}
+            onPress={onAllDice}
+            style={({ pressed }) => [
+              themed($diceTool),
+              allDice && { backgroundColor: overlayTint(ink, 0.18) },
+              pressed && { backgroundColor: overlayTint(ink, 0.14) },
+            ]}
+          >
+            <Icon icon="more" size={compact ? 20 : 22} color={ink} />
+          </BoardPressable>
+        </Animated.View>
+      ) : null}
     </View>
+  )
+}
+
+function DieButton({
+  seatNumber,
+  tool,
+  dice,
+  ink,
+  compact,
+  onRolled,
+}: {
+  seatNumber: number
+  tool: DiceTool
+  dice: SheetDice
+  ink: string
+  compact?: boolean
+  onRolled: () => void
+}) {
+  const { themed } = useAppTheme()
+  const rollForSeat = () => {
+    onRolled()
+    dice.rollFor(tool)
+  }
+  const putOut = () => {
+    onRolled()
+    dice.armForOthers(tool)
+  }
+  // why: closing the bag while the finger is still down unmounts the button that holds the touch, and the next tap on a seat then only clears it, so a hold puts the die out when the finger lifts.
+  const held = useRef(false)
+  return (
+    <BoardPressable
+      testID={`bag-tool-${tool}-seat-${seatNumber}`}
+      accessibilityRole="button"
+      accessibilityLabel={toolLabel(tool)}
+      accessibilityActions={[
+        { name: "activate" },
+        { name: "longpress", label: translate("board:dice.rollForTable") },
+      ]}
+      onAccessibilityAction={({ nativeEvent }) => {
+        if (nativeEvent.actionName === "longpress") putOut()
+        else if (nativeEvent.actionName === "activate") rollForSeat()
+      }}
+      hitSlop={4}
+      delayLongPress={LONG_PRESS_MS}
+      onPressIn={() => {
+        held.current = false
+      }}
+      onLongPress={() => {
+        held.current = true
+      }}
+      onPressOut={() => {
+        if (held.current) putOut()
+      }}
+      onPress={rollForSeat}
+      style={({ pressed }) => [
+        themed($diceTool),
+        pressed && { backgroundColor: overlayTint(ink, 0.14) },
+      ]}
+    >
+      <DieFace tool={tool} size={compact ? 24 : 28} color={ink} />
+    </BoardPressable>
   )
 }
 
@@ -766,9 +999,17 @@ function SheetOption({
   selected,
   ink,
   rule,
+  ruleButton,
   ruleTestID,
+  iconOnly,
+  slide,
+  fade,
   onPress,
 }: {
+  ruleButton: boolean
+  iconOnly?: boolean
+  slide?: ReturnType<typeof useCornerSlide>
+  fade?: boolean
   ref?: Ref<View>
   testID: string
   id: string
@@ -782,54 +1023,79 @@ function SheetOption({
   onPress: () => void
 }) {
   const { themed } = useAppTheme()
+  const fadeIn = fade ? FadeIn.duration(SHEET_FADE_MS) : undefined
+  const fadeOut = fade ? FadeOut.duration(SHEET_FADE_MS) : undefined
   return (
-    <View style={$optionCell}>
+    <Animated.View layout={slide} style={$optionCell}>
       <BoardPressable
         ref={ref}
         testID={testID}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ selected: !!selected }}
+        accessibilityActions={
+          rule && !ruleButton
+            ? [
+                { name: "activate" },
+                { name: "longpress", label: translate("board:counters.rule", { rule: rule.id }) },
+              ]
+            : undefined
+        }
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === "longpress") rule?.onPress()
+          else if (nativeEvent.actionName === "activate") onPress()
+        }}
+        onLongPress={rule && !ruleButton && !iconOnly ? rule.onPress : undefined}
         onPress={onPress}
         style={({ pressed }) => [
           themed($option),
-          !rule && $optionFill,
+          (!ruleButton || iconOnly) && themed($tightOption),
+          !(rule && ruleButton && !iconOnly) && $optionFill,
           pressed && { backgroundColor: overlayTint(ink, 0.14) },
         ]}
       >
-        <TableGlyph id={id} size={16} color={ink} />
-        {value !== undefined ? (
-          <Text
-            text={String(value)}
-            weight={value > 0 ? "bold" : "medium"}
-            size="xs"
-            style={[themed($optionValue), { color: ink }, value === 0 && $muted]}
-          />
-        ) : null}
-        <Text
-          text={label}
-          weight={selected ? "bold" : "medium"}
-          size="xs"
-          numberOfLines={1}
-          style={[themed($optionLabel), { color: ink }, !selected && $muted]}
-        />
-        {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
+        <Animated.View layout={slide}>
+          <TableGlyph id={id} size={16} color={ink} />
+        </Animated.View>
+        {iconOnly ? null : (
+          <Animated.View entering={fadeIn} exiting={fadeOut} style={themed($optionWords)}>
+            {value ? (
+              <Text
+                text={String(value)}
+                weight="bold"
+                size="xs"
+                style={[themed($optionValue), { color: ink }]}
+              />
+            ) : null}
+            <Text
+              text={label}
+              weight={selected ? "bold" : "medium"}
+              size={ruleButton ? "xs" : "xxs"}
+              numberOfLines={1}
+              style={[themed($optionLabel), { color: ink }, !selected && $muted]}
+            />
+            {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
+          </Animated.View>
+        )}
       </BoardPressable>
-      {rule ? (
-        <BoardPressable
-          testID={ruleTestID}
-          accessibilityRole="link"
-          accessibilityLabel={translate("board:counters.rule", { rule: rule.id })}
-          onPress={rule.onPress}
-          style={({ pressed }) => [
-            themed($optionRule),
-            pressed && { backgroundColor: overlayTint(ink, 0.14) },
-          ]}
-        >
-          <Text text={`§${rule.id}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
-        </BoardPressable>
+      {rule && ruleButton && !iconOnly ? (
+        <Animated.View entering={fadeIn} exiting={fadeOut}>
+          <BoardPressable
+            testID={ruleTestID}
+            accessibilityRole="link"
+            accessibilityLabel={translate("board:counters.rule", { rule: rule.id })}
+            hitSlop={6}
+            onPress={rule.onPress}
+            style={({ pressed }) => [
+              themed($optionRule),
+              pressed && { backgroundColor: overlayTint(ink, 0.14) },
+            ]}
+          >
+            <Icon icon="info" size={15} color={ink} containerStyle={$muted} />
+          </BoardPressable>
+        </Animated.View>
       ) : null}
-    </View>
+    </Animated.View>
   )
 }
 
@@ -954,6 +1220,21 @@ const $textButton: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
 
 const $optionScroll: ViewStyle = { flex: 1 }
 
+const $diceTools: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  gap: spacing.xxxs,
+})
+
+const $diceTool: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  minWidth: DICE_TOOL_SIZE,
+  minHeight: DICE_TOOL_SIZE,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: radius.md,
+})
+
 const $optionScrollContent: ViewStyle = { flexGrow: 1, alignItems: "center" }
 
 const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -965,6 +1246,37 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
 
+const $optionWords: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexShrink: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+
+/** why: with every die out, the trackers keep only their icons, two to a row, as a way back. */
+const $iconStrip: ViewStyle = { width: 2 * (16 + 2 * 4) + 8 }
+
+const $split: ViewStyle = { flex: 1, flexDirection: "row" }
+
+const $diceHalf: ViewStyle = { flex: 1, justifyContent: "center" }
+
+const $narrowDice: ViewStyle = { justifyContent: "center" }
+
+/** why: beside trackers the dice keep to a two-by-two column, so the trackers take the rest of the card. */
+const NARROW_DICE_WIDTH = 84
+const DIVIDER_SPACE = 2 * 8 + 1.5
+const LONG_PRESS_MS = 450
+// why: matches the life calculator, the card's other sheet, so both open and close alike.
+const SHEET_FADE_MS = 160
+
+// why: a layout transition owns its view's opacity, so the faded hairline sits inside the sliding slot.
+const $sideDividerSlot: ViewStyle = { marginHorizontal: 8, marginVertical: 12 }
+const $sideDivider: ViewStyle = { flex: 1, width: 1.5, borderRadius: radius.full, opacity: 0.3 }
+
+const DICE_TOOL_SIZE = 40
+// why: a tight tracker row pads its icon by 4, which lands the icon where the life − and + ink.
+const SHEET_SIDE = 14
+
 const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexShrink: 1,
   flexDirection: "row",
@@ -973,6 +1285,12 @@ const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   minHeight: 40,
   paddingHorizontal: spacing.xs,
   borderRadius: radius.md,
+})
+
+// why: a column too narrow for the rule button also gives its padding and gaps to the label, so "Initiative" fits a landscape quarter-seat.
+const $tightOption: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xxs,
+  paddingHorizontal: spacing.xxs,
 })
 
 // why: an option with a rule link keeps its content width, so the link sits beside its own label instead of the next option's.

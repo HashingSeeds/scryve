@@ -149,6 +149,12 @@ const glyphRegistry = {
     </>
   ),
   plus: () => <Path d="M12 5v14M5 12h14" />,
+  info: () => (
+    <>
+      <Circle cx={12} cy={12} r={10} />
+      <Path d="M12 16v-4M12 8h.01" />
+    </>
+  ),
 }
 
 const $imageStyleBase: ImageStyle = {

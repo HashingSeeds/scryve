@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
-import type { DiceSeatChip } from "@/features/game/dice"
+import type { DiceSeatChip, DiceTool } from "@/features/game/dice"
 import { PARTNER_COMMANDER } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
@@ -86,6 +86,11 @@ export interface DiceGridBinding {
   onPressSeat: (player: GamePlayer) => void
   onChoose: (player: GamePlayer, order: "first" | "second") => void
   onPressChip: (player: GamePlayer, chip: DiceSeatChip) => void
+  bag?: {
+    tools: readonly DiceTool[]
+    rollFor: (player: GamePlayer, tool: DiceTool) => void
+    armForOthers: (tool: DiceTool) => void
+  }
 }
 
 function lifeCardOut(
@@ -152,13 +157,19 @@ function seatDiceFor(
   const view = dice?.seatFor(player)
   const chips = dice?.chipsFor(player)
   const armed = dice?.armed ?? dice?.leaving ?? undefined
-  if (!dice || !(view || armed || chips?.length)) return undefined
+  if (!dice) return undefined
+  const { bag } = dice
   return {
     view,
     armed,
     leaving: !dice.armed && !!dice.leaving,
     chips,
     onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
+    bag: bag && {
+      tools: bag.tools,
+      rollFor: stable(`dice-roll:${player.id}`, (tool: DiceTool) => bag.rollFor(player, tool)),
+      armForOthers: bag.armForOthers,
+    },
     onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
       dice.onChoose(player, order),
     ),

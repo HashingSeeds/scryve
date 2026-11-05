@@ -15,6 +15,9 @@ export default {
     },
     tapToRoll: "Toca para tirar",
     tapToFlip: "Toca para lanzar",
+    rollForTable: "Tirar para toda la mesa",
+    moreDice: "Más dados",
+    openBag: "{{identity}}, dados y contadores",
     coinFace: {
       Heads: "Cara",
       Tails: "Cruz",

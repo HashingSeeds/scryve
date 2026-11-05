@@ -15,6 +15,9 @@ export default {
     },
     tapToRoll: "タップして振る",
     tapToFlip: "タップしてコイントス",
+    rollForTable: "全席にダイスを出して振る",
+    moreDice: "ほかのダイス",
+    openBag: "{{identity}}、ダイスとカウンター",
     coinFace: {
       Heads: "表",
       Tails: "裏",
