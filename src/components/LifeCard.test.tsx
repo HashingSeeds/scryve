@@ -21,7 +21,12 @@ import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/
 import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
-import { ATTACK_SHADE, TAKEOVER_MS } from "./CommanderDamageCardControls"
+import {
+  ATTACK_SHADE,
+  attackerLayout,
+  attackerLifeSlot,
+  TAKEOVER_MS,
+} from "./CommanderDamageCardControls"
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import {
@@ -1033,7 +1038,22 @@ describe("LifeCard", () => {
     )
 
     expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("3")
-    expect(view.getByTestId("commander-attacker-life-seat-1")).toHaveTextContent("20")
+    // why: reduced motion (the test default) lands the card's own total in the slot under the power at once, the one 20 on the card.
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 200, height: 300 } },
+    })
+    expect(view.getAllByText("20")).toHaveLength(1)
+    const slot = attackerLifeSlot(
+      attackerLayout({ space: { width: 200, height: 300 }, count: 1 }),
+      darkTheme.spacing,
+    )
+    const [, slotDrop, { scale }] = StyleSheet.flatten(
+      view.getByTestId("life-readout-seat-1").props.style,
+    ).transform
+    expect(slotDrop).toEqual({ translateY: slot.belowCardCenter })
+    const total = StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style)
+    expect(total.fontFamily).toBe("Rubik-Regular")
+    expect(total.fontSize * scale).toBeCloseTo(slot.fontSize)
     expect(view.queryByText("Done")).toBeNull()
     expect(
       view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),

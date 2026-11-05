@@ -20,7 +20,7 @@ import { lowestPower } from "@/features/game/commanderAttack"
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
-import type { ThemedStyle } from "@/theme/types"
+import type { Spacing, ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
@@ -70,8 +70,6 @@ type AssignmentSource = {
   submit: "done" | "send"
   mark?: CommanderAttacker
   commanders: readonly ArmedCommander[]
-  // why: the attacker's own life stays in view under its power, small and regular weight, so it never reads as the attack's target.
-  life: { value: number; label: string }
   acted: boolean
   onPower: (power: number, index: number) => void
   // why: the number pad covers the lower half of the screen, so a seat there lifts its card by `amount` screen points while its power field is open.
@@ -560,16 +558,10 @@ function AttackerControls({
             />
           ))}
         </View>
-        <Text
+        {/* why: the card's own total moves into this slot (see attackerLifeSlot) rather than a second copy fading in. */}
+        <View
           testID={`commander-attacker-life-seat-${seatNumber}`}
-          text={String(mode.life.value)}
-          accessibilityLabel={mode.life.label}
-          maxFontSizeMultiplier={1}
-          numberOfLines={1}
-          style={[
-            $attackerLife,
-            { color: foreground, fontSize: layout.life * 0.8, lineHeight: layout.life },
-          ]}
+          style={{ height: layout.life }}
         />
       </View>
     </BoardPressable>
@@ -611,6 +603,16 @@ export function attackerLayout({
     width: Math.max(0, Math.floor(Math.min(lane, height * BOX_RATIO))),
     name: Math.max(MIN_NAME, Math.round(height * NAME_SHARE)),
     life: Math.max(MIN_LIFE, Math.round(height * LIFE_SHARE)),
+  }
+}
+
+const ATTACKER_COLUMN_GAP = "xxs"
+
+/** why: the attacker's own life stays in view under its power, small and regular weight, so it never reads as the attack's target. It is the last line of a column centered on the card, under boxes `height + name` tall, so its middle sits half of everything above it below the card's center. */
+export function attackerLifeSlot(layout: ReturnType<typeof attackerLayout>, spacing: Spacing) {
+  return {
+    belowCardCenter: (layout.height + layout.name + spacing[ATTACKER_COLUMN_GAP]) / 2,
+    fontSize: layout.life * 0.8,
   }
 }
 
@@ -1036,7 +1038,7 @@ const $attackerCenter: ThemedStyle<ViewStyle> = () => ({
 
 const $attackerColumn: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
-  gap: spacing.xxs,
+  gap: spacing[ATTACKER_COLUMN_GAP],
 })
 
 const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -1044,8 +1046,6 @@ const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.md,
 })
-
-const $attackerLife: TextStyle = { fontVariant: ["tabular-nums"] }
 
 const $boxValue: ViewStyle = { flex: 1.4, alignItems: "center", justifyContent: "center" }
 
