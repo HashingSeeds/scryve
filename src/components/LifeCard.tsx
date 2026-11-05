@@ -695,9 +695,10 @@ export const LifeCard = memo(function LifeCard({
                   ? { edge: CONTENT_LEFT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
+              totalInk={readoutInk}
               onChange={onChange}
               onPreview={showPreview}
-              onLongChange={() => setEditorOpen(true)}
+              onOpenEditor={() => setEditorOpen(true)}
             />
           </Animated.View>
         ) : null}

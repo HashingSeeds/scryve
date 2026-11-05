@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import type { LayoutRectangle, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, useWindowDimensions, View } from "react-native"
 import * as Haptics from "expo-haptics"
@@ -19,6 +26,7 @@ import type { ThemedStyle } from "@/theme/types"
 import type { ReducedMotionPreference } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import type { ReadoutInk } from "./commanderDamageLayout"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   getDeltaFontSizeThatFits,
@@ -47,8 +55,9 @@ export interface LifeControlsProps {
   lifeFontSize?: number
   lifeDigits?: number
   obstacle?: { edge: LifeCardEdge; bounds: LayoutRectangle }
+  totalInk?: ReadoutInk
   onChange: (delta: LifeDelta) => void
-  onLongChange?: (direction: -1 | 1) => void
+  onOpenEditor?: () => void
   onPreview?: (pendingDelta: number) => void
   style?: StyleProp<ViewStyle>
 }
@@ -92,7 +101,35 @@ export function glyphClearance(
   }[edge]
 }
 
+export function totalTargetBox(
+  ink: ReadoutInk,
+  zones: { width: number; height: number },
+  rotation: LifeCardContentRotation,
+  fontScale: number,
+) {
+  const scale = Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+  const upright = {
+    width: Math.max(ink.width * scale + TOTAL_TARGET_PAD * 2, TOTAL_TARGET_MIN),
+    height: Math.max(ink.height * scale + TOTAL_TARGET_PAD * 2, TOTAL_TARGET_MIN),
+  }
+  const sideways = Math.abs(rotation) === 90
+  const width = sideways ? upright.height : upright.width
+  const height = sideways ? upright.width : upright.height
+  const radians = (rotation * Math.PI) / 180
+  const y = ink.y * scale
+  return {
+    left: (zones.width - width) / 2 - y * Math.round(Math.sin(radians)),
+    top: (zones.height - height) / 2 + y * Math.round(Math.cos(radians)),
+    width,
+    height,
+  }
+}
+
+const TOTAL_TARGET_PAD = 10
+const TOTAL_TARGET_MIN = 44
 const RECENT_DELTA_VISIBLE_MS = 1800
+// why: a hold opens the editor without a step, so its press-in preview leaves once the press outlasts a tap.
+const TAP_PREVIEW_MS = 150
 const BUMP_DISTANCE = 4
 
 export interface RecentDelta {
@@ -184,8 +221,9 @@ export function LifeControls({
   lifeFontSize = 0,
   lifeDigits = 0,
   obstacle,
+  totalInk,
   onChange,
-  onLongChange,
+  onOpenEditor,
   onPreview,
   style,
 }: LifeControlsProps) {
@@ -198,11 +236,16 @@ export function LifeControls({
   const recentDelta =
     useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get) + pendingDelta
   const longPressHandled = useRef<LifeDelta | null>(null)
+  const previewTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const endPreview = useCallback(() => {
+    clearTimeout(previewTimer.current)
+    onPreview?.(0)
+  }, [onPreview])
   // why: a zone that freezes or unmounts mid-press never reports press-out, so drop its preview.
   useEffect(() => {
-    if (disabled) onPreview?.(0)
-    return () => onPreview?.(0)
-  }, [disabled, onPreview])
+    if (disabled) endPreview()
+    return endPreview
+  }, [disabled, endPreview])
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
@@ -322,16 +365,18 @@ export function LifeControls({
                 if (locked) return
                 longPressHandled.current = null
                 onPreview?.(delta)
+                clearTimeout(previewTimer.current)
+                previewTimer.current = setTimeout(endPreview, TAP_PREVIEW_MS)
               }}
-              onPressOut={() => onPreview?.(0)}
+              onPressOut={endPreview}
               onLongPress={() => {
                 if (locked) return
                 longPressHandled.current = direction
-                onPreview?.(0)
-                onLongChange?.(direction)
+                endPreview()
+                onOpenEditor?.()
               }}
               onAccessibilityAction={({ nativeEvent }) => {
-                if (nativeEvent.actionName === "longpress") onLongChange?.(direction)
+                if (nativeEvent.actionName === "longpress") onOpenEditor?.()
               }}
               onPress={() => {
                 if (locked) {
@@ -343,7 +388,7 @@ export function LifeControls({
                   return
                 }
                 // why: onPressOut can land after onPress; clearing here keeps a tap from counting twice.
-                onPreview?.(0)
+                endPreview()
                 onChange(delta)
               }}
             >
@@ -372,9 +417,30 @@ export function LifeControls({
           )
         })}
       </View>
+      {totalInk && onOpenEditor && zonesSize.width > 0 && !disabled && !locked ? (
+        // why: the total is the first thing people tap, so it opens the editor instead of landing on the − or + half under it.
+        <BoardPressable
+          testID={`life-total-target-seat-${seatNumber}`}
+          accessibilityRole="button"
+          accessibilityLabel={translate(`board:lifeControls.moreControls.${rules.id}`, {
+            identity,
+          })}
+          onPress={onOpenEditor}
+          style={({ pressed }) => [
+            themed($totalTarget),
+            totalTargetBox(totalInk, zonesSize, contentRotation, fontScale),
+            pressed && { backgroundColor: overlayTint(foreground, 0.14) },
+          ]}
+        />
+      ) : null}
     </View>
   )
 }
+
+const $totalTarget: ThemedStyle<ViewStyle> = ({ radius }) => ({
+  borderRadius: radius.xxxl,
+  position: "absolute",
+})
 
 const $zones: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,

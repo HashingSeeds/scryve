@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
+import * as Haptics from "expo-haptics"
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -11,8 +12,8 @@ import Animated, {
 } from "react-native-reanimated"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
+import { localGameRepository } from "@/features/game/localPersistence"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
-import { appLocale } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -22,14 +23,29 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
-import type {
-  LifeCardContentInsets,
-  LifeCardContentRotation,
-  LifeCardMenuCorner,
-  LifeCardMenuEdge,
+import {
+  getLifeLineHeight,
+  type LifeCardContentInsets,
+  type LifeCardContentRotation,
+  type LifeCardMenuCorner,
+  type LifeCardMenuEdge,
 } from "./playerCardTypes"
+import { mirroredSteps, StepChips, stepChipsHeight } from "./StepChips"
 import { Text } from "./Text"
 
+// why: a step narrower than this is hard to land on with a finger, so a short track shows fewer steps and the held end carries on past them.
+const MIN_STEP_PX = 8
+const MAJOR_TICK_EVERY = 5
+// why: Rubik Bold digits ink about 0.72em tall and 0.64em wide; the total keeps a little air around its ink instead of its whole line box, so it can stay near board size.
+const VALUE_BOX = 0.84
+const DIGIT_WIDTH = 0.64
+const CLOSE_SIZE = 32
+const MIN_TITLE_WIDTH = 40
+const HEADER_GAP = 8
+const METRICS = {
+  regular: { padding: 12, gap: 8, track: 68, thumb: 36, minValue: 48 },
+  compact: { padding: 6, gap: 4, track: 52, thumb: 30, minValue: 36 },
+} as const
 const EDGE_DELAY_MS = 350
 const EDGE_REPEAT_MS = 110
 const BALLOON_SPRING = { damping: 30, stiffness: 340, mass: 0.7 }
@@ -49,7 +65,7 @@ function lifeEditorHeaderPosition(
   insets: LifeCardContentInsets | undefined,
   menuCorner: LifeCardMenuCorner | undefined,
   compact: boolean,
-): ViewStyle {
+) {
   const safe = insets ?? { top: 0, bottom: 0, left: 0, right: 0 }
   const edges = HEADER_EDGES[rotation]
   const edgeInset = compact ? 12 : 20
@@ -59,6 +75,35 @@ function lifeEditorHeaderPosition(
     left: Math.max(edgeInset + safe[edges.left], menuCorner === edges.start ? menuInset : 0),
     right: Math.max(edgeInset + safe[edges.right], menuCorner === edges.end ? menuInset : 0),
   }
+}
+
+export function lifeEditorValueLayout(input: {
+  width: number
+  height: number
+  compact: boolean
+  sourceFontSize: number
+  digits: number
+  header: { top: number; left: number; right: number }
+}) {
+  const { width, height, compact, sourceFontSize, header } = input
+  const metrics = METRICS[compact ? "compact" : "regular"]
+  const controls =
+    metrics.gap * 2 + stepChipsHeight(compact ? "compact" : "regular") + metrics.track
+  const digitWidth = Math.max(input.digits, 2) * DIGIT_WIDTH
+  const closeClearance = header.right + CLOSE_SIZE + HEADER_GAP
+  const byHeight = (height - metrics.padding * 2 - controls) / VALUE_BOX
+  const byWidth = (width - 2 * closeClearance) / digitWidth
+  const fontSize = Math.max(
+    Math.min(sourceFontSize, metrics.minValue),
+    Math.floor(Math.min(sourceFontSize, byHeight, byWidth)),
+  )
+  const column = controls + fontSize * VALUE_BOX
+  const valueTop = metrics.padding + Math.max(0, (height - metrics.padding * 2 - column) / 2)
+  const titleRoom =
+    width > 0 && valueTop < header.top + CLOSE_SIZE
+      ? Math.max(0, (width - fontSize * digitWidth) / 2 - header.left - HEADER_GAP)
+      : undefined
+  return { fontSize, titleRoom }
 }
 
 type Props = {
@@ -101,7 +146,7 @@ export function LifeEditor({
   const editorColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(editorColor)
   const rules = playSystemRules(system)
-  const { quickAdjustments, scrubStep, scrubSteps } = rules.counter
+  const { quickAdjustments, tapStep, scrubStep, scrubSteps } = rules.counter
   const [preview, setPreview] = useState(life)
   const [dragging, setDragging] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -128,30 +173,36 @@ export function LifeEditor({
       },
     ],
   }))
-  const steps = Math.max(
-    -scrubSteps,
-    Math.min(scrubSteps, Math.round((preview - start.current.life) / scrubStep)),
+  const trackSteps = Math.max(1, Math.min(scrubSteps, Math.floor(trackWidth / 2 / MIN_STEP_PX)))
+  const scrubbed = Math.max(
+    -trackSteps,
+    Math.min(trackSteps, Math.round((preview - start.current.life) / scrubStep)),
   )
   const compact = Math.min(cardWidth, cardHeight) > 0 && Math.min(cardWidth, cardHeight) < 220
-  const thumbLeft = `${50 + (steps / scrubSteps) * 50}%` as const
+  const metrics = METRICS[compact ? "compact" : "regular"]
+  const thumbLeft = `${50 + (scrubbed / trackSteps) * 50}%` as const
   const trackInset = compact ? 10 : 18
   const balloonTarget =
     trackInset +
     Math.max(
       balloonWidth / 2,
-      Math.min(trackWidth - balloonWidth / 2, trackWidth * (0.5 + steps / (2 * scrubSteps))),
+      Math.min(trackWidth - balloonWidth / 2, trackWidth * (0.5 + scrubbed / (2 * trackSteps))),
     )
-  const thumbTarget = trackInset + trackWidth * (0.5 + steps / (2 * scrubSteps))
-  const actions = [
-    -quickAdjustments[0],
-    -quickAdjustments[1],
-    quickAdjustments[1],
-    quickAdjustments[0],
-  ]
+  const thumbTarget = trackInset + trackWidth * (0.5 + scrubbed / (2 * trackSteps))
+  const chipSteps = mirroredSteps([...quickAdjustments, tapStep])
   const sideways = Math.abs(rotation) === 90 && cardWidth > 0 && cardHeight > 0
   const editorWidth = sideways ? cardHeight : cardWidth
   const editorHeight = sideways ? cardWidth : cardHeight
-  const valueFontSize = compact ? styles.compactValue.fontSize : styles.value.fontSize
+  const headerPosition = lifeEditorHeaderPosition(rotation, contentInsets, menuCorner, compact)
+  const { fontSize: valueFontSize, titleRoom } = lifeEditorValueLayout({
+    width: editorWidth,
+    height: editorHeight,
+    compact,
+    sourceFontSize,
+    digits: String(life).length,
+    header: headerPosition,
+  })
+  const valueLineHeight = getLifeLineHeight(valueFontSize)
   const safe = contentInsets ?? { top: 0, bottom: 0, left: 0, right: 0 }
   const valueStyle = useAnimatedStyle(() => ({
     opacity: valueCenter === null ? 0 : 1,
@@ -170,8 +221,7 @@ export function LifeEditor({
         bottom: undefined,
       }
     : undefined
-  const headerPosition = lifeEditorHeaderPosition(rotation, contentInsets, menuCorner, compact)
-  const titleWidth =
+  const menuTitleWidth =
     menuEdgeCenter === HEADER_EDGES[rotation].top && editorWidth > 0
       ? Math.max(
           0,
@@ -181,6 +231,10 @@ export function LifeEditor({
             safe[HEADER_EDGES[rotation].left],
         )
       : undefined
+  const titleWidth =
+    menuTitleWidth === undefined || titleRoom === undefined
+      ? (menuTitleWidth ?? titleRoom)
+      : Math.min(menuTitleWidth, titleRoom)
 
   useEffect(() => {
     const dragDelta = dragging ? draft.current - start.current.life : 0
@@ -225,10 +279,19 @@ export function LifeEditor({
         const nextDelta = draft.current - start.current.life + direction * scrubStep
         if (Math.abs(nextDelta) > MAX_LIFE_DELTA) return stopEdge()
         edgeExtra.current += direction * scrubStep
-        draft.current += direction * scrubStep
-        setPreview(draft.current)
+        moveDraft(draft.current + direction * scrubStep)
       }, EDGE_REPEAT_MS)
     }, EDGE_DELAY_MS)
+  }
+
+  // why: each whole step the drag crosses ticks, so the slider feels its steps as well as showing them.
+  function moveDraft(next: number) {
+    if (next === draft.current) return
+    draft.current = next
+    setPreview(next)
+    if (reducedMotion === false && localGameRepository.hapticsEnabled()) {
+      void Haptics.selectionAsync().catch(() => undefined)
+    }
   }
 
   function apply(delta: number) {
@@ -241,11 +304,10 @@ export function LifeEditor({
     const dy = event.nativeEvent.pageY - start.current.y
     const screenAngle = ((rotation + boardRotation) * Math.PI) / 180
     const distance = dx * Math.cos(screenAngle) + dy * Math.sin(screenAngle)
-    const rawSteps = Math.round((distance / Math.max(trackWidth / 2, 1)) * scrubSteps)
-    const clampedSteps = Math.max(-scrubSteps, Math.min(scrubSteps, rawSteps))
-    holdEdge(rawSteps >= scrubSteps ? 1 : rawSteps <= -scrubSteps ? -1 : 0)
-    draft.current = start.current.life + clampedSteps * scrubStep + edgeExtra.current
-    setPreview(draft.current)
+    const rawSteps = Math.round((distance / Math.max(trackWidth / 2, 1)) * trackSteps)
+    const clampedSteps = Math.max(-trackSteps, Math.min(trackSteps, rawSteps))
+    holdEdge(rawSteps >= trackSteps ? 1 : rawSteps <= -trackSteps ? -1 : 0)
+    moveDraft(start.current.life + clampedSteps * scrubStep + edgeExtra.current)
   }
 
   useCloseOnBack(true, closeEditor)
@@ -266,6 +328,9 @@ export function LifeEditor({
       testID={`life-editor-seat-${seatNumber}`}
       accessibilityViewIsModal
       pointerEvents={closing ? "box-only" : "auto"}
+      // why: controls claim their own touches first, so only a tap on the backdrop reaches here.
+      onStartShouldSetResponder={() => true}
+      onResponderRelease={closeEditor}
       style={[
         styles.overlay,
         compact && styles.compactOverlay,
@@ -285,7 +350,9 @@ export function LifeEditor({
       >
         <Text
           testID={`life-editor-title-seat-${seatNumber}`}
-          text={playerName}
+          // why: a name with no room beside the total would clip to a letter, so it steps aside; the seat's color still says whose editor this is.
+          text={titleWidth !== undefined && titleWidth < MIN_TITLE_WIDTH ? "" : playerName}
+          accessibilityLabel={playerName}
           weight="bold"
           numberOfLines={1}
           style={[styles.title, { color: ink, maxWidth: titleWidth }]}
@@ -321,20 +388,50 @@ export function LifeEditor({
       >
         <Text
           text={String(preview)}
+          weight="bold"
           accessibilityLiveRegion="polite"
-          style={[styles.value, compact && styles.compactValue, { color: ink }]}
+          maxFontSizeMultiplier={1}
+          numberOfLines={1}
+          style={[
+            styles.value,
+            {
+              color: ink,
+              fontSize: valueFontSize,
+              lineHeight: valueLineHeight,
+              marginVertical: (valueFontSize * VALUE_BOX - valueLineHeight) / 2,
+            },
+          ]}
         />
       </Animated.View>
       <View
-        style={[
-          styles.scrubArea,
-          compact && styles.compactScrubArea,
-          { paddingHorizontal: trackInset },
-        ]}
+        testID={`life-editor-actions-seat-${seatNumber}`}
+        style={[styles.actions, compact && styles.compactActions]}
       >
+        <StepChips
+          steps={chipSteps}
+          onStep={apply}
+          ink={ink}
+          size={compact ? "compact" : "regular"}
+          testID={`life-editor-step-${seatNumber}`}
+          accessibilityLabel={(step) =>
+            translate(
+              step > 0
+                ? `board:lifeEditor.add.${rules.id}`
+                : `board:lifeEditor.subtract.${rules.id}`,
+              { amount: Math.abs(step) },
+            )
+          }
+        />
+      </View>
+      {/* why: the slider sits last, nearest the player, so its balloon floats over the chips, which a drag has no use for, and never over the total. */}
+      <View style={[styles.scrubArea, { paddingHorizontal: trackInset }]}>
         {dragging ? (
           <Animated.View
-            style={[styles.balloon, compact && styles.compactBalloon, balloonStyle]}
+            style={[
+              styles.balloon,
+              { bottom: metrics.track / 2 + metrics.thumb / 2 },
+              balloonStyle,
+            ]}
             pointerEvents="none"
             onLayout={(event) => setBalloonWidth(event.nativeEvent.layout.width)}
           >
@@ -346,9 +443,12 @@ export function LifeEditor({
               ]}
             >
               <Text
+                testID={`life-editor-balloon-seat-${seatNumber}`}
                 text={deltaLabel(preview - start.current.life)}
-                size={compact ? "lg" : "xl"}
-                style={{ color: editorColor }}
+                weight="bold"
+                size={compact ? "xl" : "xxl"}
+                maxFontSizeMultiplier={1}
+                style={[styles.balloonText, { color: editorColor }]}
               />
             </View>
             <View
@@ -404,73 +504,72 @@ export function LifeEditor({
             draft.current = start.current.life
             setPreview(draft.current)
           }}
-          style={[styles.trackTouch, compact && styles.compactTrackTouch]}
+          style={[styles.trackTouch, { height: metrics.track }]}
         >
           <View
             style={[styles.track, { backgroundColor: theme.colors.board.border }]}
             pointerEvents="none"
           />
-          <View
-            style={[styles.center, { backgroundColor: theme.colors.board.text }]}
-            pointerEvents="none"
-          />
+          <TrackTicks seatNumber={seatNumber} steps={trackSteps} color={theme.colors.board.text} />
           <View
             style={[
               styles.thumb,
-              compact && styles.compactThumb,
-              { left: thumbLeft, backgroundColor: theme.colors.tint },
+              {
+                left: thumbLeft,
+                width: metrics.thumb,
+                height: metrics.thumb,
+                transform: [{ translateX: -metrics.thumb / 2 }],
+                backgroundColor: theme.colors.tint,
+              },
             ]}
             pointerEvents="none"
           />
         </View>
       </View>
-      <View
-        testID={`life-editor-actions-seat-${seatNumber}`}
-        style={[styles.actions, compact && styles.compactActions]}
-      >
-        {actions.map((amount) => (
-          <BoardPressable
-            key={amount}
-            testID={`life-editor-step-${seatNumber}-${amount}`}
-            accessibilityRole="button"
-            accessibilityLabel={translate(
-              amount > 0
-                ? `board:lifeEditor.add.${rules.id}`
-                : `board:lifeEditor.subtract.${rules.id}`,
-              { amount: Math.abs(amount) },
-            )}
-            onPress={() => apply(amount)}
-            style={[
-              styles.action,
-              compact && styles.compactAction,
-              { backgroundColor: theme.colors.board.surfaceRaised },
-            ]}
-          >
-            <Text
-              text={`${amount > 0 ? "+" : "−"}${Math.abs(amount).toLocaleString(appLocale)}`}
-              weight="bold"
-              size={compact ? "xs" : "sm"}
-              style={{ color: ink }}
-            />
-          </BoardPressable>
-        ))}
-      </View>
     </Animated.View>
   )
 }
 
+const TrackTicks = memo(function TrackTicks({
+  seatNumber,
+  steps,
+  color,
+}: {
+  seatNumber: number
+  steps: number
+  color: string
+}) {
+  return (
+    <View
+      testID={`life-editor-ticks-seat-${seatNumber}`}
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+    >
+      {Array.from({ length: steps * 2 + 1 }, (_, index) => {
+        const step = index - steps
+        return (
+          <View
+            key={step}
+            style={[
+              styles.tick,
+              step === 0
+                ? styles.zeroTick
+                : step % MAJOR_TICK_EVERY === 0
+                  ? styles.majorTick
+                  : styles.minorTick,
+              { left: `${50 + (step / steps) * 50}%`, backgroundColor: color },
+            ]}
+          />
+        )
+      })}
+    </View>
+  )
+})
+
 const styles = StyleSheet.create({
-  action: {
-    alignItems: "center",
-    borderRadius: radius.md,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 42,
-  },
-  actions: { alignSelf: "stretch", flexDirection: "row", gap: 5, marginHorizontal: 8 },
+  actions: { alignSelf: "stretch", marginHorizontal: 8 },
   balloon: {
     alignItems: "center",
-    bottom: 66,
     minWidth: 56,
     position: "absolute",
   },
@@ -478,8 +577,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radius.xxl,
     minWidth: 56,
-    paddingHorizontal: 6,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   balloonPointer: {
     borderLeftWidth: 8,
@@ -488,47 +587,44 @@ const styles = StyleSheet.create({
     height: 0,
     width: 0,
   },
-  center: { alignSelf: "center", height: 14, position: "absolute", width: 2 },
-  closeButton: { alignItems: "center", height: 32, justifyContent: "center", width: 32 },
-  closeStroke: { borderRadius: radius.full, height: 2, position: "absolute", width: 20 },
-  compactAction: { minHeight: 36 },
-  compactActions: { marginHorizontal: 6 },
-  compactBalloon: { bottom: 42 },
-  compactBalloonBody: { paddingVertical: 4 },
-  compactOverlay: { gap: 4, padding: 6 },
-  compactScrubArea: { height: 72 },
-  compactThumb: {
-    borderRadius: radius.full,
-    height: 30,
-    transform: [{ translateX: -15 }],
-    width: 30,
+  balloonText: { fontVariant: ["tabular-nums"] },
+  closeButton: {
+    alignItems: "center",
+    height: CLOSE_SIZE,
+    justifyContent: "center",
+    width: CLOSE_SIZE,
   },
-  compactTrackTouch: { height: 52 },
-  compactValue: { fontSize: 36, lineHeight: 42 },
+  closeStroke: { borderRadius: radius.full, height: 2, position: "absolute", width: 20 },
+  compactActions: { marginHorizontal: 6 },
+  compactBalloonBody: { paddingVertical: 2 },
+  compactOverlay: { gap: METRICS.compact.gap, padding: METRICS.compact.padding },
   header: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
     position: "absolute",
   },
+  majorTick: { height: 12, marginTop: -6, opacity: 0.6, width: 2 },
+  minorTick: { height: 6, marginTop: -3, opacity: 0.3, width: 1 },
   overlay: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",
-    gap: 8,
+    gap: METRICS.regular.gap,
     justifyContent: "center",
-    padding: 12,
+    padding: METRICS.regular.padding,
     zIndex: 20,
   },
-  scrubArea: { height: 112, justifyContent: "flex-end", width: "90%" },
-  thumb: {
+  scrubArea: { width: "90%" },
+  thumb: { borderRadius: radius.full, position: "absolute" },
+  tick: {
     borderRadius: radius.full,
-    height: 36,
     position: "absolute",
-    transform: [{ translateX: -18 }],
-    width: 36,
+    top: "50%",
+    transform: [{ translateX: -1 }],
   },
   title: { flex: 1 },
   track: { borderRadius: radius.full, height: 6 },
-  trackTouch: { height: 68, justifyContent: "center", width: "100%" },
-  value: { fontSize: 48, fontVariant: ["tabular-nums"], lineHeight: 56 },
+  trackTouch: { justifyContent: "center", width: "100%" },
+  value: { fontVariant: ["tabular-nums"] },
+  zeroTick: { height: 16, marginTop: -8, opacity: 0.9, width: 2 },
 })

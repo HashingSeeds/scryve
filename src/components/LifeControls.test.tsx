@@ -5,15 +5,15 @@ import { PLAYER_COLORS } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { accessibleForeground, contrastRatio } from "@/utils/colorContrast"
 
-import { glyphClearance, LifeControls } from "./LifeControls"
+import { glyphClearance, LifeControls, totalTargetBox } from "./LifeControls"
 
 describe("LifeControls", () => {
   it("maps taps to one life and delegates long presses to custom amount editing", () => {
     const onChange = jest.fn()
-    const onLongChange = jest.fn()
+    const onOpenEditor = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Ada" onChange={onChange} onLongChange={onLongChange} />
+        <LifeControls playerName="Ada" onChange={onChange} onOpenEditor={onOpenEditor} />
       </ThemeProvider>,
     )
     for (const delta of [-1, 1] as const) {
@@ -32,7 +32,48 @@ describe("LifeControls", () => {
       fireEvent.press(button)
     }
     expect(onChange.mock.calls.map(([delta]) => delta)).toEqual([-1, 1])
-    expect(onLongChange.mock.calls.map(([direction]) => direction)).toEqual([-1, 1])
+    expect(onOpenEditor).toHaveBeenCalledTimes(2)
+  })
+
+  it("opens the editor from a tap on the total without changing life", () => {
+    const onChange = jest.fn()
+    const onOpenEditor = jest.fn()
+    const controls = (props: { disabled?: boolean; lockedReason?: string }) => (
+      <ThemeProvider initialContext="light">
+        <LifeControls
+          playerName="Ada"
+          totalInk={{ width: 154, height: 86, y: -5 }}
+          onChange={onChange}
+          onOpenEditor={onOpenEditor}
+          {...props}
+        />
+      </ThemeProvider>
+    )
+    const view = render(controls({}))
+    fireEvent(view.getByTestId("life-control-zones"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 300 } },
+    })
+    const total = view.getByTestId("life-total-target-seat-1")
+    expect(total.props.accessibilityLabel).toBe("Seat 1, Ada, more life controls")
+    fireEvent.press(total)
+    expect(onOpenEditor).toHaveBeenCalledTimes(1)
+    expect(onChange).not.toHaveBeenCalled()
+
+    view.rerender(controls({ lockedReason: "Out" }))
+    expect(view.queryByTestId("life-total-target-seat-1")).toBeNull()
+    view.rerender(controls({ disabled: true }))
+    expect(view.queryByTestId("life-total-target-seat-1")).toBeNull()
+  })
+
+  it.each([
+    [0, { left: 113, top: 92, width: 174, height: 106 }],
+    [180, { left: 113, top: 102, width: 174, height: 106 }],
+    [90, { left: 152, top: 63, width: 106, height: 174 }],
+    [-90, { left: 142, top: 63, width: 106, height: 174 }],
+  ] as const)("covers a total turned %i° where it inks", (rotation, box) => {
+    expect(
+      totalTargetBox({ width: 154, height: 86, y: -5 }, { width: 400, height: 300 }, rotation, 1),
+    ).toEqual(box)
   })
 
   it("keeps ±1 reachable as full card halves rather than small buttons", () => {
@@ -102,7 +143,7 @@ describe("LifeControls", () => {
 
   it("uses Yu-Gi-Oh! Life Point increments", () => {
     const onChange = jest.fn()
-    const onLongChange = jest.fn()
+    const onOpenEditor = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeControls
@@ -110,7 +151,7 @@ describe("LifeControls", () => {
 
           system="ygo"
           onChange={onChange}
-          onLongChange={onLongChange}
+          onOpenEditor={onOpenEditor}
         />
       </ThemeProvider>,
     )
@@ -122,7 +163,7 @@ describe("LifeControls", () => {
 
     expect(subtract.props.accessibilityLabel).toContain("subtract 1000 Life Points")
     expect(onChange).toHaveBeenCalledWith(-1000)
-    expect(onLongChange).toHaveBeenCalledWith(-1)
+    expect(onOpenEditor).toHaveBeenCalledTimes(1)
   })
 
   it("uses the change amount saved on the game", () => {
