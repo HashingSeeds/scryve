@@ -65,14 +65,13 @@ jobs:
           path: ${{ runner.temp }}/metro-cache
           key: metro-beta-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'babel.config.js', 'metro.config.js', 'app.json', 'app.config.ts') }}
 
-      # why: `eas update --environment` always passes --clear to the export, so run the export it
-      # would run (eas-cli 24.12.1 buildBundlesAsync, same env and args) and publish with --skip-bundler.
+      # why: `eas update --environment` always passes --clear to the export. Run its export (eas-cli
+      # 24.12.1 buildBundlesAsync, same env and args except --clear) and publish with --skip-bundler.
       - name: Publish to beta
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           APP_VARIANT: production
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          # Metro writes its cache to $TMPDIR/metro-cache.
           TMPDIR: ${{ runner.temp }}
         run: |
           RELEASE_NOTES="$(node scripts/release-train.cjs notes)"
