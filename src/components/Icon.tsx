@@ -198,6 +198,31 @@ const glyphRegistry = {
     </>
   ),
   update: () => <Path d="M12 4v11m-5-5 5 5 5-5M5 20h14" />,
+  sliders: (color) => (
+    <>
+      <Path d="M4 5h16M4 12h16M4 19h16" />
+      <Circle cx={9} cy={5} r={2} fill={color} />
+      <Circle cx={15} cy={12} r={2} fill={color} />
+      <Circle cx={8} cy={19} r={2} fill={color} />
+    </>
+  ),
+  panes: () => (
+    <>
+      <Rect x={3.5} y={3.5} width={7} height={17} rx={2} />
+      <Rect x={13.5} y={3.5} width={7} height={7.5} rx={2} />
+      <Rect x={13.5} y={13} width={7} height={7.5} rx={2} />
+    </>
+  ),
+  book: () => <Path d="M5 4.5h9.5a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3ZM5 17a3 3 0 0 1 3-3h9.5" />,
+  flag: () => <Path d="M6 21V4M6 5h11l-2.5 4L17 13H6" />,
+  list: (color) => (
+    <>
+      <Path d="M9 6h11M9 12h11M9 18h11" />
+      <Circle cx={4.5} cy={6} r={1.3} fill={color} />
+      <Circle cx={4.5} cy={12} r={1.3} fill={color} />
+      <Circle cx={4.5} cy={18} r={1.3} fill={color} />
+    </>
+  ),
 } satisfies Record<string, (color: string) => ReactNode>
 
 const $imageStyleBase: ImageStyle = {

@@ -38,6 +38,7 @@ import {
   PENTAGON_BADGE_ANCHOR,
   PENTAGON_RADIUS_SHARE,
 } from "./GameMenuButtonShape"
+import { Icon, type IconTypes } from "./Icon"
 import { Text } from "./Text"
 
 export interface RadialMenuAction {
@@ -101,6 +102,22 @@ export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 
 const ACTION_WIDTH = 116
 const ACTION_HEIGHT = 52
+const ACTION_ICON_SIZE = 18
+
+const ACTION_ICONS = {
+  "layout": "panes",
+  "dice": "more",
+  "players": "account",
+  "status": "info",
+  "home": "back",
+  "setup": "sliders",
+  "decks": "decks",
+  "history": "list",
+  "rules": "book",
+  "connect": "nearby",
+  "invite": "plus",
+  "end-game": "flag",
+} satisfies Record<GameMenuActionKind, IconTypes>
 const ACTION_ELEVATION = 12
 
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
@@ -727,13 +744,18 @@ function RadialAction({
         ]}
         onPress={action.onPress}
       >
-        <Text
-          text={action.label}
-          weight="bold"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.2}
-          style={[themed($actionText), { color: foreground }]}
-        />
+        <View style={themed($actionTitle)}>
+          <Icon icon={ACTION_ICONS[action.kind]} size={ACTION_ICON_SIZE} color={foreground} />
+          <Text
+            text={action.label}
+            weight="bold"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            maxFontSizeMultiplier={1.2}
+            style={[themed($actionText), { color: foreground }]}
+          />
+        </View>
         {action.detail ? (
           <Text
             text={action.detail}
@@ -804,7 +826,7 @@ const $action: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
-  paddingHorizontal: 12,
+  paddingHorizontal: 10,
   borderRadius: ACTION_HEIGHT / 2,
   shadowColor: colors.gameMenu.shadow,
   shadowOffset: { width: 0, height: 4 },
@@ -812,7 +834,14 @@ const $action: ThemedStyle<ViewStyle> = ({ colors }) => ({
   shadowRadius: 7,
   elevation: ACTION_ELEVATION,
 })
+const $actionTitle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xxs,
+  maxWidth: "100%",
+})
 const $actionText: ThemedStyle<TextStyle> = () => ({
+  flexShrink: 1,
   fontSize: 16,
   lineHeight: 20,
   letterSpacing: 0.3,
