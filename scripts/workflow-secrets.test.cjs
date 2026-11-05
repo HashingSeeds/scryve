@@ -12,11 +12,23 @@ const workflows = path.join(
 
 const RELEASE_WORKFLOWS = ["beta.yml", "fingerprint-drift.yml", "promote.yml"]
 
+const readsExpoToken = (source) =>
+  /\bsecrets(?:\.EXPO_TOKEN\b|\[\s*['"]EXPO_TOKEN['"]\s*\])|toJSON\(\s*secrets\s*\)/.test(source)
+
 test("only release workflows read EXPO_TOKEN, which can publish production updates", () => {
   const readers = fs
     .readdirSync(workflows)
-    .filter((file) =>
-      /\bsecrets\.EXPO_TOKEN\b/.test(fs.readFileSync(path.join(workflows, file), "utf8")),
-    )
+    .filter((file) => readsExpoToken(fs.readFileSync(path.join(workflows, file), "utf8")))
   assert.deepEqual(readers.toSorted(), RELEASE_WORKFLOWS)
+})
+
+test("every way of reading EXPO_TOKEN counts", () => {
+  for (const source of [
+    "${{ secrets.EXPO_TOKEN }}",
+    "${{ secrets['EXPO_TOKEN'] }}",
+    '${{ secrets["EXPO_TOKEN"] }}',
+    "${{ toJSON(secrets) }}",
+  ])
+    assert.equal(readsExpoToken(source), true, source)
+  assert.equal(readsExpoToken("${{ secrets.EXPO_TOKEN_PR }}"), false)
 })

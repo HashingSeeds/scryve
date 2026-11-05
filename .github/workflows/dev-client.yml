@@ -1,11 +1,5 @@
 name: dev client
 
-# why: agents install dev clients instead of building them. When main changes the `development`
-# fingerprint, this builds the iOS simulator app (as `pnpm ios:development:sim` does) and a
-# debug-signed Android APK, attests each, and stores it in R2 at
-# scryve-dev-builds/development/<platform>/<fingerprint>/ as the artifact plus a build.json with
-# the fields `builds` (dotfiles) records. Merges that keep both fingerprints only run `plan`.
-
 on:
   push:
     branches: [main]
