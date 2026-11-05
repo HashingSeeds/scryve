@@ -112,35 +112,6 @@ describe("GameRadialMenu", () => {
     })
   })
 
-  it("collapses into an exit button while an exit action is set", () => {
-    const onExit = jest.fn()
-    const onToggle = jest.fn()
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <GameRadialMenu
-          open={false}
-          anchor={{ x: 0.5, y: 0.5 }}
-          actions={actions}
-          exitAction={{ label: "Exit commander damage", onPress: onExit }}
-          onToggle={onToggle}
-          onClose={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
-      "Exit commander damage",
-    )
-    expect(view.getByTestId("game-menu-button").props.accessibilityState.expanded).toBe(false)
-    expect(view.queryByTestId("layout-button")).toBeNull()
-    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
-
-    fireEvent.press(view.getByTestId("game-menu-button"))
-
-    expect(onExit).toHaveBeenCalledTimes(1)
-    expect(onToggle).not.toHaveBeenCalled()
-  })
-
   // why: queried by component type because the host element only carries processed SVG props.
   const signalLayer = (view: ReturnType<typeof render>, testID: string) =>
     view.UNSAFE_queryAllByType(Path).find((path) => path.props.testID === testID)
@@ -237,23 +208,15 @@ describe("GameRadialMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it("lets Android Back close the menu or exit commander damage, and passes it through otherwise", () => {
+  it("lets Android Back close the menu, and passes it through otherwise", () => {
     const pressBack = mockHardwareBack()
     const onClose = jest.fn()
-    const onExit = jest.fn()
     const view = render(menu(false, onClose))
 
     expect(pressBack()).toBe(false)
 
     view.rerender(menu(true, onClose))
     act(() => void pressBack())
-    expect(onClose).toHaveBeenCalledTimes(1)
-
-    view.rerender(
-      menu(false, onClose, { exitAction: { label: "Exit commander damage", onPress: onExit } }),
-    )
-    act(() => void pressBack())
-    expect(onExit).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
 
     view.rerender(menu(false, onClose))
@@ -273,25 +236,6 @@ describe("GameRadialMenu", () => {
     const shown = view.getByLabelText("Layout", hidden)
     expect(shown.props.tabIndex).toBeUndefined()
     expect(shown.props.accessibilityState.disabled).toBe(false)
-  })
-
-  it("carries an armed tool on the pentagon, which puts it away", () => {
-    const onExit = jest.fn()
-    const view = render(
-      menu(false, jest.fn(), {
-        exitAction: { label: "Close dice", onPress: onExit, heldTool: "d20" },
-      }),
-    )
-
-    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
-    expect(view.getByTestId("game-menu-held-tool")).toBeTruthy()
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(onExit).toHaveBeenCalledTimes(1)
-
-    view.rerender(
-      menu(false, jest.fn(), { exitAction: { label: "Exit commander damage", onPress: onExit } }),
-    )
-    expect(view.queryByTestId("game-menu-held-tool")).toBeNull()
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

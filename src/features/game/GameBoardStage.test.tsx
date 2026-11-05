@@ -71,31 +71,6 @@ describe("GameBoardStage on a pinned screen", () => {
     )
   })
 
-  it("carries the armed tool on the pinned board's pentagon", () => {
-    const onExit = jest.fn()
-    render(
-      <ThemeProvider initialContext="dark">
-        <GameBoardStage
-          playerCount={2}
-          layoutVariant="auto"
-          renderGrid={() => <View testID="grid" />}
-          menu={{
-            open: false,
-            actions: menuActions(),
-            exitAction: { label: "Close dice", onPress: onExit, heldTool: "coin" },
-            onToggle: jest.fn(),
-            onClose: jest.fn(),
-          }}
-        />
-      </ThemeProvider>,
-    )
-
-    const cluster = screen.getByTestId("game-menu-cluster")
-    expect(within(cluster).getByTestId("game-menu-held-tool")).toBeTruthy()
-    fireEvent.press(within(cluster).getByTestId("game-menu-button"))
-    expect(onExit).toHaveBeenCalledTimes(1)
-  })
-
   it("turns the connected sync status with the menu so the holder can read it", () => {
     const onPress = jest.fn()
     render(

@@ -1,4 +1,4 @@
-import { type ComponentProps, memo, useEffect, useState } from "react"
+import { type ComponentProps, memo, useEffect } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
@@ -14,7 +14,6 @@ import Animated, {
   ZoomOut,
 } from "react-native-reanimated"
 
-import type { DiceTool } from "@/features/game/dice"
 import { nearestEquivalentAngle } from "@/features/game/pinnedBoardGeometry"
 import {
   rotateGameBoardAnchor,
@@ -34,7 +33,6 @@ import {
 } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { DieFace } from "./DiceGlyph"
 import {
   GameMenuButtonShape,
   PENTAGON_BADGE_ANCHOR,
@@ -74,15 +72,8 @@ export interface GameRadialMenuProps {
   actions: GameMenuActions
   onToggle: () => void
   onClose: () => void
-  exitAction?: GameMenuExitAction
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
-}
-
-export interface GameMenuExitAction {
-  label: string
-  onPress: () => void
-  heldTool?: DiceTool
 }
 
 /** why: the pentagon has five sides and the fan is laid out for exactly one action per side. */
@@ -134,8 +125,6 @@ const POP_EASING = Easing.inOut(Easing.quad)
 const GATED_MOTION = ReduceMotion.Never
 const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
 const BADGE_EXITING = ZoomOut.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
-const HOLD_SWAP_MS = 220
-const HOLD_SWAP_SCALE = 0.4
 const PENTAGON_SPIN_SPRING = {
   damping: 18,
   stiffness: 220,
@@ -207,13 +196,10 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   actions,
   onToggle,
   onClose,
-  exitAction,
   signal,
   statusLine,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
-  const menuOpen = open && !exitAction
-
   const anchorStyle = percentAnchorStyle(anchor)
 
   const nativeAnchorStyle = useAnimatedStyle(() => {
@@ -225,24 +211,23 @@ export const GameRadialMenu = memo(function GameRadialMenu({
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <GameMenuBackdrop open={menuOpen} onClose={onClose} />
+      <GameMenuBackdrop open={open} onClose={onClose} />
       <GameRadialFan
-        open={menuOpen}
+        open={open}
         anchor={anchor}
         anchorStyle={[anchorStyle, nativeAnchorStyle]}
         actions={actions}
       />
       <GameMenuAnchor
-        open={menuOpen}
+        open={open}
         anchor={anchor}
         anchorStyle={[anchorStyle, nativeAnchorStyle]}
         compact={compact}
-        exitAction={exitAction}
         signal={signal}
         onToggle={onToggle}
       />
 
-      {menuOpen && statusLine ? (
+      {open && statusLine ? (
         <GameMenuStatusRow
           statusLine={statusLine}
           above={anchor.y > ANCHOR_LOW_ON_SCREEN}
@@ -356,7 +341,6 @@ type GameMenuAnchorProps = {
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
   compact?: boolean
-  exitAction?: GameMenuExitAction
   signal?: GameMenuSignal
   onToggle: () => void
 }
@@ -376,7 +360,6 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   actions: GameMenuActions
   statusLine?: GameMenuStatusLine
 }) {
-  const menuOpen = anchorProps.open && !anchorProps.exitAction
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
   const facing = useSharedValue(facingAngle)
@@ -397,14 +380,14 @@ export const GameMenuCluster = memo(function GameMenuCluster({
       style={[$cluster, percentAnchorStyle(anchorProps.anchor), facingStyle]}
     >
       <GameRadialFan
-        open={menuOpen}
+        open={anchorProps.open}
         anchor={holderAnchor}
         anchorStyle={$clusterCenter}
         actions={actions}
         poseTurnMs={FACING_TURN_MS}
       />
       <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
-      {menuOpen && statusLine ? (
+      {anchorProps.open && statusLine ? (
         <GameMenuStatusRow
           statusLine={statusLine}
           above={
@@ -423,7 +406,6 @@ function GameMenuAnchor({
   anchor,
   anchorStyle = percentAnchorStyle(anchor),
   compact,
-  exitAction,
   signal,
   onToggle,
 }: GameMenuAnchorProps) {
@@ -433,15 +415,7 @@ function GameMenuAnchor({
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
-  const suppressed = !!exitAction
-  const menuOpen = open && !suppressed
-  const heldTool = exitAction?.heldTool
-  useCloseOnBack(suppressed, () => exitAction?.onPress())
-  const spinTarget = menuOpen
-    ? PENTAGON_OPEN_ROTATION_DEG
-    : suppressed && !heldTool
-      ? -PENTAGON_OPEN_ROTATION_DEG
-      : 0
+  const spinTarget = open ? PENTAGON_OPEN_ROTATION_DEG : 0
   const pentagonRotation = useSharedValue(spinTarget)
   useEffect(() => {
     pentagonRotation.value = animateFully
@@ -479,24 +453,6 @@ function GameMenuAnchor({
   }, [animateFully, needsAttention, pop])
   const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
 
-  // why: the die stays drawn while it shrinks away, so the bars grow back in its place instead of cutting over.
-  const [lastHeldTool, setLastHeldTool] = useState(heldTool)
-  if (heldTool && heldTool !== lastHeldTool) setLastHeldTool(heldTool)
-  const shownTool = heldTool ?? lastHeldTool
-  const holding = useSharedValue(heldTool ? 1 : 0)
-  useEffect(() => {
-    const target = heldTool ? 1 : 0
-    holding.value = animateFully ? withTiming(target, { duration: HOLD_SWAP_MS }) : target
-  }, [animateFully, heldTool, holding])
-  const heldToolStyle = useAnimatedStyle(() => ({
-    opacity: holding.value,
-    transform: [{ scale: HOLD_SWAP_SCALE + (1 - HOLD_SWAP_SCALE) * holding.value }],
-  }))
-  const barsStyle = useAnimatedStyle(() => ({
-    opacity: 1 - holding.value,
-    transform: [{ scale: HOLD_SWAP_SCALE + (1 - HOLD_SWAP_SCALE) * (1 - holding.value) }],
-  }))
-
   return (
     <Animated.View
       testID="game-menu-anchor"
@@ -512,25 +468,17 @@ function GameMenuAnchor({
         testID="game-menu-button"
         accessibilityRole="button"
         accessibilityLabel={[
-          exitAction
-            ? exitAction.label
-            : menuOpen
-              ? translate("board:menu.close")
-              : translate("board:menu.open"),
+          open ? translate("board:menu.close") : translate("board:menu.open"),
           signal?.accessibilityText,
         ]
           .filter(Boolean)
           .join(". ")}
         accessibilityHint={
-          exitAction
-            ? undefined
-            : menuOpen
-              ? translate("board:menu.collapses")
-              : translate("board:menu.expands")
+          open ? translate("board:menu.collapses") : translate("board:menu.expands")
         }
-        accessibilityState={{ expanded: menuOpen }}
+        accessibilityState={{ expanded: open }}
         style={({ pressed }) => [themed($menuButton), pressed && $menuButtonPressed]}
-        onPress={exitAction ? exitAction.onPress : onToggle}
+        onPress={onToggle}
       >
         <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
           <SignalledMenuButtonShape
@@ -539,24 +487,13 @@ function GameMenuAnchor({
             reducedMotion={reducedMotion}
           />
         </Animated.View>
-        {shownTool ? (
-          <Animated.View
-            testID={heldTool ? "game-menu-held-tool" : undefined}
-            pointerEvents="none"
-            style={[$heldTool, heldToolStyle]}
-          >
-            <DieFace tool={shownTool} size={HELD_TOOL_SIZE} color={colors.gameMenu.anchorGlyph} />
-          </Animated.View>
-        ) : null}
-        <Animated.View style={barsStyle}>
-          <MenuGlyph
-            buttonSize={compact ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE}
-            color={colors.gameMenu.anchorGlyph}
-            pose={menuOpen ? 1 : exitAction && !heldTool ? -1 : 0}
-            animateFully={animateFully}
-            reducedMotion={reducedMotion}
-          />
-        </Animated.View>
+        <MenuGlyph
+          buttonSize={compact ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE}
+          color={colors.gameMenu.anchorGlyph}
+          pose={open ? 1 : 0}
+          animateFully={animateFully}
+          reducedMotion={reducedMotion}
+        />
       </BoardPressable>
       {signal?.badge ? (
         <View
@@ -640,7 +577,7 @@ function MenuGlyph({
 }: {
   buttonSize: number
   color: string
-  pose: -1 | 0 | 1
+  pose: 0 | 1
   animateFully: boolean
   reducedMotion: ReducedMotionPreference
 }) {
@@ -848,16 +785,6 @@ const $menuButton: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
 })
-const HELD_TOOL_SIZE = 32
-const $heldTool: ViewStyle = {
-  position: "absolute",
-  top: 0,
-  right: 0,
-  bottom: 0,
-  left: 0,
-  alignItems: "center",
-  justifyContent: "center",
-}
 const $menuButtonPressed: ViewStyle = {
   transform: [{ scale: 0.93 }],
 }
