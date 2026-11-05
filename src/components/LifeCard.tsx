@@ -477,6 +477,8 @@ export const LifeCard = memo(function LifeCard({
   const identityFadeStyle = useAnimatedStyle(() => ({
     opacity: withTiming(attackerSide ? 0 : 1, { duration: lifeFadeDuration }),
   }))
+  // why: web lets a box-none child take touches under a parent set to none, so the fading mark's whole chain turns off to leave the X its taps.
+  const cornerTouches = attackerSide ? "none" : "box-none"
   const knock = useSharedValue(0)
   const defenderTotal =
     commanderCardMode?.kind === "target"
@@ -929,7 +931,8 @@ export const LifeCard = memo(function LifeCard({
         <Animated.View
           key={contentRotation}
           testID={`life-corner-layer-seat-${seatNumber}`}
-          pointerEvents={attackerSide ? "none" : "box-none"}
+          pointerEvents={cornerTouches}
+          aria-hidden={attackerSide}
           accessibilityElementsHidden={attackerSide}
           importantForAccessibility={attackerSide ? "no-hide-descendants" : "auto"}
           style={[
@@ -941,7 +944,7 @@ export const LifeCard = memo(function LifeCard({
         >
           <Animated.View
             testID={`life-identity-row-seat-${seatNumber}`}
-            pointerEvents="box-none"
+            pointerEvents={cornerTouches}
             layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
@@ -970,7 +973,7 @@ export const LifeCard = memo(function LifeCard({
           >
             <View
               testID={`life-identity-seat-${seatNumber}`}
-              pointerEvents="box-none"
+              pointerEvents={cornerTouches}
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
