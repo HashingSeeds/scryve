@@ -431,7 +431,6 @@ export default {
       riftbound: "points",
     },
     openCalculator: "Ouvrir la calculatrice pour {{identity}}",
-    undo: "Annuler le dernier changement de points de vie de {{identity}}",
   },
   lifeControls: {
     add: "{{identity}}, ajouter {{amount}}",

@@ -142,7 +142,7 @@ export type GameCommand =
       commander?: typeof PARTNER_COMMANDER
       delta: number
     }
-  | { type: "life.undo"; playerId?: PlayerId }
+  | { type: "life.undo" }
   | { type: "game.finish"; result?: LocalGameResult }
   | { type: "game.abandon" }
 

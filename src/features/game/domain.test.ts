@@ -23,7 +23,9 @@ import {
   restartMatchGame,
   soleLoserSeat,
 } from "./domain"
+import { LocalGameRepository } from "./localPersistence"
 import type { CommandContext, GameEvent, LifeDelta, LocalGame, LocalGameResult } from "./types"
+import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 function makeContext(actor = "local") {
   let now = 100
@@ -220,9 +222,10 @@ describe("local game domain", () => {
     expect(applyGameCommand(game, { type: "life.undo" }, context)).toBe(game)
   })
 
-  it("undoes one seat's latest change, step by step, leaving other seats alone", () => {
+  it("loads and replays a saved game whose undo took back an older change", () => {
     const context = makeContext()
-    let game = makeGame()
+    const start = makeGame()
+    let game = start
     const [first, second] = game.players.map(({ id }) => id)
     for (const [playerId, delta] of [
       [first, -1],
@@ -230,11 +233,31 @@ describe("local game domain", () => {
       [second, -3],
     ] as const)
       game = applyGameCommand(game, { type: "life.change", playerId, delta }, context)
-    game = applyGameCommand(game, { type: "life.undo", playerId: first }, context)
-    expect(game.players.map(({ life }) => life)).toEqual([19, 17])
-    game = applyGameCommand(game, { type: "life.undo", playerId: first }, context)
-    expect(game.players.map(({ life }) => life)).toEqual([20, 17])
-    expect(applyGameCommand(game, { type: "life.undo", playerId: first }, context)).toBe(game)
+    // why: beta builds with #923's card undo arrow stored undos of a seat's change even after another seat changed.
+    const seatUndo: GameEvent = {
+      type: "life.changed",
+      operationId: asOperationId("op-seat-undo"),
+      gameId: game.id,
+      actorId: context.actorId,
+      deviceId: context.deviceId,
+      clientCreatedAt: 200,
+      playerId: first,
+      delta: 2,
+      compensatesOperationId: game.events[1].operationId,
+    }
+    game = reduceGameEvent(game, seatUndo)
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(game)
+
+    const loaded = repository.loadActiveGame()
+    if (!loaded) throw new Error("saved game did not load")
+    expect(loaded.players.map(({ life }) => life)).toEqual([19, 17])
+    expect(loaded.events.reduce(reduceGameEvent, start).players).toEqual(loaded.players)
+    const undone = applyGameCommand(loaded, { type: "life.undo" }, context)
+    expect(undone.players.map(({ life }) => life)).toEqual([19, 20])
+    expect(
+      applyGameCommand(undone, { type: "life.undo" }, context).players.map(({ life }) => life),
+    ).toEqual([20, 20])
   })
 
   it("does not undo another actor's action", () => {
