@@ -959,10 +959,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     incomingFor: commanderPort.incoming,
                     lethal: commanderLethal,
                     attack,
-                    inspection: {
-                      playerId: attack.inspectedPlayerId,
-                      onChange: (playerId) => attackDispatch({ type: "inspect", playerId }),
-                    },
                     pendingFor: (player) =>
                       controlled.has(player.id)
                         ? (game.commanderDamage?.pendingClaims ?? [])

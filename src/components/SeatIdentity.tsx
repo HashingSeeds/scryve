@@ -1,5 +1,7 @@
+import type { ComponentProps } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
+import Animated from "react-native-reanimated"
 
 import { translate } from "@/i18n/translate"
 import { useElapsedSince } from "@/utils/useElapsedSince"
@@ -31,6 +33,7 @@ export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
   const scale = seatIdentityMetrics(compact).mark / MARK_VIEW_BOX
   const art = MARK_ART_BOUNDS[shape]
   return {
+    width: (art.right - art.left) * scale,
     height: (art.bottom - art.top) * scale,
     trim: {
       marginTop: -art.top * scale,
@@ -60,6 +63,8 @@ export interface SeatIdentityProps {
   foil?: boolean
   staleSince?: number
   markOnly?: boolean
+  markHidden?: boolean
+  nameStyle?: ComponentProps<typeof Animated.View>["style"]
   style?: StyleProp<ViewStyle>
 }
 
@@ -74,6 +79,8 @@ export function SeatIdentity({
   foil,
   staleSince,
   markOnly,
+  markHidden,
+  nameStyle,
   style,
 }: SeatIdentityProps) {
   const metrics = seatIdentityMetrics(compact)
@@ -87,9 +94,9 @@ export function SeatIdentity({
         insetSwordColor={insetSwordColor}
         foil={foil}
         size={metrics.mark}
-        style={[$mark, art.trim]}
+        style={[$mark, art.trim, markHidden && $hidden]}
       />
-      <View testID={`life-status-seat-${seatNumber}`} style={$text}>
+      <Animated.View testID={`life-status-seat-${seatNumber}`} style={[$text, nameStyle]}>
         {markOnly ? null : (
           <Text
             testID={`player-name-seat-${seatNumber}`}
@@ -103,7 +110,7 @@ export function SeatIdentity({
           />
         )}
         {staleSince !== undefined ? <UpdatedAgo since={staleSince} color={color} /> : null}
-      </View>
+      </Animated.View>
     </View>
   )
 }
@@ -124,5 +131,6 @@ function UpdatedAgo({ since, color }: { since: number; color: string }) {
 
 const $row: ViewStyle = { flexDirection: "row", alignItems: "center" }
 const $mark: ViewStyle = { opacity: PLAYER_MARK_MUTED_OPACITY }
+const $hidden: ViewStyle = { opacity: 0 }
 const $text: ViewStyle = { flexShrink: 1, alignItems: "flex-start" }
 const $status: TextStyle = { opacity: 0.9 }

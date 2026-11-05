@@ -280,11 +280,6 @@ export function CurrentGameScreen({
     attackDispatch({ type: "press", playerId: player.id })
   }
 
-  function inspectCommanderDamage(playerId: PlayerId | null) {
-    if (playerId) markFirstPlayerUsed()
-    attackDispatch({ type: "inspect", playerId })
-  }
-
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
     if (ended.status === "active") {
@@ -374,10 +369,6 @@ export function CurrentGameScreen({
                       incomingFor: commanderPort.incoming,
                       lethal: commanderLethal,
                       attack,
-                      inspection: {
-                        playerId: attack.inspectedPlayerId,
-                        onChange: inspectCommanderDamage,
-                      },
                       onPressSword: toggleSword,
                     }
                   : undefined

@@ -359,9 +359,6 @@ export default {
     },
   },
   commander: {
-    takenBySeat: "Blessures de commandant subies par la place {{seat}}",
-    ownCommander: "{{name}}, propre commandant",
-    damageFrom: "{{damage}} blessures de {{name}}",
     assignFromSeat: "Attribuer des blessures de commandant de la place {{seat}}",
     assigningFromSeat: "Attribution de blessures de commandant de la place {{seat}}",
     submitAssigningFromSeat: {
@@ -378,11 +375,11 @@ export default {
     partnerAttacks: "{{name}} attaque",
     unnamed: "Commandant",
     totalFrom: "{{damage}} blessures de commandant infligées par {{name}}",
-    closeFor: "Fermer les blessures de commandant de {{identity}}",
-    showFor: "Afficher les blessures de commandant de {{identity}}, {{sources}}",
     amountFrom: "{{amount}} de {{name}}",
     unknownAttacker: "Commandant",
     assignFrom: "Attribuer des blessures de commandant de {{identity}}",
+    assignFromWithDamage:
+      "Assigner des blessures de commandant de {{identity}}. Subies : {{sources}}",
     assignFromStale: "Attribuer des blessures de commandant de {{identity}}, périmé",
   },
   outReason: {
@@ -542,7 +539,6 @@ export default {
     closeDice: "Fermer les dés",
     openDiceBag: "Ouvrir le sac de dés",
     closeDiceBag: "Fermer le sac de dés",
-    exitCommander: "Quitter les blessures de commandant",
     closeLayoutChooser: "Fermer le choix de disposition",
     showsConnectionDetails: "Affiche les détails de connexion",
     open: "Options de partie",

@@ -333,9 +333,6 @@ export default {
     },
   },
   commander: {
-    takenBySeat: "자리 {{seat}}이(가) 받은 커맨더 피해",
-    ownCommander: "{{name}}, 자신의 커맨더",
-    damageFrom: "{{name}}의 피해 {{damage}}",
     assignFromSeat: "자리 {{seat}}의 커맨더 피해 지정",
     assigningFromSeat: "자리 {{seat}}의 커맨더 피해 지정 중",
     submitAssigningFromSeat: {
@@ -352,11 +349,10 @@ export default {
     partnerAttacks: "{{name}} 공격",
     unnamed: "커맨더",
     totalFrom: "{{name}}의 커맨더 피해 {{damage}}",
-    closeFor: "{{identity}}의 커맨더 피해 닫기",
-    showFor: "{{identity}}의 커맨더 피해 보기, {{sources}}",
     amountFrom: "{{name}}에게서 {{amount}}",
     unknownAttacker: "커맨더",
     assignFrom: "{{identity}}의 커맨더 피해 지정",
+    assignFromWithDamage: "{{identity}}의 커맨더 피해를 적용하세요. 받은 피해: {{sources}}",
     assignFromStale: "{{identity}}의 커맨더 피해 지정, 오래된 정보",
   },
   outReason: {
@@ -500,7 +496,6 @@ export default {
     closeDice: "주사위 닫기",
     openDiceBag: "주사위 가방 열기",
     closeDiceBag: "주사위 가방 닫기",
-    exitCommander: "커맨더 피해 종료",
     closeLayoutChooser: "레이아웃 선택 닫기",
     showsConnectionDetails: "연결 정보를 표시합니다",
     open: "게임 옵션",

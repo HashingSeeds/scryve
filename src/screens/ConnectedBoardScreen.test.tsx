@@ -249,51 +249,6 @@ describe("ConnectedBoardScreen", () => {
     expect(mockSubmitCommanderDamage).not.toHaveBeenCalled()
   })
 
-  it("opens the commander board from the compact grid on your own seat", () => {
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: {
-        ...connectedHarness.runtime.projection,
-        commanderDamage: {
-          totals: [{ fromPlayerId: "player-2", toPlayerId: "player-1", total: 3 }],
-          pendingClaims: [],
-          eliminatedPlayerIds: [],
-        },
-      },
-    }
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
-
-    fireEvent.press(screen.getByTestId("commander-map-seat-2"))
-    expect(screen.getByTestId("commander-overview-seat-2")).toBeTruthy()
-    expect(screen.getByTestId("commander-cell-seat-2-player-1")).toBeTruthy()
-    expect(screen.queryByTestId("commander-pip-seat-2-player-2")).toBeNull()
-
-    const exit = screen.getByTestId("game-menu-button")
-    expect(exit.props.accessibilityLabel).toBe("Exit commander damage")
-    fireEvent.press(exit)
-    expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
-  })
-
-  it("lets you inspect an opponent board without arming from it", () => {
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: {
-        ...connectedHarness.runtime.projection,
-        commanderDamage: {
-          totals: [{ fromPlayerId: "player-1", toPlayerId: "player-2", total: 3 }],
-          pendingClaims: [],
-          eliminatedPlayerIds: [],
-        },
-      },
-    }
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-
-    fireEvent.press(screen.getByTestId("commander-map-seat-1"))
-    expect(screen.getByTestId("commander-overview-seat-1")).toBeTruthy()
-    expect(screen.getByTestId("commander-mark-seat-1").props.accessibilityState.disabled).toBe(true)
-  })
-
   it("lets the defending seat confirm and decline a claim from its banner", () => {
     const claim = {
       claimId: "claim-1",

@@ -1,12 +1,12 @@
-import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
+import { makeMutable } from "react-native-reanimated"
 
 import { asPlayerId } from "@/features/game/domain"
 import type { GamePlayer } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { CommanderStrip, type CommanderStripProps } from "./CommanderStrip"
+import { CommanderStrip, commanderDamageTier, type CommanderStripProps } from "./CommanderStrip"
 
 const players: GamePlayer[] = [
   { id: asPlayerId("ada"), name: "Ada", color: "#41476E", life: 40, seat: 0 },
@@ -31,8 +31,7 @@ function renderStrip(props: Partial<CommanderStripProps> = {}) {
         lethal={21}
         foreground="#FFFFFF"
         contentRotation={0}
-        open={false}
-        onToggle={jest.fn()}
+        onPress={jest.fn()}
         {...props}
       />
     </ThemeProvider>,
@@ -42,73 +41,14 @@ function renderStrip(props: Partial<CommanderStripProps> = {}) {
 const damaged = { [players[2].id]: 21 }
 
 describe("CommanderStrip", () => {
-  it("replaces the compact grid with a nearby close button while inspecting", () => {
-    const onToggle = jest.fn()
-    const view = renderStrip({ incoming: damaged, open: true, onToggle })
-    expect(view.queryByTestId(`commander-pip-seat-1-${players[2].id}`)).toBeNull()
-    const close = view.getByRole("button", { name: "Close commander damage for Seat 1, Ada" })
-    fireEvent.press(close)
-    expect(onToggle).toHaveBeenCalledTimes(1)
-  })
-
-  it("reaches a 48 dp target around a one-row grid without drawing it bigger", () => {
-    const view = renderStrip({ incoming: damaged })
-    const map = view.getByTestId("commander-map-seat-1")
-    fireEvent(map, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 58, height: 32 } } })
-    expect(view.getByTestId("commander-map-seat-1").props.hitSlop).toEqual({
-      top: 8,
-      bottom: 8,
-      left: 2,
-      right: 2,
-    })
-  })
-
   it("stays hidden until someone deals damage", () => {
     const view = renderStrip()
     expect(view.queryByTestId("commander-strip-seat-1")).toBeNull()
   })
 
-  it("tucks into a screen corner but keeps the full inset beside a mid-edge notch", () => {
-    const props = {
-      incoming: damaged,
-      contentRotation: 180 as const,
-      contentInsets: { top: 47, bottom: 0, left: 0, right: 0 },
-    }
-    const corner = renderStrip({
-      ...props,
-      screenEdges: { top: true, bottom: false, left: true, right: false },
-    })
-    expect(corner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 24, left: 8, right: 8 })
-    corner.unmount()
-
-    const inner = renderStrip({
-      ...props,
-      screenEdges: { top: true, bottom: false, left: false, right: true },
-    })
-    expect(inner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 55 })
-  })
-
-  it("moves to the seat's inner corner when a camera hole holds its own", () => {
-    const view = renderStrip({
-      incoming: damaged,
-      contentRotation: -90,
-      contentInsets: {
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        cutout: { edge: "top", side: "right", size: 84 },
-      },
-      screenEdges: { top: true, bottom: false, left: false, right: true },
-    })
-    const strip = StyleSheet.flatten(view.getByTestId("commander-strip-seat-1").props.style)
-    expect(strip).toMatchObject({ left: 8, top: 8 })
-    expect(strip.right).toBeUndefined()
-  })
-
-  it("shows the whole board, with the card's own seat as a muted mark", () => {
-    const onToggle = jest.fn()
-    const view = renderStrip({ incoming: damaged, onToggle })
+  it("shows the whole board, with the card's own seat holding its mark, and opens an attack when tapped", () => {
+    const onPress = jest.fn()
+    const view = renderStrip({ incoming: damaged, onPress })
 
     const rows = view.getByTestId("commander-map-seat-1").children.map((row) =>
       typeof row === "string"
@@ -126,33 +66,58 @@ describe("CommanderStrip", () => {
       ["commander-own-seat-1", `commander-pip-seat-1-${players[1].id}`],
       [`commander-pip-seat-1-${players[2].id}`],
     ])
-    expect(view.queryByTestId("commander-mark-seat-1")).toBeNull()
     expect(
       view.getByTestId(`commander-pip-seat-1-${players[2].id}`, { includeHiddenElements: true }),
     ).toHaveTextContent("21")
-
-    const idle = view.getByTestId(`commander-pip-seat-1-${players[1].id}`, {
-      includeHiddenElements: true,
+    const grid = view.getByRole("button", {
+      name: "Assign commander damage from Seat 1, Ada. Taken: 21 from Cy",
     })
-    expect(idle).not.toHaveTextContent("0")
-    const toggle = view.getByRole("button", {
-      name: "Show commander damage for Seat 1, Ada, 21 from Cy",
-    })
-    expect(
-      view.getByTestId("commander-strip-close-icon-seat-1", { includeHiddenElements: true }),
-    ).not.toBeVisible()
     expect(view.getAllByRole("button")).toHaveLength(1)
-    expect(toggle).toBe(view.getByTestId("commander-map-seat-1"))
-    fireEvent.press(toggle)
-    expect(onToggle).toHaveBeenCalledTimes(1)
+    fireEvent.press(grid)
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 
-  it("disables the whole compact grid when inspection is unavailable", () => {
-    const onToggle = jest.fn()
-    const view = renderStrip({ incoming: damaged, inspectDisabled: true, onToggle })
-    const toggle = view.getByTestId("commander-map-seat-1")
-    expect(toggle).toBeDisabled()
-    fireEvent.press(toggle)
-    expect(onToggle).not.toHaveBeenCalled()
+  it("sits in the mark's corner, tucked into a screen corner but clear of a mid-edge notch", () => {
+    const props = {
+      incoming: damaged,
+      contentRotation: 180 as const,
+      contentInsets: { top: 47, bottom: 0, left: 0, right: 0 },
+    }
+    const corner = renderStrip({
+      ...props,
+      screenEdges: { top: true, bottom: false, left: false, right: true },
+    })
+    expect(corner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 24, right: 12 })
+    corner.unmount()
+
+    const inner = renderStrip({
+      ...props,
+      screenEdges: { top: true, bottom: false, left: true, right: false },
+    })
+    expect(inner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 59 })
+  })
+
+  it("turns the attacker's own cell into the finish button", () => {
+    const onSubmit = jest.fn()
+    const view = renderStrip({
+      source: { active: true, flight: makeMutable(1), submit: "done", acted: false, onSubmit },
+    })
+    const finish = view.getByRole("button", {
+      name: "Done assigning commander damage from seat 1",
+    })
+    expect(finish).toBe(view.getByTestId("commander-exit-seat-1"))
+    fireEvent.press(finish)
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it("rings an attacker orange from half of lethal and oxblood within five of it", () => {
+    expect([0, 10, 11, 15, 16, 21].map((total) => commanderDamageTier(total, 21))).toEqual([
+      "calm",
+      "calm",
+      "significant",
+      "significant",
+      "nearLethal",
+      "nearLethal",
+    ])
   })
 })

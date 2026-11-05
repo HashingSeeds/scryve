@@ -34,13 +34,11 @@ const commanderDamage = {
   lethal: 21,
   attack: {
     armedPlayerId: null,
-    inspectedPlayerId: null,
     acted: false,
     stagedTargets: undefined,
     against: jest.fn(),
     dispatch: jest.fn(),
   },
-  inspection: { playerId: null, onChange: jest.fn() },
   onPressSword: jest.fn(),
 }
 

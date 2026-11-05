@@ -324,9 +324,6 @@ const board = {
   },
   // Magic Commander damage: damage a commander card dealt to a player. {{seat}} is a seat number.
   commander: {
-    takenBySeat: "Commander damage taken by seat {{seat}}",
-    ownCommander: "{{name}}, own commander",
-    damageFrom: "{{damage}} damage from {{name}}",
     assignFromSeat: "Assign commander damage from seat {{seat}}",
     assigningFromSeat: "Assigning commander damage from seat {{seat}}",
     submitAssigningFromSeat: {
@@ -348,11 +345,11 @@ const board = {
     // Shown dimmed in place of the commander's name when the seat has no deck.
     unnamed: "Commander",
     totalFrom: "{{damage}} commander damage from {{name}}",
-    closeFor: "Close commander damage for {{identity}}",
-    showFor: "Show commander damage for {{identity}}, {{sources}}",
     amountFrom: "{{amount}} from {{name}}",
     unknownAttacker: "Commander",
     assignFrom: "Assign commander damage from {{identity}}",
+    // {{sources}} lists the commander damage this seat has taken, such as "6 from Ana, 3 from Ben".
+    assignFromWithDamage: "Assign commander damage from {{identity}}. Taken: {{sources}}",
     assignFromStale: "Assign commander damage from {{identity}}, out of date",
   },
   outReason: {
@@ -502,7 +499,6 @@ const board = {
     closeDice: "Close dice",
     openDiceBag: "Open dice bag",
     closeDiceBag: "Close dice bag",
-    exitCommander: "Exit commander damage",
     closeLayoutChooser: "Close layout chooser",
     showsConnectionDetails: "Shows connection details",
     open: "Game options",
