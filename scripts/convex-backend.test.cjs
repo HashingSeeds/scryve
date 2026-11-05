@@ -58,7 +58,9 @@ test("a convex.json that keeps the functions in convex/ still lets app-only chan
 
 test("a convex.json edit counts as a backend change", () => {
   const config = { ...base, "convex.json": '{ "typescriptCompiler": "tsgo" }' }
-  const [first, last] = repoWithCommits(config, { "convex.json": '{ "typescriptCompiler": "tsc" }' })
+  const [first, last] = repoWithCommits(config, {
+    "convex.json": '{ "typescriptCompiler": "tsc" }',
+  })
   assert.equal(backendMatches(first.sha, last.sha, last.cwd), false)
 })
 
