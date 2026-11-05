@@ -5,7 +5,7 @@ const os = require("node:os")
 const path = require("node:path")
 const { after, test } = require("node:test")
 
-const root = path.join(__dirname, "..")
+const root = path.join(path.dirname(require.resolve("./tsrs-as-tsgo.test.cjs")), "..")
 const convexCli = path.join(root, "node_modules", "convex", "bin", "main.js")
 const projects = []
 after(() => projects.forEach((cwd) => fs.rmSync(cwd, { recursive: true })))
