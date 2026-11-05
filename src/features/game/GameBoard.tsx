@@ -46,7 +46,7 @@ export interface BoardChromeOptions {
     seats?: ReactNode
   }
   petals: readonly [BoardPetal, BoardPetal]
-  attack: Pick<CommanderAttack, "dispatch" | "inspectedPlayerId">
+  attack: Pick<CommanderAttack, "dispatch">
   onDiceTool?: () => void
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
@@ -67,7 +67,7 @@ export function useBoardChrome({
   players,
   layout,
   petals: [third, end],
-  attack: { dispatch, inspectedPlayerId },
+  attack: { dispatch },
   onDiceTool,
   signal,
   statusLine,
@@ -180,10 +180,8 @@ export function useBoardChrome({
             onPress: closeDice,
             ...(diceArmed ? { heldTool: diceArmed } : {}),
           }
-        : inspectedPlayerId
-          ? { label: translate("board:menu.exitCommander"), onPress: finishAttack }
-          : undefined,
-    [closeDice, diceArmed, diceOpen, inspectedPlayerId, finishAttack],
+        : undefined,
+    [closeDice, diceArmed, diceOpen],
   )
   const pressStatus = stable("status", () => {
     setMenuOpen(false)

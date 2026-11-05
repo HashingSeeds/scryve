@@ -345,9 +345,6 @@ export default {
     },
   },
   commander: {
-    takenBySeat: "सीट {{seat}} को मिला कमांडर डैमेज",
-    ownCommander: "{{name}}, अपना कमांडर",
-    damageFrom: "{{name}} से {{damage}} डैमेज",
     assignFromSeat: "सीट {{seat}} से कमांडर डैमेज असाइन करें",
     assigningFromSeat: "सीट {{seat}} से कमांडर डैमेज असाइन हो रहा है",
     submitAssigningFromSeat: {
@@ -364,11 +361,10 @@ export default {
     partnerAttacks: "{{name}} अटैक करता है",
     unnamed: "कमांडर",
     totalFrom: "{{name}} से {{damage}} कमांडर डैमेज",
-    closeFor: "{{identity}} के लिए कमांडर डैमेज बंद करें",
-    showFor: "{{identity}} के लिए कमांडर डैमेज दिखाएँ, {{sources}}",
     amountFrom: "{{name}} से {{amount}}",
     unknownAttacker: "कमांडर",
     assignFrom: "{{identity}} से कमांडर डैमेज असाइन करें",
+    assignFromWithDamage: "{{identity}} से कमांडर डैमेज असाइन करें। मिला: {{sources}}",
     assignFromStale: "{{identity}} से कमांडर डैमेज असाइन करें, पुराना",
   },
   outReason: {
@@ -520,7 +516,6 @@ export default {
     closeDice: "पासे बंद करें",
     openDiceBag: "डाइस बैग खोलें",
     closeDiceBag: "डाइस बैग बंद करें",
-    exitCommander: "कमांडर डैमेज से बाहर निकलें",
     closeLayoutChooser: "लेआउट चुनना बंद करें",
     showsConnectionDetails: "कनेक्शन का विवरण दिखाता है",
     open: "गेम विकल्प",

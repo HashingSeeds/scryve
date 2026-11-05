@@ -121,10 +121,10 @@ describe("commander attack", () => {
     expect(board.commits).toHaveLength(1)
   })
 
-  it("sends the staged attack before another seat arms, and arming closes the inspected board", () => {
+  it("sends the staged attack before another seat arms", () => {
     const board = attack({ buffered: true })
-    board.run({ type: "inspect", playerId: grace }, press(ada))
-    expect(board.state()).toMatchObject({ armed: ada, inspected: null, acted: false })
+    board.run(press(ada))
+    expect(board.state()).toMatchObject({ armed: ada, acted: false })
 
     board.run(hit(grace))
     expect(board.state().acted).toBe(true)

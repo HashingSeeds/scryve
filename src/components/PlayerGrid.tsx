@@ -64,7 +64,6 @@ export interface CommanderDamageGridBinding {
   incomingFor: (playerId: PlayerId, commander?: CommanderSlot) => Record<PlayerId, number>
   lethal: number
   attack: CommanderAttack
-  inspection: { playerId: PlayerId | null; onChange: (playerId: PlayerId | null) => void }
   pendingFor?: (player: GamePlayer) => LifeCardCommanderDamage["pendingClaims"]
   onPressSword: (player: GamePlayer) => void
 }
@@ -509,19 +508,7 @@ export function PlayerGrid({
                         ? {
                             ownerPlayerId: player.id,
                             players: commanderPlayers,
-                            inspection: {
-                              open: commanderDamage.inspection.playerId === player.id,
-                              onToggle: stable(`inspect:${player.id}`, () =>
-                                commanderDamage.inspection.onChange(
-                                  commanderDamage.inspection.playerId === player.id
-                                    ? null
-                                    : player.id,
-                                ),
-                              ),
-                            },
                             seats: boardSeats.seats,
-                            rows: boardSeats.rows,
-                            columns: boardSeats.columns,
                             incoming: strongerCommander(firstIncoming, partnerIncoming),
                             lethal: commanderDamage.lethal,
                             armedPlayerId: attack.armedPlayerId,

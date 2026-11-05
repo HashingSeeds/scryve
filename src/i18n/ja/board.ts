@@ -334,9 +334,6 @@ export default {
     },
   },
   commander: {
-    takenBySeat: "席{{seat}}が受けた統率者ダメージ",
-    ownCommander: "{{name}}、自分の統率者",
-    damageFrom: "{{name}}から{{damage}}ダメージ",
     assignFromSeat: "席{{seat}}からの統率者ダメージを設定",
     assigningFromSeat: "席{{seat}}からの統率者ダメージを設定中",
     submitAssigningFromSeat: {
@@ -353,11 +350,10 @@ export default {
     partnerAttacks: "{{name}}が攻撃",
     unnamed: "統率者",
     totalFrom: "{{name}}からの統率者ダメージ{{damage}}",
-    closeFor: "{{identity}}の統率者ダメージを閉じる",
-    showFor: "{{identity}}の統率者ダメージを表示、{{sources}}",
     amountFrom: "{{name}}から{{amount}}",
     unknownAttacker: "統率者",
     assignFrom: "{{identity}}からの統率者ダメージを設定",
+    assignFromWithDamage: "{{identity}}からの統率者ダメージを割り振る。受けた分: {{sources}}",
     assignFromStale: "{{identity}}からの統率者ダメージを設定、情報が古い",
   },
   outReason: {
@@ -498,7 +494,6 @@ export default {
     closeDice: "ダイスを閉じる",
     openDiceBag: "ダイスバッグを開く",
     closeDiceBag: "ダイスバッグを閉じる",
-    exitCommander: "統率者ダメージを終了",
     closeLayoutChooser: "レイアウト選択を閉じる",
     showsConnectionDetails: "接続の詳細を表示します",
     open: "ゲームオプション",

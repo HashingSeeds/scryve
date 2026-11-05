@@ -25,7 +25,7 @@ function Board(options: Partial<BoardChromeOptions> & { playerCount?: number }) 
       { kind: "players", label: "Players", onPress: jest.fn() },
       { kind: "end-game", label: "End", onPress: jest.fn() },
     ],
-    attack: { dispatch: jest.fn(), inspectedPlayerId: null },
+    attack: { dispatch: jest.fn() },
     ...rest,
   })
   return <GameBoard chrome={chrome} renderGrid={() => <View testID="grid" />} />
@@ -72,7 +72,7 @@ describe("GameBoard chrome", () => {
     const dispatch = jest.fn()
     const onHistory = jest.fn(() => expect(dispatch).toHaveBeenCalledWith({ type: "send" }))
     renderBoard({
-      attack: { dispatch, inspectedPlayerId: null },
+      attack: { dispatch },
       onHistory,
       onSettings: jest.fn(),
       onSupport: jest.fn(),
@@ -93,12 +93,12 @@ describe("GameBoard chrome", () => {
     expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
-  it("pauses an attack under the menu, finishes it when a petal takes over the board, and exits an inspected commander", () => {
+  it("pauses an attack under the menu, and finishes it when a petal takes over the board", () => {
     const dispatch = jest.fn()
-    const view = renderBoard({
+    renderBoard({
       system: "mtg",
       onRules: jest.fn(),
-      attack: { dispatch, inspectedPlayerId: null },
+      attack: { dispatch },
     })
     openMenu()
     openMenu()
@@ -107,18 +107,6 @@ describe("GameBoard chrome", () => {
     expect(dispatch).not.toHaveBeenCalled()
     openMenu()
     fireEvent.press(screen.getByTestId("players-button"))
-    expect(dispatch).toHaveBeenCalledWith({ type: "send" })
-
-    view.rerender(
-      <ThemeProvider initialContext="dark">
-        <Board attack={{ dispatch, inspectedPlayerId: asPlayerId("player-2") }} />
-      </ThemeProvider>,
-    )
-    dispatch.mockClear()
-    expect(screen.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
-      "Exit commander damage",
-    )
-    fireEvent.press(screen.getByTestId("game-menu-button"))
     expect(dispatch).toHaveBeenCalledWith({ type: "send" })
   })
 

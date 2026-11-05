@@ -19,7 +19,7 @@ import Animated, {
 } from "react-native-reanimated"
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
-import type { LifeDelta } from "@/features/game/types"
+import type { CommanderBoardPlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -30,7 +30,6 @@ import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
-import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
   ATTACK_SHADE,
   CommanderDamageCardControls,
@@ -38,7 +37,6 @@ import {
   SWAP_MS,
   CommanderTakeoverBackdrop,
   SHADOW_INK,
-  PulseRing,
   TAKEOVER_LAYERS,
   useCommanderTakeover,
   type ArmedCommander,
@@ -46,27 +44,20 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import {
-  commanderOverview,
   commanderTakeover,
-  DISC_RING,
   lifeInk,
   OUT_CAUSE_GAP,
   OUT_LABEL,
   outInk,
   STRUCK_LIFE,
+  type CommanderBoardSeat,
   type CommanderFacing,
   type CommanderReach,
 } from "./commanderDamageLayout"
-import {
-  CommanderStrip,
-  commanderDamageDealers,
-  commanderStripCorner,
-  commanderStripMovesInward,
-} from "./CommanderStrip"
+import { CommanderStrip, commanderGridShown, commanderStripCorner } from "./CommanderStrip"
 import { CounterChips, TableGlyph, type SeatTable } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
-import { Icon } from "./Icon"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
@@ -102,17 +93,19 @@ import {
 import { Text } from "./Text"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-const COMMANDER_OVERVIEW_MS = 220
 // why: matches the attacker's power boxes swapping in, so the life total and its − and + cross-fade with them.
 const LIFE_FADE_MS = SWAP_MS
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
-export type LifeCardCommanderDamage = Omit<
-  CommanderDamageBoardProps,
-  "contentRotation" | "compact" | "foreground" | "seatNumber"
-> & {
-  inspection: { open: boolean; onToggle: () => void }
+export type LifeCardCommanderDamage = {
+  players?: readonly CommanderBoardPlayer[]
+  ownerPlayerId: PlayerId
+  seats: readonly CommanderBoardSeat[]
+  incoming: Record<PlayerId, number>
+  lethal: number
+  armedPlayerId?: PlayerId | null
+  onPressSword?: () => void
   attackerName?: string
   attacker?: CommanderAttacker
   commanders?: readonly ArmedCommander[]
@@ -195,21 +188,16 @@ export const LifeCard = memo(function LifeCard({
   onChange,
   style,
 }: LifeCardProps) {
-  const {
-    themed,
-    theme: { spacing, colors },
-  } = useAppTheme()
+  const { themed } = useAppTheme()
   const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const cornerSlide = useCornerSlide()
-  const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
   const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
   const locked = !!out && out.cause !== "life"
   const frozen = disabled || locked
-  const inspectDisabled = disabled && ownership !== "unowned"
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
@@ -240,69 +228,10 @@ export const LifeCard = memo(function LifeCard({
       }),
     )
   const resolvedLifeFontSize = fontSizeFor(shownDigits)
-  const cardPadding = compact ? spacing.xxs : spacing.xs
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
-  const commanderOverviewOpen = !!commanderDamage?.inspection.open
-  const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
-  const [boardBounds, setBoardBounds] = useState<LayoutRectangle | null>(null)
-  const overviewProgress = useSharedValue(commanderOverviewOpen ? 1 : 0)
-  const overviewPlayerId = useRef(playerId)
-  useEffect(() => {
-    const reseated = overviewPlayerId.current !== playerId
-    overviewPlayerId.current = playerId
-    if (!commanderSeat) return
-    if (commanderOverviewOpen) setOverviewVisible(true)
-    if (commanderOverviewDuration === 0 || reseated) {
-      overviewProgress.value = commanderOverviewOpen ? 1 : 0
-      setOverviewVisible(commanderOverviewOpen)
-      return
-    }
-    overviewProgress.value = withTiming(
-      commanderOverviewOpen ? 1 : 0,
-      {
-        duration: commanderOverviewDuration,
-      },
-      (finished) => {
-        if (finished && !commanderOverviewOpen) runOnJS(setOverviewVisible)(false)
-      },
-    )
-  }, [commanderSeat, commanderOverviewOpen, commanderOverviewDuration, overviewProgress, playerId])
-  const overviewShown = commanderSeat && (commanderOverviewOpen || overviewVisible)
-  const overviewCloseStyle = useAnimatedStyle(() => ({ opacity: overviewProgress.value }))
-  const boardStyle = useAnimatedStyle(() => ({
-    opacity: boardBounds ? 1 : 0,
-    transform: [
-      {
-        translateX:
-          stripBounds && boardBounds
-            ? (stripBounds.x + stripBounds.width / 2 - boardBounds.x - boardBounds.width / 2) *
-              (1 - overviewProgress.value)
-            : 0,
-      },
-      {
-        translateY:
-          stripBounds && boardBounds
-            ? (stripBounds.y + stripBounds.height / 2 - boardBounds.y - boardBounds.height / 2) *
-              (1 - overviewProgress.value)
-            : 0,
-      },
-      {
-        scaleX:
-          stripBounds && boardBounds && boardBounds.width > 0
-            ? 1 + (stripBounds.width / boardBounds.width - 1) * (1 - overviewProgress.value)
-            : 1,
-      },
-      {
-        scaleY:
-          stripBounds && boardBounds && boardBounds.height > 0
-            ? 1 + (stripBounds.height / boardBounds.height - 1) * (1 - overviewProgress.value)
-            : 1,
-      },
-    ],
-  }))
 
   const [editorOpen, setEditorOpen] = useState(false)
   const calculator = !!playSystemRules(system).counter.calculator
@@ -314,7 +243,6 @@ export const LifeCard = memo(function LifeCard({
     setPreview(0)
     setEditorOpen(false)
     setTableSheetOpen(false)
-    setOverviewVisible(commanderOverviewOpen)
   }
   useEffect(() => {
     if (tableSheetOpen || editorOpen) onPlayStart?.()
@@ -367,23 +295,6 @@ export const LifeCard = memo(function LifeCard({
           lead: causeGlyphShown ? causeGlyphSize + OUT_CAUSE_GAP : 0,
           below: { ...STRUCK_LIFE, chars: shownDigits },
         })
-  const overview = commanderOverview({
-    card: cardSize,
-    rotation: contentRotation,
-    insets: contentInsets,
-    lifeFontSize: out && out.cause !== "life" ? causeFontSize : resolvedLifeFontSize,
-    ink: readoutInk,
-    board: boardBounds,
-    compact,
-  })
-  const boardInsets = overview.padding
-  const overviewLifeStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: overview.life.x * overviewProgress.value },
-      { translateY: overview.life.y * overviewProgress.value },
-      { scale: 1 + (overview.life.scale - 1) * overviewProgress.value },
-    ],
-  }))
   const takeover =
     defending && cardSize.width > 0
       ? commanderTakeover({
@@ -420,7 +331,7 @@ export const LifeCard = memo(function LifeCard({
             commanders: armedCommanders,
             lethal: commanderDamage.lethal,
             facing: commanderDamage.facing ?? {},
-            stripCorner: commanderStripCorner(contentRotation, contentInsets),
+            stripCorner: commanderStripCorner(contentRotation),
             takeover,
             wave: floodedBy.wave,
             acted: !!commanderDamage.acted,
@@ -473,10 +384,19 @@ export const LifeCard = memo(function LifeCard({
   const lifeFadeStyle = useAnimatedStyle(() => ({
     opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
   }))
-  // why: the attacker's mark and name cross-fade with the finish X as the life total does with the power boxes, rather than popping out and back.
-  const identityFadeStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(attackerSide ? 0 : 1, { duration: lifeFadeDuration }),
-  }))
+  // why: the attacker's mark flies into its grid as the life total swaps for the power boxes, and back out after, so the grid stays up until the mark has landed home.
+  const sourceFlight = useSharedValue(attackerSide ? 1 : 0)
+  const [sourceLanding, setSourceLanding] = useState(false)
+  useEffect(() => {
+    if (attackerSide) setSourceLanding(true)
+    sourceFlight.value = withTiming(
+      attackerSide ? 1 : 0,
+      { duration: lifeFadeDuration },
+      (finished) => {
+        if (finished && !attackerSide) runOnJS(setSourceLanding)(false)
+      },
+    )
+  }, [attackerSide, lifeFadeDuration, sourceFlight])
   // why: web lets a box-none child take touches under a parent set to none, so the fading mark's whole chain turns off to leave the X its taps.
   const cornerTouches = attackerSide ? "none" : "box-none"
   const knock = useSharedValue(0)
@@ -510,28 +430,24 @@ export const LifeCard = memo(function LifeCard({
     ],
   }))
   const lifeControlsShown =
-    !commanderCovers &&
-    !sittingOut &&
-    !overviewShown &&
-    !tableSheetOpen &&
-    !diceCovers &&
-    ownership !== "unowned"
+    !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   const calculatorButtonSize = compact ? 30 : 40
   const claimShown = !!claims?.length
+  const sourceShown = attackerSide || sourceLanding
   // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card.
   const commanderStripShown =
     commanderSeat &&
-    (!commanderCovers || defending) &&
+    (!commanderCovers || defending || attackerSide) &&
     !tableSheetOpen &&
     !diceCovers &&
-    (defending ||
-      commanderDamageDealers(
-        commanderDamage.players ?? [],
-        commanderDamage.ownerPlayerId,
-        commanderDamage.incoming,
-      ).length > 0)
+    commanderGridShown({
+      players: commanderDamage.players ?? [],
+      ownerPlayerId: commanderDamage.ownerPlayerId,
+      incoming: commanderDamage.incoming,
+      attacked: !!stripAttackerId || sourceShown,
+    })
   const identityMetrics = seatIdentityMetrics(compact)
   const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
   const identityCorner = seatIdentityPlacement({
@@ -542,9 +458,22 @@ export const LifeCard = memo(function LifeCard({
     screenEdges,
     markHeight: identityMetrics.mark,
   })
-  const stripAtEdge = !commanderStripMovesInward(contentRotation, contentInsets)
+  const markAnchor =
+    cardSize.width > 0
+      ? identityMarkCenter({
+          rotation: contentRotation,
+          cardSize,
+          left: Number(identityCorner.position.left ?? 0),
+          bottom: Number(identityCorner.position.bottom ?? 0),
+          art: markArt,
+          size: identityMetrics.mark,
+        })
+      : undefined
+  const nameFadeStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(commanderStripShown ? 0 : 1, { duration: lifeFadeDuration }),
+  }))
   const seatRun = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
-  // why: beside the commander strip a short seat cuts every name to a few letters, so in commander games such seats keep just their mark from the start; judged by seat length alone so seats of one size match.
+  // why: a name cut to a few letters reads worse than none, so in commander games short seats keep just their mark from the start; judged by seat length alone so seats of one size match.
   const markOnly =
     commanderSeat &&
     seatRun > 0 &&
@@ -561,6 +490,8 @@ export const LifeCard = memo(function LifeCard({
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
       markOnly={markOnly}
+      markHidden={commanderStripShown}
+      nameStyle={nameFadeStyle}
     />
   )
 
@@ -645,9 +576,7 @@ export const LifeCard = memo(function LifeCard({
         />
       ) : null}
       <Animated.View
-        pointerEvents={
-          commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
-        }
+        pointerEvents={commanderCardMode || diceCovers ? "none" : "box-none"}
         accessibilityElementsHidden={attackerSide || tableSheetOpen || diceCovers}
         importantForAccessibility={
           attackerSide || tableSheetOpen || diceCovers ? "no-hide-descendants" : "auto"
@@ -656,14 +585,13 @@ export const LifeCard = memo(function LifeCard({
           themed($content),
           lifeFadeStyle,
           readoutFitStyle,
-          overviewShown && $overviewReadout,
           floodedBy.takeover && $aboveFlood,
         ]}
       >
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={[themed($readout), commanderSeat && overviewLifeStyle]}
+          style={themed($readout)}
         >
           {out?.cause === "life" ? (
             <View style={[$outReadout, contentRotationStyle]}>
@@ -723,76 +651,6 @@ export const LifeCard = memo(function LifeCard({
           style={[themed($eliminated), locked && $lockedOverlay]}
         />
       ) : null}
-      {commanderDamage && overviewShown && !commanderCardMode ? (
-        <View
-          testID={`commander-overview-seat-${seatNumber}`}
-          style={[
-            themed($commanderOverview),
-            compact && themed($compactCommanderOverview),
-            { backgroundColor: color },
-          ]}
-        >
-          <Animated.View
-            testID={`commander-overview-ring-seat-${seatNumber}`}
-            pointerEvents="none"
-            style={[
-              $overviewRing,
-              {
-                left: cardSize.width / 2 + overview.ring.x - overview.ring.size / 2,
-                top: cardSize.height / 2 + overview.ring.y - overview.ring.size / 2,
-                width: overview.ring.size,
-                height: overview.ring.size,
-                borderRadius: overview.ring.size / 2,
-                borderColor: colors.board.background,
-              },
-              overviewCloseStyle,
-            ]}
-          />
-          <View
-            testID={`commander-overview-content-seat-${seatNumber}`}
-            style={[themed($commanderOverviewContent), boardInsets]}
-          >
-            <Animated.View
-              testID={`commander-overview-board-seat-${seatNumber}`}
-              onLayout={(event) => setBoardBounds(event.nativeEvent.layout)}
-              style={boardStyle}
-            >
-              <CommanderDamageBoard
-                ownerPlayerId={commanderDamage.ownerPlayerId}
-                players={commanderDamage.players}
-                seats={commanderDamage.seats}
-                rows={commanderDamage.rows}
-                columns={commanderDamage.columns}
-                incoming={commanderDamage.incoming}
-                lethal={commanderDamage.lethal}
-                onPressSword={commanderDamage.onPressSword}
-                seatNumber={seatNumber}
-                contentRotation={contentRotation}
-                compact={compact}
-                expanded
-                foreground={foreground}
-                style={themed($expandedCommanderBoard)}
-                maxSize={{
-                  width: Math.max(
-                    cardSize.width -
-                      cardPadding * 2 -
-                      boardInsets.paddingLeft -
-                      boardInsets.paddingRight,
-                    0,
-                  ),
-                  height: Math.max(
-                    cardSize.height -
-                      cardPadding * 2 -
-                      boardInsets.paddingTop -
-                      boardInsets.paddingBottom,
-                    0,
-                  ),
-                }}
-              />
-            </Animated.View>
-          </View>
-        </View>
-      ) : null}
       {/* why: the − and + fade out as commander mode or a sheet takes the card and back in after, but not when the board first draws. */}
       <LayoutAnimationConfig skipEntering>
         {shownCardMode ? (
@@ -832,7 +690,7 @@ export const LifeCard = memo(function LifeCard({
               lifeDigits={shownDigits}
               obstacle={
                 commanderStripShown && stripBounds
-                  ? { edge: CONTENT_RIGHT_EDGE[contentRotation], bounds: stripBounds }
+                  ? { edge: CONTENT_LEFT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
               onChange={onChange}
@@ -842,57 +700,6 @@ export const LifeCard = memo(function LifeCard({
           </Animated.View>
         ) : null}
       </LayoutAnimationConfig>
-      {commanderCardMode?.kind === "source" ? (
-        // why: the mark and name opened this mode, so the same spot finishes it: an X until a hit lands, then a check.
-        <Animated.View
-          key={`finish-${contentRotation}`}
-          entering={lifeFadeDuration ? FadeIn.duration(lifeFadeDuration) : undefined}
-          exiting={lifeFadeDuration ? FadeOut.duration(lifeFadeDuration) : undefined}
-          pointerEvents="box-none"
-          style={[
-            themed($cornerLayer),
-            identityCorner.layer,
-            { transform: [{ rotate: `${contentRotation}deg` }] },
-          ]}
-        >
-          <BoardPressable
-            testID={`commander-exit-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel={translate(
-              `board:commander.submitAssigningFromSeat.${commanderCardMode.submit}`,
-              { seat: seatNumber },
-            )}
-            hitSlop={12}
-            onPress={commanderCardMode.onSubmit}
-            style={[themed($overviewClose), identityCorner.position]}
-          >
-            {/* why: hits already count in a local game, so finishing only closes and stays an X; a connected game's check sends hits that have not landed yet. */}
-            <View
-              testID={`commander-exit-${commanderCardMode.submit === "send" ? "check" : "x"}-seat-${seatNumber}`}
-              style={[
-                $exitGlyph,
-                { width: identityMetrics.mark, height: identityMetrics.mark },
-                markArt.trim,
-              ]}
-            >
-              {/* why: the ring lives in the glyph box, not the trimmed button, so it centers on the X itself. */}
-              {commanderCardMode.acted ? (
-                <PulseRing
-                  testID={`commander-finish-pulse-seat-${seatNumber}`}
-                  size={identityMetrics.mark}
-                  from={0.6}
-                  color={foreground}
-                />
-              ) : null}
-              <Icon
-                icon={commanderCardMode.submit === "send" ? "check" : "x"}
-                color={foreground}
-                size={Math.round(identityMetrics.mark * 0.6)}
-              />
-            </View>
-          </BoardPressable>
-        </Animated.View>
-      ) : null}
       {dice && diceCovers ? (
         <DiceSeatOverlay
           seatNumber={seatNumber}
@@ -904,7 +711,7 @@ export const LifeCard = memo(function LifeCard({
           dice={dice}
         />
       ) : null}
-      {commanderDamage && (!commanderCovers || defending) && !tableSheetOpen && !diceCovers ? (
+      {commanderDamage && commanderStripShown ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -918,11 +725,22 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
-          open={overviewShown}
           attack={stripAttack}
-          inspectDisabled={inspectDisabled || sittingOut}
-          closeIconStyle={overviewCloseStyle}
-          onToggle={commanderDamage.inspection.onToggle}
+          source={
+            sourceShown
+              ? {
+                  active: attackerSide,
+                  flight: sourceFlight,
+                  submit: commanderCardMode?.kind === "source" ? commanderCardMode.submit : "done",
+                  acted: !!commanderDamage.acted,
+                  onSubmit:
+                    commanderCardMode?.kind === "source" ? commanderCardMode.onSubmit : () => {},
+                }
+              : undefined
+          }
+          markAnchor={markAnchor}
+          disabled={!!disabled || sittingOut}
+          onPress={commanderDamage.onPressSword}
           onBoundsChange={setStripBounds}
         />
       ) : null}
@@ -939,7 +757,6 @@ export const LifeCard = memo(function LifeCard({
             themed($cornerLayer),
             identityCorner.layer,
             { transform: [{ rotate: `${contentRotation}deg` }] },
-            identityFadeStyle,
           ]}
         >
           <Animated.View
@@ -978,9 +795,8 @@ export const LifeCard = memo(function LifeCard({
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
                 $cornerIdentity,
-                // why: the half-run cap leaves the far corner to the commander strip; without it the name runs to the row's limit.
-                commanderStripShown &&
-                  stripAtEdge && { maxWidth: identityCorner.position.maxWidth },
+                // why: the half-run cap keeps the far corner clear; without it the name runs to the row's limit.
+                commanderSeat && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
               {commanderDamage ? (
@@ -994,7 +810,11 @@ export const LifeCard = memo(function LifeCard({
                     { identity },
                   )}
                   accessibilityState={{ disabled: !!disabled || sittingOut }}
-                  disabled={disabled || sittingOut}
+                  // why: once the grid has taken the mark's place, the grid is the one target that opens an attack, so the hidden mark leaves the accessibility tree too.
+                  accessible={!commanderStripShown}
+                  accessibilityElementsHidden={commanderStripShown}
+                  importantForAccessibility={commanderStripShown ? "no-hide-descendants" : "auto"}
+                  disabled={disabled || sittingOut || commanderStripShown}
                   hitSlop={8}
                   onPress={commanderDamage.onPressSword}
                   style={({ pressed }) => pressed && { opacity: 0.72 }}
@@ -1067,13 +887,7 @@ export const LifeCard = memo(function LifeCard({
           disabled={disabled}
         />
       ) : null}
-      {seatTable &&
-      !claimShown &&
-      !diceCovers &&
-      !commanderCovers &&
-      !sittingOut &&
-      !overviewShown &&
-      !editorOpen ? (
+      {seatTable && !claimShown && !diceCovers && !commanderCovers && !sittingOut && !editorOpen ? (
         <CounterChips
           key={playerId}
           seat={seatTable}
@@ -1220,6 +1034,38 @@ const CONTENT_BOTTOM_EDGE = {
   [-90]: "right",
 } as const
 
+/** why: the center of the identity row's mark in card coordinates. The row is laid out in the seat's own upright frame, which is centered on the card and turned by its rotation, so a point there turns about the card's center. */
+export function identityMarkCenter({
+  rotation,
+  cardSize,
+  left,
+  bottom,
+  art,
+  size,
+}: {
+  rotation: LifeCardContentRotation
+  cardSize: { width: number; height: number }
+  left: number
+  bottom: number
+  art: { width: number; height: number }
+  size: number
+}) {
+  const sideways = Math.abs(rotation) === 90
+  const frame = sideways
+    ? { width: cardSize.height, height: cardSize.width }
+    : { width: cardSize.width, height: cardSize.height }
+  const x = left + art.width / 2 - frame.width / 2
+  const y = frame.height - bottom - art.height / 2 - frame.height / 2
+  const turn = (rotation * Math.PI) / 180
+  const cos = Math.round(Math.cos(turn))
+  const sin = Math.round(Math.sin(turn))
+  return {
+    x: cardSize.width / 2 + x * cos - y * sin,
+    y: cardSize.height / 2 + x * sin + y * cos,
+    size,
+  }
+}
+
 /** why: the layer swaps its sides before turning sideways; turned as is, the identity pokes past the card. */
 export function seatIdentityPlacement({
   rotation,
@@ -1290,37 +1136,6 @@ export function seatIdentityPlacement({
   return { layer, position, rowMaxWidth, trailing }
 }
 
-const $commanderOverview: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  ...StyleSheet.absoluteFill,
-  zIndex: 7,
-  overflow: "hidden",
-  borderRadius: radius.xxxl,
-})
-
-const $compactCommanderOverview: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  borderRadius: radius.xxl,
-})
-
-const $commanderOverviewContent: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
-})
-
-const $expandedCommanderBoard: ThemedStyle<ViewStyle> = () => ({
-  position: "relative",
-  zIndex: 2,
-})
-
-const $exitGlyph: ViewStyle = { alignItems: "center", justifyContent: "center" }
-
-const $overviewClose: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 3,
-})
-
 const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
   zIndex: 2,
@@ -1351,8 +1166,5 @@ const $struckLife: ThemedStyle<TextStyle> = () => ({
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
-
-const $overviewReadout: ViewStyle = { zIndex: 8 }
-const $overviewRing: ViewStyle = { position: "absolute", borderWidth: DISC_RING }
 
 const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.life }

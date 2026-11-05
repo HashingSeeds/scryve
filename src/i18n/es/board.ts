@@ -361,9 +361,6 @@ export default {
     },
   },
   commander: {
-    takenBySeat: "Daño de comandante recibido por el asiento {{seat}}",
-    ownCommander: "{{name}}, comandante propio",
-    damageFrom: "{{damage}} de daño de {{name}}",
     assignFromSeat: "Asignar daño de comandante del asiento {{seat}}",
     assigningFromSeat: "Asignando daño de comandante del asiento {{seat}}",
     submitAssigningFromSeat: {
@@ -380,11 +377,10 @@ export default {
     partnerAttacks: "{{name}} ataca",
     unnamed: "Comandante",
     totalFrom: "{{damage}} de daño de comandante de {{name}}",
-    closeFor: "Cerrar el daño de comandante de {{identity}}",
-    showFor: "Mostrar el daño de comandante de {{identity}}, {{sources}}",
     amountFrom: "{{amount}} de {{name}}",
     unknownAttacker: "Comandante",
     assignFrom: "Asignar daño de comandante de {{identity}}",
+    assignFromWithDamage: "Asignar daño de comandante de {{identity}}. Recibido: {{sources}}",
     assignFromStale: "Asignar daño de comandante de {{identity}}, desactualizado",
   },
   outReason: {
@@ -544,7 +540,6 @@ export default {
     closeDice: "Cerrar dados",
     openDiceBag: "Abrir bolsa de dados",
     closeDiceBag: "Cerrar bolsa de dados",
-    exitCommander: "Salir del daño de comandante",
     closeLayoutChooser: "Cerrar selector de diseño",
     showsConnectionDetails: "Muestra los detalles de la conexión",
     open: "Opciones de partida",

@@ -5,7 +5,6 @@ export type AttackChange = { toPlayerId: PlayerId; commander?: CommanderSlot; de
 
 export type AttackState = {
   armed: PlayerId | null
-  inspected: PlayerId | null
   /** why: keyed by attacker and slot, and kept across attacks, so a commander's pumped power is still set the next time it attacks. */
   powers: Partial<Record<`${PlayerId}:${number}`, number>>
   benched: number | null
@@ -18,7 +17,6 @@ export type AttackState = {
 export type AttackAction =
   | { type: "press"; playerId: PlayerId }
   | { type: "send" }
-  | { type: "inspect"; playerId: PlayerId | null }
   | { type: "power"; slot: number; step: 1 | -1 }
   | { type: "bench"; slot: number }
   | { type: "hit"; to: PlayerId }
@@ -35,7 +33,6 @@ export type AttackCommit = { from: PlayerId; changes: readonly AttackChange[] }
 
 export const IDLE_ATTACK: AttackState = {
   armed: null,
-  inspected: null,
   powers: {},
   benched: null,
   acted: false,
@@ -105,8 +102,6 @@ export function reduceAttack(
     }
     case "send":
       return finish(state)
-    case "inspect":
-      return { state: { ...state, inspected: action.playerId } }
     case "power": {
       if (!armed) return { state }
       const key = `${armed}:${action.slot}` as const
@@ -141,14 +136,13 @@ export function reduceAttack(
 }
 
 function finish(state: AttackState): AttackResult {
-  if (!state.armed && !state.inspected) return { state }
+  if (!state.armed) return { state }
   const commit =
     state.armed && state.staged.length ? { from: state.armed, changes: state.staged } : undefined
   return {
     state: {
       ...state,
       armed: null,
-      inspected: null,
       benched: null,
       acted: false,
       hits: {},

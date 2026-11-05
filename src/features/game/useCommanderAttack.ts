@@ -59,7 +59,6 @@ export function useCommanderAttack(
 
   return {
     armedPlayerId: state.armed,
-    inspectedPlayerId: state.inspected,
     acted: state.acted,
     stagedTargets: buffered ? stagedTargets(state) : undefined,
     against: (to: PlayerId) => attackView(state, board, to),

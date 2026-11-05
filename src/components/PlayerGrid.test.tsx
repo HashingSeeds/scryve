@@ -52,13 +52,11 @@ const idleCommanderDamage = {
   lethal: 21,
   attack: {
     armedPlayerId: null,
-    inspectedPlayerId: null,
     acted: false,
     stagedTargets: undefined,
     against: jest.fn(),
     dispatch: jest.fn(),
   },
-  inspection: { playerId: null, onChange: jest.fn() },
   onPressSword: jest.fn(),
 }
 
@@ -81,7 +79,6 @@ function CommanderGrid({
         incomingFor: () => ({}),
         lethal: 21,
         attack,
-        inspection: { playerId: null, onChange: () => {} },
         onPressSword:
           onPressSword ?? ((player) => attack.dispatch({ type: "press", playerId: player.id })),
       }}
@@ -357,19 +354,29 @@ describe("PlayerGrid", () => {
 
     armFirstSeat(view)
     expect(pulsing()).toHaveLength(2)
-    expect(view.queryByTestId("commander-finish-pulse-seat-1")).toBeNull()
-    expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
+    expect(
+      view.queryByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
+    ).toBeNull()
+    expect(
+      view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
+    ).toBeTruthy()
 
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
     expect(pulsing()).toHaveLength(0)
-    expect(view.getByTestId("commander-finish-pulse-seat-1")).toBeTruthy()
+    expect(
+      view.getByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
+    ).toBeTruthy()
     // why: a local hit already counts, so finishing stays an X rather than asking to confirm.
-    expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
+    expect(
+      view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
+    ).toBeTruthy()
 
     fireEvent.press(view.getByTestId("commander-exit-seat-1"))
     armFirstSeat(view)
     expect(pulsing()).toHaveLength(2)
-    expect(view.queryByTestId("commander-finish-pulse-seat-1")).toBeNull()
+    expect(
+      view.queryByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
+    ).toBeNull()
   })
 
   it.each([-90, 90])(
