@@ -30,7 +30,6 @@ const values = {
   timing: ["join.completed", "join.failed", "mutation.ack"],
   write: ["life", "table", "commander.claim", "commander.resolve"],
   tool: DICE_TOOLS,
-  source: ["pill", "bag"],
   status: ["ready", "unsupported", "refreshing", "rate_limited", "unavailable"],
   transport: ["cloud", "nearby"],
   role: ["host", "guest"],
@@ -84,7 +83,6 @@ const NUMBER_KEYS = new Set<string>([
   "open_count",
   ...GAME_SHAPE_NUMBER_KEYS,
   "attempt_count",
-  "since_roll_ms",
   ...LATENCY_KEYS,
   ...SCAN_COUNT_KEYS,
 ])
@@ -121,7 +119,6 @@ type Events = {
     attempt_count?: number
     write?: (typeof values.write)[number]
   }
-  dice_armed: { tool: DiceTool; source: "pill" | "bag"; system?: string; since_roll_ms?: number }
   dice_rolled: { tool: DiceTool; system?: string }
   deck_browse_empty: { system: string; format: string; status: (typeof values.status)[number] }
   sync_latency: {
@@ -156,7 +153,6 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   stats_viewed: ["surface"],
   deck_sync: ["action", "outcome"],
   sync_timing: ["timing", "duration_ms", "attempt_count", "write"],
-  dice_armed: ["tool", "source", "system", "since_roll_ms"],
   dice_rolled: ["tool", "system"],
   deck_browse_empty: ["system", "format", "status"],
   sync_latency: ["transport", "role", "scope", ...LATENCY_KEYS],

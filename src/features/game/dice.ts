@@ -33,7 +33,6 @@ export type FirstPlayer =
   | { kind: "picked"; seatId: PlayerId; phase: DicePhase; note?: string }
 
 export interface DiceState {
-  armed: DiceTool | null
   results: Partial<Record<PlayerId, SeatResult>>
   first: FirstPlayer | null
 }
@@ -56,8 +55,7 @@ export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" } 
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
 
-export const PROMPT_FADE_MS = 260
-export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
+export const EMPTY_DICE: DiceState = { results: {}, first: null }
 export const DIE_SIDES: Record<BagDie, number> = {
   d4: 4,
   d6: 6,
@@ -116,22 +114,17 @@ export function dicePlayerName(
   return players.find(({ id }) => id === seatId)?.name ?? translate("board:dice.unnamedPlayer")
 }
 
-export function armTool(state: DiceState, tool: DiceTool): DiceState {
-  return state.armed === tool ? state : { ...state, armed: tool }
-}
-
 export function rollForSeat(
   state: DiceState,
   seatId: PlayerId,
+  tool: DiceTool,
   random = Math.random,
-): { state: DiceState; roll: DiceRoll } | undefined {
-  if (!state.armed) return undefined
-  const result = roll(state.armed, random)
+): { state: DiceState; roll: DiceRoll } {
+  const result = roll(tool, random)
   const attempt = (state.results[seatId]?.attempt ?? 0) + 1
   return {
     state: {
       ...state,
-      armed: null,
       results: { ...state.results, [seatId]: { roll: result, phase: "bloom", attempt } },
     },
     roll: result,
@@ -276,6 +269,10 @@ export function diceSeatView(state: DiceState, seatId: PlayerId): DiceSeatView |
   }
   if (first?.kind === "rolloff" && first.phase === "bloom") {
     const value = first.rolls[seatId]
+    const round = Math.max(...first.pool.map((id) => first.attempts[id] ?? 1))
+    // why: a seat knocked out in an earlier round shows no number, so only the latest round's rolls are on the board.
+    if (value !== undefined && (first.attempts[seatId] ?? 1) < round)
+      return { kind: "first", status: "lost" }
     if (value !== undefined) {
       const inPool = first.pool.includes(seatId)
       const decided = first.pool.length === 1

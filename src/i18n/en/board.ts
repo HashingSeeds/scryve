@@ -10,10 +10,6 @@ const board = {
       d20: "d20",
       d100: "d100",
     },
-    tapToRoll: "Tap to roll",
-    tapToFlip: "Tap to flip",
-    // Screen reader action on a die in the seat's bag: put the die out on every seat, so each player can tap to roll it.
-    rollForTable: "Roll for the table",
     // Button beside the bag's three quick dice; opens the rest of the dice.
     moreDice: "More dice",
     // {{identity}} is the seat, such as "Seat 2, Ana".
@@ -59,8 +55,6 @@ const board = {
     },
     waitingForChoice: "Waiting for the choice",
     firstLabel: { won: "{{name}} goes first", lost: "{{name}} does not go first" },
-    flipCoinFor: "Flip a coin for {{name}}",
-    rollDieFor: "Roll a {{die}} for {{name}}",
   },
   playerNames: {
     // The name a seat gets when nobody types one. It is saved into the game, so keep it short.

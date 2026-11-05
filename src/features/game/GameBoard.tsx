@@ -93,13 +93,9 @@ export function useBoardChrome({
     onDiceTool?.()
     seatDice.grid.bag.rollFor(player, tool)
   })
-  const armForOthers = stable("bagArm", (tool: DiceTool) => {
-    onDiceTool?.()
-    seatDice.grid.bag.armForOthers(tool)
-  })
   const dice = {
     ...seatDice,
-    grid: { ...seatDice.grid, bag: { ...seatDice.grid.bag, rollFor, armForOthers } },
+    grid: { ...seatDice.grid, bag: { ...seatDice.grid.bag, rollFor } },
   }
   const rules = gameRules(system)
   useEffect(() => {
@@ -185,19 +181,6 @@ export function useBoardChrome({
   )
 
   const toggleMenu = useCallback(() => setMenuOpen((current) => !current), [])
-  const { open: diceOpen, close: closeDice } = dice
-  const diceArmed = dice.grid.armed
-  const exitAction = useMemo(
-    () =>
-      diceOpen
-        ? {
-            label: translate("board:menu.closeDice"),
-            onPress: closeDice,
-            ...(diceArmed ? { heldTool: diceArmed } : {}),
-          }
-        : undefined,
-    [closeDice, diceArmed, diceOpen],
-  )
   const pressStatus = stable("status", () => {
     setMenuOpen(false)
     statusLine?.onPress()
@@ -223,7 +206,6 @@ export function useBoardChrome({
     menu: {
       open: menuOpen,
       actions,
-      exitAction,
       signal,
       statusLine: shownStatusLine,
       onToggle: toggleMenu,

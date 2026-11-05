@@ -13,9 +13,6 @@ export default {
       d20: "d20",
       d100: "d100",
     },
-    tapToRoll: "Touchez pour lancer",
-    tapToFlip: "Touchez pour lancer la pièce",
-    rollForTable: "Lancer pour toute la table",
     moreDice: "Plus de dés",
     openBag: "{{identity}}, dés et marqueurs",
     coinFace: {
@@ -69,8 +66,6 @@ export default {
       won: "{{name}} joue en premier",
       lost: "{{name}} ne joue pas en premier",
     },
-    flipCoinFor: "Lancer une pièce pour {{name}}",
-    rollDieFor: "Lancer un {{die}} pour {{name}}",
   },
   playerNames: {
     default: "Joueur {{number}}",

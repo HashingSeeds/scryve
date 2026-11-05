@@ -1,5 +1,4 @@
 import {
-  armTool,
   claimFirst,
   clearFirst,
   clearResult,
@@ -67,8 +66,20 @@ describe("dice roll-off", () => {
     const settled = rerollTies(tied, d20s(2, 20))
     expect(diceSeatView(settled, ada)).toMatchObject({ value: 2, attempt: 2, status: "lost" })
     expect(diceSeatView(settled, grace)).toMatchObject({ value: 20, attempt: 2, status: "won" })
-    expect(diceSeatView(settled, kat)).toMatchObject({ value: 3, attempt: 1, status: "lost" })
+    expect(diceSeatView(settled, kat)).toEqual({ kind: "first", status: "lost" })
     expect(rerollTies(settled)).toBe(settled)
+  })
+
+  it("shows only the latest round's rolls once a tie is rerolled", () => {
+    const tied = startRollOff(EMPTY_DICE, [ada, grace, kat], magic, d20s(18, 18, 17))
+    const again = rerollTies(tied, d20s(9, 9))
+    expect(diceSeatView(again, ada)).toMatchObject({ value: 9, attempt: 2, status: "tied" })
+    expect(diceSeatView(again, kat)).toEqual({ kind: "first", status: "lost" })
+
+    const decided = rerollTies(again, d20s(13, 2))
+    expect(diceSeatView(decided, ada)).toMatchObject({ value: 13, status: "won" })
+    expect(diceSeatView(decided, grace)).toMatchObject({ value: 2, status: "lost" })
+    expect(diceSeatView(decided, kat)).toEqual({ kind: "first", status: "lost" })
   })
 
   it("rolls Yu-Gi-Oh!'s d6 for the roll-off and its tie rerolls", () => {
@@ -124,19 +135,15 @@ describe("first-player choice", () => {
 })
 
 describe("dice per seat", () => {
-  it("rolls once for the tapped seat, then puts the tool away", () => {
-    expect(rollForSeat(EMPTY_DICE, ada)).toBeUndefined()
-    const armed = armTool(EMPTY_DICE, "d20")
-    const rolled = rollForSeat(armed, ada, d20s(17))!
+  it("rolls for just the tapped seat", () => {
+    const rolled = rollForSeat(EMPTY_DICE, ada, "d20", d20s(17))
     expect(rolled.roll).toEqual({ tool: "d20", value: 17 })
-    expect(rolled.state.armed).toBeNull()
     expect(diceSeatView(rolled.state, ada)).toEqual({ kind: "roll", roll: rolled.roll, attempt: 1 })
     expect(diceSeatView(rolled.state, grace)).toBeUndefined()
-    expect(rollForSeat(rolled.state, grace)).toBeUndefined()
   })
 
   it("settles a bloom into a chip that the next roll replaces and a tap clears", () => {
-    const rolled = rollForSeat(armTool(EMPTY_DICE, "coin"), grace, () => 0.7)!.state
+    const rolled = rollForSeat(EMPTY_DICE, grace, "coin", () => 0.7).state
     const chipped = settleResult(rolled, grace)
     expect(diceSeatView(chipped, grace)).toBeUndefined()
     expect(diceSeatChips(chipped, grace)).toEqual([
@@ -144,7 +151,7 @@ describe("dice per seat", () => {
     ])
     expect(settleResult(chipped, grace)).toBe(chipped)
 
-    const again = rollForSeat(armTool(chipped, "coin"), grace, () => 0.1)!.state
+    const again = rollForSeat(chipped, grace, "coin", () => 0.1).state
     expect(diceSeatView(again, grace)).toEqual({
       kind: "roll",
       roll: { tool: "coin", value: "Heads" },
@@ -156,7 +163,7 @@ describe("dice per seat", () => {
 
   it("keeps a seat's roll chip beside its first-player chip", () => {
     const first = settleFirst(pickFirst(EMPTY_DICE, ada))
-    const rolled = settleResult(rollForSeat(armTool(first, "d20"), ada, d20s(9))!.state, ada)
+    const rolled = settleResult(rollForSeat(first, ada, "d20", d20s(9)).state, ada)
     expect(diceSeatChips(rolled, ada)).toEqual([
       { kind: "first" },
       { kind: "roll", roll: { tool: "d20", value: 9 } },

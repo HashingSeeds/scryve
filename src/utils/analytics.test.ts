@@ -173,18 +173,8 @@ it("drops unexpected events, free text, SDK metadata, and unknown catalog values
   ).not.toContain("private")
 })
 
-it("records which die was armed, from where, and how soon after the last roll", () => {
+it("drops a die it doesn't know from a roll", () => {
   const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
-  expect(
-    analyticsProperties("dice_armed", {
-      tool: "d20",
-      source: "bag",
-      system: "mtg",
-      since_roll_ms: 4200.4,
-    }),
-  ).toEqual(
-    expect.objectContaining({ tool: "d20", source: "bag", system: "mtg", since_roll_ms: 4200 }),
-  )
   const unknown = analyticsProperties("dice_rolled", { tool: "d7", system: "private" })
   expect(unknown).not.toHaveProperty("tool")
   expect(unknown).toEqual(expect.objectContaining({ system: "none" }))

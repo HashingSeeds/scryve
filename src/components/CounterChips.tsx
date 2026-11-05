@@ -829,7 +829,7 @@ type SheetDice = SeatDiceBag
 /** why: the dice that earn a spot beside the trackers; the rest open from the more button. */
 const QUICK_DICE: readonly DiceTool[] = ["d20", "d6", "coin"]
 
-/** why: a die rolls for its own seat on a tap, and a hold puts it out for the table, where each seat taps to roll. Beside trackers the bag keeps three dice and a more button, which opens the rest over the trackers. */
+/** why: a die rolls for its own seat on a tap. Beside trackers the bag keeps three dice and a more button, which opens the rest over the trackers. */
 function DiceSection({
   seatNumber,
   dice,
@@ -917,36 +917,12 @@ function DieButton({
     onRolled()
     dice.rollFor(tool)
   }
-  const putOut = () => {
-    onRolled()
-    dice.armForOthers(tool)
-  }
-  // why: closing the bag while the finger is still down unmounts the button that holds the touch, and the next tap on a seat then only clears it, so a hold puts the die out when the finger lifts.
-  const held = useRef(false)
   return (
     <BoardPressable
       testID={`bag-tool-${tool}-seat-${seatNumber}`}
       accessibilityRole="button"
       accessibilityLabel={toolLabel(tool)}
-      accessibilityActions={[
-        { name: "activate" },
-        { name: "longpress", label: translate("board:dice.rollForTable") },
-      ]}
-      onAccessibilityAction={({ nativeEvent }) => {
-        if (nativeEvent.actionName === "longpress") putOut()
-        else if (nativeEvent.actionName === "activate") rollForSeat()
-      }}
       hitSlop={4}
-      delayLongPress={LONG_PRESS_MS}
-      onPressIn={() => {
-        held.current = false
-      }}
-      onLongPress={() => {
-        held.current = true
-      }}
-      onPressOut={() => {
-        if (held.current) putOut()
-      }}
       onPress={rollForSeat}
       style={({ pressed }) => [
         themed($diceTool),
@@ -1265,7 +1241,6 @@ const $narrowDice: ViewStyle = { justifyContent: "center" }
 /** why: beside trackers the dice keep to a two-by-two column, so the trackers take the rest of the card. */
 const NARROW_DICE_WIDTH = 84
 const DIVIDER_SPACE = 2 * 8 + 1.5
-const LONG_PRESS_MS = 450
 // why: matches the life calculator, the card's other sheet, so both open and close alike.
 const SHEET_FADE_MS = 160
 

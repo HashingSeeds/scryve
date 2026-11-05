@@ -114,8 +114,7 @@ function PinnedGameBoardStage({
         : undefined,
     [pinned, width, height, fontScale, metrics.insets, holderAngle],
   )
-  const menuOpen = menu.open && !menu.exitAction
-  const tabsShown = !!firstPlayer && !menu.open && !menu.exitAction
+  const tabsShown = !!firstPlayer && !menu.open
 
   return (
     <View testID={testID} style={$stage}>
@@ -125,7 +124,7 @@ function PinnedGameBoardStage({
             <FirstPlayerTabsShownContext.Provider value={tabsShown}>
               {renderGrid(boardOrientation)}
             </FirstPlayerTabsShownContext.Provider>
-            <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
+            <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
               open={menu.open}
               anchor={boardAnchor}
@@ -134,7 +133,6 @@ function PinnedGameBoardStage({
               facingAngle={holderAngle}
               actions={menu.actions}
               compact={playerCount > 2}
-              exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
               onToggle={menu.onToggle}
@@ -144,7 +142,7 @@ function PinnedGameBoardStage({
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
       {toast ? (
-        <BoardToastSlot anchor={holderAnchor} hidden={menu.open || !!menu.exitAction}>
+        <BoardToastSlot anchor={holderAnchor} hidden={menu.open}>
           {toast}
         </BoardToastSlot>
       ) : null}
@@ -182,7 +180,7 @@ function LegacyGameBoardStage({
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
     [boardAnchor, playerCount, gridLayout, rotation],
   )
-  const tabsShown = !!firstPlayer && !menu.open && !menu.exitAction
+  const tabsShown = !!firstPlayer && !menu.open
 
   return (
     <Animated.View
@@ -203,7 +201,7 @@ function LegacyGameBoardStage({
       />
       {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
       {toast ? (
-        <BoardToastSlot anchor={menuAnchor} hidden={menu.open || !!menu.exitAction}>
+        <BoardToastSlot anchor={menuAnchor} hidden={menu.open}>
           {toast}
         </BoardToastSlot>
       ) : null}

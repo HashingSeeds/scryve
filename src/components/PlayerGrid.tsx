@@ -87,8 +87,6 @@ function partnerTotals(first: Record<PlayerId, number>, partner: Record<PlayerId
 }
 
 export interface DiceGridBinding {
-  armed: LifeCardDice["armed"] | null
-  leaving?: LifeCardDice["armed"] | null
   seatFor: (player: GamePlayer) => LifeCardDice["view"]
   chipsFor: (player: GamePlayer) => readonly DiceSeatChip[]
   onPressSeat: (player: GamePlayer) => void
@@ -97,7 +95,6 @@ export interface DiceGridBinding {
   bag?: {
     tools: readonly DiceTool[]
     rollFor: (player: GamePlayer, tool: DiceTool) => void
-    armForOthers: (tool: DiceTool) => void
   }
 }
 
@@ -162,21 +159,15 @@ function seatDiceFor(
   player: GamePlayer,
   stable: ReturnType<typeof useStableCallbacks>,
 ): LifeCardDice | undefined {
-  const view = dice?.seatFor(player)
-  const chips = dice?.chipsFor(player)
-  const armed = dice?.armed ?? dice?.leaving ?? undefined
   if (!dice) return undefined
   const { bag } = dice
   return {
-    view,
-    armed,
-    leaving: !dice.armed && !!dice.leaving,
-    chips,
+    view: dice.seatFor(player),
+    chips: dice.chipsFor(player),
     onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
     bag: bag && {
       tools: bag.tools,
       rollFor: stable(`dice-roll:${player.id}`, (tool: DiceTool) => bag.rollFor(player, tool)),
-      armForOthers: bag.armForOthers,
     },
     onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
       dice.onChoose(player, order),
@@ -442,9 +433,9 @@ export function PlayerGrid({
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
+              const out = outState && outReason(outState, player.id)
               const seatDice = seatDiceFor(dice, player, stable)
               const seatTable = seatTableState(table, player.id)
-              const out = outState && outReason(outState, player.id)
               const firstIncoming = commanderDamage?.incomingFor(player.id) ?? NO_INCOMING
               const partnerIncoming =
                 commanderDamage?.incomingFor(player.id, PARTNER_COMMANDER) ?? NO_INCOMING

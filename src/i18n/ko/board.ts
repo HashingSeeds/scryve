@@ -13,9 +13,6 @@ export default {
       d20: "d20",
       d100: "d100",
     },
-    tapToRoll: "탭하여 굴리세요",
-    tapToFlip: "탭하여 던지세요",
-    rollForTable: "모든 자리에 주사위 굴리기",
     moreDice: "주사위 더보기",
     openBag: "{{identity}}, 주사위와 카운터",
     coinFace: {
@@ -69,8 +66,6 @@ export default {
       won: "{{name}}님이 선공입니다",
       lost: "{{name}}님은 선공이 아닙니다",
     },
-    flipCoinFor: "{{name}}님을 위해 코인 던지기",
-    rollDieFor: "{{name}} {{die}} 굴리기",
   },
   playerNames: {
     default: "플레이어 {{number}}",
