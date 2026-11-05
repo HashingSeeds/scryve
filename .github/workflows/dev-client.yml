@@ -24,8 +24,6 @@ concurrency:
 
 env:
   BUCKET: scryve-dev-builds
-  AWS_ACCESS_KEY_ID: ${{ secrets.R2_BUILDS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BUILDS_SECRET_ACCESS_KEY }}
   AWS_ENDPOINT_URL: https://2d3a76be968d967ce236dde4cfeb74d6.r2.cloudflarestorage.com
   AWS_DEFAULT_REGION: auto
   # why: R2 rejects the CRC checksums newer AWS CLI versions send by default.
@@ -58,6 +56,9 @@ jobs:
 
       - name: Find fingerprints missing from R2
         id: plan
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_BUILDS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BUILDS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           : "${AWS_ACCESS_KEY_ID:?set R2_BUILDS_ACCESS_KEY_ID in the release environment}"
@@ -182,6 +183,9 @@ jobs:
 
       # The artifact goes first so a reader never finds a build.json whose artifact is uploading.
       - name: Upload to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_BUILDS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BUILDS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           prefix="development/$PLATFORM/$FINGERPRINT"
