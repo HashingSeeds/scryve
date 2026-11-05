@@ -1,4 +1,4 @@
-import { AccessibilityInfo, Platform, ScrollView, StyleSheet } from "react-native"
+import { AccessibilityInfo, Platform, StyleSheet } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { playTableRules } from "@/features/game/playSystems"
@@ -180,14 +180,16 @@ describe("CounterChips", () => {
     expect(table.takeDesignation).not.toHaveBeenCalled()
   })
 
-  it("scrolls the rule links after the options, so they never push Monarch out of view", () => {
+  it("puts each designation's rule link right after its option", () => {
     const table = seat({ tableItemRules: { monarch: "725" }, openRule: jest.fn() })
     const view = chips(table)
 
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
-    const options = within(view.UNSAFE_getByType(ScrollView))
-    expect(options.getByTestId("designation-option-1-monarch")).toBeTruthy()
-    expect(options.getByTestId("designation-rule-1-monarch")).toBeTruthy()
+    let optionCell = view.getByTestId("designation-option-1-monarch").parent
+    while (optionCell && StyleSheet.flatten(optionCell.props.style)?.width !== "50%") {
+      optionCell = optionCell.parent
+    }
+    expect(optionCell && within(optionCell).getByTestId("designation-rule-1-monarch")).toBeTruthy()
   })
 
   it("shows another device's chips without letting this one change them", () => {
