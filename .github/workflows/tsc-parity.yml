@@ -1,8 +1,5 @@
 name: tsc-parity
 
-# why: `pnpm compile` checks types with tsrs, a Rust port of TypeScript 7. This weekly run checks
-# main with tsc 7 too and fails if the two report different diagnostics, so a tsrs gap cannot hide
-# errors for long. It is a safety net, not a pull request gate.
 on:
   schedule:
     - cron: "0 13 * * 1"
@@ -49,8 +46,8 @@ jobs:
             tsc_exit=$?
             pnpm exec tsrs --noEmit --fast --pretty false -p "$project" > "$RUNNER_TEMP/tsrs.out"
             tsrs_exit=$?
-            # Exit codes above 2 mean the checker crashed rather than reported diagnostics.
-            if [ "$tsc_exit" -gt 2 ] || [ "$tsrs_exit" -gt 2 ] || ! diff -u --label tsc --label tsrs <(normalize "$RUNNER_TEMP/tsc.out") <(normalize "$RUNNER_TEMP/tsrs.out"); then
+            # Diagnostics exit 1 from tsc 7.0.2 (2 is a panic) and 2 from tsrs; anything higher is a crash.
+            if [ "$tsc_exit" -gt 1 ] || [ "$tsrs_exit" -gt 2 ] || ! diff -u --label tsc --label tsrs <(normalize "$RUNNER_TEMP/tsc.out") <(normalize "$RUNNER_TEMP/tsrs.out"); then
               echo "::error title=tsc and tsrs disagree::$project (tsc exit $tsc_exit, tsrs exit $tsrs_exit)"
               echo "- $project: tsc exit $tsc_exit, tsrs exit $tsrs_exit, diagnostics differ" >> "$GITHUB_STEP_SUMMARY"
               status=1

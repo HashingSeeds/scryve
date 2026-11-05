@@ -54,7 +54,7 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 ## Verifying
 
 - Smallest proof that the change works. `pnpm test <files>` for the tests you touched, targeted lint (`pnpm lint:check <files>`) and `pnpm compile` (typechecks both the app and test tsconfigs) for the scope you changed.
-- `pnpm compile` is the only type check. It runs tsrs, a Rust port of TypeScript 7, in under a second. Don't run `tsc` or `npx tsc`. `typescript` in `package.json` is the TypeScript 6 API that typescript-eslint and dependency-cruiser need, and `@typescript/native` (TypeScript 7 `tsc`) exists only for the weekly `tsc-parity` workflow.
+- `pnpm compile` type-checks the app and tests (`pnpm check:ygo-worker` covers the worker). It runs tsrs, a Rust port of TypeScript 7, in under a second. Don't run `tsc` or `npx tsc`. `typescript` in `package.json` is the TypeScript 6 API that typescript-eslint and dependency-cruiser need, and `@typescript/native` (TypeScript 7 `tsc`) exists only for the weekly `tsc-parity` workflow.
 - For a change with non-obvious reach, name the fact that makes it safe and prove it with the cheapest real evidence: the implementation, the failure path, a focused test, or the client.
 - **Do not run repo-wide checks.** No `pnpm lint` (it auto-fixes), full `pnpm test`, or Maestro E2E unless asked.
 - Backend behavior changes ship with focused tests for that behavior.
