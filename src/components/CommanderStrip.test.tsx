@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render, within } from "@testing-library/react-native"
 import { makeMutable } from "react-native-reanimated"
 
 import { asPlayerId } from "@/features/game/domain"
@@ -30,6 +30,7 @@ function renderStrip(props: Partial<CommanderStripProps> = {}) {
         incoming={{}}
         lethal={21}
         foreground="#FFFFFF"
+        cardColor="#41476E"
         contentRotation={0}
         onPress={jest.fn()}
         {...props}
@@ -46,7 +47,7 @@ describe("CommanderStrip", () => {
     expect(view.queryByTestId("commander-strip-seat-1")).toBeNull()
   })
 
-  it("shows the whole board, with the card's own seat holding its mark, and opens an attack when tapped", () => {
+  it("shows the whole board, with the card's own seat holding its sword mark, and opens an attack when tapped", () => {
     const onPress = jest.fn()
     const view = renderStrip({ incoming: damaged, onPress })
 
@@ -66,6 +67,14 @@ describe("CommanderStrip", () => {
       ["commander-own-seat-1", `commander-pip-seat-1-${players[1].id}`],
       [`commander-pip-seat-1-${players[2].id}`],
     ])
+    expect(
+      within(view.getByTestId("commander-own-seat-1", { includeHiddenElements: true })).getByTestId(
+        "player-mark-sword",
+        {
+          includeHiddenElements: true,
+        },
+      ),
+    ).toBeTruthy()
     expect(
       view.getByTestId(`commander-pip-seat-1-${players[2].id}`, { includeHiddenElements: true }),
     ).toHaveTextContent("21")
@@ -97,7 +106,7 @@ describe("CommanderStrip", () => {
     expect(inner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 59 })
   })
 
-  it("turns the attacker's own cell into the finish button", () => {
+  it("turns the attacker's own cell into the finish button, its mark showing an X", () => {
     const onSubmit = jest.fn()
     const view = renderStrip({
       source: { active: true, flight: makeMutable(1), submit: "done", acted: false, onSubmit },
@@ -106,6 +115,11 @@ describe("CommanderStrip", () => {
       name: "Done assigning commander damage from seat 1",
     })
     expect(finish).toBe(view.getByTestId("commander-exit-seat-1"))
+    expect(
+      within(
+        view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
+      ).getByTestId("player-mark-close", { includeHiddenElements: true }),
+    ).toBeTruthy()
     fireEvent.press(finish)
     expect(onSubmit).toHaveBeenCalledTimes(1)
   })

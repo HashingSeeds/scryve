@@ -723,6 +723,7 @@ export const LifeCard = memo(function LifeCard({
           incoming={stripIncoming ?? commanderDamage.incoming}
           lethal={commanderDamage.lethal}
           foreground={stripAttack ? SHADOW_INK : foreground}
+          cardColor={color}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           screenEdges={screenEdges}

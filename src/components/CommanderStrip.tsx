@@ -27,7 +27,6 @@ import {
   type CommanderFlood,
 } from "./CommanderDamageCardControls"
 import { floodGap, type CommanderBoardSeat } from "./commanderDamageLayout"
-import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
 import {
   cornerOffset,
@@ -41,8 +40,9 @@ import { seatIdentityMetrics } from "./SeatIdentity"
 import { Text } from "./Text"
 import { targetSlop } from "./touchTarget"
 
-const DISC_SIZE = 24
-const COMPACT_DISC_SIZE = 20
+// why: the own cell carries the seat's mark with its sword so the grid reads as the way to start an attack, and the cells are big enough for the sword to read.
+const DISC_SIZE = 32
+const COMPACT_DISC_SIZE = 22
 
 export interface CommanderStripProps {
   seatNumber: number
@@ -53,6 +53,8 @@ export interface CommanderStripProps {
   incoming: Record<PlayerId, number>
   lethal: number
   foreground: string
+  /** why: the seat's own color, cut into its mark as the sword. */
+  cardColor: string
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
@@ -122,6 +124,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   incoming,
   lethal,
   foreground,
+  cardColor,
   contentRotation,
   contentInsets,
   screenEdges,
@@ -149,7 +152,7 @@ export const CommanderStrip = memo(function CommanderStrip({
     }
   }, [stripBounds, mapBounds, onBoundsChange])
   const disc = compact ? COMPACT_DISC_SIZE : DISC_SIZE
-  const ownMarkSize = Math.round(disc * OWN_MARK_SHARE)
+  const ownMarkSize = Math.round(disc * OWN_MARK_SCALE)
   const pad = spacing.xxs
   const cellGap = spacing.xxxs
   const glyphRotation: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -282,11 +285,14 @@ export const CommanderStrip = memo(function CommanderStrip({
                     attacked={attackerId ? FADED_OPACITY : OWN_OPACITY}
                     style={[themed($ownSeat), size, $aboveCells]}
                   >
-                    <Animated.View style={[$ownGlyph, flightStyle]}>
+                    <Animated.View
+                      style={[$ownGlyph, { margin: (disc - ownMarkSize) / 2 }, flightStyle]}
+                    >
                       <OwnGlyph
                         seatNumber={playerIndex + 1}
                         shape={player.shape}
                         color={foreground}
+                        insetSwordColor={cardColor}
                         rotation={contentRotation}
                         size={ownMarkSize}
                         grow={grow}
@@ -472,7 +478,7 @@ function Pop({ value, children }: { value: number; children: ReactNode }) {
   return <Animated.View style={style}>{children}</Animated.View>
 }
 
-/** why: the own cell holds the seat's mark, and on the attacker's card the mark gives way to the finish X or check once it has landed. */
+/** why: the own cell holds the seat's mark with its sword, and on the attacker's card the sword gives way to the finish X or check once the mark has landed. */
 function OwnGlyph({
   finish,
   grow,
@@ -492,11 +498,7 @@ function OwnGlyph({
           testID={`commander-exit-${finish === "send" ? "check" : "x"}-seat-${mark.seatNumber}`}
           style={[$overlaid, finishStyle]}
         >
-          <Icon
-            icon={finish === "send" ? "check" : "x"}
-            color={mark.color}
-            size={mark.size ?? 14}
-          />
+          <PlayerMark {...mark} closeIcon={finish === "done"} insetCheck={finish === "send"} />
         </Animated.View>
       ) : null}
     </>
@@ -511,6 +513,9 @@ function grownAt({ attackOnly, lit, flight }: Grow) {
   if (!attackOnly) return 1
   return flight ? flight.value : litAt(lit)
 }
+
+// why: worklets capture their closure when the module loads, so constants they read are declared above them.
+const LANDED_FROM = 0.75
 
 function landedAt(amount: number) {
   "worklet"
@@ -593,14 +598,14 @@ const $disc: ThemedStyle<ViewStyle> = () => ({
 const $tierDisc: ViewStyle = { borderWidth: 2 }
 
 const $count: ThemedStyle<TextStyle> = () => ({
-  fontSize: 13,
-  lineHeight: 16,
+  fontSize: 16,
+  lineHeight: 20,
   fontVariant: ["tabular-nums"],
 })
 
 const $compactCount: ThemedStyle<TextStyle> = () => ({
-  fontSize: 11,
-  lineHeight: 14,
+  fontSize: 13,
+  lineHeight: 16,
   fontVariant: ["tabular-nums"],
 })
 
@@ -622,10 +627,10 @@ const IDLE_OPACITY = 0.45
 const RIM_ALPHA = 0.75
 // why: the own cell is where the seat's mark lands, so it keeps the mark's muted look instead of fading like a cell.
 const OWN_OPACITY = 0.72
-const OWN_MARK_SHARE = 0.8
+// why: a mark's art fills about 55% of its box, so the box outgrows the cell for the art to match the discs beside it.
+const OWN_MARK_SCALE = 1.6
 const NEAR_LETHAL_MARGIN = 5
 const TIER_RING = { significant: "#FF8A1F", nearLethal: "#8E1B2C" } as const
-const LANDED_FROM = 0.75
 const GROW_FROM = 0.35
 const GROWN_START_SCALE = 0.6
 const FADED_OPACITY = 0.3
