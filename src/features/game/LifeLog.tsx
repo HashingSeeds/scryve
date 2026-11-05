@@ -4,7 +4,7 @@ import { usePaginatedQuery } from "convex/react"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { PendingLifeAction } from "@/features/connected/model"
 
-import type { CommanderDamageAssignedEvent, GameEvent, LifeChangedEvent } from "./types"
+import type { CommanderDamageAssignedEvent, GameEvent, GamePlayer, LifeChangedEvent } from "./types"
 import { api } from "../../../convex/_generated/api"
 import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
 
@@ -38,20 +38,48 @@ export function lifeLog(life: number, newestFirst: readonly LifeLogChange[]): Li
 }
 
 // why: an undo leaves the log as if the change never happened, so both it and the change it reverses drop out.
-export function localLifeChanges(events: readonly GameEvent[], playerId: string): LifeLogChange[] {
+function standingLifeEvents(events: readonly GameEvent[]) {
   const lifeEvents = events.filter(
     (event): event is LifeChangedEvent | CommanderDamageAssignedEvent =>
       event.type === "life.changed" || event.type === "commanderDamage.assigned",
   )
   const undone = new Set(lifeEvents.map(({ compensatesOperationId }) => compensatesOperationId))
-  return lifeEvents
+  return lifeEvents.filter(
+    (event) => !event.compensatesOperationId && !undone.has(event.operationId),
+  )
+}
+
+function lifeChangeOf(event: LifeChangedEvent | CommanderDamageAssignedEvent) {
+  return event.type === "life.changed"
+    ? { playerId: event.playerId, delta: event.delta }
+    : { playerId: event.toPlayerId, delta: -event.delta, fromPlayerId: event.fromPlayerId }
+}
+
+export function localLifeChanges(events: readonly GameEvent[], playerId: string): LifeLogChange[] {
+  return standingLifeEvents(events)
     .flatMap((event) => {
-      if (event.compensatesOperationId || undone.has(event.operationId)) return []
-      if (event.type === "life.changed")
-        return event.playerId === playerId ? [{ id: event.operationId, delta: event.delta }] : []
-      return event.toPlayerId === playerId ? [{ id: event.operationId, delta: -event.delta }] : []
+      const change = lifeChangeOf(event)
+      return change.playerId === playerId ? [{ id: event.operationId, delta: change.delta }] : []
     })
     .reverse()
+}
+
+export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number }
+
+export function gameLog(
+  players: readonly Pick<GamePlayer, "id" | "life">[],
+  events: readonly GameEvent[],
+): GameLogRow[] {
+  const totals = new Map<string, number>(players.map(({ id, life }) => [id, life]))
+  return standingLifeEvents(events)
+    .reverse()
+    .flatMap((event) => {
+      const change = lifeChangeOf(event)
+      const life = totals.get(change.playerId)
+      if (life === undefined) return []
+      totals.set(change.playerId, life - change.delta)
+      return [{ id: event.operationId, life, ...change }]
+    })
 }
 
 type LifeLogProps = {

@@ -158,66 +158,38 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
     expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("dice-bag")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
 
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
-    expect(view.getByTestId("dice-bag")).toBeTruthy()
+    expect(view.getByTestId("history-button")).toHaveTextContent("Log")
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("decks-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
-  it("opens the dice bag over the menu, which its pentagon returns to", () => {
+  it("lists the game's changes in Log and undoes the latest", () => {
     const view = renderGame()
+    fireEvent.press(view.getByTestId("life-seat-1--1"))
+    fireEvent.press(view.getByTestId("life-seat-2--1"))
     fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("dice-bag"))
+    fireEvent.press(view.getByTestId("history-button"))
 
-    expect(view.queryByTestId("layout-button")).toBeNull()
-    expect(view.getByTestId("dice-bag-d12")).toBeTruthy()
-    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice bag")
+    const rows = () =>
+      within(view.getByTestId("game-log-dialog"))
+        .queryAllByTestId(/^game-log-row-/)
+        .map((row) => row.props.accessibilityLabel)
+    expect(rows()).toEqual(["Grace −1 to 1", "Ada −1 to 1"])
 
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("dice-bag-d12")).toBeNull()
-    expect(view.getByTestId("layout-button")).toBeTruthy()
-  })
+    fireEvent.press(view.getByTestId("game-log-undo"))
+    expect(rows()).toEqual(["Ada −1 to 1"])
+    expect(view.getByTestId("life-total-seat-2").props.children).toBe("2")
 
-  it("enters dice mode from the dice bag and closes it from the pentagon", () => {
-    const view = renderGame()
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("dice-bag"))
-    fireEvent.press(view.getByTestId("dice-bag-coin"))
-
-    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
-    expect(view.queryByTestId("layout-button")).toBeNull()
-    expect(view.queryByTestId("dice-bag")).toBeNull()
-    expect(view.getByTestId("game-menu-held-tool")).toBeTruthy()
-    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
-    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice")
-
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("game-menu-held-tool")).toBeNull()
-    expect(view.queryByTestId("dice-seat-1")).toBeNull()
-    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
-  })
-
-  it("arms a die from the menu, rolls it once for the tapped seat, and leaves a chip", () => {
-    jest.spyOn(Math, "random").mockReturnValue(0.5)
-    const view = renderGame()
-    layoutSeats(view)
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("dice-d20"))
-
-    expect(view.getByTestId("game-menu-held-tool")).toBeTruthy()
-    fireEvent.press(view.getByTestId("dice-seat-1"))
-    expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
-    expect(view.queryByTestId("game-menu-held-tool")).toBeNull()
-    expect(view.queryByTestId("dice-seat-2")).toBeNull()
-    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
-    expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
+    fireEvent.press(view.getByTestId("game-log-undo"))
+    expect(view.getByText("No changes yet")).toBeTruthy()
+    expect(view.getByTestId("game-log-undo").props.accessibilityState.disabled).toBe(true)
   })
 
   it("puts a die out for the table from a seat's bag, and the pentagon puts it away", () => {

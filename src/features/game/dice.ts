@@ -120,10 +120,6 @@ export function armTool(state: DiceState, tool: DiceTool): DiceState {
   return state.armed === tool ? state : { ...state, armed: tool }
 }
 
-export function defaultTool({ die, twoPlayerCoinFlip }: FirstPlayerDefinition): DiceTool {
-  return twoPlayerCoinFlip ? "coin" : die
-}
-
 export function rollForSeat(
   state: DiceState,
   seatId: PlayerId,

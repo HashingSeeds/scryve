@@ -1,5 +1,5 @@
 # flow: Complete local-game smoke test
-# intent: Start, play, roll dice, finish, land on the rematch, and inspect the finished game without an account.
+# intent: Start, play, roll a die from a seat's bag, finish, land on the rematch, and inspect the finished game without an account.
 
 appId: ${MAESTRO_APP_ID}
 tags: [smoke, local]
@@ -16,11 +16,9 @@ onFlowStart:
     id: "life-editor-close-seat-1"
 - assertVisible: "Seat 1, Player 1, 15 life"
 - tapOn:
-    id: "game-menu-button"
+    id: "seat-bag-seat-1"
 - tapOn:
-    id: "dice-d20"
-- tapOn:
-    id: "game-menu-button"
+    id: "bag-tool-d20-seat-1"
 - assertVisible: "Seat 1, Player 1, 15 life"
 - tapOn:
     id: "game-menu-button"
