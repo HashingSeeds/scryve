@@ -430,6 +430,13 @@ export const LifeCard = memo(function LifeCard({
             onUndo: commanderDamage.onUndo ?? (() => {}),
           }
         : undefined
+  // why: a defender's ring and badges stay while the shadow drains, so they fade out as its edge passes the disc, mirroring how they came in.
+  const lastTarget = useRef<CommanderDamageCardMode>(undefined)
+  useEffect(() => {
+    if (commanderCardMode)
+      lastTarget.current = commanderCardMode.kind === "target" ? commanderCardMode : undefined
+  })
+  const shownCardMode = commanderCardMode ?? (floodedBy.takeover ? lastTarget.current : undefined)
   const attackerSide = commanderCardMode?.kind === "source"
   // why: a defender's own controls stay until the attacker's flood has covered them.
   const commanderCovers = !!commanderCardMode && (!takeover || floodedBy.covered)
@@ -466,6 +473,12 @@ export const LifeCard = memo(function LifeCard({
   const lifeFadeStyle = useAnimatedStyle(() => ({
     opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
   }))
+  // why: the attacker's mark and name cross-fade with the finish X as the life total does with the power boxes, rather than popping out and back.
+  const identityFadeStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(attackerSide ? 0 : 1, { duration: lifeFadeDuration }),
+  }))
+  // why: web lets a box-none child take touches under a parent set to none, so the fading mark's whole chain turns off to leave the X its taps.
+  const cornerTouches = attackerSide ? "none" : "box-none"
   const knock = useSharedValue(0)
   const defenderTotal =
     commanderCardMode?.kind === "target"
@@ -782,7 +795,7 @@ export const LifeCard = memo(function LifeCard({
       ) : null}
       {/* why: the − and + fade out as commander mode or a sheet takes the card and back in after, but not when the board first draws. */}
       <LayoutAnimationConfig skipEntering>
-        {commanderCardMode ? (
+        {shownCardMode ? (
           <CommanderDamageCardControls
             seatNumber={seatNumber}
             playerName={displayName}
@@ -791,7 +804,8 @@ export const LifeCard = memo(function LifeCard({
             contentInsets={contentInsets}
             menuCorner={menuCorner}
             compact={compact}
-            mode={commanderCardMode}
+            mode={shownCardMode}
+            draining={!commanderCardMode}
           />
         ) : null}
         {lifeControlsShown ? (
@@ -830,8 +844,10 @@ export const LifeCard = memo(function LifeCard({
       </LayoutAnimationConfig>
       {commanderCardMode?.kind === "source" ? (
         // why: the mark and name opened this mode, so the same spot finishes it: an X until a hit lands, then a check.
-        <View
+        <Animated.View
           key={`finish-${contentRotation}`}
+          entering={lifeFadeDuration ? FadeIn.duration(lifeFadeDuration) : undefined}
+          exiting={lifeFadeDuration ? FadeOut.duration(lifeFadeDuration) : undefined}
           pointerEvents="box-none"
           style={[
             themed($cornerLayer),
@@ -875,7 +891,7 @@ export const LifeCard = memo(function LifeCard({
               />
             </View>
           </BoardPressable>
-        </View>
+        </Animated.View>
       ) : null}
       {dice && diceCovers ? (
         <DiceSeatOverlay
@@ -910,21 +926,25 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {!commanderCovers && !tableSheetOpen && !dice?.view ? (
+      {(!commanderCovers || attackerSide) && !tableSheetOpen && !dice?.view ? (
         // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
-        <View
+        <Animated.View
           key={contentRotation}
           testID={`life-corner-layer-seat-${seatNumber}`}
-          pointerEvents="box-none"
+          pointerEvents={cornerTouches}
+          aria-hidden={attackerSide}
+          accessibilityElementsHidden={attackerSide}
+          importantForAccessibility={attackerSide ? "no-hide-descendants" : "auto"}
           style={[
             themed($cornerLayer),
             identityCorner.layer,
             { transform: [{ rotate: `${contentRotation}deg` }] },
+            identityFadeStyle,
           ]}
         >
           <Animated.View
             testID={`life-identity-row-seat-${seatNumber}`}
-            pointerEvents="box-none"
+            pointerEvents={cornerTouches}
             layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
@@ -953,7 +973,7 @@ export const LifeCard = memo(function LifeCard({
           >
             <View
               testID={`life-identity-seat-${seatNumber}`}
-              pointerEvents="box-none"
+              pointerEvents={cornerTouches}
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
@@ -985,7 +1005,11 @@ export const LifeCard = memo(function LifeCard({
                 <View pointerEvents="none">{seatIdentity}</View>
               )}
             </View>
-            {diceChips?.length && dice?.onPressChip && !dice.view && !editorOpen ? (
+            {diceChips?.length &&
+            dice?.onPressChip &&
+            !dice.view &&
+            !editorOpen &&
+            !attackerSide ? (
               <DiceChips
                 seatNumber={seatNumber}
                 playerName={displayName}
@@ -1029,7 +1053,7 @@ export const LifeCard = memo(function LifeCard({
               <CalculatorGlyph color={foreground} size={calculatorButtonSize} />
             </BoardPressable>
           ) : null}
-        </View>
+        </Animated.View>
       ) : null}
       {claims?.length ? (
         <CommanderClaimBanner

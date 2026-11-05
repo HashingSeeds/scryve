@@ -85,6 +85,8 @@ export interface CommanderDamageCardControlsProps {
   menuCorner?: LifeCardMenuCorner
   compact?: boolean
   mode: CommanderDamageCardMode
+  // why: a defender's last attack, kept on screen while the shadow drains so its ring fades out as the shadow's edge passes the disc. It takes no touches.
+  draining?: boolean
 }
 
 // why: the shadow eases off the attacker's card and travels at a pace the eye can follow, so neighbours darken first and the far seats after.
@@ -108,6 +110,7 @@ export function CommanderDamageCardControls({
   menuCorner,
   compact,
   mode,
+  draining,
 }: CommanderDamageCardControlsProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
@@ -134,6 +137,9 @@ export function CommanderDamageCardControls({
   return (
     <Animated.View
       testID={`commander-card-mode-seat-${seatNumber}`}
+      pointerEvents={draining ? "none" : undefined}
+      accessibilityElementsHidden={draining}
+      importantForAccessibility={draining ? "no-hide-descendants" : "auto"}
       exiting={swap ? takeoverExit(source ? swap : swap / 2, source) : undefined}
       style={[
         themed($overlay),
