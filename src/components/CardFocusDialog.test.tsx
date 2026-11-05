@@ -1,3 +1,4 @@
+import { View } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -114,6 +115,20 @@ describe("CardFocusDialog", () => {
     expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
       ["keyword_viewed", { system: "mtg", rule: expect.stringMatching(/^702\./) }],
     ])
+  })
+
+  it("closes a tapped keyword's definition when you tap outside it", () => {
+    jest
+      .spyOn(View.prototype, "measureInWindow")
+      .mockImplementation((callback) => callback(0, 0, 0, 0))
+    const view = renderDialog({
+      card: { ...card, game: "mtg" },
+      details: { ...details, oracleText: "Flying", keywords: "Flying" },
+    })
+    fireEvent.press(view.getByText("Flying"), { nativeEvent: { pageX: 40, pageY: 300 } })
+    expect(view.getByTestId("card-focus-keyword")).toBeTruthy()
+    fireEvent.press(view.getByTestId("card-focus-keyword-dismiss", { includeHiddenElements: true }))
+    expect(view.queryByTestId("card-focus-keyword")).toBeNull()
   })
 
   it("shows the focused card image with rules, printing, and deck context", () => {

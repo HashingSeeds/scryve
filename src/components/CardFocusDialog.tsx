@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -259,8 +259,9 @@ export function CardFocusDialog({
         scrollEventThrottle={64}
         onScroll={(event) => (viewport.current.scrolled = event.nativeEvent.contentOffset.y)}
         onLayout={(event) => (viewport.current.visible = event.nativeEvent.layout.height)}
+        contentContainerStyle={$grow}
       >
-        <View ref={content} style={themed($scrollContent)}>
+        <View ref={content} style={[themed($scrollContent), $grow]}>
           <CardImage
             game={card.game}
             cardId={faceIndex === 0 ? card.cardId : undefined}
@@ -321,14 +322,23 @@ export function CardFocusDialog({
             ) : null}
           </View>
           {keyword?.anchor && keywordRule ? (
-            <KeywordPopover
-              key={keyword.name}
-              name={keyword.name}
-              rule={keywordRule}
-              anchor={keyword.anchor}
-              onClose={() => setKeyword(undefined)}
-              onHeight={setPopoverHeight}
-            />
+            <>
+              <Pressable
+                testID="card-focus-keyword-dismiss"
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+                style={StyleSheet.absoluteFill}
+                onPress={() => setKeyword(undefined)}
+              />
+              <KeywordPopover
+                key={keyword.name}
+                name={keyword.name}
+                rule={keywordRule}
+                anchor={keyword.anchor}
+                onClose={() => setKeyword(undefined)}
+                onHeight={setPopoverHeight}
+              />
+            </>
           ) : null}
           {keyword?.anchor ? <View style={{ height: popoverHeight }} /> : null}
         </View>
@@ -390,6 +400,8 @@ export function CardFocusDialog({
 }
 
 const $scrollBody: ViewStyle = { flex: 1 }
+// why: blank space under short card text still counts as outside the keyword popover.
+const $grow: ViewStyle = { flexGrow: 1 }
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 44,
