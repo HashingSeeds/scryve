@@ -1,8 +1,8 @@
 name: dev client
 
 # why: agents install dev clients instead of building them. When main changes the `development`
-# fingerprint, this builds the iOS simulator app and the Android debug APK the way
-# `pnpm ios:development:sim` and `pnpm android:development` do, and stores each in R2 at
+# fingerprint, this builds the iOS simulator app (as `pnpm ios:development:sim` does) and a
+# debug-signed Android APK, attests each, and stores it in R2 at
 # scryve-dev-builds/development/<platform>/<fingerprint>/ as the artifact plus a build.json with
 # the fields `builds` (dotfiles) records. Merges that keep both fingerprints only run `plan`.
 
@@ -32,8 +32,8 @@ env:
 
 jobs:
   plan:
-    # why: the R2 keys and EXPO_TOKEN live in this main-only environment.
-    environment: release
+    # why: this main-only environment holds only the R2 keys, kept apart from `release`.
+    environment: dev-builds
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -61,11 +61,11 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BUILDS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
-          : "${AWS_ACCESS_KEY_ID:?set R2_BUILDS_ACCESS_KEY_ID in the release environment}"
-          : "${AWS_SECRET_ACCESS_KEY:?set R2_BUILDS_SECRET_ACCESS_KEY in the release environment}"
+          : "${AWS_ACCESS_KEY_ID:?set R2_BUILDS_ACCESS_KEY_ID in the dev-builds environment}"
+          : "${AWS_SECRET_ACCESS_KEY:?set R2_BUILDS_SECRET_ACCESS_KEY in the dev-builds environment}"
           builds='[]'
           for platform in ios android; do
-            fingerprint=$(scripts/ci/dev-client-fingerprint.sh "$platform")
+            fingerprint=$(scripts/ci/dev-client-env.sh node_modules/.bin/fingerprint fingerprint:generate --platform "$platform" | jq -er .hash)
             key="development/$platform/$fingerprint/build.json"
             if aws s3api head-object --bucket "$BUCKET" --key "$key" > /dev/null 2> "$RUNNER_TEMP/head.err"; then
               echo "$platform $fingerprint: in R2"
@@ -77,8 +77,8 @@ jobs:
               platform: $platform,
               fingerprint: $fingerprint
             } + {
-              ios: { runner: "macos-26", target: "ios:development:sim", artifact: "ios-sim.tar.gz" },
-              android: { runner: "ubuntu-latest", target: "android:development", artifact: "android-dev.apk" }
+              ios: { runner: "macos-26", artifact: "ios-sim.tar.gz" },
+              android: { runner: "ubuntu-latest", artifact: "android-dev.apk" }
             }[$platform]]' <<< "$builds")
           done
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
@@ -87,7 +87,11 @@ jobs:
     needs: plan
     if: needs.plan.outputs.builds != '[]'
     name: build (${{ matrix.platform }})
-    environment: release
+    environment: dev-builds
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -114,15 +118,36 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Set up EAS CLI
-        uses: ./.github/actions/setup-eas-cli
-
       # why: the plan ran on Linux; a macOS fingerprint that differs would file the build under
       # a hash `builds` never asks for.
       - name: Check the fingerprint matches the plan
         run: |
-          actual=$(scripts/ci/dev-client-fingerprint.sh "$PLATFORM")
+          actual=$(scripts/ci/dev-client-env.sh node_modules/.bin/fingerprint fingerprint:generate --platform "$PLATFORM" | jq -er .hash)
           [ "$actual" = "$FINGERPRINT" ] || { echo "::error::$PLATFORM fingerprint is $actual here, $FINGERPRINT in plan"; exit 1; }
+
+      - name: Set up EAS CLI
+        if: matrix.platform == 'ios'
+        uses: ./.github/actions/setup-eas-cli
+
+      # why: DerivedData lives in EAS's throwaway working copy, so only pod downloads carry over.
+      - name: Restore CocoaPods cache
+        if: matrix.platform == 'ios'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: dev-client-ios-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: dev-client-ios-
+
+      - name: Show Xcode
+        if: matrix.platform == 'ios'
+        run: xcodebuild -version
+
+      # why: a simulator build needs no signing, so the view-only Expo robot is enough.
+      - name: Build iOS
+        if: matrix.platform == 'ios'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN_PR }}
+        run: node scripts/native.cjs ios:development:sim --build-path "$ARTIFACT"
 
       - name: Set up Java
         if: matrix.platform == 'android'
@@ -151,24 +176,17 @@ jobs:
           key: dev-client-gradle-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: dev-client-gradle-
 
-      # why: DerivedData lives in EAS's throwaway working copy, so only pod downloads carry over.
-      - name: Restore CocoaPods cache
-        if: matrix.platform == 'ios'
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/CocoaPods
-          key: dev-client-ios-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: dev-client-ios-
-
-      - name: Show Xcode
-        if: matrix.platform == 'ios'
-        run: xcodebuild -version
-
-      - name: Build
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          TARGET: ${{ matrix.target }}
-        run: node scripts/native.cjs "$TARGET" --build-path "$ARTIFACT"
+      # why: a debug build signs with the React Native template's debug keystore and needs no
+      # Expo token. EAS signs with the dev keystore it holds unless eas.json sets
+      # `withoutCredentials`, and every profile's fingerprint (production too) hashes eas.json.
+      - name: Build Android
+        if: matrix.platform == 'android'
+        run: |
+          set -euo pipefail
+          scripts/ci/dev-client-env.sh npx expo prebuild --platform android --no-install
+          scripts/ci/dev-client-env.sh android/gradlew -p android :app:assembleDebug
+          mkdir -p "$(dirname "$ARTIFACT")"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$ARTIFACT"
 
       - name: Check the embedded fingerprint
         run: |
@@ -181,11 +199,20 @@ jobs:
           fi
           [ "$embedded" = "$FINGERPRINT" ] || { echo "::error::built $embedded, planned $FINGERPRINT"; exit 1; }
 
+      # why: `builds get` checks the downloaded file with `gh attestation verify`, so a file put in
+      # R2 by anything other than this workflow fails, even with the R2 keys.
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ env.ARTIFACT }}
+
       # The artifact goes first so a reader never finds a build.json whose artifact is uploading.
       - name: Upload to R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_BUILDS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BUILDS_SECRET_ACCESS_KEY }}
+          ATTESTATION: ${{ steps.attest.outputs.attestation-url }}
         run: |
           set -euo pipefail
           prefix="development/$PLATFORM/$FINGERPRINT"
@@ -203,10 +230,12 @@ jobs:
             --arg commit "$GITHUB_SHA" \
             --arg branch "$GITHUB_REF_NAME" \
             --arg message "$(git log -1 --format=%s)" \
+            --arg attestation "$ATTESTATION" \
             '{ id: $id, app: $app, platform: $platform, profile: "development",
               fingerprint: $fingerprint, artifact: $artifact, bytes: $bytes, sha256: $sha256,
               builtAt: $builtAt, host: "github-actions",
-              git: { commit: $commit, branch: $branch, dirty: false, message: $message } }' \
+              git: { commit: $commit, branch: $branch, dirty: false, message: $message },
+              attestation: $attestation }' \
             > build/build.json
           ls -l "$ARTIFACT"
           cat build/build.json
