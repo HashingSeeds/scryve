@@ -251,13 +251,13 @@ export const CounterChips = memo(function CounterChips({
     menuEdgeCenter,
     spacing,
   })
-  // why: the plus, and the Close that takes its spot, draw small but reach a 48 dp target. It stands off the chip before it by its slop, so a tap on that chip's edge still bumps the chip.
+  // why: the plus, and the Close that takes its spot, draw small but reach a 48 dp target. It stands off the chip before it by its slop, and once wrapped under a row of chips it reaches down instead of up, so a tap on a chip's edge still bumps the chip.
   const plusSlop = targetSlop(
     addAt ??
       (compact
         ? { width: COMPACT_CHIP_WIDTH, height: COMPACT_CHIP_SIZE }
         : { width: CHIP_SIZE, height: CHIP_SIZE }),
-    { top: top + (addAt?.y ?? 0) },
+    { top: addAt?.y ? 0 : top },
   )
   const plusClearance =
     shown.length + heldDesignations.length > 0

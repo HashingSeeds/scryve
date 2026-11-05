@@ -102,6 +102,16 @@ describe("CounterChips", () => {
     expect(top + plus.props.hitSlop.bottom + 32).toBe(48)
   })
 
+  it("reaches down, not into the row above, once the plus wraps", () => {
+    const view = chips(seat({ counters: { poison: 1 } }), { compact: true })
+    const plus = view.getByTestId("counter-add-seat-1")
+    fireEvent(plus, "layout", { nativeEvent: { layout: { x: 0, y: 32, width: 28, height: 32 } } })
+    expect(view.getByTestId("counter-add-seat-1").props.hitSlop).toMatchObject({
+      top: 0,
+      bottom: 16,
+    })
+  })
+
   it("closes the sheet from the spot the plus opened it", () => {
     const view = chips(seat())
     const plus = view.getByTestId("counter-add-seat-1")
