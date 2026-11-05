@@ -194,8 +194,12 @@ export function SegmentedControl({
               disabled={disabled}
               style={[
                 $segment,
-                // why: on Android, percentage flexBasis collapsed wrapped segments to empty slivers at large font scales.
-                wrapped ? { width: Math.floor(trackWidth / columns) } : $fill,
+                // why: segments take the thumb's measured width rather than flex, which once laid labels out by their own length so the selected thumb covered its neighbor's first letter. Wrapped rows use fixed widths too, because percentage flexBasis collapsed them to slivers on Android at large font scales.
+                wrapped
+                  ? { width: Math.floor(trackWidth / columns) }
+                  : segmentWidth > 0
+                    ? { width: segmentWidth }
+                    : $fill,
                 // why: the thumb carries the accent; filling the target too made it flash before the thumb arrived.
                 selected &&
                   segmentWidth <= 0 && {

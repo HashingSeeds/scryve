@@ -167,8 +167,8 @@ describe("AppUtilityMenu", () => {
     fireEvent.press(view.getByTestId("utility-menu-button"))
 
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
-      width: 148,
-      height: 216,
+      width: 180,
+      height: 218,
     })
   })
 
@@ -198,7 +198,7 @@ describe("AppUtilityMenu", () => {
       "utility-settings-button",
     ])
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
-      height: 324,
+      height: 326,
     })
     fireEvent.press(view.getByTestId("utility-decks-button"))
     expect(onDecks).toHaveBeenCalledTimes(1)
@@ -219,8 +219,8 @@ describe("AppUtilityMenu", () => {
     )
     fireEvent.press(view.getByTestId("utility-menu-button"))
     expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
-      width: 176,
-      height: 270,
+      width: 208,
+      height: 272,
     })
 
     fireEvent.press(view.getByText("Nearby only: Off"))
@@ -229,6 +229,33 @@ describe("AppUtilityMenu", () => {
     expect(view.getByText("Nearby only: On")).toBeTruthy()
     expect(view.getByTestId("utility-nearby-only-button").props.accessibilityState).toEqual({
       checked: true,
+    })
+  })
+
+  it("wraps a long row at large text and grows the open menu to fit it", () => {
+    mockNearbyPlay = true
+    const onOpenHeightChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          compact
+          onHistory={jest.fn()}
+          onSettings={jest.fn()}
+          onSupport={jest.fn()}
+          onAccount={jest.fn()}
+          onOpenHeightChange={onOpenHeightChange}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("utility-menu-items", { includeHiddenElements: true }), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 208, height: 400 } },
+    })
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+
+    expect(view.getByText("Nearby only: Off").props.numberOfLines).toBeUndefined()
+    expect(onOpenHeightChange).toHaveBeenCalledWith(402)
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
+      height: 402,
     })
   })
 

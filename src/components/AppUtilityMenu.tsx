@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import { useEffect, useState, type ReactNode } from "react"
+import type { PressableProps, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
   interpolate,
@@ -20,7 +20,8 @@ import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
-import { Text } from "./Text"
+import { Icon, type IconTypes } from "./Icon"
+import { Text, type TextProps } from "./Text"
 
 export type AccountEntry = "account" | "signIn"
 
@@ -64,7 +65,10 @@ export function AppUtilityMenu({
     Number(testsNearby) +
     Number(Boolean(storeUpdate)) +
     Number(showsEvents)
-  const openWidth = compact ? (testsNearby ? 176 : 148) : 188
+  const openWidth = compact ? (testsNearby ? 208 : 180) : 220
+  // why: rows grow when their labels wrap at large text, so the open menu sizes to what it measured.
+  const [measuredHeight, setMeasuredHeight] = useState<number>()
+  const openHeight = (measuredHeight ?? ITEM_HEIGHT * itemCount) + MENU_BORDER * 2
   const progress = useSharedValue(0)
 
   useEffect(() => {
@@ -82,7 +86,7 @@ export function AppUtilityMenu({
 
   const containerStyle = useAnimatedStyle(() => ({
     width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, openWidth]),
-    height: interpolate(progress.value, [0, 1], [44, ITEM_HEIGHT * itemCount]),
+    height: interpolate(progress.value, [0, 1], [44, openHeight]),
     borderRadius: compact ? interpolate(progress.value, [0, 1], [22, 16]) : 0,
   }))
   const triggerStyle = useAnimatedStyle(() => ({ opacity: progress.value < 0.05 ? 1 : 0 }))
@@ -102,7 +106,7 @@ export function AppUtilityMenu({
     onChoose?.()
     action()
   }
-  const slotStyle = open ? { width: openWidth, height: ITEM_HEIGHT * itemCount } : undefined
+  const slotStyle = open ? { width: openWidth, height: openHeight } : undefined
 
   return (
     <Animated.View
@@ -146,7 +150,7 @@ export function AppUtilityMenu({
             style={themed($trigger)}
             onPress={() => {
               setOpen(true)
-              onOpenHeightChange?.(ITEM_HEIGHT * itemCount)
+              onOpenHeightChange?.(openHeight)
             }}
           >
             {compact ? (
@@ -170,138 +174,126 @@ export function AppUtilityMenu({
           </Pressable>
         </Animated.View>
         <Animated.View
+          testID="utility-menu-items"
           pointerEvents={open ? "auto" : "none"}
           accessibilityElementsHidden={!open}
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
-          style={[$fill, themed($items), itemsStyle]}
+          style={[
+            placement === "bottomLeft" ? $bottomLeft : $topRight,
+            $itemsColumn,
+            { width: openWidth },
+            itemsStyle,
+          ]}
+          onLayout={(event) => setMeasuredHeight(event.nativeEvent.layout.height)}
         >
           {storeUpdate ? (
-            <Pressable
+            <MenuItem
               testID="utility-store-update-button"
+              icon="update"
+              tx="common:appMenu.updateApp"
               accessibilityRole="link"
               accessibilityLabel={translate(storeUpdate.labelTx)}
-              style={themed($item)}
+              tone="tint"
               onPress={() => choose(updateFromStore)}
-            >
-              <Text
-                tx="common:appMenu.updateApp"
-                weight="bold"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-                style={themed($storeUpdateText)}
-              />
-            </Pressable>
+            />
           ) : null}
           {onDecks ? (
-            <Pressable
+            <MenuItem
               testID="utility-decks-button"
-              accessibilityRole="button"
-              style={themed($item)}
+              icon="decks"
+              tx="common:appNavigation.decks"
               onPress={() => choose(onDecks)}
-            >
-              <Text
-                tx="common:appNavigation.decks"
-                weight="medium"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            </Pressable>
-          ) : null}
-          <Pressable
-            testID="utility-history-button"
-            accessibilityRole="button"
-            style={themed($item)}
-            onPress={() => choose(onHistory)}
-          >
-            <Text
-              tx="common:appMenu.history"
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
             />
-          </Pressable>
+          ) : null}
+          <MenuItem
+            testID="utility-history-button"
+            icon="history"
+            tx="common:appMenu.history"
+            onPress={() => choose(onHistory)}
+          />
           {showsEvents ? (
-            <Pressable
+            <MenuItem
               testID="utility-events-button"
-              accessibilityRole="button"
-              style={themed($item)}
+              icon="events"
+              tx="events:title"
               onPress={() => choose(() => openEvents(nearbyOnly))}
-            >
-              <Text
-                tx="events:title"
-                weight="medium"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            </Pressable>
+            />
           ) : null}
           {testsNearby ? (
-            <Pressable
+            <MenuItem
               testID="utility-nearby-only-button"
+              icon="nearby"
+              tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
               accessibilityRole="switch"
               accessibilityState={{ checked: nearbyOnly }}
-              style={themed($item)}
               onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
-            >
-              <Text
-                tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
-                weight="medium"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            </Pressable>
+            />
           ) : null}
-          <Pressable
+          <MenuItem
             testID="utility-account-button"
-            accessibilityRole="button"
-            style={themed($item)}
+            icon="account"
+            tx={`common:appMenu.${accountEntry}`}
             onPress={() => choose(onAccount)}
-          >
-            <Text
-              tx={`common:appMenu.${accountEntry}`}
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
-          </Pressable>
-          <Pressable
+          />
+          <MenuItem
             testID="utility-support-button"
-            accessibilityRole="button"
-            style={themed($item)}
+            icon="support"
+            tx="common:appMenu.support"
             onPress={() => choose(onSupport)}
-          >
-            <Text
-              tx="common:appMenu.support"
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
-          </Pressable>
-          <Pressable
+          />
+          <MenuItem
             testID="utility-settings-button"
-            accessibilityRole="button"
+            icon="settings"
+            tx="common:appMenu.settings"
             accessibilityLabel={translate(
               updateReady ? "common:appMenu.settingsUpdateReady" : "common:appMenu.settings",
             )}
-            style={themed([$item, $settingsItem])}
             onPress={() => choose(onSettings)}
           >
-            <Text
-              tx="common:appMenu.settings"
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
             {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
-          </Pressable>
+          </MenuItem>
         </Animated.View>
       </Animated.View>
     </Animated.View>
   )
 }
 
+function MenuItem({
+  icon,
+  tx,
+  tone,
+  accessibilityRole = "button",
+  children,
+  ...pressableProps
+}: Omit<PressableProps, "children" | "style"> & {
+  icon: IconTypes
+  tx: TextProps["tx"]
+  tone?: "tint"
+  children?: ReactNode
+}) {
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const color = tone === "tint" ? colors.tint : undefined
+  return (
+    <Pressable {...pressableProps} accessibilityRole={accessibilityRole} style={themed($item)}>
+      <Icon icon={icon} size={ICON_SIZE} color={color ?? colors.textDim} />
+      <Text
+        tx={tx}
+        weight={tone === "tint" ? "bold" : "medium"}
+        maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+        style={[$label, color ? { color } : undefined]}
+      />
+      {children}
+    </Pressable>
+  )
+}
+
 const MENU_MAX_FONT_SCALE = 1.5
+const ICON_SIZE = 20
 const ITEM_HEIGHT = 54
+const MENU_BORDER = 1
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
@@ -316,11 +308,12 @@ const $fill: ViewStyle = { ...StyleSheet.absoluteFill }
 const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
   position: "absolute",
   overflow: "hidden",
-  borderWidth: 1,
+  borderWidth: MENU_BORDER,
   borderColor: colors.separator,
   backgroundColor: colors.surface,
 })
 const $topRight: ViewStyle = { right: 0, top: 0 }
+const $itemsColumn: ViewStyle = { position: "absolute" }
 const $bottomLeft: ViewStyle = { bottom: 0, left: 0 }
 const $trigger: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
@@ -339,20 +332,16 @@ const $dot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   borderRadius: radius.full,
   backgroundColor: colors.text,
 })
-const $items: ThemedStyle<ViewStyle> = () => ({ justifyContent: "center" })
+const $label: TextStyle = { flexShrink: 1 }
 const $item: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flex: 1,
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
-  borderBottomWidth: StyleSheet.hairlineWidth,
-  borderBottomColor: colors.separator,
-})
-const $storeUpdateText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
-const $settingsItem: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: ITEM_HEIGHT,
   flexDirection: "row",
   alignItems: "center",
-  justifyContent: "flex-start",
-  gap: spacing.xs,
+  gap: spacing.sm,
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.xs,
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: colors.separator,
 })
 const $inlineUpdateDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 7,

@@ -43,8 +43,8 @@ it.each([
 
 describe("FloatingAppNavigation", () => {
   it.each([
-    [false, 216],
-    [true, 270],
+    [false, 218],
+    [true, 272],
   ])(
     "with nearby play %s, expands its hit area to the open menu without moving the destination button",
     (nearbyPlay, height) => {

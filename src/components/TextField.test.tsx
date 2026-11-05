@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -42,5 +43,20 @@ describe("TextField", () => {
     const view = renderField("")
 
     expect(view.queryByTestId("search-clear")).toBeNull()
+  })
+
+  it("centers single-line text in a field that grows with it, and keeps multiline text at the top", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <TextField testID="single" value="" />
+        <TextField testID="multi" value="" multiline />
+      </ThemeProvider>,
+    )
+    const single = view.getByTestId("single")
+
+    expect(single.props.textAlignVertical).toBe("center")
+    expect(StyleSheet.flatten(single.props.style)).toMatchObject({ alignSelf: "stretch" })
+    expect(StyleSheet.flatten(single.props.style).height).toBeUndefined()
+    expect(view.getByTestId("multi").props.textAlignVertical).toBe("top")
   })
 })

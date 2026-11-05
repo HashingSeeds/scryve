@@ -7,6 +7,7 @@ import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { GameRadialMenu, getRadialActionPoses, type GameMenuActions } from "./GameRadialMenu"
+import { Icon } from "./Icon"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 describe("GameRadialMenu", () => {
@@ -50,6 +51,15 @@ describe("GameRadialMenu", () => {
 
     expect(view.getByTestId("game-menu-button").props.accessibilityState.expanded).toBe(true)
     for (const action of actions) expect(view.getByTestId(`${action.kind}-button`)).toBeTruthy()
+  })
+
+  it("leads each pill with its action's glyph in the pill's text color", () => {
+    const view = render(menu(true))
+    const icon = view.getByTestId("layout-button").findByType(Icon)
+    const label = view.getByText("Layout")
+
+    expect(icon.props.icon).toBe("panes")
+    expect(icon.props.color).toBe(StyleSheet.flatten(label.props.style).color)
   })
 
   it("uses the flat Keystone II treatment in dark mode", () => {
