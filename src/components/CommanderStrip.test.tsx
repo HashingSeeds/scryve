@@ -124,6 +124,52 @@ describe("CommanderStrip", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1)
   })
 
+  it("gives each partner its own chip once both have dealt damage, each ringed against lethal on its own", () => {
+    const cy = players[2].id
+    const view = renderStrip({ incoming: damaged, split: { [cy]: [21, 5] } })
+    const chip = (suffix: string) =>
+      view.getByTestId(`commander-pip-seat-1-${cy}${suffix}`, { includeHiddenElements: true })
+    expect(chip("")).toHaveTextContent("21")
+    expect(chip("-partner")).toHaveTextContent("5")
+    expect(chip("")).toHaveStyle({ borderWidth: 2 })
+    expect(chip("-partner")).toHaveStyle({ borderWidth: 1 })
+    view.getByRole("button", {
+      name: "Assign commander damage from Seat 1, Ada. Taken: 21 from Cy, 5 from Cy",
+    })
+
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <CommanderStrip
+          seatNumber={1}
+          identity="Seat 1, Ada"
+          ownerPlayerId={players[0].id}
+          players={players}
+          seats={seats}
+          incoming={damaged}
+          split={{ [cy]: [21, 0] }}
+          lethal={21}
+          foreground="#FFFFFF"
+          cardColor="#41476E"
+          contentRotation={0}
+        />
+      </ThemeProvider>,
+    )
+    expect(
+      view.queryByTestId(`commander-pip-seat-1-${cy}-partner`, { includeHiddenElements: true }),
+    ).toBeNull()
+  })
+
+  it("keeps the grid's touch slop toward the card's edges, off the − and + and the total", () => {
+    const view = renderStrip({ incoming: damaged })
+    const map = view.getByTestId("commander-map-seat-1")
+    fireEvent(map, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 40, height: 40 } } })
+    // why: rotation 0 puts the grid in the bottom-left corner, so its slop may grow down and left only.
+    expect(view.getByTestId("commander-map-seat-1").props.hitSlop).toMatchObject({
+      top: 0,
+      right: 0,
+    })
+  })
+
   it("rings an attacker orange from half of lethal and oxblood within five of it", () => {
     expect([0, 10, 11, 15, 16, 21].map((total) => commanderDamageTier(total, 21))).toEqual([
       "calm",

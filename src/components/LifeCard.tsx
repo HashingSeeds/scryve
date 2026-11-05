@@ -8,6 +8,7 @@ import type {
 } from "react-native"
 import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native"
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   LayoutAnimationConfig,
@@ -42,14 +43,17 @@ import {
   type ArmedCommander,
   type CommanderAttacker,
   type CommanderDamageCardMode,
+  attackerLayout,
+  attackerLifeSlot,
 } from "./CommanderDamageCardControls"
 import {
   commanderTakeover,
   lifeInk,
+  OUT_CAUSE,
   OUT_CAUSE_GAP,
+  OUT_CAUSE_GLYPH,
   OUT_LABEL,
   outInk,
-  STRUCK_LIFE,
   type CommanderBoardSeat,
   type CommanderFacing,
   type CommanderReach,
@@ -93,8 +97,10 @@ import {
 import { Text } from "./Text"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-// why: matches the attacker's power boxes swapping in, so the life total and its − and + cross-fade with them.
+// why: matches the attacker's power boxes swapping in, so the life total moves and its − and + fade with them.
 const LIFE_FADE_MS = SWAP_MS
+// why: about the number pad's own rise, so the card moves up with it.
+const LIFT_MS = 250
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -103,14 +109,14 @@ export type LifeCardCommanderDamage = {
   ownerPlayerId: PlayerId
   seats: readonly CommanderBoardSeat[]
   incoming: Record<PlayerId, number>
+  split?: Record<PlayerId, readonly number[]>
   lethal: number
   armedPlayerId?: PlayerId | null
   onPressSword?: () => void
   attackerName?: string
   attacker?: CommanderAttacker
   commanders?: readonly ArmedCommander[]
-  onPowerStep?: (step: 1 | -1, index: number) => void
-  onToggleCommander?: (index: number) => void
+  onPower?: (power: number, index: number) => void
   facing?: CommanderFacing
   reach?: CommanderReach
   dealt?: number
@@ -188,7 +194,10 @@ export const LifeCard = memo(function LifeCard({
   onChange,
   style,
 }: LifeCardProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { spacing },
+  } = useAppTheme()
   const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
@@ -276,8 +285,6 @@ export const LifeCard = memo(function LifeCard({
   const armedCommanders = commanderDamage?.commanders ?? [
     { power: 1, total: (armedCommanderId && commanderDamage?.incoming[armedCommanderId]) || 0 },
   ]
-  const causeFontSize = out && out.cause !== "life" ? fontSizeFor(String(out.amount).length) : 0
-  const causeGlyphSize = Math.round(causeFontSize * 0.5)
   const causeGlyphShown =
     out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
   // why: the disc rings whatever the readout shows, so an out seat's stacked readout gets a disc of its own size.
@@ -290,17 +297,20 @@ export const LifeCard = memo(function LifeCard({
           below: { ...OUT_LABEL, chars: translate("board:lifeCard.outLabel").length },
         })
       : outInk({
-          fontSize: causeFontSize,
-          digits: String(out.amount).length,
-          lead: causeGlyphShown ? causeGlyphSize + OUT_CAUSE_GAP : 0,
-          below: { ...STRUCK_LIFE, chars: shownDigits },
+          fontSize: resolvedLifeFontSize,
+          digits: shownDigits,
+          below: {
+            ...OUT_CAUSE,
+            chars: String(out.amount).length,
+            lead: causeGlyphShown ? OUT_CAUSE_GLYPH + OUT_CAUSE_GAP : 0,
+          },
         })
   const takeover =
     defending && cardSize.width > 0
       ? commanderTakeover({
           card: cardSize,
           rotation: contentRotation,
-          lifeFontSize: out && out.cause !== "life" ? causeFontSize : resolvedLifeFontSize,
+          lifeFontSize: resolvedLifeFontSize,
           ink: readoutInk,
           reach: commanderDamage?.reach,
         })
@@ -309,6 +319,18 @@ export const LifeCard = memo(function LifeCard({
     id: armedCommanderId,
     color: commanderDamage?.attacker?.color,
   })
+  // why: the attacker's power field lifts its card clear of the number pad, straight up the screen whichever way the board is turned.
+  const lift = useSharedValue(0)
+  const liftAxis = {
+    x: -Math.sin((boardRotation * Math.PI) / 180),
+    y: -Math.cos((boardRotation * Math.PI) / 180),
+  }
+  const liftCard = useCallback(
+    (amount: number) => {
+      lift.value = withTiming(amount, { duration: motionDuration(reducedMotion, LIFT_MS) })
+    },
+    [lift, reducedMotion],
+  )
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -318,8 +340,8 @@ export const LifeCard = memo(function LifeCard({
           mark: { color, shape, seatNumber },
           commanders: armedCommanders,
           acted: !!commanderDamage.acted,
-          onPowerStep: commanderDamage.onPowerStep ?? (() => {}),
-          onToggle: commanderDamage.onToggleCommander ?? (() => {}),
+          onPower: commanderDamage.onPower ?? (() => {}),
+          onLift: liftCard,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
         }
       : commanderDamage && defending
@@ -361,7 +383,7 @@ export const LifeCard = memo(function LifeCard({
         flood: shownFlood,
       }
     : undefined
-  // why: a connected game holds hits until the attacker sends them, so the lit total reads the attack's own running totals, the stronger partner's, to move with each tap.
+  // why: a connected game holds hits until the attacker sends them, so the lit totals read the attack's own running totals, one per partner, to move with each tap.
   const stripIncoming =
     defending && armedCommanderId && commanderDamage
       ? {
@@ -369,6 +391,10 @@ export const LifeCard = memo(function LifeCard({
           [armedCommanderId]: Math.max(...armedCommanders.map(({ total }) => total)),
         }
       : undefined
+  const stripSplit =
+    defending && armedCommanderId && commanderDamage
+      ? { ...commanderDamage.split, [armedCommanderId]: armedCommanders.map(({ total }) => total) }
+      : commanderDamage?.split
   // why: a readout too big for its disc shrinks into it as the shadow's edge passes the disc, and grows back as it drains.
   const readoutFit = floodedBy.takeover?.fit ?? 1
   const fitFlood = readoutFit < 1 ? shownFlood : undefined
@@ -380,10 +406,53 @@ export const LifeCard = memo(function LifeCard({
       : fitWave.value
     return { transform: [{ scale: 1 + (readoutFit - 1) * reached }] }
   })
-  const lifeMuted = attackerSide
-  const lifeFadeStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(lifeMuted ? 0 : 1, { duration: lifeFadeDuration }),
-  }))
+  // why: an attacker's total shrinks into its slot under the power boxes and grows back after, one number throughout, turning regular weight once it lands. The slot keeps the attack's partner count after it ends, so the total grows back from where it sat.
+  const [slotCommanders, setSlotCommanders] = useState(armedCommanders.length)
+  if (attackerSide && slotCommanders !== armedCommanders.length)
+    setSlotCommanders(armedCommanders.length)
+  const lifeSlot =
+    commanderSeat && cardSize.width > 0
+      ? attackerLifeSlot(
+          attackerLayout({
+            space: sidewaysContent ? { width: cardSize.height, height: cardSize.width } : cardSize,
+            count: slotCommanders,
+            compact,
+          }),
+          spacing,
+        )
+      : undefined
+  const toSlot = attackerSide && !!lifeSlot
+  const [lifeInSlot, setLifeInSlot] = useState(false)
+  if (lifeInSlot && !toSlot) setLifeInSlot(false)
+  useEffect(() => {
+    if (!toSlot) return
+    const landed = setTimeout(() => setLifeInSlot(true), lifeFadeDuration)
+    return () => clearTimeout(landed)
+  }, [toSlot, lifeFadeDuration])
+  const lifeLanded = toSlot && (lifeInSlot || !lifeFadeDuration)
+  const slotPose =
+    toSlot && lifeSlot
+      ? {
+          x: -lifeSlot.belowCardCenter * Math.round(Math.sin((contentRotation * Math.PI) / 180)),
+          y: lifeSlot.belowCardCenter * Math.round(Math.cos((contentRotation * Math.PI) / 180)),
+          scale: lifeSlot.fontSize / resolvedLifeFontSize,
+        }
+      : { x: 0, y: 0, scale: 1 }
+  const slotStyle = useAnimatedStyle(() => {
+    if (!lifeSlot) return {}
+    const timing = { duration: lifeFadeDuration, easing: Easing.out(Easing.cubic) }
+    return {
+      transform: [
+        { translateX: withTiming(slotPose.x, timing) },
+        { translateY: withTiming(slotPose.y, timing) },
+        { scale: withTiming(slotPose.scale, timing) },
+      ],
+    }
+  })
+  // why: Reanimated applies a style a frame after the commit that mounts the power boxes, so with reduced motion the total takes its slot in that same commit.
+  const slotAt = {
+    transform: [{ translateX: slotPose.x }, { translateY: slotPose.y }, { scale: slotPose.scale }],
+  }
   // why: the attacker's mark flies into its grid as the life total swaps for the power boxes, and back out after, so the grid stays up until the mark has landed home.
   const sourceFlight = useSharedValue(attackerSide ? 1 : 0)
   const [sourceLanding, setSourceLanding] = useState(false)
@@ -425,8 +494,8 @@ export const LifeCard = memo(function LifeCard({
   }
   const knockStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: knock.value * knockDirection.x * KNOCKBACK },
-      { translateY: knock.value * knockDirection.y * KNOCKBACK },
+      { translateX: knock.value * knockDirection.x * KNOCKBACK + lift.value * liftAxis.x },
+      { translateY: knock.value * knockDirection.y * KNOCKBACK + lift.value * liftAxis.y },
     ],
   }))
   const lifeControlsShown =
@@ -447,6 +516,16 @@ export const LifeCard = memo(function LifeCard({
       ownerPlayerId: commanderDamage.ownerPlayerId,
       incoming: commanderDamage.incoming,
       attacked: !!stripAttackerId || sourceShown,
+    })
+  // why: a grid grown only for an attack is mid-flight to or from the mark while the − and + fade, so only a grid that stays slides the glyph at its end.
+  const stripStays =
+    !!commanderDamage &&
+    commanderStripShown &&
+    commanderGridShown({
+      players: commanderDamage.players ?? [],
+      ownerPlayerId: commanderDamage.ownerPlayerId,
+      incoming: commanderDamage.incoming,
+      attacked: false,
     })
   const identityMetrics = seatIdentityMetrics(compact)
   const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
@@ -512,7 +591,7 @@ export const LifeCard = memo(function LifeCard({
     <Text
       testID={`life-total-seat-${seatNumber}`}
       text={String(shownLife)}
-      weight="bold"
+      weight={lifeLanded ? "normal" : "bold"}
       accessible
       accessibilityLabel={translate("board:counters.seatItem", {
         identity,
@@ -579,21 +658,19 @@ export const LifeCard = memo(function LifeCard({
       ) : null}
       <Animated.View
         pointerEvents={commanderCardMode || diceCovers ? "none" : "box-none"}
-        accessibilityElementsHidden={attackerSide || tableSheetOpen || diceCovers}
-        importantForAccessibility={
-          attackerSide || tableSheetOpen || diceCovers ? "no-hide-descendants" : "auto"
-        }
+        accessibilityElementsHidden={tableSheetOpen || diceCovers}
+        importantForAccessibility={tableSheetOpen || diceCovers ? "no-hide-descendants" : "auto"}
         style={[
           themed($content),
-          lifeFadeStyle,
           readoutFitStyle,
           floodedBy.takeover && $aboveFlood,
+          sourceShown && $aboveAttackerControls,
         ]}
       >
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={themed($readout)}
+          style={[themed($readout), lifeFadeDuration ? slotStyle : slotAt]}
         >
           {out?.cause === "life" ? (
             <View style={[$outReadout, contentRotationStyle]}>
@@ -608,17 +685,19 @@ export const LifeCard = memo(function LifeCard({
               />
             </View>
           ) : out ? (
+            // why: life stays the big number; the mark or glyph of what knocked the seat out and its lethal amount sit small under it.
             <View style={[$outReadout, contentRotationStyle]}>
-              <View style={$outCause}>
+              {lifeTotal(lifeFontStyle)}
+              <View testID={`life-out-cause-seat-${seatNumber}`} style={$outCause}>
                 {out.cause === "counter" ? (
-                  <TableGlyph id={out.counterId} size={causeGlyphSize} color={foreground} />
+                  <TableGlyph id={out.counterId} size={OUT_CAUSE_GLYPH} color={foreground} />
                 ) : out.attacker ? (
                   <PlayerMark
                     seatNumber={out.attacker.seatNumber}
                     shape={out.attacker.shape}
                     color={foreground}
                     insetSwordColor={color}
-                    size={causeGlyphSize}
+                    size={OUT_CAUSE_GLYPH}
                   />
                 ) : null}
                 <Text
@@ -626,20 +705,11 @@ export const LifeCard = memo(function LifeCard({
                   text={String(out.amount)}
                   weight="bold"
                   accessible={false}
-                  maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
+                  maxFontSizeMultiplier={1}
                   numberOfLines={1}
-                  style={[
-                    themed($life),
-                    $outAmount,
-                    {
-                      fontSize: causeFontSize,
-                      lineHeight: getLifeLineHeight(causeFontSize),
-                      color: foreground,
-                    },
-                  ]}
+                  style={[$outAmount, { color: foreground }]}
                 />
               </View>
-              {lifeTotal(themed($struckLife))}
             </View>
           ) : (
             lifeTotal(lifeFontStyle, contentRotationStyle)
@@ -691,7 +761,7 @@ export const LifeCard = memo(function LifeCard({
               lifeFontSize={resolvedLifeFontSize}
               lifeDigits={shownDigits}
               obstacle={
-                commanderStripShown && stripBounds
+                stripStays && stripBounds
                   ? { edge: CONTENT_LEFT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
@@ -722,6 +792,7 @@ export const LifeCard = memo(function LifeCard({
           players={commanderDamage.players ?? []}
           seats={commanderDamage.seats}
           incoming={stripIncoming ?? commanderDamage.incoming}
+          split={stripSplit}
           lethal={commanderDamage.lethal}
           foreground={stripAttack ? SHADOW_INK : foreground}
           cardColor={color}
@@ -794,7 +865,8 @@ export const LifeCard = memo(function LifeCard({
           >
             <View
               testID={`life-identity-seat-${seatNumber}`}
-              pointerEvents={cornerTouches}
+              // why: the corner layer draws above the grid, so the hidden mark and name would swallow touches meant for the grid's lower chips.
+              pointerEvents={commanderStripShown ? "none" : cornerTouches}
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
@@ -1165,9 +1237,19 @@ const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
 
 const $outReadout: ViewStyle = { width: "100%", alignItems: "center" }
 
-const $outCause: ViewStyle = { flexDirection: "row", alignItems: "center", gap: OUT_CAUSE_GAP }
+const $outCause: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: OUT_CAUSE_GAP,
+  height: OUT_CAUSE.lineHeight,
+  marginTop: OUT_CAUSE.marginTop,
+}
 
-const $outAmount: TextStyle = { width: "auto" }
+const $outAmount: TextStyle = {
+  fontSize: OUT_CAUSE.fontSize,
+  lineHeight: OUT_CAUSE.lineHeight,
+  fontVariant: ["tabular-nums"],
+}
 
 const $outLabel: ThemedStyle<TextStyle> = () => ({
   ...OUT_LABEL,
@@ -1175,12 +1257,10 @@ const $outLabel: ThemedStyle<TextStyle> = () => ({
   textTransform: "uppercase",
 })
 
-const $struckLife: ThemedStyle<TextStyle> = () => ({
-  ...STRUCK_LIFE,
-  textDecorationLine: "line-through",
-})
-
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 
 const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.life }
+
+// why: the attacker's total crosses its power boxes (z 8) on the way to its slot, so it rides over them and under the corner layer's X (z 10).
+const $aboveAttackerControls: ViewStyle = { zIndex: 9 }

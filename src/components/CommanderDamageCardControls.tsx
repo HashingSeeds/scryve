@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { Keyboard, Platform, StyleSheet, View } from "react-native"
 import Animated, {
   cancelAnimation,
   Easing,
@@ -16,10 +16,11 @@ import Animated, {
 } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
 
+import { lowestPower } from "@/features/game/commanderAttack"
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
-import type { ThemedStyle } from "@/theme/types"
+import type { Spacing, ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
@@ -33,6 +34,7 @@ import type {
   LifeCardMenuCorner,
 } from "./playerCardTypes"
 import { Text } from "./Text"
+import { TextField } from "./TextField"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
 export type CommanderAttacker = {
@@ -42,7 +44,7 @@ export type CommanderAttacker = {
   rotation?: LifeCardContentRotation
 }
 
-export type ArmedCommander = { name?: string; power: number; benched?: boolean; total: number }
+export type ArmedCommander = { name?: string; power: number; total: number }
 
 type AssignmentTarget = {
   kind: "target"
@@ -69,8 +71,9 @@ type AssignmentSource = {
   mark?: CommanderAttacker
   commanders: readonly ArmedCommander[]
   acted: boolean
-  onPowerStep: (step: 1 | -1, index: number) => void
-  onToggle: (index: number) => void
+  onPower: (power: number, index: number) => void
+  // why: the number pad covers the lower half of the screen, so a seat there lifts its card by `amount` screen points while its power field is open.
+  onLift: (amount: number) => void
   onSubmit: () => void
 }
 
@@ -403,6 +406,8 @@ function DefenderControls({
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }))
 
   function hit() {
+    // why: the number pad has no Done key, so a tap on a target is what puts the attacker's power field away.
+    Keyboard.dismiss()
     if (dealt <= 0) return
     mode.onHit()
   }
@@ -424,6 +429,8 @@ function DefenderControls({
   const discY = content.height / 2 + (takeover?.discOffset.y ?? 0)
   const ring = (disc + DISC_RING) * 2
   const lead = Math.max(...totals)
+  // why: the hit a tap would deal shows as a faint stretch of the arc ahead of the lead total; a tap that deals nothing shows none.
+  const next = dealt > 0 ? Math.max(...commanders.map(({ power, total }) => total + power)) : lead
 
   return (
     <>
@@ -450,6 +457,7 @@ function DefenderControls({
             seatNumber={seatNumber}
             size={ring}
             fraction={Math.min(lead, mode.lethal) / mode.lethal}
+            ghost={Math.min(next, mode.lethal) / mode.lethal}
             style={$centeredAt(discX - ring / 2, discY - ring / 2)}
           />
         ) : null}
@@ -516,7 +524,10 @@ function AttackerControls({
   const ink = cardColor ? deepShade(cardColor) : foreground
 
   return (
-    <View
+    // why: the number pad has no Done key, so a tap anywhere else on the card puts the power field away.
+    <BoardPressable
+      accessible={false}
+      onPress={Keyboard.dismiss}
       style={themed($attackerCenter)}
       onLayout={({ nativeEvent: { layout: box } }) =>
         setRoom({ width: box.width, height: box.height })
@@ -524,42 +535,55 @@ function AttackerControls({
     >
       <View
         style={[
-          themed($partners),
+          themed($attackerColumn),
           contentRotation ? { transform: [{ rotate: `${contentRotation}deg` }] } : null,
         ]}
       >
-        {mode.commanders.map(({ name, power, benched }, index) => (
-          <PowerBox
-            key={index}
-            suffix={testSeats[index]}
-            name={name}
-            partner={partners}
-            benched={!!benched}
-            power={power}
-            color={paper}
-            ink={ink}
-            ring={foreground}
-            width={layout.width}
-            height={layout.height}
-            nameHeight={layout.name}
-            onStep={(step) => mode.onPowerStep(step, index)}
-            onToggle={() => mode.onToggle(index)}
-          />
-        ))}
+        <View style={themed($partners)}>
+          {mode.commanders.map(({ name, power }, index) => (
+            <PowerBox
+              key={index}
+              suffix={testSeats[index]}
+              name={name}
+              partner={partners}
+              power={power}
+              color={paper}
+              ink={ink}
+              ring={foreground}
+              width={layout.width}
+              height={layout.height}
+              nameHeight={layout.name}
+              onPower={(next) => mode.onPower(next, index)}
+              onLift={mode.onLift}
+            />
+          ))}
+        </View>
+        {/* why: the card's own total moves into this slot (see attackerLifeSlot) rather than a second copy fading in. */}
+        <View
+          testID={`commander-attacker-life-seat-${seatNumber}`}
+          style={{ height: layout.life }}
+        />
       </View>
-    </View>
+    </BoardPressable>
   )
 }
 
 const UNIT_GAP = 16
+// why: iOS reports the keyboard as it starts to rise, so the card lifts with it; Android only once it is up.
+const KEYBOARD_SHOWN = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
+const KEYBOARD_HIDDEN = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
+const KEYBOARD_GAP = 12
 // why: a power box's number row is wide enough for its small − and + to sit at its ends, clear of the number.
 const BOX_RATIO = 2
 const MIN_BOX = 44
 // why: the commander's name runs along the box's foot, under the number, at about a quarter of the number row's height.
 const NAME_SHARE = 0.26
 const MIN_NAME = 16
+// why: the attacker's life sits under its power boxes at about half a number row, small enough to read as secondary.
+const LIFE_SHARE = 0.5
+const MIN_LIFE = 18
 
-/** why: an attacker's name sits inside its power box under the number, and partners share the card's width side by side, since a card runs out of height before width. Each box shrinks to its lane, down to a tappable minimum. `height` is the number row, `name` the row under it. */
+/** why: an attacker's name sits inside its power box under the number, its life under the boxes, and partners share the card's width side by side, since a card runs out of height before width. Each box shrinks to its lane, down to a tappable minimum. `height` is the number row, `name` the row under it, `life` the line under the boxes. */
 export function attackerLayout({
   space,
   count,
@@ -571,13 +595,24 @@ export function attackerLayout({
 }) {
   const largest = count > 1 ? (compact ? 52 : 64) : compact ? 72 : 88
   const lane = space ? (space.width - UNIT_GAP * (count + 1)) / count : Infinity
-  const room = space ? (space.height - UNIT_GAP * 2) / (1 + NAME_SHARE) : Infinity
+  const room = space ? (space.height - UNIT_GAP * 2) / (1 + NAME_SHARE + LIFE_SHARE) : Infinity
   const height = Math.floor(Math.max(MIN_BOX, Math.min(largest, lane / BOX_RATIO, room)))
   // why: below the tappable minimum height a box narrows instead, so partners never run past a short seat's edges.
   return {
     height,
     width: Math.max(0, Math.floor(Math.min(lane, height * BOX_RATIO))),
     name: Math.max(MIN_NAME, Math.round(height * NAME_SHARE)),
+    life: Math.max(MIN_LIFE, Math.round(height * LIFE_SHARE)),
+  }
+}
+
+const ATTACKER_COLUMN_GAP = "xxs"
+
+/** why: the attacker's own life stays in view under its power, small and regular weight, so it never reads as the attack's target. It is the last line of a column centered on the card, under boxes `height + name` tall, so its middle sits half of everything above it below the card's center. */
+export function attackerLifeSlot(layout: ReturnType<typeof attackerLayout>, spacing: Spacing) {
+  return {
+    belowCardCenter: (layout.height + layout.name + spacing[ATTACKER_COLUMN_GAP]) / 2,
+    fontSize: layout.life * 0.8,
   }
 }
 
@@ -589,6 +624,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path)
 // why: the ink of a hit, bright enough to read on the gutter ring over any shade.
 const DAMAGE_INK = "#FF4D5A"
 const TRACK_OPACITY = 0.18
+const GHOST_OPACITY = 0.4
 // why: a hit eases the arc forward rather than snapping, so the defender sees how much it just took.
 const FILL_MS = 520
 // why: the arc's stroke runs a pixel past the ring's outer edge, so its canvas bleeds past the ring's box to keep that edge unclipped.
@@ -609,36 +645,45 @@ function arcPath(center: number, radius: number, fraction: number) {
   return `M ${center} ${center - radius} A ${radius} ${radius} 0 ${large} 1 ${x} ${y}`
 }
 
-/** why: damage toward lethal reads as a red arc filling a faint full ring, clockwise from the top of the seat's own upright view. */
+/** why: damage toward lethal reads as a red arc filling a faint full ring, clockwise from the top of the seat's own upright view. `ghost` reaches as far as the next hit would take it. */
 function DamageArc({
   seatNumber,
   size,
   fraction,
+  ghost,
   style,
 }: {
   seatNumber: number
   size: number
   fraction: number
+  ghost: number
   style: ViewStyle
 }) {
   const reducedMotion = useReducedMotion()
   const fill = useSharedValue(fraction)
+  const ahead = useSharedValue(ghost)
   const radius = size / 2 - DISC_RING / 2
   const arcRadius = size / 2 + ARC_BLEED - ARC_WIDTH / 2
   const canvas = size + ARC_BLEED * 2
   const center = canvas / 2
 
   useEffect(() => {
-    fill.value = withTiming(fraction, {
+    const timing = {
       duration: motionDuration(reducedMotion, FILL_MS),
       easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-    })
-  }, [fill, fraction, reducedMotion])
+    }
+    fill.value = withTiming(fraction, timing)
+    ahead.value = withTiming(ghost, timing)
+  }, [ahead, fill, fraction, ghost, reducedMotion])
 
   // why: a round cap draws a dot even at zero length, so an empty arc hides.
   const animatedProps = useAnimatedProps(() => ({
     d: arcPath(center, arcRadius, fill.value),
     strokeOpacity: fill.value > 0 ? 1 : 0,
+  }))
+  const ghostProps = useAnimatedProps(() => ({
+    d: arcPath(center, arcRadius, ahead.value),
+    strokeOpacity: ahead.value > fill.value ? GHOST_OPACITY : 0,
   }))
 
   return (
@@ -652,6 +697,16 @@ function DamageArc({
         strokeWidth={DISC_RING}
         fill="none"
       />
+      {ghost > fraction ? (
+        <AnimatedPath
+          testID={`commander-hit-preview-seat-${seatNumber}`}
+          stroke={DAMAGE_INK}
+          strokeWidth={ARC_WIDTH}
+          strokeLinecap="round"
+          fill="none"
+          animatedProps={ghostProps}
+        />
+      ) : null}
       <AnimatedPath
         testID={`commander-progress-seat-${seatNumber}`}
         stroke={DAMAGE_INK}
@@ -734,12 +789,11 @@ const $pulseCenter: ViewStyle = {
   justifyContent: "center",
 }
 
-/** why: the attacker's power reads as a creature's power box, and its left and right ends lower and raise it, as a card's halves do for life. The commander's name sits under the number; for partners the number and name are one big target that benches or returns that partner. */
+/** why: the attacker's power reads as a creature's power box, and its left and right ends lower and raise it, as a card's halves do for life. Tapping the number types a power in, for a pump or a seat with no deck. The commander's name sits under the number; a partner at 0 sits the hit out and dims. */
 function PowerBox({
   suffix,
   name,
   partner,
-  benched,
   power,
   color,
   ink,
@@ -747,13 +801,12 @@ function PowerBox({
   width,
   height,
   nameHeight,
-  onStep,
-  onToggle,
+  onPower,
+  onLift,
 }: {
   suffix: string
   name?: string
   partner: boolean
-  benched: boolean
   power: number
   color: string
   ink: string
@@ -761,13 +814,32 @@ function PowerBox({
   width: number
   height: number
   nameHeight: number
-  onStep: (step: 1 | -1) => void
-  onToggle: () => void
+  onPower: (power: number) => void
+  onLift: (amount: number) => void
 }) {
   const { themed } = useAppTheme()
+  const [draft, setDraft] = useState<string>()
+  const box = useRef<View>(null)
+  const editing = draft !== undefined
+  useEffect(() => {
+    if (!editing) return
+    const shown = Keyboard.addListener(KEYBOARD_SHOWN, ({ endCoordinates }) =>
+      box.current?.measureInWindow((_x, y, _width, height) =>
+        onLift(Math.max(0, y + height + KEYBOARD_GAP - endCoordinates.screenY)),
+      ),
+    )
+    const hidden = Keyboard.addListener(KEYBOARD_HIDDEN, () => setDraft(undefined))
+    return () => {
+      shown.remove()
+      hidden.remove()
+      onLift(0)
+    }
+  }, [editing, onLift])
   const pressedTint = { backgroundColor: overlayTint(ink, 0.14) }
+  const lowest = lowestPower(partner)
+  const numberStyle = { color: ink, fontSize: height * 0.62, lineHeight: height * 0.8 }
   const half = (step: 1 | -1) => {
-    const disabled = step < 0 ? power <= 1 : power >= MAX_COMMANDER_DAMAGE
+    const disabled = step < 0 ? power <= lowest : power >= MAX_COMMANDER_DAMAGE
     const label =
       step < 0
         ? partner && name
@@ -783,7 +855,7 @@ function PowerBox({
         accessibilityLabel={label}
         accessibilityState={{ disabled }}
         disabled={disabled}
-        onPress={() => onStep(step)}
+        onPress={() => onPower(power + step)}
         style={({ pressed }) => [
           $boxHalf,
           { alignItems: step < 0 ? "flex-start" : "flex-end", paddingHorizontal: height * 0.16 },
@@ -801,9 +873,18 @@ function PowerBox({
       </BoardPressable>
     )
   }
+
+  // why: each keystroke sets the power at once, so a hit tapped while the field is open deals what was typed.
+  function type(text: string) {
+    const digits = text.replace(/\D/g, "").slice(0, String(MAX_COMMANDER_DAMAGE).length)
+    setDraft(digits)
+    if (digits) onPower(Number(digits))
+  }
+
   const nameFont = Math.round(nameHeight * 0.62)
   return (
     <View
+      ref={box}
       style={[
         $box,
         {
@@ -814,38 +895,41 @@ function PowerBox({
           borderColor: ring,
           backgroundColor: color,
         },
-        benched && $benched,
+        power === 0 && !editing && $sittingOut,
       ]}
     >
-      {partner ? (
-        <BoardPressable
-          testID={`commander-toggle-seat-${suffix}`}
-          accessibilityRole="checkbox"
-          accessibilityLabel={translate("board:commander.partnerAttacks", { name })}
-          accessibilityState={{ checked: !benched }}
-          onPress={onToggle}
-          style={({ pressed }) => [StyleSheet.absoluteFill, pressed && pressedTint]}
-        />
-      ) : null}
-      <View pointerEvents="box-none" style={[$boxRow, { height }]}>
+      <View style={[$boxRow, { height }]}>
         {half(-1)}
-        {partner ? <View pointerEvents="none" style={$boxToggleGap} /> : null}
-        {half(1)}
-        <View
-          testID={`commander-power-seat-${suffix}`}
-          accessible
-          accessibilityLabel={translate("board:commander.power", { power })}
-          accessibilityLiveRegion="polite"
-          pointerEvents="none"
-          style={themed($boxValue)}
-        >
-          <Text
-            text={`${power}`}
-            weight="bold"
+        {editing ? (
+          <TextField
+            testID={`commander-power-input-seat-${suffix}`}
+            accessibilityLabel={translate("board:commander.power", { power })}
+            autoFocus
+            keyboardType="number-pad"
             maxFontSizeMultiplier={1}
-            style={{ color: ink, fontSize: height * 0.62, lineHeight: height * 0.8 }}
+            // why: the field opens empty with the current power as its placeholder, so typing replaces it; a field closed empty keeps it.
+            placeholder={String(power)}
+            placeholderTextColor={overlayTint(ink, 0.35)}
+            value={draft}
+            onChangeText={type}
+            onBlur={() => setDraft(undefined)}
+            containerStyle={$boxValue}
+            inputWrapperStyle={[$powerInput, { borderColor: ink }]}
+            style={[themed($powerInputText), numberStyle]}
           />
-        </View>
+        ) : (
+          <BoardPressable
+            testID={`commander-power-seat-${suffix}`}
+            accessibilityRole="button"
+            accessibilityLabel={translate("board:commander.power", { power })}
+            accessibilityLiveRegion="polite"
+            onPress={() => setDraft("")}
+            style={({ pressed }) => [$boxValue, pressed && pressedTint]}
+          >
+            <Text text={`${power}`} weight="bold" maxFontSizeMultiplier={1} style={numberStyle} />
+          </BoardPressable>
+        )}
+        {half(1)}
       </View>
       {/* why: a seat with no deck still names its attacker, dimmed, so the box never sits unlabeled. */}
       <View pointerEvents="none" style={{ height: nameHeight, paddingHorizontal: height * 0.16 }}>
@@ -916,12 +1000,12 @@ export const TAKEOVER_LAYERS = { flood: 11, life: 12, controls: 13 } as const
 const $flood: ViewStyle = { zIndex: TAKEOVER_LAYERS.flood }
 const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }
 
-const $benched: ViewStyle = { opacity: 0.4 }
+const $sittingOut: ViewStyle = { opacity: 0.4 }
 
 const $box: ViewStyle = { overflow: "hidden" }
 const $boxRow: ViewStyle = { flexDirection: "row" }
-const $boxHalf: ViewStyle = { flex: 1, justifyContent: "center" }
-const $boxToggleGap: ViewStyle = { flex: 1 }
+// why: the number takes the middle of its row, wide enough for two digits, and the − and + split the rest.
+const $boxHalf: ViewStyle = { flex: 0.8, justifyContent: "center" }
 const $boxName: TextStyle = { textAlign: "center", marginTop: -4, opacity: 0.75 }
 const $boxGlyph: TextStyle = { opacity: 0.6 }
 const $boxGlyphDisabled: TextStyle = { opacity: 0.2 }
@@ -952,16 +1036,32 @@ const $attackerCenter: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
+const $attackerColumn: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "center",
+  gap: spacing[ATTACKER_COLUMN_GAP],
+})
+
 const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.md,
 })
 
-const $boxValue: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
+const $boxValue: ViewStyle = { flex: 1.4, alignItems: "center", justifyContent: "center" }
+
+const $powerInput: ViewStyle = {
+  minHeight: 0,
+  alignSelf: "stretch",
+  flex: 1,
+  borderWidth: 2,
+  backgroundColor: "transparent",
+}
+
+const $powerInputText: ThemedStyle<TextStyle> = ({ typography }) => ({
+  fontFamily: typography.primary.bold,
+  textAlign: "center",
+  marginVertical: 0,
+  marginHorizontal: 0,
 })
 
 const $unnamed: TextStyle = { opacity: 0.45 }

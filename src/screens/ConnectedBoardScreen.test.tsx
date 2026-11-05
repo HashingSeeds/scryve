@@ -584,7 +584,7 @@ describe("ConnectedBoardScreen", () => {
       expect(screen.queryByTestId("commander-power-seat-2-partner")).toBeNull()
 
       screen.rerender(themed(<NearbyBoard partners />))
-      expect(screen.getByTestId("commander-power-seat-2-partner")).toHaveTextContent("4")
+      expect(screen.getByTestId("commander-power-seat-2-partner")).toHaveTextContent("0")
     } finally {
       commanders.mockRestore()
     }

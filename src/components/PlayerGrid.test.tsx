@@ -332,7 +332,8 @@ describe("PlayerGrid", () => {
       const view = render(grid())
       armFirstSeat(view)
       expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("2")
-      expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("4")
+      // why: the second partner starts at 0, so a fresh attack lands on one commander.
+      expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("0")
 
       view.rerender(grid(true))
       expect(view.queryByTestId("commander-power-seat-1-partner")).toBeNull()

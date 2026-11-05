@@ -7,7 +7,6 @@ export type AttackState = {
   armed: PlayerId | null
   /** why: keyed by attacker and slot, and kept across attacks, so a commander's pumped power is still set the next time it attacks. */
   powers: Partial<Record<`${PlayerId}:${number}`, number>>
-  benched: number | null
   acted: boolean
   /** why: each defender's hits this attack, newest last, so undo takes back exactly the last hit rather than the current power. */
   hits: Partial<Record<PlayerId, readonly (readonly number[])[]>>
@@ -17,8 +16,7 @@ export type AttackState = {
 export type AttackAction =
   | { type: "press"; playerId: PlayerId }
   | { type: "send" }
-  | { type: "power"; slot: number; step: 1 | -1 }
-  | { type: "bench"; slot: number }
+  | { type: "power"; slot: number; power: number }
   | { type: "hit"; to: PlayerId }
   | { type: "undo"; to: PlayerId }
 
@@ -34,11 +32,13 @@ export type AttackCommit = { from: PlayerId; changes: readonly AttackChange[] }
 export const IDLE_ATTACK: AttackState = {
   armed: null,
   powers: {},
-  benched: null,
   acted: false,
   hits: {},
   staged: [],
 }
+
+/** why: a partner sits a hit out at 0, so one commander can carry the whole hit. A lone commander always hits for at least 1. */
+export const lowestPower = (partners: boolean) => (partners ? 0 : 1)
 
 const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0)
 
@@ -65,18 +65,18 @@ export function attackView(state: AttackState, board: AttackBoard, to: PlayerId)
   const { armed } = state
   const commanders = board.commanders.map(({ name, power }, slot) => {
     const commander = COMMANDER_SLOTS[slot]
+    // why: the second partner starts at 0, so a fresh attack lands on one commander until the player raises the other.
+    const starting = slot > 0 ? 0 : (power ?? 1)
     return {
       name,
-      power: (armed ? state.powers[`${armed}:${slot}`] : undefined) ?? power ?? 1,
-      benched: state.benched === slot,
+      power: (armed ? state.powers[`${armed}:${slot}`] : undefined) ?? starting,
       total: armed ? board.recorded(armed, to, commander) + heldIn(state.staged, to, commander) : 0,
     }
   })
-  const steps = commanders.map(({ power, benched, total }) =>
-    benched ? 0 : Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
+  const steps = commanders.map(({ power, total }) =>
+    Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
   )
-  const lastHit =
-    state.hits[to]?.at(-1) ?? commanders.map(({ power, benched }) => (benched ? 0 : power))
+  const lastHit = state.hits[to]?.at(-1) ?? commanders.map(({ power }) => power)
   const takeBacks = commanders.map(({ total }, slot) => Math.min(lastHit[slot] ?? 0, total))
   return { commanders, steps, dealt: sum(steps), takeBacks, takeBack: sum(takeBacks) }
 }
@@ -103,16 +103,11 @@ export function reduceAttack(
     case "send":
       return finish(state)
     case "power": {
-      if (!armed) return { state }
+      if (!armed || !Number.isFinite(action.power)) return { state }
       const key = `${armed}:${action.slot}` as const
-      const current = attackView(state, board, armed).commanders[action.slot]?.power ?? 1
-      const power = Math.min(MAX_COMMANDER_DAMAGE, Math.max(1, current + action.step))
+      const lowest = lowestPower(board.commanders.length > 1)
+      const power = Math.min(MAX_COMMANDER_DAMAGE, Math.max(lowest, Math.trunc(action.power)))
       return { state: { ...state, powers: { ...state.powers, [key]: power } } }
-    }
-    case "bench": {
-      const benched =
-        state.benched === null ? action.slot : state.benched === action.slot ? null : state.benched
-      return { state: { ...state, benched } }
     }
     case "hit": {
       const view = attackView(state, board, action.to)
@@ -143,7 +138,6 @@ function finish(state: AttackState): AttackResult {
     state: {
       ...state,
       armed: null,
-      benched: null,
       acted: false,
       hits: {},
       staged: [],

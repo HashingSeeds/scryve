@@ -150,10 +150,12 @@ const DISC_CLEARANCE = 0.08
 // why: a total's line box is centred on the card, but its digits sit high in it (measured on iOS; Android and web from Rubik's metrics and each line-height model), so the disc rises to meet them.
 const DIGIT_RISE = Platform.select({ ios: 0.043, android: 0.037, default: 0.0125 })
 
-// why: an out seat's second line under its big number. LifeCard styles it from these, so the disc that rings it stays in step.
-export const STRUCK_LIFE = { fontSize: 22, lineHeight: 28 } as const
+// why: an out seat's second line under its life total: OUT, or the lethal amount after the mark or glyph of what knocked it out. LifeCard styles it from these, so the disc that rings it stays in step.
 export const OUT_LABEL = { fontSize: 14, lineHeight: 24, marginTop: -8 } as const
+export const OUT_CAUSE = { fontSize: 26, lineHeight: 30, marginTop: -6 } as const
 export const OUT_CAUSE_GAP = 6
+// why: a mark's art fills about 55% of its box, so the box outgrows the amount for the art to match its digits.
+export const OUT_CAUSE_GLYPH = Math.round(OUT_CAUSE.fontSize * 1.4)
 
 export function lifeInk(fontSize: number, digits: number): ReadoutInk {
   return {
@@ -163,12 +165,11 @@ export function lifeInk(fontSize: number, digits: number): ReadoutInk {
   }
 }
 
-/** why: an out seat stacks a smaller line (its struck total, or OUT) under its big number, and a cause glyph `lead`s wide may sit before that number. */
+/** why: an out seat stacks a smaller line under its life total, and a cause glyph `lead`s wide may sit before that line's text. */
 export function outInk(input: {
   fontSize: number
   digits: number
-  lead?: number
-  below: { fontSize: number; lineHeight: number; marginTop?: number; chars: number }
+  below: { fontSize: number; lineHeight: number; marginTop?: number; chars: number; lead?: number }
 }): ReadoutInk {
   const { fontSize, below } = input
   const top = getLifeLineHeight(fontSize)
@@ -179,8 +180,8 @@ export function outInk(input: {
     column / 2 - below.lineHeight / 2 + (DIGIT_INK_HEIGHT / 2 - DIGIT_RISE) * below.fontSize
   return {
     width: Math.max(
-      (input.lead ?? 0) + number.width,
-      below.chars * DIGIT_INK_WIDTH * below.fontSize,
+      number.width,
+      (below.lead ?? 0) + below.chars * DIGIT_INK_WIDTH * below.fontSize,
     ),
     height: inkBottom - inkTop,
     y: (inkTop + inkBottom) / 2,
