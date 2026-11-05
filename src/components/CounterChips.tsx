@@ -580,7 +580,7 @@ function CounterSheet({
                 hitSlop={8}
                 onPress={() => openRule(ruleId)}
               >
-                <Text text={`§${ruleId}`} size="xs" style={[$ruleLink, { color: ink }]} />
+                <Text text={`§${ruleId}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
               </BoardPressable>
             ) : null}
           </View>
