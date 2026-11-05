@@ -103,13 +103,17 @@ function Bloom({
   const reducedMotion = useReducedMotion()
   const { view, armed } = dice
   const covers = !!view && view.kind !== "waiting"
-  const scrim = view?.kind === "waiting" || (view?.kind === "first" && view.status === "lost")
+  const scrim =
+    view?.kind === "waiting" ||
+    view?.kind === "sittingOut" ||
+    (view?.kind === "first" && view.status === "lost")
   const dim = view?.kind === "rolloff" && (view.status === "lost" || view.status === "out")
   const rotationStyle: ViewStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
   const animate = reducedMotion === false && !!view && !scrim
-  const interactive = view?.kind !== "waiting" && view?.kind !== "choice"
+  const interactive =
+    view?.kind !== "waiting" && view?.kind !== "choice" && view?.kind !== "sittingOut"
   const tumble = useTumble(animate ? view : undefined)
 
   const arrive = useSharedValue(animate ? 0 : 1)
@@ -179,9 +183,7 @@ function Bloom({
           testID={`dice-seat-${seatNumber}`}
           accessibilityRole={interactive ? "button" : undefined}
           accessibilityLabel={accessibilityLabel(playerName, view, armed)}
-          accessibilityHint={
-            interactive && view ? translate("board:dice.settlesResult") : undefined
-          }
+          accessibilityHint={interactive ? hint(playerName, view, armed) : undefined}
           disabled={!interactive || leaving}
           onPress={dice.onPress}
           style={overlayStyle}
@@ -384,7 +386,7 @@ function Result({
                   : null}
       </>
     )
-  if (view.kind === "waiting") return null
+  if (view.kind === "waiting" || view.kind === "sittingOut") return null
   if (view.kind === "flip")
     return (
       <>
@@ -444,12 +446,23 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
   if (view?.kind === "choice")
     return translate(`board:dice.choiceLabel.${view.reason}`, { name: playerName })
   if (view?.kind === "waiting") return translate("board:dice.waitingForChoice")
+  if (view?.kind === "sittingOut") return translate("board:dice.out")
   if (view?.kind === "flip") return translate("board:dice.flippingForFirst")
   if (view?.kind === "first")
     return translate(`board:dice.firstLabel.${view.status}`, { name: playerName })
   return armed === "coin"
     ? translate("board:dice.flipCoinFor", { name: playerName })
     : translate("board:dice.rollDieFor", { name: playerName, die: armed && toolLabel(armed) })
+}
+
+// why: with the dice out, a tap on a result rolls that seat again, and once the roll-off has a winner it puts the dice away.
+function hint(playerName: string, view?: DiceSeatView, armed?: DiceTool) {
+  if (!view) return undefined
+  if (armed && view.kind === "rolloff" && (view.status === "won" || view.status === "lost"))
+    return translate("board:menu.closeDice")
+  return armed && view.kind === "roll"
+    ? accessibilityLabel(playerName, undefined, armed)
+    : translate("board:dice.settlesResult")
 }
 
 // why: a seat with dice on it is the dice's; the layer sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap. The z-index lives on the animated wrapper because its entering transform opens a stacking context of its own.

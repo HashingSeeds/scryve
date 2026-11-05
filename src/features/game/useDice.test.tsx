@@ -9,7 +9,7 @@ import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { DICE_TOOLS } from "./dice"
 import { asPlayerId } from "./domain"
-import type { GamePlayer } from "./types"
+import type { GamePlayer, PlayerId } from "./types"
 import { useDice } from "./useDice"
 
 const players: GamePlayer[] = [
@@ -18,9 +18,18 @@ const players: GamePlayer[] = [
   { id: asPlayerId("p3"), name: "Katherine", color: "#7B5A91", life: 20, seat: 2 },
 ]
 
-function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?: string }) {
+function Table({
+  gameId = "game-1",
+  system = "mtg",
+  out = [],
+}: {
+  gameId?: string
+  system?: string
+  out?: readonly PlayerId[]
+}) {
   const dice = useDice(players, gameId, system)
   const { grid } = dice
+  const inSeats = players.map(({ id }) => id).filter((id) => !out.includes(id))
   return (
     <>
       <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
@@ -29,7 +38,7 @@ function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?
           key={tool}
           testID={`arm-${tool}`}
           accessibilityState={{ selected: grid.armed === tool }}
-          onPress={() => grid.bag.armForOthers(tool)}
+          onPress={() => grid.bag.armForOthers(tool, inSeats)}
         />
       ))}
       <Pressable testID="dice-rolloff" onPress={dice.rollOff} />
@@ -38,7 +47,7 @@ function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?
       <Pressable testID="game-started" onPress={dice.gameStarted} />
       {players.map((player, index) => {
         const seat = {
-          view: grid.seatFor(player),
+          view: grid.seatFor(player, out.includes(player.id)),
           armed: grid.armed ?? grid.leaving ?? undefined,
           leaving: !grid.armed && !!grid.leaving,
           chips: grid.chipsFor(player),
@@ -49,10 +58,13 @@ function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?
         }
         return (
           <View key={player.id}>
-            <Pressable
-              testID={`bag-d6-${index + 1}`}
-              onPress={() => grid.bag.rollFor(player, "d6")}
-            />
+            {(["d6", "coin"] as const).map((tool) => (
+              <Pressable
+                key={tool}
+                testID={`bag-${tool}-${index + 1}`}
+                onPress={() => grid.bag.rollFor(player, tool)}
+              />
+            ))}
             {diceCoversSeat(seat) ? (
               <DiceSeatOverlay
                 seatNumber={index + 1}
@@ -77,10 +89,10 @@ function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?
   )
 }
 
-function renderTable(system?: string) {
+function renderTable(system?: string, out?: readonly PlayerId[]) {
   const view = render(
     <ThemeProvider initialContext="dark">
-      <Table system={system} />
+      <Table system={system} out={out} />
     </ThemeProvider>,
   )
   return Object.assign(view, {
@@ -99,21 +111,54 @@ describe("useDice", () => {
     jest.useRealTimers()
   })
 
-  it("arms a tool, rolls once for the tapped seat, puts the tool away, and announces the seat's name", () => {
+  it("puts a die out for every seat, rolls each tapped seat, and stays out until closed", () => {
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
 
-    fireEvent.press(view.getByTestId("arm-d20"))
-    expect(view.getByTestId("arm-d20").props.accessibilityState.selected).toBe(true)
-    expect(view.getAllByLabelText(/Roll a d20 for/)).toHaveLength(3)
+    fireEvent.press(view.getByTestId("arm-d6"))
+    expect(view.getAllByLabelText(/Roll a d6 for/)).toHaveLength(3)
 
     fireEvent.press(view.getByTestId("dice-seat-2"))
-    expect(view.getByTestId("dice-chip-2-d20")).toHaveTextContent("11")
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent("d64")
+    expect(view.getByTestId("dice-seat-2").props.accessibilityHint).toBe("Roll a d6 for Grace")
+    expect(view.getByTestId("arm-d6").props.accessibilityState.selected).toBe(true)
+    expect(view.getAllByLabelText(/Roll a d6 for (Ada|Katherine)/)).toHaveLength(2)
+    expect(announce).toHaveBeenLastCalledWith("Grace, d6, 4")
+
+    fireEvent.press(view.getByTestId("dice-close"))
+    expect(view.getByTestId("dice-chip-2-d6")).toHaveTextContent("4")
+    expect(view.getByTestId("arm-d6").props.accessibilityState.selected).toBe(false)
+  })
+
+  it("rolls the game's die for every seat still in at once, rerolls a tie on its own, and a tap after the winner closes the dice", () => {
+    jest.useFakeTimers()
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
+    const rolls = [0.9, 0.9, 0.1, 0.95]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const view = renderTable("mtg", [players[2].id])
+
+    fireEvent.press(view.getByTestId("arm-d20"))
+    expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada and Grace. Rolling again")
+    expect(view.getByTestId("dice-seat-3").props.accessibilityLabel).toBe("Out")
+    expect(view.getByTestId("dice-seat-3").props.accessibilityState.disabled).toBe(true)
+    expect(view.getByTestId("dice-seat-3")).not.toHaveTextContent("d20")
+
+    act(() => jest.advanceTimersByTime(1600))
+    act(() => jest.advanceTimersByTime(5000))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/20Goes first$/)
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d203")
+    expect(view.getByTestId("dice-seat-1").props.accessibilityHint).toBe("Close dice")
+    expect(announce).toHaveBeenLastCalledWith("Grace rolled 20, goes first")
+
+    fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.getByTestId("arm-d20").props.accessibilityState.selected).toBe(false)
-    expect(view.queryByLabelText(/Roll a d20 for (Ada|Grace|Katherine)/)).toBeNull()
-    expect(announce).toHaveBeenLastCalledWith("Grace, d20, 11")
+    expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
+    act(() => jest.runAllTimers())
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.queryByTestId("dice-seat-3")).toBeNull()
   })
 
   it("rolls at once for just the seat whose bag picked the die", () => {
@@ -130,8 +175,7 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable("pokemon")
 
-    fireEvent.press(view.getByTestId("arm-coin"))
-    fireEvent.press(view.getByTestId("dice-seat-1"))
+    fireEvent.press(view.getByTestId("bag-coin-1"))
     expect(view.getByTestId("dice-coin-flipping")).toBeTruthy()
     expect(view.getByTestId("dice-seat-1")).not.toHaveTextContent("Tails")
     act(() => jest.advanceTimersByTime(700))
@@ -146,33 +190,32 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.queryByTestId("dice-chip-1-coin")).toBeNull()
-    act(() => jest.advanceTimersByTime(700))
+    act(() => jest.advanceTimersByTime(2300))
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("CoinTails")
 
     fireEvent.press(view.getByTestId("dice-close"))
-    expect(view.queryByTestId("dice-seat-1")).toBeNull()
     act(() => jest.runAllTimers())
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
     expect(view.getByTestId("dice-chip-1-coin")).toHaveTextContent("Tails")
   })
 
-  it("fades the other seats' prompts out after a put-away or a roll, ignoring taps meanwhile", () => {
+  it("fades the prompts out after a put-away, ignoring taps meanwhile, but keeps them after a roll", () => {
     jest.useFakeTimers()
     jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("arm-d20"))
+    fireEvent.press(view.getByTestId("arm-d6"))
     fireEvent.press(view.getByTestId("dice-close"))
     expect(view.getByTestId("dice-seat-2").props.accessibilityState.disabled).toBe(true)
     act(() => jest.advanceTimersByTime(260))
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
 
-    fireEvent.press(view.getByTestId("arm-d20"))
+    fireEvent.press(view.getByTestId("arm-d6"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
-    expect(view.getByTestId("dice-seat-2").props.accessibilityState.disabled).toBe(true)
-    act(() => jest.advanceTimersByTime(260))
-    expect(view.queryByTestId("dice-seat-2")).toBeNull()
-    expect(view.getByTestId("dice-seat-1")).toBeTruthy()
+    act(() => jest.advanceTimersByTime(2300))
+    expect(view.getByTestId("dice-seat-2").props.accessibilityState.disabled).toBe(false)
+    expect(view.getByTestId("dice-seat-2").props.accessibilityLabel).toBe("Roll a d6 for Grace")
   })
 
   it("tumbles again when a seat rolls the same result twice", () => {
@@ -198,13 +241,11 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("arm-d20"))
-    fireEvent.press(view.getByTestId("dice-seat-1"))
-    expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
+    fireEvent.press(view.getByTestId("bag-d6-1"))
+    expect(view.getByTestId("dice-chip-1-d6")).toHaveTextContent("4")
 
-    fireEvent.press(view.getByTestId("arm-d20"))
-    fireEvent.press(view.getByTestId("dice-chip-1-d20"))
-    expect(view.queryByTestId("dice-chip-1-d20")).toBeNull()
+    fireEvent.press(view.getByTestId("dice-chip-1-d6"))
+    expect(view.queryByTestId("dice-chip-1-d6")).toBeNull()
   })
 
   it("rolls off for every seat, re-rolls only the tied seats on its own, and leaves a 1st chip", () => {
@@ -298,13 +339,12 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("arm-d20"))
-    fireEvent.press(view.getByTestId("dice-seat-1"))
+    fireEvent.press(view.getByTestId("bag-d6-1"))
     view.changeGame("game-2")
     act(() => jest.runAllTimers())
 
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
-    expect(view.queryByTestId("dice-chip-1-d20")).toBeNull()
+    expect(view.queryByTestId("dice-chip-1-d6")).toBeNull()
   })
 
   it("does not read a cleared result after dice close on web", () => {
@@ -313,7 +353,7 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("arm-d20"))
+    fireEvent.press(view.getByTestId("arm-d6"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     fireEvent.press(view.getByTestId("dice-close"))
     act(() => jest.runOnlyPendingTimers())
@@ -330,15 +370,15 @@ describe("useDice", () => {
     const view = renderTable()
     const region = () => view.getByTestId("dice-announcer", { includeHiddenElements: true })
 
-    fireEvent.press(view.getByTestId("arm-d20"))
+    fireEvent.press(view.getByTestId("arm-d6"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     act(() => jest.runOnlyPendingTimers())
-    expect(region()).toHaveTextContent("Ada, d20, 11")
+    expect(region()).toHaveTextContent("Ada, d6, 4")
 
-    fireEvent.press(view.getByTestId("arm-d20"))
+    fireEvent.press(view.getByTestId("arm-d6"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(region()).toHaveTextContent("")
     act(() => jest.runOnlyPendingTimers())
-    expect(region()).toHaveTextContent("Ada, d20, 11")
+    expect(region()).toHaveTextContent("Ada, d6, 4")
   })
 })

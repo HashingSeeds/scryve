@@ -89,7 +89,7 @@ function partnerTotals(first: Record<PlayerId, number>, partner: Record<PlayerId
 export interface DiceGridBinding {
   armed: LifeCardDice["armed"] | null
   leaving?: LifeCardDice["armed"] | null
-  seatFor: (player: GamePlayer) => LifeCardDice["view"]
+  seatFor: (player: GamePlayer, out: boolean) => LifeCardDice["view"]
   chipsFor: (player: GamePlayer) => readonly DiceSeatChip[]
   onPressSeat: (player: GamePlayer) => void
   onChoose: (player: GamePlayer, order: "first" | "second") => void
@@ -97,7 +97,7 @@ export interface DiceGridBinding {
   bag?: {
     tools: readonly DiceTool[]
     rollFor: (player: GamePlayer, tool: DiceTool) => void
-    armForOthers: (tool: DiceTool) => void
+    armForOthers: (tool: DiceTool, inSeats: readonly PlayerId[]) => void
   }
 }
 
@@ -161,8 +161,11 @@ function seatDiceFor(
   dice: DiceGridBinding | undefined,
   player: GamePlayer,
   stable: ReturnType<typeof useStableCallbacks>,
+  out: boolean,
+  inSeats: readonly PlayerId[],
 ): LifeCardDice | undefined {
-  const view = dice?.seatFor(player)
+  // why: only the grid knows who is out, so it tells the dice which seats sit out the pod's roll.
+  const view = dice?.seatFor(player, out)
   const chips = dice?.chipsFor(player)
   const armed = dice?.armed ?? dice?.leaving ?? undefined
   if (!dice) return undefined
@@ -176,7 +179,7 @@ function seatDiceFor(
     bag: bag && {
       tools: bag.tools,
       rollFor: stable(`dice-roll:${player.id}`, (tool: DiceTool) => bag.rollFor(player, tool)),
-      armForOthers: bag.armForOthers,
+      armForOthers: stable("dice-arm", (tool: DiceTool) => bag.armForOthers(tool, inSeats)),
     },
     onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
       dice.onChoose(player, order),
@@ -286,6 +289,9 @@ export function PlayerGrid({
   const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const stable = useStableCallbacks()
+  const inSeats = players
+    .filter(({ id }) => !(outState && outReason(outState, id)))
+    .map(({ id }) => id)
   const systemId = playSystemRules(system).id
   const tableItemRules = tableItemRulesOf(system)
   const layout = usePlayerGridLayout({
@@ -442,9 +448,9 @@ export function PlayerGrid({
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
-              const seatDice = seatDiceFor(dice, player, stable)
-              const seatTable = seatTableState(table, player.id)
               const out = outState && outReason(outState, player.id)
+              const seatDice = seatDiceFor(dice, player, stable, !!out, inSeats)
+              const seatTable = seatTableState(table, player.id)
               const firstIncoming = commanderDamage?.incomingFor(player.id) ?? NO_INCOMING
               const partnerIncoming =
                 commanderDamage?.incomingFor(player.id, PARTNER_COMMANDER) ?? NO_INCOMING

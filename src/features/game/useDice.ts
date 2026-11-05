@@ -24,8 +24,10 @@ import {
   rollForSeat,
   rollLabel,
   rollOffAnnouncement,
+  settleAll,
   settleFirst,
   settleResult,
+  SITTING_OUT,
   startFlip,
   startRollOff,
   systemDice,
@@ -130,15 +132,20 @@ export function useDice(
   const name = (seatId: PlayerId) => dicePlayerName(players, seatId)
   const seatIds = () => players.map(({ id }) => id)
 
-  const close = stable("close", () => {
+  function settleBoard(from: DiceState) {
     players.forEach(({ id }) => dropHold(id))
+    dropHold(FIRST_HOLD)
+    return settleAll(from, seatIds())
+  }
+
+  const close = stable("close", () => {
     resetAnnouncer()
-    // why: the pentagon is the only way out of dice mode, so putting the die away must keep the rolls on the seats.
-    const settled = players.reduce((next, { id }) => settleResult(next, id), dice)
-    set({ ...settled, armed: null }, { mode: false, leaving: fadePrompts(dice.armed) })
+    // why: the pentagon is the only way out of dice mode, so putting the die away must keep the rolls on the seats and the roll-off's winner as the 1st chip.
+    set({ ...settleBoard(dice), armed: null }, { mode: false, leaving: fadePrompts(dice.armed) })
   })
 
-  const armForOthers = stable("armForOthers", (tool: DiceTool) => {
+  // why: putting the game's die out for the table is the pod rolling for who goes first, so every seat still in rolls it at once; other dice wait for each seat's tap.
+  const armForOthers = stable("armForOthers", (tool: DiceTool, inSeats: readonly PlayerId[]) => {
     const last = lastRollAt.current?.gameId === gameId ? lastRollAt.current.at : undefined
     captureAnalytics("dice_armed", {
       tool,
@@ -147,11 +154,23 @@ export function useDice(
       ...(last !== undefined && { since_roll_ms: Date.now() - last }),
     })
     dropHold(FADE_HOLD)
-    set(armTool(dice, tool), { mode: true, leaving: null })
+    const armed = armTool(settleBoard(dice), tool)
+    const patch = { mode: true, leaving: null }
+    if (tool !== die || inSeats.length < 2) return set(armed, patch)
+    const next = startRollOff(armed, inSeats, rules)
+    lastRollAt.current = { gameId, at: Date.now() }
+    captureAnalytics("dice_rolled", { tool, system: systemId })
+    const message = rollOffAnnouncement(next.first, players)
+    if (message) announce(message)
+    set(next, patch)
   })
 
   function holdFirst(next: DiceState) {
     return settleFirst(next) === next ? next : hold(FIRST_HOLD, BLOOM_MS.first, settleFirst)(next)
+  }
+  // why: with the dice out, the roll-off's result stays up until a tap or Close dice puts it away.
+  function settleLater(next: DiceState) {
+    return state.mode ? next : holdFirst(next)
   }
   function crown(next: DiceState) {
     const winner = firstPlayerSeat(next)
@@ -184,7 +203,7 @@ export function useDice(
     if (next === dice) return
     const message = rollOffAnnouncement(next.first, players)
     if (message) announce(message)
-    set(holdFirst(next))
+    set(settleLater(next))
   })
   const { first } = dice
   const tied = first?.kind === "rolloff" && first.pool.length > 1
@@ -205,37 +224,34 @@ export function useDice(
     set(clearFirst(dice))
   })
 
-  function rollSeat(from: DiceState, player: GamePlayer) {
-    const rolled = rollForSeat(from, player.id)
-    if (!rolled) return false
+  // why: with the dice out, a result stays up until the seat rolls again or the dice are put away.
+  function rollSeat(player: GamePlayer, tool: DiceTool) {
+    const rolled = rollForSeat(dice, player.id, tool)
     announce(rollLabel(player.name, rolled.roll))
     lastRollAt.current = { gameId, at: Date.now() }
     captureAnalytics("dice_rolled", { tool: rolled.roll.tool, system: systemId })
     const settle = (next: DiceState) => settleResult(next, player.id)
-    set(hold(player.id, BLOOM_MS.roll, settle)(rolled.state), {
-      mode: false,
-      leaving: fadePrompts(dice.armed),
-    })
-    return true
+    set(state.mode ? rolled.state : hold(player.id, BLOOM_MS.roll, settle)(rolled.state))
   }
 
-  const rollFor = stable("rollFor", (player: GamePlayer, tool: DiceTool) => {
-    rollSeat(armTool(dice, tool), player)
-  })
+  const rollFor = stable("rollFor", rollSeat)
 
   const pressSeat = stable("pressSeat", (player: GamePlayer) => {
-    if (rollSeat(dice, player)) return
     const view = diceSeatView(dice, player.id)
     if (view?.kind === "rolloff" && view.status === "tied") {
       const next = rerollTies(dice)
       const message = rollOffAnnouncement(next.first, players)
       if (message) announce(message)
-      return set(holdFirst(next))
+      return set(settleLater(next))
     }
+    // why: once the pod's roll-off has a winner, a tap on any seat means the pod is done rolling, so it puts the dice away and the winner keeps the 1st chip.
+    if (dice.armed && view?.kind === "rolloff" && (view.status === "won" || view.status === "lost"))
+      return close()
     if (view?.kind === "rolloff" || view?.kind === "first" || view?.kind === "flip") {
       dropHold(FIRST_HOLD)
       return set(settleFirst(dice))
     }
+    if (dice.armed) return rollSeat(player, dice.armed)
     if (view?.kind === "roll") {
       dropHold(player.id)
       set(settleResult(dice, player.id))
@@ -270,7 +286,9 @@ export function useDice(
       bag: { tools: DICE_TOOLS, rollFor, armForOthers },
       armed,
       leaving: armed ? null : state.leaving,
-      seatFor: (player: GamePlayer) => diceSeatView(dice, player.id),
+      // why: an out seat takes no die while the dice are out, and its cover keeps a tap from changing its life.
+      seatFor: (player: GamePlayer, out = false) =>
+        out && armed ? SITTING_OUT : diceSeatView(dice, player.id),
       chipsFor: (player: GamePlayer) => diceSeatChips(dice, player.id),
       onPressSeat: pressSeat,
       onChoose: choose,

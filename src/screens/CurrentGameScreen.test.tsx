@@ -196,10 +196,10 @@ describe("CurrentGameScreen", () => {
     const view = renderGame()
     layoutSeats(view)
     fireEvent.press(view.getByTestId("seat-bag-seat-1"))
-    fireEvent(view.getByTestId("bag-tool-d20-seat-1"), "longPress")
-    fireEvent(view.getByTestId("bag-tool-d20-seat-1"), "pressOut")
+    fireEvent(view.getByTestId("bag-tool-d6-seat-1"), "longPress")
+    fireEvent(view.getByTestId("bag-tool-d6-seat-1"), "pressOut")
 
-    expect(view.getByTestId("dice-seat-2").props.accessibilityLabel).toBe("Roll a d20 for Grace")
+    expect(view.getByTestId("dice-seat-2").props.accessibilityLabel).toBe("Roll a d6 for Grace")
     expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice")
     fireEvent.press(view.getByTestId("game-menu-button"))
     expect(view.queryByTestId("dice-seat-1")).toBeNull()

@@ -12,6 +12,7 @@ import {
   rerollTies,
   rollForSeat,
   rollOffAnnouncement,
+  settleAll,
   settleFirst,
   settleResult,
   startFlip,
@@ -124,19 +125,17 @@ describe("first-player choice", () => {
 })
 
 describe("dice per seat", () => {
-  it("rolls once for the tapped seat, then puts the tool away", () => {
-    expect(rollForSeat(EMPTY_DICE, ada)).toBeUndefined()
+  it("rolls for just the tapped seat and leaves the tool out for the next", () => {
     const armed = armTool(EMPTY_DICE, "d20")
-    const rolled = rollForSeat(armed, ada, d20s(17))!
+    const rolled = rollForSeat(armed, ada, "d20", d20s(17))
     expect(rolled.roll).toEqual({ tool: "d20", value: 17 })
-    expect(rolled.state.armed).toBeNull()
+    expect(rolled.state.armed).toBe("d20")
     expect(diceSeatView(rolled.state, ada)).toEqual({ kind: "roll", roll: rolled.roll, attempt: 1 })
     expect(diceSeatView(rolled.state, grace)).toBeUndefined()
-    expect(rollForSeat(rolled.state, grace)).toBeUndefined()
   })
 
   it("settles a bloom into a chip that the next roll replaces and a tap clears", () => {
-    const rolled = rollForSeat(armTool(EMPTY_DICE, "coin"), grace, () => 0.7)!.state
+    const rolled = rollForSeat(EMPTY_DICE, grace, "coin", () => 0.7).state
     const chipped = settleResult(rolled, grace)
     expect(diceSeatView(chipped, grace)).toBeUndefined()
     expect(diceSeatChips(chipped, grace)).toEqual([
@@ -144,7 +143,7 @@ describe("dice per seat", () => {
     ])
     expect(settleResult(chipped, grace)).toBe(chipped)
 
-    const again = rollForSeat(armTool(chipped, "coin"), grace, () => 0.1)!.state
+    const again = rollForSeat(chipped, grace, "coin", () => 0.1).state
     expect(diceSeatView(again, grace)).toEqual({
       kind: "roll",
       roll: { tool: "coin", value: "Heads" },
@@ -156,10 +155,21 @@ describe("dice per seat", () => {
 
   it("keeps a seat's roll chip beside its first-player chip", () => {
     const first = settleFirst(pickFirst(EMPTY_DICE, ada))
-    const rolled = settleResult(rollForSeat(armTool(first, "d20"), ada, d20s(9))!.state, ada)
+    const rolled = settleResult(rollForSeat(first, ada, "d20", d20s(9)).state, ada)
     expect(diceSeatChips(rolled, ada)).toEqual([
       { kind: "first" },
       { kind: "roll", roll: { tool: "d20", value: 9 } },
     ])
+  })
+})
+
+describe("putting the dice away", () => {
+  it("turns every bloom into its chip and a decided roll-off into the 1st chip", () => {
+    const rolled = rollForSeat(EMPTY_DICE, kat, "d6", () => 0.5).state
+    const pod = startRollOff(rolled, [ada, grace], magic, d20s(4, 12))
+    const settled = settleAll(pod, [ada, grace, kat])
+    expect(diceSeatView(settled, grace)).toBeUndefined()
+    expect(diceSeatChips(settled, grace)).toEqual([{ kind: "first" }])
+    expect(diceSeatChips(settled, kat)).toEqual([{ kind: "roll", roll: { tool: "d6", value: 4 } }])
   })
 })

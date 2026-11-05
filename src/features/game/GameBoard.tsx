@@ -27,7 +27,7 @@ import { useStructurallyStable } from "@/utils/useStructurallyStable"
 import type { DiceTool } from "./dice"
 import { GameBoardStage, type GameBoardStageProps } from "./GameBoardStage"
 import { getPlayerGridLayoutOptions, type PlayerGridLayoutVariant } from "./playerLayouts"
-import type { GamePlayer } from "./types"
+import type { GamePlayer, PlayerId } from "./types"
 import type { CommanderAttack } from "./useCommanderAttack"
 import { useDice } from "./useDice"
 import type { SystemId } from "../../../convex/lib/systems"
@@ -93,9 +93,9 @@ export function useBoardChrome({
     onDiceTool?.()
     seatDice.grid.bag.rollFor(player, tool)
   })
-  const armForOthers = stable("bagArm", (tool: DiceTool) => {
+  const armForOthers = stable("bagArm", (tool: DiceTool, inSeats: readonly PlayerId[]) => {
     onDiceTool?.()
-    seatDice.grid.bag.armForOthers(tool)
+    seatDice.grid.bag.armForOthers(tool, inSeats)
   })
   const dice = {
     ...seatDice,

@@ -51,10 +51,12 @@ export type DiceSeatView =
   | { kind: "flip" }
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
+  | { kind: "sittingOut" }
 
 export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" } | { kind: "claim" }
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
+export const SITTING_OUT: DiceSeatView = { kind: "sittingOut" }
 
 export const PROMPT_FADE_MS = 260
 export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
@@ -123,15 +125,14 @@ export function armTool(state: DiceState, tool: DiceTool): DiceState {
 export function rollForSeat(
   state: DiceState,
   seatId: PlayerId,
+  tool: DiceTool,
   random = Math.random,
-): { state: DiceState; roll: DiceRoll } | undefined {
-  if (!state.armed) return undefined
-  const result = roll(state.armed, random)
+): { state: DiceState; roll: DiceRoll } {
+  const result = roll(tool, random)
   const attempt = (state.results[seatId]?.attempt ?? 0) + 1
   return {
     state: {
       ...state,
-      armed: null,
       results: { ...state.results, [seatId]: { roll: result, phase: "bloom", attempt } },
     },
     roll: result,
@@ -249,6 +250,11 @@ export function settleFirst(state: DiceState): DiceState {
       : { ...state, first: { kind: "picked", seatId: first.pool[0], phase: "chip" } }
   }
   return { ...state, first: { ...first, phase: "chip" } }
+}
+
+// why: putting the dice away, or putting a new one out, turns every result on the board into its chip.
+export function settleAll(state: DiceState, seatIds: readonly PlayerId[]): DiceState {
+  return settleFirst(seatIds.reduce(settleResult, state))
 }
 
 export function clearFirst(state: DiceState): DiceState {
