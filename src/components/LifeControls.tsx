@@ -416,13 +416,11 @@ const COMPACT_GLYPH_SIZE = 30
 const $glyph: ThemedStyle<TextStyle> = () => ({
   fontSize: GLYPH_SIZE,
   lineHeight: LIFE_GLYPH_LINE_HEIGHT,
-  opacity: 0.6,
 })
 
 const $compactGlyph: ThemedStyle<TextStyle> = () => ({
   fontSize: COMPACT_GLYPH_SIZE,
   lineHeight: COMPACT_LIFE_GLYPH_LINE_HEIGHT,
-  opacity: 0.6,
 })
 
 const $lockedGlyph: TextStyle = { opacity: 0.25 }

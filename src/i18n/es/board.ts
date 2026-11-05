@@ -433,6 +433,7 @@ export default {
       riftbound: "puntos",
     },
     openCalculator: "Abrir la calculadora de {{identity}}",
+    undo: "Deshacer el último cambio de vidas de {{identity}}",
   },
   lifeControls: {
     add: "{{identity}}, sumar {{amount}}",

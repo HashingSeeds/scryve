@@ -4,7 +4,7 @@ import { usePaginatedQuery } from "convex/react"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { PendingLifeAction } from "@/features/connected/model"
 
-import type { CommanderDamageAssignedEvent, GameEvent, LifeChangedEvent } from "./types"
+import type { CommanderDamageAssignedEvent, GameEvent, LifeChangedEvent, PlayerId } from "./types"
 import { api } from "../../../convex/_generated/api"
 import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
 
@@ -20,7 +20,7 @@ interface LifeLogChange {
 }
 
 export type LifeLogSource =
-  | { kind: "local"; events: readonly GameEvent[] }
+  | { kind: "local"; events: readonly GameEvent[]; undo: (playerId: PlayerId) => void }
   | { kind: "connected"; publicId: string; pending: readonly PendingLifeAction[] }
 
 export const LifeLogContext = createContext<LifeLogSource | undefined>(undefined)

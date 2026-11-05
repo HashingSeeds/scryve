@@ -220,6 +220,23 @@ describe("local game domain", () => {
     expect(applyGameCommand(game, { type: "life.undo" }, context)).toBe(game)
   })
 
+  it("undoes one seat's latest change, step by step, leaving other seats alone", () => {
+    const context = makeContext()
+    let game = makeGame()
+    const [first, second] = game.players.map(({ id }) => id)
+    for (const [playerId, delta] of [
+      [first, -1],
+      [first, -2],
+      [second, -3],
+    ] as const)
+      game = applyGameCommand(game, { type: "life.change", playerId, delta }, context)
+    game = applyGameCommand(game, { type: "life.undo", playerId: first }, context)
+    expect(game.players.map(({ life }) => life)).toEqual([19, 17])
+    game = applyGameCommand(game, { type: "life.undo", playerId: first }, context)
+    expect(game.players.map(({ life }) => life)).toEqual([20, 17])
+    expect(applyGameCommand(game, { type: "life.undo", playerId: first }, context)).toBe(game)
+  })
+
   it("does not undo another actor's action", () => {
     const actorA = makeContext("actor-a")
     const actorB = makeContext("actor-b")

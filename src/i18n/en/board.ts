@@ -406,6 +406,7 @@ const board = {
       riftbound: "points",
     },
     openCalculator: "Open calculator for {{identity}}",
+    undo: "Undo last life change for {{identity}}",
   },
   lifeControls: {
     add: "{{identity}}, add {{amount}}",

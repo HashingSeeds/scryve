@@ -102,6 +102,11 @@ export function useLocalGame(
     [context, ownerId, repository, save],
   )
 
+  const undo = useCallback(
+    (playerId?: PlayerId) => dispatch({ type: "life.undo", playerId }),
+    [dispatch],
+  )
+
   const assignCommanderDamage = useCallback(
     (fromPlayerId: PlayerId, toPlayerId: PlayerId, delta: number, commander?: CommanderSlot) => {
       const previous = gameRef.current
@@ -289,7 +294,7 @@ export function useLocalGame(
     changeLayout,
     changeSeatOrder,
     changeClock,
-    undo: () => dispatch({ type: "life.undo" }),
+    undo,
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
       dispatch({ type: "game.finish", result }, endSource),
     abandon: () => dispatch({ type: "game.abandon" }),
