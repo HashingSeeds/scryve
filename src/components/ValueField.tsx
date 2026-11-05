@@ -67,7 +67,7 @@ export function ValueField({
 
   return (
     <View style={[themed($field), disabled && $dimmed]}>
-      <Animated.View pointerEvents="none" style={[themed($readout), $pulse]}>
+      <Animated.View pointerEvents="none" style={[$readout, $pulse]}>
         <Text
           text={String(value)}
           maxFontSizeMultiplier={1.2}
@@ -81,13 +81,7 @@ export function ValueField({
           ]}
         />
       </Animated.View>
-      <Text
-        pointerEvents="none"
-        text={label}
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.5}
-        style={themed($caption)}
-      />
+      <Text pointerEvents="none" text={label} maxFontSizeMultiplier={1.5} style={$caption} />
       <View style={themed($zones)}>
         {ZONES.map(({ direction, glyph, labelTx }) => {
           const atBound = disabled || (direction < 0 ? value <= min : value >= max)
@@ -139,18 +133,20 @@ export function ValueField({
   )
 }
 
-const $field: ThemedStyle<ViewStyle> = ({ colors, isDark, radius }) => ({
+// why: padding above matches the caption block below, so the number stays centered while a wrapped caption grows the field.
+const CAPTION_LINE_HEIGHT = 16
+const CAPTION_BOTTOM = 14
+
+const $field: ThemedStyle<ViewStyle> = ({ colors, isDark, radius, spacing }) => ({
   minHeight: 132,
+  paddingTop: CAPTION_LINE_HEIGHT + CAPTION_BOTTOM,
+  paddingBottom: CAPTION_BOTTOM,
+  paddingHorizontal: spacing.sm,
   borderRadius: radius.xxl,
   overflow: "hidden",
-  justifyContent: "center",
   backgroundColor: isDark ? colors.surfaceRaised : colors.palette.neutral300,
 })
-const $readout: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
-})
+const $readout: ViewStyle = { flexGrow: 1, alignItems: "center", justifyContent: "center" }
 const $value: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.text,
   fontSize: 60,
@@ -158,16 +154,14 @@ const $value: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 const $compactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 44, lineHeight: 52 })
 const $veryCompactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 34, lineHeight: 42 })
-const $caption: ThemedStyle<TextStyle> = () => ({
-  position: "absolute",
-  bottom: 14,
-  alignSelf: "center",
+const $caption: TextStyle = {
+  textAlign: "center",
   fontSize: 12,
-  lineHeight: 16,
+  lineHeight: CAPTION_LINE_HEIGHT,
   letterSpacing: 1.6,
   textTransform: "uppercase",
   opacity: 0.72,
-})
+}
 const $zones: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,
   flexDirection: "row",

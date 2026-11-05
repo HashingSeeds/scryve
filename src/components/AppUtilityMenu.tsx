@@ -66,6 +66,9 @@ export function AppUtilityMenu({
     Number(Boolean(storeUpdate)) +
     Number(showsEvents)
   const openWidth = compact ? (testsNearby ? 208 : 180) : 220
+  // why: rows grow when their labels wrap at large text, so the open menu sizes to what it measured.
+  const [measuredHeight, setMeasuredHeight] = useState<number>()
+  const openHeight = (measuredHeight ?? ITEM_HEIGHT * itemCount) + MENU_BORDER * 2
   const progress = useSharedValue(0)
 
   useEffect(() => {
@@ -83,7 +86,7 @@ export function AppUtilityMenu({
 
   const containerStyle = useAnimatedStyle(() => ({
     width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, openWidth]),
-    height: interpolate(progress.value, [0, 1], [44, ITEM_HEIGHT * itemCount]),
+    height: interpolate(progress.value, [0, 1], [44, openHeight]),
     borderRadius: compact ? interpolate(progress.value, [0, 1], [22, 16]) : 0,
   }))
   const triggerStyle = useAnimatedStyle(() => ({ opacity: progress.value < 0.05 ? 1 : 0 }))
@@ -103,7 +106,7 @@ export function AppUtilityMenu({
     onChoose?.()
     action()
   }
-  const slotStyle = open ? { width: openWidth, height: ITEM_HEIGHT * itemCount } : undefined
+  const slotStyle = open ? { width: openWidth, height: openHeight } : undefined
 
   return (
     <Animated.View
@@ -147,7 +150,7 @@ export function AppUtilityMenu({
             style={themed($trigger)}
             onPress={() => {
               setOpen(true)
-              onOpenHeightChange?.(ITEM_HEIGHT * itemCount)
+              onOpenHeightChange?.(openHeight)
             }}
           >
             {compact ? (
@@ -171,10 +174,17 @@ export function AppUtilityMenu({
           </Pressable>
         </Animated.View>
         <Animated.View
+          testID="utility-menu-items"
           pointerEvents={open ? "auto" : "none"}
           accessibilityElementsHidden={!open}
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
-          style={[$fill, themed($items), itemsStyle]}
+          style={[
+            placement === "bottomLeft" ? $bottomLeft : $topRight,
+            $itemsColumn,
+            { width: openWidth },
+            itemsStyle,
+          ]}
+          onLayout={(event) => setMeasuredHeight(event.nativeEvent.layout.height)}
         >
           {storeUpdate ? (
             <MenuItem
@@ -272,7 +282,6 @@ function MenuItem({
       <Text
         tx={tx}
         weight={tone === "tint" ? "bold" : "medium"}
-        numberOfLines={1}
         maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
         style={[$label, color ? { color } : undefined]}
       />
@@ -284,6 +293,7 @@ function MenuItem({
 const MENU_MAX_FONT_SCALE = 1.5
 const ICON_SIZE = 20
 const ITEM_HEIGHT = 54
+const MENU_BORDER = 1
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
@@ -298,11 +308,12 @@ const $fill: ViewStyle = { ...StyleSheet.absoluteFill }
 const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
   position: "absolute",
   overflow: "hidden",
-  borderWidth: 1,
+  borderWidth: MENU_BORDER,
   borderColor: colors.separator,
   backgroundColor: colors.surface,
 })
 const $topRight: ViewStyle = { right: 0, top: 0 }
+const $itemsColumn: ViewStyle = { position: "absolute" }
 const $bottomLeft: ViewStyle = { bottom: 0, left: 0 }
 const $trigger: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
@@ -322,13 +333,13 @@ const $dot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   backgroundColor: colors.text,
 })
 const $label: TextStyle = { flexShrink: 1 }
-const $items: ThemedStyle<ViewStyle> = () => ({ justifyContent: "center" })
 const $item: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flex: 1,
+  minHeight: ITEM_HEIGHT,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
   paddingHorizontal: spacing.md,
+  paddingVertical: spacing.xs,
   borderBottomWidth: StyleSheet.hairlineWidth,
   borderBottomColor: colors.separator,
 })

@@ -43,7 +43,7 @@ export function PlayerLayoutPicker({
             accessibilityState={{ selected }}
             style={({ pressed }) => [
               themed($option),
-              { width: previewWidth + 16 },
+              { minWidth: previewWidth + 16 },
               selected && themed($selectedOption),
               pressed && themed($pressedOption),
             ]}
@@ -57,7 +57,12 @@ export function PlayerLayoutPicker({
               height={height}
               previewStyle={previewStyle}
             />
-            <Text text={option.label} size="xs" weight="medium" />
+            <Text
+              text={option.label}
+              size="xs"
+              weight="medium"
+              maxFontSizeMultiplier={LABEL_MAX_FONT_SCALE}
+            />
           </Pressable>
         )
       })}
@@ -111,6 +116,9 @@ function LayoutPreview({
     </View>
   )
 }
+
+// why: a fixed width split "Balanced" mid-word at the largest text sizes; the option now widens to fit its label.
+const LABEL_MAX_FONT_SCALE = 1.5
 
 const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

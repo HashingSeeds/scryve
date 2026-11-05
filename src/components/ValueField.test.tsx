@@ -45,6 +45,12 @@ describe("ValueField", () => {
     expect(onChange).toHaveBeenCalledWith(30)
   })
 
+  it("wraps its label rather than cutting it off", () => {
+    const { view } = renderField()
+
+    expect(view.getByText("life").props.numberOfLines).toBeUndefined()
+  })
+
   it("does not report a value outside its bounds", () => {
     const { view, onChange } = renderField(1)
 
