@@ -401,8 +401,8 @@ function NewGameForm({
   const draftChanged = (from: SetupDraft) =>
     NEW_GAME_FIELDS.some((field) => from[field] !== draft[field])
   const optionsOpenedWith = useRef(draft)
-  // why: iOS drops a modal presented while another is still dismissing, so the end prompt waits for the options sheet to finish closing.
-  const [ending, setEnding] = useState<{ restore?: SetupDraft; afterSheet?: boolean }>()
+  // why: iOS drops a modal presented while another is still dismissing, so the end prompt waits for the options sheet to finish closing. Closing the prompt keeps the staged setup, so the next New game starts it.
+  const [ending, setEnding] = useState<{ afterSheet?: boolean }>()
   const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
   useEffect(() => {
@@ -683,21 +683,6 @@ function NewGameForm({
     void startLocal()
   }
 
-  function restoreDraft(saved: SetupDraft) {
-    setSystem(saved.system)
-    setFormat(saved.format)
-    setStartingLife(saved.startingLife)
-    setLifeStep(saved.lifeStep)
-    setPlayerCount(saved.playerCount)
-    setChosenLayout(saved.chosenLayout)
-    setTreacheryChosen(saved.treacheryChosen)
-    setDeck(saved.deck)
-    setMatchOn(saved.matchOn)
-    setChosenBestOf(saved.chosenBestOf)
-    setClockMode(saved.clockMode)
-    setChosenClockMinutes(saved.chosenClockMinutes)
-  }
-
   function openOptions() {
     optionsOpenedWith.current = draft
     setOptionsOpen(true)
@@ -707,15 +692,14 @@ function NewGameForm({
     setOptionsOpen(false)
     const before = optionsOpenedWith.current
     if (!draftChanged(before)) return
-    if (changeEndsGame) setEnding({ restore: before, afterSheet: Platform.OS === "ios" })
+    if (changeEndsGame) setEnding({ afterSheet: Platform.OS === "ios" })
     else setEdited(true)
   }
 
   function pickGameType(type: GameType) {
     if (type.id === selectedTypeId) return
-    const before = draft
     chooseGameType(type)
-    if (changeEndsGame) setEnding({ restore: before })
+    if (changeEndsGame) setEnding({})
     else setEdited(true)
   }
 
@@ -1603,10 +1587,7 @@ function NewGameForm({
       {ending && !ending.afterSheet && localGame && onEndLocal && !matchBlocks ? (
         <LocalGameEndDialog
           game={localGame}
-          onClose={() => {
-            if (ending.restore) restoreDraft(ending.restore)
-            setEnding(undefined)
-          }}
+          onClose={() => setEnding(undefined)}
           onEnd={(result) => endThenStart(() => onEndLocal(result))}
           onAbandon={onAbandonLocal ? () => endThenStart(onAbandonLocal) : undefined}
         />

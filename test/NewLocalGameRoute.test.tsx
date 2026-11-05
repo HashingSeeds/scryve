@@ -293,7 +293,7 @@ describe("new local game route", () => {
     expect(view.getByTestId("start-game-button")).toBeEnabled()
   })
 
-  it("applies a setup change to a running game through one end prompt, then starts it", () => {
+  it("keeps a staged setup through a closed end prompt, and New game starts it", () => {
     const game = createLocalGame({
       startingLife: 20,
       players: [
@@ -310,16 +310,14 @@ describe("new local game route", () => {
     )
     fireEvent.changeText(view.getByTestId("player-name-1"), "Alex")
     fireEvent.press(view.getByTestId("setup-change-button"))
-    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
     fireEvent.press(view.getByTestId("setup-options-done"))
     expect(view.getByTestId("end-game-dialog")).toBeTruthy()
     fireEvent.press(view.getByTestId("end-game-backdrop"))
     expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
-    expect(view.getByText(/ 20 life/)).toBeTruthy()
+    expect(view.getByText(/^3 players/)).toBeTruthy()
 
-    fireEvent.press(view.getByTestId("setup-change-button"))
-    fireEvent.press(view.getByTestId("starting-counter-increment"))
-    fireEvent.press(view.getByTestId("setup-options-done"))
+    fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-winner-1"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     expect(localGameRepository.loadHistoryDetail(game.id)?.game.result).toEqual({
@@ -328,10 +326,7 @@ describe("new local game route", () => {
     })
     const started = localGameRepository.loadActiveGame()
     expect(started?.id).not.toBe(game.id)
-    expect(started).toMatchObject({
-      startingLife: 21,
-      players: [{ name: "Alex" }, { name: "Two" }],
-    })
+    expect(started?.players.map(({ name }) => name)).toEqual(["Alex", "Two", "Player 3"])
     expect(router.dismissTo).toHaveBeenCalledTimes(1)
   })
 

@@ -924,7 +924,7 @@ describe("NewGameScreen", () => {
     expect(onStartLocal).not.toHaveBeenCalled()
   })
 
-  it("changes a running game's type only through the end prompt", () => {
+  it("changes a running game's type only through the end prompt, keeping the pick if it closes", () => {
     const onStartLocal = jest.fn()
     const onAbandonLocal = jest.fn()
     const view = setup({
@@ -936,10 +936,10 @@ describe("NewGameScreen", () => {
     })
     fireEvent.press(view.getByTestId("game-type-mtg-standard"))
     fireEvent.press(view.getByTestId("end-game-backdrop"))
-    expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("game-type-mtg-standard").props.accessibilityState.selected).toBe(true)
     expect(onStartLocal).not.toHaveBeenCalled()
 
-    fireEvent.press(view.getByTestId("game-type-mtg-standard"))
+    fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("abandon-game-button"))
     expect(onAbandonLocal).toHaveBeenCalledTimes(1)
     expect(onStartLocal).toHaveBeenCalledWith(
