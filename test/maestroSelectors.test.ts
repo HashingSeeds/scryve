@@ -42,9 +42,14 @@ describe("shipping Maestro selectors", () => {
     fireEvent.press(view.getByTestId("life-editor-close-seat-1"))
     fireEvent.press(view.getByTestId("game-menu-button"))
     rememberMountedIds()
-    fireEvent.press(view.getByTestId("dice-d20"))
-    rememberMountedIds()
     fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 400 } },
+    })
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+    rememberMountedIds()
+    fireEvent.press(view.getByTestId("bag-tool-d20-seat-1"))
+    rememberMountedIds()
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("end-game-button"))
     rememberMountedIds()
