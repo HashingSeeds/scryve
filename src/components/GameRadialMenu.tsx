@@ -154,10 +154,10 @@ const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"
 const STATUS_LINE_DISTANCE = 128
 const STATUS_LINE_HEIGHT = 40
 const STATUS_LINE_REACH = STATUS_LINE_DISTANCE + STATUS_LINE_HEIGHT
-// why: past the farthest pill tip (about 170 from the pentagon) and the status line, yet inside the cluster box, where Android still delivers touches.
+// why: past the pill tips and the status line, yet inside the cluster box, because Android stops delivering touches outside it.
 const MORE_DISTANCE = STATUS_LINE_REACH + 12
 const MORE_SIZE = 44
-const MORE_REACH = MORE_DISTANCE + MORE_SIZE
+export const MORE_REACH = MORE_DISTANCE + MORE_SIZE
 const APP_NAVIGATION_CLEARANCE = 96
 const ANCHOR_LOW_ON_SCREEN = 0.6
 
@@ -495,7 +495,7 @@ function GameRadialFan({
 }
 
 const FACING_TURN_MS = 260
-const CLUSTER_SIZE = 2 * (EDGE_POSE_DISTANCE + ACTION_WIDTH)
+export const CLUSTER_SIZE = 2 * (EDGE_POSE_DISTANCE + ACTION_WIDTH)
 
 type GameMenuAnchorProps = {
   open: boolean

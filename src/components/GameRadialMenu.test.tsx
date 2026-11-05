@@ -8,7 +8,9 @@ import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import {
+  CLUSTER_SIZE,
   GameRadialMenu,
+  MORE_REACH,
   getMoreButtonOffset,
   getRadialActionPoses,
   getRadialToolOffsets,
@@ -18,6 +20,10 @@ import {
   type RadialMenuToolBag,
 } from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
+
+test("the more button stays inside the cluster box that receives touches", () => {
+  expect(MORE_REACH).toBeLessThanOrEqual(CLUSTER_SIZE / 2)
+})
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
