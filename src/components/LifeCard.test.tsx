@@ -145,7 +145,7 @@ describe("LifeCard", () => {
             takeDesignation: jest.fn(),
             releaseDesignation: jest.fn(),
           }}
-          dice={{ armed: "d20", onPress }}
+          dice={{ view: { kind: "roll", roll: { tool: "d20", value: 7 }, attempt: 1 }, onPress }}
           onChange={onChange}
         />
       </ThemeProvider>,

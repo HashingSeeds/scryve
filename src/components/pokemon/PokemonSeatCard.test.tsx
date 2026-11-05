@@ -219,7 +219,16 @@ describe("PokemonSeatCard", () => {
   it("drops its controls from touch and screen readers while dice sit on the seat", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const onPress = jest.fn()
-    render(<Seat harness={table} seat={0} dice={{ armed: "coin", onPress }} />)
+    render(
+      <Seat
+        harness={table}
+        seat={0}
+        dice={{
+          view: { kind: "roll", roll: { tool: "coin", value: "Heads" }, attempt: 1 },
+          onPress,
+        }}
+      />,
+    )
 
     const layer = screen.getByTestId("pokemon-layer-seat-1", { includeHiddenElements: true })
     expect(layer.props.pointerEvents).toBe("none")

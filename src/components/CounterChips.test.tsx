@@ -119,11 +119,10 @@ describe("CounterChips", () => {
     expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
   })
 
-  it("rolls a die for its own seat on a tap and puts it out for the table on a hold, and more shrinks the trackers to icons until one is tapped", () => {
+  it("rolls a die for its own seat on a tap, and more shrinks the trackers to icons until one is tapped", () => {
     const dice = {
       tools: ["d4", "d6", "d20", "coin"] as const,
       rollFor: jest.fn(),
-      armForOthers: jest.fn(),
     }
     const view = chips(seat(), { dice })
 
@@ -141,9 +140,8 @@ describe("CounterChips", () => {
     expect(dice.rollFor).toHaveBeenCalledTimes(1)
 
     fireEvent.press(view.getByRole("button", { name: "More dice" }))
-    fireEvent(view.getByTestId("bag-tool-d4-seat-1"), "longPress")
-    fireEvent(view.getByTestId("bag-tool-d4-seat-1"), "pressOut")
-    expect(dice.armForOthers).toHaveBeenCalledWith("d4")
+    fireEvent.press(view.getByTestId("bag-tool-d4-seat-1"))
+    expect(dice.rollFor).toHaveBeenLastCalledWith("d4")
   })
 
   it("edits from a held chip: steps never go below zero and remove clears the count", () => {

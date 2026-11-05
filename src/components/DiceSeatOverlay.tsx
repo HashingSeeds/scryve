@@ -6,8 +6,6 @@ import Animated, {
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
   withTiming,
   FadeOut,
@@ -15,7 +13,6 @@ import Animated, {
 
 import {
   DIE_SIDES,
-  PROMPT_FADE_MS,
   rollLabel,
   rollValueLabel,
   toolLabel,
@@ -30,14 +27,11 @@ import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { DieFace } from "./DiceGlyph"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { Text } from "./Text"
 
 export interface LifeCardDice {
   view?: DiceSeatView
-  armed?: DiceTool
-  leaving?: boolean
   chips?: readonly DiceSeatChip[]
   onPress: () => void
   bag?: SeatDiceBag
@@ -48,11 +42,10 @@ export interface LifeCardDice {
 export interface SeatDiceBag {
   tools: readonly DiceTool[]
   rollFor: (tool: DiceTool) => void
-  armForOthers: (tool: DiceTool) => void
 }
 
 export function diceCoversSeat(dice: LifeCardDice | undefined): boolean {
-  return !!dice && (dice.view !== undefined || dice.armed !== undefined)
+  return dice?.view !== undefined
 }
 
 export interface DiceSeatOverlayProps {
@@ -76,11 +69,6 @@ const GATED_MOTION = ReduceMotion.Never
 // why: the result itself flies into its chip, so the card behind it only fades. On web the exit copy lands at the wrong place and size on a turned seat, so web skips it and lets the chip carry the handoff.
 const BLOOM_EXITING =
   Platform.OS === "web" ? undefined : FadeOut.duration(BLOOM_EXIT_MS).reduceMotion(GATED_MOTION)
-const PROMPT_FADE_IN_MS = 200
-const ARMED_PULSE_SCALE = 1.08
-const ARMED_PULSE_MS = 650
-// why: the seat's life stays faintly visible behind the prompt, so players still know whose seat it is.
-const ARMED_TINT_OPACITY = 0.88
 const TUMBLE_TICKS = 9
 const tumbleStepMs = (step: number) => 30 + step * step * 1.2
 const COIN_FLIP_MS = 640
@@ -101,19 +89,15 @@ function Bloom({
 }: DiceSeatOverlayProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const { view, armed } = dice
+  const { view } = dice
   const covers = !!view && view.kind !== "waiting"
-  const scrim =
-    view?.kind === "waiting" ||
-    view?.kind === "sittingOut" ||
-    (view?.kind === "first" && view.status === "lost")
+  const scrim = view?.kind === "waiting" || (view?.kind === "first" && view.status === "lost")
   const dim = view?.kind === "rolloff" && (view.status === "lost" || view.status === "out")
   const rotationStyle: ViewStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
   const animate = reducedMotion === false && !!view && !scrim
-  const interactive =
-    view?.kind !== "waiting" && view?.kind !== "choice" && view?.kind !== "sittingOut"
+  const interactive = view?.kind !== "waiting" && view?.kind !== "choice"
   const tumble = useTumble(animate ? view : undefined)
 
   const arrive = useSharedValue(animate ? 0 : 1)
@@ -128,51 +112,31 @@ function Bloom({
     ],
   }))
 
-  const prompting = !!armed && !view
-  const leaving = prompting && !!dice.leaving
-  // why: dice mode tints every seat at once, so the prompt fades in and out rather than cutting.
-  const promptOpacity = useSharedValue(prompting && reducedMotion === false ? 0 : 1)
-  useEffect(() => {
-    if (!prompting) return
-    const target = leaving ? 0 : 1
-    promptOpacity.value =
-      reducedMotion === false
-        ? withTiming(target, { duration: leaving ? PROMPT_FADE_MS : PROMPT_FADE_IN_MS })
-        : target
-  }, [leaving, prompting, promptOpacity, reducedMotion])
-  const promptStyle = useAnimatedStyle(() => ({ opacity: promptOpacity.value }))
   const overlayStyle = [
     themed($overlay),
     compact && themed($compactOverlay),
     covers && !scrim && { backgroundColor: color },
     scrim && themed($scrim),
-    prompting && [themed($ring), { borderColor: foreground }],
   ]
-  const content = prompting ? (
-    <>
-      <View style={[$fill, { backgroundColor: color, opacity: ARMED_TINT_OPACITY }]} />
-      <View style={[themed($content), rotationStyle]}>
-        <ArmedPrompt tool={armed} foreground={foreground} compact={compact} />
+  const content =
+    view && covers && !scrim ? (
+      <View style={[themed($content), rotationStyle, dim && $dim]}>
+        <Result
+          view={view}
+          playerName={playerName}
+          foreground={foreground}
+          compact={compact}
+          tumble={tumble}
+          onChoose={dice.onChoose}
+        />
       </View>
-    </>
-  ) : view && covers && !scrim ? (
-    <View style={[themed($content), rotationStyle, dim && $dim]}>
-      <Result
-        view={view}
-        playerName={playerName}
-        foreground={foreground}
-        compact={compact}
-        tumble={tumble}
-        onChoose={dice.onChoose}
-      />
-    </View>
-  ) : null
+    ) : null
 
   return (
     <Animated.View
       exiting={animate ? BLOOM_EXITING : undefined}
-      pointerEvents={leaving ? "none" : "box-none"}
-      style={[$layer, animate && arriveStyle, prompting && promptStyle]}
+      pointerEvents="box-none"
+      style={[$layer, animate && arriveStyle]}
     >
       {view?.kind === "choice" ? (
         <View testID={`dice-seat-${seatNumber}`} accessible={false} style={overlayStyle}>
@@ -182,9 +146,9 @@ function Bloom({
         <BoardPressable
           testID={`dice-seat-${seatNumber}`}
           accessibilityRole={interactive ? "button" : undefined}
-          accessibilityLabel={accessibilityLabel(playerName, view, armed)}
-          accessibilityHint={interactive ? hint(playerName, view, armed) : undefined}
-          disabled={!interactive || leaving}
+          accessibilityLabel={accessibilityLabel(playerName, view)}
+          accessibilityHint={interactive && view ? hint(view) : undefined}
+          disabled={!interactive}
           onPress={dice.onPress}
           style={overlayStyle}
         >
@@ -192,50 +156,6 @@ function Bloom({
         </BoardPressable>
       )}
     </Animated.View>
-  )
-}
-
-function ArmedPrompt({
-  tool,
-  foreground,
-  compact,
-}: {
-  tool: DiceTool
-  foreground: string
-  compact?: boolean
-}) {
-  const reducedMotion = useReducedMotion()
-  const pulse = useSharedValue(1)
-  useEffect(() => {
-    if (reducedMotion !== false) {
-      pulse.value = 1
-      return
-    }
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(ARMED_PULSE_SCALE, { duration: ARMED_PULSE_MS, reduceMotion: GATED_MOTION }),
-        withTiming(1, { duration: ARMED_PULSE_MS, reduceMotion: GATED_MOTION }),
-      ),
-      -1,
-      false,
-      undefined,
-      GATED_MOTION,
-    )
-  }, [pulse, reducedMotion])
-  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }))
-  return (
-    <>
-      <Animated.View testID="dice-armed-prompt" style={pulseStyle}>
-        <DieFace tool={tool} size={compact ? 48 : 72} color={foreground} />
-      </Animated.View>
-      <Text
-        tx={tool === "coin" ? "board:dice.tapToFlip" : "board:dice.tapToRoll"}
-        weight="bold"
-        size={compact ? "xs" : "sm"}
-        maxFontSizeMultiplier={1.2}
-        style={{ color: foreground }}
-      />
-    </>
   )
 }
 
@@ -290,7 +210,7 @@ function rollingTool(view: DiceSeatView): DiceTool | undefined {
 }
 
 function viewKey(view: DiceSeatView | undefined) {
-  if (!view) return "armed"
+  if (!view) return "none"
   if (view.kind === "roll") return `roll:${view.roll.tool}:${view.attempt}`
   if (view.kind === "rolloff") return `rolloff:${view.attempt}`
   return view.kind
@@ -386,7 +306,7 @@ function Result({
                   : null}
       </>
     )
-  if (view.kind === "waiting" || view.kind === "sittingOut") return null
+  if (view.kind === "waiting") return null
   if (view.kind === "flip")
     return (
       <>
@@ -436,7 +356,7 @@ function FlippingCoin({
   )
 }
 
-function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: DiceTool) {
+function accessibilityLabel(playerName: string, view?: DiceSeatView) {
   if (view?.kind === "roll") return rollLabel(playerName, view.roll)
   if (view?.kind === "rolloff")
     return translate(`board:dice.rolloffLabel.${view.status}`, {
@@ -446,28 +366,21 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
   if (view?.kind === "choice")
     return translate(`board:dice.choiceLabel.${view.reason}`, { name: playerName })
   if (view?.kind === "waiting") return translate("board:dice.waitingForChoice")
-  if (view?.kind === "sittingOut") return translate("board:dice.out")
   if (view?.kind === "flip") return translate("board:dice.flippingForFirst")
   if (view?.kind === "first")
     return translate(`board:dice.firstLabel.${view.status}`, { name: playerName })
-  return armed === "coin"
-    ? translate("board:dice.flipCoinFor", { name: playerName })
-    : translate("board:dice.rollDieFor", { name: playerName, die: armed && toolLabel(armed) })
+  return undefined
 }
 
-// why: with the dice out, a tap on a result rolls that seat again, and once the roll-off has a winner it puts the dice away.
-function hint(playerName: string, view?: DiceSeatView, armed?: DiceTool) {
-  if (!view) return undefined
-  if (armed && view.kind === "rolloff" && (view.status === "won" || view.status === "lost"))
-    return translate("board:menu.closeDice")
-  return armed && view.kind === "roll"
-    ? accessibilityLabel(playerName, undefined, armed)
+// why: once the roll-off has a winner, a tap on any seat puts the dice away and the winner keeps the 1st chip.
+function hint(view: DiceSeatView) {
+  return view.kind === "rolloff" && (view.status === "won" || view.status === "lost")
+    ? translate("board:menu.closeDice")
     : translate("board:dice.settlesResult")
 }
 
 // why: a seat with dice on it is the dice's; the layer sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap. The z-index lives on the animated wrapper because its entering transform opens a stacking context of its own.
 const $layer: ViewStyle = { ...StyleSheet.absoluteFill, zIndex: 16 }
-const $fill: ViewStyle = StyleSheet.absoluteFill
 const $overlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
   ...StyleSheet.absoluteFill,
   overflow: "hidden",
@@ -478,7 +391,6 @@ const $overlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
 const $compactOverlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
   borderRadius: radius.xxl,
 })
-const $ring: ThemedStyle<ViewStyle> = () => ({ borderWidth: 3 })
 const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.board.background,
   opacity: 0.6,

@@ -33,7 +33,6 @@ export type FirstPlayer =
   | { kind: "picked"; seatId: PlayerId; phase: DicePhase; note?: string }
 
 export interface DiceState {
-  armed: DiceTool | null
   results: Partial<Record<PlayerId, SeatResult>>
   first: FirstPlayer | null
 }
@@ -51,15 +50,12 @@ export type DiceSeatView =
   | { kind: "flip" }
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
-  | { kind: "sittingOut" }
 
 export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" } | { kind: "claim" }
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
-export const SITTING_OUT: DiceSeatView = { kind: "sittingOut" }
 
-export const PROMPT_FADE_MS = 260
-export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
+export const EMPTY_DICE: DiceState = { results: {}, first: null }
 export const DIE_SIDES: Record<BagDie, number> = {
   d4: 4,
   d6: 6,
@@ -116,10 +112,6 @@ export function dicePlayerName(
   seatId: PlayerId,
 ) {
   return players.find(({ id }) => id === seatId)?.name ?? translate("board:dice.unnamedPlayer")
-}
-
-export function armTool(state: DiceState, tool: DiceTool): DiceState {
-  return state.armed === tool ? state : { ...state, armed: tool }
 }
 
 export function rollForSeat(
@@ -250,11 +242,6 @@ export function settleFirst(state: DiceState): DiceState {
       : { ...state, first: { kind: "picked", seatId: first.pool[0], phase: "chip" } }
   }
   return { ...state, first: { ...first, phase: "chip" } }
-}
-
-// why: putting the dice away, or putting a new one out, turns every result on the board into its chip.
-export function settleAll(state: DiceState, seatIds: readonly PlayerId[]): DiceState {
-  return settleFirst(seatIds.reduce(settleResult, state))
 }
 
 export function clearFirst(state: DiceState): DiceState {

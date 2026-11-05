@@ -13,9 +13,6 @@ export default {
       d20: "d20",
       d100: "d100",
     },
-    tapToRoll: "タップして振る",
-    tapToFlip: "タップしてコイントス",
-    rollForTable: "全席にダイスを出して振る",
     moreDice: "ほかのダイス",
     openBag: "{{identity}}、ダイスとカウンター",
     coinFace: {
@@ -69,8 +66,6 @@ export default {
       won: "{{name}}さんが先攻です",
       lost: "{{name}}さんは先攻ではありません",
     },
-    flipCoinFor: "{{name}}のコインを投げる",
-    rollDieFor: "{{name}}の{{die}}を振る",
   },
   playerNames: {
     default: "プレイヤー{{number}}",

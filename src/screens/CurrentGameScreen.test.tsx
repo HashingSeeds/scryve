@@ -192,20 +192,6 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-log-undo").props.accessibilityState.disabled).toBe(true)
   })
 
-  it("puts a die out for the table from a seat's bag, and the pentagon puts it away", () => {
-    const view = renderGame()
-    layoutSeats(view)
-    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
-    fireEvent(view.getByTestId("bag-tool-d6-seat-1"), "longPress")
-    fireEvent(view.getByTestId("bag-tool-d6-seat-1"), "pressOut")
-
-    expect(view.getByTestId("dice-seat-2").props.accessibilityLabel).toBe("Roll a d6 for Grace")
-    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice")
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("dice-seat-1")).toBeNull()
-    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
-  })
-
   it("offers the first-player roll only while the game is fresh, and its chip leaves on the first life change", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)

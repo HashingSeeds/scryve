@@ -13,9 +13,6 @@ export default {
       d20: "d20",
       d100: "d100",
     },
-    tapToRoll: "रोल करने के लिए टैप करें",
-    tapToFlip: "फ़्लिप करने के लिए टैप करें",
-    rollForTable: "पूरी टेबल के लिए रोल करें",
     moreDice: "और डाइस",
     openBag: "{{identity}}, डाइस और काउंटर",
     coinFace: {
@@ -69,8 +66,6 @@ export default {
       won: "{{name}} पहले खेलेंगे",
       lost: "{{name}} पहले नहीं खेलेंगे",
     },
-    flipCoinFor: "{{name}} के लिए सिक्का उछालें",
-    rollDieFor: "{{name}} के लिए {{die}} फेंकें",
   },
   playerNames: {
     default: "खिलाड़ी {{number}}",
