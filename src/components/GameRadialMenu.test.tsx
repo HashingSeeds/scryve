@@ -9,6 +9,7 @@ import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import {
   GameRadialMenu,
+  getMoreButtonOffset,
   getRadialActionPoses,
   getRadialToolOffsets,
   getToolBagLayout,
@@ -410,15 +411,36 @@ describe("GameRadialMenu", () => {
 
     view.rerender(menu(true, jest.fn(), { more }))
     expect(view.getByTestId("more")).toBeTruthy()
-    const below = StyleSheet.flatten(view.getByTestId("game-menu-more").props.style)
-    expect(below.marginTop).toBeGreaterThan(0)
-
-    view.rerender(menu(true, jest.fn(), { more, anchor: { x: 0.5, y: 0.8 } }))
-    const above = StyleSheet.flatten(view.getByTestId("game-menu-more").props.style)
-    expect(above.marginTop).toBeLessThan(0)
 
     view.rerender(menu(true, jest.fn(), { more, actions: diceActions(true) }))
     expect(view.queryByTestId("more")).toBeNull()
+  })
+
+  it("keeps the more button on the board, beside the fan when the board is too short", () => {
+    const portrait = { width: 402, height: 874 }
+    const landscape = { width: 874, height: 402 }
+    const onBoard = (anchor: { x: number; y: number }, board: typeof portrait) => {
+      const offset = getMoreButtonOffset(anchor, board)
+      const center = { x: anchor.x * board.width + offset.x, y: anchor.y * board.height + offset.y }
+      return (
+        center.x - 22 >= 0 &&
+        center.x + 22 <= board.width &&
+        center.y - 22 >= 0 &&
+        center.y + 22 <= board.height
+      )
+    }
+
+    expect(getMoreButtonOffset({ x: 0.5, y: 0.5 }, portrait).y).toBeGreaterThan(0)
+    expect(getMoreButtonOffset({ x: 0.5, y: 0.66 }, portrait).y).toBeLessThan(0)
+    expect(getMoreButtonOffset({ x: 0.5, y: 0.5 }, landscape).y).toBe(0)
+    for (const anchor of [
+      { x: 0.5, y: 0.5 },
+      { x: 0.5, y: 0.35 },
+      { x: 0.5, y: 0.66 },
+    ]) {
+      expect(onBoard(anchor, portrait)).toBe(true)
+      expect(onBoard(anchor, landscape)).toBe(true)
+    }
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

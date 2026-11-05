@@ -1,6 +1,6 @@
 import { type ComponentProps, memo, type ReactNode, useEffect, useState } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, {
   Easing,
   ReduceMotion,
@@ -156,7 +156,8 @@ const STATUS_LINE_HEIGHT = 40
 const STATUS_LINE_REACH = STATUS_LINE_DISTANCE + STATUS_LINE_HEIGHT
 // why: past the farthest pill tip (about 170 from the pentagon) and the status line, yet inside the cluster box, where Android still delivers touches.
 const MORE_DISTANCE = STATUS_LINE_REACH + 12
-const MORE_HEIGHT = 44
+const MORE_SIZE = 44
+const MORE_REACH = MORE_DISTANCE + MORE_SIZE
 const APP_NAVIGATION_CLEARANCE = 96
 const ANCHOR_LOW_ON_SCREEN = 0.6
 
@@ -230,6 +231,32 @@ export function getRadialActionPoses(anchor: {
   return CENTER_ACTION_POSES
 }
 
+type MoreSide = "below" | "above" | "right" | "left"
+
+export function getMoreButtonOffset(
+  anchor: { x: number; y: number },
+  board: { width: number; height: number },
+): { x: number; y: number } {
+  const room: Record<MoreSide, number> = {
+    below: (1 - anchor.y) * board.height,
+    above: anchor.y * board.height,
+    right: (1 - anchor.x) * board.width,
+    left: anchor.x * board.width,
+  }
+  const vertical: readonly MoreSide[] =
+    anchor.y > ANCHOR_LOW_ON_SCREEN ? ["above", "below"] : ["below", "above"]
+  const side =
+    vertical.find((candidate) => room[candidate] >= MORE_REACH) ??
+    (room.right >= room.left ? "right" : "left")
+  const center = MORE_DISTANCE + MORE_SIZE / 2
+  return {
+    below: { x: 0, y: center },
+    above: { x: 0, y: -center },
+    right: { x: center, y: 0 },
+    left: { x: -center, y: 0 },
+  }[side]
+}
+
 export interface ToolBagLayout {
   x: number
   y: number
@@ -290,6 +317,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   more,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
+  const window = useWindowDimensions()
   const menuOpen = open && !exitAction
 
   const anchorStyle = percentAnchorStyle(anchor)
@@ -330,12 +358,12 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         />
       ) : null}
       {menuOpen && more && !bag ? (
-        <GameMenuMoreRow
-          above={anchor.y > ANCHOR_LOW_ON_SCREEN}
-          atAnchorStyle={[themed($statusLineInset), { top: `${anchor.y * 100}%` }]}
+        <GameMenuMore
+          offset={getMoreButtonOffset(anchor, window)}
+          anchorStyle={[anchorStyle, nativeAnchorStyle]}
         >
           {more}
-        </GameMenuMoreRow>
+        </GameMenuMore>
       ) : null}
     </View>
   )
@@ -383,29 +411,27 @@ function GameMenuStatusRow({
   )
 }
 
-function GameMenuMoreRow({
-  above,
-  atAnchorStyle,
+function GameMenuMore({
+  offset,
+  anchorStyle,
   children,
 }: {
-  above: boolean
-  atAnchorStyle: StyleProp<ViewStyle>
+  offset: { x: number; y: number }
+  anchorStyle: AnchorStyle
   children: ReactNode
 }) {
-  const { themed } = useAppTheme()
   return (
-    <View
+    <Animated.View
       testID="game-menu-more"
       pointerEvents="box-none"
       style={[
-        themed($statusLineRow),
-        $moreRow,
-        atAnchorStyle,
-        { marginTop: above ? -MORE_DISTANCE - MORE_HEIGHT : MORE_DISTANCE },
+        $more,
+        anchorStyle,
+        { marginLeft: offset.x - MORE_SIZE / 2, marginTop: offset.y - MORE_SIZE / 2 },
       ]}
     >
       {children}
-    </View>
+    </Animated.View>
   )
 }
 
@@ -485,6 +511,7 @@ type GameMenuAnchorProps = {
 /** why: a hardware-pinned board does not turn with the window, so the pentagon and its fan stay put through the system rotation and then turn together about the anchor to face the holder (`facingAngle`, clockwise degrees). `holderAnchor` is where the anchor sits in the holder's view and picks the side the fan opens toward. The box is large enough to contain the fan, because Android drops touches outside a parent's bounds. */
 export const GameMenuCluster = memo(function GameMenuCluster({
   holderAnchor,
+  holderWidth,
   holderHeight,
   facingAngle,
   actions,
@@ -493,6 +520,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   ...anchorProps
 }: Omit<GameMenuAnchorProps, "anchorStyle" | "bag"> & {
   holderAnchor: { x: number; y: number }
+  holderWidth: number
   holderHeight: number
   facingAngle: number
   actions: GameMenuActions
@@ -504,9 +532,6 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
   const facing = useSharedValue(facingAngle)
-  const rowsAbove =
-    holderAnchor.y > ANCHOR_LOW_ON_SCREEN ||
-    (1 - holderAnchor.y) * holderHeight < STATUS_LINE_REACH + APP_NAVIGATION_CLEARANCE
 
   useEffect(() => {
     const target = nearestEquivalentAngle(facing.value, facingAngle)
@@ -534,14 +559,20 @@ export const GameMenuCluster = memo(function GameMenuCluster({
       {menuOpen && statusLine ? (
         <GameMenuStatusRow
           statusLine={statusLine}
-          above={rowsAbove}
+          above={
+            holderAnchor.y > ANCHOR_LOW_ON_SCREEN ||
+            (1 - holderAnchor.y) * holderHeight < STATUS_LINE_REACH + APP_NAVIGATION_CLEARANCE
+          }
           atAnchorStyle={$clusterStatusRow}
         />
       ) : null}
       {menuOpen && more && !bag ? (
-        <GameMenuMoreRow above={rowsAbove} atAnchorStyle={$clusterStatusRow}>
+        <GameMenuMore
+          offset={getMoreButtonOffset(holderAnchor, { width: holderWidth, height: holderHeight })}
+          anchorStyle={$clusterCenter}
+        >
           {more}
-        </GameMenuMoreRow>
+        </GameMenuMore>
       ) : null}
     </Animated.View>
   )
@@ -1367,7 +1398,7 @@ const $statusLineRow: ThemedStyle<ViewStyle> = () => ({
   height: STATUS_LINE_HEIGHT,
   alignItems: "center",
 })
-const $moreRow: ViewStyle = { height: MORE_HEIGHT }
+const $more: ViewStyle = { position: "absolute", zIndex: 25, width: MORE_SIZE, height: MORE_SIZE }
 const $statusLineInset: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   left: spacing.lg,
   right: spacing.lg,

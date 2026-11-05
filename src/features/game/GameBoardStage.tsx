@@ -125,6 +125,7 @@ function PinnedGameBoardStage({
               open={menu.open}
               anchor={boardAnchor}
               holderAnchor={holderAnchor}
+              holderWidth={holderAngle % 180 === 0 ? width : height}
               holderHeight={holderAngle % 180 === 0 ? height : width}
               facingAngle={holderAngle}
               actions={menu.actions}
