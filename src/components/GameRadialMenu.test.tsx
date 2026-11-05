@@ -1,4 +1,4 @@
-import { AccessibilityInfo, StyleSheet } from "react-native"
+import { AccessibilityInfo, StyleSheet, View } from "react-native"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { Path } from "react-native-svg"
 
@@ -389,6 +389,36 @@ describe("GameRadialMenu", () => {
       { x: 0.9, y: 0.5 },
     ])
       expect(clear(getToolBagLayout(anchor, count))).toBe(true)
+  })
+
+  it("sets the last action further from the third than the third's own neighbor", () => {
+    const angle = ({ x, y }: { x: number; y: number }) => (Math.atan2(y, x) * 180) / Math.PI
+    const apart = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      const turn = Math.abs(angle(a) - angle(b)) % 360
+      return Math.min(turn, 360 - turn)
+    }
+    for (const x of [0.2, 0.5, 0.8]) {
+      const [, , third, fourth, last] = getRadialActionPoses({ x, y: 0.5 })
+      expect(apart(third, last)).toBeGreaterThan(apart(third, fourth))
+    }
+  })
+
+  it("shows the more button past the fan only while the fan is open and the bag shut", () => {
+    const more = <View testID="more" />
+    const view = render(menu(false, jest.fn(), { more }))
+    expect(view.queryByTestId("more")).toBeNull()
+
+    view.rerender(menu(true, jest.fn(), { more }))
+    expect(view.getByTestId("more")).toBeTruthy()
+    const below = StyleSheet.flatten(view.getByTestId("game-menu-more").props.style)
+    expect(below.marginTop).toBeGreaterThan(0)
+
+    view.rerender(menu(true, jest.fn(), { more, anchor: { x: 0.5, y: 0.8 } }))
+    const above = StyleSheet.flatten(view.getByTestId("game-menu-more").props.style)
+    expect(above.marginTop).toBeLessThan(0)
+
+    view.rerender(menu(true, jest.fn(), { more, actions: diceActions(true) }))
+    expect(view.queryByTestId("more")).toBeNull()
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

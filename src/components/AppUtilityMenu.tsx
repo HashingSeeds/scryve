@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import { type ComponentProps, useEffect, useState } from "react"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
   interpolate,
@@ -20,6 +20,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
+import { DialogCard, type DialogOrigin } from "./DialogCard"
 import { Text } from "./Text"
 
 export type AccountEntry = "account" | "signIn"
@@ -29,6 +30,7 @@ export function AppUtilityMenu({
   compact = false,
   placement = "topRight",
   onDecks,
+  onRules,
   onHistory,
   onSettings,
   onSupport,
@@ -39,9 +41,10 @@ export function AppUtilityMenu({
 }: {
   visible?: boolean
   compact?: boolean
-  placement?: "topRight" | "bottomLeft"
+  placement?: "topRight" | "bottomLeft" | "board"
   onDecks?: () => void
-  onHistory: () => void
+  onRules?: () => void
+  onHistory?: () => void
   onSettings: () => void
   onSupport: () => void
   onAccount: () => void
@@ -53,14 +56,17 @@ export function AppUtilityMenu({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [open, setOpen] = useState(false)
+  const [origin, setOrigin] = useState<DialogOrigin>()
   const updateReady = useAppUpdate().status === "ready"
   const storeUpdate = useStoreUpdate()
   const nearbyOnly = useNearbyOnly()
   const testsNearby = nearbyBetaAvailable()
   const showsEvents = nearbyOnly || readPublicCloudConfig().configured
   const itemCount =
-    4 +
+    3 +
     Number(Boolean(onDecks)) +
+    Number(Boolean(onRules)) +
+    Number(Boolean(onHistory)) +
     Number(testsNearby) +
     Number(Boolean(storeUpdate)) +
     Number(showsEvents)
@@ -102,6 +108,161 @@ export function AppUtilityMenu({
     onChoose?.()
     action()
   }
+  const openMenu = (event?: GestureResponderEvent) => {
+    setOrigin(
+      event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
+    )
+    setOpen(true)
+    onOpenHeightChange?.(ITEM_HEIGHT * itemCount)
+  }
+  const updateDot = updateReady || storeUpdate
+  const items = (
+    <>
+      {storeUpdate ? (
+        <Pressable
+          testID="utility-store-update-button"
+          accessibilityRole="link"
+          accessibilityLabel={translate(storeUpdate.labelTx)}
+          style={themed($item)}
+          onPress={() => choose(updateFromStore)}
+        >
+          <Text
+            tx="common:appMenu.updateApp"
+            weight="bold"
+            numberOfLines={1}
+            maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+            style={themed($storeUpdateText)}
+          />
+        </Pressable>
+      ) : null}
+      {onDecks ? (
+        <Item
+          testID="utility-decks-button"
+          tx="common:appNavigation.decks"
+          onPress={() => choose(onDecks)}
+        />
+      ) : null}
+      {onRules ? (
+        <Item
+          testID="utility-rules-button"
+          tx="board:menu.rules"
+          onPress={() => {
+            close()
+            onRules()
+          }}
+        />
+      ) : null}
+      {onHistory ? (
+        <Item
+          testID="utility-history-button"
+          tx="common:appMenu.history"
+          onPress={() => choose(onHistory)}
+        />
+      ) : null}
+      {showsEvents ? (
+        <Item
+          testID="utility-events-button"
+          tx="events:title"
+          onPress={() => choose(() => openEvents(nearbyOnly))}
+        />
+      ) : null}
+      {testsNearby ? (
+        <Pressable
+          testID="utility-nearby-only-button"
+          accessibilityRole="switch"
+          accessibilityState={{ checked: nearbyOnly }}
+          style={themed($item)}
+          onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
+        >
+          <Text
+            tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
+            weight="medium"
+            numberOfLines={1}
+            maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+          />
+        </Pressable>
+      ) : null}
+      <Item
+        testID="utility-account-button"
+        tx={`common:appMenu.${accountEntry}`}
+        onPress={() => choose(onAccount)}
+      />
+      <Item
+        testID="utility-support-button"
+        tx="common:appMenu.support"
+        onPress={() => choose(onSupport)}
+      />
+      <Pressable
+        testID="utility-settings-button"
+        accessibilityRole="button"
+        accessibilityLabel={translate(
+          updateReady ? "common:appMenu.settingsUpdateReady" : "common:appMenu.settings",
+        )}
+        style={themed([$item, $settingsItem])}
+        onPress={() => choose(onSettings)}
+      >
+        <Text
+          tx="common:appMenu.settings"
+          weight="medium"
+          numberOfLines={1}
+          maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+        />
+        {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
+      </Pressable>
+    </>
+  )
+  const trigger = (
+    <Pressable
+      testID="utility-menu-button"
+      accessibilityRole="button"
+      accessibilityLabel={translate(
+        storeUpdate
+          ? "common:appMenu.moreStoreUpdate"
+          : updateReady
+            ? "common:appMenu.moreUpdateReady"
+            : "common:appMenu.more",
+      )}
+      accessibilityState={{ expanded: open }}
+      style={themed($trigger)}
+      onPress={openMenu}
+    >
+      {compact || placement === "board" ? (
+        <View testID="utility-menu-dots" accessible={false} style={$dotsRow}>
+          <View style={themed($dot)} />
+          <View style={themed($dot)} />
+          <View style={themed($dot)} />
+        </View>
+      ) : (
+        <Text
+          tx="common:appMenu.more"
+          weight="bold"
+          size="xs"
+          numberOfLines={1}
+          maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+        />
+      )}
+      {updateDot ? <View testID="utility-update-dot" style={themed($updateDot)} /> : null}
+    </Pressable>
+  )
+
+  if (placement === "board")
+    return (
+      <View testID="utility-menu-slot" style={themed($boardTrigger)}>
+        {trigger}
+        <DialogCard
+          visible={open}
+          onClose={close}
+          origin={origin}
+          backdropTestID="utility-menu-backdrop"
+          backdropAccessibilityLabel={translate("common:appMenu.closeMenu")}
+          dialogTestID="utility-menu"
+          style={[themed($boardSheet), { width: openWidth, height: ITEM_HEIGHT * itemCount }]}
+        >
+          {items}
+        </DialogCard>
+      </View>
+    )
+
   const slotStyle = open ? { width: openWidth, height: ITEM_HEIGHT * itemCount } : undefined
 
   return (
@@ -132,42 +293,7 @@ export function AppUtilityMenu({
           importantForAccessibility={open ? "no-hide-descendants" : "auto"}
           style={[$fill, triggerStyle]}
         >
-          <Pressable
-            testID="utility-menu-button"
-            accessibilityRole="button"
-            accessibilityLabel={translate(
-              storeUpdate
-                ? "common:appMenu.moreStoreUpdate"
-                : updateReady
-                  ? "common:appMenu.moreUpdateReady"
-                  : "common:appMenu.more",
-            )}
-            accessibilityState={{ expanded: open }}
-            style={themed($trigger)}
-            onPress={() => {
-              setOpen(true)
-              onOpenHeightChange?.(ITEM_HEIGHT * itemCount)
-            }}
-          >
-            {compact ? (
-              <View testID="utility-menu-dots" accessible={false} style={$dotsRow}>
-                <View style={themed($dot)} />
-                <View style={themed($dot)} />
-                <View style={themed($dot)} />
-              </View>
-            ) : (
-              <Text
-                tx="common:appMenu.more"
-                weight="bold"
-                size="xs"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            )}
-            {updateReady || storeUpdate ? (
-              <View testID="utility-update-dot" style={themed($updateDot)} />
-            ) : null}
-          </Pressable>
+          {trigger}
         </Animated.View>
         <Animated.View
           pointerEvents={open ? "auto" : "none"}
@@ -175,128 +301,27 @@ export function AppUtilityMenu({
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
           style={[$fill, themed($items), itemsStyle]}
         >
-          {storeUpdate ? (
-            <Pressable
-              testID="utility-store-update-button"
-              accessibilityRole="link"
-              accessibilityLabel={translate(storeUpdate.labelTx)}
-              style={themed($item)}
-              onPress={() => choose(updateFromStore)}
-            >
-              <Text
-                tx="common:appMenu.updateApp"
-                weight="bold"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-                style={themed($storeUpdateText)}
-              />
-            </Pressable>
-          ) : null}
-          {onDecks ? (
-            <Pressable
-              testID="utility-decks-button"
-              accessibilityRole="button"
-              style={themed($item)}
-              onPress={() => choose(onDecks)}
-            >
-              <Text
-                tx="common:appNavigation.decks"
-                weight="medium"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            </Pressable>
-          ) : null}
-          <Pressable
-            testID="utility-history-button"
-            accessibilityRole="button"
-            style={themed($item)}
-            onPress={() => choose(onHistory)}
-          >
-            <Text
-              tx="common:appMenu.history"
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
-          </Pressable>
-          {showsEvents ? (
-            <Pressable
-              testID="utility-events-button"
-              accessibilityRole="button"
-              style={themed($item)}
-              onPress={() => choose(() => openEvents(nearbyOnly))}
-            >
-              <Text
-                tx="events:title"
-                weight="medium"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            </Pressable>
-          ) : null}
-          {testsNearby ? (
-            <Pressable
-              testID="utility-nearby-only-button"
-              accessibilityRole="switch"
-              accessibilityState={{ checked: nearbyOnly }}
-              style={themed($item)}
-              onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
-            >
-              <Text
-                tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
-                weight="medium"
-                numberOfLines={1}
-                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-              />
-            </Pressable>
-          ) : null}
-          <Pressable
-            testID="utility-account-button"
-            accessibilityRole="button"
-            style={themed($item)}
-            onPress={() => choose(onAccount)}
-          >
-            <Text
-              tx={`common:appMenu.${accountEntry}`}
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
-          </Pressable>
-          <Pressable
-            testID="utility-support-button"
-            accessibilityRole="button"
-            style={themed($item)}
-            onPress={() => choose(onSupport)}
-          >
-            <Text
-              tx="common:appMenu.support"
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
-          </Pressable>
-          <Pressable
-            testID="utility-settings-button"
-            accessibilityRole="button"
-            accessibilityLabel={translate(
-              updateReady ? "common:appMenu.settingsUpdateReady" : "common:appMenu.settings",
-            )}
-            style={themed([$item, $settingsItem])}
-            onPress={() => choose(onSettings)}
-          >
-            <Text
-              tx="common:appMenu.settings"
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
-            />
-            {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
-          </Pressable>
+          {items}
         </Animated.View>
       </Animated.View>
     </Animated.View>
+  )
+}
+
+function Item({
+  testID,
+  tx,
+  onPress,
+}: {
+  testID: string
+  tx: ComponentProps<typeof Text>["tx"]
+  onPress: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <Pressable testID={testID} accessibilityRole="button" style={themed($item)} onPress={onPress}>
+      <Text tx={tx} weight="medium" numberOfLines={1} maxFontSizeMultiplier={MENU_MAX_FONT_SCALE} />
+    </Pressable>
   )
 }
 
@@ -318,6 +343,22 @@ const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
   overflow: "hidden",
   borderWidth: 1,
   borderColor: colors.separator,
+  backgroundColor: colors.surface,
+})
+const $boardTrigger: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  overflow: "hidden",
+  borderWidth: 1,
+  borderColor: colors.separator,
+  backgroundColor: colors.surface,
+})
+const $boardSheet: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  padding: 0,
+  gap: 0,
+  borderRadius: 16,
+  overflow: "hidden",
   backgroundColor: colors.surface,
 })
 const $topRight: ViewStyle = { right: 0, top: 0 }

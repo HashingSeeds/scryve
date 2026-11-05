@@ -123,6 +123,43 @@ describe("AppUtilityMenu", () => {
     expect(onSupport).toHaveBeenCalledTimes(1)
   })
 
+  it("opens the board's list as a centered sheet, where Rules leaves the board as it was", () => {
+    const order: string[] = []
+    const onChoose = jest.fn(() => order.push("choose"))
+    const onRules = jest.fn()
+    const onSettings = jest.fn(() => order.push("settings"))
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          placement="board"
+          onRules={onRules}
+          onSettings={onSettings}
+          onSupport={jest.fn()}
+          onAccount={jest.fn()}
+          onChoose={onChoose}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("utility-menu-dots")).toBeTruthy()
+    expect(view.queryByTestId("utility-menu")).toBeNull()
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-layout").props.style)).toMatchObject({
+      alignItems: "center",
+      justifyContent: "center",
+    })
+    expect(view.queryByTestId("utility-history-button")).toBeNull()
+
+    fireEvent.press(view.getByTestId("utility-rules-button"))
+    expect(onRules).toHaveBeenCalledTimes(1)
+    expect(onChoose).not.toHaveBeenCalled()
+    expect(view.queryByTestId("utility-menu")).toBeNull()
+
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    fireEvent.press(view.getByTestId("utility-settings-button"))
+    expect(order).toEqual(["choose", "settings"])
+  })
+
   it("supports the compact bottom-left version, hiding actions until opened", () => {
     const view = render(
       <ThemeProvider initialContext="dark">

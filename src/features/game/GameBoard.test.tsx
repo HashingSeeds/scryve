@@ -42,55 +42,67 @@ function renderBoard(options: Parameters<typeof Board>[0] = {}) {
 const openMenu = () => fireEvent.press(screen.getByTestId("game-menu-button"))
 
 describe("GameBoard chrome", () => {
-  it("puts the system's rules in the menu and moves Decks to the app navigation", () => {
+  const appDestinations = {
+    onHistory: jest.fn(),
+    onSettings: jest.fn(),
+    onSupport: jest.fn(),
+    onAccount: jest.fn(),
+  }
+  const openMore = () => {
+    openMenu()
+    fireEvent.press(screen.getByTestId("utility-menu-button"))
+  }
+
+  it("puts History in the fan and the system's rules beside Decks under the more button", () => {
     const onRules = jest.fn()
     const onDecks = jest.fn()
-    renderBoard({
-      system: "mtg",
-      onRules,
-      onDecks,
-      onHistory: jest.fn(),
-      onSettings: jest.fn(),
-      onSupport: jest.fn(),
-      onAccount: jest.fn(),
-    })
+    const onHistory = jest.fn()
+    renderBoard({ system: "mtg", onRules, onDecks, ...appDestinations, onHistory })
 
     expect(prefetchRules).toHaveBeenCalledTimes(1)
     openMenu()
-    expect(screen.queryByTestId("decks-button")).toBeNull()
-    fireEvent.press(screen.getByTestId("rules-button"))
+    expect(screen.queryByTestId("rules-button")).toBeNull()
+    fireEvent.press(screen.getByTestId("history-button"))
+    expect(onHistory).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId("game-menu-backdrop")).toBeNull()
+
+    openMore()
+    expect(screen.queryByTestId("utility-history-button")).toBeNull()
+    fireEvent.press(screen.getByTestId("utility-rules-button"))
     expect(onRules).toHaveBeenCalledWith("mtg")
     expect(screen.queryByTestId("game-menu-backdrop")).toBeNull()
 
-    openMenu()
-    fireEvent.press(screen.getByTestId("utility-menu-button"))
+    openMore()
     fireEvent.press(screen.getByTestId("utility-decks-button"))
     expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
-  it("finishes an attack before an app destination leaves the board", () => {
-    const dispatch = jest.fn()
-    const onHistory = jest.fn(() => expect(dispatch).toHaveBeenCalledWith({ type: "send" }))
-    renderBoard({
-      attack: { dispatch, inspectedPlayerId: null },
-      onHistory,
-      onSettings: jest.fn(),
-      onSupport: jest.fn(),
-      onAccount: jest.fn(),
-    })
-    openMenu()
-    fireEvent.press(screen.getByTestId("utility-menu-button"))
-    fireEvent.press(screen.getByTestId("utility-history-button"))
-    expect(onHistory).toHaveBeenCalledTimes(1)
+  it("leaves Rules out of the more button when the game has no rules", () => {
+    renderBoard({ onDecks: jest.fn(), ...appDestinations })
+    openMore()
+    expect(screen.queryByTestId("utility-rules-button")).toBeNull()
+    expect(screen.getByTestId("utility-decks-button")).toBeTruthy()
   })
 
-  it("gives Decks the rules petal when the game has no rules", () => {
-    const onDecks = jest.fn()
-    renderBoard({ onDecks })
+  it("finishes an attack before History or an app destination leaves the board", () => {
+    const dispatch = jest.fn()
+    const sent = () => expect(dispatch).toHaveBeenCalledWith({ type: "send" })
+    const onHistory = jest.fn(sent)
+    const onSettings = jest.fn(sent)
+    renderBoard({
+      attack: { dispatch, inspectedPlayerId: null },
+      ...appDestinations,
+      onHistory,
+      onSettings,
+    })
     openMenu()
-    expect(screen.queryByTestId("rules-button")).toBeNull()
-    fireEvent.press(screen.getByTestId("decks-button"))
-    expect(onDecks).toHaveBeenCalledTimes(1)
+    fireEvent.press(screen.getByTestId("history-button"))
+    expect(onHistory).toHaveBeenCalledTimes(1)
+
+    dispatch.mockClear()
+    openMore()
+    fireEvent.press(screen.getByTestId("utility-settings-button"))
+    expect(onSettings).toHaveBeenCalledTimes(1)
   })
 
   it("pauses an attack under the menu, finishes it when a petal takes over the board, and exits an inspected commander", () => {
@@ -98,12 +110,13 @@ describe("GameBoard chrome", () => {
     const view = renderBoard({
       system: "mtg",
       onRules: jest.fn(),
+      ...appDestinations,
       attack: { dispatch, inspectedPlayerId: null },
     })
     openMenu()
     openMenu()
-    openMenu()
-    fireEvent.press(screen.getByTestId("rules-button"))
+    openMore()
+    fireEvent.press(screen.getByTestId("utility-rules-button"))
     expect(dispatch).not.toHaveBeenCalled()
     openMenu()
     fireEvent.press(screen.getByTestId("players-button"))

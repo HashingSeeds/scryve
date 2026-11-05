@@ -1,4 +1,4 @@
-import { type ComponentProps, memo, useEffect, useState } from "react"
+import { type ComponentProps, memo, type ReactNode, useEffect, useState } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
@@ -97,6 +97,7 @@ export interface GameRadialMenuProps {
   exitAction?: GameMenuExitAction
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
+  more?: ReactNode
 }
 
 export interface GameMenuExitAction {
@@ -153,6 +154,9 @@ const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"
 const STATUS_LINE_DISTANCE = 128
 const STATUS_LINE_HEIGHT = 40
 const STATUS_LINE_REACH = STATUS_LINE_DISTANCE + STATUS_LINE_HEIGHT
+// why: past the farthest pill tip (about 170 from the pentagon) and the status line, yet inside the cluster box, where Android still delivers touches.
+const MORE_DISTANCE = STATUS_LINE_REACH + 12
+const MORE_HEIGHT = 44
 const APP_NAVIGATION_CLEARANCE = 96
 const ANCHOR_LOW_ON_SCREEN = 0.6
 
@@ -181,7 +185,7 @@ const PENTAGON_SPIN_SPRING = {
 } as const
 
 const BASE_ACTION_POSE = { x: -30, y: -86, rotationDeg: 22 } as const
-const CENTER_ACTION_SIDE_STEPS = [-1, 0, 1, -2, 2] as const
+const CENTER_ACTION_SIDE_STEPS = [-1, 0, 1, 2, -2] as const
 
 function rotateBasePoseToSide(stepsFromTopSide: number): RadialActionPose {
   const angleDeg = stepsFromTopSide * (360 / PENTAGON_SIDES)
@@ -283,6 +287,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   exitAction,
   signal,
   statusLine,
+  more,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
   const menuOpen = open && !exitAction
@@ -323,6 +328,14 @@ export const GameRadialMenu = memo(function GameRadialMenu({
           above={anchor.y > ANCHOR_LOW_ON_SCREEN}
           atAnchorStyle={[themed($statusLineInset), { top: `${anchor.y * 100}%` }]}
         />
+      ) : null}
+      {menuOpen && more && !bag ? (
+        <GameMenuMoreRow
+          above={anchor.y > ANCHOR_LOW_ON_SCREEN}
+          atAnchorStyle={[themed($statusLineInset), { top: `${anchor.y * 100}%` }]}
+        >
+          {more}
+        </GameMenuMoreRow>
       ) : null}
     </View>
   )
@@ -366,6 +379,32 @@ function GameMenuStatusRow({
         <Text text={statusLine.text} weight="medium" size="xs" style={themed($statusText)} />
         <Text text="›" size="xs" style={themed($statusText)} />
       </BoardPressable>
+    </View>
+  )
+}
+
+function GameMenuMoreRow({
+  above,
+  atAnchorStyle,
+  children,
+}: {
+  above: boolean
+  atAnchorStyle: StyleProp<ViewStyle>
+  children: ReactNode
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <View
+      testID="game-menu-more"
+      pointerEvents="box-none"
+      style={[
+        themed($statusLineRow),
+        $moreRow,
+        atAnchorStyle,
+        { marginTop: above ? -MORE_DISTANCE - MORE_HEIGHT : MORE_DISTANCE },
+      ]}
+    >
+      {children}
     </View>
   )
 }
@@ -450,6 +489,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle,
   actions,
   statusLine,
+  more,
   ...anchorProps
 }: Omit<GameMenuAnchorProps, "anchorStyle" | "bag"> & {
   holderAnchor: { x: number; y: number }
@@ -457,11 +497,16 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle: number
   actions: GameMenuActions
   statusLine?: GameMenuStatusLine
+  more?: ReactNode
 }) {
   const menuOpen = anchorProps.open && !anchorProps.exitAction
+  const bag = openToolBag(actions)
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
   const facing = useSharedValue(facingAngle)
+  const rowsAbove =
+    holderAnchor.y > ANCHOR_LOW_ON_SCREEN ||
+    (1 - holderAnchor.y) * holderHeight < STATUS_LINE_REACH + APP_NAVIGATION_CLEARANCE
 
   useEffect(() => {
     const target = nearestEquivalentAngle(facing.value, facingAngle)
@@ -485,16 +530,18 @@ export const GameMenuCluster = memo(function GameMenuCluster({
         actions={actions}
         poseTurnMs={FACING_TURN_MS}
       />
-      <GameMenuAnchor {...anchorProps} bag={openToolBag(actions)} anchorStyle={$clusterCenter} />
+      <GameMenuAnchor {...anchorProps} bag={bag} anchorStyle={$clusterCenter} />
       {menuOpen && statusLine ? (
         <GameMenuStatusRow
           statusLine={statusLine}
-          above={
-            holderAnchor.y > ANCHOR_LOW_ON_SCREEN ||
-            (1 - holderAnchor.y) * holderHeight < STATUS_LINE_REACH + APP_NAVIGATION_CLEARANCE
-          }
+          above={rowsAbove}
           atAnchorStyle={$clusterStatusRow}
         />
+      ) : null}
+      {menuOpen && more && !bag ? (
+        <GameMenuMoreRow above={rowsAbove} atAnchorStyle={$clusterStatusRow}>
+          {more}
+        </GameMenuMoreRow>
       ) : null}
     </Animated.View>
   )
@@ -1320,6 +1367,7 @@ const $statusLineRow: ThemedStyle<ViewStyle> = () => ({
   height: STATUS_LINE_HEIGHT,
   alignItems: "center",
 })
+const $moreRow: ViewStyle = { height: MORE_HEIGHT }
 const $statusLineInset: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   left: spacing.lg,
   right: spacing.lg,

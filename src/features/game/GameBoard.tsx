@@ -3,10 +3,9 @@ import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { ScrollView } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
-import type { AccountEntry } from "@/components/AppUtilityMenu"
+import { type AccountEntry, AppUtilityMenu } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { $dialogText, DialogCard, type DialogOrigin } from "@/components/DialogCard"
-import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import type {
   GameMenuActions,
   GameMenuSignal,
@@ -119,7 +118,7 @@ export function useBoardChrome({
     "rules",
     () => rules && openRules(rules, () => system && onRules?.(system)),
   )
-  const showDecks = stable("decks", () => onDecks?.())
+  const showHistory = stable("history", () => onHistory?.())
   const pickedDiceTool = stable("diceTool", () => {
     setMenuOpen(false)
     finishAttack()
@@ -129,7 +128,7 @@ export function useBoardChrome({
     () => closingMenu(dice.tools, pickedDiceTool),
     [dice.tools, pickedDiceTool],
   )
-  const decksEnabled = Boolean(onDecks)
+  const historyEnabled = Boolean(onHistory)
   const actions: GameMenuActions = useMemo(
     () => [
       {
@@ -140,33 +139,29 @@ export function useBoardChrome({
       },
       { kind: "dice", label: translate("board:menu.dice"), tools: diceTools },
       { ...thirdPetal, onPress: fromMenu(pressThird) },
-      hasRules
-        ? {
-            kind: "rules",
-            label: translate("board:menu.rules"),
-            onPress: fromMenu(showRules, { keepsAttack: true }),
-          }
-        : {
-            kind: "decks",
-            label: translate("common:appNavigation.decks"),
-            disabled: !decksEnabled,
-            onPress: fromMenu(showDecks),
-          },
+      {
+        kind: "history",
+        label: translate("common:appMenu.history"),
+        disabled: !historyEnabled,
+        onPress: fromMenu(showHistory),
+      },
       { ...endPetal, onPress: fromMenu(pressEnd) },
     ],
     [
       canPickLayout,
-      decksEnabled,
       diceTools,
       endPetal,
       fromMenu,
-      hasRules,
+      historyEnabled,
       pressEnd,
       pressThird,
-      showDecks,
-      showRules,
+      showHistory,
       thirdPetal,
     ],
+  )
+  const rulesFromMenu = useMemo(
+    () => (hasRules ? fromMenu(showRules, { keepsAttack: true }) : undefined),
+    [fromMenu, hasRules, showRules],
   )
 
   const toggleMenu = useCallback(() => setMenuOpen((current) => !current), [])
@@ -217,11 +212,11 @@ export function useBoardChrome({
       onClose: closeMenu,
     },
     navigation:
-      menuOpen && onHistory && onSettings && onSupport && onAccount
+      menuOpen && onSettings && onSupport && onAccount
         ? {
             accountEntry,
-            onDecks: hasRules ? onDecks : undefined,
-            onHistory,
+            onDecks,
+            onRules: rulesFromMenu,
             onSettings,
             onSupport,
             onAccount,
@@ -236,10 +231,9 @@ function petal({ onPress: _onPress, ...shown }: BoardPetal) {
   return shown
 }
 
-export type GameBoardProps = Omit<
-  GameBoardStageProps,
-  "playerCount" | "layoutVariant" | "menu" | "windowOverlay"
-> & { chrome: BoardChrome }
+export type GameBoardProps = Omit<GameBoardStageProps, "playerCount" | "layoutVariant" | "menu"> & {
+  chrome: BoardChrome
+}
 
 export function GameBoard({ chrome, ...stage }: GameBoardProps) {
   const { navigation, layout } = chrome
@@ -249,8 +243,10 @@ export function GameBoard({ chrome, ...stage }: GameBoardProps) {
         {...stage}
         playerCount={chrome.playerCount}
         layoutVariant={layout.value}
-        menu={chrome.menu}
-        windowOverlay={navigation ? <FloatingAppNavigation {...navigation} /> : null}
+        menu={{
+          ...chrome.menu,
+          more: navigation ? <AppUtilityMenu placement="board" {...navigation} /> : undefined,
+        }}
       />
       <ResultLiveRegion testID="dice-announcer" message={chrome.dice.webMessage} />
       {chrome.layoutOpen ? (

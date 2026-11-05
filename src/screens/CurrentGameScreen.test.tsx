@@ -87,35 +87,6 @@ describe("CurrentGameScreen", () => {
     expect(awake.size).toBe(1)
   })
 
-  it.each(["commander", "standard"])("applies one navigation bottom inset in %s", (format) => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={createLocalGame({
-            players: [
-              { name: "Ada", color: "#41476E" },
-              { name: "Grace", color: "#39755C" },
-            ],
-            startingLife: 40,
-            system: "mtg",
-            format,
-            now: 1,
-          })}
-          repository={new LocalGameRepository(new MemoryStorage())}
-          onDecks={jest.fn()}
-          onHistory={jest.fn()}
-          onSettings={jest.fn()}
-          onSupport={jest.fn()}
-          onAccount={jest.fn()}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    const navigation = StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style)
-    expect((navigation.bottom ?? 0) + (navigation.marginBottom ?? 0)).toBe(34)
-  })
-
   it("keeps playing if haptics fail", () => {
     jest.mocked(Haptics.impactAsync).mockRejectedValueOnce(new Error("unavailable"))
     const repository = new LocalGameRepository(new MemoryStorage())
@@ -139,7 +110,7 @@ describe("CurrentGameScreen", () => {
     expect(Haptics.impactAsync).not.toHaveBeenCalled()
   })
 
-  it("keeps the radial geometry and reveals the new actions and corner navigation", () => {
+  it("keeps the radial geometry and reveals the new actions and the more button", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
@@ -166,7 +137,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
     expect(view.getByTestId("dice-bag")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
-    expect(view.getByTestId("decks-button")).toBeTruthy()
+    expect(view.getByTestId("history-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })

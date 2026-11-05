@@ -14,21 +14,17 @@ export type AppDestination = "decks" | "cards"
 
 export function FloatingAppNavigation({
   destination,
-  onDecks,
   onHistory,
   onSettings,
   onSupport,
   onAccount,
-  onChoose,
   accountEntry = "account",
 }: {
   destination?: { kind: AppDestination; onPress: () => void }
-  onDecks?: () => void
   onHistory: () => void
   onSettings: () => void
   onSupport: () => void
   onAccount: () => void
-  onChoose?: () => void
   accountEntry?: AccountEntry
 }) {
   const { themed, theme } = useAppTheme()
@@ -50,12 +46,10 @@ export function FloatingAppNavigation({
           compact
           placement="bottomLeft"
           accountEntry={accountEntry}
-          onDecks={onDecks}
           onHistory={onHistory}
           onSettings={onSettings}
           onSupport={onSupport}
           onAccount={onAccount}
-          onChoose={onChoose}
           onOpenHeightChange={setUtilityHeight}
         />
       </View>

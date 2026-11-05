@@ -40,7 +40,6 @@ export interface GameBoardStageProps {
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   firstPlayer?: FirstPlayerOffer
-  windowOverlay?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
   testID?: string
 }
@@ -58,7 +57,6 @@ function PinnedGameBoardStage({
   renderGrid,
   menu,
   firstPlayer,
-  windowOverlay,
   onBoardSizeChange,
   testID = "game-board",
 }: GameBoardStageProps) {
@@ -134,13 +132,13 @@ function PinnedGameBoardStage({
               exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
+              more={menu.more}
               onToggle={menu.onToggle}
             />
             {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
-      {windowOverlay}
     </View>
   )
 }
@@ -151,7 +149,6 @@ function LegacyGameBoardStage({
   renderGrid,
   menu,
   firstPlayer,
-  windowOverlay,
   onBoardSizeChange,
   testID = "game-board",
 }: GameBoardStageProps) {
@@ -193,7 +190,6 @@ function LegacyGameBoardStage({
         compact={playerCount > 2}
       />
       {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
-      {windowOverlay}
     </Animated.View>
   )
 }
