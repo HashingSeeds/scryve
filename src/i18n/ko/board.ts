@@ -233,6 +233,9 @@ export default {
     matchSaved: "매치를 저장했습니다",
     summary: "요약",
   },
+  abandonedToast: {
+    message: "게임을 중단했습니다",
+  },
   saveFailed: {
     title: "이 게임을 저장할 수 없습니다",
     message:

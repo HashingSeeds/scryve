@@ -14,11 +14,8 @@ appId: ${MAESTRO_APP_ID}
     commands:
       - tapOn:
           id: "setup-change-button"
-      - repeat:
-          times: ${PLAYER_COUNT - 2}
-          commands:
-            - tapOn:
-                id: "player-count-increment"
+      - tapOn:
+          id: "player-count-${PLAYER_COUNT}"
       - tapOn:
           id: "setup-options-done"
 - scrollUntilVisible:

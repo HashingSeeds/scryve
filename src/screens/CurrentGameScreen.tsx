@@ -31,7 +31,7 @@ import {
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import type { BoardSize } from "@/features/game/GameBoardStage"
 import { GameLogDialog } from "@/features/game/GameLogDialog"
-import { GameSavedToast } from "@/features/game/GameSavedToast"
+import { GameToast } from "@/features/game/GameToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
@@ -354,6 +354,31 @@ export function CurrentGameScreen({
           chrome={chrome}
           onBoardSizeChange={setBoardSize}
           firstPlayer={firstPlayer}
+          toast={
+            saved ? (
+              <GameToast
+                key={saved.gameId}
+                inline
+                message={saved.message}
+                actionTx="board:savedToast.summary"
+                testID="game-saved-toast"
+                actionTestID="game-saved-summary-button"
+                onAction={() => onViewSummary(saved.gameId)}
+                onDismiss={dismissSavedToast}
+              />
+            ) : runtime.abandoned ? (
+              <GameToast
+                key={runtime.abandoned.id}
+                inline
+                message={translate("board:abandonedToast.message")}
+                actionTx="common:undo"
+                testID="game-abandoned-toast"
+                actionTestID="game-abandoned-undo-button"
+                persistent
+                onAction={runtime.undoAbandon}
+              />
+            ) : null
+          }
           renderGrid={(boardOrientation) => (
             <PlayerGrid
               boardOrientation={boardOrientation}
@@ -579,15 +604,6 @@ export function CurrentGameScreen({
 
       {matchEnding ? (
         <LocalMatchEndDialog game={matchEnding} onClose={cancelEndMatch} onEnd={confirmEndMatch} />
-      ) : null}
-
-      {saved ? (
-        <GameSavedToast
-          key={saved.gameId}
-          message={saved.message}
-          onViewSummary={() => onViewSummary(saved.gameId)}
-          onDismiss={dismissSavedToast}
-        />
       ) : null}
     </Screen>
   )

@@ -110,13 +110,19 @@ export function LocalGameEndDialog({
         />
       </ScrollView>
       {error ? <AlertNote text={error} /> : null}
+      <Button
+        testID="abandon-game-button"
+        tx="board:endGame.abandon"
+        disabled={!onAbandon}
+        style={themed($wideAction)}
+        onPress={() => onAbandon && finish(onAbandon)}
+      />
       <View style={themed($dialogActions)}>
         <Button
-          testID="abandon-game-button"
-          tx="board:endGame.abandon"
-          disabled={!onAbandon}
+          testID="cancel-end-game-button"
+          tx="common:cancel"
           style={themed($dialogAction)}
-          onPress={() => onAbandon && finish(onAbandon)}
+          onPress={onClose}
         />
         <Button
           testID="confirm-end-game-button"
@@ -138,8 +144,8 @@ export function LocalGameEndDialog({
 const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  flex: 1,
+const $wideAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   minHeight: 48,
   borderRadius: radius.xl,
 })
+const $dialogAction: ThemedStyle<ViewStyle> = (theme) => ({ ...$wideAction(theme), flex: 1 })

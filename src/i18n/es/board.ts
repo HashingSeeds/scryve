@@ -241,6 +241,9 @@ export default {
     matchSaved: "Encuentro guardado",
     summary: "Resumen",
   },
+  abandonedToast: {
+    message: "Partida anulada",
+  },
   saveFailed: {
     title: "No se puede guardar esta partida",
     message:

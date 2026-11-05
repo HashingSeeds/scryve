@@ -79,6 +79,10 @@ const common = {
     increase: "Increase {{label}} by {{step}}",
     longPressHint: "Long press to change it by {{step}}.",
   },
+  optionGrid: {
+    // Screen reader label for the pencil button after a row of number choices; it opens a field to type a different number.
+    other: "Other value",
+  },
 }
 
 export default common

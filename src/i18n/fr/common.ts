@@ -80,4 +80,7 @@ export default {
     increase: "Augmenter {{label}} de {{step}}",
     longPressHint: "Appui long pour le modifier de {{step}}.",
   },
+  optionGrid: {
+    other: "Autre valeur",
+  },
 } satisfies LocaleNamespace

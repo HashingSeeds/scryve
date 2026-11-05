@@ -14,6 +14,7 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { Header, HeaderBack } from "@/components/Header"
+import { OptionGrid } from "@/components/OptionGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -64,6 +65,7 @@ import {
   counterHeading,
   counterValueLabel,
   defaultStartingLife,
+  lifePresets,
   NO_PLAY_SYSTEM,
   playSystemFormat,
   playSystemRules,
@@ -322,7 +324,7 @@ function NewGameForm({
   const [lifeStep, setLifeStep] = useState(
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
-  const counter = playSystemRules(system).counter
+  const lifeOptions = lifePresets(system, format)
   const claimedGame = replaying ? undefined : initialGame
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
     claimedGame && (claimedGame.account || hasLocalGameStarted(claimedGame))
@@ -1269,34 +1271,26 @@ function NewGameForm({
         testID="setup-options-dialog"
       >
         <ScrollView style={$sheetScroll} contentContainerStyle={themed($statusDetails)}>
-          <View style={themed($valueGrid)}>
-            <View style={themed($playerValue)}>
-              <ValueField
-                testID="player-count"
-                label={
-                  connectedMode
-                    ? translate("play:newGame.seats")
-                    : translate("play:newGame.players")
-                }
-                value={playerCount}
-                min={treachery ? TREACHERY_MIN_SEATS : PLAYER_COUNTS[0]}
-                max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
-                onChange={choosePlayerCount}
-              />
-            </View>
-            <View style={themed($counterValue)}>
-              <ValueField
-                testID="starting-counter"
-                label={counterHeading(system)}
-                value={startingLife}
-                min={startingValueRange(system).min}
-                max={counter.maxStartingValue}
-                longStep={counter.longPressStep}
-                step={lifeStep}
-                onChange={setStartingLife}
-              />
-            </View>
-          </View>
+          <OptionGrid
+            testID="player-count"
+            label={
+              connectedMode ? translate("play:newGame.seats") : translate("play:newGame.players")
+            }
+            options={PLAYER_COUNTS}
+            value={playerCount}
+            isDisabled={treachery ? (count) => !isTreacheryPlayerCount(count) : undefined}
+            onSelect={choosePlayerCount}
+          />
+          {lifeOptions.length > 0 ? (
+            <OptionGrid
+              testID="starting-counter"
+              label={counterHeading(system)}
+              options={lifeOptions}
+              value={startingLife}
+              custom={startingValueRange(system)}
+              onSelect={setStartingLife}
+            />
+          ) : null}
 
           {!connectedMode && !localGame ? (
             <View style={themed($section)}>
@@ -1623,12 +1617,6 @@ const $changeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 40,
   paddingVertical: spacing.xxs,
 })
-const $valueGrid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.xs,
-})
-const $playerValue: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $counterValue: ThemedStyle<ViewStyle> = () => ({ flex: 1.45 })
 const $nameList: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",

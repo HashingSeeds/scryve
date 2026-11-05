@@ -78,10 +78,10 @@ it("keeps the draft through session loading, sign-in, query recovery, and reconn
   const view = render(route(false, false))
   fireEvent.changeText(view.getByTestId("player-name-1"), "Draft player")
   fireEvent.press(view.getByTestId("setup-change-button"))
-  fireEvent.press(view.getByTestId("starting-counter-increment"))
+  fireEvent.press(view.getByTestId("starting-counter-50"))
   fireEvent.press(view.getByTestId("setup-options-done"))
   fireEvent.press(view.getByTestId("mode-connected"))
-  expect(view.getByText(/ 41 life/)).toBeTruthy()
+  expect(view.getByText(/ 50 life/)).toBeTruthy()
   expect(view.getByTestId("host-connected-button")).toBeDisabled()
   expect(mockOpenAuth).not.toHaveBeenCalled()
   mockConnectedHarness.userLoaded = true
@@ -92,7 +92,7 @@ it("keeps the draft through session loading, sign-in, query recovery, and reconn
   fireEvent.press(view.getByTestId("join-with-code-button"))
   expect(mockOpenAuth).toHaveBeenCalledTimes(1)
   expect(router.push).toHaveBeenCalledWith("/connected/join")
-  expect(view.getByText(/ 41 life/)).toBeTruthy()
+  expect(view.getByText(/ 50 life/)).toBeTruthy()
   mockConnectedHarness.userId = "user-a"
   mockConnectedHarness.convexLoading = false
   mockConnectedHarness.convexAuthenticated = true
@@ -107,7 +107,7 @@ it("keeps the draft through session loading, sign-in, query recovery, and reconn
   try {
     mockConnectedHarness.paginatedError = new Error("Temporary query failure")
     view.rerender(route(true, true))
-    expect(view.getByText(/ 41 life/)).toBeTruthy()
+    expect(view.getByText(/ 50 life/)).toBeTruthy()
     expect(view.getByTestId("host-connected-button")).toBeDisabled()
     mockConnectedHarness.paginatedError = undefined
     fireEvent.press(view.getByTestId("setup-status"))
@@ -130,7 +130,7 @@ it("keeps the draft through session loading, sign-in, query recovery, and reconn
   await waitFor(() => expect(view.getByTestId("host-connected-button")).toBeEnabled())
   fireEvent.press(view.getByTestId("host-connected-button"))
   await waitFor(() =>
-    expect(mockCreateLobby).toHaveBeenCalledWith(expect.objectContaining({ startingLife: 41 })),
+    expect(mockCreateLobby).toHaveBeenCalledWith(expect.objectContaining({ startingLife: 50 })),
   )
 })
 
@@ -138,7 +138,7 @@ it("requests a missing username on action without discarding setup", async () =>
   mockUsername = null
   const view = render(route(true, true))
   fireEvent.press(view.getByTestId("setup-change-button"))
-  fireEvent.press(view.getByTestId("starting-counter-increment"))
+  fireEvent.press(view.getByTestId("starting-counter-50"))
   fireEvent.press(view.getByTestId("setup-options-done"))
   fireEvent.press(view.getByTestId("mode-connected"))
   expect(view.queryByText("Choose your player username")).toBeNull()
@@ -147,7 +147,7 @@ it("requests a missing username on action without discarding setup", async () =>
   expect(mockCreateLobby).not.toHaveBeenCalled()
   fireEvent.press(view.getByText("Back to local play"))
   expect(view.queryByText("Choose your player username")).toBeNull()
-  expect(view.getByText(/ 41 life/)).toBeTruthy()
+  expect(view.getByText(/ 50 life/)).toBeTruthy()
   mockUsername = "alex"
   view.rerender(route(true, true))
   await waitFor(() => expect(view.getByTestId("host-connected-button")).toBeEnabled())

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -75,6 +75,8 @@ export default function NewLocalGameRoute() {
     return remembered === "none" ? undefined : (remembered ?? 0)
   })
   const [initialGame] = useState(activeGame ?? undefined)
+  // why: setup's Abandon starts the next game itself, and that board keeps the Undo offer.
+  const abandonedHere = useRef(false)
   useFocusEffect(
     useCallback(() => {
       setActiveGame(localGameRepository.loadActiveGame())
@@ -109,7 +111,7 @@ export default function NewLocalGameRoute() {
         defaultCommandContext(localGameRepository.getDeviceId()),
       )
       localGameRepository.archiveGame(ended, "new_game_prompt", ownerId)
-    } else localGameRepository.discardActiveGame("new_game_prompt")
+    } else localGameRepository.discardActiveGame("new_game_prompt", { undoable: true })
     setActiveGame(null)
   }
 
@@ -136,7 +138,10 @@ export default function NewLocalGameRoute() {
         account={ownerId ? { ownerId, defaultMeSeat, decks } : undefined}
         onResumeLocal={() => goBack("/game/current")}
         onEndLocal={endLocal}
-        onAbandonLocal={() => endLocal()}
+        onAbandonLocal={() => {
+          endLocal()
+          abandonedHere.current = true
+        }}
         // why: Play opens plain /game/new before its stored-game state catches up, so a running game's edits must persist on every entry.
         onSavePlayers={
           blocking
@@ -149,7 +154,9 @@ export default function NewLocalGameRoute() {
         onModeChange={setMode}
         onBack={() => goBack({ pathname: "/", params: { destination: "play" } })}
         onStartLocal={(players, startingLife, setup) => {
-          if (!startLocalGame({ players, startingLife, ...setup }))
+          const replacesAbandoned = abandonedHere.current
+          abandonedHere.current = false
+          if (!startLocalGame({ players, startingLife, ...setup }, { replacesAbandoned }))
             setActiveGame(localGameRepository.loadActiveGame())
         }}
         connected={connected}

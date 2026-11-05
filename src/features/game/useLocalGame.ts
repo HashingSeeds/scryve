@@ -242,11 +242,29 @@ export function useLocalGame(
 
   const restartMatchGameBoard = useCallback(
     (endSource: GameEndSource = "game_menu") => {
-      repository.reportAbandoned(gameRef.current, endSource)
+      repository.rememberAbandoned(gameRef.current, endSource)
       return replaceBoard(restartMatchGame(gameRef.current))
     },
     [replaceBoard, repository],
   )
+
+  const [abandoned, setAbandoned] = useState<LocalGame>()
+  // why: setup starts the next game under this board without remounting it, so the offer is read whenever the board's game changes, and a start that ended it takes the toast away.
+  useEffect(() => {
+    const held = repository.recentlyAbandoned()
+    setAbandoned(held && held.id !== game.id ? held : undefined)
+  }, [game.id, repository])
+  const boardTouched = game.firstPlayerOffered === true || hasLocalGameStarted(game)
+  useEffect(() => {
+    if (!abandoned || !boardTouched) return
+    setAbandoned(undefined)
+    repository.forgetAbandoned()
+  }, [abandoned, boardTouched, repository])
+  const undoAbandon = useCallback(() => {
+    const held = repository.takeBackAbandoned()
+    setAbandoned(undefined)
+    if (held) replaceBoard(held.game)
+  }, [replaceBoard, repository])
 
   const endMatch = useCallback(
     (matchId: string, outcomes: MatchSeatOutcome[]) => {
@@ -306,9 +324,11 @@ export function useLocalGame(
     },
     holdMatchEnd: (matchId: string) => repository.savePendingMatchEnd(matchId),
     discard: (endSource: GameEndSource = "game_menu") => {
-      repository.discardActiveGame(endSource)
+      repository.discardActiveGame(endSource, { undoable: true })
       return gameRef.current
     },
+    abandoned: boardTouched ? undefined : abandoned,
+    undoAbandon,
   }
 }
 

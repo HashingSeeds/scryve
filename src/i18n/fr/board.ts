@@ -241,6 +241,9 @@ export default {
     matchSaved: "Match enregistré",
     summary: "Résumé",
   },
+  abandonedToast: {
+    message: "Partie terminée sans résultat",
+  },
   saveFailed: {
     title: "Impossible d'enregistrer cette partie",
     message:

@@ -5,25 +5,34 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
-import { translate } from "@/i18n/translate"
+import type { TxKeyPath } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 const VISIBLE_MS = 6_000
 
-export function GameSavedToast({
-  message = translate("board:savedToast.gameSaved"),
-  onViewSummary,
+/** why: `inline` drops the toast's own top-of-screen placement, for a parent that places it, as the game board does. A `persistent` toast stays until its owner removes it. */
+export function GameToast({
+  message,
+  actionTx,
+  testID,
+  actionTestID,
+  inline = false,
+  onAction,
   onDismiss,
 }: {
-  message?: string
-  onViewSummary: () => void
-  onDismiss: () => void
-}) {
+  message: string
+  actionTx: TxKeyPath
+  testID: string
+  actionTestID: string
+  inline?: boolean
+  onAction: () => void
+} & ({ persistent?: false; onDismiss: () => void } | { persistent: true; onDismiss?: never })) {
   const { themed, theme } = useAppTheme()
   const insets = useSafeAreaInsets()
   useEffect(() => {
     if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message)
+    if (!onDismiss) return
     let active = true
     let timeout: ReturnType<typeof setTimeout> | undefined
     const schedule = (ms: number) => {
@@ -41,21 +50,25 @@ export function GameSavedToast({
     }
   }, [message, onDismiss])
 
+  const toast = (
+    <View testID={testID} accessibilityLiveRegion="polite" style={themed($toast)}>
+      <Text size="xs" weight="medium" text={message} style={themed($message)} />
+      <Button
+        testID={actionTestID}
+        tx={actionTx}
+        style={themed($action)}
+        textStyle={themed($actionText)}
+        onPress={() => {
+          onDismiss?.()
+          onAction()
+        }}
+      />
+    </View>
+  )
+  if (inline) return toast
   return (
     <View pointerEvents="box-none" style={[themed($layer), { top: insets.top + theme.spacing.md }]}>
-      <View testID="game-saved-toast" accessibilityLiveRegion="polite" style={themed($toast)}>
-        <Text size="xs" weight="medium" text={message} style={themed($message)} />
-        <Button
-          testID="game-saved-summary-button"
-          tx="board:savedToast.summary"
-          style={themed($action)}
-          textStyle={themed($actionText)}
-          onPress={() => {
-            onDismiss()
-            onViewSummary()
-          }}
-        />
-      </View>
+      {toast}
     </View>
   )
 }

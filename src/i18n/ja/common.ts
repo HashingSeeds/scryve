@@ -80,4 +80,7 @@ export default {
     increase: "{{label}}を{{step}}増やす",
     longPressHint: "長押しで{{step}}ずつ変更できます。",
   },
+  optionGrid: {
+    other: "その他の値",
+  },
 } satisfies LocaleNamespace
