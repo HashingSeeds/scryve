@@ -559,8 +559,15 @@ describe("LifeCard", () => {
       expect(view.getByTestId("commander-flood-seat-2")).toBeTruthy()
       // why: the strip stays over the draining shadow instead of dropping under it.
       expect(view.getByTestId("commander-strip-seat-2")).toHaveProp("pointerEvents", "none")
+      // why: the damage ring drains off with the shadow, as it came in, but takes no taps.
+      expect(
+        view.getByTestId("commander-card-mode-seat-2", { includeHiddenElements: true }),
+      ).toHaveProp("pointerEvents", "none")
       act(() => jest.advanceTimersByTime(TAKEOVER_MS))
       expect(view.queryByTestId("commander-takeover-seat-2")).toBeNull()
+      expect(
+        view.queryByTestId("commander-card-mode-seat-2", { includeHiddenElements: true }),
+      ).toBeNull()
       expect(view.getByTestId("commander-strip-seat-2")).toHaveProp("pointerEvents", "auto")
     } finally {
       timing.mockRestore()
@@ -1083,6 +1090,10 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("3")
     expect(view.queryByText("Done")).toBeNull()
     expect(view.getByTestId("commander-exit-x-seat-1")).toBeTruthy()
+    // why: the mark and name stay to fade under the X, but take no taps.
+    expect(
+      view.getByTestId("life-corner-layer-seat-1", { includeHiddenElements: true }),
+    ).toHaveProp("pointerEvents", "none")
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
     fireEvent.press(view.getByTestId("commander-power-down-seat-1"))
     expect(onPowerStep.mock.calls).toEqual([
