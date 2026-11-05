@@ -55,15 +55,30 @@ jobs:
       - name: Set up EAS CLI
         uses: ./.github/actions/setup-eas-cli
 
+      # why: its own key, because checks.yml exports with other env. Expo SDK 58 keys each
+      # transformed module by the EXPO_PUBLIC_* values it inlines, so an EAS env change re-transforms
+      # only those modules. Those values ship in the public bundle anyway, and other env is never
+      # inlined, so PR runs that can read this cache see nothing secret.
+      - name: Restore Metro cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/metro-cache
+          key: metro-beta-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'babel.config.js', 'metro.config.js', 'app.json', 'app.config.ts') }}
+
+      # why: `eas update --environment` always passes --clear to the export. Run its export (eas-cli
+      # 24.12.1 buildBundlesAsync, same env and args except --clear) and publish with --skip-bundler.
       - name: Publish to beta
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           APP_VARIANT: production
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          TMPDIR: ${{ runner.temp }}
         run: |
           RELEASE_NOTES="$(node scripts/release-train.cjs notes)"
           export RELEASE_NOTES
-          eas update --channel beta --environment production --non-interactive \
+          eas env:exec production --non-interactive \
+            'EXPO_NO_DOTENV=1 pnpm exec expo export --output-dir dist --dump-sourcemap --dump-assetmap --platform ios --platform android'
+          eas update --skip-bundler --channel beta --environment production --non-interactive \
             --message "$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)"
 
       # why: `eas update` leaves the Hermes bundles and source maps in dist/. Sentry matches them to
