@@ -1,0 +1,211 @@
+name: dev client
+
+# why: agents install dev clients instead of building them. When main changes the `development`
+# fingerprint, this builds the iOS simulator app and the Android debug APK the way
+# `pnpm ios:development:sim` and `pnpm android:development` do, and stores each in R2 at
+# scryve-dev-builds/development/<platform>/<fingerprint>/ as the artifact plus a build.json with
+# the fields `builds` (dotfiles) records. Merges that keep both fingerprints only run `plan`.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# why: one run at a time, and a burst of merges leaves only the newest waiting. That run plans
+# after the previous one uploaded, so it skips a fingerprint that already landed.
+concurrency:
+  group: dev-client
+  cancel-in-progress: false
+
+env:
+  BUCKET: scryve-dev-builds
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_BUILDS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BUILDS_SECRET_ACCESS_KEY }}
+  AWS_ENDPOINT_URL: https://2d3a76be968d967ce236dde4cfeb74d6.r2.cloudflarestorage.com
+  AWS_DEFAULT_REGION: auto
+  # why: R2 rejects the CRC checksums newer AWS CLI versions send by default.
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+
+jobs:
+  plan:
+    # why: the R2 keys and EXPO_TOKEN live in this main-only environment.
+    environment: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      builds: ${{ steps.plan.outputs.builds }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Find fingerprints missing from R2
+        id: plan
+        run: |
+          set -euo pipefail
+          : "${AWS_ACCESS_KEY_ID:?set R2_BUILDS_ACCESS_KEY_ID in the release environment}"
+          : "${AWS_SECRET_ACCESS_KEY:?set R2_BUILDS_SECRET_ACCESS_KEY in the release environment}"
+          builds='[]'
+          for platform in ios android; do
+            fingerprint=$(scripts/ci/dev-client-fingerprint.sh "$platform")
+            key="development/$platform/$fingerprint/build.json"
+            if aws s3api head-object --bucket "$BUCKET" --key "$key" > /dev/null 2> "$RUNNER_TEMP/head.err"; then
+              echo "$platform $fingerprint: in R2"
+              continue
+            fi
+            grep -q '(404)' "$RUNNER_TEMP/head.err" || { cat "$RUNNER_TEMP/head.err" >&2; exit 1; }
+            echo "$platform $fingerprint: missing, building"
+            builds=$(jq -c --arg platform "$platform" --arg fingerprint "$fingerprint" '. + [{
+              platform: $platform,
+              fingerprint: $fingerprint
+            } + {
+              ios: { runner: "macos-26", target: "ios:development:sim", artifact: "ios-sim.tar.gz" },
+              android: { runner: "ubuntu-latest", target: "android:development", artifact: "android-dev.apk" }
+            }[$platform]]' <<< "$builds")
+          done
+          echo "builds=$builds" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.builds != '[]'
+    name: build (${{ matrix.platform }})
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      FINGERPRINT: ${{ matrix.fingerprint }}
+      ARTIFACT: build/${{ matrix.artifact }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up EAS CLI
+        uses: ./.github/actions/setup-eas-cli
+
+      # why: the plan ran on Linux; a macOS fingerprint that differs would file the build under
+      # a hash `builds` never asks for.
+      - name: Check the fingerprint matches the plan
+        run: |
+          actual=$(scripts/ci/dev-client-fingerprint.sh "$PLATFORM")
+          [ "$actual" = "$FINGERPRINT" ] || { echo "::error::$PLATFORM fingerprint is $actual here, $FINGERPRINT in plan"; exit 1; }
+
+      - name: Set up Java
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # why: Gradle and two ABIs of C++ peak near the runner's 16 GB of memory, and one proof run
+      # died in the reanimated linker with a Bus error.
+      - name: Add swap
+        if: matrix.platform == 'android'
+        run: |
+          sudo fallocate -l 8G /dev-client.swap
+          sudo chmod 600 /dev-client.swap
+          sudo mkswap /dev-client.swap
+          sudo swapon /dev-client.swap
+
+      - name: Restore Gradle cache
+        if: matrix.platform == 'android'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: dev-client-gradle-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: dev-client-gradle-
+
+      # why: DerivedData lives in EAS's throwaway working copy, so only pod downloads carry over.
+      - name: Restore CocoaPods cache
+        if: matrix.platform == 'ios'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: dev-client-ios-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: dev-client-ios-
+
+      - name: Show Xcode
+        if: matrix.platform == 'ios'
+        run: xcodebuild -version
+
+      - name: Build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          TARGET: ${{ matrix.target }}
+        run: node scripts/native.cjs "$TARGET" --build-path "$ARTIFACT"
+
+      - name: Check the embedded fingerprint
+        run: |
+          set -euo pipefail
+          if [ "$PLATFORM" = ios ]; then
+            entry=$(tar -tzf "$ARTIFACT" | grep -E '(^|/)EXUpdates\.bundle/fingerprint$' | head -n 1)
+            embedded=$(tar -xOzf "$ARTIFACT" "$entry")
+          else
+            embedded=$(unzip -p "$ARTIFACT" assets/fingerprint)
+          fi
+          [ "$embedded" = "$FINGERPRINT" ] || { echo "::error::built $embedded, planned $FINGERPRINT"; exit 1; }
+
+      # The artifact goes first so a reader never finds a build.json whose artifact is uploading.
+      - name: Upload to R2
+        run: |
+          set -euo pipefail
+          prefix="development/$PLATFORM/$FINGERPRINT"
+          name=$(basename "$ARTIFACT")
+          stamp=$(date -u +%Y%m%d-%H%M%S)
+          jq -n \
+            --arg id "$stamp-$PLATFORM-development-github-$GITHUB_RUN_ID" \
+            --arg app "$(jq -r .name package.json)" \
+            --arg platform "$PLATFORM" \
+            --arg fingerprint "$FINGERPRINT" \
+            --arg artifact "$name" \
+            --argjson bytes "$(wc -c < "$ARTIFACT" | tr -d ' ')" \
+            --arg sha256 "$(shasum -a 256 "$ARTIFACT" | cut -d ' ' -f 1)" \
+            --arg builtAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg commit "$GITHUB_SHA" \
+            --arg branch "$GITHUB_REF_NAME" \
+            --arg message "$(git log -1 --format=%s)" \
+            '{ id: $id, app: $app, platform: $platform, profile: "development",
+              fingerprint: $fingerprint, artifact: $artifact, bytes: $bytes, sha256: $sha256,
+              builtAt: $builtAt, host: "github-actions",
+              git: { commit: $commit, branch: $branch, dirty: false, message: $message } }' \
+            > build/build.json
+          ls -l "$ARTIFACT"
+          cat build/build.json
+          aws s3 cp "$ARTIFACT" "s3://$BUCKET/$prefix/$name" --no-progress
+          aws s3 cp build/build.json "s3://$BUCKET/$prefix/build.json" \
+            --content-type application/json --no-progress
