@@ -10,7 +10,8 @@ config.transformer.getTransformOptions = async () => ({
     // However, this comes with some gotchas.
     // Read more here: https://reactnative.dev/docs/optimizing-javascript-loading
     // And here: https://github.com/expo/expo/issues/27279#issuecomment-1971610698
-    inlineRequires: true,
+    // why: dev uses Oxc (app.config.ts), whose inline requires emit `new require("x").Foo()` and crash Convex at load.
+    inlineRequires: process.env.APP_VARIANT !== "development",
   },
 })
 

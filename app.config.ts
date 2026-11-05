@@ -177,6 +177,8 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     experiments: {
       ...config.experiments,
       ...(webExportBaseUrl ? { baseUrl: webExportBaseUrl } : {}),
+      // why: Oxc leaves some Platform.OS branches unfolded (minified web +8%), so exports stay on Babel.
+      ...(IS_DEV ? { noxcturnalTransformWorker: true } : {}),
     },
     // why: an off-main production build takes its version from scripts/native.cjs, since it cannot commit a bump to main.
     ...(process.env.SCRYVE_APP_VERSION ? { version: process.env.SCRYVE_APP_VERSION } : {}),
