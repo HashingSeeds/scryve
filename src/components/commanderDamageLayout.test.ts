@@ -5,7 +5,9 @@ import {
   commanderBoardGrid,
   commanderBoardSeats,
   commanderFacing,
+  commanderOverview,
   commanderReach,
+  DISC_RING,
   commanderTakeover,
   lifeInk,
   outInk,
@@ -144,5 +146,79 @@ describe("commander damage board layout", () => {
     expect(discOffset.y).toBeLessThan(0)
     expect(cardDiscOffset.x).toBeCloseTo(-discOffset.y)
     expect(cardDiscOffset.y).toBeCloseTo(0)
+  })
+
+  describe("a seat showing the damage it has taken", () => {
+    const fontSize = 140
+    const ink = lifeInk(fontSize, 2)
+    // why: the breakdown's box from the card's center, from the padding the overview gives it.
+    const boardBox = (
+      card: { width: number; height: number },
+      padding: ReturnType<typeof commanderOverview>["padding"],
+      board: { width: number; height: number },
+    ) => {
+      const x = (padding.paddingLeft + card.width - padding.paddingRight) / 2 - card.width / 2
+      const y = (padding.paddingTop + card.height - padding.paddingBottom) / 2 - card.height / 2
+      return {
+        left: x - board.width / 2,
+        right: x + board.width / 2,
+        top: y - board.height / 2,
+        bottom: y + board.height / 2,
+      }
+    }
+
+    it("rings its total beside the breakdown along a wide seat, the pair centered", () => {
+      const card = { width: 420, height: 200 }
+      const board = { width: 110, height: 110 }
+      const { ring, life, padding } = commanderOverview({
+        card,
+        rotation: 0,
+        lifeFontSize: fontSize,
+        ink,
+        board,
+      })
+      const box = boardBox(card, padding, board)
+      expect(ring.y).toBe(0)
+      expect(ring.x + ring.size / 2).toBeLessThan(box.left)
+      expect(ring.x - ring.size / 2 + card.width / 2).toBeCloseTo(card.width / 2 - box.right)
+      expect(life.x).toBeCloseTo(ring.x)
+    })
+
+    it("stacks them on a tall seat, upright to the seat that reads it", () => {
+      const card = { width: 390, height: 430 }
+      const board = { width: 242, height: 120 }
+      const { ring, padding } = commanderOverview({
+        card,
+        rotation: 180,
+        lifeFontSize: fontSize,
+        ink,
+        board,
+      })
+      expect(ring.x).toBeCloseTo(0)
+      expect(ring.y - ring.size / 2).toBeGreaterThan(boardBox(card, padding, board).bottom)
+    })
+
+    it("turns with a sideways seat", () => {
+      const { ring, padding } = commanderOverview({
+        card: { width: 200, height: 420 },
+        rotation: 90,
+        lifeFontSize: fontSize,
+        ink,
+      })
+      expect(ring.x).toBeCloseTo(0)
+      expect(ring.y).toBeLessThan(0)
+      expect(padding.paddingTop).toBeGreaterThan(padding.paddingBottom + ring.size)
+    })
+
+    it("shrinks the total inside its ring", () => {
+      const { ring, life } = commanderOverview({
+        card: { width: 420, height: 200 },
+        rotation: 0,
+        lifeFontSize: fontSize,
+        ink,
+      })
+      expect(life.scale).toBeLessThan(1)
+      expect(Math.hypot(ink.width, ink.height) * life.scale).toBeLessThan(ring.size - DISC_RING * 2)
+    })
   })
 })

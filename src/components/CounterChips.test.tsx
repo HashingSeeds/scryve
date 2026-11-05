@@ -82,13 +82,13 @@ describe("CounterChips", () => {
   it("shortens Commander tax only when the sheet's columns are too narrow for it", () => {
     const wide = chips(seat(), { cardSize: { width: 460, height: 400 } })
     fireEvent.press(wide.getByTestId("counter-add-seat-1"))
-    expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("+2Commander tax")
+    expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("0Commander tax")
     wide.unmount()
 
     const narrow = chips(seat(), { cardSize: { width: 320, height: 400 } })
     fireEvent.press(narrow.getByTestId("counter-add-seat-1"))
     const tax = narrow.getByTestId("counter-option-1-commanderTax")
-    expect(tax).toHaveTextContent("+2Tax")
+    expect(tax).toHaveTextContent("0Tax")
     expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
   })
 

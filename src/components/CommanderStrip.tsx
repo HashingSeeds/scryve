@@ -180,7 +180,7 @@ export const CommanderStrip = memo(function CommanderStrip({
         accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
         accessible={!attackerId}
         disabled={inspectDisabled || !!attackerId}
-        hitSlop={open ? 12 : 2}
+        hitSlop={targetSlop(mapBounds, open ? 12 : 2)}
         onPress={onToggle}
         style={({ pressed }) => [themed($map), pressed && { opacity: 0.72 }]}
       >
@@ -220,7 +220,7 @@ export const CommanderStrip = memo(function CommanderStrip({
               const ink = accessibleForeground(player.color)
               const attacking = playerId === attackerId
               const restOpacity = total === 0 ? IDLE_OPACITY : 1
-              const restBorder = total >= lethal ? foreground : overlayTint(foreground, 0.5)
+              const restBorder = total >= lethal ? foreground : overlayTint(foreground, RIM_ALPHA)
               const count = (
                 <Text
                   testID={attacking ? `commander-total-seat-${seatNumber}` : undefined}
@@ -306,6 +306,16 @@ export const CommanderStrip = memo(function CommanderStrip({
     </Animated.View>
   )
 }, structurallyEqual)
+
+// why: the strip draws small, so its touch area grows past it to a 48 dp target on each axis.
+const MIN_TARGET = 48
+
+function targetSlop(bounds: LayoutRectangle | null, least: number) {
+  if (!bounds) return least
+  const vertical = Math.max(least, (MIN_TARGET - bounds.height) / 2)
+  const horizontal = Math.max(least, (MIN_TARGET - bounds.width) / 2)
+  return { top: vertical, bottom: vertical, left: horizontal, right: horizontal }
+}
 
 // why: the grid is small, so it eases over a longer stretch of the shadow's travel than its edge takes to cross it; a quick edge would flip it in a frame.
 const LIT_SPAN = 192
@@ -482,6 +492,8 @@ const $overlaid: ViewStyle = {
   justifyContent: "center",
 }
 const IDLE_OPACITY = 0.45
+// why: the lowest rim that, drawn over any attacker's disc, keeps 3:1 against every seat color, so each disc stands off its card.
+const RIM_ALPHA = 0.75
 const OWN_OPACITY = 0.35
 const FADED_OPACITY = 0.3
 const $aboveShadow: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }

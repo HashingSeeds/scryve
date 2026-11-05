@@ -23,7 +23,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import type { CommanderFacing, CommanderTakeover } from "./commanderDamageLayout"
+import { DISC_RING, type CommanderFacing, type CommanderTakeover } from "./commanderDamageLayout"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { overlayTint } from "./LifeControls"
 import type {
@@ -585,8 +585,11 @@ const DAMAGE_INK = "#FF4D5A"
 const TRACK_OPACITY = 0.18
 // why: a hit eases the arc forward rather than snapping, so the defender sees how much it just took.
 const FILL_MS = 520
-// why: the arc's stroke is a pixel wider than the ring it sits on, so its canvas bleeds past the ring's box to keep the outer edge unclipped.
+// why: the arc's stroke runs a pixel past the ring's outer edge, so its canvas bleeds past the ring's box to keep that edge unclipped.
 const ARC_BLEED = 1
+// why: a strip of the dark ring stays between the disc and the arc, so the arc reads on a red seat's disc as well as on the shadow.
+const ARC_SEAM = 1.5
+const ARC_WIDTH = DISC_RING - ARC_SEAM + ARC_BLEED
 // why: a single SVG arc cannot close on itself; stopping a hair short leaves a gap the round caps cover.
 const FULL_SWEEP = 0.9999
 
@@ -615,6 +618,7 @@ function DamageArc({
   const reducedMotion = useReducedMotion()
   const fill = useSharedValue(fraction)
   const radius = size / 2 - DISC_RING / 2
+  const arcRadius = size / 2 + ARC_BLEED - ARC_WIDTH / 2
   const canvas = size + ARC_BLEED * 2
   const center = canvas / 2
 
@@ -627,7 +631,7 @@ function DamageArc({
 
   // why: a round cap draws a dot even at zero length, so an empty arc hides.
   const animatedProps = useAnimatedProps(() => ({
-    d: arcPath(center, radius, fill.value),
+    d: arcPath(center, arcRadius, fill.value),
     strokeOpacity: fill.value > 0 ? 1 : 0,
   }))
 
@@ -645,7 +649,7 @@ function DamageArc({
       <AnimatedPath
         testID={`commander-progress-seat-${seatNumber}`}
         stroke={DAMAGE_INK}
-        strokeWidth={DISC_RING + 1}
+        strokeWidth={ARC_WIDTH}
         strokeLinecap="round"
         fill="none"
         animatedProps={animatedProps}
@@ -901,8 +905,6 @@ function freeCorner(
 
 const $absolute: ViewStyle = { position: "absolute" }
 
-// why: the disc's ring matches the board's gutter between cards, and the damage arc runs along it.
-const DISC_RING = 4
 /** why: while an attack holds a defending card, the flood covers its own controls (z 10), the life total rides above the flood, and the ring, badges, and hit target above that. */
 export const TAKEOVER_LAYERS = { flood: 11, life: 12, controls: 13 } as const
 const $flood: ViewStyle = { zIndex: TAKEOVER_LAYERS.flood }

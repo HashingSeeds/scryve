@@ -128,6 +128,16 @@ const MENU_CLEARANCE = 42
 const COMPACT_MENU_CLEARANCE = 37
 const CHIP_SIZE = 36
 const COMPACT_CHIP_SIZE = 32
+const COMPACT_CHIP_WIDTH = 28
+// why: the plus and the Close that takes its place draw as a small glyph but reach a 48 dp target.
+const slopTo48 = (width: number, height: number) => ({
+  top: (48 - height) / 2,
+  bottom: (48 - height) / 2,
+  left: (48 - width) / 2,
+  right: (48 - width) / 2,
+})
+const PLUS_SLOP = slopTo48(CHIP_SIZE, CHIP_SIZE)
+const COMPACT_PLUS_SLOP = slopTo48(COMPACT_CHIP_WIDTH, COMPACT_CHIP_SIZE)
 /** why: below this column width "+2 Commander tax" no longer fits on one line, so items with a short label use it. */
 const SHORT_LABEL_COLUMN = 180
 
@@ -388,7 +398,7 @@ export const CounterChips = memo(function CounterChips({
                 testID={`counter-add-seat-${seatNumber}`}
                 accessibilityRole="button"
                 accessibilityLabel={translate("board:counters.addLabel", { identity })}
-                hitSlop={{ top: 6, bottom: 6 }}
+                hitSlop={compact ? COMPACT_PLUS_SLOP : PLUS_SLOP}
                 onLayout={({ nativeEvent }) => setAddTrigger({ at: nativeEvent.layout, frameKey })}
                 onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
                 style={({ pressed }) => [
@@ -519,6 +529,10 @@ function CounterSheet({
   const counterLabel = counter ? tableItemLabel(counter) : ""
   const ruleId = counter && seat.tableItemRules?.[counter.id]
   const { openRule } = seat
+  const designationRules = seat.rules.designations.flatMap(({ id }) => {
+    const rule = seat.tableItemRules?.[id]
+    return rule ? [{ id, rule }] : []
+  })
   const firstControl = useRef<View>(null)
   const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
@@ -622,8 +636,7 @@ function CounterSheet({
                   testID={`counter-option-${seatNumber}-${option.id}`}
                   id={option.id}
                   label={shortLabels ? tableItemShortLabel(option) : optionLabel}
-                  value={current > 0 ? current : undefined}
-                  step={option.step}
+                  value={current}
                   accessibilityLabel={
                     current > 0
                       ? translate("board:counters.editWithValue", {
@@ -648,7 +661,6 @@ function CounterSheet({
             {seat.rules.designations.map((option, index) => {
               const holds = seat.held.includes(option.id)
               const optionLabel = tableItemLabel(option)
-              const optionRule = seat.tableItemRules?.[option.id]
               return (
                 <SheetOption
                   key={option.id}
@@ -662,15 +674,6 @@ function CounterSheet({
                   )}
                   selected={holds}
                   ink={ink}
-                  rule={
-                    optionRule && openRule
-                      ? {
-                          id: optionRule,
-                          testID: `designation-rule-${seatNumber}-${option.id}`,
-                          onPress: () => openRule(optionRule),
-                        }
-                      : undefined
-                  }
                   onPress={() => {
                     if (holds) seat.releaseDesignation(option.id)
                     else seat.takeDesignation(option.id)
@@ -680,13 +683,34 @@ function CounterSheet({
               )
             })}
           </ScrollView>
+          {/* why: rule links sit apart from the options, so a slipped tap never leaves the game. */}
+          {openRule && designationRules.length > 0 ? (
+            <View style={themed($ruleLinks)}>
+              {designationRules.map(({ id, rule }) => (
+                <BoardPressable
+                  key={id}
+                  testID={`designation-rule-${seatNumber}-${id}`}
+                  accessibilityRole="link"
+                  accessibilityLabel={translate("board:counters.rule", { rule })}
+                  onPress={() => openRule(rule)}
+                  style={({ pressed }) => [
+                    themed($ruleLinkButton),
+                    pressed && { backgroundColor: overlayTint(ink, 0.14) },
+                  ]}
+                >
+                  <TableGlyph id={id} size={12} color={ink} />
+                  <Text text={`§${rule}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
+                </BoardPressable>
+              ))}
+            </View>
+          ) : null}
         </>
       )}
       <BoardPressable
         testID={`counter-close-${seatNumber}`}
         accessibilityRole="button"
         accessibilityLabel={translate("common:close")}
-        hitSlop={{ top: 6, bottom: 6 }}
+        hitSlop={compact ? COMPACT_PLUS_SLOP : PLUS_SLOP}
         onPress={onClose}
         style={({ pressed }) => [
           themed(compact ? $compactChip : $chip),
@@ -743,11 +767,9 @@ function SheetOption({
   id,
   label,
   value,
-  step,
   accessibilityLabel,
   selected,
   ink,
-  rule,
   onPress,
 }: {
   ref?: Ref<View>
@@ -755,11 +777,9 @@ function SheetOption({
   id: string
   label: string
   value?: number
-  step?: number
   accessibilityLabel: string
   selected?: boolean
   ink: string
-  rule?: { id: string; testID: string; onPress: () => void }
   onPress: () => void
 }) {
   const { themed } = useAppTheme()
@@ -774,7 +794,6 @@ function SheetOption({
         onPress={onPress}
         style={({ pressed }) => [
           themed($option),
-          !rule && $optionFill,
           pressed && { backgroundColor: overlayTint(ink, 0.14) },
         ]}
       >
@@ -782,16 +801,9 @@ function SheetOption({
         {value !== undefined ? (
           <Text
             text={String(value)}
-            weight="bold"
+            weight={value > 0 ? "bold" : "medium"}
             size="xs"
-            style={[themed($optionValue), { color: ink }]}
-          />
-        ) : step !== undefined ? (
-          <Text
-            text={`+${step}`}
-            weight="medium"
-            size="xs"
-            style={[themed($optionValue), { color: ink }, $muted]}
+            style={[themed($optionValue), { color: ink }, value === 0 && $muted]}
           />
         ) : null}
         <Text
@@ -803,20 +815,6 @@ function SheetOption({
         />
         {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
       </BoardPressable>
-      {rule ? (
-        <BoardPressable
-          testID={rule.testID}
-          accessibilityRole="link"
-          accessibilityLabel={translate("board:counters.rule", { rule: rule.id })}
-          onPress={rule.onPress}
-          style={({ pressed }) => [
-            themed($optionRule),
-            pressed && { backgroundColor: overlayTint(ink, 0.14) },
-          ]}
-        >
-          <Text text={`§${rule.id}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
-        </BoardPressable>
-      ) : null}
     </View>
   )
 }
@@ -862,7 +860,7 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   alignItems: "center",
   gap: spacing.xxxs,
   minHeight: COMPACT_CHIP_SIZE,
-  minWidth: 28,
+  minWidth: COMPACT_CHIP_WIDTH,
   justifyContent: "center",
   paddingHorizontal: spacing.xxs,
   borderRadius: radius.md,
@@ -870,7 +868,8 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   borderColor: "transparent",
 })
 
-const $addChip: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
+// why: the lowest opacity that keeps the plus at 3:1 on every seat color.
+const $addChip: ThemedStyle<ViewStyle> = () => ({ opacity: 0.7 })
 
 const $value: ThemedStyle<TextStyle> = () => ({
   fontSize: 15,
@@ -953,7 +952,7 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
 
 const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
-  flexShrink: 1,
+  flex: 1,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
@@ -962,11 +961,17 @@ const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   borderRadius: radius.md,
 })
 
-// why: an option with a rule link keeps its content width, so the link sits beside its own label instead of the next option's.
-const $optionFill: ViewStyle = { flex: 1 }
-
-const $optionRule: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $ruleLinks: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
   justifyContent: "center",
+  gap: spacing.md,
+  marginTop: spacing.xs,
+})
+
+const $ruleLinkButton: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xxs,
   minHeight: 40,
   paddingHorizontal: spacing.xxs,
   borderRadius: radius.md,

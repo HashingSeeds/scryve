@@ -48,7 +48,9 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import {
+  commanderOverview,
   commanderTakeover,
+  DISC_RING,
   lifeInk,
   OUT_CAUSE_GAP,
   OUT_LABEL,
@@ -76,7 +78,6 @@ import {
   getLifeFontSizeThatFits,
   getLifeLineHeight,
   getLifeTargetTextSpace,
-  lifeCardContentInsetStyle,
   LIFE_FONT_SIZE,
   LIFE_MAX_FONT_SCALE,
   LIFE_GLYPH_LINE_HEIGHT,
@@ -200,7 +201,7 @@ export const LifeCard = memo(function LifeCard({
 }: LifeCardProps) {
   const {
     themed,
-    theme: { spacing },
+    theme: { spacing, colors },
   } = useAppTheme()
   const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
@@ -244,7 +245,6 @@ export const LifeCard = memo(function LifeCard({
     )
   const resolvedLifeFontSize = fontSizeFor(shownDigits)
   const cardPadding = compact ? spacing.xxs : spacing.xs
-  const safeContentStyle = lifeCardContentInsetStyle(contentInsets)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
@@ -275,52 +275,6 @@ export const LifeCard = memo(function LifeCard({
     )
   }, [commanderSeat, commanderOverviewOpen, commanderOverviewDuration, overviewProgress, playerId])
   const overviewShown = commanderSeat && (commanderOverviewOpen || overviewVisible)
-  const headerEdge = { 0: "top", 90: "right", [-90]: "left", 180: "bottom" } as const
-  const headerPadding = {
-    0: "paddingTop",
-    90: "paddingRight",
-    [-90]: "paddingLeft",
-    180: "paddingBottom",
-  } as const
-  const footerPadding = {
-    0: "paddingBottom",
-    90: "paddingLeft",
-    [-90]: "paddingRight",
-    180: "paddingTop",
-  } as const
-  const boardInsets = {
-    ...safeContentStyle,
-    [headerPadding[contentRotation]]: (contentInsets?.[headerEdge[contentRotation]] ?? 0) + 56,
-    [footerPadding[contentRotation]]: 0,
-  }
-  const lifeOffset = Math.max(
-    (Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height) / 2 -
-      (contentInsets?.[headerEdge[contentRotation]] ?? 0) -
-      cardPadding -
-      24,
-    0,
-  )
-  const overviewLifeStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateX:
-          contentRotation === 90
-            ? lifeOffset * overviewProgress.value
-            : contentRotation === -90
-              ? -lifeOffset * overviewProgress.value
-              : 0,
-      },
-      {
-        translateY:
-          contentRotation === 0
-            ? -lifeOffset * overviewProgress.value
-            : contentRotation === 180
-              ? lifeOffset * overviewProgress.value
-              : 0,
-      },
-      { scale: 1 + (32 / resolvedLifeFontSize - 1) * overviewProgress.value },
-    ],
-  }))
   const overviewCloseStyle = useAnimatedStyle(() => ({ opacity: overviewProgress.value }))
   const boardStyle = useAnimatedStyle(() => ({
     opacity: boardBounds ? 1 : 0,
@@ -426,6 +380,23 @@ export const LifeCard = memo(function LifeCard({
           lead: causeGlyphShown ? causeGlyphSize + OUT_CAUSE_GAP : 0,
           below: { ...STRUCK_LIFE, chars: shownDigits },
         })
+  const overview = commanderOverview({
+    card: cardSize,
+    rotation: contentRotation,
+    insets: contentInsets,
+    lifeFontSize: out && out.cause !== "life" ? causeFontSize : resolvedLifeFontSize,
+    ink: readoutInk,
+    board: boardBounds,
+    compact,
+  })
+  const boardInsets = overview.padding
+  const overviewLifeStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: overview.life.x * overviewProgress.value },
+      { translateY: overview.life.y * overviewProgress.value },
+      { scale: 1 + (overview.life.scale - 1) * overviewProgress.value },
+    ],
+  }))
   const takeover =
     defending && cardSize.width > 0
       ? commanderTakeover({
@@ -764,6 +735,22 @@ export const LifeCard = memo(function LifeCard({
             { backgroundColor: color },
           ]}
         >
+          <Animated.View
+            testID={`commander-overview-ring-seat-${seatNumber}`}
+            pointerEvents="none"
+            style={[
+              $overviewRing,
+              {
+                left: cardSize.width / 2 + overview.ring.x - overview.ring.size / 2,
+                top: cardSize.height / 2 + overview.ring.y - overview.ring.size / 2,
+                width: overview.ring.size,
+                height: overview.ring.size,
+                borderRadius: overview.ring.size / 2,
+                borderColor: colors.board.background,
+              },
+              overviewCloseStyle,
+            ]}
+          />
           <View
             testID={`commander-overview-content-seat-${seatNumber}`}
             style={[themed($commanderOverviewContent), boardInsets]}
@@ -1386,6 +1373,7 @@ const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 
 const $overviewReadout: ViewStyle = { zIndex: 8 }
+const $overviewRing: ViewStyle = { position: "absolute", borderWidth: DISC_RING }
 
 const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.life }
 
