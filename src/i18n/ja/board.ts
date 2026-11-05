@@ -406,7 +406,6 @@ export default {
       riftbound: "ポイント",
     },
     openCalculator: "{{identity}}の電卓を開く",
-    undo: "{{identity}}の直前のライフ変更を元に戻す",
   },
   lifeControls: {
     add: "{{identity}}、{{amount}}増やす",

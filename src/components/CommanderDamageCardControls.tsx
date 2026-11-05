@@ -860,7 +860,7 @@ function PowerBox({
   )
 }
 
-export function UndoGlyph({ size, color }: { size: number; color: string }) {
+function UndoGlyph({ size, color }: { size: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path

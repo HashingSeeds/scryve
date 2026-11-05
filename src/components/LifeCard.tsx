@@ -1,4 +1,4 @@
-import { memo, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type {
   LayoutChangeEvent,
   LayoutRectangle,
@@ -18,9 +18,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
-import { LifeLogContext, localLifeChanges } from "@/features/game/LifeLog"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
-import type { LifeDelta, PlayerId } from "@/features/game/types"
+import type { LifeDelta } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -41,7 +40,6 @@ import {
   SHADOW_INK,
   PulseRing,
   TAKEOVER_LAYERS,
-  UndoGlyph,
   useCommanderTakeover,
   type ArmedCommander,
   type CommanderAttacker,
@@ -70,7 +68,7 @@ import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { Icon } from "./Icon"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
-import { LifeControls, overlayTint, useRecentDelta } from "./LifeControls"
+import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
   COMPACT_LIFE_FONT_SIZE,
@@ -89,7 +87,6 @@ import {
   CUTOUT_ENDS_INSIDE_INSET,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
-  type LifeCardEdge,
   type LifeCardScreenEdges,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
@@ -108,7 +105,6 @@ import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex
 const COMMANDER_OVERVIEW_MS = 220
 // why: matches the attacker's power boxes swapping in, so the life total and its − and + cross-fade with them.
 const LIFE_FADE_MS = SWAP_MS
-const UNDO_VISIBLE_MS = 4000
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -140,7 +136,7 @@ export type LifeCardOut = { reason: string } & (
 )
 
 export interface LifeCardProps {
-  playerId?: PlayerId
+  playerId?: string
   playerName: string
   seatNumber: number
   shape?: PlayerMarkShape
@@ -312,14 +308,6 @@ export const LifeCard = memo(function LifeCard({
   const calculator = !!playSystemRules(system).counter.calculator
   // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
   const [tableSheetOpen, setTableSheetOpen] = useState(false)
-  const [undoOffered, setUndoOffered] = useState(false)
-  const undoTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const offerUndo = useCallback(() => {
-    setUndoOffered(true)
-    clearTimeout(undoTimer.current)
-    undoTimer.current = setTimeout(() => setUndoOffered(false), UNDO_VISIBLE_MS)
-  }, [])
-  useEffect(() => () => clearTimeout(undoTimer.current), [])
   const [seatedPlayerId, setSeatedPlayerId] = useState(playerId)
   if (seatedPlayerId !== playerId) {
     setSeatedPlayerId(playerId)
@@ -327,7 +315,6 @@ export const LifeCard = memo(function LifeCard({
     setEditorOpen(false)
     setTableSheetOpen(false)
     setOverviewVisible(commanderOverviewOpen)
-    setUndoOffered(false)
   }
   useEffect(() => {
     if (tableSheetOpen || editorOpen) onPlayStart?.()
@@ -411,7 +398,6 @@ export const LifeCard = memo(function LifeCard({
     id: armedCommanderId,
     color: commanderDamage?.attacker?.color,
   })
-  const stripCorner = commanderStripCorner(contentRotation, contentInsets)
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -434,7 +420,7 @@ export const LifeCard = memo(function LifeCard({
             commanders: armedCommanders,
             lethal: commanderDamage.lethal,
             facing: commanderDamage.facing ?? {},
-            stripCorner,
+            stripCorner: commanderStripCorner(contentRotation, contentInsets),
             takeover,
             wave: floodedBy.wave,
             acted: !!commanderDamage.acted,
@@ -517,7 +503,6 @@ export const LifeCard = memo(function LifeCard({
     !tableSheetOpen &&
     !diceCovers &&
     ownership !== "unowned"
-  if (undoOffered && (!lifeControlsShown || editorOpen || disabled)) setUndoOffered(false)
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   const calculatorButtonSize = compact ? 30 : 40
@@ -535,7 +520,7 @@ export const LifeCard = memo(function LifeCard({
         commanderDamage.incoming,
       ).length > 0)
   const identityMetrics = seatIdentityMetrics(compact)
-  const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact, commanderSeat)
+  const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
     cardSize,
@@ -552,7 +537,7 @@ export const LifeCard = memo(function LifeCard({
     seatRun > 0 &&
     seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.mark - identityMetrics.gap <
       MIN_NAME_ROOM
-  const seatIdentity = (pressed?: boolean) => (
+  const seatIdentity = (
     <SeatIdentity
       seatNumber={seatNumber}
       playerName={displayName}
@@ -560,7 +545,6 @@ export const LifeCard = memo(function LifeCard({
       color={foreground}
       compact={compact}
       insetSwordColor={commanderDamage ? color : undefined}
-      backing={pressed === undefined ? undefined : overlayTint(foreground, pressed ? 0.36 : 0.18)}
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
       markOnly={markOnly}
@@ -837,40 +821,11 @@ export const LifeCard = memo(function LifeCard({
                   ? { edge: CONTENT_RIGHT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
-              onChange={(delta) => {
-                onChange(delta)
-                offerUndo()
-              }}
+              onChange={onChange}
               onPreview={showPreview}
               onLongChange={() => setEditorOpen(true)}
             />
           </Animated.View>
-        ) : null}
-        {undoOffered && playerId ? (
-          <UndoLifeChange
-            playerId={playerId}
-            seatNumber={seatNumber}
-            identity={identity}
-            foreground={foreground}
-            compact={compact}
-            entering={lifeFadeDuration ? FadeIn.duration(lifeFadeDuration) : undefined}
-            exiting={lifeFadeDuration ? FadeOut.duration(lifeFadeDuration) : undefined}
-            style={[
-              $undo,
-              undoCorner({
-                rotation: contentRotation,
-                gap: spacing.xxs,
-                insets: contentInsets,
-                screenEdges,
-                taken: [
-                  menuCorner && MENU_CORNER_EDGES[menuCorner],
-                  commanderStripShown && [stripCorner.y, stripCorner.x],
-                  calculatorButtonShown && contentCorner(contentRotation, TRAILING_CORNER),
-                ],
-              }),
-            ]}
-            onUndone={offerUndo}
-          />
         ) : null}
       </LayoutAnimationConfig>
       {commanderCardMode?.kind === "source" ? (
@@ -1022,11 +977,12 @@ export const LifeCard = memo(function LifeCard({
                   disabled={disabled || sittingOut}
                   hitSlop={8}
                   onPress={commanderDamage.onPressSword}
+                  style={({ pressed }) => pressed && { opacity: 0.72 }}
                 >
-                  {({ pressed }) => seatIdentity(pressed)}
+                  {seatIdentity}
                 </BoardPressable>
               ) : (
-                <View pointerEvents="none">{seatIdentity()}</View>
+                <View pointerEvents="none">{seatIdentity}</View>
               )}
             </View>
             {diceChips?.length && dice?.onPressChip && !dice.view && !editorOpen ? (
@@ -1376,105 +1332,3 @@ const $overviewReadout: ViewStyle = { zIndex: 8 }
 const $overviewRing: ViewStyle = { position: "absolute", borderWidth: DISC_RING }
 
 const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.life }
-
-function UndoLifeChange({
-  playerId,
-  seatNumber,
-  identity,
-  foreground,
-  compact,
-  entering,
-  exiting,
-  style,
-  onUndone,
-}: {
-  playerId: PlayerId
-  seatNumber: number
-  identity: string
-  foreground: string
-  compact?: boolean
-  entering?: ReturnType<typeof FadeIn.duration>
-  exiting?: ReturnType<typeof FadeOut.duration>
-  style: StyleProp<ViewStyle>
-  onUndone: () => void
-}) {
-  const source = useContext(LifeLogContext)
-  if (source?.kind !== "local" || localLifeChanges(source.events, playerId).length === 0)
-    return null
-  return (
-    <Animated.View entering={entering} exiting={exiting} style={style}>
-      <BoardPressable
-        testID={`life-undo-seat-${seatNumber}`}
-        accessibilityRole="button"
-        accessibilityLabel={translate("board:lifeCard.undo", { identity })}
-        onPress={() => {
-          source.undo(playerId)
-          onUndone()
-        }}
-        style={$undoButton}
-      >
-        <UndoGlyph size={compact ? 22 : 28} color={foreground} />
-      </BoardPressable>
-    </Animated.View>
-  )
-}
-
-type CardCorner = readonly [LifeCardEdge, LifeCardEdge]
-
-const MENU_CORNER_EDGES = {
-  topLeft: ["top", "left"],
-  topRight: ["top", "right"],
-  bottomLeft: ["bottom", "left"],
-  bottomRight: ["bottom", "right"],
-} as const satisfies Record<LifeCardMenuCorner, CardCorner>
-
-const CONTENT_EDGE = {
-  top: CONTENT_TOP_EDGE,
-  bottom: CONTENT_BOTTOM_EDGE,
-  left: CONTENT_LEFT_EDGE,
-  right: CONTENT_RIGHT_EDGE,
-} as const
-
-type ContentCorner = readonly ["top" | "bottom", "left" | "right"]
-
-const TRAILING_CORNER: ContentCorner = ["bottom", "right"]
-const UNDO_CORNERS: readonly ContentCorner[] = [TRAILING_CORNER, ["top", "right"], ["top", "left"]]
-
-function contentCorner(rotation: LifeCardContentRotation, [y, x]: ContentCorner): CardCorner {
-  return [CONTENT_EDGE[y][rotation], CONTENT_EDGE[x][rotation]]
-}
-
-function undoCorner({
-  rotation,
-  gap,
-  insets,
-  screenEdges,
-  taken,
-}: {
-  rotation: LifeCardContentRotation
-  gap: number
-  insets?: LifeCardContentInsets
-  screenEdges?: LifeCardScreenEdges
-  taken: readonly (CardCorner | false | undefined)[]
-}): ViewStyle {
-  const corners = UNDO_CORNERS.map((corner) => contentCorner(rotation, corner))
-  const [edge, side] =
-    corners.find((corner) =>
-      taken.every((used) => !used || !corner.every((cornerEdge) => used.includes(cornerEdge))),
-    ) ?? corners[0]
-  return {
-    [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
-    [side]: cornerOffset(gap, side, edge, insets, screenEdges),
-    transform: [{ rotate: `${rotation}deg` }],
-  }
-}
-
-const $undo: ViewStyle = { position: "absolute", zIndex: 10 }
-
-const $undoButton: ViewStyle = {
-  opacity: 0.85,
-  width: 48,
-  height: 48,
-  alignItems: "center",
-  justifyContent: "center",
-}

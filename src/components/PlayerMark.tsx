@@ -37,8 +37,6 @@ export const MARK_ART_BOUNDS: Record<
   tower: { top: 9, bottom: 36, left: 10.5, right: 33.5 },
 }
 export const MARK_VIEW_BOX = 44
-/** why: wide enough to hold every shape, so a pressable mark sits on a round key like the board's other buttons. */
-export const MARK_BACKING_RADIUS = 17
 
 export interface PlayerMarkProps {
   seatNumber: number
@@ -50,7 +48,6 @@ export interface PlayerMarkProps {
   closeIcon?: boolean
   foil?: boolean
   foilBackdrop?: string
-  backing?: string
   size?: number
   style?: StyleProp<ViewStyle>
 }
@@ -68,7 +65,6 @@ export const PlayerMark = memo(function PlayerMark({
   closeIcon = false,
   foil = false,
   foilBackdrop,
-  backing,
   size = 44,
   style,
 }: PlayerMarkProps) {
@@ -91,15 +87,6 @@ export const PlayerMark = memo(function PlayerMark({
     >
       <Svg width="100%" height="100%" viewBox="0 0 44 44">
         {foil ? <FoilGradient id={foilId} color={color} backdrop={foilBackdrop} /> : null}
-        {backing ? (
-          <Circle
-            testID="player-mark-backing"
-            cx="22"
-            cy="22"
-            r={MARK_BACKING_RADIUS}
-            fill={backing}
-          />
-        ) : null}
         <MarkShape
           shape={shape}
           color={foil ? `url(#${foilId})` : color}

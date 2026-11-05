@@ -405,7 +405,6 @@ export default {
       riftbound: "점수",
     },
     openCalculator: "{{identity}}의 계산기 열기",
-    undo: "{{identity}}의 마지막 생명점 변경 취소하세요",
   },
   lifeControls: {
     add: "{{identity}}, {{amount}} 추가",

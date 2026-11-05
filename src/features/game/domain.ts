@@ -466,10 +466,6 @@ function isCompensatable(event: GameEvent): event is CompensatableEvent {
   return event.type === "life.changed" || event.type === "commanderDamage.assigned"
 }
 
-function seatOf(event: CompensatableEvent): PlayerId {
-  return event.type === "life.changed" ? event.playerId : event.toPlayerId
-}
-
 function compensatedOperationIds(game: LocalGame): Set<OperationId> {
   return new Set(
     game.events.flatMap((event) =>
@@ -636,8 +632,7 @@ export function commandToEvent(
         isCompensatable(event) &&
         !event.compensatesOperationId &&
         event.actorId === context.actorId &&
-        !compensated.has(event.operationId) &&
-        (!command.playerId || seatOf(event) === command.playerId),
+        !compensated.has(event.operationId),
     )
     if (!target) return null
     if (target.type === "commanderDamage.assigned")
