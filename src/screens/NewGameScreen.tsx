@@ -358,7 +358,6 @@ function NewGameForm({
   )
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
-  // why: with no game running, Back must start the draft rather than drop it, but only once the player has touched it; a deck link that fills the form on its own is still a plain Back.
   const [edited, setEdited] = useState(false)
   const [playerSaveError, setPlayerSaveError] = useState<string>()
   const [gameToExit, setGameToExit] = useState<ResumableGame>()
@@ -395,7 +394,7 @@ function NewGameForm({
   const draftChanged = (from: SetupDraft) =>
     NEW_GAME_FIELDS.some((field) => from[field] !== draft[field])
   const optionsOpenedWith = useRef(draft)
-  // why: a running game can't take a new setup, so a change opens the end prompt where it was made, and closing that prompt puts the running game's setup back. On iOS the prompt waits for the options sheet to finish closing.
+  // why: iOS drops a modal presented while another is still dismissing, so the end prompt waits for the options sheet to finish closing.
   const [ending, setEnding] = useState<{ restore?: SetupDraft; afterSheet?: boolean }>()
   const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
@@ -667,7 +666,6 @@ function NewGameForm({
     }
   }
 
-  // why: ending a game here asks for a new one, so on this device it starts with this setup straight away; Connected still hosts by hand.
   function endThenStart(end: () => void) {
     if (!connectedMode && !localReady)
       throw new Error(nameValidation.errors.find(Boolean) ?? translate("board:endGame.failed"))

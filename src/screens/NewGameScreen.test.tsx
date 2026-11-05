@@ -488,6 +488,25 @@ describe("NewGameScreen", () => {
     expect(view.getByText("2 players · 40 life")).toBeTruthy()
   })
 
+  it("leaves an untouched setup on Back", () => {
+    const untouched = { onBack: jest.fn(), onStartLocal: jest.fn() }
+    setup(untouched)
+    fireEvent.press(screen.getByTestId("setup-back"))
+    expect(untouched.onBack).toHaveBeenCalledTimes(1)
+    expect(untouched.onStartLocal).not.toHaveBeenCalled()
+  })
+
+  it("starts an edited setup on Back", async () => {
+    const edited = { onBack: jest.fn(), onStartLocal: jest.fn() }
+    setup(edited)
+    openOptions()
+    fireEvent.press(screen.getByTestId("player-count-increment"))
+    closeOptions()
+    fireEvent.press(screen.getByTestId("setup-back"))
+    await waitFor(() => expect(edited.onStartLocal).toHaveBeenCalledTimes(1))
+    expect(edited.onBack).not.toHaveBeenCalled()
+  })
+
   it("falls back to the placeholder name for seats left blank", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
