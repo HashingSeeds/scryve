@@ -27,7 +27,7 @@
     "compile": "tsrs --noEmit --fast --pretty --incremental -p . --tsBuildInfoFile node_modules/.cache/tsrs/app.tsbuildinfo && tsrs --noEmit --fast --pretty --incremental -p test/test-tsconfig.json --tsBuildInfoFile node_modules/.cache/tsrs/test.tsbuildinfo",
     "lint": "eslint . --fix --cache --cache-strategy content --cache-location node_modules/.cache/eslint/",
     "lint:check": "sh scripts/lint-check.sh",
-    "export:check": "expo export --platform ios --platform android --platform web --output-dir dist-export-check",
+    "export:check": "expo export --platform ios --output-dir dist-export-check/ios && expo export --platform android --output-dir dist-export-check/android && expo export --platform web --output-dir dist-export-check/web",
     "lint:comments:baseline": "node scripts/generate-comment-baseline.cjs",
     "comments:apply": "node scripts/comment-review.cjs apply",
     "deps:check": "depcruise src convex --config .dependency-cruiser.js",

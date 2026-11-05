@@ -5,10 +5,15 @@ const MARKER = "<!-- bundle-size -->"
 const BUNDLES = { ios: "iOS", android: "Android", web: "Web" }
 const { maxGrowthPercent } = require("./bundle-size-budget.json")
 
+/**
+ * why: export:check exports each platform on its own, into exportDir/<platform>. One
+ * export of several platforms numbers modules in whatever order the builds race, which
+ * moved iOS and Android by about 25 KB between runs of the same commit.
+ */
 function measure(exportDir) {
   return Object.fromEntries(
     Object.keys(BUNDLES).map((platform) => {
-      const dir = path.join(exportDir, "_expo", "static", "js", platform)
+      const dir = path.join(exportDir, platform, "_expo", "static", "js", platform)
       const files = fs.readdirSync(dir).map((name) => fs.statSync(path.join(dir, name)).size)
       if (files.length === 0) throw new Error(`No ${platform} bundle in ${dir}`)
       return [platform, files.reduce((total, size) => total + size, 0)]
