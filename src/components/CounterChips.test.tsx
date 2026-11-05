@@ -154,7 +154,7 @@ describe("CounterChips", () => {
     const view = chips(table)
 
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
-    expect(view.getByTestId("designation-rule-1-initiative")).toHaveTextContent("726")
+    expect(view.getByTestId("designation-rule-1-initiative")).toHaveTextContent("§726")
     fireEvent.press(view.getByLabelText("Rule 725"))
     expect(openRule).toHaveBeenCalledWith("725")
     expect(table.takeDesignation).not.toHaveBeenCalled()
