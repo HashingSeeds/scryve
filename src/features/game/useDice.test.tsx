@@ -3,11 +3,11 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { DiceChips } from "@/components/DiceChips"
 import { diceCoversSeat, DiceSeatOverlay } from "@/components/DiceSeatOverlay"
-import type { RadialMenuTool } from "@/components/GameRadialMenu"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { ThemeProvider } from "@/theme/context"
 import * as reducedMotion from "@/utils/useReducedMotion"
 
+import { DICE_TOOLS } from "./dice"
 import { asPlayerId } from "./domain"
 import type { GamePlayer } from "./types"
 import { useDice } from "./useDice"
@@ -18,34 +18,20 @@ const players: GamePlayer[] = [
   { id: asPlayerId("p3"), name: "Katherine", color: "#7B5A91", life: 20, seat: 2 },
 ]
 
-function ToolButton({ testID, tool }: { testID: string; tool: RadialMenuTool }) {
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityLabel={tool.accessibilityLabel}
-      accessibilityState={{ selected: !!tool.selected }}
-      onPress={tool.onPress}
-    />
-  )
-}
-
 function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?: string }) {
   const dice = useDice(players, gameId, system)
   const { grid } = dice
   return (
     <>
       <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
-      <ToolButton testID={`dice-${dice.tools.recent.key}`} tool={dice.tools.recent} />
-      <Pressable
-        testID="dice-bag"
-        accessibilityState={{ expanded: dice.tools.open }}
-        onPress={dice.tools.onToggle}
-      />
-      {dice.tools.open
-        ? dice.tools.tools.map((tool) => (
-            <ToolButton key={tool.key} testID={`dice-bag-${tool.key}`} tool={tool} />
-          ))
-        : null}
+      {DICE_TOOLS.map((tool) => (
+        <Pressable
+          key={tool}
+          testID={`arm-${tool}`}
+          accessibilityState={{ selected: grid.armed === tool }}
+          onPress={() => grid.bag.armForOthers(tool)}
+        />
+      ))}
       <Pressable testID="dice-rolloff" onPress={dice.rollOff} />
       <Pressable testID="dice-flip" onPress={dice.flip} />
       <Pressable testID="dice-close" accessibilityLabel="Close dice" onPress={dice.close} />
@@ -119,13 +105,13 @@ describe("useDice", () => {
     const view = renderTable()
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
 
-    fireEvent.press(view.getByTestId("dice-d20"))
-    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(true)
+    fireEvent.press(view.getByTestId("arm-d20"))
+    expect(view.getByTestId("arm-d20").props.accessibilityState.selected).toBe(true)
     expect(view.getAllByLabelText(/Roll a d20 for/)).toHaveLength(3)
 
     fireEvent.press(view.getByTestId("dice-seat-2"))
     expect(view.getByTestId("dice-chip-2-d20")).toHaveTextContent("11")
-    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(false)
+    expect(view.getByTestId("arm-d20").props.accessibilityState.selected).toBe(false)
     expect(view.queryByLabelText(/Roll a d20 for (Ada|Grace|Katherine)/)).toBeNull()
     expect(announce).toHaveBeenLastCalledWith("Grace, d20, 11")
   })
@@ -138,40 +124,13 @@ describe("useDice", () => {
     expect(view.queryByTestId("dice-chip-1-d6")).toBeNull()
   })
 
-  it.each([
-    ["mtg", "d20"],
-    ["ygo", "coin"],
-    ["pokemon", "coin"],
-  ])("leads %s with its %s", (system, tool) => {
-    const view = renderTable(system)
-    expect(view.getAllByTestId(/^dice-(d\d+|coin)$/).map(({ props }) => props.testID)).toEqual([
-      `dice-${tool}`,
-    ])
-  })
-
-  it("leads with the bag's pick once one is chosen", () => {
-    jest.spyOn(Math, "random").mockReturnValue(0.5)
-    const view = renderTable()
-    fireEvent.press(view.getByTestId("dice-bag"))
-    expect(view.getByTestId("dice-bag").props.accessibilityState.expanded).toBe(true)
-    fireEvent.press(view.getByTestId("dice-bag-d8"))
-
-    expect(view.getByTestId("dice-bag").props.accessibilityState.expanded).toBe(false)
-    expect(view.queryByTestId("dice-d20")).toBeNull()
-    expect(view.getByTestId("dice-d8").props.accessibilityState.selected).toBe(true)
-    fireEvent.press(view.getByTestId("dice-seat-2"))
-    expect(view.getByTestId("dice-chip-2-d8")).toHaveTextContent("5")
-
-    expect(view.getByTestId("dice-d8").props.accessibilityState.selected).toBe(false)
-  })
-
   it("shrinks a roll into a chip after a beat, which the next roll replaces and closing keeps", () => {
     jest.useFakeTimers()
     jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable("pokemon")
 
-    fireEvent.press(view.getByTestId("dice-coin"))
+    fireEvent.press(view.getByTestId("arm-coin"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.getByTestId("dice-coin-flipping")).toBeTruthy()
     expect(view.getByTestId("dice-seat-1")).not.toHaveTextContent("Tails")
@@ -183,7 +142,7 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-chip-1-coin")).toHaveTextContent("Tails")
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
 
-    fireEvent.press(view.getByTestId("dice-coin"))
+    fireEvent.press(view.getByTestId("arm-coin"))
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.queryByTestId("dice-chip-1-coin")).toBeNull()
@@ -202,13 +161,13 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-close"))
     expect(view.getByTestId("dice-seat-2").props.accessibilityState.disabled).toBe(true)
     act(() => jest.advanceTimersByTime(260))
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.getByTestId("dice-seat-2").props.accessibilityState.disabled).toBe(true)
     act(() => jest.advanceTimersByTime(260))
@@ -222,12 +181,12 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.7)
     const view = renderTable("pokemon")
 
-    fireEvent.press(view.getByTestId("dice-coin"))
+    fireEvent.press(view.getByTestId("arm-coin"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     act(() => jest.advanceTimersByTime(700))
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("CoinTails")
 
-    fireEvent.press(view.getByTestId("dice-coin"))
+    fireEvent.press(view.getByTestId("arm-coin"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.getByTestId("dice-coin-flipping")).toBeTruthy()
     act(() => jest.advanceTimersByTime(700))
@@ -239,11 +198,11 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-chip-1-d20"))
     expect(view.queryByTestId("dice-chip-1-d20")).toBeNull()
   })
@@ -339,7 +298,7 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     view.changeGame("game-2")
     act(() => jest.runAllTimers())
@@ -354,7 +313,7 @@ describe("useDice", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderTable()
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     fireEvent.press(view.getByTestId("dice-close"))
     act(() => jest.runOnlyPendingTimers())
@@ -371,12 +330,12 @@ describe("useDice", () => {
     const view = renderTable()
     const region = () => view.getByTestId("dice-announcer", { includeHiddenElements: true })
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     act(() => jest.runOnlyPendingTimers())
     expect(region()).toHaveTextContent("Ada, d20, 11")
 
-    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("arm-d20"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(region()).toHaveTextContent("")
     act(() => jest.runOnlyPendingTimers())

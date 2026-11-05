@@ -1323,24 +1323,9 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
   })
 
-  it("rolls dice for any seat, including ones this device does not control", () => {
-    const random = jest.spyOn(Math, "random").mockReturnValue(0.5)
+  it("shows Log disabled until connected games have one", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    for (const card of screen.queryAllByTestId(/^life-card-seat-\d+$/))
-      fireEvent(card, "layout", {
-        nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 400 } },
-      })
     openConnectedMenu()
-    expect(screen.queryByTestId("setup-button")).toBeNull()
-    fireEvent.press(screen.getByTestId("dice-d20"))
-    expect(menuButtonLabel()).toBe("Close dice")
-
-    fireEvent.press(screen.getByTestId("dice-seat-1"))
-    expect(screen.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
-    expect(connectedHarness.runtime.changeLife).not.toHaveBeenCalled()
-
-    fireEvent.press(screen.getByTestId("game-menu-button"))
-    expect(screen.queryByTestId("dice-seat-1")).toBeNull()
-    random.mockRestore()
+    expect(screen.getByTestId("history-button").props.accessibilityState.disabled).toBe(true)
   })
 })

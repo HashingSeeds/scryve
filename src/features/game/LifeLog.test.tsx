@@ -13,7 +13,7 @@ import {
   asPlayerId,
   createLocalGame,
 } from "./domain"
-import { LifeLog, LifeLogContext, lifeLog, localLifeChanges } from "./LifeLog"
+import { gameLog, LifeLog, LifeLogContext, lifeLog, localLifeChanges } from "./LifeLog"
 import type { CommandContext, GameCommand } from "./types"
 
 jest.mock("convex/react", () => ({ usePaginatedQuery: jest.fn() }))
@@ -58,6 +58,41 @@ describe("life log", () => {
       [-2000, 6000],
       [-1200, 4800],
       [1000, 5800],
+    ])
+  })
+
+  it("lists the whole game newest first with each seat's resulting total, commander damage by its source, and no undone change", () => {
+    const pod = createLocalGame({
+      gameId: asGameId("pod"),
+      system: "mtg",
+      format: "commander",
+      startingLife: 40,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#fff" },
+      ],
+    })
+    const [ada, grace] = pod.players.map(({ id }) => id)
+    const commands: GameCommand[] = [
+      { type: "life.change", playerId: ada, delta: -3 },
+      { type: "commanderDamage.assign", fromPlayerId: grace, toPlayerId: ada, delta: 5 },
+      { type: "life.change", playerId: grace, delta: 2 },
+      { type: "life.change", playerId: ada, delta: -1 },
+      { type: "life.undo" },
+    ]
+    const game = commands.reduce((state, command) => applyGameCommand(state, command, context), pod)
+
+    expect(
+      gameLog(game.players, game.events).map(({ playerId, delta, life, fromPlayerId }) => [
+        playerId,
+        delta,
+        life,
+        fromPlayerId,
+      ]),
+    ).toEqual([
+      [grace, 2, 42, undefined],
+      [ada, -5, 32, grace],
+      [ada, -3, 37, undefined],
     ])
   })
 

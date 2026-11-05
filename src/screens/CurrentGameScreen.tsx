@@ -30,6 +30,7 @@ import {
 } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import type { BoardSize } from "@/features/game/GameBoardStage"
+import { GameLogDialog } from "@/features/game/GameLogDialog"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
@@ -117,6 +118,8 @@ export function CurrentGameScreen({
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
+  const [logOpen, setLogOpen] = useState(false)
+  const openLog = useCallback(() => setLogOpen(true), [])
   const clock = runtime.game.clock
   const isFresh = runtime.game.id !== resumedGameId && !hasLocalGameStarted(runtime.game)
   const match = runtime.game.match
@@ -189,6 +192,7 @@ export function CurrentGameScreen({
     attack,
     // why: rolling by hand means the players skipped the first-player offer.
     onDiceTool: markFirstPlayerUsed,
+    onLog: openLog,
     statusLine: match
       ? {
           text: translate("board:match.statusLine", {
@@ -409,6 +413,17 @@ export function CurrentGameScreen({
           players={runtime.game.players}
           onChange={runtime.changeClock}
           onClose={closeClock}
+        />
+      ) : null}
+
+      {logOpen ? (
+        <GameLogDialog
+          players={runtime.game.players}
+          events={events}
+          canUndo={runtime.canUndo}
+          origin={chrome.dialogOrigin}
+          onUndo={runtime.undo}
+          onClose={() => setLogOpen(false)}
         />
       ) : null}
 

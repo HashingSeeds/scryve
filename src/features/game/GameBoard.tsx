@@ -29,7 +29,7 @@ import { GameBoardStage, type GameBoardStageProps } from "./GameBoardStage"
 import { getPlayerGridLayoutOptions, type PlayerGridLayoutVariant } from "./playerLayouts"
 import type { GamePlayer } from "./types"
 import type { CommanderAttack } from "./useCommanderAttack"
-import { closingMenu, useDice } from "./useDice"
+import { useDice } from "./useDice"
 import type { SystemId } from "../../../convex/lib/systems"
 
 export type BoardPetal = Pick<
@@ -49,6 +49,7 @@ export interface BoardChromeOptions {
   petals: readonly [BoardPetal, BoardPetal]
   attack: Pick<CommanderAttack, "dispatch">
   onDiceTool?: () => void
+  onLog?: () => void
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
   accountEntry?: AccountEntry
@@ -70,6 +71,7 @@ export function useBoardChrome({
   petals: [third, end],
   attack: { dispatch },
   onDiceTool,
+  onLog,
   signal,
   statusLine,
   accountEntry,
@@ -134,16 +136,9 @@ export function useBoardChrome({
     () => rules && openRules(rules, () => system && onRules?.(system)),
   )
   const showDecks = stable("decks", () => onDecks?.())
-  const pickedDiceTool = stable("diceTool", () => {
-    setMenuOpen(false)
-    finishAttack()
-    onDiceTool?.()
-  })
-  const diceTools = useMemo(
-    () => closingMenu(dice.tools, pickedDiceTool),
-    [dice.tools, pickedDiceTool],
-  )
+  const showLog = stable("log", () => onLog?.())
   const decksEnabled = Boolean(onDecks)
+  const logEnabled = Boolean(onLog)
   const actions: GameMenuActions = useMemo(
     () => [
       {
@@ -152,7 +147,12 @@ export function useBoardChrome({
         disabled: !canPickLayout,
         onPress: fromMenu(() => setLayoutOpen(true)),
       },
-      { kind: "dice", label: translate("board:menu.dice"), tools: diceTools },
+      {
+        kind: "history",
+        label: translate("board:menu.log"),
+        disabled: !logEnabled,
+        onPress: fromMenu(showLog),
+      },
       { ...thirdPetal, onPress: fromMenu(pressThird) },
       hasRules
         ? {
@@ -171,13 +171,14 @@ export function useBoardChrome({
     [
       canPickLayout,
       decksEnabled,
-      diceTools,
       endPetal,
       fromMenu,
       hasRules,
+      logEnabled,
       pressEnd,
       pressThird,
       showDecks,
+      showLog,
       showRules,
       thirdPetal,
     ],

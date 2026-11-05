@@ -28,10 +28,6 @@ const board = {
     wonFlipGoFirstOrSecond: "{{name}} won the flip. Go first or second",
     goFirstOrSecond: "{{name}}, go first or second",
     choseSecond: "{{name}} chose second",
-    coinArmed: "Coin armed, tap a seat",
-    flipCoinForSeat: "Flip a coin for a seat",
-    dieArmed: "{{die}} armed, tap a seat",
-    rollDieForSeat: "Roll a {{die}} for a seat",
     clearsResult: "Clears this result",
     // Tiny badge on the player who goes first.
     firstShort: "1st",
@@ -495,16 +491,15 @@ const board = {
   },
   menu: {
     layout: "Layout",
-    dice: "Dice",
     game: "Game",
     history: "History",
+    // This game's list of life changes, opened from the game menu. Not the app's History of past games.
+    log: "Log",
     rules: "Rules",
     // Turns this local game into a connected game. Not sign in.
     connect: "Connect",
     end: "End",
     closeDice: "Close dice",
-    openDiceBag: "Open dice bag",
-    closeDiceBag: "Close dice bag",
     closeLayoutChooser: "Close layout chooser",
     showsConnectionDetails: "Shows connection details",
     open: "Game options",
@@ -512,6 +507,17 @@ const board = {
     collapses: "Collapses the game controls",
     expands: "Expands the game controls",
     actionWithDetail: "{{label}}, {{detail}}",
+  },
+  log: {
+    close: "Close log",
+    empty: "No changes yet",
+    // Shown after the change on a commander damage row: whose commander dealt it, as in "Grace's commander".
+    commanderFrom: "{{name}}'s commander",
+    // One row of the game log: a player's life change and the total it left them on, as in "Ada −3 to 17".
+    row: "{{name}} {{delta}} to {{life}}",
+    // A commander damage row, as in "Ada −5 from Grace's commander, to 12".
+    commanderRow: "{{name}} {{delta}} from {{from}}'s commander, to {{life}}",
+    undoLast: "Undo the last change",
   },
   calculator: {
     damage: "− Damage",
