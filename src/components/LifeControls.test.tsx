@@ -5,7 +5,7 @@ import { PLAYER_COLORS } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { accessibleForeground, contrastRatio } from "@/utils/colorContrast"
 
-import { glyphClearance, LifeControls, totalTargetBox } from "./LifeControls"
+import { glyphSlide, LifeControls, totalTargetBox } from "./LifeControls"
 
 describe("LifeControls", () => {
   it("maps taps to one life and delegates long presses to custom amount editing", () => {
@@ -241,17 +241,18 @@ describe("LifeControls", () => {
   })
 })
 
-describe("glyphClearance", () => {
-  const wideSeat = { width: 466, height: 148 }
+describe("glyphSlide", () => {
+  const sidewaysSeat = { width: 200, height: 420 }
 
-  it("steps a glyph past a strip that reaches the middle of its end", () => {
-    const strip = { x: 404, y: 40, width: 54, height: 100 }
-    expect(glyphClearance({ edge: "right", bounds: strip }, wideSeat, 34)).toBe(62)
-    expect(glyphClearance({ edge: "left", bounds: { ...strip, x: 8 } }, wideSeat, 34)).toBe(62)
+  it("slides a sideways glyph along its edge past a grid that reaches the middle of its end", () => {
+    const grid = { x: 8, y: 8, width: 90, height: 70 }
+    expect(glyphSlide({ edge: "top", bounds: grid }, sidewaysSeat, 50, 4)).toEqual({
+      paddingLeft: 2 * (98 + 4 + 25) - 200,
+    })
   })
 
-  it("leaves the glyph alone when the strip stays in its corner", () => {
-    const strip = { x: 404, y: 96, width: 54, height: 44 }
-    expect(glyphClearance({ edge: "right", bounds: strip }, wideSeat, 34)).toBe(0)
+  it("leaves the glyph alone when the grid stays in its corner", () => {
+    const grid = { x: 8, y: 8, width: 60, height: 70 }
+    expect(glyphSlide({ edge: "top", bounds: grid }, sidewaysSeat, 50, 4)).toBeUndefined()
   })
 })

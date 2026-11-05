@@ -71,34 +71,35 @@ const HALF_CARD_ZONES: readonly {
   { direction: 1, glyph: "+", edge: "right" },
 ]
 
-const ZONE_PADDING = {
-  top: "paddingTop",
-  bottom: "paddingBottom",
-  left: "paddingLeft",
-  right: "paddingRight",
-} as const satisfies Record<LifeCardEdge, keyof ViewStyle>
+const SLIDE_PADDING = {
+  x: ["paddingLeft", "paddingRight"],
+  y: ["paddingTop", "paddingBottom"],
+} as const
 
 function sidewaysZoneEdge(pinsToTopEdge: boolean): LifeCardEdge {
   return pinsToTopEdge ? "top" : "bottom"
 }
 
-/** why: on a wide seat the commander strip runs past the middle of its end, so the glyph there steps inward past it. */
-export function glyphClearance(
+/** why: on a short seat the commander grid reaches the middle of its end, so the glyph there slides along its edge until it clears the grid, and never steps inward toward the total. */
+export function glyphSlide(
   { edge, bounds }: { edge: LifeCardEdge; bounds: LayoutRectangle },
   zones: { width: number; height: number },
   glyphSize: number,
-) {
+  gap: number,
+): ViewStyle | undefined {
   const alongY = edge === "left" || edge === "right"
-  const [start, length, across] = alongY
+  const [start, length, run] = alongY
     ? [bounds.y, bounds.height, zones.height]
     : [bounds.x, bounds.width, zones.width]
-  if (start >= (across + glyphSize) / 2 || start + length <= (across - glyphSize) / 2) return 0
+  if (start >= (run + glyphSize) / 2 || start + length <= (run - glyphSize) / 2) return undefined
+  const gridAtFarEnd = start + length / 2 > run / 2
+  // why: the zone centers its glyph, so padding the grid's side by twice the overlap moves the glyph by the overlap; it stops where the glyph meets the far end.
+  const padding = gridAtFarEnd
+    ? run - 2 * (start - gap - glyphSize / 2)
+    : 2 * (start + length + gap + glyphSize / 2) - run
   return {
-    left: bounds.x + bounds.width,
-    right: zones.width - bounds.x,
-    top: bounds.y + bounds.height,
-    bottom: zones.height - bounds.y,
-  }[edge]
+    [SLIDE_PADDING[alongY ? "y" : "x"][gridAtFarEnd ? 1 : 0]]: Math.min(padding, run - glyphSize),
+  }
 }
 
 export function totalTargetBox(
@@ -316,8 +317,10 @@ export function LifeControls({
           const lineHeight =
             (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) *
             Math.min(fontScale, LIFE_MAX_FONT_SCALE)
-          const clearance =
-            obstacle?.edge === zoneEdge ? glyphClearance(obstacle, zonesSize, lineHeight) : 0
+          const slide =
+            obstacle?.edge === zoneEdge
+              ? glyphSlide(obstacle, zonesSize, lineHeight, spacing.xxs)
+              : undefined
           const overhang =
             sideways && deltaSize
               ? Math.max((getDeltaTextWidth(feedback, deltaSize, fontScale) - lineHeight) / 2, 0)
@@ -355,7 +358,7 @@ export function LifeControls({
                   : edge === "left"
                     ? themed($zoneLeft)
                     : themed($zoneRight),
-                clearance > 0 && { [ZONE_PADDING[zoneEdge]]: clearance + spacing.xxs },
+                slide,
                 pressed &&
                   !disabled &&
                   !locked && { backgroundColor: overlayTint(foreground, 0.14) },

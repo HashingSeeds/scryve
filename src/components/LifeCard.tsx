@@ -517,7 +517,7 @@ export const LifeCard = memo(function LifeCard({
       incoming: commanderDamage.incoming,
       attacked: !!stripAttackerId || sourceShown,
     })
-  // why: a grid grown only for an attack is mid-flight to or from the mark while the − and + fade, so only a grid that stays moves the glyph at its end inward.
+  // why: a grid grown only for an attack is mid-flight to or from the mark while the − and + fade, so only a grid that stays slides the glyph at its end.
   const stripStays =
     !!commanderDamage &&
     commanderStripShown &&

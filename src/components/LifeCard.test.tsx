@@ -930,6 +930,37 @@ describe("LifeCard", () => {
     }
   })
 
+  it("keeps a damaged seat's − at its own edge, sliding along it clear of a grid that reaches it", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={34}
+          color="#41476E"
+          commanderDamage={commanderDamage({
+            players: commanderPlayers,
+            incoming: { [commanderIds[1]]: 6 },
+          })}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    // why: a short, wide seat whose grid reaches past the middle of the −'s end.
+    const layout = { x: 12, y: 80, width: 70, height: 98 }
+    fireEvent(view.getByTestId("commander-strip-seat-1"), "layout", { nativeEvent: { layout } })
+    fireEvent(view.getByTestId("commander-map-seat-1"), "layout", {
+      nativeEvent: { layout: { ...layout, x: 0, y: 0 } },
+    })
+    fireEvent(view.getByTestId("life-control-zones"), "layout", {
+      nativeEvent: { layout: { width: 402, height: 190 } },
+    })
+
+    const minus = StyleSheet.flatten(view.getByTestId(lifeControlTestId(1, -1)).props.style)
+    expect(minus.paddingLeft).toBeUndefined()
+    expect(minus.paddingBottom).toBeGreaterThan(0)
+  })
+
   it("deals a hit with each tap anywhere on a defending card, and takes back the last one", () => {
     const onHit = jest.fn()
     const onUndo = jest.fn()
