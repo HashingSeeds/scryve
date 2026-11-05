@@ -1,5 +1,6 @@
 import { DEFAULT_LOCAL_SETTINGS } from "./localPersistence"
 import { settingsForWhatYouPlay } from "./whatYouPlay"
+import { NO_SYSTEM_SETTINGS } from "../../../test/fixtures/localSettings"
 
 const asked = { ...DEFAULT_LOCAL_SETTINGS, askWhatYouPlay: true } as const
 
@@ -16,7 +17,23 @@ describe("settingsForWhatYouPlay", () => {
     })
   })
 
-  it("keeps today's defaults for no system", () => {
-    expect(settingsForWhatYouPlay(asked, { id: "none" })).toEqual(DEFAULT_LOCAL_SETTINGS)
+  it("starts other games head to head", () => {
+    expect(
+      settingsForWhatYouPlay(asked, {
+        id: "pokemon-standard",
+        system: "pokemon",
+        format: "standard",
+      }),
+    ).toEqual({
+      ...DEFAULT_LOCAL_SETTINGS,
+      defaultSystem: "pokemon",
+      defaultFormat: "standard",
+      defaultPlayerCount: 2,
+      defaultStartingLife: 6,
+    })
+  })
+
+  it("clears the system for no system", () => {
+    expect(settingsForWhatYouPlay(asked, { id: "none" })).toEqual(NO_SYSTEM_SETTINGS)
   })
 })

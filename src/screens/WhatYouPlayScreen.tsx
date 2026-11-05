@@ -17,13 +17,11 @@ import {
   MORE_GAME_TYPES,
   type GameType,
 } from "@/features/game/gameTypes"
-import { COMMANDER_SEATS } from "@/features/game/whatYouPlay"
+import { whatYouPlaySeats } from "@/features/game/whatYouPlay"
 import { useFirstUseSharing } from "@/features/legal/useFirstUseSharing"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
-
-import { isCommanderFormat } from "../../convex/lib/gameRules"
 
 const BRAND_EYEBROW = "SCRYVE"
 
@@ -37,11 +35,10 @@ const FIRST_GAME_TYPES = {
 }
 
 export interface WhatYouPlayScreenProps {
-  defaultPlayerCount: number
   onChoose: (type: GameType) => void
 }
 
-export function WhatYouPlayScreen({ defaultPlayerCount, onChoose }: WhatYouPlayScreenProps) {
+export function WhatYouPlayScreen({ onChoose }: WhatYouPlayScreenProps) {
   const { themed } = useAppTheme()
   const [chosen, setChosen] = useState<GameType>()
   const { configured, sharing, setSharing, saveFailed, saveSharing } = useFirstUseSharing()
@@ -57,12 +54,7 @@ export function WhatYouPlayScreen({ defaultPlayerCount, onChoose }: WhatYouPlayS
           <GameTypeList
             types={FIRST_GAME_TYPES}
             selectedId={chosen?.id}
-            detail={(type) =>
-              gameTypeDetail(
-                type,
-                isCommanderFormat(type.system, type.format) ? COMMANDER_SEATS : defaultPlayerCount,
-              )
-            }
+            detail={(type) => gameTypeDetail(type, whatYouPlaySeats(type))}
             onChoose={setChosen}
           />
           <Text tx="play:whatYouPlay.changeLater" size="xs" tone="dim" />

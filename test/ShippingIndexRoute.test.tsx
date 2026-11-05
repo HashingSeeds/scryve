@@ -135,6 +135,7 @@ describe("shipping index route", () => {
       ...DEFAULT_LOCAL_SETTINGS,
       defaultSystem: "pokemon",
       defaultFormat: "standard",
+      defaultPlayerCount: 2,
       defaultStartingLife: 6,
     })
   })
@@ -262,6 +263,7 @@ describe("shipping index route", () => {
       ...DEFAULT_LOCAL_SETTINGS,
       defaultSystem: "ygo",
       defaultFormat: "advanced",
+      defaultPlayerCount: 2,
       defaultStartingLife: 8000,
     })
 
@@ -280,7 +282,7 @@ describe("shipping index route", () => {
         <Index />
       </ThemeProvider>,
     )
-    expect(view.getByLabelText("2 player life grid")).toBeTruthy()
+    expect(view.getByLabelText("4 player life grid")).toBeTruthy()
 
     mockSearchParams = {
       destination: "play",

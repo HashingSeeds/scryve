@@ -95,10 +95,18 @@ export interface LocalSettings {
   syncStats?: boolean
 }
 
+export const COMMANDER_SEATS = 4
+
+const COMMANDER_POD = {
+  defaultSystem: "mtg",
+  defaultFormat: "commander",
+  defaultPlayerCount: COMMANDER_SEATS,
+  defaultStartingLife: defaultStartingLife("mtg", "commander", COMMANDER_SEATS),
+} satisfies Partial<LocalSettings>
+
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   schemaVersion: 1,
-  defaultPlayerCount: 2,
-  defaultStartingLife: 20,
+  ...COMMANDER_POD,
   hapticsEnabled: true,
   themePreference: "system",
   launchDestination: "play",
@@ -532,6 +540,16 @@ function migrateBrawlStartingLife(settings: LocalSettings): LocalSettings {
     : settings
 }
 
+function migrateOldTwoPlayerFallback(settings: LocalSettings): LocalSettings {
+  const { defaultSystem, defaultFormat, defaultPlayerCount, defaultStartingLife: life } = settings
+  return defaultSystem === undefined &&
+    defaultFormat === undefined &&
+    defaultPlayerCount === 2 &&
+    life === 20
+    ? { ...settings, ...COMMANDER_POD }
+    : settings
+}
+
 function parseSystemPreference(
   system: unknown,
   format: unknown,
@@ -685,14 +703,20 @@ export class LocalGameRepository {
     const storedText = this.storage.getString(LOCAL_KEYS.settings)
     const stored = parseJson(storedText)
     const current = parseSettings(stored)
-    if (current && isRecord(stored) && stored.brawlLifeMigrated === true) return current
+    const flags = current && isRecord(stored) ? stored : {}
+    if (current && flags.brawlLifeMigrated === true && flags.podDefaultMigrated === true)
+      return current
     const legacyText = current ? undefined : this.storage.getString(LOCAL_KEYS.legacySettings)
     const legacy = parseSettings(parseJson(legacyText))
     const found = current ?? legacy
     // why: every launch saves settings, so nothing stored at all means this install has never opened.
     const freshInstall = storedText === undefined && legacyText === undefined
-    const settings: LocalSettings = found
-      ? migrateBrawlStartingLife(found)
+    const brawlChecked =
+      found && flags.brawlLifeMigrated !== true ? migrateBrawlStartingLife(found) : found
+    const settings: LocalSettings = brawlChecked
+      ? flags.podDefaultMigrated === true
+        ? brawlChecked
+        : migrateOldTwoPlayerFallback(brawlChecked)
       : freshInstall
         ? { ...DEFAULT_LOCAL_SETTINGS, askWhatYouPlay: true }
         : DEFAULT_LOCAL_SETTINGS
@@ -708,8 +732,22 @@ export class LocalGameRepository {
 
   saveSettings(settings: LocalSettings): void {
     const valid = parseSettings(settings) ?? DEFAULT_LOCAL_SETTINGS
-    // why: anything this build saves is past the one-time Brawl fix, so a 20 chosen afterward is never migrated again.
-    this.storage.set(LOCAL_KEYS.settings, JSON.stringify({ ...valid, brawlLifeMigrated: true }))
+    // why: anything this build saves is past the one-time Brawl and pod fixes, so a 20 or a 2/20 chosen afterward is never migrated again.
+    this.storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({ ...valid, brawlLifeMigrated: true, podDefaultMigrated: true }),
+    )
+  }
+
+  saveDefaultsFrom(game: Pick<LocalGame, "players" | "startingLife" | "system" | "format">): void {
+    const { defaultSystem: _system, defaultFormat: _format, ...rest } = this.loadSettings()
+    const next = parseSettings({
+      ...rest,
+      defaultPlayerCount: game.players.length,
+      defaultStartingLife: game.startingLife,
+      ...(game.system ? { defaultSystem: game.system, defaultFormat: game.format } : {}),
+    })
+    if (next) this.saveSettings(next)
   }
 
   loadRecentSetups(): RecentSetup[] {

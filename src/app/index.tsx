@@ -134,7 +134,6 @@ export default function Index() {
   if (settings.askWhatYouPlay && !activeGame && !prepared) {
     return (
       <WhatYouPlayScreen
-        defaultPlayerCount={settings.defaultPlayerCount}
         onChoose={(type) => {
           const next = settingsForWhatYouPlay(settings, type)
           localGameRepository.saveSettings(next)

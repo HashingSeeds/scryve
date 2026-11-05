@@ -17,6 +17,7 @@ export function startLocalGame(setup: LocalSetup & { account?: LocalGameAccountI
   if (account) localGameRepository.saveMeSeat(account.meSeat)
   localGameRepository.rememberSetup({ mode: "local", game })
   localGameRepository.saveActiveGame(created)
+  localGameRepository.saveDefaultsFrom(created)
   // why: setup sits above the board it came from, so replacing it would stack a second board that never unmounts.
   router.dismissTo({
     pathname: "/",
