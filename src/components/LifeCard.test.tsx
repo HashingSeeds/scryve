@@ -1099,23 +1099,33 @@ describe("LifeCard", () => {
     expect(view.getByText("+1")).toBeTruthy()
   })
 
-  it("drops a held change that slides off or becomes a long press", () => {
+  it("drops a held change that slides off", () => {
     const onChange = jest.fn()
     const view = render(card(20, onChange))
     const minus = view.getByTestId("life-seat-1--1")
 
     fireEvent(minus, "pressIn")
-    act(() => jest.advanceTimersByTime(2000))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("19")
-    expect(view.getByText("-1")).toBeTruthy()
     fireEvent(minus, "pressOut")
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("20")
     expect(view.getByText("−")).toBeTruthy()
-    expect(view.getByText("+")).toBeTruthy()
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("withdraws the preview once a press outlasts a tap, so a hold opens the editor unchanged", () => {
+    const onChange = jest.fn()
+    const view = render(card(20, onChange))
+    const minus = view.getByTestId("life-seat-1--1")
 
     fireEvent(minus, "pressIn")
+    act(() => jest.advanceTimersByTime(149))
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("19")
+    act(() => jest.advanceTimersByTime(1))
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("20")
+    expect(view.getByText("−")).toBeTruthy()
+
     fireEvent(minus, "longPress")
+    fireEvent(minus, "pressOut")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
     expect(onChange).not.toHaveBeenCalled()
   })
@@ -1284,6 +1294,17 @@ describe("LifeCard", () => {
     )
   })
 
+  it("opens the editor from a tap on the total", () => {
+    const onChange = jest.fn()
+    const view = render(card(20, onChange))
+    fireEvent(view.getByTestId("life-control-zones"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 300 } },
+    })
+    fireEvent.press(view.getByTestId("life-total-target-seat-1"))
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it("uses Magic quick amounts", () => {
     const onChange = jest.fn()
     const view = render(card(20, onChange))
@@ -1352,9 +1373,9 @@ describe("LifeCard", () => {
     const view = render(card(20, onChange))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     const slider = view.getByTestId("life-editor-slider-seat-1")
-    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 400 } } })
     fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
-    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 125, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 150, pageY: 100 } })
     expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("25")
     view.rerender(card(30, onChange))
     expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("35")
@@ -1368,15 +1389,15 @@ describe("LifeCard", () => {
     const view = render(card(20, onChange))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     const slider = view.getByTestId("life-editor-slider-seat-1")
-    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 400 } } })
     fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
-    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 200, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 300, pageY: 100 } })
     expect(
       StyleSheet.flatten(view.getByTestId("life-editor-balloon-pointer-seat-1").props.style),
     ).toMatchObject({ borderTopWidth: 10, borderLeftWidth: 8, borderRightWidth: 8 })
     act(() => jest.advanceTimersByTime(350 + 3 * 110))
     expect(view.getByText("+23")).toBeTruthy()
-    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 190, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 280, pageY: 100 } })
     expect(view.getByText("+21")).toBeTruthy()
     fireEvent(slider, "responderRelease")
     expect(onChange).toHaveBeenCalledTimes(1)
