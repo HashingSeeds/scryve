@@ -141,7 +141,6 @@ jobs:
         if: matrix.platform == 'ios'
         run: xcodebuild -version
 
-      # why: a simulator build needs no signing, so the view-only Expo robot is enough.
       - name: Build iOS
         if: matrix.platform == 'ios'
         env:
