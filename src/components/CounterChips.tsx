@@ -690,28 +690,28 @@ function CounterSheet({
                 />
               )
             })}
+            {/* why: rule links sit apart from the options, so a slipped tap never leaves the game, and come last so they never crowd an option out of view. */}
+            {openRule && designationRules.length > 0 ? (
+              <View style={themed($ruleLinks)}>
+                {designationRules.map(({ id, rule }) => (
+                  <BoardPressable
+                    key={id}
+                    testID={`designation-rule-${seatNumber}-${id}`}
+                    accessibilityRole="link"
+                    accessibilityLabel={translate("board:counters.rule", { rule })}
+                    onPress={() => openRule(rule)}
+                    style={({ pressed }) => [
+                      themed($ruleLinkButton),
+                      pressed && { backgroundColor: overlayTint(ink, 0.14) },
+                    ]}
+                  >
+                    <TableGlyph id={id} size={12} color={ink} />
+                    <Text text={`§${rule}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
+                  </BoardPressable>
+                ))}
+              </View>
+            ) : null}
           </ScrollView>
-          {/* why: rule links sit apart from the options, so a slipped tap never leaves the game. */}
-          {openRule && designationRules.length > 0 ? (
-            <View style={themed($ruleLinks)}>
-              {designationRules.map(({ id, rule }) => (
-                <BoardPressable
-                  key={id}
-                  testID={`designation-rule-${seatNumber}-${id}`}
-                  accessibilityRole="link"
-                  accessibilityLabel={translate("board:counters.rule", { rule })}
-                  onPress={() => openRule(rule)}
-                  style={({ pressed }) => [
-                    themed($ruleLinkButton),
-                    pressed && { backgroundColor: overlayTint(ink, 0.14) },
-                  ]}
-                >
-                  <TableGlyph id={id} size={12} color={ink} />
-                  <Text text={`§${rule}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
-                </BoardPressable>
-              ))}
-            </View>
-          ) : null}
         </>
       )}
       <BoardPressable
@@ -970,6 +970,7 @@ const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
 })
 
 const $ruleLinks: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: "100%",
   flexDirection: "row",
   justifyContent: "center",
   gap: spacing.md,

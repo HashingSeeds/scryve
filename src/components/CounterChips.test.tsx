@@ -1,5 +1,5 @@
-import { AccessibilityInfo, Platform, StyleSheet } from "react-native"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { AccessibilityInfo, Platform, ScrollView, StyleSheet } from "react-native"
+import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { playTableRules } from "@/features/game/playSystems"
 import { ThemeProvider } from "@/theme/context"
@@ -178,6 +178,16 @@ describe("CounterChips", () => {
     fireEvent.press(view.getByLabelText("Rule 725"))
     expect(openRule).toHaveBeenCalledWith("725")
     expect(table.takeDesignation).not.toHaveBeenCalled()
+  })
+
+  it("scrolls the rule links after the options, so they never push Monarch out of view", () => {
+    const table = seat({ tableItemRules: { monarch: "725" }, openRule: jest.fn() })
+    const view = chips(table)
+
+    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    const options = within(view.UNSAFE_getByType(ScrollView))
+    expect(options.getByTestId("designation-option-1-monarch")).toBeTruthy()
+    expect(options.getByTestId("designation-rule-1-monarch")).toBeTruthy()
   })
 
   it("shows another device's chips without letting this one change them", () => {
