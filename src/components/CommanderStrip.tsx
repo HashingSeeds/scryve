@@ -33,6 +33,7 @@ import {
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
+import { targetSlop } from "./touchTarget"
 
 const DISC_SIZE = 24
 const COMPACT_DISC_SIZE = 20
@@ -116,6 +117,7 @@ export const CommanderStrip = memo(function CommanderStrip({
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
   const corner = stripCorner(contentRotation, contentInsets)
   const [edge, side] = corner
+  const offsets = stripEdge(corner, spacing.xs, contentInsets, screenEdges)
   const [horizontal, vertical] = edge === "left" || edge === "right" ? [edge, side] : [side, edge]
   const closePosition: ViewStyle = {
     alignItems: horizontal === "left" ? "flex-start" : "flex-end",
@@ -150,7 +152,7 @@ export const CommanderStrip = memo(function CommanderStrip({
       pointerEvents={attackerId ? "none" : "auto"}
       style={[
         themed($strip),
-        stripEdge(corner, spacing.xs, contentInsets, screenEdges),
+        offsets,
         {
           flexDirection: stripDirection(contentRotation),
         },
@@ -180,7 +182,13 @@ export const CommanderStrip = memo(function CommanderStrip({
         accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
         accessible={!attackerId}
         disabled={inspectDisabled || !!attackerId}
-        hitSlop={open ? 12 : 2}
+        hitSlop={
+          mapBounds
+            ? targetSlop(mapBounds, { [edge]: offsets[edge], [side]: offsets[side] }, open ? 12 : 2)
+            : open
+              ? 12
+              : 2
+        }
         onPress={onToggle}
         style={({ pressed }) => [themed($map), pressed && { opacity: 0.72 }]}
       >
@@ -220,7 +228,7 @@ export const CommanderStrip = memo(function CommanderStrip({
               const ink = accessibleForeground(player.color)
               const attacking = playerId === attackerId
               const restOpacity = total === 0 ? IDLE_OPACITY : 1
-              const restBorder = total >= lethal ? foreground : overlayTint(foreground, 0.5)
+              const restBorder = total >= lethal ? foreground : overlayTint(foreground, RIM_ALPHA)
               const count = (
                 <Text
                   testID={attacking ? `commander-total-seat-${seatNumber}` : undefined}
@@ -422,7 +430,7 @@ function stripEdge(
   gap: number,
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
-): ViewStyle {
+): Partial<Record<LifeCardEdge, number>> {
   return {
     [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
     [side]: cornerOffset(gap, side, edge, insets, screenEdges),
@@ -482,6 +490,8 @@ const $overlaid: ViewStyle = {
   justifyContent: "center",
 }
 const IDLE_OPACITY = 0.45
+// why: the lowest rim that, drawn over any attacker's disc, keeps 3:1 against every seat color, so each disc stands off its card.
+const RIM_ALPHA = 0.75
 const OWN_OPACITY = 0.35
 const FADED_OPACITY = 0.3
 const $aboveShadow: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }

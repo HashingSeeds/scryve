@@ -281,7 +281,7 @@ describe("LifeCard", () => {
   )
 
   it.each([0, 90, -90, 180] as const)(
-    "expands the commander map and keeps life visible at %s degrees",
+    "expands the commander map and rings the total beside it at %s degrees",
     (rotation) => {
       const props = {
         playerName: "Ada",
@@ -317,18 +317,16 @@ describe("LifeCard", () => {
         nativeEvent: { layout: { x: 0, y: 56, width: 100, height: 200 } },
       })
       expect(view.getByTestId("life-total-seat-1")).toBeVisible()
-      const offset = (Math.abs(rotation) === 90 ? 100 : 150) - darkTheme.spacing.xs - 24
-      expect(view.getByTestId("life-readout-seat-1")).toHaveStyle({
-        transform: [
-          { translateX: rotation === 90 ? offset : rotation === -90 ? -offset : 0 },
-          { translateY: rotation === 0 ? -offset : rotation === 180 ? offset : 0 },
-          {
-            scale: expect.closeTo(
-              32 / StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style).fontSize,
-            ),
-          },
-        ],
-      })
+      // why: the total moves onto its ring's center, give or take where its digits sit in the line.
+      const ring = StyleSheet.flatten(
+        view.getByTestId("commander-overview-ring-seat-1").props.style,
+      )
+      const [moveX, moveY, shrink] = StyleSheet.flatten(
+        view.getByTestId("life-readout-seat-1").props.style,
+      ).transform
+      expect(Math.abs(moveX.translateX - (ring.left + ring.width / 2 - 100))).toBeLessThan(6)
+      expect(Math.abs(moveY.translateY - (ring.top + ring.height / 2 - 150))).toBeLessThan(6)
+      expect(shrink.scale).toBeLessThan(1)
       expect(view.getByTestId("commander-board-seat-1")).toBeVisible()
       view.rerender(renderInspection(false))
       expect(view.getByTestId("commander-strip-seat-1")).toBeVisible()
@@ -366,7 +364,7 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-mark-seat-1")).toBeVisible()
   })
 
-  it("uses the card origin and full bottom space for a vertical inspection grid", () => {
+  it("fits a vertical inspection grid beside the total's disc, clear of the bottom inset", () => {
     const players = Array.from({ length: 5 }, (_, seat) => ({
       id: asPlayerId(`player-${seat + 1}`),
       seat,
@@ -402,13 +400,16 @@ describe("LifeCard", () => {
     fireEvent(view.getByTestId("life-card-seat-5"), "layout", {
       nativeEvent: { layout: { width: 400, height: 300 } },
     })
+    // why: a compact wide seat keeps 32 clear of each edge, past the bottom inset, and its 88 disc and 8 gap take the left.
     expect(view.getByTestId("commander-overview-content-seat-5")).toHaveStyle({
       top: 0,
       left: 0,
-      paddingTop: 56,
-      paddingBottom: 0,
+      paddingTop: 32,
+      paddingBottom: 34 + 32,
+      paddingLeft: 32 + 88 + 8,
+      paddingRight: 32,
     })
-    const availableHeight = 300 - darkTheme.spacing.xxs * 2 - 56
+    const availableHeight = 300 - darkTheme.spacing.xxs * 2 - 32 - 66
     expect(view.getByTestId("commander-cell-seat-5-player-1")).toHaveStyle({
       height: Math.floor((availableHeight - darkTheme.spacing.xxxs * 2) / 3),
     })

@@ -2,7 +2,11 @@ import { Platform } from "react-native"
 
 import type { PlayerId } from "@/features/game/types"
 
-import { getLifeLineHeight } from "./playerCardTypes"
+import {
+  getLifeLineHeight,
+  type LifeCardContentRotation,
+  type LifeCardEdge,
+} from "./playerCardTypes"
 
 export interface CommanderBoardSeat {
   playerId: PlayerId
@@ -178,6 +182,8 @@ export interface ReadoutInk {
 
 // why: the disc keeps this gap from the card's edges.
 const DISC_GAP = 6
+// why: the disc's ring matches the board's gutter between cards, and the damage arc runs along it.
+export const DISC_RING = 4
 // why: a readout never shrinks past legibility, even if it then runs past a tiny card's disc.
 const MIN_FIT = 0.6
 // why: Rubik Bold digits ink about 0.64em wide and 0.72em tall, and the disc keeps clear of the ink box's corners by DISC_CLEARANCE.
@@ -286,4 +292,80 @@ export function commanderTakeover(input: {
         ),
       },
   }
+}
+
+type Edge = LifeCardEdge
+type Padding = {
+  paddingTop: number
+  paddingRight: number
+  paddingBottom: number
+  paddingLeft: number
+}
+
+// why: which card edge each edge of a seat's own upright content faces.
+const CARD_EDGE = {
+  0: { top: "top", right: "right", bottom: "bottom", left: "left" },
+  90: { top: "right", right: "bottom", bottom: "left", left: "top" },
+  [-90]: { top: "left", right: "top", bottom: "right", left: "bottom" },
+  180: { top: "bottom", right: "left", bottom: "top", left: "right" },
+} as const satisfies Record<LifeCardContentRotation, Record<Edge, Edge>>
+
+const EDGES = ["top", "right", "bottom", "left"] as const
+
+const PADDING = {
+  top: "paddingTop",
+  right: "paddingRight",
+  bottom: "paddingBottom",
+  left: "paddingLeft",
+} as const
+
+export interface CommanderOverview {
+  life: { x: number; y: number; scale: number }
+  ring: { x: number; y: number; size: number }
+  padding: Padding
+}
+
+/** why: a seat showing the damage it has taken keeps its total, shrunk into a ringed disc as a target's is during an attack, with the breakdown beside it along the seat's long side. The pair centers as one; until the breakdown measures, it is taken to fill its box. Moves run from the card's center in card space, and `padding` pads the card down to the breakdown's box. */
+export function commanderOverview(input: {
+  card: { width: number; height: number }
+  rotation: LifeCardContentRotation
+  insets?: Record<Edge, number>
+  lifeFontSize: number
+  ink: ReadoutInk
+  board?: { width: number; height: number } | null
+  compact?: boolean
+}): CommanderOverview {
+  const { card, rotation, lifeFontSize, ink, board, compact } = input
+  const edges = CARD_EDGE[rotation]
+  const sideways = Math.abs(rotation) === 90
+  const content = sideways
+    ? { width: card.height, height: card.width }
+    : { width: card.width, height: card.height }
+  const inset = (edge: Edge) => input.insets?.[edges[edge]] ?? 0
+  const row = content.width >= content.height
+  const [start, end, crossStart, crossEnd] = row
+    ? (["left", "right", "top", "bottom"] as const)
+    : (["top", "bottom", "left", "right"] as const)
+  // why: the reserve clears the name, the counter chips and the strip at the card's edges.
+  const reserve = compact ? 32 : 44
+  const gap = compact ? 8 : 16
+  const main = row ? content.width : content.height
+  const cross = row ? content.height : content.width
+  const mainRoom = main - inset(start) - inset(end) - reserve * 2
+  const crossRoom = cross - inset(crossStart) - inset(crossEnd) - reserve * 2
+  const size = Math.max(0, Math.min(crossRoom, mainRoom * 0.4, compact ? 88 : 120))
+  // why: content's x axis runs along the card's y axis on a sideways seat.
+  const boardMain = board ? (row === sideways ? board.height : board.width) : mainRoom - size - gap
+  const mainAt = (inset(start) - inset(end)) / 2 - (boardMain + gap) / 2
+  const crossAt = (inset(crossStart) - inset(crossEnd)) / 2
+  const needed = Math.hypot(ink.width, ink.height) / 2 + lifeFontSize * DISC_CLEARANCE
+  const scale = needed > 0 ? Math.min(1, Math.max(0, size / 2 - DISC_RING) / needed) : 1
+  const disc = row ? { x: mainAt, y: crossAt } : { x: crossAt, y: mainAt }
+  const ring = rotate(disc.x, disc.y, rotation)
+  // why: the total shrinks about its line box's center, and its ink sits `ink.y` off that.
+  const life = rotate(disc.x, disc.y - ink.y * scale, rotation)
+  const pad = (edge: Edge) => inset(edge) + reserve + (edge === start ? size + gap : 0)
+  const padding: Padding = { paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0 }
+  for (const edge of EDGES) padding[PADDING[edges[edge]]] = pad(edge)
+  return { life: { ...life, scale }, ring: { ...ring, size }, padding }
 }

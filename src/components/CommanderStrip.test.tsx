@@ -51,6 +51,18 @@ describe("CommanderStrip", () => {
     expect(onToggle).toHaveBeenCalledTimes(1)
   })
 
+  it("reaches a 48 dp target around a one-row grid without drawing it bigger", () => {
+    const view = renderStrip({ incoming: damaged })
+    const map = view.getByTestId("commander-map-seat-1")
+    fireEvent(map, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 58, height: 32 } } })
+    expect(view.getByTestId("commander-map-seat-1").props.hitSlop).toEqual({
+      top: 8,
+      bottom: 8,
+      left: 2,
+      right: 2,
+    })
+  })
+
   it("stays hidden until someone deals damage", () => {
     const view = renderStrip()
     expect(view.queryByTestId("commander-strip-seat-1")).toBeNull()

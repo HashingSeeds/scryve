@@ -82,14 +82,34 @@ describe("CounterChips", () => {
   it("shortens Commander tax only when the sheet's columns are too narrow for it", () => {
     const wide = chips(seat(), { cardSize: { width: 460, height: 400 } })
     fireEvent.press(wide.getByTestId("counter-add-seat-1"))
-    expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("+2Commander tax")
+    expect(wide.getByTestId("counter-option-1-commanderTax")).toHaveTextContent("0Commander tax")
     wide.unmount()
 
     const narrow = chips(seat(), { cardSize: { width: 320, height: 400 } })
     fireEvent.press(narrow.getByTestId("counter-add-seat-1"))
     const tax = narrow.getByTestId("counter-option-1-commanderTax")
-    expect(tax).toHaveTextContent("+2Tax")
+    expect(tax).toHaveTextContent("0Tax")
     expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
+  })
+
+  it("keeps a compact plus's reach off the chip beside it and inside the card", () => {
+    const view = chips(seat({ counters: { poison: 1 } }), { compact: true })
+    const plus = view.getByTestId("counter-add-seat-1")
+    const { left, top } = plus.props.hitSlop
+    expect(StyleSheet.flatten(plus.props.style).marginLeft).toBe(left)
+    const rowTop = StyleSheet.flatten(view.getByTestId("counter-chips-seat-1").props.style).top
+    expect(top).toBeLessThanOrEqual(rowTop)
+    expect(top + plus.props.hitSlop.bottom + 32).toBe(48)
+  })
+
+  it("reaches down, not into the row above, once the plus wraps", () => {
+    const view = chips(seat({ counters: { poison: 1 } }), { compact: true })
+    const plus = view.getByTestId("counter-add-seat-1")
+    fireEvent(plus, "layout", { nativeEvent: { layout: { x: 0, y: 32, width: 28, height: 32 } } })
+    expect(view.getByTestId("counter-add-seat-1").props.hitSlop).toMatchObject({
+      top: 0,
+      bottom: 16,
+    })
   })
 
   it("closes the sheet from the spot the plus opened it", () => {
