@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+const { execFileSync } = require("child_process")
+const path = require("path")
+
+const tsrs = path.join(__dirname, "../../../node_modules/tsrs/bin/tsrs")
+
+if (process.argv[2] === "--version") {
+  const out = execFileSync(process.execPath, [tsrs, "--version"], { encoding: "utf8" })
+  console.log(out.split(" (")[0].trim())
+} else {
+  require(tsrs)
+}

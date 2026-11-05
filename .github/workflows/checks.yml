@@ -128,13 +128,13 @@ jobs:
       - name: Check lint
         run: pnpm lint:check
 
-      # tsc's build info tracks file hashes and compiler options itself, so any older entry is safe.
+      # tsrs's build info tracks file hashes and compiler options itself, so any older entry is safe.
       - name: Restore TypeScript build info
         uses: actions/cache@v4
         with:
-          path: node_modules/.cache/tsc
-          key: tsc-${{ github.sha }}
-          restore-keys: tsc-
+          path: node_modules/.cache/tsrs
+          key: tsrs-${{ github.sha }}
+          restore-keys: tsrs-
 
       - name: Type-check app and tests
         run: pnpm compile

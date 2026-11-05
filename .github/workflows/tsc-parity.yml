@@ -1,0 +1,58 @@
+name: tsc-parity
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Keep this list and the tsrs flags in sync with the compile and check:ygo-worker scripts in
+      # package.json. Each multi-line diagnostic is joined into one line, then sorted, because tsrs
+      # checks files in parallel and may print them in another order.
+      - name: Compare tsc and tsrs diagnostics
+        shell: bash
+        run: |
+          set +e
+          status=0
+          normalize() {
+            awk '/^[[:space:]]/ { line = line " " $0; next } { if (line != "") print line; line = $0 } END { if (line != "") print line }' "$1" | sort
+          }
+          for project in tsconfig.json test/test-tsconfig.json workers/ygo-image-mirror/tsconfig.json workers/ygo-image-mirror/sync/tsconfig.json workers/ygo-image-mirror/test/tsconfig.json; do
+            pnpm exec tsc --noEmit --pretty false -p "$project" > "$RUNNER_TEMP/tsc.out"
+            tsc_exit=$?
+            pnpm exec tsrs --noEmit --fast --pretty false -p "$project" > "$RUNNER_TEMP/tsrs.out"
+            tsrs_exit=$?
+            # Diagnostics exit 1 from tsc 7.0.2 (2 is a panic) and 2 from tsrs; anything higher is a crash.
+            if [ "$tsc_exit" -gt 1 ] || [ "$tsrs_exit" -gt 2 ] || ! diff -u --label tsc --label tsrs <(normalize "$RUNNER_TEMP/tsc.out") <(normalize "$RUNNER_TEMP/tsrs.out"); then
+              echo "::error title=tsc and tsrs disagree::$project (tsc exit $tsc_exit, tsrs exit $tsrs_exit)"
+              echo "- $project: tsc exit $tsc_exit, tsrs exit $tsrs_exit, diagnostics differ" >> "$GITHUB_STEP_SUMMARY"
+              status=1
+            else
+              echo "- $project: $(wc -l < "$RUNNER_TEMP/tsc.out" | tr -d ' ') lines, same in both" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          exit "$status"
