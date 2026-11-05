@@ -20,6 +20,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
+import { BoardPressable } from "./BoardPressable"
 import { DialogCard, type DialogOrigin } from "./DialogCard"
 import { Text } from "./Text"
 
@@ -212,7 +213,7 @@ export function AppUtilityMenu({
     </>
   )
   const trigger = (
-    <Pressable
+    <BoardPressable
       testID="utility-menu-button"
       accessibilityRole="button"
       accessibilityLabel={translate(
@@ -242,7 +243,7 @@ export function AppUtilityMenu({
         />
       )}
       {updateDot ? <View testID="utility-update-dot" style={themed($updateDot)} /> : null}
-    </Pressable>
+    </BoardPressable>
   )
 
   if (placement === "board")
