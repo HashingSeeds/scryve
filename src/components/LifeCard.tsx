@@ -1005,7 +1005,11 @@ export const LifeCard = memo(function LifeCard({
                 <View pointerEvents="none">{seatIdentity}</View>
               )}
             </View>
-            {diceChips?.length && dice?.onPressChip && !dice.view && !editorOpen ? (
+            {diceChips?.length &&
+            dice?.onPressChip &&
+            !dice.view &&
+            !editorOpen &&
+            !attackerSide ? (
               <DiceChips
                 seatNumber={seatNumber}
                 playerName={displayName}
