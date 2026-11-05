@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+// why: Convex type-checks only with typescript/bin/tsc or this tsgo path; without it `convex deploy` skips the check.
+const { execFileSync } = require("child_process")
+const path = require("path")
+
+const tsrs = path.join(__dirname, "../../../node_modules/tsrs/bin/tsrs")
+
+if (process.argv[2] === "--version") {
+  // why: Convex semver-parses everything after "Version " and crashes on tsrs's "(tsrs …)" suffix.
+  const out = execFileSync(process.execPath, [tsrs, "--version"], { encoding: "utf8" })
+  console.log(out.split(" (")[0].trim())
+} else {
+  require(tsrs)
+}
