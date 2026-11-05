@@ -580,7 +580,7 @@ function CounterSheet({
                 hitSlop={8}
                 onPress={() => openRule(ruleId)}
               >
-                <Text text={ruleId} size="xs" style={[$ruleLink, { color: ink }]} />
+                <Text text={`§${ruleId}`} size="xs" style={[$ruleLink, { color: ink }]} />
               </BoardPressable>
             ) : null}
           </View>
@@ -774,6 +774,7 @@ function SheetOption({
         onPress={onPress}
         style={({ pressed }) => [
           themed($option),
+          !rule && $optionFill,
           pressed && { backgroundColor: overlayTint(ink, 0.14) },
         ]}
       >
@@ -813,7 +814,7 @@ function SheetOption({
             pressed && { backgroundColor: overlayTint(ink, 0.14) },
           ]}
         >
-          <Text text={rule.id} size="xs" style={[$ruleLink, { color: ink }]} />
+          <Text text={`§${rule.id}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
         </BoardPressable>
       ) : null}
     </View>
@@ -952,7 +953,7 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
 
 const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
-  flex: 1,
+  flexShrink: 1,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
@@ -961,10 +962,13 @@ const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   borderRadius: radius.md,
 })
 
+// why: an option with a rule link keeps its content width, so the link sits beside its own label instead of the next option's.
+const $optionFill: ViewStyle = { flex: 1 }
+
 const $optionRule: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   justifyContent: "center",
   minHeight: 40,
-  paddingHorizontal: spacing.xs,
+  paddingHorizontal: spacing.xxs,
   borderRadius: radius.md,
 })
 
