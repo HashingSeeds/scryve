@@ -45,7 +45,13 @@ import {
   validateStartingLife,
 } from "@/features/game/domain"
 import { GameTabs } from "@/features/game/GameTabs"
-import { gameTypeDetail, gameTypeId, newGameTabs, type GameType } from "@/features/game/gameTypes"
+import {
+  gameTypeDetail,
+  gameTypeId,
+  newGameTabs,
+  type GameTab,
+  type GameType,
+} from "@/features/game/gameTypes"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
@@ -89,6 +95,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { useCloseOnBack } from "@/utils/useCloseOnBack"
 
 import {
   PLAYER_MARK_SHAPES,
@@ -181,6 +188,19 @@ export interface LocalConnectFeed {
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
+const NEW_GAME_FIELDS = [
+  "system",
+  "format",
+  "startingLife",
+  "lifeStep",
+  "playerCount",
+  "layout",
+  "treacheryChosen",
+  "matchOn",
+  "chosenBestOf",
+  "clockMode",
+  "chosenClockMinutes",
+] as const
 const TREACHERY_MIN_SEATS = 4
 const MAX_SEATS = 6
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
@@ -338,7 +358,8 @@ function NewGameForm({
   )
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
-  const [endingLocal, setEndingLocal] = useState(false)
+  // why: with no game running, Back must start the draft rather than drop it, but only once the player has touched it; a deck link that fills the form on its own is still a plain Back.
+  const [edited, setEdited] = useState(false)
   const [playerSaveError, setPlayerSaveError] = useState<string>()
   const [gameToExit, setGameToExit] = useState<ResumableGame>()
   const [exitingGameId, setExitingGameId] = useState<string>()
@@ -355,6 +376,27 @@ function NewGameForm({
   const treacheryAvailable =
     connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
+  const draft = {
+    system,
+    format,
+    startingLife,
+    lifeStep,
+    playerCount,
+    chosenLayout,
+    layout,
+    treacheryChosen,
+    deck,
+    matchOn,
+    chosenBestOf,
+    clockMode,
+    chosenClockMinutes,
+  }
+  type SetupDraft = typeof draft
+  const draftChanged = (from: SetupDraft) =>
+    NEW_GAME_FIELDS.some((field) => from[field] !== draft[field])
+  const optionsOpenedWith = useRef(draft)
+  // why: a running game can't take a new setup, so a change opens the end prompt where it was made, and closing that prompt puts the running game's setup back. On iOS the prompt waits for the options sheet to finish closing.
+  const [ending, setEnding] = useState<{ restore?: SetupDraft; afterSheet?: boolean }>()
   const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
   useEffect(() => {
@@ -390,6 +432,12 @@ function NewGameForm({
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
   const selectedTypeId = gameTypeId(system, format, treachery)
+  const gameSetup = {
+    layout,
+    lifeStep,
+    ...(system && format ? { system, format } : {}),
+    ...(treachery ? { variant: "treachery" as const } : {}),
+  }
   const gameTabs = useMemo(
     () =>
       newGameTabs({
@@ -498,15 +546,19 @@ function NewGameForm({
     wantedDeckId.current = undefined
     void chooseDeck(deckChoiceId(choice))
   })
+  const localReady = validLife && nameValidation.valid && !deckLifeLoading
   const valid = nearbyMode
     ? validLife
     : connectedMode
       ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
-      : validLife && nameValidation.valid && !localGame && !deckLifeLoading
+      : localReady && !localGame
   const busy = pinning || (cloudMode && Boolean(connected?.busy))
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)
   const matchBlocks = Boolean(localGame?.match)
+  const changeEndsGame =
+    !connectedMode && localGameBlocksStart && !matchBlocks && Boolean(onEndLocal)
+  const matchLocksSetup = !connectedMode && matchBlocks
   const [endingMatch, setEndingMatch] = useState(false)
   const connectedBlocksLocal =
     !connectedMode && Boolean(connected?.ready) && connectedGames.length > 0
@@ -532,6 +584,12 @@ function NewGameForm({
           ? () => onResumeConnected(singleBlockingConnected)
           : undefined
   const resume = localGame ? onBack : resumeConnected
+  const backStarts = !connectedMode && !gameBlocksStart && edited && localReady && !busy
+  function back() {
+    if (backStarts) void startLocal()
+    else (resume ?? onBack)()
+  }
+  useCloseOnBack(backStarts, back)
   const statusResumesMatch = !connectedMode && Boolean(localGame?.match)
 
   const hasStatusDetails = cloudMode
@@ -558,58 +616,99 @@ function NewGameForm({
       connected.access.request()
       return
     }
-    const setup = {
-      layout,
-      lifeStep,
-      ...(system && format ? { system, format } : {}),
-      ...(treachery ? { variant: "treachery" as const } : {}),
-    }
     if (nearbyMode)
-      onNearby?.({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...setup })
+      onNearby?.({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...gameSetup })
     else if (connectedMode)
       connected?.host({
         playerCount,
         startingLife,
         ruleset: format ?? NO_PLAY_SYSTEM,
-        ...setup,
+        ...gameSetup,
       })
-    else {
-      const request = Symbol()
-      pinningRef.current = request
-      setPinning(true)
-      setPlayerSaveError(undefined)
-      try {
-        const pinned =
-          deck && accountInput?.meSeat !== undefined
-            ? await pinDeckChoice(deck, accountInput.ownerId)
-            : undefined
-        if (pinningRef.current !== request || seenOwnerId.current !== accountInput?.ownerId) return
-        onStartLocal(
-          deckLife === undefined
-            ? players
-            : players.map((player, seat) =>
-                seat === effectiveMeSeat ? { ...player, startingLife: deckLife } : player,
-              ),
-          startingLife,
-          {
-            ...setup,
-            account: accountInput ? { ...accountInput, ...pinned } : undefined,
-            ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
-            ...(clockSetup ? { clock: clockSetup } : {}),
-          },
-        )
-      } catch (cause) {
-        if (pinningRef.current !== request) return
-        setPlayerSaveError(
-          cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
-        )
-      } finally {
-        if (pinningRef.current === request) {
-          pinningRef.current = undefined
-          setPinning(false)
-        }
+    else await startLocal()
+  }
+
+  async function startLocal() {
+    if (!localReady || pinningRef.current) return
+    const request = Symbol()
+    pinningRef.current = request
+    setPinning(true)
+    setPlayerSaveError(undefined)
+    try {
+      const pinned =
+        deck && accountInput?.meSeat !== undefined
+          ? await pinDeckChoice(deck, accountInput.ownerId)
+          : undefined
+      if (pinningRef.current !== request || seenOwnerId.current !== accountInput?.ownerId) return
+      onStartLocal(
+        deckLife === undefined
+          ? players
+          : players.map((player, seat) =>
+              seat === effectiveMeSeat ? { ...player, startingLife: deckLife } : player,
+            ),
+        startingLife,
+        {
+          ...gameSetup,
+          account: accountInput ? { ...accountInput, ...pinned } : undefined,
+          ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
+          ...(clockSetup ? { clock: clockSetup } : {}),
+        },
+      )
+    } catch (cause) {
+      if (pinningRef.current !== request) return
+      setPlayerSaveError(
+        cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
+      )
+    } finally {
+      if (pinningRef.current === request) {
+        pinningRef.current = undefined
+        setPinning(false)
       }
     }
+  }
+
+  // why: ending a game here asks for a new one, so on this device it starts with this setup straight away; Connected still hosts by hand.
+  function startAfterEnding() {
+    setEnding(undefined)
+    if (connectedMode) return
+    setEdited(true)
+    void startLocal()
+  }
+
+  function restoreDraft(saved: SetupDraft) {
+    setSystem(saved.system)
+    setFormat(saved.format)
+    setStartingLife(saved.startingLife)
+    setLifeStep(saved.lifeStep)
+    setPlayerCount(saved.playerCount)
+    setChosenLayout(saved.chosenLayout)
+    setTreacheryChosen(saved.treacheryChosen)
+    setDeck(saved.deck)
+    setMatchOn(saved.matchOn)
+    setChosenBestOf(saved.chosenBestOf)
+    setClockMode(saved.clockMode)
+    setChosenClockMinutes(saved.chosenClockMinutes)
+  }
+
+  function openOptions() {
+    optionsOpenedWith.current = draft
+    setOptionsOpen(true)
+  }
+
+  function closeOptions() {
+    setOptionsOpen(false)
+    const before = optionsOpenedWith.current
+    if (!draftChanged(before)) return
+    if (changeEndsGame) setEnding({ restore: before, afterSheet: Platform.OS === "ios" })
+    else setEdited(true)
+  }
+
+  function pickGameType(type: GameType) {
+    if (type.id === selectedTypeId) return
+    const before = draft
+    chooseGameType(type)
+    if (changeEndsGame) setEnding({ restore: before })
+    else setEdited(true)
   }
 
   function changeMode(next: NewGameMode) {
@@ -795,6 +894,7 @@ function NewGameForm({
     )
     const next = confirmedFree ? withoutProMarks(drafted) : drafted
     setAppearances(next)
+    setEdited(true)
     savePlayers(next)
     closeAppearancePicker()
   }
@@ -808,7 +908,7 @@ function NewGameForm({
             <HeaderBack
               testID="setup-back"
               label={translate(resume ? "common:appNavigation.game" : "common:appNavigation.play")}
-              onPress={resume ?? onBack}
+              onPress={back}
             />
           }
           backgroundColor={colors.surface}
@@ -839,7 +939,7 @@ function NewGameForm({
           contentContainerStyle={themed($form)}
         >
           <GameTabs
-            tabs={gameTabs}
+            tabs={matchLocksSetup ? tabsLockedTo(gameTabs, selectedTypeId) : gameTabs}
             selectedId={selectedTypeId}
             detail={(type) =>
               gameTypeDetail(
@@ -849,18 +949,20 @@ function NewGameForm({
                   : playerCount,
               )
             }
-            onChoose={chooseGameType}
+            onChoose={pickGameType}
           />
 
           <View style={themed($summaryRow)}>
             <Text size="xs" text={setupSummary} style={themed($summaryText)} />
-            <Button
-              testID="setup-change-button"
-              tx="play:newGame.change"
-              accessibilityLabel={`${translate("play:newGame.change")}, ${setupSummary}`}
-              style={themed($changeButton)}
-              onPress={() => setOptionsOpen(true)}
-            />
+            {matchLocksSetup ? null : (
+              <Button
+                testID="setup-change-button"
+                tx="play:newGame.change"
+                accessibilityLabel={`${translate("play:newGame.change")}, ${setupSummary}`}
+                style={themed($changeButton)}
+                onPress={openOptions}
+              />
+            )}
           </View>
 
           {connectedMode && onNearby ? (
@@ -928,11 +1030,12 @@ function NewGameForm({
                       }
                       containerStyle={themed($nameField)}
                       onBlur={() => savePlayers()}
-                      onChangeText={(value) =>
+                      onChangeText={(value) => {
+                        setEdited(true)
                         setNames((current) =>
                           current.map((name, i) => (i === index ? value : name)),
                         )
-                      }
+                      }}
                     />
                   </View>
                 ))}
@@ -951,7 +1054,10 @@ function NewGameForm({
                       id: String(index),
                       label: player.name,
                     }))}
-                    onSelect={chooseMeSeat}
+                    onSelect={(value) => {
+                      setEdited(true)
+                      chooseMeSeat(value)
+                    }}
                   />
                   {effectiveMeSeat !== undefined && system && attachesDecks(system) ? (
                     <SelectField
@@ -1003,7 +1109,10 @@ function NewGameForm({
                             : undefined,
                         })),
                       ]}
-                      onSelect={chooseDeck}
+                      onSelect={(id) => {
+                        setEdited(true)
+                        void chooseDeck(id)
+                      }}
                     />
                   ) : null}
                 </View>
@@ -1021,7 +1130,9 @@ function NewGameForm({
                   gameBlocksStart
                     ? matchBlocks
                       ? translate("play:newGame.continueMatch")
-                      : translate("play:newGame.endCurrentGame")
+                      : changeEndsGame
+                        ? translate("play:newGame.newTitle")
+                        : translate("play:newGame.endCurrentGame")
                     : nearbyMode
                       ? translate("play:newGame.hostLobby")
                       : connectedMode
@@ -1034,7 +1145,7 @@ function NewGameForm({
                         : undefined
                 }
                 tx={connectedMode || gameBlocksStart ? undefined : "play:startGame"}
-                preset="primary"
+                preset={changeEndsGame ? "secondary" : "primary"}
                 TextProps={$footerButtonText}
                 style={footerRow && themed($footerAction)}
                 disabled={
@@ -1063,7 +1174,7 @@ function NewGameForm({
                   localGameBlocksStart
                     ? matchBlocks
                       ? onResumeLocal
-                      : () => setEndingLocal(true)
+                      : () => setEnding({})
                     : hostedGame
                       ? () => setGameToExit(hostedGame)
                       : singleBlockingConnected
@@ -1157,7 +1268,12 @@ function NewGameForm({
       </>
       <Sheet
         visible={optionsOpen}
-        onClose={() => setOptionsOpen(false)}
+        onClose={closeOptions}
+        onDismissed={() =>
+          setEnding((current) =>
+            current?.afterSheet ? { ...current, afterSheet: false } : current,
+          )
+        }
         testID="setup-options-dialog"
       >
         <ScrollView style={$sheetScroll} contentContainerStyle={themed($statusDetails)}>
@@ -1280,7 +1396,7 @@ function NewGameForm({
           testID="setup-options-done"
           tx="common:done"
           preset="primary"
-          onPress={() => setOptionsOpen(false)}
+          onPress={closeOptions}
         />
       </Sheet>
       <DialogCard
@@ -1476,19 +1592,22 @@ function NewGameForm({
           }}
         />
       ) : null}
-      {endingLocal && localGame && onEndLocal && !matchBlocks ? (
+      {ending && !ending.afterSheet && localGame && onEndLocal && !matchBlocks ? (
         <LocalGameEndDialog
           game={localGame}
-          onClose={() => setEndingLocal(false)}
+          onClose={() => {
+            if (ending.restore) restoreDraft(ending.restore)
+            setEnding(undefined)
+          }}
           onEnd={(result) => {
             onEndLocal(result)
-            setEndingLocal(false)
+            startAfterEnding()
           }}
           onAbandon={
             onAbandonLocal
               ? () => {
                   onAbandonLocal()
-                  setEndingLocal(false)
+                  startAfterEnding()
                 }
               : undefined
           }
@@ -1496,6 +1615,13 @@ function NewGameForm({
       ) : null}
     </View>
   )
+}
+
+function tabsLockedTo(tabs: readonly GameTab[], selectedId: string) {
+  return tabs.flatMap((tab) => {
+    const types = tab.types.filter((type) => type.id === selectedId)
+    return types.length ? [{ ...tab, types }] : []
+  })
 }
 
 function defaultName(index: number) {

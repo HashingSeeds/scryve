@@ -873,6 +873,7 @@ describe("NewGameScreen", () => {
   it("blocks hosting while a local game is active and ends it explicitly", () => {
     const host = jest.fn()
     const onEndLocal = jest.fn()
+    const onStartLocal = jest.fn()
     const localGame = createLocalGame({
       players: [
         { name: "Ada", color: "#FF0000" },
@@ -887,7 +888,7 @@ describe("NewGameScreen", () => {
           mode="connected"
           onModeChange={jest.fn()}
           onBack={jest.fn()}
-          onStartLocal={jest.fn()}
+          onStartLocal={onStartLocal}
           localGame={localGame}
           onEndLocal={onEndLocal}
           connected={{ ...readyHost, host }}
@@ -901,6 +902,47 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("end-game-result-draw"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     expect(onEndLocal).toHaveBeenCalledWith({ kind: "draw" })
+    expect(onStartLocal).not.toHaveBeenCalled()
+  })
+
+  it("changes a running game's type only through the end prompt", () => {
+    const onStartLocal = jest.fn()
+    const onAbandonLocal = jest.fn()
+    const view = setup({
+      localGame: runningLocalGame(),
+      initialGame: runningLocalGame(),
+      onEndLocal: jest.fn(),
+      onAbandonLocal,
+      onStartLocal,
+    })
+    fireEvent.press(view.getByTestId("game-type-mtg-standard"))
+    fireEvent.press(view.getByTestId("end-game-backdrop"))
+    expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
+    expect(onStartLocal).not.toHaveBeenCalled()
+
+    fireEvent.press(view.getByTestId("game-type-mtg-standard"))
+    fireEvent.press(view.getByTestId("abandon-game-button"))
+    expect(onAbandonLocal).toHaveBeenCalledTimes(1)
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      20,
+      expect.objectContaining({ system: "mtg", format: "standard" }),
+    )
+  })
+
+  it("starts a touched draft on Back instead of dropping it", () => {
+    const onBack = jest.fn()
+    const onStartLocal = jest.fn()
+    const view = setup({ onBack, onStartLocal })
+    fireEvent.press(view.getByTestId("setup-back"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+
+    openOptions()
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    closeOptions()
+    fireEvent.press(view.getByTestId("setup-back"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(onStartLocal.mock.calls[0][0]).toHaveLength(3)
   })
 
   it("blocks starting local while a connected game is live and exits it explicitly", async () => {
