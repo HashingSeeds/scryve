@@ -92,6 +92,16 @@ describe("CounterChips", () => {
     expect(tax).toHaveProp("accessibilityLabel", "Seat 1, Ada, add 2 Commander tax")
   })
 
+  it("keeps a compact plus's reach off the chip beside it and inside the card", () => {
+    const view = chips(seat({ counters: { poison: 1 } }), { compact: true })
+    const plus = view.getByTestId("counter-add-seat-1")
+    const { left, top } = plus.props.hitSlop
+    expect(StyleSheet.flatten(plus.props.style).marginLeft).toBe(left)
+    const rowTop = StyleSheet.flatten(view.getByTestId("counter-chips-seat-1").props.style).top
+    expect(top).toBeLessThanOrEqual(rowTop)
+    expect(top + plus.props.hitSlop.bottom + 32).toBe(48)
+  })
+
   it("closes the sheet from the spot the plus opened it", () => {
     const view = chips(seat())
     const plus = view.getByTestId("counter-add-seat-1")

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type Ref } from "react"
-import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
+import type { Insets, LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, View } from "react-native"
 import Svg, { Circle, Path } from "react-native-svg"
 
@@ -23,6 +23,7 @@ import type {
   LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { Text } from "./Text"
+import { targetSlop } from "./touchTarget"
 import { playerTableOf } from "../../convex/lib/table"
 
 /** why: what one seat shows and may change. The plain parts compare structurally in the memoized card; PlayerGrid keeps the callbacks stable. */
@@ -129,15 +130,6 @@ const COMPACT_MENU_CLEARANCE = 37
 const CHIP_SIZE = 36
 const COMPACT_CHIP_SIZE = 32
 const COMPACT_CHIP_WIDTH = 28
-// why: the plus and the Close that takes its place draw as a small glyph but reach a 48 dp target.
-const slopTo48 = (width: number, height: number) => ({
-  top: (48 - height) / 2,
-  bottom: (48 - height) / 2,
-  left: (48 - width) / 2,
-  right: (48 - width) / 2,
-})
-const PLUS_SLOP = slopTo48(CHIP_SIZE, CHIP_SIZE)
-const COMPACT_PLUS_SLOP = slopTo48(COMPACT_CHIP_WIDTH, COMPACT_CHIP_SIZE)
 /** why: below this column width "+2 Commander tax" no longer fits on one line, so items with a short label use it. */
 const SHORT_LABEL_COLUMN = 180
 
@@ -259,6 +251,18 @@ export const CounterChips = memo(function CounterChips({
     menuEdgeCenter,
     spacing,
   })
+  // why: the plus, and the Close that takes its spot, draw small but reach a 48 dp target. It stands off the chip before it by its slop, so a tap on that chip's edge still bumps the chip.
+  const plusSlop = targetSlop(
+    addAt ??
+      (compact
+        ? { width: COMPACT_CHIP_WIDTH, height: COMPACT_CHIP_SIZE }
+        : { width: CHIP_SIZE, height: CHIP_SIZE }),
+    { top: top + (addAt?.y ?? 0) },
+  )
+  const plusClearance =
+    shown.length + heldDesignations.length > 0
+      ? Math.max(0, (plusSlop.left ?? 0) - (compact ? 0 : spacing.xxxs))
+      : 0
 
   return (
     <>
@@ -398,12 +402,13 @@ export const CounterChips = memo(function CounterChips({
                 testID={`counter-add-seat-${seatNumber}`}
                 accessibilityRole="button"
                 accessibilityLabel={translate("board:counters.addLabel", { identity })}
-                hitSlop={compact ? COMPACT_PLUS_SLOP : PLUS_SLOP}
+                hitSlop={plusSlop}
                 onLayout={({ nativeEvent }) => setAddTrigger({ at: nativeEvent.layout, frameKey })}
                 onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
                 style={({ pressed }) => [
                   themed(compact ? $compactChip : $chip),
                   themed($addChip),
+                  { marginLeft: plusClearance },
                   pressed && { backgroundColor: overlayTint(foreground, 0.14) },
                 ]}
               >
@@ -425,6 +430,7 @@ export const CounterChips = memo(function CounterChips({
           width={frameWidth}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
+          closeSlop={plusSlop}
           closeButton={{
             left: addAt
               ? (compact ? spacing.xxs : spacing.xs) + addAt.x
@@ -491,6 +497,7 @@ function CounterSheet({
   contentRotation,
   contentInsets,
   closeButton,
+  closeSlop,
   onEdit,
   onClose,
 }: {
@@ -506,6 +513,7 @@ function CounterSheet({
   contentInsets?: LifeCardContentInsets
   /** why: Close sits exactly where the chip row's add button was, so the same tap opens and closes the sheet. */
   closeButton: { left: number; top: number; size: number; width?: number }
+  closeSlop: Insets
   onEdit: (counterId: string) => void
   onClose: () => void
 }) {
@@ -710,7 +718,7 @@ function CounterSheet({
         testID={`counter-close-${seatNumber}`}
         accessibilityRole="button"
         accessibilityLabel={translate("common:close")}
-        hitSlop={compact ? COMPACT_PLUS_SLOP : PLUS_SLOP}
+        hitSlop={closeSlop}
         onPress={onClose}
         style={({ pressed }) => [
           themed(compact ? $compactChip : $chip),

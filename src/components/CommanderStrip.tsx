@@ -33,6 +33,7 @@ import {
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
+import { targetSlop } from "./touchTarget"
 
 const DISC_SIZE = 24
 const COMPACT_DISC_SIZE = 20
@@ -116,6 +117,7 @@ export const CommanderStrip = memo(function CommanderStrip({
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
   const corner = stripCorner(contentRotation, contentInsets)
   const [edge, side] = corner
+  const offsets = stripEdge(corner, spacing.xs, contentInsets, screenEdges)
   const [horizontal, vertical] = edge === "left" || edge === "right" ? [edge, side] : [side, edge]
   const closePosition: ViewStyle = {
     alignItems: horizontal === "left" ? "flex-start" : "flex-end",
@@ -150,7 +152,7 @@ export const CommanderStrip = memo(function CommanderStrip({
       pointerEvents={attackerId ? "none" : "auto"}
       style={[
         themed($strip),
-        stripEdge(corner, spacing.xs, contentInsets, screenEdges),
+        offsets,
         {
           flexDirection: stripDirection(contentRotation),
         },
@@ -180,7 +182,13 @@ export const CommanderStrip = memo(function CommanderStrip({
         accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
         accessible={!attackerId}
         disabled={inspectDisabled || !!attackerId}
-        hitSlop={targetSlop(mapBounds, open ? 12 : 2)}
+        hitSlop={
+          mapBounds
+            ? targetSlop(mapBounds, { [edge]: offsets[edge], [side]: offsets[side] }, open ? 12 : 2)
+            : open
+              ? 12
+              : 2
+        }
         onPress={onToggle}
         style={({ pressed }) => [themed($map), pressed && { opacity: 0.72 }]}
       >
@@ -307,16 +315,6 @@ export const CommanderStrip = memo(function CommanderStrip({
   )
 }, structurallyEqual)
 
-// why: the strip draws small, so its touch area grows past it to a 48 dp target on each axis.
-const MIN_TARGET = 48
-
-function targetSlop(bounds: LayoutRectangle | null, least: number) {
-  if (!bounds) return least
-  const vertical = Math.max(least, (MIN_TARGET - bounds.height) / 2)
-  const horizontal = Math.max(least, (MIN_TARGET - bounds.width) / 2)
-  return { top: vertical, bottom: vertical, left: horizontal, right: horizontal }
-}
-
 // why: the grid is small, so it eases over a longer stretch of the shadow's travel than its edge takes to cross it; a quick edge would flip it in a frame.
 const LIT_SPAN = 192
 
@@ -432,7 +430,7 @@ function stripEdge(
   gap: number,
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
-): ViewStyle {
+): Partial<Record<LifeCardEdge, number>> {
   return {
     [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
     [side]: cornerOffset(gap, side, edge, insets, screenEdges),
