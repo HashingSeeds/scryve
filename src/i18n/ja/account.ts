@@ -120,6 +120,10 @@ export default {
     copyDebugInfo: "デバッグ情報をコピー",
     copied: "コピーしました",
     copyFailed: "コピーできませんでした。もう一度お試しください。",
+    turnTab: {
+      label: "ターンタブ",
+      helper: "誰のターンか、何分経過したかを表示します。タップでパスします。",
+    },
     syncStats: {
       label: "開発者向け統計",
       helper:

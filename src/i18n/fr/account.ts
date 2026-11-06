@@ -121,6 +121,10 @@ export default {
     copyDebugInfo: "Copier les infos de débogage",
     copied: "Copié",
     copyFailed: "Copie impossible. Réessayez.",
+    turnTab: {
+      label: "Onglet du tour",
+      helper: "Indique à qui est le tour et depuis combien de temps. Touchez pour passer.",
+    },
     syncStats: {
       label: "Stats pour les geeks",
       helper:

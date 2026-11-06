@@ -78,12 +78,17 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
         const along = tab.edge === "left" || tab.edge === "right"
         const upright = tab.facing % 180 === 0
         const wide = along ? !upright : upright
-        const box = along
-          ? { width: FIRST_PLAYER_TAB.depth, height: FIRST_PLAYER_TAB.length }
-          : { width: FIRST_PLAYER_TAB.length, height: FIRST_PLAYER_TAB.depth }
-        const inner = wide
-          ? { width: FIRST_PLAYER_TAB.length, height: FIRST_PLAYER_TAB.depth }
-          : { width: FIRST_PLAYER_TAB.depth, height: FIRST_PLAYER_TAB.length }
+        // why: the attached edge has no border, so the press area is one border short there.
+        const press = along
+          ? {
+              width: FIRST_PLAYER_TAB.depth - TAB_BORDER,
+              height: FIRST_PLAYER_TAB.length - 2 * TAB_BORDER,
+            }
+          : {
+              width: FIRST_PLAYER_TAB.length - 2 * TAB_BORDER,
+              height: FIRST_PLAYER_TAB.depth - TAB_BORDER,
+            }
+        const inner = upright ? press : { width: press.height, height: press.width }
         return (
           <Animated.View
             key={`${tab.edge}:${tab.at}`}
@@ -117,8 +122,8 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
                   $inner,
                   inner,
                   {
-                    left: (box.width - inner.width) / 2 - TAB_BORDER,
-                    top: (box.height - inner.height) / 2 - TAB_BORDER,
+                    left: (press.width - inner.width) / 2,
+                    top: (press.height - inner.height) / 2,
                     transform: [{ rotate: `${tab.facing}deg` }],
                   },
                 ]}
@@ -182,7 +187,7 @@ function TurnTabFace({
         text={`${bankLeft < 0 ? "−" : ""}${formatElapsed(Math.abs(bankLeft))}`}
       />
     ) : clockStyle === "swap" && swapToRound ? (
-      <View style={$inline}>
+      <View style={wide ? $inline : $texts}>
         <ClockGlyph color={ink} />
         <Text size="xxs" weight="semiBold" style={[$digits, { color: ink }]} text={round} />
       </View>
@@ -219,8 +224,9 @@ function TurnTabFace({
       <View style={wide ? $textsWide : $texts}>
         {time}
         {second}
+        {passStyle === "label" ? pass : null}
       </View>
-      {pass}
+      {passStyle === "icon" ? pass : null}
     </View>
   )
 }
