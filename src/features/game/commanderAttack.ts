@@ -63,22 +63,30 @@ function restage(
 
 export function attackView(state: AttackState, board: AttackBoard, to: PlayerId) {
   const { armed } = state
+  const hits = state.hits[to] ?? []
   const commanders = board.commanders.map(({ name, power }, slot) => {
     const commander = COMMANDER_SLOTS[slot]
     // why: the second partner starts at 0, so a fresh attack lands on one commander until the player raises the other.
     const starting = slot > 0 ? 0 : (power ?? 1)
+    const total = armed
+      ? board.recorded(armed, to, commander) + heldIn(state.staged, to, commander)
+      : 0
     return {
       name,
       power: (armed ? state.powers[`${armed}:${slot}`] : undefined) ?? starting,
-      total: armed ? board.recorded(armed, to, commander) + heldIn(state.staged, to, commander) : 0,
+      total,
+      // why: the part of the total this attack's hits dealt, which the defender's ring shows apart until the attack ends.
+      landed: Math.min(total, sum(hits.map((hit) => hit[slot] ?? 0))),
     }
   })
   const steps = commanders.map(({ power, total }) =>
     Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
   )
-  const lastHit = state.hits[to]?.at(-1) ?? commanders.map(({ power }) => power)
+  const lastHit = hits.at(-1) ?? commanders.map(({ power }) => power)
   const takeBacks = commanders.map(({ total }, slot) => Math.min(lastHit[slot] ?? 0, total))
-  return { commanders, steps, dealt: sum(steps), takeBacks, takeBack: sum(takeBacks) }
+  // why: a local hit lowers the defender's life as it lands; a buffered one waits for Send, so none of it is on their life yet.
+  const applied = board.buffered ? 0 : sum(commanders.map(({ landed }) => landed))
+  return { commanders, steps, dealt: sum(steps), takeBacks, takeBack: sum(takeBacks), applied }
 }
 
 export function stagedTargets(state: AttackState) {

@@ -121,6 +121,8 @@ export type LifeCardCommanderDamage = {
   reach?: CommanderReach
   dealt?: number
   takeBack?: number
+  /** why: how much of this attack's damage the defender's life already shows, so its readout can name the life it started from. */
+  applied?: number
   onHit?: () => void
   onUndo?: () => void
   acted?: boolean
@@ -287,9 +289,23 @@ export const LifeCard = memo(function LifeCard({
   ]
   const causeGlyphShown =
     out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
+  // why: a defender's life reads "34 − 4" small under it during an attack: the life it started from, less what this attack has dealt so far. The row holds its place before the first hit so the total never jumps.
+  const incoming = armedCommanders.reduce((sum, { landed = 0 }) => sum + landed, 0)
+  const attackLine =
+    defending && commanderDamage
+      ? incoming > 0
+        ? `${life + (commanderDamage.applied ?? 0)} − ${incoming}`
+        : ""
+      : undefined
   // why: the disc rings whatever the readout shows, so an out seat's stacked readout gets a disc of its own size.
   const readoutInk = !out
-    ? lifeInk(resolvedLifeFontSize, shownDigits)
+    ? attackLine !== undefined
+      ? outInk({
+          fontSize: resolvedLifeFontSize,
+          digits: shownDigits,
+          below: { ...OUT_CAUSE, chars: attackLine.length },
+        })
+      : lifeInk(resolvedLifeFontSize, shownDigits)
     : out.cause === "life"
       ? outInk({
           fontSize: resolvedLifeFontSize,
@@ -703,6 +719,21 @@ export const LifeCard = memo(function LifeCard({
                 <Text
                   testID={`life-out-amount-seat-${seatNumber}`}
                   text={String(out.amount)}
+                  weight="bold"
+                  accessible={false}
+                  maxFontSizeMultiplier={1}
+                  numberOfLines={1}
+                  style={[$outAmount, { color: foreground }]}
+                />
+              </View>
+            </View>
+          ) : attackLine !== undefined ? (
+            <View style={[$outReadout, contentRotationStyle]}>
+              {lifeTotal(lifeFontStyle)}
+              <View style={$outCause}>
+                <Text
+                  testID={`life-incoming-seat-${seatNumber}`}
+                  text={attackLine}
                   weight="bold"
                   accessible={false}
                   maxFontSizeMultiplier={1}
