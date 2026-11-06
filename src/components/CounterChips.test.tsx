@@ -119,6 +119,17 @@ describe("CounterChips", () => {
     expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
   })
 
+  it("keeps a sideways sheet's top-edge side clear of a notch, and its other side in place", () => {
+    const insets = { top: 50, bottom: 0, left: 0, right: 0 }
+    const view = chips(seat(), { contentRotation: -90, contentInsets: insets })
+
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+    expect(StyleSheet.flatten(view.getByTestId("counter-sheet-seat-1").props.style)).toMatchObject({
+      paddingRight: 39,
+      paddingLeft: 14,
+    })
+  })
+
   it("rolls a die for its own seat on a tap, and more shrinks the trackers to icons until one is tapped", () => {
     const dice = {
       tools: ["d4", "d6", "d20", "coin"] as const,
