@@ -28,7 +28,9 @@ function TicketSignIn({ ticket }: { ticket: string }) {
     void (async () => {
       const failure = (await signIn.ticket({ ticket })).error ?? (await signIn.finalize()).error
       if (failure) setError(failure.message)
-    })()
+    })().catch((failure: unknown) =>
+      setError(failure instanceof Error ? failure.message : String(failure)),
+    )
   }, [signIn, ticket, isLoaded, isSignedIn, signingIn])
 
   useEffect(() => {

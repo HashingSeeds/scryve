@@ -12,11 +12,19 @@ env:
   LIFE: "20"
 ---
 - openLink: "${SCHEME}://lan?players=${PLAYERS}&life=${LIFE}"
-- runFlow:
-    when:
-      visible: "Allow"
+# iOS asks for local network access once hosting starts, which can be after the lobby opens.
+- repeat:
+    times: 20
+    while:
+      notVisible:
+        id: "open-invite-button"
     commands:
-      - tapOn: "Allow"
+      - runFlow:
+          when:
+            visible: "Allow"
+          commands:
+            - tapOn: "Allow"
+      - waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       id: "open-invite-button"
