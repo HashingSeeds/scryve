@@ -16,12 +16,22 @@ export default {
     openPlay: "プレイへ移動",
   },
   launch: {
-    updateTitle: "Scryveをアップデート",
+    updateTitle: "このゲームは更新が必要です",
     updateMessage:
-      "現在のゲームは新しいバージョンで保存されました。続けるにはアップデートしてください。",
+      "より新しいバージョンのScryveで進行中のゲームが保存されたため、このバージョンでは開けません。続けるにはScryveを更新してください。ゲームは保存されたままです。",
+    checkForUpdates: "アップデートを確認",
+    checkingForUpdates: "確認中…",
+    noUpdate:
+      "利用できるアップデートはまだありません。しばらくしてからもう一度お試しいただくか、サポートにお問い合わせください。",
+    updateCheckFailed:
+      "アップデートを確認できませんでした。接続を確認して、もう一度お試しください。",
+    contactSupport: "サポートに問い合わせる",
+    deleteGame: "ゲームを削除",
+    deleteGameTitle: "このゲームを削除しますか?",
+    deleteGameMessage: "更新後も、削除したゲームは復元できません。",
+    keepGame: "ゲームを残す",
     openAppStore: "App Storeを開く",
     openGooglePlay: "Google Playを開く",
-    replaceWithNewGame: "新しいゲームに置き換える",
     staleTitle: "ゲームを続けますか?",
     staleMessage: "このゲームは24時間以上待機していました。データは破棄されていません。",
     continue: "続ける",

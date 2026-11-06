@@ -6,6 +6,7 @@ import {
   openPrPreview,
   prereleaseBuild,
   RESTART_FADE_MS,
+  restartIntoNewestUpdate,
   restartToUpdate,
   setBetaUpdates,
   useRestarting,
@@ -121,6 +122,28 @@ describe("restartToUpdate", () => {
     await act(async () => jest.advanceTimersByTime(RESTART_FADE_MS))
     expect(result.current).toBe(false)
     expect(Updates.reloadAsync).toHaveBeenCalledTimes(1)
+    jest.useRealTimers()
+  })
+})
+
+describe("restartIntoNewestUpdate", () => {
+  const runtime = globalThis as typeof globalThis & { __DEV__: boolean }
+  const dev = __DEV__
+  beforeEach(() => {
+    runtime.__DEV__ = false
+  })
+  afterEach(() => {
+    runtime.__DEV__ = dev
+    mockUpdates.available = false
+  })
+
+  it("reports a failed restart so the screen can offer the check again", async () => {
+    jest.useFakeTimers()
+    mockUpdates.available = true
+    jest.mocked(Updates.reloadAsync).mockRejectedValueOnce(new Error("no runtime"))
+    const result = restartIntoNewestUpdate()
+    await jest.advanceTimersByTimeAsync(RESTART_FADE_MS)
+    await expect(result).resolves.toBe("failed")
     jest.useRealTimers()
   })
 })

@@ -16,12 +16,22 @@ export default {
     openPlay: "Aller à Jouer",
   },
   launch: {
-    updateTitle: "Mettre à jour Scryve",
+    updateTitle: "Cette partie nécessite une mise à jour",
     updateMessage:
-      "Votre partie en cours a été enregistrée par une version plus récente. Mettez à jour pour la continuer.",
+      "Une version plus récente de Scryve a enregistré votre partie en cours, donc cette version ne peut pas l'ouvrir. Mettez à jour Scryve pour continuer à jouer. Votre partie est toujours enregistrée.",
+    checkForUpdates: "Rechercher des mises à jour",
+    checkingForUpdates: "Recherche…",
+    noUpdate:
+      "Aucune mise à jour n'est disponible pour le moment. Réessayez plus tard ou contactez l'assistance.",
+    updateCheckFailed:
+      "Impossible de rechercher des mises à jour. Vérifiez votre connexion et réessayez.",
+    contactSupport: "Contacter l'assistance",
+    deleteGame: "Supprimer la partie",
+    deleteGameTitle: "Supprimer cette partie ?",
+    deleteGameMessage: "Elle ne pourra pas être récupérée, même après la mise à jour.",
+    keepGame: "Conserver la partie",
     openAppStore: "Ouvrir l'App Store",
     openGooglePlay: "Ouvrir Google Play",
-    replaceWithNewGame: "Remplacer par une nouvelle partie",
     staleTitle: "Continuer la partie ?",
     staleMessage: "Cette partie est en attente depuis plus de 24 heures. Rien n'a été supprimé.",
     continue: "Continuer",

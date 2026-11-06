@@ -17,12 +17,15 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { gameLog, withTurnDividers, type GameLogItem } from "./LifeLog"
+import { teamName } from "./teams"
 import type { GameEvent, GamePlayer, TurnLogEntry } from "./types"
+import type { TurnGroups } from "../../../convex/lib/turns"
 
 export function GameLogDialog({
   players,
   events,
   turns,
+  groups,
   canUndo,
   origin,
   onUndo,
@@ -31,6 +34,7 @@ export function GameLogDialog({
   players: readonly Pick<GamePlayer, "id" | "name" | "life" | "color" | "shape">[]
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
+  groups?: TurnGroups
   canUndo: boolean
   origin?: DialogOrigin
   onUndo: () => void
@@ -56,7 +60,7 @@ export function GameLogDialog({
       const holder = seats.get(item.playerId)
       const label = translate("board:turn.divider", {
         number: item.number,
-        name: holder?.name ?? "",
+        name: teamName(players, groups, item.playerId) ?? "",
       })
       return (
         <View

@@ -547,7 +547,7 @@ export function lanProjection(
     ...(commander ? { commanderDamage: commander } : {}),
     ...(memory &&
     (tableRulesApply(rules) ||
-      (memory.turn && tableVersion >= 3) ||
+      ((memory.turn || memory.turnGroups) && tableVersion >= 3) ||
       (memory.modes && tableVersion >= TABLE_VERSION))
       ? {
           table: tableForVersion(

@@ -19,6 +19,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import type { AttackBox } from "@/features/game/commanderAttack"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { CommanderBoardPlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
@@ -33,6 +34,8 @@ import { BoardPressable } from "./BoardPressable"
 import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
 import {
   ATTACK_SHADE,
+  DAMAGE_INK,
+  OTHERS_INK,
   CommanderDamageCardControls,
   shadowReached,
   SWAP_MS,
@@ -54,6 +57,7 @@ import {
   OUT_CAUSE_GLYPH,
   OUT_LABEL,
   outInk,
+  stackedReadout,
   type CommanderBoardSeat,
   type CommanderFacing,
   type CommanderReach,
@@ -80,6 +84,7 @@ import {
   cornerStep,
   useCornerSlide,
   CUTOUT_ENDS_INSIDE_INSET,
+  SCREEN_CORNER_CLEARANCE,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardScreenEdges,
@@ -101,7 +106,6 @@ import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex
 // why: matches the attacker's power boxes swapping in, so the life total moves and its − and + fade with them.
 const LIFE_FADE_MS = SWAP_MS
 // why: about the number pad's own rise, so the card moves up with it.
-const LIFT_MS = 250
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -122,6 +126,19 @@ export type LifeCardCommanderDamage = {
   reach?: CommanderReach
   dealt?: number
   takeBack?: number
+  othersStep?: number
+  othersTakeBack?: number
+  /** why: how much of this attack's damage the defender's life already shows, so its readout can name the life it started from. */
+  applied?: number
+  /** why: the attacker's Others box, damage from its other creatures that takes life but never counts toward commander lethal. */
+  others?: number
+  onOthers?: (power: number) => void
+  /** why: false where the game has no Others, so the attacker's card shows commanders only. */
+  othersShown?: boolean
+  othersSitting?: boolean
+  onSit?: (box: AttackBox) => void
+  /** why: the part of this attack's damage to a defender that came from Others. */
+  othersLanded?: number
   onHit?: () => void
   onUndo?: () => void
   acted?: boolean
@@ -195,10 +212,7 @@ export const LifeCard = memo(function LifeCard({
   onChange,
   style,
 }: LifeCardProps) {
-  const {
-    themed,
-    theme: { spacing },
-  } = useAppTheme()
+  const { themed } = useAppTheme()
   const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
@@ -289,6 +303,50 @@ export const LifeCard = memo(function LifeCard({
   ]
   const causeGlyphShown =
     out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
+  // why: once an attack lands, a defender's life reads "34 − 4 − 3" small under it: the life it started from, less this attack's commander damage in red and its Others damage in orange.
+  const incoming = armedCommanders.reduce((sum, { landed = 0 }) => sum + landed, 0)
+  const othersIncoming = commanderDamage?.othersLanded ?? 0
+  const attackParts =
+    defending && commanderDamage && (incoming || othersIncoming)
+      ? {
+          from: life + (commanderDamage.applied ?? 0),
+          commander: incoming,
+          others: othersIncoming,
+        }
+      : undefined
+  // why: the line fades out with the last attack's numbers rather than going blank as it goes.
+  const lastAttack = useRef(attackParts)
+  if (attackParts) lastAttack.current = attackParts
+  const shownAttack = attackParts ?? lastAttack.current
+  const attackLine = shownAttack
+    ? [
+        shownAttack.from,
+        ...(shownAttack.commander ? [shownAttack.commander] : []),
+        ...(shownAttack.others ? [shownAttack.others] : []),
+      ].join(" − ")
+    : ""
+  const stacked = stackedReadout(resolvedLifeFontSize, shownDigits, attackLine.length)
+  const lifeRise = lifeInk(resolvedLifeFontSize, shownDigits).y
+  const stack = useSharedValue(0)
+  const landed = !!attackParts
+  useEffect(() => {
+    stack.value = withTiming(landed ? 1 : 0, {
+      duration: motionDuration(reducedMotion, STACK_MS),
+      easing: Easing.out(Easing.cubic),
+    })
+  }, [landed, reducedMotion, stack])
+  const lifeStackStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY: stack.value * (lifeRise + stacked.lifeShift - lifeRise * stacked.scale),
+      },
+      { scale: 1 - stack.value * (1 - stacked.scale) },
+    ],
+  }))
+  const incomingStyle = useAnimatedStyle(() => ({
+    opacity: stack.value,
+    transform: [{ translateY: lifeRise + stacked.lineShift + (1 - stack.value) * 6 }],
+  }))
   // why: the disc rings whatever the readout shows, so an out seat's stacked readout gets a disc of its own size.
   const readoutInk = !out
     ? lifeInk(resolvedLifeFontSize, shownDigits)
@@ -321,18 +379,14 @@ export const LifeCard = memo(function LifeCard({
     id: armedCommanderId,
     color: commanderDamage?.attacker?.color,
   })
-  // why: the attacker's power field lifts its card clear of the number pad, straight up the screen whichever way the board is turned.
-  const lift = useSharedValue(0)
-  const liftAxis = {
-    x: -Math.sin((boardRotation * Math.PI) / 180),
-    y: -Math.cos((boardRotation * Math.PI) / 180),
-  }
-  const liftCard = useCallback(
-    (amount: number) => {
-      lift.value = withTiming(amount, { duration: motionDuration(reducedMotion, LIFT_MS) })
-    },
-    [lift, reducedMotion],
-  )
+  // why: an attacker typing a power hides its own life total, which sits where the in-card keypad opens. A new attack starts with it shown.
+  const [powerEditing, setPowerEditing] = useState(false)
+  if (powerEditing && armedCommanderId !== commanderDamage?.ownerPlayerId) setPowerEditing(false)
+  // why: the attacker's power boxes keep clear of the commander grid in its lower corner.
+  const grid =
+    stripBounds && cardSize.width > 0
+      ? gridReach(stripBounds, cardSize, sidewaysContent)
+      : undefined
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -341,9 +395,15 @@ export const LifeCard = memo(function LifeCard({
           submit: commanderDamage.armBar?.stagedTargets ? "send" : "done",
           mark: { color, shape, seatNumber },
           commanders: armedCommanders,
+          others: commanderDamage.others ?? 0,
+          onOthers: commanderDamage.onOthers ?? (() => {}),
+          othersShown: commanderDamage.othersShown !== false,
+          othersSitting: !!commanderDamage.othersSitting,
+          onSit: commanderDamage.onSit ?? (() => {}),
           acted: !!commanderDamage.acted,
           onPower: commanderDamage.onPower ?? (() => {}),
-          onLift: liftCard,
+          onEditing: setPowerEditing,
+          grid,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
         }
       : commanderDamage && defending
@@ -361,6 +421,8 @@ export const LifeCard = memo(function LifeCard({
             acted: !!commanderDamage.acted,
             dealt: commanderDamage.dealt ?? 0,
             takeBack: commanderDamage.takeBack ?? 0,
+            othersStep: commanderDamage.othersStep ?? 0,
+            othersTakeBack: commanderDamage.othersTakeBack ?? 0,
             onHit: commanderDamage.onHit ?? (() => {}),
             onUndo: commanderDamage.onUndo ?? (() => {}),
           }
@@ -418,9 +480,10 @@ export const LifeCard = memo(function LifeCard({
           attackerLayout({
             space: sidewaysContent ? { width: cardSize.height, height: cardSize.width } : cardSize,
             count: slotCommanders,
+            others: commanderDamage?.othersShown !== false,
             compact,
+            grid,
           }),
-          spacing,
         )
       : undefined
   const toSlot = attackerSide && !!lifeSlot
@@ -496,8 +559,8 @@ export const LifeCard = memo(function LifeCard({
   }
   const knockStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: knock.value * knockDirection.x * KNOCKBACK + lift.value * liftAxis.x },
-      { translateY: knock.value * knockDirection.y * KNOCKBACK + lift.value * liftAxis.y },
+      { translateX: knock.value * knockDirection.x * KNOCKBACK },
+      { translateY: knock.value * knockDirection.y * KNOCKBACK },
     ],
   }))
   const lifeControlsShown =
@@ -672,7 +735,11 @@ export const LifeCard = memo(function LifeCard({
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={[themed($readout), lifeFadeDuration ? slotStyle : slotAt]}
+          style={[
+            themed($readout),
+            lifeFadeDuration ? slotStyle : slotAt,
+            powerEditing && $powerEditingHidden,
+          ]}
         >
           {out?.cause === "life" ? (
             <View style={[$outReadout, contentRotationStyle]}>
@@ -714,7 +781,44 @@ export const LifeCard = memo(function LifeCard({
               </View>
             </View>
           ) : (
-            lifeTotal(lifeFontStyle, contentRotationStyle)
+            <View
+              testID={`life-upright-seat-${seatNumber}`}
+              style={[$outReadout, contentRotationStyle]}
+            >
+              <Animated.View style={[$outReadout, lifeStackStyle]}>
+                {lifeTotal(lifeFontStyle)}
+              </Animated.View>
+              {shownAttack ? (
+                <Animated.View pointerEvents="none" style={[$incomingSlot, incomingStyle]}>
+                  <Text
+                    testID={`life-incoming-seat-${seatNumber}`}
+                    weight="bold"
+                    accessible={false}
+                    maxFontSizeMultiplier={1}
+                    numberOfLines={1}
+                    style={[$outAmount, { color: foreground }]}
+                  >
+                    {String(shownAttack.from)}
+                    {shownAttack.commander ? (
+                      <Text
+                        text={` − ${shownAttack.commander}`}
+                        weight="bold"
+                        maxFontSizeMultiplier={1}
+                        style={[$outAmount, $hurtInk, { color: DAMAGE_INK }]}
+                      />
+                    ) : null}
+                    {shownAttack.others ? (
+                      <Text
+                        text={` − ${shownAttack.others}`}
+                        weight="bold"
+                        maxFontSizeMultiplier={1}
+                        style={[$outAmount, $hurtInk, { color: OTHERS_INK }]}
+                      />
+                    ) : null}
+                  </Text>
+                </Animated.View>
+              ) : null}
+            </View>
           )}
         </Animated.View>
       </Animated.View>
@@ -1052,6 +1156,8 @@ export const LifeCard = memo(function LifeCard({
   )
 }, structurallyEqual)
 
+// why: the life eases up and the incoming line fades in over about a quarter second once the first hit lands.
+const STACK_MS = 260
 const KNOCKBACK = 12
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
@@ -1256,7 +1362,38 @@ const $lockedOverlay: ViewStyle = { zIndex: 9 }
 
 const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
 
+/** why: how far a corner grid, measured in the card, reaches in from the nearer end of each of the seat's axes: along its width (the card's height when its content turns sideways) and up from its foot. A grid in a screen corner sits further in than one by the screen's middle, so every seat allows the screen corner's clearance, and attackers' boxes match from seat to seat. */
+function gridReach(
+  bounds: LayoutRectangle,
+  card: { width: number; height: number },
+  sideways: boolean,
+) {
+  const along = (length: number, start: number, size: number) =>
+    Math.max(
+      start * 2 + size < length ? start + size : length - start,
+      size + SCREEN_CORNER_CLEARANCE,
+    )
+  return {
+    width: sideways
+      ? along(card.height, bounds.y, bounds.height)
+      : along(card.width, bounds.x, bounds.width),
+    height: sideways
+      ? along(card.width, bounds.x, bounds.width)
+      : along(card.height, bounds.y, bounds.height),
+  }
+}
+
 const $outReadout: ViewStyle = { width: "100%", alignItems: "center" }
+// why: the incoming line hangs from the life's center, so it never moves the life before the first hit.
+const $incomingSlot: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  top: "50%",
+  marginTop: -OUT_CAUSE.lineHeight / 2,
+  alignItems: "center",
+}
+const $powerEditingHidden: ViewStyle = { opacity: 0 }
 
 const $outCause: ViewStyle = {
   flexDirection: "row",
@@ -1264,6 +1401,13 @@ const $outCause: ViewStyle = {
   gap: OUT_CAUSE_GAP,
   height: OUT_CAUSE.lineHeight,
   marginTop: OUT_CAUSE.marginTop,
+}
+
+// why: red and orange digits sit on any seat's color, so a dark halo keeps them legible on a red or orange disc.
+const $hurtInk: TextStyle = {
+  textShadowColor: "rgba(0, 0, 0, 0.7)",
+  textShadowRadius: 4,
+  textShadowOffset: { width: 0, height: 0 },
 }
 
 const $outAmount: TextStyle = {

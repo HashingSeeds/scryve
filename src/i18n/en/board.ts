@@ -74,6 +74,8 @@ const board = {
     closeScore: "Close match score",
     scoreTitle: "Best of {{bestOf}} · Game {{number}}",
     endHint: "Ends the match after its last finished game",
+    leave: "Leave match",
+    leaveHint: "Plays this board as a single game instead",
     continue: "Continue to the next game",
     gameSaved: "Game {{number}} saved",
     limitReached: "A match holds at most ten games, so this one ends here.",
@@ -92,6 +94,10 @@ const board = {
     bottomFocus: "Bottom focus",
     evenGrid: "Even grid",
     table: "Table",
+  },
+  teams: {
+    // A team of players who share a turn, named by its players, as in "Ada & Grace" or "Ada, Grace & Kim".
+    name: "{{first}} & {{second}}",
   },
   seats: {
     title: "Swap seats",
@@ -333,6 +339,12 @@ const board = {
     // {{name}} is the player who takes the damage.
     dealTo: "Deal {{damage}} commander damage to {{name}}",
     undoHit: "Take back {{damage}} commander damage",
+    // {{others}} is damage from the attacking player's other creatures, besides the commander. It takes life but is not commander damage.
+    dealWithOthersTo:
+      "Deal {{damage}} commander damage and {{others}} from other attackers to {{name}}",
+    undoHitWithOthers: "Take back {{damage}} commander damage and {{others}} from other attackers",
+    // Read by screen readers on the box for the attacking player's other creatures.
+    othersPower: "Damage from other attackers {{power}}",
     // The attacking commander's power: how much one hit deals.
     power: "Commander power {{power}}",
     raisePower: "Raise commander power",
@@ -342,6 +354,11 @@ const board = {
     lowerPowerOf: "Lower {{name}}'s power",
     // Shown dimmed in place of the commander's name when the seat has no deck.
     unnamed: "Commander",
+    // Short label on a small box beside the attacking player's commander. It stands for all the other creatures that player is attacking ("swinging") with this turn, besides the commander. Their combat damage takes life but is not commander damage. Keep it to one short word if the language allows; it is a plural noun for those creatures, not "other players".
+    others: "Others",
+    // Buttons on that box: they change how much damage the attacking player's other creatures deal.
+    raiseOthers: "Raise damage from other attackers",
+    lowerOthers: "Lower damage from other attackers",
     totalFrom: "{{damage}} commander damage from {{name}}",
     amountFrom: "{{amount}} from {{name}}",
     unknownAttacker: "Commander",
