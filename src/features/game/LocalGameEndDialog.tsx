@@ -94,14 +94,15 @@ export function LocalGameEndDialog({
               key={player.id}
               testID={`end-game-winner-${player.seat}`}
               text={name}
-              detail={value}
+              TextProps={{ numberOfLines: 2 }}
+              detail={value.shown}
               accentColor={player.color}
               Leading={({ color }) => (
                 <PlayerMark seatNumber={seat + 1} shape={player.shape} color={color} size={28} />
               )}
               accessibilityLabel={translate(
                 selected ? "board:endGame.playerWinner" : "board:endGame.player",
-                { name, value },
+                { name, value: value.spoken },
               )}
               selected={selected}
               onPress={() => toggleWinner(player.id)}

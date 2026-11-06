@@ -1650,7 +1650,8 @@ function WinnerChoice({
   return (
     <ChoiceButton
       text={name}
-      detail={life}
+      TextProps={{ numberOfLines: 2 }}
+      detail={life.shown}
       accentColor={player.color}
       Leading={({ color }) => (
         <PlayerMark
@@ -1663,7 +1664,7 @@ function WinnerChoice({
       )}
       accessibilityLabel={translate(
         selected ? "connected:board.finish.winnerOption" : "connected:board.finish.playerOption",
-        { name, life },
+        { name, life: life.spoken },
       )}
       selected={selected}
       onPress={onPress}

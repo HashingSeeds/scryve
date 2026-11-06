@@ -47,14 +47,17 @@ export function winnerNames(
   ).flatMap(({ id }) => teamName(players, groups, id) ?? [])
 }
 
-/** why: a team's choice shows each member's value, or one value when they share it. */
+/** why: a team's row shows its value only when the team shares one, so the team's name keeps the room; screen readers still hear each member's value. */
 export function teamValueLabel(
   players: readonly { id: string; life: number }[],
   groups: TurnGroups | undefined,
   playerId: string,
   label: (life: number) => string,
-): string {
+): { shown?: string; spoken: string } {
   const lives = teamMembers(players, groups, playerId).map(({ life }) => life)
-  const shared = lives.every((life) => life === lives[0])
-  return (shared ? lives.slice(0, 1) : lives).map(label).join(" · ")
+  if (lives.every((life) => life === lives[0])) {
+    const value = label(lives[0] ?? 0)
+    return { shown: value, spoken: value }
+  }
+  return { spoken: lives.map(label).join(", ") }
 }
