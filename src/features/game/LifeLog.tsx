@@ -140,7 +140,7 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
   return rows.filter(({ delta }) => delta !== 0)
 }
 
-type GameLogChange = GameLogRow | GameCounterRow
+type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
 
 export function mergedLog(
   life: readonly GameLogRow[],
@@ -149,10 +149,11 @@ export function mergedLog(
   return [...life, ...counters].sort((left, right) => right.at - left.at)
 }
 
-export type GameLogItem =
-  | (GameLogRow & { kind?: undefined })
-  | GameCounterRow
-  | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
+type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & {
+  kind: "turn"
+}
+
+export type GameLogItem = GameLogChange | TurnDivider
 
 export function withTurnDividers(
   rows: readonly GameLogChange[],

@@ -332,7 +332,7 @@ export function useLocalGame(
     changeLayout,
     changeSeatOrder,
     changeClock,
-    undo: (turns: boolean) => {
+    undo: (turns = true) => {
       const current = gameRef.current
       const undo =
         current.status === "active" ? newestLogUndo(current, context.actorId, { turns }) : undefined

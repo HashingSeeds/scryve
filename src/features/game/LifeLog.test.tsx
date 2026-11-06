@@ -215,7 +215,9 @@ describe("counter log rows", () => {
       ["custom:Speed", 1, 1],
       ["poison", 2, 2],
     ])
-    const life = [{ id: "life", playerId: ada, delta: -3, life: 37, at: 1_550 }]
+    const life = [
+      { id: "life", playerId: ada, delta: -3, life: 37, at: 1_550, operationIds: ["life"] },
+    ]
     expect(mergedLog(life, rows).map(({ at }) => at)).toEqual([9_000, 1_600, 1_550, 1_500])
   })
 })
