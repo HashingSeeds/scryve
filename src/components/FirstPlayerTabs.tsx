@@ -26,9 +26,9 @@ export interface FirstPlayerTab {
   facing: number
 }
 
-const TAB_LENGTH = 56
+const TAB_LENGTH = 52
 const TAB_DEPTH = 40
-export const TURN_TAB_FACE = { width: 48, height: 74 } as const
+export const TURN_TAB_FACE = { width: 44, height: 74 } as const
 export const TURN_TAB_BORDER = 4
 /**
  * why: the first-player tab becomes the turn tab in the same place, so seats clear the turn tab

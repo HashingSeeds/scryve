@@ -47,7 +47,7 @@ export interface TurnTabProps {
   onLongPress: () => void
 }
 
-const PAD_X = 6
+const PAD_X = 5
 const PAD_Y = 4
 const MARK = 26
 const NEXT_MARK = 13
