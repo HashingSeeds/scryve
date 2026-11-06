@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Keyboard, Platform, StyleSheet, View } from "react-native"
+import { Platform, StyleSheet, View } from "react-native"
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
   runOnJS,
   useAnimatedProps,
   useAnimatedStyle,
@@ -16,11 +19,12 @@ import Animated, {
 } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
 
-import { lowestPower } from "@/features/game/commanderAttack"
+import { lowestPower, type AttackBox } from "@/features/game/commanderAttack"
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
-import type { Spacing, ThemedStyle } from "@/theme/types"
+import { spacing } from "@/theme/spacing"
+import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
@@ -33,8 +37,8 @@ import type {
   LifeCardEdge,
   LifeCardMenuCorner,
 } from "./playerCardTypes"
+import { COMPACT_KEY_HEIGHT, KEY_HEIGHT, PokemonKeypad } from "./pokemon/PokemonKeypad"
 import { Text } from "./Text"
-import { TextField } from "./TextField"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
 export type CommanderAttacker = {
@@ -45,7 +49,14 @@ export type CommanderAttacker = {
 }
 
 /** why: `landed` is the part of `total` dealt by this attack's hits so far; absent means none. */
-export type ArmedCommander = { name?: string; power: number; total: number; landed?: number }
+export type ArmedCommander = {
+  name?: string
+  power: number
+  total: number
+  landed?: number
+  /** why: sat out of this attack by tapping its name; it keeps its power for when it comes back. */
+  sitting?: boolean
+}
 
 type AssignmentTarget = {
   kind: "target"
@@ -61,6 +72,9 @@ type AssignmentTarget = {
   acted: boolean
   dealt: number
   takeBack: number
+  /** why: the part of `dealt` and `takeBack` that is Others damage, which the labels name apart from commander damage. */
+  othersStep: number
+  othersTakeBack: number
   onHit: () => void
   onUndo: () => void
 }
@@ -71,10 +85,19 @@ type AssignmentSource = {
   submit: "done" | "send"
   mark?: CommanderAttacker
   commanders: readonly ArmedCommander[]
+  /** why: what each tap deals from the attacker's other creatures, which takes life but never counts toward commander lethal. */
+  others: number
+  onOthers: (power: number) => void
+  othersShown: boolean
+  othersSitting: boolean
+  /** why: how far the commander grid in the card's lower corner reaches in from the seat's side and up from its foot, in the seat's own upright space, so the boxes stay clear of it. */
+  grid?: { width: number; height: number }
+  /** why: a box's name toggles whether it takes part in this attack. */
+  onSit: (box: AttackBox) => void
   acted: boolean
   onPower: (power: number, index: number) => void
-  // why: the number pad covers the lower half of the screen, so a seat there lifts its card by `amount` screen points while its power field is open.
-  onLift: (amount: number) => void
+  // why: the card's own life total sits where the keypad opens, so the card hides it while a power is being typed.
+  onEditing: (editing: boolean) => void
   onSubmit: () => void
 }
 
@@ -407,8 +430,6 @@ function DefenderControls({
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }))
 
   function hit() {
-    // why: the number pad has no Done key, so a tap on a target is what puts the attacker's power field away.
-    Keyboard.dismiss()
     if (dealt <= 0) return
     mode.onHit()
   }
@@ -438,10 +459,15 @@ function DefenderControls({
       <BoardPressable
         testID={`commander-hit-seat-${seatNumber}`}
         accessibilityRole="button"
-        accessibilityLabel={translate("board:commander.dealTo", {
-          damage: dealt,
-          name: playerName,
-        })}
+        accessibilityLabel={
+          mode.othersStep > 0
+            ? translate("board:commander.dealWithOthersTo", {
+                damage: dealt - mode.othersStep,
+                others: mode.othersStep,
+                name: playerName,
+              })
+            : translate("board:commander.dealTo", { damage: dealt, name: playerName })
+        }
         accessibilityState={{ disabled: dealt <= 0 }}
         disabled={dealt <= 0}
         onPress={hit}
@@ -479,7 +505,14 @@ function DefenderControls({
         <BoardPressable
           testID={`commander-undo-seat-${seatNumber}`}
           accessibilityRole="button"
-          accessibilityLabel={translate("board:commander.undoHit", { damage: takeBack })}
+          accessibilityLabel={
+            mode.othersTakeBack > 0
+              ? translate("board:commander.undoHitWithOthers", {
+                  damage: takeBack - mode.othersTakeBack,
+                  others: mode.othersTakeBack,
+                })
+              : translate("board:commander.undoHit", { damage: takeBack })
+          }
           onPress={mode.onUndo}
           style={[
             themed($undo),
@@ -511,11 +544,19 @@ function AttackerControls({
   mode: AssignmentSource
 }) {
   const { themed } = useAppTheme()
+  const reducedMotion = useReducedMotion()
   const [room, setRoom] = useState<{ width: number; height: number } | null>(null)
+  const [open, setOpen] = useState<{ box: AttackBox; draft: string }>()
   const partners = mode.commanders.length > 1
   const sideways = Math.abs(contentRotation) === 90
   const space = room && (sideways ? { width: room.height, height: room.width } : room)
-  const layout = attackerLayout({ space, count: mode.commanders.length, compact })
+  const layout = attackerLayout({
+    space,
+    count: mode.commanders.length,
+    others: mode.othersShown,
+    compact,
+    grid: mode.grid,
+  })
   const testSeats = partnerTestSeats(seatNumber)
   // why: the box is a pale card of the attacker's own color with its number inked in a deep shade, like the power box printed on a creature card.
   const cardColor = mode.mark?.color
@@ -523,12 +564,100 @@ function AttackerControls({
     ? mixColorsInLinearLight(cardColor, "#FFFFFF", 0.7)
     : overlayTint(foreground, 0.2)
   const ink = cardColor ? deepShade(cardColor) : foreground
+  const motion = reducedMotion === false
+  const moved = motion ? LinearTransition.duration(EDIT_MS) : undefined
+  const shown = motion ? FadeIn.duration(EDIT_MS) : undefined
+  const hidden = motion ? FadeOut.duration(EDIT_MS / 2) : undefined
+
+  function edit(box: AttackBox) {
+    const closing = open?.box === box
+    setOpen(closing ? undefined : { box, draft: "" })
+    mode.onEditing(!closing)
+  }
+  function close() {
+    if (!open) return
+    setOpen(undefined)
+    mode.onEditing(false)
+  }
+  const setPower = (box: AttackBox, power: number) =>
+    box === "others" ? mode.onOthers(power) : mode.onPower(power, box)
+  // why: a − or + on the box being typed into replaces what was typed, so the box shows the power the next hit deals.
+  function step(box: AttackBox, power: number) {
+    if (open?.box === box) setOpen({ box, draft: "" })
+    setPower(box, power)
+  }
+  // why: each key sets the power at once, so a hit tapped while the keypad is open deals what was typed. It opens empty, so the first key replaces the power rather than adding to it.
+  function type(char: string) {
+    if (!open || !/^\d$/.test(char)) return
+    if (open.draft.length >= String(MAX_COMMANDER_DAMAGE).length) return
+    const draft = open.draft + char
+    setOpen({ ...open, draft })
+    setPower(open.box, Number(draft))
+  }
+  function erase() {
+    if (!open) return
+    const draft = open.draft.slice(0, -1)
+    setOpen({ ...open, draft })
+    if (draft) setPower(open.box, Number(draft))
+  }
+
+  const box = {
+    color: paper,
+    ink,
+    ring: foreground,
+    bar: cardColor ?? overlayTint(foreground, 0.35),
+    width: layout.width,
+    height: layout.height,
+    nameHeight: layout.name,
+  }
+  const commanderBox = ({ name, power, sitting }: ArmedCommander, index: number) => (
+    <Animated.View key={index} layout={moved} entering={shown} exiting={hidden}>
+      <PowerBox
+        {...box}
+        suffix={testSeats[index]}
+        name={name}
+        partner={partners}
+        power={power}
+        sitting={!!sitting}
+        draft={open?.box === index ? open.draft : undefined}
+        onPower={(next) => step(index, next)}
+        onEdit={() => edit(index)}
+        onSit={() => mode.onSit(index)}
+      />
+    </Animated.View>
+  )
+  const othersBox = (
+    <Animated.View key="others" layout={moved} entering={shown} exiting={hidden}>
+      <PowerBox
+        {...box}
+        suffix={`${seatNumber}-others`}
+        name={translate("board:commander.others")}
+        others
+        partner
+        power={mode.others}
+        sitting={mode.othersSitting}
+        draft={open?.box === "others" ? open.draft : undefined}
+        onPower={(next) => step("others", next)}
+        onEdit={() => edit("others")}
+        onSit={() => mode.onSit("others")}
+      />
+    </Animated.View>
+  )
+  const editedCommander = typeof open?.box === "number" ? mode.commanders[open.box] : undefined
+  const edited =
+    open?.box === "others"
+      ? othersBox
+      : editedCommander && typeof open?.box === "number"
+        ? commanderBox(editedCommander, open.box)
+        : undefined
+  const keypad = space ? keypadPlacement(space, layout, compact) : undefined
 
   return (
-    // why: the number pad has no Done key, so a tap anywhere else on the card puts the power field away.
+    // why: a tap anywhere else on the card closes the keypad, like tapping away from a field.
     <BoardPressable
+      testID={`commander-attacker-seat-${seatNumber}`}
       accessible={false}
-      onPress={Keyboard.dismiss}
+      onPress={close}
       style={themed($attackerCenter)}
       onLayout={({ nativeEvent: { layout: box } }) =>
         setRoom({ width: box.width, height: box.height })
@@ -540,81 +669,217 @@ function AttackerControls({
           contentRotation ? { transform: [{ rotate: `${contentRotation}deg` }] } : null,
         ]}
       >
-        <View style={themed($partners)}>
-          {mode.commanders.map(({ name, power }, index) => (
-            <PowerBox
-              key={index}
-              suffix={testSeats[index]}
-              name={name}
-              partner={partners}
-              power={power}
-              color={paper}
-              ink={ink}
-              ring={foreground}
-              width={layout.width}
-              height={layout.height}
-              nameHeight={layout.name}
-              onPower={(next) => mode.onPower(next, index)}
-              onLift={mode.onLift}
-            />
-          ))}
-        </View>
-        {/* why: the card's own total moves into this slot (see attackerLifeSlot) rather than a second copy fading in. */}
-        <View
-          testID={`commander-attacker-life-seat-${seatNumber}`}
-          style={{ height: layout.life }}
-        />
+        {edited && keypad ? (
+          // why: the box being typed into stays and the rest step aside for the keypad: above it when the card is tall enough, beside it on a short seat.
+          <View style={[keypad.stacked ? $editStacked : $editBeside, { gap: UNIT_GAP }]}>
+            {edited}
+            <Animated.View
+              entering={shown}
+              exiting={hidden}
+              style={{ width: keypad.width, height: keypad.height }}
+            >
+              <PokemonKeypad
+                seatNumber={seatNumber}
+                ink={foreground}
+                digitsOnly
+                capitalize={false}
+                compact={keypad.compact}
+                onType={type}
+                onDelete={erase}
+                onDone={close}
+              />
+            </Animated.View>
+          </View>
+        ) : (
+          <>
+            {/* why: Others leads on the left of a single row; with two rows, partners take the top and Others sits under them. The card's own total moves into its slot (see attackerLifeSlot) rather than a second copy fading in. */}
+            <View
+              testID={`commander-boxes-seat-${seatNumber}`}
+              style={[themed($boxRows), { transform: [{ translateY: layout.boxesY }] }]}
+            >
+              {(layout.rows > 1
+                ? [mode.commanders.map(commanderBox), [othersBox]]
+                : [[...(mode.othersShown ? [othersBox] : []), ...mode.commanders.map(commanderBox)]]
+              ).map((row, rowIndex) => (
+                <View key={rowIndex} style={themed($partners)}>
+                  {row}
+                </View>
+              ))}
+            </View>
+          </>
+        )}
       </View>
     </BoardPressable>
   )
 }
 
+const EDIT_MS = 220
+const KEY_ROWS = 4
+const KEYPAD_ROW_GAP = 5
+const KEYPAD_MAX_WIDTH = 280
+// why: beside the box, the keypad keeps to about three thumb-wide keys so the pair stays centered and clear of the card's corner marks.
+const KEYPAD_BESIDE_WIDTH = 150
+
+/** why: the in-card keypad for a power. It sits under the box when the card has room for four rows of full keys there, and beside it otherwise, with compact keys that give up height to fit a short seat. */
+export function keypadPlacement(
+  space: { width: number; height: number },
+  layout: ReturnType<typeof attackerLayout>,
+  compact?: boolean,
+) {
+  const boxHeight = layout.height + layout.name
+  const rowsHeight = (key: number) => KEY_ROWS * key + (KEY_ROWS - 1) * KEYPAD_ROW_GAP
+  const stacked = !compact && space.height >= boxHeight + rowsHeight(KEY_HEIGHT) + UNIT_GAP * 3
+  if (stacked)
+    return {
+      stacked,
+      compact: false,
+      width: Math.min(KEYPAD_MAX_WIDTH, space.width - UNIT_GAP * 2),
+      height: rowsHeight(KEY_HEIGHT),
+    }
+  return {
+    stacked,
+    compact: true,
+    width: Math.max(0, Math.min(KEYPAD_BESIDE_WIDTH, space.width - layout.width - UNIT_GAP * 3)),
+    height: Math.max(0, Math.min(rowsHeight(COMPACT_KEY_HEIGHT), space.height - UNIT_GAP * 2)),
+  }
+}
+
 const UNIT_GAP = 16
-// why: iOS reports the keyboard as it starts to rise, so the card lifts with it; Android only once it is up.
-const KEYBOARD_SHOWN = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
-const KEYBOARD_HIDDEN = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
-const KEYBOARD_GAP = 12
 // why: a power box's number row is wide enough for its small − and + to sit at its ends, clear of the number.
 const BOX_RATIO = 2
-const MIN_BOX = 44
-// why: the commander's name runs along the box's foot, under the number, at about a quarter of the number row's height.
-const NAME_SHARE = 0.26
-const MIN_NAME = 16
+// why: the commander's name runs along the box's foot, under the number. It toggles the box in and out of the attack, so with its slop below it reaches about a 40pt touch target.
+const NAME_SHARE = 0.5
+const MIN_NAME = 32
 // why: the attacker's life sits under its power boxes at about half a number row, small enough to read as secondary.
 const LIFE_SHARE = 0.5
 const MIN_LIFE = 18
 
-/** why: an attacker's name sits inside its power box under the number, its life under the boxes, and partners share the card's width side by side, since a card runs out of height before width. Each box shrinks to its lane, down to a tappable minimum. `height` is the number row, `name` the row under it, `life` the line under the boxes. */
+/** why: an attacker's power boxes take whichever arrangement and placement gives them the most face while keeping at least UNIT_GAP from every edge of the seat and clear of the commander grid in its lower corner. Beside: the boxes and the attacker's life sit in one column centered on the card, narrowed on both sides to clear the grid. Above: the boxes use the full width over the grid, and the life sits larger in the band beside the grid. Arrangements are one commander beside Others, or partners either above Others or in one row with it. Seats only get smaller from here (8 and 10 players), so the size comes from the room rather than a fixed minimum; the name bar stays a 32pt touch target until nothing else fits. `height` is the number row and `name` the row under it; `boxesY` and `lifeY` place the boxes' and the life's middles below the card's center, in the seat's upright space. */
 export function attackerLayout({
   space,
   count,
+  others = true,
   compact,
+  grid,
 }: {
   space: { width: number; height: number } | null
   count: number
+  /** why: whether the Others box joins the commanders. */
+  others?: boolean
   compact?: boolean
+  /** why: how far the commander grid reaches in from the seat's side, and up from its foot. */
+  grid?: { width: number; height: number }
 }) {
-  const largest = count > 1 ? (compact ? 52 : 64) : compact ? 72 : 88
-  const lane = space ? (space.width - UNIT_GAP * (count + 1)) / count : Infinity
-  const room = space ? (space.height - UNIT_GAP * 2) / (1 + NAME_SHARE + LIFE_SHARE) : Infinity
-  const height = Math.floor(Math.max(MIN_BOX, Math.min(largest, lane / BOX_RATIO, room)))
-  // why: below the tappable minimum height a box narrows instead, so partners never run past a short seat's edges.
-  return {
-    height,
-    width: Math.max(0, Math.floor(Math.min(lane, height * BOX_RATIO))),
-    name: Math.max(MIN_NAME, Math.round(height * NAME_SHARE)),
-    life: Math.max(MIN_LIFE, Math.round(height * LIFE_SHARE)),
+  const largest = compact ? 52 : 64
+  const boxes = count + (others ? 1 : 0)
+  const arrangements: readonly Arrangement[] =
+    count > 1 && others
+      ? [
+          { rows: 2, perRow: 2 },
+          { rows: 1, perRow: boxes },
+        ]
+      : [{ rows: 1, perRow: boxes }]
+  const placements: readonly Placement[] = grid?.height ? ["beside", "above"] : ["beside"]
+  const size = (
+    height: number,
+    nameFloor: number,
+    { rows, perRow }: Arrangement,
+    placement: Placement,
+  ) => {
+    const beside = placement === "beside"
+    const band = grid?.height ?? 0
+    const clear = beside ? (grid?.width ?? 0) : 0
+    const lane = space
+      ? (space.width - clear * 2 - UNIT_GAP * 2 - spacing[BOX_GAP] * (perRow - 1)) / perRow
+      : Infinity
+    const name = Math.max(nameFloor, Math.round(height * NAME_SHARE))
+    const life = Math.max(MIN_LIFE, Math.round(height * LIFE_SHARE))
+    const boxesHeight = rows * (height + name) + (rows - 1) * spacing[BOX_ROW_GAP]
+    return {
+      height,
+      width: Math.max(
+        0,
+        Math.floor(Math.min(lane, height * (beside ? BOX_RATIO : WIDE_BOX_RATIO))),
+      ),
+      name,
+      rows,
+      perRow,
+      placement,
+      boxesHeight,
+      boxesY: beside ? -(spacing[ATTACKER_COLUMN_GAP] + life) / 2 : -band / 2,
+      lifeY: beside
+        ? (boxesHeight + spacing[ATTACKER_COLUMN_GAP]) / 2
+        : (space?.height ?? 0) / 2 - band / 2,
+      // why: above the grid, the life is centered in the band beside it, so it shrinks to the room the grid leaves on both sides.
+      lifeFont: beside
+        ? life * 0.8
+        : Math.min(
+            band * BAND_LIFE_SHARE,
+            MAX_BAND_LIFE,
+            ((space?.width ?? 0) - ((grid?.width ?? 0) + UNIT_GAP / 2) * 2) /
+              (LIFE_DIGITS * DIGIT_ADVANCE),
+          ),
+      // why: the column's full height, the life line included when it sits under the boxes.
+      columnHeight: beside ? boxesHeight + spacing[ATTACKER_COLUMN_GAP] + life : boxesHeight,
+    }
   }
+  if (!space) return size(largest, MIN_NAME, arrangements[0], "beside")
+  const fits = (layout: ReturnType<typeof size>) => {
+    if (layout.width < layout.height * MIN_BOX_RATIO) return false
+    if (layout.placement === "beside") return layout.columnHeight <= space.height - UNIT_GAP * 2
+    return (
+      layout.boxesHeight <= space.height - (grid?.height ?? 0) - UNIT_GAP * 2 &&
+      layout.lifeFont >= MIN_LIFE
+    )
+  }
+  for (const [nameFloor, smallest] of [
+    [MIN_NAME, SMALLEST_BOX],
+    [TIGHT_NAME, TIGHT_BOX],
+  ]) {
+    const best = arrangements
+      .flatMap((arrangement) => placements.map((placement) => ({ arrangement, placement })))
+      .map(({ arrangement, placement }) => {
+        for (let height = largest; height >= smallest; height--) {
+          const layout = size(height, nameFloor, arrangement, placement)
+          if (fits(layout)) return layout
+        }
+        return undefined
+      })
+      .filter((layout) => layout !== undefined)
+      // why: a short, wide box reads and taps better than a tall, narrow one, so the arrangement with the most box face wins.
+      .sort((a, b) => b.height * b.width - a.height * a.width)[0]
+    if (best) return best
+  }
+  // why: a seat too small for any margin still gets the roomiest boxes rather than ones squeezed to nothing.
+  return arrangements
+    .flatMap((arrangement) =>
+      placements.map((placement) => size(TIGHT_BOX, TIGHT_NAME, arrangement, placement)),
+    )
+    .sort((a, b) => b.height * b.width - a.height * a.width)[0]
 }
 
-const ATTACKER_COLUMN_GAP = "xxs"
+type Arrangement = { rows: number; perRow: number }
+type Placement = "beside" | "above"
+// why: a box narrower than this leaves its − and + no room beside the number.
+const MIN_BOX_RATIO = 1.4
+// why: above the grid, a short row has the seat's whole width, so its boxes stretch further than BOX_RATIO to use it.
+const WIDE_BOX_RATIO = 2.8
+const SMALLEST_BOX = 28
+// why: the name bar gives up its 32pt, and the number row shrinks past SMALLEST_BOX, only when a seat is too small for the boxes otherwise.
+const TIGHT_NAME = 24
+const TIGHT_BOX = 20
+const BOX_GAP = "md"
+// why: in the band beside the grid, the life reads larger than under the boxes, up to a size that still reads as secondary to the boxes.
+const BAND_LIFE_SHARE = 0.5
+const MAX_BAND_LIFE = 34
+const LIFE_DIGITS = 3
 
-/** why: the attacker's own life stays in view under its power, small and regular weight, so it never reads as the attack's target. It is the last line of a column centered on the card, under boxes `height + name` tall, so its middle sits half of everything above it below the card's center. */
-export function attackerLifeSlot(layout: ReturnType<typeof attackerLayout>, spacing: Spacing) {
-  return {
-    belowCardCenter: (layout.height + layout.name + spacing[ATTACKER_COLUMN_GAP]) / 2,
-    fontSize: layout.life * 0.8,
-  }
+const ATTACKER_COLUMN_GAP = "xxs"
+const BOX_ROW_GAP = "sm"
+
+/** why: the attacker's own life stays in view while it attacks, regular weight, so it never reads as the attack's target: under its boxes, or larger in the band beside the commander grid when the boxes sit above it. */
+export function attackerLifeSlot(layout: ReturnType<typeof attackerLayout>) {
+  return { belowCardCenter: layout.lifeY, fontSize: layout.lifeFont }
 }
 
 const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber}-partner`]
@@ -623,7 +888,9 @@ const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, l
 
 const AnimatedPath = Animated.createAnimatedComponent(Path)
 // why: the ink of a hit, bright enough to read on the gutter ring over any shade.
-const DAMAGE_INK = "#FF4D5A"
+export const DAMAGE_INK = "#FF4D5A"
+// why: Others damage hurts too, so it reads warm like a hit, but orange so it never passes for commander damage.
+export const OTHERS_INK = "#FF8A1F"
 const TRACK_OPACITY = 0.18
 const GHOST_OPACITY = 0.4
 // why: a hit eases the arc forward rather than snapping, so the defender sees how much it just took.
@@ -794,55 +1061,56 @@ const $pulseCenter: ViewStyle = {
 function PowerBox({
   suffix,
   name,
+  others,
   partner,
   power,
+  sitting,
+  draft,
   color,
   ink,
   ring,
+  bar,
   width,
   height,
   nameHeight,
   onPower,
-  onLift,
+  onEdit,
+  onSit,
 }: {
   suffix: string
   name?: string
+  /** why: the Others box, damage from the attacker's other creatures rather than a commander. */
+  others?: boolean
   partner: boolean
   power: number
+  sitting: boolean
+  /** why: what has been typed while this box's keypad is open; undefined while it is closed. */
+  draft?: string
   color: string
   ink: string
   ring: string
+  /** why: an included box's name bar takes the seat's own color with the card's light ink, so it reads like the card around it rather than a dark slab. */
+  bar: string
   width: number
   height: number
   nameHeight: number
   onPower: (power: number) => void
-  onLift: (amount: number) => void
+  onEdit: () => void
+  onSit: () => void
 }) {
-  const { themed } = useAppTheme()
-  const [draft, setDraft] = useState<string>()
-  const box = useRef<View>(null)
   const editing = draft !== undefined
-  useEffect(() => {
-    if (!editing) return
-    const shown = Keyboard.addListener(KEYBOARD_SHOWN, ({ endCoordinates }) =>
-      box.current?.measureInWindow((_x, y, _width, height) =>
-        onLift(Math.max(0, y + height + KEYBOARD_GAP - endCoordinates.screenY)),
-      ),
-    )
-    const hidden = Keyboard.addListener(KEYBOARD_HIDDEN, () => setDraft(undefined))
-    return () => {
-      shown.remove()
-      hidden.remove()
-      onLift(0)
-    }
-  }, [editing, onLift])
   const pressedTint = { backgroundColor: overlayTint(ink, 0.14) }
   const lowest = lowestPower(partner)
-  const numberStyle = { color: ink, fontSize: height * 0.62, lineHeight: height * 0.8 }
+  // why: a box narrowed to its lane still fits two digits, so the number shrinks to the middle of its row rather than wrapping out of sight; the platform shrinks it further if the font runs wider than this estimate.
+  const valueWidth = (width * VALUE_FLEX) / (VALUE_FLEX + HALF_FLEX * 2)
+  const digits = Math.max(1, String(draft || power).length)
+  const fontSize = Math.min(height * 0.62, valueWidth / (digits * DIGIT_ADVANCE))
+  const numberStyle = { color: ink, fontSize, lineHeight: height * 0.8 }
   const half = (step: 1 | -1) => {
     const disabled = step < 0 ? power <= lowest : power >= MAX_COMMANDER_DAMAGE
-    const label =
-      step < 0
+    const label = others
+      ? translate(step < 0 ? "board:commander.lowerOthers" : "board:commander.raiseOthers")
+      : step < 0
         ? partner && name
           ? translate("board:commander.lowerPowerOf", { name })
           : translate("board:commander.lowerPower")
@@ -875,17 +1143,9 @@ function PowerBox({
     )
   }
 
-  // why: each keystroke sets the power at once, so a hit tapped while the field is open deals what was typed.
-  function type(text: string) {
-    const digits = text.replace(/\D/g, "").slice(0, String(MAX_COMMANDER_DAMAGE).length)
-    setDraft(digits)
-    if (digits) onPower(Number(digits))
-  }
-
-  const nameFont = Math.round(nameHeight * 0.62)
+  const nameFont = Math.round(Math.min(nameHeight * 0.45, height * 0.34))
   return (
     <View
-      ref={box}
       style={[
         $box,
         {
@@ -896,57 +1156,84 @@ function PowerBox({
           borderColor: ring,
           backgroundColor: color,
         },
-        power === 0 && !editing && $sittingOut,
+        (sitting || power === 0) && !editing && $sittingOut,
       ]}
     >
       <View style={[$boxRow, { height }]}>
         {half(-1)}
-        {editing ? (
-          <TextField
-            testID={`commander-power-input-seat-${suffix}`}
-            accessibilityLabel={translate("board:commander.power", { power })}
-            autoFocus
-            keyboardType="number-pad"
+        <BoardPressable
+          testID={`commander-power-seat-${suffix}`}
+          accessibilityRole="button"
+          accessibilityLabel={
+            others
+              ? translate("board:commander.othersPower", { power })
+              : translate("board:commander.power", { power })
+          }
+          accessibilityState={{ expanded: editing }}
+          accessibilityLiveRegion="polite"
+          onPress={onEdit}
+          style={({ pressed }) => [
+            $boxValue,
+            editing && { backgroundColor: overlayTint(ink, 0.1) },
+            pressed && pressedTint,
+          ]}
+        >
+          {/* why: the keypad opens empty with the current power dimmed in its place, so typing replaces it; closing empty keeps it. */}
+          <Text
+            testID={editing ? `commander-power-input-seat-${suffix}` : undefined}
+            text={draft || `${power}`}
+            weight="bold"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.5}
             maxFontSizeMultiplier={1}
-            // why: the field opens empty with the current power as its placeholder, so typing replaces it; a field closed empty keeps it.
-            placeholder={String(power)}
-            placeholderTextColor={overlayTint(ink, 0.35)}
-            value={draft}
-            onChangeText={type}
-            onBlur={() => setDraft(undefined)}
-            containerStyle={$boxValue}
-            inputWrapperStyle={[$powerInput, { borderColor: ink }]}
-            style={[themed($powerInputText), numberStyle]}
+            style={[numberStyle, editing && !draft && $draftHint]}
           />
-        ) : (
-          <BoardPressable
-            testID={`commander-power-seat-${suffix}`}
-            accessibilityRole="button"
-            accessibilityLabel={translate("board:commander.power", { power })}
-            accessibilityLiveRegion="polite"
-            onPress={() => setDraft("")}
-            style={({ pressed }) => [$boxValue, pressed && pressedTint]}
-          >
-            <Text text={`${power}`} weight="bold" maxFontSizeMultiplier={1} style={numberStyle} />
-          </BoardPressable>
-        )}
+        </BoardPressable>
         {half(1)}
       </View>
-      {/* why: a seat with no deck still names its attacker, dimmed, so the box never sits unlabeled. */}
-      <View pointerEvents="none" style={{ height: nameHeight, paddingHorizontal: height * 0.16 }}>
+      {/* why: the name strip is a toggle button: a bar in the seat's color while the box is in the attack, hollow with its name struck through once it sits out. A seat with no deck names its box "Commander". */}
+      <BoardPressable
+        testID={`commander-sit-seat-${suffix}`}
+        accessibilityRole="switch"
+        accessibilityLabel={name ?? translate("board:commander.unnamed")}
+        accessibilityState={{ checked: !sitting }}
+        // why: the box's border trims a few points off the strip, so its touch area reaches a little past the box's foot.
+        hitSlop={{ bottom: 8 }}
+        onPress={onSit}
+        style={({ pressed }) => [
+          $boxNameRow,
+          {
+            height: nameHeight,
+            paddingHorizontal: height * 0.12,
+            borderTopColor: overlayTint(ink, 0.35),
+          },
+          sitting
+            ? pressed && { backgroundColor: overlayTint(ink, 0.14) }
+            : { backgroundColor: bar, opacity: pressed ? 0.8 : 1 },
+        ]}
+      >
         <Text
           testID={`commander-name-seat-${suffix}`}
           text={name ?? translate("board:commander.unnamed")}
           weight="bold"
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
           maxFontSizeMultiplier={1}
           style={[
             $boxName,
-            { color: ink, fontSize: nameFont, lineHeight: nameHeight },
-            !name && $unnamed,
+            // why: a line box close to the font's own height, since iOS sets a taller one's extra room above the text and the name sinks low in its bar.
+            {
+              color: sitting ? ink : ring,
+              fontSize: nameFont,
+              lineHeight: Math.round(nameFont * 1.2),
+              transform: [{ translateY: -nameFont * NAME_RISE }],
+            },
+            sitting && $sittingName,
           ]}
         />
-      </View>
+      </BoardPressable>
     </View>
   )
 }
@@ -1002,12 +1289,32 @@ const $flood: ViewStyle = { zIndex: TAKEOVER_LAYERS.flood }
 const $aboveFlood: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }
 
 const $sittingOut: ViewStyle = { opacity: 0.4 }
+const $draftHint: TextStyle = { opacity: 0.35 }
+const $editStacked: ViewStyle = { alignItems: "center" }
+const $editBeside: ViewStyle = { flexDirection: "row", alignItems: "center" }
 
 const $box: ViewStyle = { overflow: "hidden" }
 const $boxRow: ViewStyle = { flexDirection: "row" }
 // why: the number takes the middle of its row, wide enough for two digits, and the − and + split the rest.
-const $boxHalf: ViewStyle = { flex: 0.8, justifyContent: "center" }
-const $boxName: TextStyle = { textAlign: "center", marginTop: -4, opacity: 0.75 }
+// why: iOS sets Rubik's lowercase-heavy names about a fifth of an em below the middle of their line box; Android centers them.
+const NAME_RISE = Platform.OS === "ios" ? 0.2 : 0
+const HALF_FLEX = 0.8
+const VALUE_FLEX = 1.4
+// why: Rubik Bold digits advance a little over 0.6em, so this keeps two of them clear of the − and +.
+const DIGIT_ADVANCE = 0.66
+const $boxHalf: ViewStyle = { flex: HALF_FLEX, justifyContent: "center" }
+const $boxNameRow: ViewStyle = {
+  alignItems: "center",
+  justifyContent: "center",
+  borderTopWidth: StyleSheet.hairlineWidth,
+}
+const $sittingName: TextStyle = { textDecorationLine: "line-through" }
+const $boxName: TextStyle = {
+  flexShrink: 1,
+  textAlign: "center",
+  includeFontPadding: false,
+  textAlignVertical: "center",
+}
 const $boxGlyph: TextStyle = { opacity: 0.6 }
 const $boxGlyphDisabled: TextStyle = { opacity: 0.2 }
 
@@ -1042,27 +1349,15 @@ const $attackerColumn: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing[ATTACKER_COLUMN_GAP],
 })
 
+const $boxRows: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "center",
+  gap: spacing[BOX_ROW_GAP],
+})
+
 const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  gap: spacing.md,
+  gap: spacing[BOX_GAP],
 })
 
-const $boxValue: ViewStyle = { flex: 1.4, alignItems: "center", justifyContent: "center" }
-
-const $powerInput: ViewStyle = {
-  minHeight: 0,
-  alignSelf: "stretch",
-  flex: 1,
-  borderWidth: 2,
-  backgroundColor: "transparent",
-}
-
-const $powerInputText: ThemedStyle<TextStyle> = ({ typography }) => ({
-  fontFamily: typography.primary.bold,
-  textAlign: "center",
-  marginVertical: 0,
-  marginHorizontal: 0,
-})
-
-const $unnamed: TextStyle = { opacity: 0.45 }
+const $boxValue: ViewStyle = { flex: VALUE_FLEX, alignItems: "center", justifyContent: "center" }

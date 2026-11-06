@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
+import type { AttackBox } from "@/features/game/commanderAttack"
 import type { DiceSeatChip, DiceTool } from "@/features/game/dice"
 import { PARTNER_COMMANDER } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
@@ -533,9 +534,21 @@ export function PlayerGrid({
                             commanders: strike?.commanders,
                             dealt: strike?.dealt,
                             takeBack: strike?.takeBack,
+                            othersStep: strike?.othersStep,
+                            othersTakeBack: strike?.othersTakeBack,
                             applied: strike?.applied,
+                            others: strike?.others,
+                            othersLanded: strike?.othersLanded,
                             onPower: stable(`power:${player.id}`, (power: number, slot: number) =>
                               attack.dispatch({ type: "power", slot, power }),
+                            ),
+                            onOthers: stable(`others:${player.id}`, (power: number) =>
+                              attack.dispatch({ type: "others", power }),
+                            ),
+                            othersShown: strike?.othersShown,
+                            othersSitting: strike?.othersSitting,
+                            onSit: stable(`sit:${player.id}`, (box: AttackBox) =>
+                              attack.dispatch({ type: "sit", box }),
                             ),
                             facing:
                               armedIndex >= 0
