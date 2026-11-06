@@ -108,6 +108,8 @@ export type TableCounterDefinition = {
   readonly max: number
   readonly losesAt?: number
   readonly commandZoneOnly?: boolean
+  /** why: a counter teammates share, such as Two-Headed Giant poison, moves on every seat of the team at once. */
+  readonly shared?: boolean
 }
 
 export type DesignationDefinition = { readonly id: string; readonly label: string }
@@ -309,7 +311,7 @@ export const SYSTEMS = {
         { id: "initiative", label: "Initiative" },
       ],
     },
-    variants: ["treachery"],
+    variants: ["treachery", "twoHeadedGiant"],
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },
     deckAnalysis: true,

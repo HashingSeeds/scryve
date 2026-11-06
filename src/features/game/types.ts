@@ -5,6 +5,7 @@ import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
 import type { TableState } from "../../../convex/lib/table"
+import type { GameVariant } from "../../../convex/lib/treachery"
 import type { Turn } from "../../../convex/lib/turns"
 
 export type CommanderSlot = typeof PARTNER_COMMANDER | undefined
@@ -129,6 +130,8 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
+  /** why: Two-Headed Giant games share life and poison across each turn group. */
+  variant?: GameVariant
 }
 
 export interface TurnLogEntry {

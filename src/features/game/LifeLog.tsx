@@ -13,6 +13,7 @@ import type {
 } from "./types"
 import { api } from "../../../convex/_generated/api"
 import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
+import { turnGroupOf, type TurnGroups } from "../../../convex/lib/turns"
 
 export interface LifeLogStep {
   id: string
@@ -25,9 +26,15 @@ interface LifeLogChange {
   delta: number
 }
 
+/** why: a Two-Headed Giant head's life is its team's, so `teams` folds both heads' changes into one history. */
 export type LifeLogSource =
-  | { kind: "local"; events: readonly GameEvent[] }
-  | { kind: "connected"; publicId: string; pending: readonly PendingLifeAction[] }
+  | { kind: "local"; events: readonly GameEvent[]; teams?: TurnGroups }
+  | {
+      kind: "connected"
+      publicId: string
+      pending: readonly PendingLifeAction[]
+      teams?: TurnGroups
+    }
 
 export const LifeLogContext = createContext<LifeLogSource | undefined>(undefined)
 
@@ -61,11 +68,16 @@ function lifeChangeOf(event: LifeChangedEvent | CommanderDamageAssignedEvent) {
     : { playerId: event.toPlayerId, delta: -event.delta, fromPlayerId: event.fromPlayerId }
 }
 
-export function localLifeChanges(events: readonly GameEvent[], playerId: string): LifeLogChange[] {
+export function localLifeChanges(
+  events: readonly GameEvent[],
+  playerId: string,
+  teams?: TurnGroups,
+): LifeLogChange[] {
+  const team = turnGroupOf(teams, playerId)
   return standingLifeEvents(events)
     .flatMap((event) => {
       const change = lifeChangeOf(event)
-      return change.playerId === playerId ? [{ id: event.operationId, delta: change.delta }] : []
+      return team.includes(change.playerId) ? [{ id: event.operationId, delta: change.delta }] : []
     })
     .reverse()
 }
@@ -78,6 +90,7 @@ export const LIFE_BURST_MS = 1800
 export function gameLog(
   players: readonly Pick<GamePlayer, "id" | "life">[],
   events: readonly GameEvent[],
+  teams?: TurnGroups,
 ): GameLogRow[] {
   const totals = new Map<string, number>(players.map(({ id, life }) => [id, life]))
   const rows: GameLogRow[] = []
@@ -86,7 +99,7 @@ export function gameLog(
     const change = lifeChangeOf(event)
     const life = totals.get(change.playerId)
     if (life === undefined) continue
-    totals.set(change.playerId, life - change.delta)
+    for (const id of turnGroupOf(teams, change.playerId)) totals.set(id, life - change.delta)
     const newer = rows.at(-1)
     if (
       newer?.playerId === change.playerId &&
@@ -130,7 +143,7 @@ export function LifeLog({ playerId, life, children }: LifeLogProps) {
   const source = useContext(LifeLogContext)
   if (!source) return null
   if (source.kind === "local")
-    return children(lifeLog(life, localLifeChanges(source.events, playerId)))
+    return children(lifeLog(life, localLifeChanges(source.events, playerId, source.teams)))
   return (
     <ConvexQueryBoundary resetKey={source.publicId} fallback={() => null}>
       <ConnectedLifeLog source={source} playerId={playerId} life={life}>
@@ -153,18 +166,19 @@ function ConnectedLifeLog({
     { initialNumItems: CONNECTED_EVENT_PAGE_MAX_ITEMS },
   )
   const confirmed = new Set(results.map(({ operationId }) => operationId))
+  const team = turnGroupOf(source.teams, playerId)
   const pending = source.pending
     .flatMap(({ event }) =>
       event.type === "life.changed" &&
       event.gameId === source.publicId &&
-      event.playerId === playerId &&
+      team.includes(event.playerId) &&
       !confirmed.has(event.operationId)
         ? [{ id: event.operationId, delta: event.delta }]
         : [],
     )
     .reverse()
   const synced = results.flatMap((event) =>
-    event.playerId === playerId && event.delta !== undefined
+    team.includes(event.playerId) && event.delta !== undefined
       ? event.kind === "life.changed"
         ? [{ id: event.operationId, delta: event.delta }]
         : event.kind === "commanderDamage.confirmed"

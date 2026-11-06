@@ -16,6 +16,7 @@ import {
   setLanDeck,
   setLanPlayerCount,
   startLanRound,
+  swapLanSeats,
   type LanGame,
   type LanSeatPass,
   type LanSetup,
@@ -138,6 +139,43 @@ describe("nearby lobby", () => {
     expect(lanSeatsReady(full)).toBe(true)
     expect(lanSeatsReady(setLanConnected(full, "guest", false))).toBe(false)
     expect(releaseLanSeat(full, "guest").seats.map((seat) => seat.key)).toEqual(["host"])
+  })
+})
+
+describe("nearby Two-Headed Giant teams", () => {
+  const twoHeaded: LanSetup = { ...commander, playerCount: 4, variant: "twoHeadedGiant" }
+  const admit = (game: LanGame, key: string) => {
+    const admitted = admitLanGuest(
+      game,
+      tokens,
+      { ...join(key), variants: ["twoHeadedGiant"] },
+      { key, token: `token-${key}` },
+    )
+    if ("rejected" in admitted) throw new Error(admitted.rejected)
+    return admitted.game
+  }
+  const seatsOf = (game: LanGame) => game.seats.map(({ key, seat }) => [key, seat])
+
+  it("lets the host trade seats in the lobby, an open one too, and the next guest fills the gap", () => {
+    const traded = swapLanSeats(admit(lobby(twoHeaded), "bo"), 2, 3)
+    expect(seatsOf(traded)).toEqual([
+      ["host", 1],
+      ["bo", 3],
+    ])
+    const full = admit(admit(traded, "cy"), "dee")
+    expect(seatsOf(releaseLanSeat(full, "cy"))).toEqual([
+      ["host", 1],
+      ["bo", 3],
+      ["dee", 4],
+    ])
+    expect(startLanRound(full, NOW).memory?.turnGroups).toEqual([
+      ["host", "cy"],
+      ["bo", "dee"],
+    ])
+    expect(swapLanSeats(startLanRound(full, NOW), 1, 2).seats).toEqual(
+      startLanRound(full, NOW).seats,
+    )
+    expect(swapLanSeats(full, 1, 5)).toBe(full)
   })
 })
 

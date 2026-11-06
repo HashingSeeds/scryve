@@ -53,6 +53,20 @@ const play = {
     onThisDevice: "On this device",
     connected: "Connected",
     gameLabel: "Game",
+    // Two-Headed Giant setup: heading above the list of two-player teams.
+    teams: "Teams",
+    // Two-Headed Giant setup: screen reader label for a player in the team list, as in "Ada, team 1".
+    teamPlayer: "{{name}}, team {{team}}",
+    // Two-Headed Giant setup: hint under the team list. Tapping one player and then another swaps their teams.
+    teamSwapHint: "Tap two players to swap them",
+    // Two-Headed Giant setup: shown after the first tap, while waiting for the second player.
+    teamSwapPicked: "Now tap who to swap with",
+    // Two-Headed Giant setup: heading for the life total each team shares.
+    teamLife: "Team life",
+    // Game type name for Two-Headed Giant, Magic's format of two-player teams sharing a life total. Keep the official name if the language has one.
+    twoHeadedGiant: "Two-Headed Giant",
+    // Game type name for Two-Headed Giant played with Commander decks. Short.
+    twoHeadedGiantCommander: "2HG Commander",
     formatLabel: "Format",
     joinWithCode: "Join with code",
     resumeHostedGame: "Resume hosted game",

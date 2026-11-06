@@ -112,7 +112,14 @@ import {
   isTreacheryPlayerCount,
   TREACHERY_SEATS_MESSAGE,
   treacheryOutcome,
+  type GameVariant,
 } from "./lib/treachery"
+import {
+  isTwoHeadedGiantPlayerCount,
+  pairedTeams,
+  TWO_HEADED_GIANT,
+  TWO_HEADED_GIANT_SEATS_MESSAGE,
+} from "./lib/twoHeadedGiant"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
 const MAX_PLAYERS_PER_GAME_READ = 7
@@ -746,6 +753,7 @@ async function terminalizeGame(
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
     ...(options.matchId ? { matchId: options.matchId } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+    ...(game.variant ? { variant: game.variant } : {}),
   })
   const summary = (await ctx.db.get(summaryId))!
   const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()
@@ -821,8 +829,8 @@ export const createLobby = mutation({
     if (args.variant !== undefined) {
       if (!systemDefinition(gameSystem)?.variants.includes(args.variant))
         throw new Error("Treachery is a Magic variant")
-      if (!isTreacheryPlayerCount(args.playerCount)) throw new Error(TREACHERY_SEATS_MESSAGE)
-      if (!args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
+      assertVariantSeats(args.variant, args.playerCount)
+      if (args.variant === "treachery" && !args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     }
     assertStartingLife(args.startingLife, startingValueRange(gameSystem))
     if (args.lifeStep !== undefined) {
@@ -1035,7 +1043,7 @@ export const claimSeat = mutation({
       return null
     }
     assertClientPlaysGame(game, args)
-    if (game.variant !== undefined && !args.deviceId)
+    if (game.variant === "treachery" && !args.deviceId)
       throw new ConvexError({ code: "device_required", message: TREACHERY_DEVICE_MESSAGE })
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
@@ -2244,8 +2252,16 @@ export const updateLobbySettings = mutation({
           message: error instanceof Error ? error.message : "Choose 2–6 seats",
         })
       }
-      if (game.variant === "treachery" && !isTreacheryPlayerCount(args.playerCount))
-        throw new ConvexError({ code: "invalid_player_count", message: TREACHERY_SEATS_MESSAGE })
+      if (game.variant !== undefined) {
+        try {
+          assertVariantSeats(game.variant, args.playerCount)
+        } catch (error) {
+          throw new ConvexError({
+            code: "invalid_player_count",
+            message: error instanceof Error ? error.message : TREACHERY_SEATS_MESSAGE,
+          })
+        }
+      }
       const players = await playersForGame(ctx, game._id)
       if (args.playerCount < Math.max(...players.map((player) => player.seat)))
         throw new ConvexError({
@@ -2264,6 +2280,41 @@ export const updateLobbySettings = mutation({
     }
   },
 })
+
+/** why: Two-Headed Giant teams are neighboring seats, so the host trades seats to change teams before the game starts. */
+export const swapLobbySeats = mutation({
+  args: { publicId: v.string(), first: v.number(), second: v.number() },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
+    if (game.status !== "lobby")
+      throw new ConvexError({
+        code: "lobby_settings_not_allowed",
+        message: "Seats can only change in a lobby",
+      })
+    const seats = [args.first, args.second]
+    if (
+      args.first === args.second ||
+      seats.some((seat) => !Number.isInteger(seat) || seat < 1 || seat > game.playerCount)
+    )
+      throw new ConvexError({ code: "invalid_seat", message: "Choose two different seats" })
+    const players = await playersForGame(ctx, game._id)
+    for (const player of players) {
+      if (player.seat === args.first) await ctx.db.patch(player._id, { seat: args.second })
+      else if (player.seat === args.second) await ctx.db.patch(player._id, { seat: args.first })
+    }
+    await ctx.db.patch(game._id, { updatedAt: Date.now() })
+    return null
+  },
+})
+
+function assertVariantSeats(variant: GameVariant, playerCount: number) {
+  if (variant === "treachery" && !isTreacheryPlayerCount(playerCount))
+    throw new Error(TREACHERY_SEATS_MESSAGE)
+  if (variant === TWO_HEADED_GIANT && !isTwoHeadedGiantPlayerCount(playerCount))
+    throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
+}
 
 function rolesFor(game: Doc<"games">, playerCount: number) {
   if (game.variant !== "treachery") return undefined
@@ -2307,6 +2358,14 @@ export const startGame = mutation({
       startedAt: now,
       updatedAt: now,
       ...lifeEditingFor(players),
+      // why: teammates sit together, so neighboring seats form the Two-Headed Giant teams.
+      ...(game.variant === TWO_HEADED_GIANT
+        ? {
+            turnGroups: pairedTeams(
+              [...players].sort((a, b) => a.seat - b.seat).map(({ _id }) => _id),
+            ),
+          }
+        : {}),
     })
     for (const [index, player] of resolvePlayerAppearances(
       players.map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK })),
@@ -2315,11 +2374,15 @@ export const startGame = mutation({
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
-      const deckLife = sharedSeatKey(player)
-        ? player.startingLife
-        : player.deckVersionId && !invalidSinceSelection
-          ? await deckStartingValue(ctx, player.deckVersionId, ...gameDeckRules(game))
-          : undefined
+      // why: a Two-Headed Giant team starts at the team life, whatever a deck would start at.
+      const deckLife =
+        game.variant === TWO_HEADED_GIANT
+          ? undefined
+          : sharedSeatKey(player)
+            ? player.startingLife
+            : player.deckVersionId && !invalidSinceSelection
+              ? await deckStartingValue(ctx, player.deckVersionId, ...gameDeckRules(game))
+              : undefined
       await ctx.db.patch(player._id, {
         resumable: true,
         color: player.color,
@@ -2702,6 +2765,7 @@ async function startRematch(
   const game = (await ctx.db.get(gameId))!
   const roles = rolesFor(game, players.length)
   const decks = attachesDecks(gameDeckRules(game)[0])
+  const seatIds: Id<"gamePlayers">[] = []
   for (const [index, player] of players
     .sort((left, right) => left.seat - right.seat)
     .map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK }))
@@ -2711,10 +2775,12 @@ async function startRematch(
         ? player.deckVersionId
         : undefined
     const deckLife =
-      (deckVersionId
-        ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
-        : undefined) ?? player.startingLife
-    await ctx.db.insert("gamePlayers", {
+      game.variant === TWO_HEADED_GIANT
+        ? undefined
+        : ((deckVersionId
+            ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
+            : undefined) ?? player.startingLife)
+    const seatId = await ctx.db.insert("gamePlayers", {
       gameId,
       seat: player.seat,
       ...(player.userId ? { userId: player.userId } : {}),
@@ -2738,7 +2804,10 @@ async function startRematch(
       ...(player.editsAnySeat ? { editsAnySeat: true } : {}),
       ...roles?.[index],
     })
+    seatIds.push(seatId)
   }
+  if (game.variant === TWO_HEADED_GIANT)
+    await ctx.db.patch(gameId, { turnGroups: pairedTeams(seatIds) })
   if (players.some((player) => player.userId === undefined)) {
     const manualCode = await allocateInvite(ctx, request.inviteToken, request.manualCodeCandidates)
     const invitationId = await ctx.db.insert("invitations", {
@@ -3123,8 +3192,15 @@ export const migrateMyGameMemberships = mutation({
   },
 })
 
+const listsVariant = (game: Doc<"games">, variants: readonly string[] = []) =>
+  game.variant !== TWO_HEADED_GIANT || variants.includes(game.variant)
+
 export const activeConnectedGames = query({
-  args: { paginationOpts: paginationOptsValidator },
+  args: {
+    paginationOpts: paginationOptsValidator,
+    /** why: clients that omit it predate Two-Headed Giant, so its games stay off their list. */
+    variants: v.optional(v.array(v.string())),
+  },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     const memberships = await ctx.db
@@ -3142,7 +3218,7 @@ export const activeConnectedGames = query({
           .order("desc")
           .take(MAX_HOSTED_GAMES_RECOVERY_READ)
         for (const game of hostedGames) {
-          if (includedGameIds.has(game._id)) continue
+          if (includedGameIds.has(game._id) || !listsVariant(game, args.variants)) continue
           includedGameIds.add(game._id)
           active.push({
             publicId: game.publicId,
@@ -3163,7 +3239,11 @@ export const activeConnectedGames = query({
     for (const membership of memberships.page) {
       if (includedGameIds.has(membership.gameId)) continue
       const game = await ctx.db.get(membership.gameId)
-      if (game && (game.status === "lobby" || game.status === "active")) {
+      if (
+        game &&
+        (game.status === "lobby" || game.status === "active") &&
+        listsVariant(game, args.variants)
+      ) {
         includedGameIds.add(membership.gameId)
         active.push({
           publicId: game.publicId,

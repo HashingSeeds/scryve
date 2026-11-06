@@ -979,6 +979,12 @@ export const LifeCard = memo(function LifeCard({
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
                 commanderSeat && { maxWidth: identityCorner.position.maxWidth },
+                // why: the commander grid takes the mark's place and can outgrow it, so the row's chips start past the grid instead of under it.
+                commanderStripShown &&
+                  stripBounds &&
+                  !!diceChips?.length && {
+                    minWidth: sidewaysContent ? stripBounds.height : stripBounds.width,
+                  },
               ]}
             >
               {commanderDamage ? (

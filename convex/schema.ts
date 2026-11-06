@@ -311,6 +311,7 @@ export default defineSchema({
     game: v.optional(v.string()),
     system: v.optional(v.string()),
     format: v.optional(v.string()),
+    variant: v.optional(gameVariantValidator),
     eventCount: v.number(),
     finishedAt: v.number(),
     players: v.array(

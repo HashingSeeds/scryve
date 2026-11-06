@@ -26,6 +26,7 @@ export function GameLogDialog({
   events,
   turns,
   groups,
+  sharedLife = false,
   canUndo,
   origin,
   onUndo,
@@ -35,6 +36,8 @@ export function GameLogDialog({
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
+  /** why: Two-Headed Giant heads share one life, so a row names the team, says which head made it, and counts the team's total. */
+  sharedLife?: boolean
   canUndo: boolean
   origin?: DialogOrigin
   onUndo: () => void
@@ -45,8 +48,8 @@ export function GameLogDialog({
     theme: { colors },
   } = useAppTheme()
   const rows = useMemo(
-    () => withTurnDividers(gameLog(players, events), turns ?? []),
-    [players, events, turns],
+    () => withTurnDividers(gameLog(players, events, sharedLife ? groups : undefined), turns ?? []),
+    [players, events, turns, groups, sharedLife],
   )
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
@@ -90,7 +93,8 @@ export function GameLogDialog({
     }
     const seat = seats.get(item.playerId)
     const source = item.fromPlayerId ? seats.get(item.fromPlayerId) : undefined
-    const name = seat?.name ?? ""
+    const name = (sharedLife ? teamName(players, groups, item.playerId) : seat?.name) ?? ""
+    const head = sharedLife && !source ? seat : undefined
     const delta = signed(item.delta)
     const when = relativeTime(item.at, openedAt)
     return (
@@ -146,6 +150,13 @@ export function GameLogDialog({
                   style={[$shrink, { color: colors.textDim }]}
                 />
               </>
+            ) : head ? (
+              <Text
+                text={`${translate("board:log.by", { name: head.name })} ·`}
+                size="xxs"
+                numberOfLines={1}
+                style={[$shrink, { color: colors.textDim }]}
+              />
             ) : null}
             <Text text={when} size="xxs" numberOfLines={1} style={{ color: colors.textDim }} />
           </View>

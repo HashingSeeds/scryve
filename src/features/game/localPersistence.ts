@@ -57,6 +57,7 @@ import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { parseTableState } from "../../../convex/lib/table"
 import { isValidTurn, isValidTurnGroups } from "../../../convex/lib/turns"
+import { isValidTeams, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -98,6 +99,7 @@ export interface LocalSettings {
   syncStats?: boolean
   turnTab?: boolean
   turnTabHideOffered?: true
+  teamBinding?: "frame"
 }
 
 export const COMMANDER_SEATS = 4
@@ -469,7 +471,10 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     status: value.status,
     ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
     ...(typeof value.format === "string" ? { format: value.format } : {}),
-    layout: playerGridLayoutForCount(players.length, value.layout),
+    layout: playerGridLayoutForCount(
+      value.variant === TWO_HEADED_GIANT && turnGroups ? turnGroups.length : players.length,
+      value.layout,
+    ),
     ...(isSeatOrder(value.seatOrder, players.length) ? { seatOrder: value.seatOrder } : {}),
     lifeStep:
       isLifeDelta(value.lifeStep) && value.lifeStep > 0
@@ -501,6 +506,9 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
+    ...(value.variant === TWO_HEADED_GIANT && isValidTeams(turnGroups, playerIds)
+      ? { variant: TWO_HEADED_GIANT }
+      : {}),
   }
 }
 
@@ -560,6 +568,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === false ? { turnTab: false } : {}),
     ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
+    ...(migrated.teamBinding === "frame" ? { teamBinding: "frame" } : {}),
   }
 }
 
@@ -787,6 +796,15 @@ export class LocalGameRepository {
       ...(next.hideOffered ? { turnTabHideOffered: true } : {}),
     })
     return next
+  }
+
+  teamBinding(): "link" | "frame" {
+    return this.loadSettings().teamBinding ?? "link"
+  }
+
+  saveTeamBinding(binding: "link" | "frame") {
+    const { teamBinding: _binding, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(binding === "frame" ? { teamBinding: "frame" } : {}) })
   }
 
   hapticsEnabled(): boolean {

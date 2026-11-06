@@ -39,6 +39,7 @@ import {
 import {
   connectedBoardView,
   connectedStandingWinners,
+  connectedTeams,
   connectedLives,
   connectedOutState,
   projectionOutState,
@@ -472,9 +473,15 @@ export function ConnectedBoardWithRuntime({
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
   )
   const { pending } = runtime
+  const lifeTeams = useStructurallyStable(
+    runtime.status === "ready" ? connectedTeams(runtime.projection) : undefined,
+  )
   const lifeLog = useMemo(
-    (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
-    [cloud, publicId, pending],
+    (): LifeLogSource | undefined =>
+      cloud
+        ? { kind: "connected", publicId, pending, ...(lifeTeams ? { teams: lifeTeams } : {}) }
+        : undefined,
+    [cloud, publicId, pending, lifeTeams],
   )
   const tableState = useStructurallyStable(runtime.table)
   const {
@@ -768,13 +775,29 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     ],
     [controlled, game.players],
   )
+  const teams = useMemo(() => {
+    const groups = connectedTeams({ variant: game.variant, table: table?.table })
+    // why: this device's team sits last, where its own seat would.
+    return (
+      groups &&
+      [...groups].sort(
+        (a, b) =>
+          Number(a.some((id) => controlled.has(id))) - Number(b.some((id) => controlled.has(id))),
+      )
+    )
+  }, [controlled, game.variant, table?.table])
+  const cellCount = teams?.length ?? players.length
+  const [teamBinding] = useState(() => localGameRepository.teamBinding())
+  /** why: a head's device changes its team's life from either half, writing as the head it holds, so the log knows who did it. */
+  const actingHead = (playerId: string) =>
+    turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
   const layoutVariant =
-    layoutChoice?.playerCount === players.length
+    layoutChoice?.playerCount === cellCount
       ? layoutChoice.layout
       : playerGridLayoutForCount(
-          players.length,
+          cellCount,
           game.layout,
-          defaultConnectedLayout(players.length),
+          teams ? "auto" : defaultConnectedLayout(players.length),
         )
   const commanderLethal = playCommanderLethal(system, game.format || game.ruleset)
   const commanderDamageEnabled = commanderLethal !== undefined && game.commanderDamage !== undefined
@@ -913,10 +936,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     gameId: publicId,
     system,
     players,
+    teamCount: teams?.length,
     layout: {
       value: layoutVariant,
       onChange: (layout) => {
-        const choice = { playerCount: players.length, layout }
+        const choice = { playerCount: cellCount, layout }
         setLayoutChoice(choice)
         saveLayoutChoice(publicId, choice)
       },
@@ -1129,8 +1153,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             {...(anySeat
               ? {}
               : {
-                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(player.id),
-                  isPlayerOwned: (player: GamePlayer) => controlled.has(player.id),
+                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(actingHead(player.id)),
+                  isPlayerOwned: (player: GamePlayer) => controlled.has(actingHead(player.id)),
                 })}
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
@@ -1161,7 +1185,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 : undefined
             }
             dice={seatGrid}
-            onChange={controls.changeLife}
+            teams={teams}
+            teamBinding={teamBinding}
+            onChange={(playerId, delta) =>
+              controls.changeLife(asPlayerId(actingHead(playerId)), delta)
+            }
           />
         )}
       />

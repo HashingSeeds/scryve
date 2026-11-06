@@ -563,6 +563,8 @@ const board = {
     empty: "No changes yet",
     // Under a commander damage row in the game log, naming whose commander dealt it, as in "From Grace's commander". Keep it short so the name fits.
     commanderFrom: "From {{name}}'s commander",
+    // Two-Headed Giant: under a team's life change in the game log, naming the teammate who made it, as in "By Ada". Keep it short.
+    by: "By {{name}}",
     // One row of the game log: a player's life change and the total it left them on, as in "Ada −3 to 17".
     row: "{{name}} {{delta}} to {{life}}",
     // A commander damage row, as in "Ada −5 from Grace's commander, to 12".

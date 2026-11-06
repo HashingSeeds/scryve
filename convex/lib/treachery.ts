@@ -1,7 +1,7 @@
 import { v, type Infer } from "convex/values"
 
 // why: these rules follow the creator's Comprehensive Rules, so changes start there: https://mtgtreachery.net/rules/cr/
-export const gameVariantValidator = v.literal("treachery")
+export const gameVariantValidator = v.union(v.literal("treachery"), v.literal("twoHeadedGiant"))
 export type GameVariant = Infer<typeof gameVariantValidator>
 
 export const treacheryRoleValidator = v.union(

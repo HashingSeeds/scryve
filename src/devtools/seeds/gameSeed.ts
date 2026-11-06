@@ -2,6 +2,7 @@ import type { Href } from "expo-router"
 
 import {
   applyGameCommand,
+  applyLocalTableAction,
   commanderDamageBetween,
   createLocalGame,
   defaultCommandContext,
@@ -29,6 +30,7 @@ import type { LocalGame } from "@/features/game/types"
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isValidTurnGroups } from "../../../convex/lib/turns"
+import { defaultTeamLife } from "../../../convex/lib/twoHeadedGiant"
 
 function integer(name: string, value: string): number {
   const parsed = Number(value)
@@ -79,21 +81,29 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   if (!layout)
     throw new SeedError(`layout for ${playerCount} players must be one of ${layouts.join(", ")}.`)
 
+  const names = list(params.names)
+  // why: teams=1+2,3+4 starts a Two-Headed Giant game with those seats as teams.
+  const teams = list(params.teams).map((entry) =>
+    entry.split("+").map((value) => integer("teams seat", value) - 1),
+  )
   let game: LocalGame
   try {
     game = createLocalGame({
       players: Array.from({ length: playerCount }, (_, index) => ({
-        name: `Player ${index + 1}`,
+        name: names[index] || `Player ${index + 1}`,
         color: PLAYER_COLORS[index],
         ...(marks[index] ? { shape: marks[index] } : {}),
       })),
       startingLife:
         params.start !== undefined
           ? integer("start", params.start)
-          : defaultStartingLife(system, format, playerCount),
+          : teams.length > 0
+            ? defaultTeamLife(format)
+            : defaultStartingLife(system, format, playerCount),
       system,
       format,
       layout,
+      ...(teams.length > 0 ? { teams } : {}),
     })
   } catch (error) {
     throw new SeedError(error instanceof Error ? error.message : String(error))
@@ -146,11 +156,29 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       throw new SeedError(`groups name each seat once, like 1+2,3+4, got "${params.groups}".`)
     game = { ...game, turnGroups: groups }
   }
+
+  // why: poison=1:12 gives seat 1 twelve poison, through the same rules a tap uses.
+  for (const entry of list(params.poison)) {
+    const [seatValue, amount] = entry.split(":")
+    game = applyLocalTableAction(
+      game,
+      {
+        kind: "counter.changed",
+        playerId: seat(seatValue ?? "").id,
+        counterId: "poison",
+        delta: integer("poison", amount ?? ""),
+      },
+      { operationId: context.operationId(), now: context.now() },
+    )
+  }
   return game
 }
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {
   const game = buildSeededGame(params, repository)
+  // why: binding=frame or binding=link picks the team binding on trial, until one is chosen.
+  if (params.binding === "frame" || params.binding === "link")
+    repository.saveTeamBinding(params.binding)
   repository.clearActiveGame()
   repository.saveActiveGame(game)
   return { pathname: "/", params: { destination: "play" } }

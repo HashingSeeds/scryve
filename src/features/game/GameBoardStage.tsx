@@ -45,6 +45,7 @@ import {
 
 export interface GameBoardStageProps {
   playerCount: number
+  teamBoard?: boolean
   layoutVariant: PlayerGridLayoutVariant
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
@@ -79,6 +80,7 @@ export const GameBoardStage = SCREEN_PINNING_AVAILABLE ? PinnedGameBoardStage : 
 
 function PinnedGameBoardStage({
   playerCount,
+  teamBoard,
   layoutVariant,
   renderGrid,
   menu,
@@ -108,7 +110,14 @@ function PinnedGameBoardStage({
   const holderAngle = pinned ? metrics.holderAngle : 0
   const fontScale = window.fontScale
 
-  const gridLayout = usePlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant })
+  const gridLayout = usePlayerGridLayout({
+    playerCount,
+    width,
+    height,
+    fontScale,
+    layoutVariant,
+    teamBoard,
+  })
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const boardAnchor = useMemo(
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
@@ -182,6 +191,7 @@ function PinnedGameBoardStage({
 
 function LegacyGameBoardStage({
   playerCount,
+  teamBoard,
   layoutVariant,
   renderGrid,
   menu,
@@ -195,7 +205,14 @@ function LegacyGameBoardStage({
 }: GameBoardStageProps) {
   const boardOrientation = useGameBoardOrientation()
   const { width, height, fontScale, rotation } = boardOrientation
-  const gridLayout = usePlayerGridLayout({ playerCount, width, height, fontScale, layoutVariant })
+  const gridLayout = usePlayerGridLayout({
+    playerCount,
+    width,
+    height,
+    fontScale,
+    layoutVariant,
+    teamBoard,
+  })
   useEffect(() => onBoardSizeChange?.({ width, height }), [onBoardSizeChange, width, height])
   const topEdgeBand = useTopEdgeBand()
   const boardAnchor = useMemo(

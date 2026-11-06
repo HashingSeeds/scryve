@@ -541,6 +541,7 @@ export default {
     close: "기록 닫기",
     empty: "아직 변경 내역이 없습니다",
     commanderFrom: "{{name}}의 커맨더로부터",
+    by: "{{name}} 님",
     row: "{{name}} {{delta}}, 현재 {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}}의 커맨더에게서, 현재 {{life}}",
     undoLast: "마지막 변경 취소",

@@ -585,6 +585,7 @@ export default {
     close: "Cerrar registro",
     empty: "Aún no hay cambios",
     commanderFrom: "Del comandante de {{name}}",
+    by: "Por {{name}}",
     row: "{{name}} {{delta}} a {{life}}",
     commanderRow: "{{name}} {{delta}} por el comandante de {{from}}, a {{life}}",
     undoLast: "Deshacer el último cambio",

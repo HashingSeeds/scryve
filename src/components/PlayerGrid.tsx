@@ -53,11 +53,22 @@ import {
   getFourCardMenuJunction,
   getPlayerContentRotation,
   getPlayerGridLayout,
+  getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
 } from "./playerGridGeometry"
 import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
+import {
+  headBox,
+  type Box,
+  menuPlacementAt,
+  panelBoxes,
+  seamEdge,
+  teamSeatRows,
+  teamSplit,
+} from "./teamGridGeometry"
+import { TeamPanelLayer, type TeamBinding } from "./TeamPanelLayer"
 import { SeatSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
@@ -206,6 +217,9 @@ export interface PlayerGridProps {
   onPlayStart?: () => void
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
+  /** why: a Two-Headed Giant team's heads share one panel, so the grid seats teams in place of players. */
+  teams?: readonly (readonly string[])[]
+  teamBinding?: TeamBinding
 }
 
 export function PlayerGrid({
@@ -229,6 +243,8 @@ export function PlayerGrid({
   onPlayStart,
   onChange,
   style,
+  teams,
+  teamBinding = "link",
 }: PlayerGridProps) {
   const dimensions = useWindowDimensions()
   const boardRotation = boardOrientation?.rotation ?? 0
@@ -281,21 +297,25 @@ export function PlayerGrid({
   const stable = useStableCallbacks()
   const systemId = playSystemRules(system).id
   const tableItemRules = tableItemRulesOf(system)
+  const cellCount = teams?.length ?? players.length
   const layout = usePlayerGridLayout({
-    playerCount: players.length,
+    playerCount: cellCount,
     width,
     height,
     fontScale,
     layoutVariant,
+    teamBoard: !!teams,
   })
   const cellSize = getCellSize({
     board: { width: board.width, height: board.height - topEdgeBand },
     layout,
     gap: spacing.xxs,
   })
-  const lifeTargetSize = layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
+  // why: a team panel's heads are as small as the cards of a game with that many seats.
+  const compact = layout.compact || (!!teams && players.length >= 5)
+  const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const sidewaysGlyphReserve =
-    2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
+    2 * ((compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
   const lifeFontSizeFor = useCallback(
     (digits: number) =>
       getLifeFontSize({
@@ -318,11 +338,47 @@ export function PlayerGrid({
     )
   }
 
-  const rows = getPlayerGridRows(players.length, layout)
-  const seatedRows = rows.map((row) =>
-    row.map((slot) => (slot === null ? null : (seatOrder?.[slot] ?? slot))),
-  )
+  const rows = getPlayerGridRows(cellCount, layout)
+  const rotationAt = (rowIndex: number, columnIndex: number) =>
+    getPlayerContentRotation({
+      playerCount: cellCount,
+      layout,
+      row: rows[rowIndex],
+      rowIndex,
+      columnIndex,
+      slot: rows[rowIndex][columnIndex] ?? 0,
+    })
+  const playerIndexOf = new Map<string, number>(players.map(({ id }, index) => [id, index]))
+  const teamIndexes = (teams ?? []).map(([first, second]): readonly [number, number] => [
+    playerIndexOf.get(first) ?? 0,
+    playerIndexOf.get(second) ?? 0,
+  ])
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  const seated = teams
+    ? teamSeatRows(rows, rowFlexes, rotationAt, (slot) => teamIndexes[slot])
+    : {
+        rows: rows.map((row) =>
+          row.map((slot) => (slot === null ? null : (seatOrder?.[slot] ?? slot))),
+        ),
+        flexes: rowFlexes,
+      }
+  const seatedRows = seated.rows
+  const seatedRowFlexes = seated.flexes
+  const panelBoxMap = panelBoxes(rows, rowFlexes)
+  const menuAnchor = getPlayerGridMenuAnchor(cellCount, layout)
+  const headLifeFontSizeFor = (index: number, box: Box | undefined) =>
+    stable(`font:${index}`, (digits: number) =>
+      box
+        ? getLifeFontSize({
+            cellWidth: (box.x1 - box.x0) * board.width,
+            cellHeight: (box.y1 - box.y0) * (board.height - topEdgeBand),
+            digits,
+            fontScale,
+            targetSize: lifeTargetSize,
+            sidewaysGlyphReserve,
+          })
+        : undefined,
+    )
   const menuJunction = getFourCardMenuJunction(rows)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const tabRow = useContext(FirstPlayerTabsShownContext)
@@ -340,19 +396,10 @@ export function PlayerGrid({
   const seatRotations = new Map<number, LifeCardContentRotation>()
   rows.forEach((row, rowIndex) =>
     row.forEach((slot, columnIndex) => {
-      const index = seatedRows[rowIndex][columnIndex]
-      if (slot === null || index === null) return
-      seatRotations.set(
-        index,
-        getPlayerContentRotation({
-          playerCount: players.length,
-          layout,
-          row,
-          rowIndex,
-          columnIndex,
-          slot,
-        }),
-      )
+      if (slot === null) return
+      const seated = teams ? teamIndexes[slot] : [seatedRows[rowIndex][columnIndex]]
+      for (const index of seated ?? [])
+        if (index !== null) seatRotations.set(index, rotationAt(rowIndex, columnIndex))
     }),
   )
   const commanderPlayers = players.map(({ id, name, color, shape }): CommanderBoardPlayer => ({
@@ -361,6 +408,241 @@ export function PlayerGrid({
     color,
     shape,
   }))
+
+  function seatCard(index: number, place: SeatPlace) {
+    const player = players[index]
+    const seatNumber = index + 1
+    const playerDisabled = Boolean(isPlayerDisabled?.(player))
+    const { contentRotation, screenEdges } = place
+    const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
+    const out = outState && outReason(outState, player.id)
+    const seatDice = seatDiceFor(dice, player, stable)
+    const seatTable = seatTableState(table, player.id)
+    const firstIncoming = commanderDamage?.incomingFor(player.id) ?? NO_INCOMING
+    const partnerIncoming =
+      commanderDamage?.incomingFor(player.id, PARTNER_COMMANDER) ?? NO_INCOMING
+    const strike = attack && armedPlayer ? attack.against(player.id) : undefined
+    if (table?.tableRules.pokemon) {
+      return (
+        <PokemonSeatCard
+          playerId={player.id}
+          playerName={player.name}
+          seatNumber={seatNumber}
+          shape={player.shape}
+          foil={isPlayerFoil?.(player)}
+          prizes={player.life}
+          color={player.color}
+          compact={compact}
+          contentRotation={contentRotation}
+          contentInsets={place.contentInsets}
+          screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
+          menuCorner={place.menuCorner}
+          menuEdgeCenter={place.menuEdgeCenter}
+          disabled={disabled || playerDisabled}
+          ownership={ownership}
+          staleSince={getStaleSince?.(player)}
+          deck={getSeatDeck?.(player)}
+          opponents={players
+            .filter(({ id }) => id !== player.id)
+            .map(({ id, name }) => ({ id, name }))}
+          table={table}
+          dice={seatDice}
+          onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
+            onChange(player.id, delta),
+          )}
+          onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
+          style={place.style}
+        />
+      )
+    }
+    return (
+      <LifeCard
+        playerId={player.id}
+        playerName={player.name}
+        seatNumber={seatNumber}
+        shape={player.shape}
+        foil={isPlayerFoil?.(player)}
+        life={player.life}
+        color={player.color}
+        compact={compact}
+        contentRotation={contentRotation}
+        boardRotation={boardOrientation?.touchRotation ?? boardRotation}
+        contentInsets={place.contentInsets}
+        screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
+        menuCorner={place.menuCorner}
+        menuEdgeCenter={place.menuEdgeCenter}
+        lifeFontSizeFor={place.lifeFontSizeFor ?? lifeFontSizeFor}
+        system={system}
+        lifeStep={lifeStep}
+        disabled={disabled || playerDisabled}
+        ownership={ownership}
+        staleSince={getStaleSince?.(player)}
+        out={out && lifeCardOut(out, players, system, table)}
+        commanderDamage={
+          commanderDamage && attack && boardSeats
+            ? {
+                ownerPlayerId: player.id,
+                players: commanderPlayers,
+                seats: boardSeats.seats,
+                incoming: strongerCommander(firstIncoming, partnerIncoming),
+                split: partnerTotals(firstIncoming, partnerIncoming),
+                lethal: commanderDamage.lethal,
+                armedPlayerId: attack.armedPlayerId,
+                attackerName: armedPlayer?.name,
+                attacker: armedPlayer && {
+                  color: armedPlayer.color,
+                  shape: armedPlayer.shape,
+                  seatNumber: armedIndex + 1,
+                  rotation: seatRotations.get(armedIndex),
+                },
+                commanders: strike?.commanders,
+                dealt: strike?.dealt,
+                takeBack: strike?.takeBack,
+                othersStep: strike?.othersStep,
+                othersTakeBack: strike?.othersTakeBack,
+                applied: strike?.applied,
+                others: strike?.others,
+                othersLanded: strike?.othersLanded,
+                onPower: stable(`power:${player.id}`, (power: number, slot: number) =>
+                  attack.dispatch({ type: "power", slot, power }),
+                ),
+                onOthers: stable(`others:${player.id}`, (power: number) =>
+                  attack.dispatch({ type: "others", power }),
+                ),
+                othersShown: strike?.othersShown,
+                othersSitting: strike?.othersSitting,
+                onSit: stable(`sit:${player.id}`, (box: AttackBox) =>
+                  attack.dispatch({ type: "sit", box }),
+                ),
+                facing:
+                  armedIndex >= 0 ? commanderFacing(seatedRows, armedIndex, index) : undefined,
+                reach:
+                  armedIndex >= 0 && armedIndex !== index
+                    ? commanderReach({
+                        gridRows: seatedRows,
+                        rowFlexes: seatedRowFlexes,
+                        board: {
+                          width: board.width,
+                          height: board.height - topEdgeBand,
+                        },
+                        attackerIndex: armedIndex,
+                        defenderIndex: index,
+                      })
+                    : undefined,
+                pendingClaims: commanderDamage.pendingFor?.(player),
+                onPressSword: stable(`sword:${player.id}`, () =>
+                  commanderDamage.onPressSword(player),
+                ),
+                acted: attack.acted,
+                onHit: stable(`hit:${player.id}`, () =>
+                  attack.dispatch({ type: "hit", to: player.id }),
+                ),
+                onUndo: stable(`undo:${player.id}`, () =>
+                  attack.dispatch({ type: "undo", to: player.id }),
+                ),
+                ...(attack.stagedTargets !== undefined && attack.armedPlayerId === player.id
+                  ? {
+                      armBar: {
+                        stagedTargets: attack.stagedTargets,
+                        onSend: stable("armSend", () => attack.dispatch({ type: "send" })),
+                      },
+                    }
+                  : {}),
+              }
+            : undefined
+        }
+        seatTable={
+          table && seatTable
+            ? {
+                ...seatTable,
+                editable: !(disabled || playerDisabled),
+                adjustCounter: stable(`counter:${player.id}`, (counterId: string, delta: number) =>
+                  table.adjustCounter(player.id, counterId, delta),
+                ),
+                takeDesignation: stable(`take:${player.id}`, (designationId: string) =>
+                  table.takeDesignation(player.id, designationId),
+                ),
+                releaseDesignation: stable(`release:${player.id}`, (designationId: string) =>
+                  table.releaseDesignation(player.id, designationId),
+                ),
+                ...(tableItemRules && onOpenRule
+                  ? { tableItemRules, openRule: stable("openRule", onOpenRule) }
+                  : {}),
+              }
+            : undefined
+        }
+        dice={seatDice}
+        onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
+        onChange={stable(`change:${player.id}`, (delta: LifeDelta) => onChange(player.id, delta))}
+        style={place.style}
+      />
+    )
+  }
+
+  function renderTeamPanel(slot: number, rowIndex: number, columnIndex: number) {
+    const team = teamIndexes[slot]
+    if (!team) return null
+    const rotation = rotationAt(rowIndex, columnIndex)
+    const panel = panelBoxMap.get(slot)
+    const lead = players[team[0]]
+    const panelMenu =
+      menuCornerAt(menuJunction, rowIndex, columnIndex) === undefined &&
+      fallbackMenuBoundary !== null
+        ? fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+        : undefined
+    const heads = ([0, 1] as const).map((head) => {
+      const index = team[head]
+      const box = panel ? headBox(panel, rotation, head) : undefined
+      const seam = seamEdge(rotation, head)
+      const screenEdges = {
+        top: !!box && box.y0 < 0.001,
+        bottom: !!box && box.y1 > 0.999,
+        left: !!box && box.x0 < 0.001,
+        right: !!box && box.x1 > 0.999,
+      }
+      const menu = box ? menuPlacementAt(box, menuAnchor) : {}
+      const tabSeam = box ? tabSeamOf(tabRow === null ? null : menuAnchor.y, box.y0, box.y1) : null
+      return (
+        <View key={`seat-${index}`} testID={`player-cell-seat-${index + 1}`} style={$head}>
+          {seatCard(index, {
+            contentRotation: rotation,
+            screenEdges,
+            contentInsets: {
+              top: screenEdges.top ? insets.top : 0,
+              bottom: screenEdges.bottom ? insets.bottom : 0,
+              left: screenEdges.left ? insets.left : 0,
+              right: screenEdges.right ? insets.right : 0,
+              cutout: seatCutout(cutout, rotation, screenEdges),
+              tabCorners: seatTabCorners(tabSeam, rotation, screenEdges),
+            },
+            menuCorner: menu.corner,
+            menuEdgeCenter: menu.edgeCenter,
+            lifeFontSizeFor: headLifeFontSizeFor(index, box),
+            style: headCornerStyle(screenEdges, seam, Platform.OS === "web" ? insets : undefined),
+          })}
+        </View>
+      )
+    })
+    return (
+      <View
+        key={`team-${slot}`}
+        testID={`team-panel-${slot + 1}`}
+        style={[$head, { flexDirection: teamSplit(rotation) }]}
+      >
+        {heads}
+        {table?.tableRules.pokemon ? null : (
+          <TeamPanelLayer
+            binding={teamBinding}
+            rotation={rotation}
+            compact={compact}
+            seatNumber={slot + 1}
+            menuAtSeam={panelMenu?.edgeCenter !== undefined}
+          />
+        )}
+        <SeatSpotlight playerId={lead.id} />
+      </View>
+    )
+  }
 
   return (
     <View testID="player-grid-frame" style={$frame}>
@@ -393,8 +675,9 @@ export function PlayerGrid({
             style={[themed($row), { flex: rowFlexes[rowIndex] }]}
           >
             {row.map((slot, columnIndex) => {
-              const index = seatedRows[rowIndex][columnIndex]
-              if (slot === null || index === null) {
+              if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex)
+              const index = seatedRows[rowIndex]?.[columnIndex]
+              if (slot === null || index === null || index === undefined) {
                 return (
                   <View
                     key={`empty-${rowIndex}-${columnIndex}`}
@@ -405,231 +688,46 @@ export function PlayerGrid({
               }
               const player = players[index]
               const seatNumber = index + 1
-              const playerDisabled = Boolean(isPlayerDisabled?.(player))
-              const contentRotation = getPlayerContentRotation({
-                playerCount: players.length,
-                layout,
-                row,
-                rowIndex,
-                columnIndex,
-                slot,
-              })
-              const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
+              const contentRotation = rotationAt(rowIndex, columnIndex)
               const screenEdges = {
                 top: rowIndex === 0,
                 bottom: rowIndex === rows.length - 1,
                 left: columnIndex === 0,
                 right: columnIndex === row.length - 1,
               }
-              const contentInsets = {
-                top: screenEdges.top ? insets.top : 0,
-                bottom: screenEdges.bottom ? insets.bottom : 0,
-                left: screenEdges.left ? insets.left : 0,
-                right: screenEdges.right ? insets.right : 0,
-                cutout: seatCutout(cutout, contentRotation, screenEdges),
-                tabCorners: seatTabCorners(tabRow, rowIndex, contentRotation, screenEdges),
-              }
               const fallbackMenu =
                 fallbackMenuBoundary === null
                   ? undefined
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
-              const menuCorner =
-                menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
-              const out = outState && outReason(outState, player.id)
-              const seatDice = seatDiceFor(dice, player, stable)
-              const seatTable = seatTableState(table, player.id)
-              const firstIncoming = commanderDamage?.incomingFor(player.id) ?? NO_INCOMING
-              const partnerIncoming =
-                commanderDamage?.incomingFor(player.id, PARTNER_COMMANDER) ?? NO_INCOMING
-              const strike = attack && armedPlayer ? attack.against(player.id) : undefined
-              if (table?.tableRules.pokemon) {
-                return (
-                  <View
-                    key={player.id}
-                    testID={`player-cell-seat-${seatNumber}`}
-                    style={themed($cell)}
-                  >
-                    <PokemonSeatCard
-                      playerId={player.id}
-                      playerName={player.name}
-                      seatNumber={seatNumber}
-                      shape={player.shape}
-                      foil={isPlayerFoil?.(player)}
-                      prizes={player.life}
-                      color={player.color}
-                      compact={layout.compact}
-                      contentRotation={contentRotation}
-                      contentInsets={contentInsets}
-                      screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
-                      menuCorner={menuCorner}
-                      menuEdgeCenter={fallbackMenu?.edgeCenter}
-                      disabled={disabled || playerDisabled}
-                      ownership={ownership}
-                      staleSince={getStaleSince?.(player)}
-                      deck={getSeatDeck?.(player)}
-                      opponents={players
-                        .filter(({ id }) => id !== player.id)
-                        .map(({ id, name }) => ({ id, name }))}
-                      table={table}
-                      dice={seatDice}
-                      onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
-                        onChange(player.id, delta),
-                      )}
-                      onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
-                      style={getScreenCornerSquaringStyle({
-                        rows,
-                        rowIndex,
-                        columnIndex,
-                        insets: Platform.OS === "web" ? insets : undefined,
-                      })}
-                    />
-                    <SeatSpotlight playerId={player.id} />
-                  </View>
-                )
-              }
+              const rowSeam = tabSeamOf(tabRow, rowIndex, rowIndex + 1)
               return (
                 // why: keyed by seat, so a rematch's new player ids reuse the card; remounting every seat each game kept the old cards' native animation memory.
                 <View
-                  key={`seat-${index}`}
+                  key={table?.tableRules.pokemon ? player.id : `seat-${index}`}
                   testID={`player-cell-seat-${seatNumber}`}
                   style={themed($cell)}
                 >
-                  <LifeCard
-                    playerId={player.id}
-                    playerName={player.name}
-                    seatNumber={seatNumber}
-                    shape={player.shape}
-                    foil={isPlayerFoil?.(player)}
-                    life={player.life}
-                    color={player.color}
-                    compact={layout.compact}
-                    contentRotation={contentRotation}
-                    boardRotation={boardOrientation?.touchRotation ?? boardRotation}
-                    contentInsets={contentInsets}
-                    screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
-                    menuCorner={menuCorner}
-                    menuEdgeCenter={fallbackMenu?.edgeCenter}
-                    lifeFontSizeFor={lifeFontSizeFor}
-                    system={system}
-                    lifeStep={lifeStep}
-                    disabled={disabled || playerDisabled}
-                    ownership={ownership}
-                    staleSince={getStaleSince?.(player)}
-                    out={out && lifeCardOut(out, players, system, table)}
-                    commanderDamage={
-                      commanderDamage && attack && boardSeats
-                        ? {
-                            ownerPlayerId: player.id,
-                            players: commanderPlayers,
-                            seats: boardSeats.seats,
-                            incoming: strongerCommander(firstIncoming, partnerIncoming),
-                            split: partnerTotals(firstIncoming, partnerIncoming),
-                            lethal: commanderDamage.lethal,
-                            armedPlayerId: attack.armedPlayerId,
-                            attackerName: armedPlayer?.name,
-                            attacker: armedPlayer && {
-                              color: armedPlayer.color,
-                              shape: armedPlayer.shape,
-                              seatNumber: armedIndex + 1,
-                              rotation: seatRotations.get(armedIndex),
-                            },
-                            commanders: strike?.commanders,
-                            dealt: strike?.dealt,
-                            takeBack: strike?.takeBack,
-                            othersStep: strike?.othersStep,
-                            othersTakeBack: strike?.othersTakeBack,
-                            applied: strike?.applied,
-                            others: strike?.others,
-                            othersLanded: strike?.othersLanded,
-                            onPower: stable(`power:${player.id}`, (power: number, slot: number) =>
-                              attack.dispatch({ type: "power", slot, power }),
-                            ),
-                            onOthers: stable(`others:${player.id}`, (power: number) =>
-                              attack.dispatch({ type: "others", power }),
-                            ),
-                            othersShown: strike?.othersShown,
-                            othersSitting: strike?.othersSitting,
-                            onSit: stable(`sit:${player.id}`, (box: AttackBox) =>
-                              attack.dispatch({ type: "sit", box }),
-                            ),
-                            facing:
-                              armedIndex >= 0
-                                ? commanderFacing(seatedRows, armedIndex, index)
-                                : undefined,
-                            reach:
-                              armedIndex >= 0 && armedIndex !== index
-                                ? commanderReach({
-                                    gridRows: seatedRows,
-                                    rowFlexes,
-                                    board: {
-                                      width: board.width,
-                                      height: board.height - topEdgeBand,
-                                    },
-                                    attackerIndex: armedIndex,
-                                    defenderIndex: index,
-                                  })
-                                : undefined,
-                            pendingClaims: commanderDamage.pendingFor?.(player),
-                            onPressSword: stable(`sword:${player.id}`, () =>
-                              commanderDamage.onPressSword(player),
-                            ),
-                            acted: attack.acted,
-                            onHit: stable(`hit:${player.id}`, () =>
-                              attack.dispatch({ type: "hit", to: player.id }),
-                            ),
-                            onUndo: stable(`undo:${player.id}`, () =>
-                              attack.dispatch({ type: "undo", to: player.id }),
-                            ),
-                            ...(attack.stagedTargets !== undefined &&
-                            attack.armedPlayerId === player.id
-                              ? {
-                                  armBar: {
-                                    stagedTargets: attack.stagedTargets,
-                                    onSend: stable("armSend", () =>
-                                      attack.dispatch({ type: "send" }),
-                                    ),
-                                  },
-                                }
-                              : {}),
-                          }
-                        : undefined
-                    }
-                    seatTable={
-                      table && seatTable
-                        ? {
-                            ...seatTable,
-                            editable: !(disabled || playerDisabled),
-                            adjustCounter: stable(
-                              `counter:${player.id}`,
-                              (counterId: string, delta: number) =>
-                                table.adjustCounter(player.id, counterId, delta),
-                            ),
-                            takeDesignation: stable(`take:${player.id}`, (designationId: string) =>
-                              table.takeDesignation(player.id, designationId),
-                            ),
-                            releaseDesignation: stable(
-                              `release:${player.id}`,
-                              (designationId: string) =>
-                                table.releaseDesignation(player.id, designationId),
-                            ),
-                            ...(tableItemRules && onOpenRule
-                              ? { tableItemRules, openRule: stable("openRule", onOpenRule) }
-                              : {}),
-                          }
-                        : undefined
-                    }
-                    dice={seatDice}
-                    onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
-                    onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
-                      onChange(player.id, delta),
-                    )}
-                    style={getScreenCornerSquaringStyle({
+                  {seatCard(index, {
+                    contentRotation,
+                    screenEdges,
+                    contentInsets: {
+                      top: screenEdges.top ? insets.top : 0,
+                      bottom: screenEdges.bottom ? insets.bottom : 0,
+                      left: screenEdges.left ? insets.left : 0,
+                      right: screenEdges.right ? insets.right : 0,
+                      cutout: seatCutout(cutout, contentRotation, screenEdges),
+                      tabCorners: seatTabCorners(rowSeam, contentRotation, screenEdges),
+                    },
+                    menuCorner:
+                      menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner,
+                    menuEdgeCenter: fallbackMenu?.edgeCenter,
+                    style: getScreenCornerSquaringStyle({
                       rows,
                       rowIndex,
                       columnIndex,
                       insets: Platform.OS === "web" ? insets : undefined,
-                    })}
-                  />
+                    }),
+                  })}
                   <SeatSpotlight playerId={player.id} />
                 </View>
               )
@@ -639,6 +737,34 @@ export function PlayerGrid({
       </Animated.View>
     </View>
   )
+}
+
+interface SeatPlace {
+  contentRotation: LifeCardContentRotation
+  screenEdges: Record<LifeCardEdge, boolean>
+  contentInsets: LifeCardContentInsets
+  menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
+  lifeFontSizeFor?: (digits: number) => number | undefined
+  style?: ViewStyle
+}
+
+/** why: the heads of a team panel meet with square corners so the panel reads as one card. */
+function headCornerStyle(
+  edges: Record<LifeCardEdge, boolean>,
+  seam: LifeCardEdge,
+  insets?: LifeCardContentInsets,
+): ViewStyle {
+  const reaches = (edge: LifeCardEdge, side: LifeCardEdge) =>
+    !insets || insets[edge] > 0 || insets[side] > 0
+  const square = (edge: "top" | "bottom", side: "left" | "right") =>
+    seam === edge || seam === side || (edges[edge] && edges[side] && reaches(edge, side))
+  return {
+    ...(square("top", "left") ? { borderTopLeftRadius: radius.none } : null),
+    ...(square("top", "right") ? { borderTopRightRadius: radius.none } : null),
+    ...(square("bottom", "left") ? { borderBottomLeftRadius: radius.none } : null),
+    ...(square("bottom", "right") ? { borderBottomRightRadius: radius.none } : null),
+  }
 }
 
 export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
@@ -761,14 +887,21 @@ function seatCutout(
 }
 
 /** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. */
+type TabSeam = "top" | "bottom" | null
+
+/** why: a first-player tab straddles the seam at `at`, so corner chrome on either side of it steps clear. */
+function tabSeamOf(at: number | null, top: number, bottom: number): TabSeam {
+  if (at === null) return null
+  if (Math.abs(top - at) < 0.01) return "top"
+  if (Math.abs(bottom - at) < 0.01) return "bottom"
+  return null
+}
+
 function seatTabCorners(
-  tabRow: number | null,
-  rowIndex: number,
+  seam: TabSeam,
   rotation: LifeCardContentRotation,
   screenEdges: Record<LifeCardEdge, boolean>,
 ): LifeCardCorner[] | undefined {
-  if (tabRow === null) return undefined
-  const seam = rowIndex === tabRow ? "top" : rowIndex === tabRow - 1 ? "bottom" : null
   if (!seam) return undefined
   const rowEdge = CONTENT_EDGES[rotation].bottom
   return (["left", "right"] as const)
@@ -827,6 +960,8 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+
+const $head: ViewStyle = { flex: 1 }
 
 const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
 

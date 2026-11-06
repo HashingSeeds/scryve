@@ -585,6 +585,7 @@ export default {
     close: "Fermer le journal",
     empty: "Aucun changement pour l'instant",
     commanderFrom: "Du commandant de {{name}}",
+    by: "Par {{name}}",
     row: "{{name}} {{delta}} à {{life}}",
     commanderRow: "{{name}} {{delta}} du commandant de {{from}}, à {{life}}",
     undoLast: "Annuler le dernier changement",
