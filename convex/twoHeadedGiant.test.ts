@@ -25,7 +25,7 @@ async function teamLobby(t: ConvexTestHarness) {
   return host
 }
 
-async function teamGame(t: ConvexTestHarness) {
+async function teamGame(t: ConvexTestHarness, beforeStart?: (host: Client) => Promise<void>) {
   const host = await teamLobby(t)
   const clients = [host]
   for (const [index, color] of ["#2563EB", "#16A34A", "#DC2626"].entries()) {
@@ -39,6 +39,7 @@ async function teamGame(t: ConvexTestHarness) {
     })
     clients.push(client)
   }
+  await beforeStart?.(host)
   await host.mutation(api.games.startGame, { publicId })
   const projection = await host.query(api.games.lobbyProjection, {
     publicId,
@@ -47,6 +48,8 @@ async function teamGame(t: ConvexTestHarness) {
   const ids = projection.players.map(({ playerId }) => playerId)
   return { clients, ids }
 }
+
+type Client = Awaited<ReturnType<typeof signedIn>>
 
 const write = (operationId: string, deviceId: string) => ({
   publicId,
@@ -112,5 +115,21 @@ describe("Two-Headed Giant", () => {
       lives: [23, 23, 30, 30],
       poison: [3, 3, 0, 0],
     })
+  })
+
+  it("lets the host trade seats in the lobby, which changes the teams", async () => {
+    const t = makeConvexTest()
+    const { clients, ids } = await teamGame(t, async (host) => {
+      await host.mutation(api.games.swapLobbySeats, { publicId, first: 2, second: 3 })
+    })
+    const ownSeat = async (client: Client) =>
+      (await client.query(api.games.lobbyProjection, { publicId })).players.find(
+        ({ controlledByMe }) => controlledByMe,
+      )?.seat
+    expect(await Promise.all(clients.map(ownSeat))).toEqual([1, 3, 2, 4])
+    expect((await lives(clients[0])).groups).toEqual([ids.slice(0, 2), ids.slice(2)])
+    await expect(
+      clients[1].mutation(api.games.swapLobbySeats, { publicId, first: 1, second: 2 }),
+    ).rejects.toThrow()
   })
 })

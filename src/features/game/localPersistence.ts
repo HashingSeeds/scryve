@@ -99,7 +99,7 @@ export interface LocalSettings {
   syncStats?: boolean
   turnTab?: boolean
   turnTabHideOffered?: true
-  teamDesign?: "split"
+  teamBinding?: "frame"
 }
 
 export const COMMANDER_SEATS = 4
@@ -568,7 +568,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === false ? { turnTab: false } : {}),
     ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
-    ...(migrated.teamDesign === "split" ? { teamDesign: "split" } : {}),
+    ...(migrated.teamBinding === "frame" ? { teamBinding: "frame" } : {}),
   }
 }
 
@@ -793,13 +793,13 @@ export class LocalGameRepository {
     return next
   }
 
-  teamDesign(): "merged" | "split" {
-    return this.loadSettings().teamDesign ?? "merged"
+  teamBinding(): "link" | "frame" {
+    return this.loadSettings().teamBinding ?? "link"
   }
 
-  saveTeamDesign(design: "merged" | "split") {
-    const { teamDesign: _design, ...rest } = this.loadSettings()
-    this.saveSettings({ ...rest, ...(design === "split" ? { teamDesign: "split" } : {}) })
+  saveTeamBinding(binding: "link" | "frame") {
+    const { teamBinding: _binding, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(binding === "frame" ? { teamBinding: "frame" } : {}) })
   }
 
   hapticsEnabled(): boolean {

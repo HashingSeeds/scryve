@@ -2279,6 +2279,34 @@ export const updateLobbySettings = mutation({
   },
 })
 
+/** why: Two-Headed Giant teams are neighboring seats, so the host trades seats to change teams before the game starts. */
+export const swapLobbySeats = mutation({
+  args: { publicId: v.string(), first: v.number(), second: v.number() },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
+    if (game.status !== "lobby")
+      throw new ConvexError({
+        code: "lobby_settings_not_allowed",
+        message: "Seats can only change in a lobby",
+      })
+    const seats = [args.first, args.second]
+    if (
+      args.first === args.second ||
+      seats.some((seat) => !Number.isInteger(seat) || seat < 1 || seat > game.playerCount)
+    )
+      throw new ConvexError({ code: "invalid_seat", message: "Choose two different seats" })
+    const players = await playersForGame(ctx, game._id)
+    for (const player of players) {
+      if (player.seat === args.first) await ctx.db.patch(player._id, { seat: args.second })
+      else if (player.seat === args.second) await ctx.db.patch(player._id, { seat: args.first })
+    }
+    await ctx.db.patch(game._id, { updatedAt: Date.now() })
+    return null
+  },
+})
+
 function assertVariantSeats(variant: GameVariant, playerCount: number) {
   if (variant === "treachery" && !isTreacheryPlayerCount(playerCount))
     throw new Error(TREACHERY_SEATS_MESSAGE)

@@ -68,7 +68,7 @@ import {
   teamSeatRows,
   teamSplit,
 } from "./teamGridGeometry"
-import { TeamLifeLayer } from "./TeamLifeLayer"
+import { TeamPanelLayer, type TeamBinding } from "./TeamPanelLayer"
 import { SeatSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
@@ -219,11 +219,8 @@ export interface PlayerGridProps {
   style?: StyleProp<ViewStyle>
   /** why: a Two-Headed Giant team's heads share one panel, so the grid seats teams in place of players. */
   teams?: readonly (readonly string[])[]
-  teamDesign?: TeamDesign
+  teamBinding?: TeamBinding
 }
-
-/** why: two panel designs are on trial. `merged` draws one total across a panel with − on the first head and + on the second; `split` keeps a full card per head that shows the team total. */
-export type TeamDesign = "merged" | "split"
 
 export function PlayerGrid({
   players,
@@ -247,7 +244,7 @@ export function PlayerGrid({
   onChange,
   style,
   teams,
-  teamDesign = "merged",
+  teamBinding = "link",
 }: PlayerGridProps) {
   const dimensions = useWindowDimensions()
   const boardRotation = boardOrientation?.rotation ?? 0
@@ -466,7 +463,7 @@ export function PlayerGrid({
         shape={player.shape}
         foil={isPlayerFoil?.(player)}
         life={player.life}
-        color={place.color ?? player.color}
+        color={player.color}
         compact={compact}
         contentRotation={contentRotation}
         boardRotation={boardOrientation?.touchRotation ?? boardRotation}
@@ -481,7 +478,6 @@ export function PlayerGrid({
         ownership={ownership}
         staleSince={getStaleSince?.(player)}
         out={out && lifeCardOut(out, players, system, table)}
-        teamZone={place.teamZone}
         commanderDamage={
           commanderDamage && attack && boardSeats
             ? {
@@ -585,9 +581,7 @@ export function PlayerGrid({
     if (!team) return null
     const rotation = rotationAt(rowIndex, columnIndex)
     const panel = panelBoxMap.get(slot)
-    const merged = teamDesign === "merged"
     const lead = players[team[0]]
-    const teamColor = merged ? lead.color : undefined
     const foreground = accessibleForeground(lead.color)
     const panelEdges = {
       top: rowIndex === 0,
@@ -604,7 +598,6 @@ export function PlayerGrid({
     const teamChip = team
       .flatMap((index) => dice?.chipsFor(players[index]) ?? [])
       .flatMap((chip) => (chip.kind === "turn" ? [chip.state] : []))[0]
-    const out = !!outState && !!outReason(outState, lead.id)
     const heads = ([0, 1] as const).map((head) => {
       const index = team[head]
       const box = panel ? headBox(panel, rotation, head) : undefined
@@ -632,8 +625,6 @@ export function PlayerGrid({
             },
             menuCorner: menu.corner,
             menuEdgeCenter: menu.edgeCenter,
-            color: teamColor,
-            teamZone: merged ? (head === 0 ? -1 : 1) : undefined,
             lifeFontSizeFor: headLifeFontSizeFor(index, box),
             style: headCornerStyle(screenEdges, seam, Platform.OS === "web" ? insets : undefined),
           })}
@@ -644,19 +635,15 @@ export function PlayerGrid({
       <View
         key={`team-${slot}`}
         testID={`team-panel-${slot + 1}`}
-        style={[$head, { flexDirection: teamSplit(rotation) }, merged ? null : $splitPanel]}
+        style={[$head, { flexDirection: teamSplit(rotation) }]}
       >
         {heads}
         {table?.tableRules.pokemon ? null : (
-          <TeamLifeLayer
-            teamLabel={team.map((index) => players[index].name).join(" & ")}
-            life={lead.life}
-            out={out}
-            shown={merged}
+          <TeamPanelLayer
+            binding={teamBinding}
             foreground={foreground}
             rotation={rotation}
             compact={compact}
-            system={system}
             seatNumber={slot + 1}
             turnChip={teamChip}
             contentInsets={{
@@ -775,8 +762,6 @@ interface SeatPlace {
   contentInsets: LifeCardContentInsets
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
-  color?: string
-  teamZone?: -1 | 1
   lifeFontSizeFor?: (digits: number) => number | undefined
   style?: ViewStyle
 }
@@ -994,7 +979,6 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 
 const $head: ViewStyle = { flex: 1 }
-const $splitPanel: ViewStyle = { gap: 1 }
 
 const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
 

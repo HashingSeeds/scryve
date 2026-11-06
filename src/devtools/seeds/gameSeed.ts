@@ -176,8 +176,9 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {
   const game = buildSeededGame(params, repository)
-  if (params.design === "split" || params.design === "merged")
-    repository.saveTeamDesign(params.design)
+  // why: binding=frame or binding=link picks the team binding on trial, until one is chosen.
+  if (params.binding === "frame" || params.binding === "link")
+    repository.saveTeamBinding(params.binding)
   repository.clearActiveGame()
   repository.saveActiveGame(game)
   return { pathname: "/", params: { destination: "play" } }

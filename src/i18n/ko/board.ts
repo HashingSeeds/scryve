@@ -103,9 +103,6 @@ export default {
     table: "테이블",
   },
   teams: {
-    panel: "팀 패널",
-    merged: "하나의 총합",
-    split: "카드 두 장",
     name: "{{first}} & {{second}}",
   },
   seats: {

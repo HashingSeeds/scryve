@@ -104,9 +104,6 @@ export default {
     table: "टेबल",
   },
   teams: {
-    panel: "टीम पैनल",
-    merged: "एक कुल",
-    split: "दो कार्ड",
     name: "{{first}} और {{second}}",
   },
   seats: {

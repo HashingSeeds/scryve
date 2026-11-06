@@ -160,8 +160,6 @@ export interface LifeCardProps {
   out?: LifeCardOut
   seatTable?: SeatTable
   dice?: LifeCardDice
-  /** why: one head of a Two-Headed Giant panel whose team total the panel draws, so this half is only its − or its +. */
-  teamZone?: -1 | 1
   onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -193,7 +191,6 @@ export const LifeCard = memo(function LifeCard({
   dice,
   out,
   seatTable,
-  teamZone,
   onPlayStart,
   onChange,
   style,
@@ -675,11 +672,7 @@ export const LifeCard = memo(function LifeCard({
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={[
-            themed($readout),
-            lifeFadeDuration ? slotStyle : slotAt,
-            teamZone !== undefined && !toSlot && $hidden,
-          ]}
+          style={[themed($readout), lifeFadeDuration ? slotStyle : slotAt]}
         >
           {out?.cause === "life" ? (
             <View style={[$outReadout, contentRotationStyle]}>
@@ -774,8 +767,7 @@ export const LifeCard = memo(function LifeCard({
                   ? { edge: CONTENT_LEFT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
-              totalInk={teamZone === undefined ? readoutInk : undefined}
-              zone={teamZone}
+              totalInk={readoutInk}
               onChange={onChange}
               onPreview={showPreview}
               onOpenEditor={() => setEditorOpen(true)}
@@ -883,6 +875,12 @@ export const LifeCard = memo(function LifeCard({
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
                 commanderSeat && { maxWidth: identityCorner.position.maxWidth },
+                // why: the commander grid takes the mark's place and can outgrow it, so the row's chips start past the grid instead of under it.
+                commanderStripShown &&
+                  stripBounds &&
+                  !!diceChips?.length && {
+                    minWidth: sidewaysContent ? stripBounds.height : stripBounds.width,
+                  },
               ]}
             >
               {commanderDamage ? (
@@ -1061,8 +1059,6 @@ export const LifeCard = memo(function LifeCard({
 }, structurallyEqual)
 
 const KNOCKBACK = 12
-
-const $hidden: ViewStyle = { opacity: 0 }
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,

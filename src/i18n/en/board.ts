@@ -94,12 +94,6 @@ const board = {
     table: "Table",
   },
   teams: {
-    // Two-Headed Giant: heading in the layout dialog for how each team's shared panel is drawn.
-    panel: "Team panel",
-    // Two-Headed Giant panel design: one life total drawn across both teammates' halves.
-    merged: "One total",
-    // Two-Headed Giant panel design: each teammate keeps a full card that shows the team's total.
-    split: "Two cards",
     // A Two-Headed Giant team, named by its two players, as in "Ada & Grace".
     name: "{{first}} & {{second}}",
   },

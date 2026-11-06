@@ -10,14 +10,15 @@ import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
+/** why: a seat with no player yet is still a place on a team, so an open seat can be traded too. Without `onSwap` the teams only show. */
 export function TeamPicker({
   players,
   teams,
-  onChange,
+  onSwap,
 }: {
-  players: readonly { name: string; color: string; shape?: PlayerMarkShape }[]
+  players: readonly ({ name: string; color: string; shape?: PlayerMarkShape } | undefined)[]
   teams: readonly (readonly number[])[]
-  onChange: (teams: number[][]) => void
+  onSwap?: (first: number, second: number) => void
 }) {
   const {
     themed,
@@ -30,11 +31,7 @@ export function TeamPicker({
       setPicked(picked === seat ? undefined : seat)
       return
     }
-    onChange(
-      teams.map((team) =>
-        team.map((member) => (member === picked ? seat : member === seat ? picked : member)),
-      ),
-    )
+    onSwap?.(picked, seat)
     setPicked(undefined)
   }
 
@@ -50,44 +47,52 @@ export function TeamPicker({
           />
           {team.map((seat) => {
             const player = players[seat]
-            if (!player) return null
+            const name = player?.name ?? translate("connected:seats.openSeat")
             const selected = picked === seat
             return (
               <Pressable
                 key={seat}
                 testID={`team-player-${seat + 1}`}
                 accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={translate("play:newGame.teamPlayer", {
-                  name: player.name,
-                  team: index + 1,
-                })}
-                accessibilityHint={translate("play:newGame.teamSwapHint")}
+                accessibilityState={{ selected, disabled: !onSwap }}
+                accessibilityLabel={translate("play:newGame.teamPlayer", { name, team: index + 1 })}
+                accessibilityHint={onSwap ? translate("play:newGame.teamSwapHint") : undefined}
+                disabled={!onSwap}
                 onPress={() => press(seat)}
                 style={({ pressed }) => [themed($member), pressed && { opacity: 0.7 }]}
               >
-                <PlayerMark
-                  seatNumber={seat + 1}
-                  shape={player.shape}
-                  color={player.color}
-                  size={24}
-                />
+                {player ? (
+                  <PlayerMark
+                    seatNumber={seat + 1}
+                    shape={player.shape}
+                    color={player.color}
+                    size={24}
+                  />
+                ) : (
+                  <View style={$openMark} />
+                )}
                 <Text
-                  text={player.name}
+                  text={name}
                   weight={selected ? "bold" : "medium"}
                   numberOfLines={1}
-                  style={[$name, selected && [$picked, { color: colors.tint }]]}
+                  style={[
+                    $name,
+                    !player && { color: colors.textDim },
+                    selected && [$picked, { color: colors.tint }],
+                  ]}
                 />
               </Pressable>
             )
           })}
         </View>
       ))}
-      <Text
-        tx={picked === undefined ? "play:newGame.teamSwapHint" : "play:newGame.teamSwapPicked"}
-        size="xs"
-        style={{ color: colors.textDim }}
-      />
+      {onSwap ? (
+        <Text
+          tx={picked === undefined ? "play:newGame.teamSwapHint" : "play:newGame.teamSwapPicked"}
+          size="xs"
+          style={{ color: colors.textDim }}
+        />
+      ) : null}
     </View>
   )
 }
@@ -109,3 +114,4 @@ const $member: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $number: TextStyle = { width: 16, textAlign: "center", fontVariant: ["tabular-nums"] }
 const $name: TextStyle = { flexShrink: 1 }
 const $picked: TextStyle = { textDecorationLine: "underline" }
+const $openMark: ViewStyle = { width: 24, height: 24 }

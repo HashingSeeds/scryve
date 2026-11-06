@@ -57,8 +57,6 @@ export interface LifeControlsProps {
   lifeDigits?: number
   obstacle?: { edge: LifeCardEdge; bounds: LayoutRectangle }
   totalInk?: ReadoutInk
-  /** why: half of a Two-Headed Giant panel is one zone, so the whole panel reads as one card: − on the first head, + on the second. */
-  zone?: -1 | 1
   onChange: (delta: LifeDelta) => void
   onOpenEditor?: () => void
   onPreview?: (pendingDelta: number) => void
@@ -73,8 +71,6 @@ const HALF_CARD_ZONES: readonly {
   { direction: -1, glyph: "−", edge: "left" },
   { direction: 1, glyph: "+", edge: "right" },
 ]
-
-const OPPOSITE = { left: "right", right: "left" } as const
 
 const SLIDE_PADDING = {
   x: ["paddingLeft", "paddingRight"],
@@ -227,7 +223,6 @@ export function LifeControls({
   lifeDigits = 0,
   obstacle,
   totalInk,
-  zone,
   onChange,
   onOpenEditor,
   onPreview,
@@ -301,139 +296,135 @@ export function LifeControls({
               : $zones,
         )}
       >
-        {HALF_CARD_ZONES.filter(({ direction }) => !zone || direction === zone).map(
-          ({ direction, glyph, edge: halfEdge }) => {
-            // why: an upside-down card keeps − on the screen's left, which on a team half is the seam under the total, so a half's glyph moves to the panel's outer end.
-            const edge = zone && contentRotation === 180 ? OPPOSITE[halfEdge] : halfEdge
-            const delta = direction * tapStep
-            const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
-            const zoneEdge = sideways ? sidewaysZoneEdge(pinsToTopEdge) : edge
-            const showingDelta = direction * recentDelta > 0
-            const feedback = showingDelta ? deltaText(recentDelta) : glyph
-            const deltaSize = showingDelta
-              ? getDeltaFontSizeThatFits({
-                  text: feedback,
-                  baseSize: compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE,
-                  run: sideways ? zonesSize.height : zonesSize.width,
-                  inset: spacing.xs,
-                  lifeFontSize,
-                  lifeDigits,
-                  fontScale,
-                })
+        {HALF_CARD_ZONES.map(({ direction, glyph, edge }) => {
+          const delta = direction * tapStep
+          const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
+          const zoneEdge = sideways ? sidewaysZoneEdge(pinsToTopEdge) : edge
+          const showingDelta = direction * recentDelta > 0
+          const feedback = showingDelta ? deltaText(recentDelta) : glyph
+          const deltaSize = showingDelta
+            ? getDeltaFontSizeThatFits({
+                text: feedback,
+                baseSize: compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE,
+                run: sideways ? zonesSize.height : zonesSize.width,
+                inset: spacing.xs,
+                lifeFontSize,
+                lifeDigits,
+                fontScale,
+              })
+            : undefined
+          // why: a sideways glyph turns inside its unturned box, so a delta wider than the line height would reach past the card edge; move it inward by that overhang.
+          const glyphScale = Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+          const lineHeight =
+            (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) * glyphScale
+          // why: the grid only has to clear what the glyph inks, a delta's digits at most, not its taller line box.
+          const slide =
+            obstacle?.edge === zoneEdge
+              ? glyphSlide(
+                  obstacle,
+                  zonesSize,
+                  DIGIT_INK_HEIGHT * (compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE) * glyphScale,
+                  spacing.xxs,
+                )
               : undefined
-            // why: a sideways glyph turns inside its unturned box, so a delta wider than the line height would reach past the card edge; move it inward by that overhang.
-            const glyphScale = Math.min(fontScale, LIFE_MAX_FONT_SCALE)
-            const lineHeight =
-              (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) * glyphScale
-            // why: the grid only has to clear what the glyph inks, a delta's digits at most, not its taller line box.
-            const slide =
-              obstacle?.edge === zoneEdge
-                ? glyphSlide(
-                    obstacle,
-                    zonesSize,
-                    DIGIT_INK_HEIGHT * (compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE) * glyphScale,
-                    spacing.xxs,
-                  )
-                : undefined
-            const overhang =
-              sideways && deltaSize
-                ? Math.max((getDeltaTextWidth(feedback, deltaSize, fontScale) - lineHeight) / 2, 0)
-                : 0
-            return (
-              <BoardPressable
-                key={delta}
-                testID={lifeControlTestId(seatNumber, delta)}
-                // why: Pressable writes its own `disabled` over accessibilityState, so a locked zone leaves it unset to read as disabled and still take the press.
-                disabled={locked ? undefined : disabled}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: !!disabled || locked }}
-                accessibilityLabel={labelFor(delta)}
-                accessibilityHint={
-                  locked
-                    ? lockedReason
-                    : translate(`board:lifeControls.hint.${rules.id}`, { identity, delta })
+          const overhang =
+            sideways && deltaSize
+              ? Math.max((getDeltaTextWidth(feedback, deltaSize, fontScale) - lineHeight) / 2, 0)
+              : 0
+          return (
+            <BoardPressable
+              key={delta}
+              testID={lifeControlTestId(seatNumber, delta)}
+              // why: Pressable writes its own `disabled` over accessibilityState, so a locked zone leaves it unset to read as disabled and still take the press.
+              disabled={locked ? undefined : disabled}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !!disabled || locked }}
+              accessibilityLabel={labelFor(delta)}
+              accessibilityHint={
+                locked
+                  ? lockedReason
+                  : translate(`board:lifeControls.hint.${rules.id}`, { identity, delta })
+              }
+              accessibilityActions={
+                locked
+                  ? undefined
+                  : [
+                      {
+                        name: "longpress",
+                        label: translate(`board:lifeControls.moreControls.${rules.id}`, {
+                          identity,
+                        }),
+                      },
+                    ]
+              }
+              style={({ pressed }) => [
+                themed($zone),
+                sideways
+                  ? themed(pinsToTopEdge ? $zoneSidewaysTop : $zoneSidewaysBottom)
+                  : edge === "left"
+                    ? themed($zoneLeft)
+                    : themed($zoneRight),
+                slide,
+                pressed &&
+                  !disabled &&
+                  !locked && { backgroundColor: overlayTint(foreground, 0.14) },
+              ]}
+              delayLongPress={450}
+              onPressIn={() => {
+                if (locked) return
+                longPressHandled.current = null
+                onPreview?.(delta)
+                clearTimeout(previewTimer.current)
+                previewTimer.current = setTimeout(endPreview, TAP_PREVIEW_MS)
+              }}
+              onPressOut={endPreview}
+              onLongPress={() => {
+                if (locked) return
+                longPressHandled.current = direction
+                endPreview()
+                onOpenEditor?.()
+              }}
+              onAccessibilityAction={({ nativeEvent }) => {
+                if (nativeEvent.actionName === "longpress") onOpenEditor?.()
+              }}
+              onPress={() => {
+                if (locked) {
+                  bump(direction === -1 ? minusBump : plusBump)
+                  return
                 }
-                accessibilityActions={
-                  locked
-                    ? undefined
-                    : [
-                        {
-                          name: "longpress",
-                          label: translate(`board:lifeControls.moreControls.${rules.id}`, {
-                            identity,
-                          }),
-                        },
-                      ]
-                }
-                style={({ pressed }) => [
-                  themed($zone),
-                  sideways
-                    ? themed(pinsToTopEdge ? $zoneSidewaysTop : $zoneSidewaysBottom)
-                    : edge === "left"
-                      ? themed($zoneLeft)
-                      : themed($zoneRight),
-                  slide,
-                  pressed &&
-                    !disabled &&
-                    !locked && { backgroundColor: overlayTint(foreground, 0.14) },
-                ]}
-                delayLongPress={450}
-                onPressIn={() => {
-                  if (locked) return
+                if (longPressHandled.current === direction) {
                   longPressHandled.current = null
-                  onPreview?.(delta)
-                  clearTimeout(previewTimer.current)
-                  previewTimer.current = setTimeout(endPreview, TAP_PREVIEW_MS)
-                }}
-                onPressOut={endPreview}
-                onLongPress={() => {
-                  if (locked) return
-                  longPressHandled.current = direction
-                  endPreview()
-                  onOpenEditor?.()
-                }}
-                onAccessibilityAction={({ nativeEvent }) => {
-                  if (nativeEvent.actionName === "longpress") onOpenEditor?.()
-                }}
-                onPress={() => {
-                  if (locked) {
-                    bump(direction === -1 ? minusBump : plusBump)
-                    return
-                  }
-                  if (longPressHandled.current === direction) {
-                    longPressHandled.current = null
-                    return
-                  }
-                  // why: onPressOut can land after onPress; clearing here keeps a tap from counting twice.
-                  endPreview()
-                  onChange(delta)
-                }}
-              >
-                <Animated.View style={direction === -1 ? minusBumpStyle : plusBumpStyle}>
-                  <Text
-                    text={feedback}
-                    maxFontSizeMultiplier={1.3}
-                    numberOfLines={1}
-                    style={[
-                      themed(compact ? $compactGlyph : $glyph),
-                      deltaSize !== undefined && { fontSize: deltaSize },
-                      overhang
-                        ? {
-                            transform: [
-                              { translateY: pinsToTopEdge ? overhang : -overhang },
-                              { rotate: `${contentRotation}deg` },
-                            ],
-                          }
-                        : contentRotationStyle,
-                      { color: foreground },
-                      locked && $lockedGlyph,
-                    ]}
-                  />
-                </Animated.View>
-              </BoardPressable>
-            )
-          },
-        )}
+                  return
+                }
+                // why: onPressOut can land after onPress; clearing here keeps a tap from counting twice.
+                endPreview()
+                onChange(delta)
+              }}
+            >
+              <Animated.View style={direction === -1 ? minusBumpStyle : plusBumpStyle}>
+                <Text
+                  text={feedback}
+                  maxFontSizeMultiplier={1.3}
+                  numberOfLines={1}
+                  style={[
+                    themed(compact ? $compactGlyph : $glyph),
+                    deltaSize !== undefined && { fontSize: deltaSize },
+                    overhang
+                      ? {
+                          transform: [
+                            { translateY: pinsToTopEdge ? overhang : -overhang },
+                            { rotate: `${contentRotation}deg` },
+                          ],
+                        }
+                      : contentRotationStyle,
+                    { color: foreground },
+                    locked && $lockedGlyph,
+                  ]}
+                />
+              </Animated.View>
+            </BoardPressable>
+          )
+        })}
       </View>
       {totalInk && onOpenEditor && zonesSize.width > 0 && !disabled && !locked ? (
         // why: the total is the first thing people tap, so it opens the editor instead of landing on the − or + half under it.

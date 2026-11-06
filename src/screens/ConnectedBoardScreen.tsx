@@ -20,7 +20,6 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard"
-import type { TeamDesign } from "@/components/PlayerGrid"
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -784,7 +783,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     )
   }, [controlled, game.variant, table?.table])
   const cellCount = teams?.length ?? players.length
-  const [teamDesign, setTeamDesign] = useState(() => localGameRepository.teamDesign())
+  const [teamBinding] = useState(() => localGameRepository.teamBinding())
   /** why: a head's device changes its team's life from either half, writing as the head it holds, so the log knows who did it. */
   const actingHead = (playerId: string) =>
     turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
@@ -936,17 +935,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         setLayoutChoice(choice)
         saveLayoutChoice(publicId, choice)
       },
-      ...(teams
-        ? {
-            teamDesign: {
-              value: teamDesign,
-              onChange: (design: TeamDesign) => {
-                localGameRepository.saveTeamDesign(design)
-                setTeamDesign(design)
-              },
-            },
-          }
-        : {}),
     },
     petals: [
       {
@@ -1195,7 +1183,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             }
             dice={seatGrid}
             teams={teams}
-            teamDesign={teamDesign}
+            teamBinding={teamBinding}
             onChange={(playerId, delta) =>
               controls.changeLife(asPlayerId(actingHead(playerId)), delta)
             }

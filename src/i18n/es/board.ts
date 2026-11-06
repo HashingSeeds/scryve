@@ -105,9 +105,6 @@ export default {
     table: "Mesa",
   },
   teams: {
-    panel: "Panel del equipo",
-    merged: "Un total",
-    split: "Dos tarjetas",
     name: "{{first}} y {{second}}",
   },
   seats: {

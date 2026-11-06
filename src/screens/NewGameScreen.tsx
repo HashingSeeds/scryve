@@ -1129,8 +1129,14 @@ function NewGameForm({
                 <TeamPicker
                   players={players}
                   teams={teams}
-                  onChange={(next) => {
-                    setTeamDraft(next)
+                  onSwap={(first, second) => {
+                    setTeamDraft(
+                      teams.map((team) =>
+                        team.map((seat) =>
+                          seat === first ? second : seat === second ? first : seat,
+                        ),
+                      ),
+                    )
                     setEdited(true)
                   }}
                 />

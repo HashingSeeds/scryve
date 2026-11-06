@@ -8,7 +8,6 @@ import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import type { FirstPlayerOffer } from "@/components/FirstPlayerTabs"
 import { PlayerGrid } from "@/components/PlayerGrid"
-import type { TeamDesign } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
@@ -176,9 +175,7 @@ export function CurrentGameScreen({
   const attackDispatch = attack.dispatch
   const layoutVariant = runtime.game.layout ?? "auto"
   const teams = localTeams(runtime.game)
-  const [teamDesign, setTeamDesign] = useState(() =>
-    (repository ?? localGameRepository).teamDesign(),
-  )
+  const [teamBinding] = useState(() => (repository ?? localGameRepository).teamBinding())
   const chrome = useBoardChrome({
     gameId: runtime.game.id,
     system,
@@ -188,15 +185,7 @@ export function CurrentGameScreen({
       value: layoutVariant,
       onChange: runtime.changeLayout,
       ...(teams
-        ? {
-            teamDesign: {
-              value: teamDesign,
-              onChange: (design: TeamDesign) => {
-                ;(repository ?? localGameRepository).saveTeamDesign(design)
-                setTeamDesign(design)
-              },
-            },
-          }
+        ? {}
         : {
             seats: (
               <SeatArrangement
@@ -540,7 +529,7 @@ export function CurrentGameScreen({
               layoutVariant={layoutVariant}
               seatOrder={runtime.game.seatOrder}
               teams={teams}
-              teamDesign={teamDesign}
+              teamBinding={teamBinding}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
               outState={outState}

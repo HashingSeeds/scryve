@@ -104,9 +104,6 @@ export default {
     table: "テーブル",
   },
   teams: {
-    panel: "チームパネル",
-    merged: "合計1つ",
-    split: "カード2枚",
     name: "{{first}} & {{second}}",
   },
   seats: {

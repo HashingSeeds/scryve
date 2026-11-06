@@ -13,10 +13,8 @@ import type {
   GameMenuStatusLine,
   RadialMenuAction,
 } from "@/components/GameRadialMenu"
-import type { TeamDesign } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
-import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
@@ -47,7 +45,6 @@ export interface BoardChromeOptions {
     value: PlayerGridLayoutVariant
     onChange: (layout: PlayerGridLayoutVariant) => void
     seats?: ReactNode
-    teamDesign?: { value: TeamDesign; onChange: (design: TeamDesign) => void }
   }
   /** why: a Two-Headed Giant board seats team panels, so the menu and tabs sit by the teams. */
   teamCount?: number
@@ -270,7 +267,7 @@ export function GameBoard({ chrome, ...stage }: GameBoardProps) {
 
 function LayoutDialog({
   playerCount,
-  layout: { value, onChange, seats, teamDesign },
+  layout: { value, onChange, seats },
   origin,
   onClose,
 }: {
@@ -308,21 +305,6 @@ function LayoutDialog({
               onClose()
             }}
           />
-        ) : null}
-        {teamDesign ? (
-          <>
-            <Text tx="board:teams.panel" preset="subheading" style={themed($dialogText)} />
-            <SegmentedControl
-              testID="team-design"
-              accessibilityLabel={translate("board:teams.panel")}
-              segments={[
-                { id: "merged", label: translate("board:teams.merged") },
-                { id: "split", label: translate("board:teams.split") },
-              ]}
-              selectedId={teamDesign.value}
-              onSelect={(id) => teamDesign.onChange(id === "split" ? "split" : "merged")}
-            />
-          </>
         ) : null}
         {seats ? (
           <>
