@@ -94,7 +94,8 @@ export function connectedLogInputs(
 /**
  * why: connected events don't carry turn numbers, but each turn record names the pass that began
  * it, so numbers count back from the turn the table holds now. A hand-off keeps the number, and a
- * turn named twice (a first player picked again) shows once, as its newest holder.
+ * turn named twice (a first player picked again) shows once, as its newest holder. The log arrives
+ * a page at a time, so the current turn heads it even before the change that began it has loaded.
  */
 function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): TurnLogEntry[] {
   if (!turn) return []
@@ -108,6 +109,15 @@ function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): 
       (action?.kind === "turn.passed" || action?.kind === "turn.set") && !undone.has(operationId),
   )
   const newest = starts.findLastIndex(({ operationId }) => operationId === turn.operationId)
+  if (newest < 0)
+    return [
+      {
+        operationId: turn.operationId,
+        playerId: asPlayerId(turn.playerId),
+        number: turn.number,
+        at: turn.startedAt,
+      },
+    ]
   const entries: TurnLogEntry[] = []
   let number = turn.number
   for (const event of starts.slice(0, newest + 1).reverse()) {

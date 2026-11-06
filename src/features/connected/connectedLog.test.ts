@@ -134,4 +134,23 @@ describe("connected log", () => {
       kind: "life",
     })
   })
+
+  it("heads the log with the current turn before the change that began it has loaded", () => {
+    const page = [life("op-recent-hit-001", "ada", -1, 9_000)]
+    expect(connectedLogInputs(page, GAME, turnOf("op-not-on-page-1", 3)).turns).toEqual([
+      { operationId: "op-not-on-page-1", playerId: "bo", number: 3, at: 0 },
+    ])
+  })
+
+  it("reads a seat's quick taps as one change even when another device's change lands between them", () => {
+    const events = [
+      life("op-ada-tap-00001", "ada", -1, 1_000, { mine: true }),
+      life("op-bo-between-01", "bo", -2, 1_200),
+      life("op-ada-tap-00002", "ada", -2, 1_500, { mine: true }),
+    ]
+    expect(gameLog(players, connectedLogInputs(events, GAME, undefined).events)).toMatchObject([
+      { playerId: "ada", delta: -3, life: 34 },
+      { playerId: "bo", delta: -2, life: 40 },
+    ])
+  })
 })
