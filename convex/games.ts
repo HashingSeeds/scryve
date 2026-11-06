@@ -2735,6 +2735,7 @@ async function startRematch(
   const game = (await ctx.db.get(gameId))!
   const roles = rolesFor(game, players.length)
   const decks = attachesDecks(gameDeckRules(game)[0])
+  const seatIds: Id<"gamePlayers">[] = []
   for (const [index, player] of players
     .sort((left, right) => left.seat - right.seat)
     .map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK }))
@@ -2744,10 +2745,12 @@ async function startRematch(
         ? player.deckVersionId
         : undefined
     const deckLife =
-      (deckVersionId
-        ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
-        : undefined) ?? player.startingLife
-    await ctx.db.insert("gamePlayers", {
+      game.variant === TWO_HEADED_GIANT
+        ? undefined
+        : ((deckVersionId
+            ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
+            : undefined) ?? player.startingLife)
+    const seatId = await ctx.db.insert("gamePlayers", {
       gameId,
       seat: player.seat,
       ...(player.userId ? { userId: player.userId } : {}),
@@ -2771,7 +2774,10 @@ async function startRematch(
       ...(player.editsAnySeat ? { editsAnySeat: true } : {}),
       ...roles?.[index],
     })
+    seatIds.push(seatId)
   }
+  if (game.variant === TWO_HEADED_GIANT)
+    await ctx.db.patch(gameId, { turnGroups: pairedTeams(seatIds) })
   if (players.some((player) => player.userId === undefined)) {
     const manualCode = await allocateInvite(ctx, request.inviteToken, request.manualCodeCandidates)
     const invitationId = await ctx.db.insert("invitations", {
