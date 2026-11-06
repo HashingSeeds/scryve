@@ -2535,6 +2535,7 @@ export const tableAction = mutation({
     clientCreatedAt: v.number(),
     tappedAt: v.optional(v.number()),
     action: tableActionValidator,
+    undoOf: v.optional(v.string()),
   },
   handler: async (ctx, { publicId, ...sent }) => {
     const write: GameWrite = { kind: "table", ...sent }

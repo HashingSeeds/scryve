@@ -398,7 +398,13 @@ function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined
       ...(event.compensatesOperationId ? { undoOf: event.compensatesOperationId } : {}),
       ...sent,
     }
-  if (event.type === "table.action") return { kind: "table", action: event.action, ...sent }
+  if (event.type === "table.action")
+    return {
+      kind: "table",
+      action: event.action,
+      ...(event.undoOf ? { undoOf: event.undoOf } : {}),
+      ...sent,
+    }
   if (event.type === "commanderDamage.submitted")
     return {
       kind: "commander.claim",
@@ -681,7 +687,12 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
         : {}),
     }
   if (value.type === "table.action" && matchesValidator(tableActionValidator, value.action))
-    return { type: "table.action", ...base, action: value.action }
+    return {
+      type: "table.action",
+      ...base,
+      action: value.action,
+      ...(isId(value.undoOf) ? { undoOf: asOperationId(value.undoOf) } : {}),
+    }
   if (
     value.type === "commanderDamage.submitted" &&
     isId(value.fromPlayerId) &&

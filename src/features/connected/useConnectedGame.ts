@@ -104,6 +104,7 @@ export function sendQueuedAction(
       clientCreatedAt: event.clientCreatedAt,
       ...sent,
       action: event.action,
+      ...(event.undoOf ? { undoOf: event.undoOf } : {}),
     })
   if (event.type === "commanderDamage.submitted")
     return mutations.submitCommanderDamage({

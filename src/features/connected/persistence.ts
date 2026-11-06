@@ -200,7 +200,9 @@ function parseTableActionEvent(value: Record<string, unknown>): TableActionEvent
     typeof value.clientCreatedAt !== "number" ||
     !Number.isSafeInteger(value.clientCreatedAt) ||
     value.clientCreatedAt < 0 ||
-    !matchesValidator(tableActionValidator, value.action)
+    !matchesValidator(tableActionValidator, value.action) ||
+    (value.undoOf !== undefined &&
+      (typeof value.undoOf !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.undoOf)))
   )
     return null
   return {
@@ -208,6 +210,7 @@ function parseTableActionEvent(value: Record<string, unknown>): TableActionEvent
     operationId: asOperationId(value.operationId),
     gameId: asGameId(value.gameId),
     action: value.action,
+    ...(typeof value.undoOf === "string" ? { undoOf: asOperationId(value.undoOf) } : {}),
     actorId: asActorId(value.actorId),
     deviceId: asDeviceId(value.deviceId),
     clientCreatedAt: value.clientCreatedAt,
@@ -411,6 +414,7 @@ const fieldNames: Record<FieldName<PendingLifeAction | ConnectedActionEvent>, tr
   claimOperationId: true,
   accepted: true,
   action: true,
+  undoOf: true,
 }
 
 const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {

@@ -104,7 +104,11 @@ async function parityGame(
               ...(write.undoOf ? { undoOf: write.undoOf } : {}),
             })
           : write.kind === "table"
-            ? await client.mutation(api.games.tableAction, { ...base, action: write.action })
+            ? await client.mutation(api.games.tableAction, {
+                ...base,
+                action: write.action,
+                ...(write.undoOf ? { undoOf: write.undoOf } : {}),
+              })
             : write.kind === "commander.claim"
               ? await client.mutation(api.games.submitCommanderDamage, {
                   ...base,
@@ -869,6 +873,39 @@ describe("memory engine: turn groups", () => {
       }),
     ).toMatchObject({ ok: true })
     expect(memory.turn).toMatchObject({ playerId: "ada", number: 1 })
+  })
+})
+
+describe("engine parity: counter undo", () => {
+  it("records what a counter tap changed, and takes back only the same kind of change", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const poison = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "table",
+        action: { kind: "counter.changed", playerId: game.hostSeat, counterId: "poison", delta },
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", poison("poison-floor-tap-01", -1))
+    await game.write("host", poison("poison-tap-000001", 2))
+    await game.write("host", {
+      kind: "life",
+      playerId: game.hostSeat,
+      delta: 1,
+      ...sent("life-wrong-undo-01"),
+      undoOf: "poison-tap-000001",
+    })
+    expect(
+      await game.write("host", poison("poison-undo-00001", -2, "poison-tap-000001")),
+    ).toMatchObject({
+      ok: true,
+    })
+    await game.expectSameState()
+    const log = await game.log("host")
+    expect(log.find((event) => event.operationId === "poison-floor-tap-01")?.delta).toBeUndefined()
+    expect(log.find((event) => event.operationId === "poison-tap-000001")?.delta).toBe(2)
+    expect(log.find((event) => event.operationId === "life-wrong-undo-01")).toBeUndefined()
   })
 })
 
