@@ -7,7 +7,6 @@ import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import type { FirstPlayerOffer } from "@/components/FirstPlayerTabs"
-import { PlanarDieButton } from "@/components/modes/ModeSeam"
 import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
@@ -60,6 +59,7 @@ import type {
 } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { useLocalGame } from "@/features/game/useLocalGame"
+import { modeChipBeside } from "@/features/modes/modeChipBeside"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { modeSeamFor } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
@@ -399,20 +399,13 @@ export function CurrentGameScreen({
           ...chips.filter(({ kind }) => kind === "roll"),
           {
             kind: "turn",
-            state:
-              dieOnChip && boardModes.planar
-                ? {
-                    ...turnChip,
-                    beside: (
-                      <PlanarDieButton
-                        planar={boardModes.planar}
-                        seat={player.id}
-                        size={36}
-                        testID={`planar-die-chip-${player.id}`}
-                      />
-                    ),
-                  }
-                : turnChip,
+            state: {
+              ...turnChip,
+              beside: modeChipBeside(boardModes, player.id, {
+                dieOnChip,
+                plays: () => true,
+              }),
+            },
           },
         ]
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]

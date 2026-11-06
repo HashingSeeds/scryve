@@ -20,7 +20,6 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard"
-import { PlanarDieButton } from "@/components/modes/ModeSeam"
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -90,6 +89,7 @@ import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
+import { modeChipBeside } from "@/features/modes/modeChipBeside"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { modeSeamFor } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
@@ -1054,20 +1054,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           ...chips.filter(({ kind }) => kind === "roll"),
           {
             kind: "turn",
-            state:
-              dieOnChip && boardModes.planar
-                ? {
-                    ...turnChip,
-                    beside: (
-                      <PlanarDieButton
-                        planar={boardModes.planar}
-                        seat={player.id}
-                        size={36}
-                        testID={`planar-die-chip-${player.id}`}
-                      />
-                    ),
-                  }
-                : turnChip,
+            state: {
+              ...turnChip,
+              beside: modeChipBeside(boardModes, player.id, {
+                dieOnChip,
+                plays: (seat) => controlled.has(seat),
+              }),
+            },
           },
         ]
       return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]

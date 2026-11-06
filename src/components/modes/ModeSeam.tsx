@@ -216,52 +216,52 @@ function PlanePlate({
 function SchemePlate({
   scheme,
   width,
+  due,
   onPress,
 }: {
   scheme: SchemeView
   width: number
+  due?: boolean
   onPress: () => void
 }) {
   const {
     theme: { colors },
   } = useAppTheme()
   const ink = colors.gameMenu.anchorGlyph
-  const label = scheme.due
+  const ongoing = scheme.ongoing.length
+  const art = scheme.ongoing[0]?.card ?? scheme.shown
+  const label = due
     ? translate("board:scheme.due")
-    : scheme.ongoing.length === 1
+    : ongoing === 1
       ? scheme.ongoing[0]!.card.name
-      : scheme.ongoing.length > 1
-        ? translate("board:scheme.ongoingCount", { count: scheme.ongoing.length })
-        : (scheme.shown?.name ?? translate("board:scheme.schemes"))
-  const full = width >= FULL_PLATE_WIDTH
-  const art = scheme.due ? undefined : (scheme.ongoing[0]?.card ?? scheme.shown)
-  const count = scheme.ongoing.length > 1 ? String(scheme.ongoing.length) : undefined
+      : ongoing > 1
+        ? translate("board:scheme.ongoingCount", { count: ongoing })
+        : (scheme.shown?.name ?? "")
+  const full = due || width >= FULL_PLATE_WIDTH
   return (
     <BoardPressable
-      testID="scheme-plate"
+      testID={due ? "scheme-due-plate" : "scheme-plate"}
       accessibilityRole="button"
       accessibilityLabel={`${translate("board:scheme.archenemy")}: ${label}`}
       accessibilityHint={translate("board:scheme.opensSchemes")}
       onPress={onPress}
       style={({ pressed }) => [
         full ? $plate : $icon,
-        full && { maxWidth: width },
+        full && { maxWidth: Math.max(width, FULL_PLATE_WIDTH) },
         {
-          backgroundColor: scheme.due ? colors.error : colors.gameMenu.anchor,
+          backgroundColor: due ? colors.error : colors.gameMenu.anchor,
           borderColor: colors.gameMenu.anchorBorder,
         },
         pressed && $pressed,
       ]}
     >
-      {art && (full || !count) ? (
+      {art && !due ? (
         <Image
           source={modeCardImage(art, "art_crop")}
           style={full ? $thumb : $iconThumb}
           contentFit="cover"
           accessibilityIgnoresInvertColors
         />
-      ) : !full && !count ? (
-        <SchemeGlyph color={ink} />
       ) : null}
       {full ? (
         <View style={$plateText}>
@@ -273,24 +273,44 @@ function SchemePlate({
             text={label}
           />
         </View>
-      ) : count ? (
-        <Text size="xs" weight="bold" style={[$name, { color: ink }]} text={count} />
+      ) : ongoing > 1 ? (
+        <View style={[$badge, { backgroundColor: colors.gameMenu.anchor }]}>
+          <Text
+            size="xxs"
+            weight="bold"
+            style={[$badgeText, { color: ink }]}
+            text={String(ongoing)}
+          />
+        </View>
       ) : null}
     </BoardPressable>
   )
 }
 
-function SchemeGlyph({ color }: { color: string }) {
+/** why: the archenemy's prompt rides beside their turn chip, labeled, since an icon can't say what's due. */
+export function SchemeDueButton({ onPress }: { onPress: () => void }) {
+  const {
+    theme: { colors },
+  } = useAppTheme()
   return (
-    <Svg width={18} height={18} viewBox="0 0 24 24">
-      <Path
-        d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"
-        stroke={color}
-        strokeWidth={2}
-        fill="none"
+    <BoardPressable
+      testID="scheme-due-chip"
+      accessibilityRole="button"
+      accessibilityHint={translate("board:scheme.opensSchemes")}
+      onPress={onPress}
+      style={({ pressed }) => [
+        $dueChip,
+        { backgroundColor: colors.error, borderColor: colors.gameMenu.anchorBorder },
+        pressed && $pressed,
+      ]}
+    >
+      <Text
+        size="xs"
+        weight="bold"
+        style={[$name, { color: colors.gameMenu.anchorGlyph }]}
+        tx="board:scheme.due"
       />
-      <Circle cx={12} cy={12} r={3.2} fill={color} />
-    </Svg>
+    </BoardPressable>
   )
 }
 
@@ -314,8 +334,10 @@ export function ModeSeam({
 }) {
   const share = (slot: SeamSlot) => {
     const dice = slot.items.filter((item) => item === "die").length
-    const plates = Math.max(slot.items.length - dice, 1)
-    return (slot.room.width - dice * (dieWidth(slot) + GAP) - (plates - 1) * GAP) / plates
+    const due = slot.items.filter((item) => item === "schemeDue").length
+    const plates = Math.max(slot.items.length - dice - due, 1)
+    const fixed = dice * (dieWidth(slot) + GAP) + due * (FULL_PLATE_WIDTH + GAP)
+    return (slot.room.width - fixed - (plates - 1) * GAP) / plates
   }
   const render = (slot: SeamSlot, item: SeamItem) => {
     if (item === "plane" && planar)
@@ -327,12 +349,13 @@ export function ModeSeam({
           onPress={() => onOpen("planar")}
         />
       )
-    if (item === "scheme" && scheme)
+    if ((item === "scheme" || item === "schemeDue") && scheme)
       return (
         <SchemePlate
           key={item}
           scheme={scheme}
           width={share(slot)}
+          due={item === "schemeDue"}
           onPress={() => onOpen("scheme")}
         />
       )
@@ -408,6 +431,24 @@ const $icon: ViewStyle = {
 const $thumb = { width: 26, height: 26, borderRadius: 5 }
 const $iconThumb = { width: ICON_WIDTH - 4, height: PLATE_HEIGHT - 4, borderRadius: 7 }
 const $plateText: ViewStyle = { flexShrink: 1 }
+const $badge: ViewStyle = {
+  position: "absolute",
+  right: 1,
+  bottom: 1,
+  minWidth: 14,
+  paddingHorizontal: 2,
+  borderRadius: 7,
+  alignItems: "center",
+}
+const $badgeText: TextStyle = { fontSize: 10, lineHeight: 13 }
+const $dueChip: ViewStyle = {
+  height: 36,
+  paddingHorizontal: 8,
+  borderRadius: 9,
+  borderWidth: 1.5,
+  alignItems: "center",
+  justifyContent: "center",
+}
 const $kicker: TextStyle = { fontSize: 9, lineHeight: 11 }
 const $name: TextStyle = { fontSize: 12, lineHeight: 14 }
 const $die: ViewStyle = {

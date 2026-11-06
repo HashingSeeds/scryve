@@ -6,7 +6,7 @@ import {
   getPlayerSlotFacings,
 } from "@/components/playerGridGeometry"
 
-import { dieOnSeam, ICON_WIDTH, planSeam, seamRoom } from "./seamPlan"
+import { chipCrowdedBySeam, ICON_WIDTH, planSeam, seamRoom } from "./seamPlan"
 
 function geometryFor(playerCount: number, width: number, height: number) {
   const layout = getPlayerGridLayout({ playerCount, width, height })
@@ -42,7 +42,7 @@ describe("seamPlan", () => {
     const right = seamRoom(geometry, "right", topSeatActive)!
     expect(left).toMatchObject({ inActiveCard: false, rotation: 0 })
     expect(right).toMatchObject({ inActiveCard: true, rotation: 180 })
-    expect(dieOnSeam(geometry, topSeatActive)).toBe(true)
+    expect(chipCrowdedBySeam(geometry, topSeatActive)).toBe(true)
     expect(planSeam({ left, right }, ["plane", "die"])).toMatchObject({
       left: { items: ["plane"] },
       right: { items: ["die"] },
@@ -50,6 +50,6 @@ describe("seamPlan", () => {
   })
 
   it("leaves the die on the chip of a side-facing seat", () => {
-    expect(dieOnSeam(geometryFor(4, 390, 844), new Set([0]))).toBe(false)
+    expect(chipCrowdedBySeam(geometryFor(4, 390, 844), new Set([0]))).toBe(false)
   })
 })

@@ -1,7 +1,7 @@
 import { ModeSeam } from "@/components/modes/ModeSeam"
 import type { BoardSeamGeometry } from "@/features/game/GameBoardStage"
 
-import { dieOnSeam, planSeam, seamRoom, type SeamItem } from "./seamPlan"
+import { chipCrowdedBySeam, planSeam, seamRoom, type SeamItem } from "./seamPlan"
 import type { BoardModes } from "./useBoardModes"
 
 const EDGE = 8
@@ -36,10 +36,15 @@ export function modeSeamFor(
       menuSize,
       edge: edgeTabs ? EDGE_WITH_TABS : EDGE,
     }
+    const crowded = chipCrowdedBySeam(geometry, busySlots)
     const items: SeamItem[] = [
       ...(planar ? ["plane" as const] : []),
-      ...(planar && (!dieOnChip || dieOnSeam(geometry, busySlots)) ? ["die" as const] : []),
-      ...(scheme ? ["scheme" as const] : []),
+      ...(planar && (!dieOnChip || crowded) ? ["die" as const] : []),
+      ...(scheme?.due && scheme.mine && crowded
+        ? ["schemeDue" as const]
+        : scheme && (scheme.ongoing.length > 0 || scheme.shown)
+          ? ["scheme" as const]
+          : []),
     ]
     const plan = planSeam(
       {

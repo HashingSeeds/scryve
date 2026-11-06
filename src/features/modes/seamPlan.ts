@@ -1,6 +1,6 @@
 import type { SeamNeighbor, SeamSide } from "@/components/playerGridGeometry"
 
-export type SeamItem = "plane" | "scheme" | "die"
+export type SeamItem = "plane" | "scheme" | "schemeDue" | "die"
 type Side = "left" | "right"
 
 /** why: a sideways card centers its + and − across its width, at both ends, so a plate straddling the seam stops short of them. */
@@ -101,7 +101,8 @@ export function seamRoom(
   return room(limit, shift, 0)
 }
 
-const minWidth = (_item: SeamItem) => ICON_WIDTH
+// why: "Scheme due" has to be read, so it never shrinks to art the way a revealed scheme does.
+export const minWidth = (item: SeamItem) => (item === "schemeDue" ? FULL_PLATE_WIDTH : ICON_WIDTH)
 
 export interface SeamSlot {
   room: SeamRoom
@@ -118,7 +119,7 @@ export function planSeam(
     placed.reduce((total, item) => total + minWidth(item) + GAP, -GAP) <= room.width
   const dieSide: Side = rooms.left?.inActiveCard && !rooms.right?.inActiveCard ? "left" : "right"
   const sideOf = (item: SeamItem): Side =>
-    item === "die"
+    item === "die" || item === "schemeDue"
       ? dieSide
       : item === "plane" && items.includes("die") && dieSide === "left"
         ? "right"
@@ -139,8 +140,8 @@ export function planSeam(
   }
 }
 
-/** why: an active card facing across the seam has the pentagon centered on its edge, so its turn chip has no room for the die (TurnChipLayer drops it) and the seam carries it. */
-export function dieOnSeam(
+/** why: an active card facing across the seam has the pentagon centered on its edge, so its turn chip has no room for what rides beside it (TurnChipLayer drops it) and the seam carries it. */
+export function chipCrowdedBySeam(
   geometry: Pick<SeamGeometry, "sides" | "facings">,
   busySlots: ReadonlySet<number>,
 ) {
