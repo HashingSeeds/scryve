@@ -6,6 +6,7 @@ import Svg, { Circle, Path } from "react-native-svg"
 
 import { toolLabel, type DiceTool } from "@/features/game/dice"
 import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features/game/playSystems"
+import { recentCounterNames, rememberCounterName } from "@/features/game/recentCounterNames"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
 import { translate } from "@/i18n/translate"
@@ -30,9 +31,19 @@ import {
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { Text } from "./Text"
+import { TextField } from "./TextField"
 import { targetSlop } from "./touchTarget"
 import { NO_TABLE } from "../../convex/lib/systems"
-import { playerTableOf } from "../../convex/lib/table"
+import {
+  customCounterId,
+  customCounterName,
+  customCounterNameOf,
+  MAX_CUSTOM_COUNTER,
+  MAX_CUSTOM_COUNTER_NAME_LENGTH,
+  MAX_CUSTOM_COUNTERS,
+  playerTableOf,
+  type CustomCounter,
+} from "../../convex/lib/table"
 
 /** why: what one seat shows and may change. The plain parts compare structurally in the memoized card; PlayerGrid keeps the callbacks stable. */
 export interface SeatTable {
@@ -67,12 +78,30 @@ export function seatTableState(
   if (!runtime) return undefined
   const { table, tableRules: rules } = runtime
   if (rules.counters.length === 0 && rules.designations.length === 0) return undefined
+  const seat = playerTableOf(table, playerId)
+  const counters = seat.counters ?? NO_COUNTERS
+  const custom = rules.customCounters ? (seat.customCounters ?? []) : []
   return {
-    rules,
-    counters: playerTableOf(table, playerId).counters ?? NO_COUNTERS,
+    rules: custom.length
+      ? { ...rules, counters: [...rules.counters, ...custom.map(customCounterRule)] }
+      : rules,
+    counters: custom.length
+      ? {
+          ...counters,
+          ...Object.fromEntries(custom.map(({ name, value }) => [customCounterId(name), value])),
+        }
+      : counters,
     held: rules.designations.flatMap(({ id }) => (table.designations[id] === playerId ? [id] : [])),
   }
 }
+
+/** why: a seat's own counters ride with the system's, so chips, the edit sheet and announcements treat them alike. */
+const customCounterRule = ({ name }: CustomCounter) => ({
+  id: customCounterId(name),
+  label: name,
+  step: 1,
+  max: MAX_CUSTOM_COUNTER,
+})
 
 type OutReasonId = keyof typeof board.outReason
 
@@ -170,7 +199,7 @@ const RULE_LINK_WIDTH = 28
 /** why: a column narrower than this gives its label the room instead, and a long press on the option opens its rule. */
 const RULE_BUTTON_COLUMN = 132
 
-type Sheet = { kind: "edit"; counterId: string } | { kind: "add" }
+type Sheet = { kind: "edit"; counterId: string } | { kind: "add" } | { kind: "name" }
 
 const ADD_TRIGGER = "add"
 const LIVE_REGION_REISSUE_MS = 100
@@ -313,9 +342,21 @@ export const CounterChips = memo(function CounterChips({
             {shown.map((counter) => {
               const value = counters[counter.id] ?? 0
               const lethal = counter.losesAt !== undefined && value >= counter.losesAt
+              const customName = customCounterNameOf(counter.id)
               const content = (
                 <>
-                  <TableGlyph id={counter.id} size={glyphSize} color={foreground} />
+                  {customName === undefined ? (
+                    <TableGlyph id={counter.id} size={glyphSize} color={foreground} />
+                  ) : (
+                    <Text
+                      text={compact ? customName.slice(0, 3) : customName}
+                      size="xxs"
+                      weight="bold"
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={1.2}
+                      style={[$customChipName, { color: foreground }]}
+                    />
+                  )}
                   <Text
                     text={String(value)}
                     weight={lethal ? "bold" : "medium"}
@@ -465,6 +506,7 @@ export const CounterChips = memo(function CounterChips({
           topClearance={top}
           dice={dice}
           onEdit={(counterId) => setSheet({ kind: "edit", counterId })}
+          onName={() => setSheet({ kind: "name" })}
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -526,6 +568,7 @@ function CounterSheet({
   topClearance,
   dice,
   onEdit,
+  onName,
   onClose,
 }: {
   sheet: Sheet
@@ -544,6 +587,7 @@ function CounterSheet({
   topClearance: number
   dice?: SeatDiceBag
   onEdit: (counterId: string) => void
+  onName: () => void
   onClose: () => void
 }) {
   const {
@@ -582,6 +626,8 @@ function CounterSheet({
   }
   const firstControl = useRef<View>(null)
   const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
+  const customCount = seat.rules.counters.filter(({ id }) => customCounterNameOf(id)).length
+  const offersCustom = seat.rules.customCounters === true && customCount < MAX_CUSTOM_COUNTERS
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
 
   return (
@@ -673,6 +719,17 @@ function CounterSheet({
               />
             </View>
           </>
+        ) : sheet.kind === "name" ? (
+          <NameCounter
+            seatNumber={seatNumber}
+            ink={ink}
+            taken={seat.rules.counters.flatMap(({ id }) => customCounterNameOf(id) ?? [])}
+            onAdd={(name) => {
+              seat.adjustCounter(customCounterId(name), 1)
+              rememberCounterName(name)
+              onClose()
+            }}
+          />
         ) : (
           <>
             {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
@@ -761,6 +818,28 @@ function CounterSheet({
                         />
                       )
                     })}
+                    {offersCustom ? (
+                      <SheetOption
+                        testID={`counter-option-${seatNumber}-custom`}
+                        id="plus"
+                        label={translate(
+                          optionColumn < SHORT_LABEL_COLUMN
+                            ? "board:counters.customShort"
+                            : "board:counters.custom",
+                        )}
+                        accessibilityLabel={translate("board:counters.custom")}
+                        ink={ink}
+                        ruleButton={roomForRule}
+                        ruleTestID={`counter-rule-${seatNumber}-custom`}
+                        iconOnly={split && allDice}
+                        slide={slide}
+                        fade={fade}
+                        onPress={() => {
+                          if (split && allDice) return setAllDice(false)
+                          onName()
+                        }}
+                      />
+                    ) : null}
                   </ScrollView>
                 </Animated.View>
               ) : null}
@@ -821,6 +900,84 @@ function CounterSheet({
         </BoardPressable>
       </View>
     </Animated.View>
+  )
+}
+
+function NameCounter({
+  seatNumber,
+  ink,
+  taken,
+  onAdd,
+}: {
+  seatNumber: number
+  ink: string
+  taken: readonly string[]
+  onAdd: (name: string) => void
+}) {
+  const { themed } = useAppTheme()
+  const [draft, setDraft] = useState("")
+  const [recent] = useState(() =>
+    recentCounterNames().filter(
+      (name) => !taken.some((held) => held.toLocaleLowerCase() === name.toLocaleLowerCase()),
+    ),
+  )
+  const name = customCounterName(draft)
+  return (
+    <View style={themed($nameCounter)}>
+      <TextField
+        testID={`counter-name-${seatNumber}`}
+        accessibilityLabel={translate("board:counters.customName")}
+        placeholder={translate("board:counters.customName")}
+        placeholderTextColor={overlayTint(ink, 0.6)}
+        autoFocus
+        autoCapitalize="words"
+        autoCorrect={false}
+        maxLength={MAX_CUSTOM_COUNTER_NAME_LENGTH}
+        returnKeyType="done"
+        value={draft}
+        onChangeText={setDraft}
+        onSubmitEditing={() => name && onAdd(name)}
+        inputWrapperStyle={[themed($nameInput), { borderColor: overlayTint(ink, 0.5) }]}
+        style={{ color: ink }}
+      />
+      {recent.length > 0 ? (
+        <View style={themed($recentNames)}>
+          {recent.map((recentName) => (
+            <BoardPressable
+              key={recentName}
+              testID={`counter-recent-${seatNumber}-${recentName}`}
+              accessibilityRole="button"
+              accessibilityLabel={translate("board:counters.customRecent", { label: recentName })}
+              hitSlop={4}
+              onPress={() => onAdd(recentName)}
+              style={({ pressed }) => [
+                themed($recentName),
+                { borderColor: overlayTint(ink, 0.4) },
+                pressed && { backgroundColor: overlayTint(ink, 0.14) },
+              ]}
+            >
+              <Text
+                text={recentName}
+                size="xs"
+                weight="medium"
+                numberOfLines={1}
+                style={{ color: ink }}
+              />
+            </BoardPressable>
+          ))}
+        </View>
+      ) : null}
+      {name ? (
+        <View style={themed($sheetFooter)}>
+          <SheetTextButton
+            testID={`counter-name-add-${seatNumber}`}
+            text={translate("board:counters.customAdd")}
+            ink={ink}
+            onPress={() => onAdd(name)}
+          />
+        </View>
+      ) : null}
+    </View>
   )
 }
 
@@ -1076,6 +1233,37 @@ function SheetOption({
 }
 
 const $layer: ViewStyle = { zIndex: 10 }
+
+const $customChipName: TextStyle = { maxWidth: 72 }
+
+const $nameCounter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  gap: spacing.xs,
+  paddingHorizontal: spacing.xs,
+})
+
+const $nameInput: ThemedStyle<ViewStyle> = () => ({
+  backgroundColor: "transparent",
+  borderBottomWidth: 1.5,
+  borderLeftWidth: 0,
+  borderRadius: 0,
+  borderRightWidth: 0,
+  borderTopWidth: 0,
+})
+
+const $recentNames: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: spacing.xxs,
+})
+
+const $recentName: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+  borderRadius: radius.sm,
+  borderWidth: 1,
+  minHeight: 32,
+  justifyContent: "center",
+  paddingHorizontal: spacing.xs,
+})
 
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",

@@ -371,6 +371,16 @@ const board = {
     giveUp: "Give up {{label}}",
     take: "Take {{label}}",
     rule: "Rule {{rule}}",
+    // Opens a field where the player names their own counter, for a mechanic the app doesn't list (Speed, rad counters, the Ring).
+    custom: "Name a counter",
+    // Short form of "Name a counter" for a narrow button.
+    customShort: "Custom",
+    // Placeholder in the field for a counter's name.
+    customName: "Counter name",
+    // Adds the named counter to the player's seat.
+    customAdd: "Add",
+    // Screen reader label for a recently used counter name; tapping it adds that counter. {{label}} is the name.
+    customRecent: "Add {{label}}",
   },
   seat: {
     identity: "Seat {{seat}}, {{name}}",

@@ -371,6 +371,11 @@ export default {
     giveUp: "{{label}} 포기",
     take: "{{label}} 가져오기",
     rule: "규칙 {{rule}}",
+    custom: "카운터 이름 정하기",
+    customShort: "직접 입력",
+    customName: "카운터 이름",
+    customAdd: "추가",
+    customRecent: "{{label}} 추가",
   },
   seat: {
     identity: "자리 {{seat}}, {{name}}",

@@ -47,11 +47,12 @@ export function tableRules(system: unknown, format: string | undefined): TableDe
   const cached = tableRulesCache.get(key)
   if (cached) return cached
   const commandZone = hasCommandZone(system, format)
-  const { counters, designations, pokemon } = definition.table
+  const { counters, designations, pokemon, customCounters } = definition.table
   const rules: TableDefinition = {
     counters: counters.filter((counter) => commandZone || !counter.commandZoneOnly),
     designations,
     ...(pokemon ? { pokemon } : {}),
+    ...(customCounters ? { customCounters } : {}),
   }
   tableRulesCache.set(key, rules)
   return rules

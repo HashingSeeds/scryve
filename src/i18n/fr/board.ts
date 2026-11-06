@@ -398,6 +398,11 @@ export default {
     giveUp: "Retirer {{label}}",
     take: "Prendre {{label}}",
     rule: "Règle {{rule}}",
+    custom: "Nommer un marqueur",
+    customShort: "Perso",
+    customName: "Nom du marqueur",
+    customAdd: "Ajouter",
+    customRecent: "Ajouter {{label}}",
   },
   seat: {
     identity: "Place {{seat}}, {{name}}",

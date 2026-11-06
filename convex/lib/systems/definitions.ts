@@ -118,6 +118,7 @@ export type TableDefinition = {
   readonly counters: readonly TableCounterDefinition[]
   readonly designations: readonly DesignationDefinition[]
   readonly pokemon?: PokemonBoardDefinition
+  readonly customCounters?: boolean
 }
 
 export type FirstPlayerDefinition = {
@@ -308,6 +309,7 @@ export const SYSTEMS = {
         { id: "monarch", label: "Monarch" },
         { id: "initiative", label: "Initiative" },
       ],
+      customCounters: true,
     },
     variants: ["treachery"],
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },

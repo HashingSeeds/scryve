@@ -383,6 +383,11 @@ export default {
     giveUp: "{{label}} छोड़ें",
     take: "{{label}} लें",
     rule: "नियम {{rule}}",
+    custom: "काउंटर का नाम दें",
+    customShort: "कस्टम",
+    customName: "काउंटर का नाम",
+    customAdd: "जोड़ें",
+    customRecent: "{{label}} जोड़ें",
   },
   seat: {
     identity: "सीट {{seat}}, {{name}}",

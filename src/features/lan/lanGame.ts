@@ -31,6 +31,7 @@ import {
 import {
   matchesValidator,
   TABLE_VERSION,
+  TURN_TABLE_VERSION,
   tableActionValidator,
   tableForVersion,
   type PlayerTable,
@@ -446,6 +447,7 @@ const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
 
 const playerTableOf = (seat: PlayerTable): PlayerTable => ({
   ...(seat.counters ? { counters: seat.counters } : {}),
+  ...(seat.customCounters ? { customCounters: seat.customCounters } : {}),
   ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
 })
 
@@ -524,7 +526,7 @@ export function lanProjection(
       ...roleFor(seat.key),
     })),
     ...(commander ? { commanderDamage: commander } : {}),
-    ...(memory && (tableRulesApply(rules) || (memory.turn && tableVersion >= TABLE_VERSION))
+    ...(memory && (tableRulesApply(rules) || (memory.turn && tableVersion >= TURN_TABLE_VERSION))
       ? {
           table: tableForVersion(
             {

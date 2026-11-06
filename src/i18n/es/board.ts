@@ -399,6 +399,11 @@ export default {
     giveUp: "Renunciar a {{label}}",
     take: "Tomar {{label}}",
     rule: "Regla {{rule}}",
+    custom: "Nombra un contador",
+    customShort: "Otro",
+    customName: "Nombre del contador",
+    customAdd: "Añadir",
+    customRecent: "Añadir {{label}}",
   },
   seat: {
     identity: "Asiento {{seat}}, {{name}}",

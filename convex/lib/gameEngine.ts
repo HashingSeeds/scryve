@@ -144,6 +144,7 @@ export interface SeatPatch {
   lastEventAt?: number
   lastWrite?: SeatWrite
   counters?: PlayerTable["counters"]
+  customCounters?: PlayerTable["customCounters"]
   pokemon?: PlayerTable["pokemon"]
 }
 
@@ -530,7 +531,13 @@ export function changeTable(
       kind: "seat.patch",
       seatId: row.id,
       patch: {
-        ...(after === before ? {} : { counters: after?.counters, pokemon: after?.pokemon }),
+        ...(after === before
+          ? {}
+          : {
+              counters: after?.counters,
+              customCounters: after?.customCounters,
+              pokemon: after?.pokemon,
+            }),
         ...(lifeDelta === 0 ? {} : { currentLife: row.currentLife + lifeDelta }),
         ...(isActor ? { eventCount: (row.eventCount ?? 0) + 1 } : {}),
         lastEventAt: now,

@@ -372,6 +372,11 @@ export default {
     giveUp: "{{label}}を手放す",
     take: "{{label}}を得る",
     rule: "ルール{{rule}}",
+    custom: "カウンターに名前をつける",
+    customShort: "カスタム",
+    customName: "カウンター名",
+    customAdd: "追加",
+    customRecent: "{{label}}を追加",
   },
   seat: {
     identity: "席{{seat}}、{{name}}",

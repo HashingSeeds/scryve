@@ -2707,6 +2707,32 @@ describe("Convex game write rate limits", () => {
     ).rejects.toMatchObject({ data: { code: "rate_limited" } })
   })
 
+  it("syncs a custom counter to current clients and leaves it out for older ones", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    await game.host.mutation(api.games.tableAction, {
+      publicId: game.publicId,
+      operationId: "custom-counter-op-0001",
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      action: {
+        kind: "customCounter.changed",
+        playerId: game.hostPlayerId,
+        name: "Speed",
+        delta: 2,
+      },
+    })
+    const seat = async (tableVersion?: number) =>
+      (
+        await game.joiner.query(api.games.lobbyProjection, {
+          publicId: game.publicId,
+          ...(tableVersion === undefined ? {} : { tableVersion }),
+        })
+      ).table?.players[game.hostPlayerId]
+    expect(await seat(TABLE_VERSION)).toEqual({ customCounters: [{ name: "Speed", value: 2 }] })
+    expect(await seat(3)).toEqual({})
+  })
+
   it("rate-limits table actions the same way and still acknowledges a replay", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)
