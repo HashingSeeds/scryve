@@ -93,9 +93,10 @@ on an implicit session when checking persistence.
 
 ## Establish the required app state
 
-Use the real consent and Clerk flows. Do not inject MMKV or SecureStore data,
-fake authentication, or add a bypass to the app. The one exception is local game
-state: open a dev seed link (below) instead of tapping through setup.
+Use the real consent flow and real Clerk sessions. Do not inject MMKV or
+SecureStore data, fake authentication, or add a bypass to the app. Two dev links
+skip the tapping: a seed link (below) for local game state, and a Clerk sign-in
+ticket for a test account.
 
 Preserve the installed app's state by default. A prior test session and legal
 acceptance are useful shared development prerequisites. Clear app data or the
@@ -122,15 +123,19 @@ the affected flow needs:
    `what-you-play-start`. This is the real Scryve first-launch flow.
 2. If the flow works signed out, continue signed out. Authentication is not a
    prerequisite for local play.
-3. If the flow requires an account and the app is signed out, open the account
-   action and use Clerk's real development sign-in flow with
-   `jane+clerk_test@sow.care` and OTP `424242`. Discover and act on the current
-   Clerk fields from a fresh accessibility snapshot rather than assuming their
-   labels or order. If Clerk asks to create a username or password, the
-   address has no account yet: finish creating it on dev or preview for a
+3. If the flow requires an account and the app is signed out, sign in with a
+   ticket: `pnpm -s dev:signin` prints a one-use link for `jane` (pass `john`
+   or a full `*+clerk_test` address for another), and
+   `agent-device open com.sowinghope.count.dev "<link>"` signs in and lands on
+   Play in a few seconds. The ticket comes from the deployment this worktree's
+   app uses; after `pnpm preview:up` it needs the preview deploy key, like
+   `pnpm bots`. A signed-in app refuses the link; sign out first only for a
+   test account.
+4. Use Clerk's own sign-in screens only when the change touches sign-in, or
+   the address has no Clerk account yet: `jane+clerk_test@sow.care` and OTP
+   `424242`, acting on fields from a fresh snapshot. If Clerk asks for a
+   username or password, finish creating the account on dev or preview for a
    `*+clerk_test@sow.care` address, and stop and report for anything else.
-4. Wait for the auth modal to close and confirm the account action reflects the
-   signed-in state.
 5. Force-close and reopen the app once. Confirm the Clerk session persists
    before navigating to the changed screen.
 
@@ -157,6 +162,21 @@ newer build can open, which shows the update-needed launch screen.
 An unknown seed kind or bad param shows `Seed failed` with the reason. A link
 that is not shaped like `/dev/seed/<kind>` opens the root route (`/`) instead. Consent and auth
 still go through the real flows.
+
+## Agent flows
+
+Maestro YAML in `.maestro/agent/` sets up common states in one command.
+agent-device runs it in the current session, also on lab devices through
+`agent-device-mini`:
+
+```bash
+agent-device replay .maestro/agent/HostConnected.yaml --maestro -e PLAYERS=4
+agent-device replay .maestro/agent/HostNearby.yaml --maestro -e PLAYERS=4 -e LIFE=40
+agent-device get text 'id="manual-code"'
+```
+
+Both leave the lobby's invite sheet open on its join code. HostConnected needs
+a signed-in app and reuses a lobby the device already hosts.
 
 ## Drive with agent-device
 
@@ -186,7 +206,7 @@ When the change touches connected play, fill the other seats with `pnpm bots`
 instead of more devices. Bots only run against a Convex preview, so first run
 `pnpm preview:up`, which points this worktree's app at the branch preview (a
 preview passes the development-deployment check). Then either host in the app
-and run `pnpm bots join <CODE> --count <n>`, or run `pnpm bots host --players <n>`
+with the HostConnected flow and run `pnpm bots join <CODE> --count <n>`, or run `pnpm bots host --players <n>`
 and join the code it prints. `pnpm bots --help` lists the play and failure
 options (commander damage, socket drops, bursts, duplicates); add `--json` for
 one event per line.
