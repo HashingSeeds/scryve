@@ -3,6 +3,11 @@ import type { Turn } from "../../../convex/lib/turns"
 export const TURN_CLOCK_STYLES = ["stacked", "swap", "ring", "chess"] as const
 export type TurnClockStyle = (typeof TURN_CLOCK_STYLES)[number]
 export const TURN_PASS_STYLES = ["next", "label", "none"] as const
+/** why: prototype. how the turn shows and how a pass feels. "tab" is the main design. */
+export const TURN_STYLES = ["tab", "spotlight", "hold"] as const
+export type TurnStyle = (typeof TURN_STYLES)[number]
+export const isTurnStyle = (value: unknown): value is TurnStyle =>
+  TURN_STYLES.some((style) => style === value)
 export type TurnPassStyle = (typeof TURN_PASS_STYLES)[number]
 export const CHESS_BANK_MINUTES = [10, 20, 30] as const
 /** why: from seven seats the seats beside the tab are too narrow for the round clock inside it, so it stays on the board's edge label. */
@@ -14,6 +19,7 @@ export interface TurnTabPrefs {
   enabled: boolean
   clock: TurnClockStyle
   pass: TurnPassStyle
+  style: TurnStyle
   hideOffered: boolean
 }
 
@@ -21,6 +27,7 @@ export const DEFAULT_TURN_TAB_PREFS: TurnTabPrefs = {
   enabled: true,
   clock: "stacked",
   pass: "next",
+  style: "tab",
   hideOffered: false,
 }
 

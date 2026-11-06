@@ -1,12 +1,12 @@
-import { memo, useEffect, useReducer, type ReactNode } from "react"
+import { createContext, memo, useContext, useEffect, useReducer, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated from "react-native-reanimated"
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
 
 import type { PlaySystemId } from "@/features/game/playSystems"
 import { roundClockText, roundClockView, type RoundClock } from "@/features/game/roundClock"
-import type { TurnClockStyle, TurnPassStyle } from "@/features/game/turnTab"
+import type { TurnClockStyle, TurnPassStyle, TurnStyle } from "@/features/game/turnTab"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -45,6 +45,7 @@ export interface TurnTabProps {
   roundClock?: RoundClock
   system?: PlaySystemId
   dense?: boolean
+  variant?: TurnStyle
   onPress: () => void
   onLongPress: () => void
 }
@@ -55,6 +56,7 @@ const GAP = 2
 const TIME_ROW = 15
 const SMALL_ROW = 11
 const SWAP_MS = 4_000
+const HOLD_MS = 600
 const TICK_MS = 1_000
 
 /**
@@ -96,7 +98,9 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
     theme: { colors },
   } = useAppTheme()
   const animateFully = useReducedMotion() === false
-  const { tabs, turn, onPress, onLongPress } = props
+  const { tabs, turn, onPress, onLongPress, variant = "tab", nextSeat } = props
+  const holds = variant === "hold" && turn !== undefined && props.canPass
+  const held = useSharedValue(0)
   const now = useNow(turn !== undefined)
   const label = turnTabLabel(props, now)
   const ink = colors.gameMenu.anchorGlyph
@@ -141,31 +145,49 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
               tabIndex={primary ? undefined : -1}
               accessibilityRole="button"
               accessibilityLabel={label}
-              accessibilityHint={translate("board:turn.longPressHint")}
-              onPress={onPress}
-              onLongPress={onLongPress}
-              delayLongPress={450}
+              accessibilityHint={translate(
+                holds ? "board:turn.tapHint" : "board:turn.longPressHint",
+              )}
+              onPress={holds ? onLongPress : onPress}
+              onLongPress={
+                holds
+                  ? () => {
+                      held.value = 0
+                      onPress()
+                    }
+                  : onLongPress
+              }
+              delayLongPress={holds ? HOLD_MS : 450}
+              onPressIn={
+                holds ? () => (held.value = withTiming(1, { duration: HOLD_MS })) : undefined
+              }
+              onPressOut={holds ? () => (held.value = withTiming(0, { duration: 150 })) : undefined}
               style={({ pressed }) => [$press, pressed && { backgroundColor: `${ink}2E` }]}
             >
               {({ pressed }) => (
-                <View
-                  style={[
-                    $face,
-                    {
-                      height: faceHeight,
-                      gap,
-                      left: (press.width - TURN_TAB_FACE_WIDTH) / 2,
-                      top: (press.height - faceHeight) / 2,
-                      transform: [{ rotate: `${tab.facing}deg` }, { scale: pressed ? 0.92 : 1 }],
-                    },
-                  ]}
-                >
-                  {rows.map((row) => (
-                    <View key={row.key} style={[$row, { height: row.height }]}>
-                      {row.node}
-                    </View>
-                  ))}
-                </View>
+                <>
+                  {holds ? (
+                    <HoldFill progress={held} edge={tab.edge} color={nextSeat?.color ?? ink} />
+                  ) : null}
+                  <View
+                    style={[
+                      $face,
+                      {
+                        height: faceHeight,
+                        gap,
+                        left: (press.width - TURN_TAB_FACE_WIDTH) / 2,
+                        top: (press.height - faceHeight) / 2,
+                        transform: [{ rotate: `${tab.facing}deg` }, { scale: pressed ? 0.92 : 1 }],
+                      },
+                    ]}
+                  >
+                    {rows.map((row) => (
+                      <View key={row.key} style={[$row, { height: row.height }]}>
+                        {row.node}
+                      </View>
+                    ))}
+                  </View>
+                </>
               )}
             </BoardPressable>
           </Animated.View>
@@ -183,7 +205,18 @@ interface FaceRow {
 
 /** why: the tab's depth follows these rows, so a row only exists when it has something to say. */
 function useFaceRows(
-  { turn, seat, nextSeat, canPass, clockStyle, passStyle, roundClock, system, dense }: TurnTabProps,
+  {
+    turn,
+    seat,
+    nextSeat,
+    canPass,
+    clockStyle,
+    passStyle,
+    roundClock,
+    system,
+    dense,
+    variant = "tab",
+  }: TurnTabProps,
   now: number,
 ): { rows: FaceRow[]; gap: number } {
   const {
@@ -224,23 +257,25 @@ function useFaceRows(
   const tile = compact ? 24 : 28
   const gap = compact ? 1 : GAP
   const rows: FaceRow[] = []
+  const spotlight = variant === "spotlight"
 
-  rows.push(
-    clockStyle === "ring"
-      ? {
-          key: "mark",
-          height: tile + 4,
-          node: (
-            <RingMark
-              seat={seat}
-              size={tile + 4}
-              fraction={ringFraction(turn, roundClock, system, now)}
-              ink={ink}
-            />
-          ),
-        }
-      : { key: "mark", height: tile, node: <SeatTile seat={seat} size={tile} /> },
-  )
+  if (!spotlight)
+    rows.push(
+      clockStyle === "ring"
+        ? {
+            key: "mark",
+            height: tile + 4,
+            node: (
+              <RingMark
+                seat={seat}
+                size={tile + 4}
+                fraction={ringFraction(turn, roundClock, system, now)}
+                ink={ink}
+              />
+            ),
+          }
+        : { key: "mark", height: tile, node: <SeatTile seat={seat} size={tile} /> },
+    )
 
   if (bank !== undefined && bank <= 0)
     rows.push({
@@ -292,7 +327,7 @@ function useFaceRows(
       ),
     })
 
-  if (showsNext) {
+  if (showsNext && !spotlight) {
     const nextTile = compact ? 16 : 18
     rows.push({
       key: "next",
@@ -306,7 +341,7 @@ function useFaceRows(
     })
   }
 
-  if (showsWord)
+  if (showsWord && !spotlight)
     rows.push({
       key: "pass",
       height: SMALL_ROW,
@@ -324,8 +359,59 @@ function useFaceRows(
   return { rows, gap }
 }
 
+/** why: prototype. a hold fills the tab with the next seat's color from the board's edge, so a pass reads as handing the turn on. */
+function HoldFill({
+  progress,
+  edge,
+  color,
+}: {
+  progress: { value: number }
+  edge: FirstPlayerTab["edge"]
+  color: string
+}) {
+  const alongSide = edge === "left" || edge === "right"
+  const style = useAnimatedStyle(() =>
+    alongSide
+      ? { transform: [{ scaleX: progress.value }] }
+      : { transform: [{ scaleY: progress.value }] },
+  )
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[$holdFill, { backgroundColor: color, transformOrigin: edge }, style]}
+    />
+  )
+}
+
+/** why: prototype. which seats Spotlight frames, read by each seat on the board. */
+export const TurnSpotlightContext = createContext<{ active?: string; next?: string } | undefined>(
+  undefined,
+)
+
+/** why: prototype. the active seat's card gets a bright frame and the next one a faint dashed one, so the board itself shows the turn. */
+export function SeatSpotlight({ playerId }: { playerId: string }) {
+  const spotlight = useContext(TurnSpotlightContext)
+  const {
+    theme: { colors },
+  } = useAppTheme()
+  const active = spotlight?.active === playerId
+  const next = spotlight?.next === playerId
+  if (!active && !next) return null
+  return (
+    <View
+      pointerEvents="none"
+      testID={active ? "seat-spotlight-active" : "seat-spotlight-next"}
+      style={[
+        $spotlight,
+        active ? $spotlightActive : $spotlightNext,
+        { borderColor: colors.gameMenu.anchorGlyph },
+      ]}
+    />
+  )
+}
+
 function turnTabLabel(
-  { turn, seat, nextSeat, canPass, roundClock, system }: TurnTabProps,
+  { turn, seat, nextSeat, canPass, roundClock, system, variant }: TurnTabProps,
   now: number,
 ) {
   if (!turn || !seat) return translate("board:turn.whoFirstLabel")
@@ -345,7 +431,9 @@ function turnTabLabel(
       : undefined,
     canPass
       ? nextSeat
-        ? translate("board:turn.passHintTo", { name: nextSeat.name })
+        ? translate(variant === "hold" ? "board:turn.holdHintTo" : "board:turn.passHintTo", {
+            name: nextSeat.name,
+          })
         : translate("board:turn.passHint")
       : undefined,
   ]
@@ -475,6 +563,24 @@ function StartGlyph({ color }: { color: string }) {
   )
 }
 
+const $holdFill: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  opacity: 0.9,
+}
+const $spotlight: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  borderRadius: 24,
+}
+const $spotlightActive: ViewStyle = { borderWidth: 4 }
+const $spotlightNext: ViewStyle = { borderWidth: 2, opacity: 0.5, borderStyle: "dashed" }
 const $tab: ViewStyle = { position: "absolute", borderWidth: TURN_TAB_BORDER, overflow: "hidden" }
 const $press: ViewStyle = { flex: 1 }
 const $face: ViewStyle = {

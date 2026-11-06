@@ -26,7 +26,12 @@ import {
 } from "@/components/PlayerGrid"
 import { getPlayerGridRows } from "@/components/playerGridGeometry"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
-import { TurnTabs, type TurnTabProps, type TurnTabSeat } from "@/components/TurnTabs"
+import {
+  TurnSpotlightContext,
+  TurnTabs,
+  type TurnTabProps,
+  type TurnTabSeat,
+} from "@/components/TurnTabs"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
@@ -134,7 +139,9 @@ function PinnedGameBoardStage({
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             <FirstPlayerTabsShownContext.Provider value={tabsShown}>
-              {renderGrid(boardOrientation)}
+              <TurnSpotlightContext.Provider value={spotlightOf(turnTab, playerCount, gridLayout)}>
+                {renderGrid(boardOrientation)}
+              </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
@@ -210,7 +217,9 @@ function LegacyGameBoardStage({
       style={$stage}
     >
       <FirstPlayerTabsShownContext.Provider value={tabsShown}>
-        {renderGrid(boardOrientation)}
+        <TurnSpotlightContext.Provider value={spotlightOf(turnTab, playerCount, gridLayout)}>
+          {renderGrid(boardOrientation)}
+        </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
       <GameRadialMenu
         {...menu}
@@ -235,6 +244,17 @@ function LegacyGameBoardStage({
       {windowOverlay}
     </Animated.View>
   )
+}
+
+/** why: prototype. Spotlight frames the active and next seats on the board itself. */
+function spotlightOf(
+  turnTab: BoardTurnTab | undefined,
+  playerCount: number,
+  gridLayout: Parameters<typeof getPlayerGridRows>[1],
+) {
+  if (turnTab?.variant !== "spotlight" || !turnTab.seat) return undefined
+  const slots = clockwiseSlots(getPlayerGridRows(playerCount, gridLayout))
+  return { active: turnTab.seat.playerId, next: turnTab.nextSeat(slots)?.playerId }
 }
 
 function BoardTabs({

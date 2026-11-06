@@ -526,6 +526,8 @@ export default {
     roundLabel: "राउंड {{time}}",
     passHint: "पास करने के लिए टैप करें",
     passHintTo: "{{name}} को पास करने के लिए टैप करें",
+    holdHintTo: "{{name}} को पास करने के लिए दबाए रखें",
+    tapHint: "टर्न कंट्रोल के लिए टैप करें",
     bankLabel: "टाइम बैंक {{time}}",
     outOfTime: "समय खत्म",
     longPressHint: "टर्न कंट्रोल के लिए देर तक दबाएँ",
@@ -546,6 +548,12 @@ export default {
     chessBank: "प्रति खिलाड़ी समय",
     chessMinutes: "{{minutes}} मिनट",
     chessOff: "बंद",
+    turnStyle: "स्टाइल",
+    turnStyles: {
+      tab: "टैब",
+      spotlight: "स्पॉटलाइट",
+      hold: "पास करने के लिए दबाए रखें",
+    },
     passStyle: "पास संकेत",
     passStyles: {
       next: "अगला",

@@ -504,6 +504,8 @@ export default {
     roundLabel: "ラウンド {{time}}",
     passHint: "タップでパス",
     passHintTo: "タップして{{name}}に渡す",
+    holdHintTo: "長押しで{{name}}に渡す",
+    tapHint: "タップでターン操作",
     bankLabel: "持ち時間 {{time}}",
     outOfTime: "時間切れ",
     longPressHint: "長押しでターン操作",
@@ -524,6 +526,12 @@ export default {
     chessBank: "プレイヤーごとの時間",
     chessMinutes: "{{minutes}}分",
     chessOff: "オフ",
+    turnStyle: "スタイル",
+    turnStyles: {
+      tab: "タブ",
+      spotlight: "スポットライト",
+      hold: "長押しで渡す",
+    },
     passStyle: "パスの合図",
     passStyles: {
       next: "次の人",

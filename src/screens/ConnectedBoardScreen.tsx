@@ -998,6 +998,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           canPass: myTurn,
           clockStyle: turnPrefs.clock,
           passStyle: turnPrefs.pass,
+          variant: turnPrefs.style,
           nextSeat: () => {
             const next = myTurn ? nextPlayerId() : undefined
             return turnSeats.find(({ playerId }) => playerId === next)

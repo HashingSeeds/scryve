@@ -40,8 +40,10 @@ import {
   DEFAULT_TURN_TAB_PREFS,
   isTurnClockStyle,
   isTurnPassStyle,
+  isTurnStyle,
   type TurnClockStyle,
   type TurnPassStyle,
+  type TurnStyle,
   type TurnTabPrefs,
 } from "./turnTab"
 import type {
@@ -107,6 +109,7 @@ export interface LocalSettings {
   turnTabHideOffered?: true
   turnClock?: TurnClockStyle
   turnPass?: TurnPassStyle
+  turnStyle?: TurnStyle
 }
 
 export const COMMANDER_SEATS = 4
@@ -569,6 +572,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
     ...(isTurnClockStyle(migrated.turnClock) ? { turnClock: migrated.turnClock } : {}),
     ...(isTurnPassStyle(migrated.turnPass) ? { turnPass: migrated.turnPass } : {}),
+    ...(isTurnStyle(migrated.turnStyle) ? { turnStyle: migrated.turnStyle } : {}),
   }
 }
 
@@ -779,6 +783,7 @@ export class LocalGameRepository {
       enabled: settings.turnTab !== false,
       clock: settings.turnClock ?? DEFAULT_TURN_TAB_PREFS.clock,
       pass: settings.turnPass ?? DEFAULT_TURN_TAB_PREFS.pass,
+      style: settings.turnStyle ?? DEFAULT_TURN_TAB_PREFS.style,
       hideOffered: settings.turnTabHideOffered === true,
     }
   }
@@ -793,6 +798,7 @@ export class LocalGameRepository {
       ...(next.hideOffered ? { turnTabHideOffered: true } : {}),
       turnClock: next.clock,
       turnPass: next.pass,
+      turnStyle: next.style,
     })
     return next
   }

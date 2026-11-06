@@ -506,6 +506,8 @@ export default {
     roundLabel: "라운드 {{time}}",
     passHint: "탭하여 넘기기",
     passHintTo: "탭하여 {{name}}에게 넘기세요",
+    holdHintTo: "길게 눌러 {{name}}에게 넘기기",
+    tapHint: "탭하여 턴 조작 열기",
     bankLabel: "타임 뱅크 {{time}}",
     outOfTime: "시간 초과",
     longPressHint: "길게 눌러 턴 설정 열기",
@@ -526,6 +528,12 @@ export default {
     chessBank: "플레이어별 시간",
     chessMinutes: "{{minutes}}분",
     chessOff: "끔",
+    turnStyle: "스타일",
+    turnStyles: {
+      tab: "탭",
+      spotlight: "스포트라이트",
+      hold: "길게 눌러 넘기기",
+    },
     passStyle: "넘기기 표시",
     passStyles: {
       next: "다음 차례",

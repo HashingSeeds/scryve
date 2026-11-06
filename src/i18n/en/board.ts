@@ -515,6 +515,8 @@ const board = {
     roundLabel: "Round {{time}}",
     passHint: "Tap to pass",
     passHintTo: "Tap to pass to {{name}}",
+    holdHintTo: "Hold to pass to {{name}}",
+    tapHint: "Tap for turn controls",
     // Screen reader text for a player's chess clock, as in "Time bank 4:12".
     bankLabel: "Time bank {{time}}",
     // Shown in the turn tab when a player's chess clock bank has run out. Play continues. Very short, may wrap to two lines.
@@ -545,6 +547,14 @@ const board = {
     chessBank: "Time per player",
     chessMinutes: "{{minutes}} min",
     chessOff: "Off",
+    turnStyle: "Style",
+    turnStyles: {
+      tab: "Tab",
+      // The active seat's own card is framed; the tab only keeps the clocks.
+      spotlight: "Spotlight",
+      // Hold the tab to pass; a tap opens these controls.
+      hold: "Hold to pass",
+    },
     passStyle: "Pass cue",
     passStyles: {
       // The next player's mark, shown small beside the active player's.

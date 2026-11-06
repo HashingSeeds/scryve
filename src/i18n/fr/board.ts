@@ -549,6 +549,8 @@ export default {
     roundLabel: "Ronde {{time}}",
     passHint: "Touchez pour passer",
     passHintTo: "Touchez pour passer à {{name}}",
+    holdHintTo: "Maintenez pour passer à {{name}}",
+    tapHint: "Touchez pour les commandes du tour",
     bankLabel: "Réserve de temps {{time}}",
     outOfTime: "Temps écoulé",
     longPressHint: "Appui long pour les commandes du tour",
@@ -569,6 +571,12 @@ export default {
     chessBank: "Temps par joueur",
     chessMinutes: "{{minutes}} min",
     chessOff: "Désactivé",
+    turnStyle: "Style",
+    turnStyles: {
+      tab: "Onglet",
+      spotlight: "Projecteur",
+      hold: "Maintenir pour passer",
+    },
     passStyle: "Indicateur de passage",
     passStyles: {
       next: "Suivant",

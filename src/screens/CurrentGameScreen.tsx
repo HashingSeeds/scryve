@@ -341,6 +341,7 @@ export function CurrentGameScreen({
           canPass: true,
           clockStyle: turnPrefs.clock,
           passStyle: turnPrefs.pass,
+          variant: turnPrefs.style,
           nextSeat: (slots) => {
             const next = turn && nextPlayerId(turn, slots)
             return turnSeats.find(({ playerId }) => playerId === next)

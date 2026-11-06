@@ -18,6 +18,7 @@ import {
   CHESS_BANK_MINUTES,
   TURN_CLOCK_STYLES,
   TURN_PASS_STYLES,
+  TURN_STYLES,
   turnsPassed,
   type TurnTabPrefs,
 } from "./turnTab"
@@ -99,6 +100,15 @@ export function TurnDialog({
         )}
         {onUndo ? <Button testID="turn-undo" tx="board:turn.undoPass" onPress={onUndo} /> : null}
         <Choices
+          tx="board:turn.turnStyle"
+          options={TURN_STYLES.map((style) => ({
+            id: style,
+            label: translate(`board:turn.turnStyles.${style}`),
+          }))}
+          selected={prefs.style}
+          onSelect={(style) => onPrefs({ style })}
+        />
+        <Choices
           tx="board:turn.clockStyle"
           options={TURN_CLOCK_STYLES.map((style) => ({
             id: style,
@@ -152,7 +162,11 @@ function Choices<Id extends string | number>({
   selected,
   onSelect,
 }: {
-  tx: "board:turn.clockStyle" | "board:turn.chessBank" | "board:turn.passStyle"
+  tx:
+    | "board:turn.clockStyle"
+    | "board:turn.chessBank"
+    | "board:turn.passStyle"
+    | "board:turn.turnStyle"
   options: readonly { id: Id; label: string }[]
   selected: Id
   onSelect: (id: Id) => void
