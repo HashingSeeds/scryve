@@ -545,7 +545,7 @@ export default {
   log: {
     close: "Cerrar registro",
     empty: "Aún no hay cambios",
-    commanderFrom: "comandante de {{name}}",
+    commanderFrom: "Del comandante de {{name}}",
     row: "{{name}} {{delta}} a {{life}}",
     commanderRow: "{{name}} {{delta}} por el comandante de {{from}}, a {{life}}",
     undoLast: "Deshacer el último cambio",

@@ -544,7 +544,7 @@ export default {
   log: {
     close: "Fermer le journal",
     empty: "Aucun changement pour l'instant",
-    commanderFrom: "commandant de {{name}}",
+    commanderFrom: "Du commandant de {{name}}",
     row: "{{name}} {{delta}} à {{life}}",
     commanderRow: "{{name}} {{delta}} du commandant de {{from}}, à {{life}}",
     undoLast: "Annuler le dernier changement",

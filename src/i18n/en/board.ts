@@ -507,8 +507,8 @@ const board = {
   log: {
     close: "Close log",
     empty: "No changes yet",
-    // Shown after the change on a commander damage row: whose commander dealt it, as in "Grace's commander".
-    commanderFrom: "{{name}}'s commander",
+    // Under a commander damage row in the game log, naming whose commander dealt it, as in "From Grace's commander". Keep it short so the name fits.
+    commanderFrom: "From {{name}}'s commander",
     // One row of the game log: a player's life change and the total it left them on, as in "Ada −3 to 17".
     row: "{{name}} {{delta}} to {{life}}",
     // A commander damage row, as in "Ada −5 from Grace's commander, to 12".

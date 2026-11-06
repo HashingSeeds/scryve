@@ -64,22 +64,36 @@ export function localLifeChanges(events: readonly GameEvent[], playerId: string)
     .reverse()
 }
 
-export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number }
+export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number; at: number }
+
+// why: a seat's card sums quick taps into one number until it rests this long, so the log reads the same burst as one change.
+export const LIFE_BURST_MS = 1800
 
 export function gameLog(
   players: readonly Pick<GamePlayer, "id" | "life">[],
   events: readonly GameEvent[],
 ): GameLogRow[] {
   const totals = new Map<string, number>(players.map(({ id, life }) => [id, life]))
-  return standingLifeEvents(events)
-    .reverse()
-    .flatMap((event) => {
-      const change = lifeChangeOf(event)
-      const life = totals.get(change.playerId)
-      if (life === undefined) return []
-      totals.set(change.playerId, life - change.delta)
-      return [{ id: event.operationId, life, ...change }]
-    })
+  const rows: GameLogRow[] = []
+  let newerAt = Infinity
+  for (const event of standingLifeEvents(events).reverse()) {
+    const change = lifeChangeOf(event)
+    const life = totals.get(change.playerId)
+    if (life === undefined) continue
+    totals.set(change.playerId, life - change.delta)
+    const newer = rows.at(-1)
+    if (
+      newer?.playerId === change.playerId &&
+      newer.fromPlayerId === change.fromPlayerId &&
+      newerAt - event.clientCreatedAt <= LIFE_BURST_MS
+    ) {
+      newer.delta += change.delta
+      newer.id = event.operationId
+    } else rows.push({ id: event.operationId, life, at: event.clientCreatedAt, ...change })
+    newerAt = event.clientCreatedAt
+  }
+  // why: a burst that nets to nothing, like a stray tap taken back, changed nothing at the table.
+  return rows.filter(({ delta }) => delta !== 0)
 }
 
 type LifeLogProps = {

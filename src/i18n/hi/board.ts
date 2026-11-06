@@ -521,7 +521,7 @@ export default {
   log: {
     close: "लॉग बंद करें",
     empty: "अभी तक कोई बदलाव नहीं",
-    commanderFrom: "{{name}} का कमांडर",
+    commanderFrom: "{{name}} के कमांडर से",
     row: "{{name}} {{delta}} से {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}} के कमांडर से, कुल {{life}}",
     undoLast: "पिछला बदलाव पूर्ववत करें",
