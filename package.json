@@ -21,6 +21,7 @@
     "build:pages": "node scripts/pages-build.cjs",
     "convex:dev": "convex dev",
     "bots": "node scripts/bots.cjs",
+    "event-bots": "node scripts/event-bots.cjs",
     "preview:up": "node scripts/preview.cjs up",
     "preview:check": "node scripts/preview.cjs check",
     "prebuild:clean": "expo prebuild --clean",
