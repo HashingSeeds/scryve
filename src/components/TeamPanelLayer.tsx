@@ -44,6 +44,12 @@ export function TeamPanelLayer({
   } = useAppTheme()
   const [size, setSize] = useState({ width: 0, height: 0 })
   const rivet = compact ? 26 : 32
+  const sideways = Math.abs(rotation) === 90
+  const depth = sideways ? size.width : size.height
+  const headRun = (sideways ? size.height : size.width) / 2
+  const toward = UP[rotation]
+  // why: on a narrow head the total fills the card and meets its − and + at the seam, so the rivet moves toward the table's center, past the totals.
+  const shift = headRun < depth ? depth * 0.25 : 0
   return (
     <View
       pointerEvents="box-none"
@@ -79,7 +85,11 @@ export function TeamPanelLayer({
                 height: rivet,
                 borderRadius: rivet / 2,
                 backgroundColor: colors.background,
-                transform: [{ rotate: `${rotation}deg` }],
+                transform: [
+                  { translateX: toward.x * shift },
+                  { translateY: toward.y * shift },
+                  { rotate: `${rotation}deg` },
+                ],
               },
             ]}
           >
@@ -102,6 +112,13 @@ export function TeamPanelLayer({
       ) : null}
     </View>
   )
+}
+
+const UP: Record<LifeCardContentRotation, { x: number; y: number }> = {
+  0: { x: 0, y: -1 },
+  180: { x: 0, y: 1 },
+  90: { x: 1, y: 0 },
+  [-90]: { x: -1, y: 0 },
 }
 
 function LinkGlyph({ size, color }: { size: number; color: string }) {
