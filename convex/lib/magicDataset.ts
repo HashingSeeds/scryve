@@ -6,6 +6,14 @@ export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRule
 
 export type MagicDataset = { version: string; cards: MagicDatasetCard[] }
 
+/**
+ * why: the dataset ships in this order, so the app only checks it on load instead of sorting
+ * 30k cards on the JS thread.
+ */
+export function compareCardNames(a: { name: string }, b: { name: string }) {
+  return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+}
+
 const NON_DECK_LAYOUTS = new Set([
   "token",
   "double_faced_token",

@@ -1,6 +1,10 @@
 import { type CardNameIndex, matchKey, searchCardNames } from "./cardNameMatch"
 import { matchesColors, type ColorMatch } from "./colorMatch"
-import type { MagicDataset, MagicDatasetCard } from "../../../convex/lib/magicDataset"
+import {
+  compareCardNames,
+  type MagicDataset,
+  type MagicDatasetCard,
+} from "../../../convex/lib/magicDataset"
 
 export const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 export const NAME_MATCHES = 20
@@ -46,7 +50,10 @@ function isMagicDataset(value: unknown): value is MagicDataset {
 export function parseMagicCards(text: string): MagicCards {
   const dataset: unknown = JSON.parse(text)
   if (!isMagicDataset(dataset)) throw new Error("Magic card file is malformed")
-  const cards = dataset.cards.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+  const sorted = dataset.cards.every(
+    (card, index, all) => index === 0 || compareCardNames(all[index - 1], card) <= 0,
+  )
+  const cards = sorted ? dataset.cards : dataset.cards.sort(compareCardNames)
   return {
     cards,
     keys: cards.map((card) => matchKey(card.name)),

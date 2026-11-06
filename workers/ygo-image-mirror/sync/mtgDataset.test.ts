@@ -20,8 +20,8 @@ function fetcherFor(lines: string[]) {
 }
 
 describe("Magic dataset sync", () => {
-  it("uploads the slim deck cards gzip-encoded with the mirror token", async () => {
-    const fetcher = fetcherFor([cardLine("a"), cardLine("t", "token"), cardLine("b")])
+  it("uploads the slim deck cards sorted by name, gzip-encoded with the mirror token", async () => {
+    const fetcher = fetcherFor([cardLine("b"), cardLine("t", "token"), cardLine("a")])
 
     await expect(
       syncMagicDataset({
