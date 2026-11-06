@@ -771,6 +771,7 @@ export function CardSearch({
           style={$results}
           contentContainerStyle={[themed($search), choosingCommander ? $searchResults : undefined]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {inDeckMatches?.length ? (
             <SectionHeader

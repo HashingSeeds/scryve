@@ -391,6 +391,7 @@ export function RulesScreen({
           keyExtractor={(row) => row.key}
           renderItem={renderRow}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={themed($list)}
           ListHeaderComponent={
             home ? (

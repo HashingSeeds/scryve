@@ -353,6 +353,7 @@ function LocalDeckList({
       contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       renderItem={({ item: row }) => (
         <DeckRow deck={row} showGame={showGame} onPress={() => selectLocalDeck(row, onSelect)} />
       )}
@@ -494,6 +495,7 @@ function DeckShelf({
       contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       ListHeaderComponent={
         <View>
           {leftovers.error ? (
