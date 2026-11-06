@@ -87,6 +87,29 @@ describe("connectedHistoryEntry", () => {
 
   const connected = { publicId: "c1", eventCount: 1, finishedAt: 2, players: [] }
 
+  it("names the winning team once, as a local row does", () => {
+    const players = ["linus", "margaret", "ada", "grace"].map((id) => ({
+      playerId: id,
+      displayName: id[0].toUpperCase() + id.slice(1),
+    }))
+    const groups = [
+      ["linus", "margaret"],
+      ["ada", "grace"],
+    ]
+    expect(
+      connectedHistoryEntry({
+        ...connected,
+        players,
+        turnGroups: groups,
+        winnerPlayerIds: ["linus", "margaret"],
+      }).winnerNames,
+    ).toEqual(["Linus & Margaret"])
+    expect(
+      connectedHistoryEntry({ ...connected, players, winnerPlayerIds: ["ada"] }).winnerNames,
+    ).toEqual(["Ada"])
+    expect(connectedHistoryEntry({ ...connected, players }).winnerNames).toBeUndefined()
+  })
+
   it("falls back to ruleset when connected format is empty", () => {
     expect(connectedHistoryEntry({ ...connected, format: "", ruleset: "commander" }).format).toBe(
       "Commander",

@@ -24,6 +24,7 @@ import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
 import {
+  CUTOUT_ENDS_INSIDE_INSET,
   useCornerSlide,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
@@ -166,14 +167,17 @@ export function contentFrame(
   }
 }
 
-/** why: the life − and + ignore a side's safe area and ink about 18 dp in, so the sheet's tracker icons start there too, past a camera hole only where one sits. */
+/** why: the life − and + ignore a side's safe area and ink about 18 dp in, so the sheet's tracker icons and dice start there too, past a camera hole only where one sits: a corner hole, or the notch or Dynamic Island mid top edge. */
 function sheetSideInset(
   rotation: LifeCardContentRotation,
   insets: LifeCardContentInsets | undefined,
   edge: LifeCardEdge,
 ) {
   const cardEdge = CONTENT_EDGES[rotation][edge]
-  return insets?.cutout?.edge === cardEdge ? insets.cutout.size : SHEET_SIDE
+  if (insets?.cutout?.edge === cardEdge) return insets.cutout.size
+  return cardEdge === "top"
+    ? Math.max(SHEET_SIDE, (insets?.top ?? 0) - CUTOUT_ENDS_INSIDE_INSET)
+    : SHEET_SIDE
 }
 
 export function contentInset(

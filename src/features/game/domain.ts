@@ -57,7 +57,7 @@ import {
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
 import {
   commanderOutState,
-  lastStanding,
+  standingWinners,
   outReason,
   type OutState,
 } from "../../../convex/lib/outReason"
@@ -303,6 +303,12 @@ export function isMatchInProgress(game: LocalGame) {
   return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
 }
 
+export function leaveMatch(game: LocalGame): LocalGame {
+  if (isMatchInProgress(game)) throw new Error("A match in progress ends with End match.")
+  const { match: _match, ...board } = game
+  return board
+}
+
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")
   return withFirstChooser(
@@ -431,6 +437,7 @@ export function localOutState(game: LocalGame): OutState<PlayerId> {
         ),
       ),
     ),
+    ...(game.turnGroups ? { groups: game.turnGroups } : {}),
   }
 }
 
@@ -578,8 +585,8 @@ function countedChange(before: TableState, after: TableState, action: TableActio
   return { counterId: customCounterId(name), delta: value - (was?.value ?? 0), value }
 }
 
-export function lastPlayerStanding(game: LocalGame) {
-  return lastStanding(localOutState(game))
+export function localStandingWinners(game: LocalGame) {
+  return standingWinners(localOutState(game))
 }
 
 type CompensatableEvent = LifeChangedEvent | CommanderDamageAssignedEvent

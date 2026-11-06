@@ -10,27 +10,32 @@ export const deckRateLimiter = new RateLimiter(components.rateLimiter, {
   localGamePublish: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 20 },
   catalogRefresh: { kind: "token bucket", rate: 1, period: 5 * MINUTE, capacity: 1 },
   deckImport: { kind: "token bucket", rate: 6, period: MINUTE, capacity: 3 },
-  guestDeckImport: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 20 },
   cardLookup: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 20 },
   guestCardLookup: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 20 },
+  // why: all guests draw from this one budget, so minting device ids cannot multiply guest provider work; most guest calls make one Scryfall request, and its slowest endpoints allow ~110 a minute.
+  guestShare: { kind: "token bucket", rate: 50, period: MINUTE, capacity: 20 },
 })
 
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,128}$/
 
+async function limitGuest(ctx: ActionCtx, perDevice?: "guestCardLookup", deviceId?: string) {
+  if (perDevice && deviceId !== undefined && DEVICE_ID.test(deviceId)) {
+    const device = await deckRateLimiter.limit(ctx, perDevice, { key: `device:${deviceId}` })
+    if (!device.ok) return device
+  }
+  return await deckRateLimiter.limit(ctx, "guestShare")
+}
+
 async function limitCaller(
   ctx: ActionCtx,
-  limits: { signedIn: "deckImport" | "cardLookup"; guest: "guestDeckImport" | "guestCardLookup" },
+  limits: { signedIn: "deckImport" | "cardLookup"; perGuestDevice?: "guestCardLookup" },
   retryVerb: string,
   deviceId?: string,
 ) {
   const identity = await ctx.auth.getUserIdentity()
-  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Records the shared anonymous quota scaling limit.
-  // ponytail: guests without a device id share a provider-work budget; use edge IP limits if traffic needs fairer quotas.
   const result = identity
     ? await deckRateLimiter.limit(ctx, limits.signedIn, { key: identity.tokenIdentifier })
-    : deviceId !== undefined && DEVICE_ID.test(deviceId)
-      ? await deckRateLimiter.limit(ctx, limits.guest, { key: `device:${deviceId}` })
-      : await deckRateLimiter.limit(ctx, limits.guest)
+    : await limitGuest(ctx, limits.perGuestDevice, deviceId)
   if (!result.ok)
     throw new ConvexError({
       code: "rate_limited",
@@ -40,14 +45,14 @@ async function limitCaller(
 }
 
 export async function limitDeckImport(ctx: ActionCtx) {
-  await limitCaller(ctx, { signedIn: "deckImport", guest: "guestDeckImport" }, "importing")
+  await limitCaller(ctx, { signedIn: "deckImport" }, "importing")
 }
 
-/** why: `deviceId` is client-supplied and spoofable, so it only splits guest budgets; the provider pacers in `externalApiRateLimits` still cap the total upstream rate. */
+/** why: `deviceId` is client-supplied and spoofable, so it only splits guest budgets; `guestShare` caps all guests together. */
 export async function limitCardLookup(ctx: ActionCtx, deviceId?: string) {
   await limitCaller(
     ctx,
-    { signedIn: "cardLookup", guest: "guestCardLookup" },
+    { signedIn: "cardLookup", perGuestDevice: "guestCardLookup" },
     "searching",
     deviceId,
   )

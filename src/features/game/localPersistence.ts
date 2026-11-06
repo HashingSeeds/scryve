@@ -63,7 +63,7 @@ export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
 export const MAX_HISTORY_EVENTS = 250
 const EVENT_CHUNK_SIZE = 100
-const ACTIVE_SCHEMA_VERSION = 1
+export const ACTIVE_SCHEMA_VERSION = 1
 
 export const LOCAL_KEYS = {
   device: "count.local.device.v1",
@@ -650,6 +650,10 @@ function parseSummary(value: unknown): LocalGameSummary | null {
   const skippedBy = parseSkippedBy(value.skippedBy)
   const match = players ? parseMatch(value.match, players.length) : undefined
   const seatPassHashes = players ? parseSeatPassHashes(value.seatPassHashes, players) : undefined
+  const turnGroups =
+    players && isValidTurnGroups(value.turnGroups, new Set(players.map(({ id }) => id)))
+      ? value.turnGroups
+      : undefined
   return players
     ? {
         schemaVersion: 1,
@@ -682,6 +686,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
           ? { matchPublish: value.matchPublish }
           : {}),
         ...(seatPassHashes ? { seatPassHashes } : {}),
+        ...(turnGroups ? { turnGroups } : {}),
       }
     : null
 }
@@ -1034,6 +1039,7 @@ export class LocalGameRepository {
       ...(account && game.status === "finished" ? { publish: "pending" as const } : {}),
       ...(game.match ? { match: game.match } : {}),
       ...(game.seatPassHashes ? { seatPassHashes: game.seatPassHashes } : {}),
+      ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
       ...(account && game.status === "finished" && game.match?.result
         ? { matchPublish: "pending" as const }
         : {}),

@@ -219,34 +219,61 @@ export function useRestarting() {
   return useSyncExternalStore(subscribeRestarting, restartingSnapshot, restartingSnapshot)
 }
 
-function restartBehindCurtain(restart: () => Promise<unknown>) {
-  if (restarting) return
+function restartBehindCurtain(restart: () => Promise<unknown>): Promise<void> {
+  if (restarting) return Promise.resolve()
   setRestarting(true)
-  setTimeout(() => {
-    restart().catch(() => setRestarting(false))
-  }, RESTART_FADE_MS)
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      restart().then(
+        () => resolve(),
+        (error: unknown) => {
+          setRestarting(false)
+          reject(error)
+        },
+      )
+    }, RESTART_FADE_MS)
+  })
 }
 
 // why: expo-updates' reload screen defaults to white, which flashes between the black app and LaunchFallback.
-export function restartToUpdate() {
-  restartBehindCurtain(() =>
-    Updates.reloadAsync({
-      reloadScreenOptions: {
-        backgroundColor: "#000000",
-        image: {
-          url: Image.resolveAssetSource(LAUNCH_MARK).uri,
-          // why: the docs say pixels, but native sizes this in points (iOS) and dp (Android).
-          width: LAUNCH_MARK_SIZE,
-          height: LAUNCH_MARK_SIZE,
-        },
-        fade: knownReducedMotion() === false,
+const reloadIntoUpdate = () =>
+  Updates.reloadAsync({
+    reloadScreenOptions: {
+      backgroundColor: "#000000",
+      image: {
+        url: Image.resolveAssetSource(LAUNCH_MARK).uri,
+        // why: the docs say pixels, but native sizes this in points (iOS) and dp (Android).
+        width: LAUNCH_MARK_SIZE,
+        height: LAUNCH_MARK_SIZE,
       },
-    }),
-  )
+      fade: knownReducedMotion() === false,
+    },
+  })
+
+export function restartToUpdate() {
+  restartBehindCurtain(reloadIntoUpdate).catch(() => undefined)
+}
+
+/** why: a save from a newer update opens only once that update runs, which reloading brings on web. */
+export async function restartIntoNewestUpdate(): Promise<"none" | "failed" | "restarting"> {
+  if (Platform.OS === "web") {
+    window.location.reload()
+    return "restarting"
+  }
+  if (!Updates.isEnabled || __DEV__) return "none"
+  try {
+    const result = await Updates.checkForUpdateAsync()
+    if (!result.isAvailable) return "none"
+    await Updates.fetchUpdateAsync()
+    await restartBehindCurtain(reloadIntoUpdate)
+  } catch {
+    return "failed"
+  }
+  return "restarting"
 }
 
 function restartIntoPlayUpdate() {
-  restartBehindCurtain(completeUpdate)
+  restartBehindCurtain(completeUpdate).catch(() => undefined)
 }
 
 export function wasUpdateNoticed(updateId: string) {

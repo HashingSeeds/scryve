@@ -643,7 +643,7 @@ it("allows guest card searches and enforces the shared guest quota", async () =>
       t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
     ).resolves.toMatchObject([{ name: "Charizard", cardId: "base1-4" }])
     await t.run(async (ctx) => {
-      await deckRateLimiter.limit(ctx, "guestCardLookup", { count: 19 })
+      await deckRateLimiter.limit(ctx, "guestShare", { count: 19 })
     })
     await expect(
       t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
@@ -713,7 +713,7 @@ it("caps provider lookups per signed-in caller without touching cached cards or 
   }
 })
 
-it("gives each guest device its own lookup budget and falls back to the shared guest bucket", async () => {
+it("gives each guest device its own lookup budget inside one budget all guests share", async () => {
   // why: buckets refill once per second, so a frozen clock keeps a slow runner from refilling them.
   const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
   const t = makeConvexTest()
@@ -740,16 +740,20 @@ it("gives each guest device its own lookup budget and falls back to the shared g
     await expect(lookup("base1-3", "device_fresh0001")).resolves.toMatchObject({
       cardId: "base1-3",
     })
+    // why: base1-1 and base1-3 each spent one shared token, so 18 more empties it.
     await t.run(async (ctx) => {
-      await deckRateLimiter.limit(ctx, "guestCardLookup", { count: 19 })
+      await deckRateLimiter.limit(ctx, "guestShare", { count: 18 })
     })
-    for (const deviceId of [undefined, "bad id"])
+    for (const deviceId of [undefined, "bad id", "device_fresh0001", "device_minted01"])
       await expect(lookup("base1-4", deviceId)).rejects.toMatchObject({
         data: { code: "rate_limited" },
       })
-    await expect(lookup("base1-5", "device_fresh0001")).resolves.toMatchObject({
-      cardId: "base1-5",
-    })
+    await expect(
+      t.withIdentity({ subject: "signed-in" }).action(api.cards.byCatalogId, {
+        game: "pokemon",
+        cardId: "base1-5",
+      }),
+    ).resolves.toMatchObject({ cardId: "base1-5" })
   } finally {
     fetchSpy.mockRestore()
     nowSpy.mockRestore()
