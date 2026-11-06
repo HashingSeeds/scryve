@@ -245,6 +245,27 @@ export function restartToUpdate() {
   )
 }
 
+/**
+ * why: a save from a newer update opens only once that update runs, and it arrives over the air
+ * (or by reloading, on web), so the store page would show an app that is already current.
+ */
+export async function restartIntoNewestUpdate(): Promise<"none" | "failed" | "restarting"> {
+  if (Platform.OS === "web") {
+    window.location.reload()
+    return "restarting"
+  }
+  if (!Updates.isEnabled || __DEV__) return "none"
+  try {
+    const result = await Updates.checkForUpdateAsync()
+    if (!result.isAvailable) return "none"
+    await Updates.fetchUpdateAsync()
+  } catch {
+    return "failed"
+  }
+  restartToUpdate()
+  return "restarting"
+}
+
 function restartIntoPlayUpdate() {
   restartBehindCurtain(completeUpdate)
 }

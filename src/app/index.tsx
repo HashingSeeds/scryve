@@ -14,9 +14,10 @@ import { localGameRepository, type LocalSettings } from "@/features/game/localPe
 import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
 import { lanPlayAvailable, savedHostedGame } from "@/features/lan/lanAvailability"
 import { rulesHref } from "@/features/rules/gameRules"
-import { openStorePage, STORE_PAGE } from "@/features/updates/storeUpdate"
+import { restartIntoNewestUpdate } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
+import { NewerGameScreen } from "@/screens/NewerGameScreen"
 import { WhatYouPlayScreen } from "@/screens/WhatYouPlayScreen"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -150,35 +151,14 @@ export default function Index() {
 
   if (newerGame) {
     return (
-      <Screen
-        preset="auto"
-        safeAreaEdges={["top", "bottom"]}
-        backgroundColor={theme.colors.surface}
-        contentContainerStyle={themed($oldGame)}
-      >
-        <View style={themed($oldGameCopy)}>
-          <Text tx="play:launch.updateTitle" preset="heading" accessibilityRole="header" />
-          <Text tx="play:launch.updateMessage" />
-        </View>
-        <View style={themed($oldGameActions)}>
-          {STORE_PAGE ? (
-            <Button
-              tx={STORE_PAGE.labelTx}
-              preset="primary"
-              style={themed($primaryAction)}
-              onPress={openStorePage}
-            />
-          ) : null}
-          <Button
-            tx="play:launch.replaceWithNewGame"
-            style={themed($secondaryAction)}
-            onPress={() => {
-              localGameRepository.clearActiveGame()
-              setNewerGame(false)
-            }}
-          />
-        </View>
-      </Screen>
+      <NewerGameScreen
+        onCheckForUpdates={restartIntoNewestUpdate}
+        onSupport={() => router.push("/support")}
+        onDeleteGame={() => {
+          localGameRepository.clearActiveGame()
+          setNewerGame(false)
+        }}
+      />
     )
   }
 

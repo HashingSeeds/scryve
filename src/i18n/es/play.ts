@@ -16,12 +16,22 @@ export default {
     openPlay: "Ir a Jugar",
   },
   launch: {
-    updateTitle: "Actualizar Scryve",
+    updateTitle: "Esta partida necesita una actualización",
     updateMessage:
-      "Una versión más reciente guardó tu partida actual. Actualiza para seguir jugándola.",
+      "Una versión más reciente de Scryve guardó tu partida en curso, así que esta versión no puede abrirla. Actualiza Scryve para seguir jugando. Tu partida sigue guardada.",
+    checkForUpdates: "Buscar actualizaciones",
+    checkingForUpdates: "Buscando…",
+    noUpdate:
+      "Aún no hay ninguna actualización disponible. Inténtalo más tarde o contacta con Soporte.",
+    updateCheckFailed:
+      "No se pudo buscar actualizaciones. Revisa tu conexión e inténtalo de nuevo.",
+    contactSupport: "Contactar con Soporte",
+    deleteGame: "Eliminar partida",
+    deleteGameTitle: "¿Eliminar esta partida?",
+    deleteGameMessage: "No se podrá recuperar, ni siquiera después de actualizar.",
+    keepGame: "Conservar partida",
     openAppStore: "Abrir App Store",
     openGooglePlay: "Abrir Google Play",
-    replaceWithNewGame: "Reemplazar con una partida nueva",
     staleTitle: "¿Continuar la partida?",
     staleMessage: "Esta partida lleva esperando más de 24 horas. No se descartó nada.",
     continue: "Continuar",
