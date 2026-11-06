@@ -98,7 +98,24 @@ export function TurnChipLayer({
         onLayout={({ nativeEvent: { layout } }) => setWidth(layout.width)}
         style={[$slot, { top: EDGE_GAP + insets.top, left }, width === 0 && $measuring]}
       >
-        <TurnChip state={state} seatNumber={seatNumber} foreground={foreground} compact={compact} />
+        {state.beside ? (
+          <View pointerEvents="box-none" style={$beside}>
+            {state.beside}
+            <TurnChip
+              state={state}
+              seatNumber={seatNumber}
+              foreground={foreground}
+              compact={compact}
+            />
+          </View>
+        ) : (
+          <TurnChip
+            state={state}
+            seatNumber={seatNumber}
+            foreground={foreground}
+            compact={compact}
+          />
+        )}
       </View>
     </View>
   )
@@ -219,6 +236,7 @@ function PlayGlyph({ color }: { color: string }) {
 
 const $layer: ViewStyle = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }
 const $slot: ViewStyle = { position: "absolute" }
+const $beside: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
 const $measuring: ViewStyle = { opacity: 0 }
 const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",

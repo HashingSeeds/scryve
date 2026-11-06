@@ -1,3 +1,5 @@
+import type { ReactNode } from "react"
+
 import { translate } from "@/i18n/translate"
 
 import type { GamePlayer, PlayerId } from "./types"
@@ -59,6 +61,8 @@ export interface TurnChipState {
   onStart: () => void
   onPass: (nextPlayerId: string) => void
   onLongPress: () => void
+  /** why: a game mode's control for the active player, like the planar die, rides beside the chip on the active card. */
+  beside?: ReactNode
 }
 
 export type DiceSeatChip =

@@ -54,6 +54,7 @@ export function applyGameChanges(game: MemoryGame, changes: readonly GameChange[
     } else if (change.kind === "pair.put")
       game.pairs.set(pairKey(change), { total: change.total, updatedAt: change.updatedAt })
     else if (change.kind === "turn.set") game.turn = change.turn
+    else if (change.kind === "modes.set") game.modes = change.modes
     else game.designations = change.designations
   }
 }

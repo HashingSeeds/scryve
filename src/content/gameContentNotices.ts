@@ -12,8 +12,8 @@ const requiredNotices = (system: SystemId) =>
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
-  version: "2026-11-03",
-  effectiveDate: "November 3, 2026",
+  version: "2026-11-06",
+  effectiveDate: "November 6, 2026",
   sections: [
     {
       blocks: [
@@ -38,6 +38,10 @@ export const gameContentNotices = {
         {
           type: "paragraph",
           text: "Magic: The Gathering card data and images are provided through Scryfall. Scryve is not affiliated with Wizards of the Coast or Scryfall.",
+        },
+        {
+          type: "paragraph",
+          text: "Planechase plane and phenomenon cards and Archenemy scheme cards are shown from Wizards of the Coast's preconstructed decks, with images from Scryfall, under the Wizards of the Coast Fan Content Policy. Planechase and Archenemy are free in Scryve and are never part of a paid feature.",
         },
         {
           type: "paragraph",

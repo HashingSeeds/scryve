@@ -7,6 +7,7 @@ import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import type { FirstPlayerOffer } from "@/components/FirstPlayerTabs"
+import { PlanarDieButton } from "@/components/modes/ModeSeam"
 import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
@@ -57,6 +58,10 @@ import type {
 } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { useLocalGame } from "@/features/game/useLocalGame"
+import { usePlanarPlacement } from "@/features/modes/modeCards"
+import { ModesDialog } from "@/features/modes/ModesDialog"
+import { modeSeamFor } from "@/features/modes/modeSeamFor"
+import { useBoardModes } from "@/features/modes/useBoardModes"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -339,6 +344,16 @@ export function CurrentGameScreen({
       changeClock((current) => stepRoundTurn(current, system, -1))
     setTurnToast(undefined)
   }
+  const boardModes = useBoardModes({
+    modes: runtime.game.table?.modes,
+    turn,
+    groups: turnGroups,
+    players: runtime.game.players,
+    controls: () => true,
+    act: runtime.tableRuntime.modeAction,
+  })
+  const planarPlacement = usePlanarPlacement()
+  const dieOnChip = planarPlacement === "chip" && turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -348,8 +363,17 @@ export function CurrentGameScreen({
           onStart: () => startTurn(turn.playerId),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
+          ...(dieOnChip && boardModes.planar
+            ? { beside: <PlanarDieButton planar={boardModes.planar} testID="planar-die-chip" /> }
+            : {}),
         }
       : undefined
+  const slotOf = (playerId: string) => {
+    const index = runtime.game.players.findIndex(({ id }) => id === playerId)
+    if (index < 0) return undefined
+    const slot = runtime.game.seatOrder?.indexOf(index)
+    return slot === undefined || slot < 0 ? index : slot
+  }
   function answerHideOffer(hide: boolean) {
     if (!hideOffer) return
     if (hide) setTurnPrefs({ enabled: false })
@@ -467,6 +491,7 @@ export function CurrentGameScreen({
           turns={
             turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
           }
+          seam={modeSeamFor(boardModes, { dieOnSeam: !dieOnChip, slotOf })}
           toast={
             saved ? (
               <GameToast
@@ -556,6 +581,7 @@ export function CurrentGameScreen({
         />
       ) : null}
 
+      <ModesDialog modes={boardModes} />
       {clockOpen && clock ? (
         <RoundClockDialog
           clock={clock}

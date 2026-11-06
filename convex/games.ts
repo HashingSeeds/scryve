@@ -107,6 +107,16 @@ import {
   type TableState,
 } from "./lib/table"
 import {
+  ARCHENEMY_LIFE,
+  ARCHENEMY_MIN_SEATS,
+  isValidModeSetup,
+  modeSetupValidator,
+  PLANECHASE_CAPABILITY,
+  modeGameFields,
+  startModes,
+  systemPlaysModeSetup,
+} from "./lib/tableModes"
+import {
   dealTreacheryRoles,
   gameVariantValidator,
   isTreacheryPlayerCount,
@@ -294,11 +304,15 @@ function assertClientPlaysGame(
   const system = game.system ?? game.game
   if (
     (system === undefined || system === NO_GAME_SYSTEM || systems.includes(system)) &&
-    (game.variant === undefined || variants.includes(game.variant))
+    (game.variant === undefined || variants.includes(game.variant)) &&
+    (!usesPlanechase(game) || variants.includes(PLANECHASE_CAPABILITY))
   )
     return
   throw new ConvexError({ code: "update_required", message: "Update Scryve to join this game" })
 }
+
+const usesPlanechase = (game: Pick<Doc<"games">, "modes" | "modeSetup">) =>
+  Boolean(game.modes?.planechase ?? game.modeSetup?.planechase)
 
 function seatLabelFor(player: { seat: number }) {
   return `Player ${player.seat}`
@@ -796,6 +810,7 @@ export const createLobby = mutation({
     system: v.optional(v.string()),
     format: v.optional(v.string()),
     variant: v.optional(gameVariantValidator),
+    modeSetup: v.optional(modeSetupValidator),
     layout: v.optional(playerGridLayoutValidator),
     editsAnySeat: v.optional(v.boolean()),
     inviteToken: v.string(),
@@ -819,10 +834,21 @@ export const createLobby = mutation({
     assertPlayerCount(args.playerCount)
     if (args.variant !== undefined) {
       if (!systemDefinition(gameSystem)?.variants.includes(args.variant))
-        throw new Error("Treachery is a Magic variant")
-      if (!isTreacheryPlayerCount(args.playerCount)) throw new Error(TREACHERY_SEATS_MESSAGE)
-      if (!args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
+        throw new Error("Treachery and Archenemy are Magic variants")
+      if (args.variant === "treachery") {
+        if (!isTreacheryPlayerCount(args.playerCount)) throw new Error(TREACHERY_SEATS_MESSAGE)
+        if (!args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
+      }
     }
+    if (args.modeSetup) {
+      if (!systemPlaysModeSetup(gameSystem, args.modeSetup))
+        throw new Error("Planechase and Archenemy are for Magic")
+      if (
+        (args.modeSetup.archenemy !== undefined) !== (args.variant === "archenemy") ||
+        !isValidModeSetup(args.modeSetup, args.playerCount)
+      )
+        throw new Error("Invalid Planechase or Archenemy setup")
+    } else if (args.variant === "archenemy") throw new Error("Archenemy needs a setup")
     assertStartingLife(args.startingLife, startingValueRange(gameSystem))
     if (args.lifeStep !== undefined) {
       assertLifeDelta(args.lifeStep)
@@ -868,6 +894,7 @@ export const createLobby = mutation({
       system: gameSystem,
       ...(format ? { format } : {}),
       ...(args.variant ? { variant: args.variant } : {}),
+      ...(args.modeSetup ? { modeSetup: args.modeSetup } : {}),
       ...(args.layout ? { layout: args.layout } : {}),
       createdAt: now,
       updatedAt: now,
@@ -1034,7 +1061,7 @@ export const claimSeat = mutation({
       return null
     }
     assertClientPlaysGame(game, args)
-    if (game.variant !== undefined && !args.deviceId)
+    if (game.variant === "treachery" && !args.deviceId)
       throw new ConvexError({ code: "device_required", message: TREACHERY_DEVICE_MESSAGE })
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
@@ -1963,6 +1990,7 @@ export const lobbyProjection = query({
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
       ...(game.variant ? { variant: game.variant } : {}),
+      ...(game.modeSetup ? { modeSetup: game.modeSetup } : {}),
       ...(game.layout ? { layout: game.layout } : {}),
       ...(game.lifeEditing === "anyone" ? { lifeEditing: game.lifeEditing } : {}),
       isHost,
@@ -2016,7 +2044,8 @@ export const lobbyProjection = query({
       ...(commanderDamage ? { commanderDamage } : {}),
       ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
       ...(tableRulesApply(gameTableRules(game)) ||
-      (game.turn && (args.tableVersion ?? 1) >= TABLE_VERSION)
+      (game.turn && (args.tableVersion ?? 1) >= 3) ||
+      (game.modes && (args.tableVersion ?? 1) >= TABLE_VERSION)
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
     }
@@ -2075,6 +2104,7 @@ function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): Tab
     players: Object.fromEntries(players.map((player) => [player._id, seatTable(player)])),
     ...(game.turn ? { turn: game.turn } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+    ...(game.modes ? { modes: game.modes } : {}),
   }
 }
 
@@ -2245,6 +2275,11 @@ export const updateLobbySettings = mutation({
       }
       if (game.variant === "treachery" && !isTreacheryPlayerCount(args.playerCount))
         throw new ConvexError({ code: "invalid_player_count", message: TREACHERY_SEATS_MESSAGE })
+      if (game.variant === "archenemy" && args.playerCount < ARCHENEMY_MIN_SEATS)
+        throw new ConvexError({
+          code: "invalid_player_count",
+          message: "Archenemy needs at least 3 seats",
+        })
       const players = await playersForGame(ctx, game._id)
       if (args.playerCount < Math.max(...players.map((player) => player.seat)))
         throw new ConvexError({
@@ -2301,11 +2336,16 @@ export const startGame = mutation({
     }
     const roles = rolesFor(game, players.length)
     const now = Date.now()
+    const started = startModes(
+      game.modeSetup,
+      [...players].sort((a, b) => a.seat - b.seat).map((player) => player._id),
+    )
     await ctx.db.patch(game._id, {
       status: "active",
       startedAt: now,
       updatedAt: now,
       ...lifeEditingFor(players),
+      ...modeGameFields(started, now, `archenemy_${game.publicId}`),
     })
     for (const [index, player] of resolvePlayerAppearances(
       players.map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK })),
@@ -2330,6 +2370,9 @@ export const startGame = mutation({
             ? await pinnedDeck(ctx, player.deckVersionId)
             : {}),
         ...(deckLife === undefined ? {} : { currentLife: deckLife, startingLife: deckLife }),
+        ...(started.archenemyId === player._id
+          ? { currentLife: ARCHENEMY_LIFE, startingLife: ARCHENEMY_LIFE }
+          : {}),
         ...roles?.[index],
       })
     }
@@ -2690,6 +2733,7 @@ async function startRematch(
     ...(finished.system === undefined ? {} : { system: finished.system }),
     ...(finished.format === undefined ? {} : { format: finished.format }),
     ...(finished.variant === undefined ? {} : { variant: finished.variant }),
+    ...(finished.modeSetup === undefined ? {} : { modeSetup: finished.modeSetup }),
     ...(finished.layout === undefined ? {} : { layout: finished.layout }),
     ...lifeEditingFor(players),
     rematchOfGameId: finished._id,
@@ -2701,6 +2745,7 @@ async function startRematch(
   const game = (await ctx.db.get(gameId))!
   const roles = rolesFor(game, players.length)
   const decks = attachesDecks(gameDeckRules(game)[0])
+  const seatIds: Id<"gamePlayers">[] = []
   for (const [index, player] of players
     .sort((left, right) => left.seat - right.seat)
     .map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK }))
@@ -2713,7 +2758,7 @@ async function startRematch(
       (deckVersionId
         ? await deckStartingValue(ctx, deckVersionId, ...gameDeckRules(game))
         : undefined) ?? player.startingLife
-    await ctx.db.insert("gamePlayers", {
+    const seatId = await ctx.db.insert("gamePlayers", {
       gameId,
       seat: player.seat,
       ...(player.userId ? { userId: player.userId } : {}),
@@ -2736,6 +2781,24 @@ async function startRematch(
       joinedAt: now,
       ...(player.editsAnySeat ? { editsAnySeat: true } : {}),
       ...roles?.[index],
+    })
+    seatIds.push(seatId)
+  }
+  if (finished.modeSetup) {
+    const archenemySeat = players.find(
+      (player) => player._id === finished.modes?.archenemy?.playerId,
+    )?.seat
+    const started = startModes(
+      finished.modeSetup.archenemy && archenemySeat !== undefined
+        ? {
+            ...finished.modeSetup,
+            archenemy: { ...finished.modeSetup.archenemy, seat: archenemySeat },
+          }
+        : finished.modeSetup,
+      seatIds,
+    )
+    await ctx.db.patch(gameId, {
+      ...modeGameFields(started, now, `archenemy_${request.publicId}`),
     })
   }
   if (players.some((player) => player.userId === undefined)) {

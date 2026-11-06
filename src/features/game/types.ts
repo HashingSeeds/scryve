@@ -5,6 +5,7 @@ import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
 import type { TableState } from "../../../convex/lib/table"
+import type { ModeSetup } from "../../../convex/lib/tableModes"
 import type { Turn } from "../../../convex/lib/turns"
 
 export type CommanderSlot = typeof PARTNER_COMMANDER | undefined
@@ -129,6 +130,8 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
+  /** why: kept so a rematch deals the same modes again; the game's own modes live in `table`. */
+  modeSetup?: ModeSetup
 }
 
 export interface TurnLogEntry {

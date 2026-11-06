@@ -2,6 +2,14 @@ import { v, type GenericValidator, type Infer } from "convex/values"
 
 import type { PokemonBoardDefinition, TableDefinition } from "./systems"
 import {
+  applyModeAction,
+  isModeAction,
+  isValidModes,
+  modeActionValidators,
+  remapModes,
+  tableModesValidator,
+} from "./tableModes"
+import {
   applyTurnAction,
   isTurnAction,
   isValidTurn,
@@ -16,8 +24,8 @@ export const MAX_POKEMON_DAMAGE = 999
 export const POKEMON_HP_FACET = "hp"
 export const POISON_CHECKUP_DAMAGE = 10
 export const BURN_CHECKUP_DAMAGE = 20
-/** why: clients that send this to lobbyProjection get Pokémon conditions (2) and the turn (3); older installs get the table without them, since their strict parser drops a table with fields it does not know. */
-export const TABLE_VERSION = 3
+/** why: clients that send this to lobbyProjection get Pokémon conditions (2), the turn (3), and Planechase and Archenemy (4); older installs get the table without them, since their strict parser drops a table with fields it does not know. */
+export const TABLE_VERSION = 4
 const MAX_POKEMON_CARD_ID_LENGTH = 200
 const MAX_POKEMON_NAME_LENGTH = 100
 const POKEMON_ID = /^[A-Za-z0-9_-]{8,64}$/
@@ -67,6 +75,7 @@ export const tableStateValidator = v.object({
   players: v.record(v.string(), playerTableValidator),
   turn: v.optional(turnValidator),
   turnGroups: v.optional(turnGroupsValidator),
+  modes: v.optional(tableModesValidator),
 })
 
 export const tableActionValidator = v.union(
@@ -138,6 +147,7 @@ export const tableActionValidator = v.union(
     takerPlayerId: v.optional(v.string()),
   }),
   ...turnActionValidators,
+  ...modeActionValidators,
 )
 
 export type PokemonSlot = Infer<typeof pokemonSlotValidator>
@@ -391,6 +401,16 @@ export function applyTableAction(
     return { table: turn ? { ...rest, turn } : rest, life: [] }
   }
 
+  if (isModeAction(action)) {
+    const modes = applyModeAction(table.modes, action, {
+      turn: table.turn,
+      groups: table.turnGroups,
+      now: context.now ?? Date.now(),
+    })
+    if (modes === null) return null
+    return modes === table.modes ? unchanged : { table: { ...table, modes }, life: [] }
+  }
+
   if (action.kind === "counter.changed") {
     const counter = rules.counters.find(({ id }) => id === action.counterId)
     if (!counter || !isNonZeroStep(action.delta, counter.max)) return null
@@ -606,6 +626,7 @@ export function isValidTableSnapshot(
 ): boolean {
   return (
     (table.turn === undefined || isValidTurn(table.turn, playerIds)) &&
+    (table.modes === undefined || isValidModes(table.modes, playerIds)) &&
     Object.entries(table.designations).every(
       ([designationId, holder]) =>
         rules.designations.some(({ id }) => id === designationId) && playerIds.has(holder),
@@ -627,6 +648,7 @@ export function isValidTableSnapshot(
 export function remapTableState(table: TableState, idOf: (playerId: string) => string): TableState {
   return {
     ...(table.turn ? { turn: remapTurn(table.turn, idOf) } : {}),
+    ...(table.modes ? { modes: remapModes(table.modes, idOf) } : {}),
     designations: Object.fromEntries(
       Object.entries(table.designations).map(([designationId, holder]) => [
         designationId,
@@ -655,7 +677,9 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
 
 export function tableForVersion(table: TableState, tableVersion = 1): TableState {
   if (tableVersion >= TABLE_VERSION) return table
-  const { turn: _newer, turnGroups: _groups, ...beforeTurns } = table
+  const { modes: _modes, ...beforeModes } = table
+  if (tableVersion >= 3) return beforeModes
+  const { turn: _newer, turnGroups: _groups, ...beforeTurns } = beforeModes
   if (tableVersion >= 2) return beforeTurns
   return {
     ...beforeTurns,

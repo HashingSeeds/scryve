@@ -86,6 +86,11 @@ import type {
 } from "@/features/game/types"
 import type { LanSetup } from "@/features/lan/lanGame"
 import {
+  DEFAULT_MODE_CHOICES,
+  modeSetupOf,
+  ModeSetupFields,
+} from "@/features/modes/ModeSetupFields"
+import {
   deckChoiceId,
   localDeckChoices,
   pinDeckChoice,
@@ -117,7 +122,8 @@ import {
   startingValueRange,
   systemDefinition,
 } from "../../convex/lib/systems"
-import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
+import { ARCHENEMY_MIN_SEATS, type ModeSetup } from "../../convex/lib/tableModes"
+import { isTreacheryPlayerCount, type GameVariant } from "../../convex/lib/treachery"
 
 export type NewGameMode = "local" | "connected"
 
@@ -160,6 +166,7 @@ export interface NewGameScreenProps {
       account?: LocalGameAccountInput
       match?: { bestOf: MatchBestOf }
       clock?: RoundClockSetup
+      modeSetup?: ModeSetup
     },
   ) => void
   connected?: ConnectedHostFeed
@@ -321,6 +328,8 @@ function NewGameForm({
     seed?.startingLife ?? defaults.defaultStartingLife,
   )
   const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
+  const [archenemyChosen, setArchenemyChosen] = useState(lobby?.variant === "archenemy")
+  const [modeChoices, setModeChoices] = useState(DEFAULT_MODE_CHOICES)
   const [lifeStep, setLifeStep] = useState(
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
@@ -384,6 +393,14 @@ function NewGameForm({
   const treacheryAvailable =
     connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
+  const planechaseAvailable = systemDefinition(system)?.planechase === true
+  const archenemy =
+    Boolean(systemDefinition(system)?.variants.includes("archenemy")) && archenemyChosen
+  const variant: GameVariant | undefined = treachery
+    ? "treachery"
+    : archenemy
+      ? "archenemy"
+      : undefined
   const draft = {
     system,
     format,
@@ -439,12 +456,16 @@ function NewGameForm({
       : clockMode === "countdown"
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
-  const selectedTypeId = gameTypeId(system, format, treachery)
+  const selectedTypeId = gameTypeId(system, format, variant)
+  const modeSetup = planechaseAvailable
+    ? modeSetupOf(modeChoices, { archenemy, playerCount })
+    : undefined
   const gameSetup = {
     layout,
     lifeStep,
     ...(system && format ? { system, format } : {}),
-    ...(treachery ? { variant: "treachery" as const } : {}),
+    ...(variant ? { variant } : {}),
+    ...(modeSetup ? { modeSetup } : {}),
   }
   const gameTabs = useMemo(
     () =>
@@ -722,7 +743,11 @@ function NewGameForm({
   function chooseGameType(type: GameType) {
     const nextTreachery = type.variant === "treachery"
     const nextCount =
-      nextTreachery && !isTreacheryPlayerCount(playerCount) ? TREACHERY_MIN_SEATS : playerCount
+      nextTreachery && !isTreacheryPlayerCount(playerCount)
+        ? TREACHERY_MIN_SEATS
+        : type.variant === "archenemy" && playerCount < ARCHENEMY_MIN_SEATS
+          ? ARCHENEMY_MIN_SEATS
+          : playerCount
     if (type.system !== system) {
       setSystem(type.system)
       setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
@@ -736,6 +761,7 @@ function NewGameForm({
       setDeck(undefined)
     }
     setTreacheryChosen(nextTreachery)
+    setArchenemyChosen(type.variant === "archenemy")
     setFormatPicked(true)
     if (nextCount !== playerCount) resizeSeats(nextCount)
   }
@@ -962,7 +988,13 @@ function NewGameForm({
                 }
                 options={PLAYER_COUNTS}
                 value={playerCount}
-                isDisabled={treachery ? (count) => !isTreacheryPlayerCount(count) : undefined}
+                isDisabled={
+                  treachery
+                    ? (count) => !isTreacheryPlayerCount(count)
+                    : archenemy
+                      ? (count) => count < ARCHENEMY_MIN_SEATS
+                      : undefined
+                }
                 onSelect={(value) => {
                   choosePlayerCount(value)
                   setEdited(true)
@@ -977,6 +1009,17 @@ function NewGameForm({
                   custom={startingValueRange(system)}
                   onSelect={(value) => {
                     setStartingLife(value)
+                    setEdited(true)
+                  }}
+                />
+              ) : null}
+              {planechaseAvailable ? (
+                <ModeSetupFields
+                  choices={modeChoices}
+                  archenemy={archenemy}
+                  seatNames={seatNames}
+                  onChange={(next) => {
+                    setModeChoices(next)
                     setEdited(true)
                   }}
                 />

@@ -20,6 +20,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard"
+import { PlanarDieButton } from "@/components/modes/ModeSeam"
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -86,6 +87,10 @@ import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
+import { usePlanarPlacement } from "@/features/modes/modeCards"
+import { ModesDialog } from "@/features/modes/ModesDialog"
+import { modeSeamFor } from "@/features/modes/modeSeamFor"
+import { useBoardModes } from "@/features/modes/useBoardModes"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -493,6 +498,7 @@ export function ConnectedBoardWithRuntime({
     undoTurn,
     setBank,
     startTurn,
+    modeAction,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -515,6 +521,7 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      modeAction,
     }),
     [
       tableState,
@@ -536,6 +543,7 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      modeAction,
     ],
   )
   const latest = useRef(runtime)
@@ -1000,6 +1008,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     })
   }
   const turnsOn = tabOn && active && table !== undefined
+  const boardModes = useBoardModes({
+    modes: active ? table?.table.modes : undefined,
+    turn: table?.table.turn,
+    groups: turnGroups,
+    players: turnSeats.map(({ playerId, name }) => ({ id: playerId, name })),
+    controls: (playerId) => controlled.has(playerId),
+    act: (action) => table?.modeAction(action) ?? false,
+  })
+  const planarPlacement = usePlanarPlacement()
+  const dieOnChip = planarPlacement === "chip" && turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -1009,6 +1027,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onStart: () => actingSeat && table?.startTurn(actingSeat),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
+          ...(dieOnChip && boardModes.planar && myTurn
+            ? { beside: <PlanarDieButton planar={boardModes.planar} testID="planar-die-chip" /> }
+            : {}),
         }
       : undefined
   // why: with turns on and nobody holding the first turn, each of this device's seats carries an empty 1st that takes it.
@@ -1083,6 +1104,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf: nextPlayerId }
             : undefined
         }
+        seam={modeSeamFor(boardModes, {
+          dieOnSeam: !dieOnChip,
+          slotOf: (playerId) => {
+            const slot = players.findIndex(({ id }) => id === playerId)
+            return slot < 0 ? undefined : slot
+          },
+        })}
         toast={
           turnToast ? (
             <GameToast
@@ -1357,6 +1385,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
+      <ModesDialog modes={boardModes} />
       {roleOpen && myRole?.role && onRevealRole ? (
         <TreacheryRoleDialog
           role={myRole.role}

@@ -6,6 +6,7 @@ import { isSystemVisible } from "./systemVisibility"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf } from "../../../convex/lib/matchResults"
 import { systemDefinition } from "../../../convex/lib/systems"
+import type { ModeSetup } from "../../../convex/lib/tableModes"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
 
 export const MAX_RECENT_SETUPS = 5
@@ -19,6 +20,7 @@ export interface ConnectedSetup {
   system?: PlaySystemId
   format?: string
   variant?: GameVariant
+  modeSetup?: ModeSetup
   layout: PlayerGridLayoutVariant
   lifeStep: number
 }
