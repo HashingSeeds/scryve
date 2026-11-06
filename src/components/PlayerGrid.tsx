@@ -25,7 +25,6 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
-import { accessibleForeground } from "@/utils/colorContrast"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
@@ -572,12 +571,7 @@ export function PlayerGrid({
               }
             : undefined
         }
-        dice={
-          // why: a team panel draws one turn chip across both heads.
-          seatDice && teams
-            ? { ...seatDice, chips: seatDice.chips?.filter(({ kind }) => kind !== "turn") }
-            : seatDice
-        }
+        dice={seatDice}
         onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
         onChange={stable(`change:${player.id}`, (delta: LifeDelta) => onChange(player.id, delta))}
         style={place.style}
@@ -585,33 +579,17 @@ export function PlayerGrid({
     )
   }
 
-  function renderTeamPanel(
-    slot: number,
-    rowIndex: number,
-    columnIndex: number,
-    row: (number | null)[],
-  ) {
+  function renderTeamPanel(slot: number, rowIndex: number, columnIndex: number) {
     const team = teamIndexes[slot]
     if (!team) return null
     const rotation = rotationAt(rowIndex, columnIndex)
     const panel = panelBoxMap.get(slot)
     const lead = players[team[0]]
-    const foreground = accessibleForeground(lead.color)
-    const panelEdges = {
-      top: rowIndex === 0,
-      bottom: rowIndex === rows.length - 1,
-      left: columnIndex === 0,
-      right: columnIndex === row.length - 1,
-    }
     const panelMenu =
-      menuCornerAt(menuJunction, rowIndex, columnIndex) !== undefined
-        ? { corner: menuCornerAt(menuJunction, rowIndex, columnIndex) }
-        : fallbackMenuBoundary === null
-          ? {}
-          : (fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex) ?? {})
-    const teamChip = team
-      .flatMap((index) => dice?.chipsFor(players[index]) ?? [])
-      .flatMap((chip) => (chip.kind === "turn" ? [chip.state] : []))[0]
+      menuCornerAt(menuJunction, rowIndex, columnIndex) === undefined &&
+      fallbackMenuBoundary !== null
+        ? fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+        : undefined
     const heads = ([0, 1] as const).map((head) => {
       const index = team[head]
       const box = panel ? headBox(panel, rotation, head) : undefined
@@ -655,19 +633,10 @@ export function PlayerGrid({
         {table?.tableRules.pokemon ? null : (
           <TeamPanelLayer
             binding={teamBinding}
-            foreground={foreground}
             rotation={rotation}
             compact={compact}
             seatNumber={slot + 1}
-            turnChip={teamChip}
-            contentInsets={{
-              top: panelEdges.top ? insets.top : 0,
-              bottom: panelEdges.bottom ? insets.bottom : 0,
-              left: panelEdges.left ? insets.left : 0,
-              right: panelEdges.right ? insets.right : 0,
-            }}
-            menuCorner={panelMenu.corner}
-            menuEdgeCenter={panelMenu.edgeCenter}
+            menuAtSeam={panelMenu?.edgeCenter !== undefined}
           />
         )}
         <SeatSpotlight playerId={lead.id} />
@@ -706,7 +675,7 @@ export function PlayerGrid({
             style={[themed($row), { flex: rowFlexes[rowIndex] }]}
           >
             {row.map((slot, columnIndex) => {
-              if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex, row)
+              if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex)
               const index = seatedRows[rowIndex]?.[columnIndex]
               if (slot === null || index === null || index === undefined) {
                 return (

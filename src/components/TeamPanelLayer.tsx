@@ -3,56 +3,47 @@ import type { ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Svg, { Path } from "react-native-svg"
 
-import type { TurnChipState } from "@/features/game/dice"
 import { useAppTheme } from "@/theme/context"
 
-import type {
-  LifeCardContentInsets,
-  LifeCardContentRotation,
-  LifeCardMenuCorner,
-  LifeCardMenuEdge,
-} from "./playerCardTypes"
-import { TurnChipLayer } from "./TurnChip"
+import type { LifeCardContentRotation } from "./playerCardTypes"
 
 /** why: two treatments are on trial for showing that two touching cards are one team. `link` joins the totals with a rivet on the seam; `frame` outlines the pair as one card. */
 export type TeamBinding = "link" | "frame"
 
-/** why: a Two-Headed Giant team's two cards share one turn chip and the mark that binds them, so both draw above the pair. */
+const MENU_CLEARANCE = 48
+
+/** why: a Two-Headed Giant team's two cards touch, and this draws the mark that binds them above the pair. */
 export function TeamPanelLayer({
   binding,
-  foreground,
   rotation,
   compact,
   seatNumber,
-  turnChip,
-  contentInsets,
-  menuCorner,
-  menuEdgeCenter,
+  menuAtSeam,
 }: {
   binding: TeamBinding
-  foreground: string
   rotation: LifeCardContentRotation
   compact?: boolean
   seatNumber: number
-  turnChip?: TurnChipState
-  contentInsets?: LifeCardContentInsets
-  menuCorner?: LifeCardMenuCorner
-  menuEdgeCenter?: LifeCardMenuEdge
+  menuAtSeam: boolean
 }) {
   const {
     theme: { colors, radius },
   } = useAppTheme()
   const [size, setSize] = useState({ width: 0, height: 0 })
-  const rivet = compact ? 26 : 32
+  const rivet = compact ? 24 : 28
   const sideways = Math.abs(rotation) === 90
   const depth = sideways ? size.width : size.height
   const headRun = (sideways ? size.height : size.width) / 2
   const toward = UP[rotation]
-  // why: on a narrow head the total fills the card and meets its − and + at the seam, so the rivet moves toward the table's center, past the totals.
-  const shift = headRun < depth ? depth * 0.25 : 0
+  // why: the seam's middle sits between one head's + and the other's −, so the rivet moves toward the table's center, off their line, and further on a narrow head whose total fills the card; it stops short of the menu.
+  const wanted = depth * (headRun < depth ? 0.25 : 0.2)
+  const shift = Math.max(
+    0,
+    menuAtSeam ? Math.min(wanted, depth / 2 - MENU_CLEARANCE - rivet / 2) : wanted,
+  )
   return (
     <View
-      pointerEvents="box-none"
+      pointerEvents="none"
       style={StyleSheet.absoluteFill}
       onLayout={({ nativeEvent: { layout } }) =>
         setSize((current) =>
@@ -65,7 +56,6 @@ export function TeamPanelLayer({
       {binding === "frame" ? (
         <View
           testID={`team-frame-${seatNumber}`}
-          pointerEvents="none"
           style={[
             $frame,
             {
@@ -74,8 +64,8 @@ export function TeamPanelLayer({
             },
           ]}
         />
-      ) : (
-        <View pointerEvents="none" style={$center}>
+      ) : size.width > 0 ? (
+        <View style={$center}>
           <View
             testID={`team-link-${seatNumber}`}
             style={[
@@ -96,19 +86,6 @@ export function TeamPanelLayer({
             <LinkGlyph size={rivet * 0.6} color={colors.textDim} />
           </View>
         </View>
-      )}
-      {turnChip ? (
-        <TurnChipLayer
-          state={turnChip}
-          seatNumber={seatNumber}
-          foreground={foreground}
-          compact={compact}
-          rotation={rotation}
-          cardSize={size}
-          contentInsets={contentInsets}
-          menuCorner={menuCorner}
-          menuEdgeCenter={menuEdgeCenter}
-        />
       ) : null}
     </View>
   )
