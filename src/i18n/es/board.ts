@@ -85,6 +85,8 @@ export default {
     closeScore: "Cerrar marcador del encuentro",
     scoreTitle: "Al mejor de {{bestOf}} · Partida {{number}}",
     endHint: "Termina el encuentro tras su última partida finalizada",
+    leave: "Salir del encuentro",
+    leaveHint: "Juega este tablero como una sola partida",
     continue: "Continuar con la siguiente partida",
     gameSaved: "Partida {{number}} guardada",
     limitReached: "Un encuentro tiene como máximo diez partidas, así que este termina aquí.",

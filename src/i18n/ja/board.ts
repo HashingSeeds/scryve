@@ -84,6 +84,8 @@ export default {
     closeScore: "マッチのスコアを閉じる",
     scoreTitle: "{{bestOf}}本勝負 · ゲーム{{number}}",
     endHint: "最後に終了したゲームでマッチを終了します",
+    leave: "マッチから退出",
+    leaveHint: "このボードを1ゲームのみで進行します",
     continue: "次のゲームへ進む",
     gameSaved: "第{{number}}ゲームを保存しました",
     limitReached: "マッチは最大10ゲームまでのため、ここで終了します。",

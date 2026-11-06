@@ -74,6 +74,8 @@ const board = {
     closeScore: "Close match score",
     scoreTitle: "Best of {{bestOf}} · Game {{number}}",
     endHint: "Ends the match after its last finished game",
+    leave: "Leave match",
+    leaveHint: "Plays this board as a single game instead",
     continue: "Continue to the next game",
     gameSaved: "Game {{number}} saved",
     limitReached: "A match holds at most ten games, so this one ends here.",

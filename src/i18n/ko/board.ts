@@ -83,6 +83,8 @@ export default {
     closeScore: "매치 점수 닫기",
     scoreTitle: "{{bestOf}}판 승부 · 게임 {{number}}",
     endHint: "마지막으로 끝난 게임 이후 매치를 종료합니다",
+    leave: "매치 나가기",
+    leaveHint: "이 보드를 단일 게임으로 진행합니다",
     continue: "다음 게임으로 계속",
     gameSaved: "{{number}}게임 저장됨",
     limitReached: "매치는 최대 10게임까지 가능하므로 여기서 종료합니다.",

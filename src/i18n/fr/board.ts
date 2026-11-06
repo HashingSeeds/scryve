@@ -85,6 +85,8 @@ export default {
     closeScore: "Fermer le score du match",
     scoreTitle: "Au meilleur des {{bestOf}} · Partie {{number}}",
     endHint: "Termine le match après sa dernière partie terminée",
+    leave: "Quitter le match",
+    leaveHint: "Joue ce plateau comme une seule partie à la place",
     continue: "Passer à la partie suivante",
     gameSaved: "Partie {{number}} enregistrée",
     limitReached: "Un match compte dix parties au maximum, il se termine donc ici.",
