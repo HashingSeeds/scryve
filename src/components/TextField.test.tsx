@@ -40,8 +40,10 @@ describe("TextField", () => {
     )
 
     expect(view.getByTestId("search").props.inputAccessoryViewID).toBeUndefined()
-    expect(view.getByTestId("life").props.inputAccessoryViewID).toEqual(expect.any(String))
-    expect(view.getByTestId("notes").props.inputAccessoryViewID).toEqual(expect.any(String))
+    for (const testID of ["life", "notes"]) {
+      const nativeID = view.getByTestId(testID).props.inputAccessoryViewID
+      expect(view.UNSAFE_getByProps({ nativeID })).toBeTruthy()
+    }
   })
 
   it("clears its text from the x", () => {

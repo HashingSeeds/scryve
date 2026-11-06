@@ -96,7 +96,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   const multiline = TextInputProps.multiline ?? false
   const accessoryID = useId()
   const dismissible = needsKeyboardDismiss(TextInputProps)
-  // why: iOS reads a field's accessory only as it gains focus, and the accessory attaches after native autoFocus already fired.
+  // why: Fabric attaches an InputAccessoryView after native autoFocus, and iOS ignores an accessory set on an already focused field.
   const deferredFocus = dismissible && TextInputProps.autoFocus
   useEffect(() => {
     if (deferredFocus) input.current?.focus()
