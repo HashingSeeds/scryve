@@ -96,6 +96,39 @@ describe("life log", () => {
     ])
   })
 
+  it("reads a burst of quick taps on one seat as one change at its last tap, and drops a burst that nets to nothing", () => {
+    const duel = createLocalGame({
+      gameId: asGameId("burst"),
+      system: "mtg",
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#fff" },
+      ],
+    })
+    const [ada, grace] = duel.players.map(({ id }) => id)
+    const at = (now: number): CommandContext => ({ ...context, now: () => now })
+    const taps: [number, GameCommand][] = [
+      [0, { type: "life.change", playerId: ada, delta: -1 }],
+      [1000, { type: "life.change", playerId: ada, delta: -1 }],
+      [2000, { type: "life.change", playerId: ada, delta: -1 }],
+      [5000, { type: "life.change", playerId: ada, delta: -1 }],
+      [5500, { type: "life.change", playerId: grace, delta: 1 }],
+      [6000, { type: "life.change", playerId: grace, delta: -1 }],
+    ]
+    const game = taps.reduce(
+      (state, [now, command]) => applyGameCommand(state, command, at(now)),
+      duel,
+    )
+
+    expect(
+      gameLog(game.players, game.events).map(({ delta, life, at }) => [delta, life, at]),
+    ).toEqual([
+      [-1, 16, 5000],
+      [-3, 17, 2000],
+    ])
+  })
+
   it("adds a connected seat's unsent changes to the synced ones without counting a change twice", () => {
     const synced = (operationId: string, delta: number) => ({
       operationId,

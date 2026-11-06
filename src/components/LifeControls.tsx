@@ -17,6 +17,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated"
 
+import { LIFE_BURST_MS } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
@@ -128,7 +129,6 @@ export function totalTargetBox(
 
 const TOTAL_TARGET_PAD = 10
 const TOTAL_TARGET_MIN = 44
-const RECENT_DELTA_VISIBLE_MS = 1800
 // why: a hold opens the editor without a step, so its press-in preview leaves once the press outlasts a tap.
 const TAP_PREVIEW_MS = 150
 const BUMP_DISTANCE = 4
@@ -170,7 +170,7 @@ function createRecentDeltaStore() {
     add: (difference: number) => {
       publish(delta + difference)
       clearTimeout(timer)
-      timer = setTimeout(() => publish(0), RECENT_DELTA_VISIBLE_MS)
+      timer = setTimeout(() => publish(0), LIFE_BURST_MS)
     },
     clear: () => {
       clearTimeout(timer)

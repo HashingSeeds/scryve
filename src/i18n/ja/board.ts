@@ -499,7 +499,7 @@ export default {
   log: {
     close: "ログを閉じる",
     empty: "まだ変更はありません",
-    commanderFrom: "{{name}}の統率者",
+    commanderFrom: "{{name}}の統率者から",
     row: "{{name}} {{delta}}(ライフ{{life}})",
     commanderRow: "{{name}} {{delta}}({{from}}の統率者から、ライフ{{life}})",
     undoLast: "直前の変更を取り消す",
