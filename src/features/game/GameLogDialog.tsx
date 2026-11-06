@@ -17,12 +17,15 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { gameLog, withTurnDividers, type GameLogItem } from "./LifeLog"
+import { teamName } from "./teams"
 import type { GameEvent, GamePlayer, TurnLogEntry } from "./types"
+import type { TurnGroups } from "../../../convex/lib/turns"
 
 export function GameLogDialog({
   players,
   events,
   turns,
+  teams,
   canUndo,
   origin,
   onUndo,
@@ -31,6 +34,7 @@ export function GameLogDialog({
   players: readonly Pick<GamePlayer, "id" | "name" | "life" | "color" | "shape">[]
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
+  teams?: TurnGroups
   canUndo: boolean
   origin?: DialogOrigin
   onUndo: () => void
@@ -41,8 +45,8 @@ export function GameLogDialog({
     theme: { colors },
   } = useAppTheme()
   const rows = useMemo(
-    () => withTurnDividers(gameLog(players, events), turns ?? []),
-    [players, events, turns],
+    () => withTurnDividers(gameLog(players, events, teams), turns ?? []),
+    [players, events, turns, teams],
   )
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
@@ -56,7 +60,7 @@ export function GameLogDialog({
       const holder = seats.get(item.playerId)
       const label = translate("board:turn.divider", {
         number: item.number,
-        name: holder?.name ?? "",
+        name: teamName(players, teams, item.playerId) ?? holder?.name ?? "",
       })
       return (
         <View
@@ -86,7 +90,8 @@ export function GameLogDialog({
     }
     const seat = seats.get(item.playerId)
     const source = item.fromPlayerId ? seats.get(item.fromPlayerId) : undefined
-    const name = seat?.name ?? ""
+    const name = teamName(players, teams, item.playerId) ?? seat?.name ?? ""
+    const head = teams && !source ? seat : undefined
     const delta = signed(item.delta)
     const when = relativeTime(item.at, openedAt)
     return (
@@ -142,6 +147,13 @@ export function GameLogDialog({
                   style={[$shrink, { color: colors.textDim }]}
                 />
               </>
+            ) : head ? (
+              <Text
+                text={`${translate("board:log.by", { name: head.name })} ·`}
+                size="xxs"
+                numberOfLines={1}
+                style={[$shrink, { color: colors.textDim }]}
+              />
             ) : null}
             <Text text={when} size="xxs" numberOfLines={1} style={{ color: colors.textDim }} />
           </View>

@@ -19,6 +19,7 @@ import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import { PLAYABLE_VARIANTS } from "./playableVariants"
 import { api } from "../../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
 
@@ -92,9 +93,13 @@ function ConnectedHostQuerySource({
   const [exitError, setExitError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const ready = connectedProfile.status === "ready"
-  const activeGames = usePaginatedQuery(api.games.activeConnectedGames, ready ? {} : "skip", {
-    initialNumItems: 10,
-  })
+  const activeGames = usePaginatedQuery(
+    api.games.activeConnectedGames,
+    ready ? { variants: PLAYABLE_VARIANTS } : "skip",
+    {
+      initialNumItems: 10,
+    },
+  )
   const activeGamesState = useMemo(
     () => (ready ? remotePage(activeGames, 10) : { status: "loading" as const }),
     [ready, activeGames],

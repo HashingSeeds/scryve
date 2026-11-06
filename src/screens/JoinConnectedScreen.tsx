@@ -15,6 +15,7 @@ import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
+import { PLAYABLE_VARIANTS } from "@/features/connected/playableVariants"
 import { connectedProfileName } from "@/features/connected/useConnectedProfile"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { hasLocalGameStarted } from "@/features/game/domain"
@@ -34,7 +35,6 @@ import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
 
 // why: the server refuses games in a system this build cannot play, rather than letting it render as another one.
 const PLAYABLE_SYSTEMS = [...PLAY_SYSTEM_IDS]
-const PLAYABLE_VARIANTS = ["treachery"]
 
 const MANUAL_CODE_EXAMPLE = "ABC123"
 

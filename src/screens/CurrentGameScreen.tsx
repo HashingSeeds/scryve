@@ -8,6 +8,7 @@ import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import type { FirstPlayerOffer } from "@/components/FirstPlayerTabs"
 import { PlayerGrid } from "@/components/PlayerGrid"
+import type { TeamDesign } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
@@ -25,6 +26,7 @@ import {
   hasPlayBegun,
   incomingCommanderDamage,
   localOutState,
+  localTeams,
   matchContextLabel,
   matchScoreAfter,
 } from "@/features/game/domain"
@@ -39,6 +41,7 @@ import { localGameRepository, type LocalGameRepository } from "@/features/game/l
 import { playCommanderLethal } from "@/features/game/playSystems"
 import { stepRoundTurn } from "@/features/game/roundClock"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
+import { teamName } from "@/features/game/teams"
 import {
   HideTurnsDialog,
   reportTurnsGame,
@@ -172,22 +175,39 @@ export function CurrentGameScreen({
   const attack = useCommanderAttack(commanderPort, { seatDeck })
   const attackDispatch = attack.dispatch
   const layoutVariant = runtime.game.layout ?? "auto"
+  const teams = localTeams(runtime.game)
+  const [teamDesign, setTeamDesign] = useState(() =>
+    (repository ?? localGameRepository).teamDesign(),
+  )
   const chrome = useBoardChrome({
     gameId: runtime.game.id,
     system,
     players: runtime.game.players,
+    teamCount: teams?.length,
     layout: {
       value: layoutVariant,
       onChange: runtime.changeLayout,
-      seats: (
-        <SeatArrangement
-          players={runtime.game.players}
-          layoutVariant={layoutVariant}
-          board={boardSize}
-          seatOrder={runtime.game.seatOrder}
-          onChange={runtime.changeSeatOrder}
-        />
-      ),
+      ...(teams
+        ? {
+            teamDesign: {
+              value: teamDesign,
+              onChange: (design: TeamDesign) => {
+                ;(repository ?? localGameRepository).saveTeamDesign(design)
+                setTeamDesign(design)
+              },
+            },
+          }
+        : {
+            seats: (
+              <SeatArrangement
+                players={runtime.game.players}
+                layoutVariant={layoutVariant}
+                board={boardSize}
+                seatOrder={runtime.game.seatOrder}
+                onChange={runtime.changeSeatOrder}
+              />
+            ),
+          }),
     },
     petals: [
       {
@@ -250,7 +270,11 @@ export function CurrentGameScreen({
   const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
   const playerCount = runtime.game.players.length
   const { events } = runtime.game
-  const lifeLog = useMemo((): LifeLogSource => ({ kind: "local", events }), [events])
+  const lifeTeams = localTeams(runtime.game)
+  const lifeLog = useMemo(
+    (): LifeLogSource => ({ kind: "local", events, ...(lifeTeams ? { teams: lifeTeams } : {}) }),
+    [events, lifeTeams],
+  )
   const firstPlayer = useMemo<FirstPlayerOffer | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
     const offer = (run: () => void) => () => {
@@ -301,12 +325,13 @@ export function CurrentGameScreen({
     shape: player.shape,
   }))
   const { passTurn, setTurn, undoTurn, setBank, startTurn, changeClock } = runtime
-  const nameOf = (playerId: string) => runtime.game.players.find(({ id }) => id === playerId)?.name
+  const nameOf = (playerId: string) => teamName(runtime.game.players, teams, playerId)
   const { turnGroups } = runtime.game
   function nextOf(clockwiseSlots: number[]) {
     if (!turn) return undefined
     const { players, seatOrder } = runtime.game
     const order = clockwiseSlots.flatMap((slot) => {
+      if (teams) return teams[slot] ?? []
       const player = players[seatOrder?.[slot] ?? slot]
       return player ? [player.id] : []
     })
@@ -514,6 +539,8 @@ export function CurrentGameScreen({
               onPlayStart={markFirstPlayerUsed}
               layoutVariant={layoutVariant}
               seatOrder={runtime.game.seatOrder}
+              teams={teams}
+              teamDesign={teamDesign}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
               outState={outState}
@@ -611,6 +638,7 @@ export function CurrentGameScreen({
           players={runtime.game.players}
           events={events}
           turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
+          teams={lifeTeams}
           canUndo={runtime.canUndo}
           origin={chrome.dialogOrigin}
           onUndo={runtime.undo}

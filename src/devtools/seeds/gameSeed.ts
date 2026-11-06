@@ -29,6 +29,7 @@ import type { LocalGame } from "@/features/game/types"
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isValidTurnGroups } from "../../../convex/lib/turns"
+import { defaultTeamLife } from "../../../convex/lib/twoHeadedGiant"
 
 function integer(name: string, value: string): number {
   const parsed = Number(value)
@@ -79,21 +80,29 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   if (!layout)
     throw new SeedError(`layout for ${playerCount} players must be one of ${layouts.join(", ")}.`)
 
+  const names = list(params.names)
+  // why: teams=1+2,3+4 starts a Two-Headed Giant game with those seats as teams.
+  const teams = list(params.teams).map((entry) =>
+    entry.split("+").map((value) => integer("teams seat", value) - 1),
+  )
   let game: LocalGame
   try {
     game = createLocalGame({
       players: Array.from({ length: playerCount }, (_, index) => ({
-        name: `Player ${index + 1}`,
+        name: names[index] || `Player ${index + 1}`,
         color: PLAYER_COLORS[index],
         ...(marks[index] ? { shape: marks[index] } : {}),
       })),
       startingLife:
         params.start !== undefined
           ? integer("start", params.start)
-          : defaultStartingLife(system, format, playerCount),
+          : teams.length > 0
+            ? defaultTeamLife(format)
+            : defaultStartingLife(system, format, playerCount),
       system,
       format,
       layout,
+      ...(teams.length > 0 ? { teams } : {}),
     })
   } catch (error) {
     throw new SeedError(error instanceof Error ? error.message : String(error))

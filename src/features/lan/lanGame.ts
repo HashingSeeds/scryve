@@ -42,6 +42,11 @@ import {
   type GameVariant,
   type TreacheryRole,
 } from "../../../convex/lib/treachery"
+import {
+  isTwoHeadedGiantPlayerCount,
+  pairedTeams,
+  TWO_HEADED_GIANT,
+} from "../../../convex/lib/twoHeadedGiant"
 import { projectionOutState } from "../connected/boardView"
 import {
   CONNECTED_RECENT_OPERATION_LIMIT,
@@ -338,6 +343,10 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
       status: "active",
       system: setup.system,
       format: setup.format,
+      // why: neighboring seats form the Two-Headed Giant teams, as on Convex.
+      ...(setup.variant === TWO_HEADED_GIANT
+        ? { variant: TWO_HEADED_GIANT, turnGroups: pairedTeams(game.seats.map(({ key }) => key)) }
+        : {}),
       ...(game.seats.every((seat) => seat.editsAnySeat) ? { lifeEditing: "anyone" as const } : {}),
       designations: {},
       seats: new Map(
@@ -346,7 +355,10 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
           {
             id: seat.key,
             userId: seat.key,
-            currentLife: startingLifeFor(setup, seat.deck),
+            currentLife:
+              setup.variant === TWO_HEADED_GIANT
+                ? setup.startingLife
+                : startingLifeFor(setup, seat.deck),
             eventCount: 0,
           },
         ]),
@@ -620,7 +632,9 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     ...setup,
     system,
     format,
-    ...(variant === "treachery" && systemDefinition(system)?.variants.includes(variant)
+    ...((variant === "treachery" ||
+      (variant === TWO_HEADED_GIANT && isTwoHeadedGiantPlayerCount(setup.playerCount))) &&
+    systemDefinition(system)?.variants.includes(variant)
       ? { variant }
       : {}),
   }
@@ -705,7 +719,11 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(value.pass ? { pass: { key: value.pass.key, token: value.pass.token } } : {}),
       ...(Array.isArray(value.systems) ? { systems: value.systems.filter(isPlaySystemId) } : {}),
       ...(Array.isArray(value.variants)
-        ? { variants: value.variants.filter((variant) => variant === "treachery") }
+        ? {
+            variants: value.variants.filter(
+              (variant) => variant === "treachery" || variant === "twoHeadedGiant",
+            ),
+          }
         : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(isCount(value.tableVersion) ? { tableVersion: value.tableVersion } : {}),

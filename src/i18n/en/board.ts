@@ -93,6 +93,16 @@ const board = {
     evenGrid: "Even grid",
     table: "Table",
   },
+  teams: {
+    // Two-Headed Giant: heading in the layout dialog for how each team's shared panel is drawn.
+    panel: "Team panel",
+    // Two-Headed Giant panel design: one life total drawn across both teammates' halves.
+    merged: "One total",
+    // Two-Headed Giant panel design: each teammate keeps a full card that shows the team's total.
+    split: "Two cards",
+    // A Two-Headed Giant team, named by its two players, as in "Ada & Grace".
+    name: "{{first}} & {{second}}",
+  },
   seats: {
     title: "Swap seats",
     seat: "{{name}}'s seat",
@@ -546,6 +556,8 @@ const board = {
     empty: "No changes yet",
     // Under a commander damage row in the game log, naming whose commander dealt it, as in "From Grace's commander". Keep it short so the name fits.
     commanderFrom: "From {{name}}'s commander",
+    // Two-Headed Giant: under a team's life change in the game log, naming the teammate who made it, as in "By Ada". Keep it short.
+    by: "By {{name}}",
     // One row of the game log: a player's life change and the total it left them on, as in "Ada −3 to 17".
     row: "{{name}} {{delta}} to {{life}}",
     // A commander damage row, as in "Ada −5 from Grace's commander, to 12".

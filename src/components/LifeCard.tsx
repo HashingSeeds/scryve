@@ -160,6 +160,8 @@ export interface LifeCardProps {
   out?: LifeCardOut
   seatTable?: SeatTable
   dice?: LifeCardDice
+  /** why: one head of a Two-Headed Giant panel whose team total the panel draws, so this half is only its − or its +. */
+  teamZone?: -1 | 1
   onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -191,6 +193,7 @@ export const LifeCard = memo(function LifeCard({
   dice,
   out,
   seatTable,
+  teamZone,
   onPlayStart,
   onChange,
   style,
@@ -672,7 +675,11 @@ export const LifeCard = memo(function LifeCard({
         <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={[themed($readout), lifeFadeDuration ? slotStyle : slotAt]}
+          style={[
+            themed($readout),
+            lifeFadeDuration ? slotStyle : slotAt,
+            teamZone !== undefined && !toSlot && $hidden,
+          ]}
         >
           {out?.cause === "life" ? (
             <View style={[$outReadout, contentRotationStyle]}>
@@ -767,7 +774,8 @@ export const LifeCard = memo(function LifeCard({
                   ? { edge: CONTENT_LEFT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
-              totalInk={readoutInk}
+              totalInk={teamZone === undefined ? readoutInk : undefined}
+              zone={teamZone}
               onChange={onChange}
               onPreview={showPreview}
               onOpenEditor={() => setEditorOpen(true)}
@@ -1053,6 +1061,8 @@ export const LifeCard = memo(function LifeCard({
 }, structurallyEqual)
 
 const KNOCKBACK = 12
+
+const $hidden: ViewStyle = { opacity: 0 }
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flex: 1,

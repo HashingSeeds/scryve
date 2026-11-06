@@ -5,7 +5,13 @@ import type {
   ConnectedPlayerProjection,
   ConnectedProjection,
 } from "./model"
-import { commanderOutState, lastStanding, type OutState } from "../../../convex/lib/outReason"
+import {
+  commanderOutState,
+  lastStanding,
+  standingWinners,
+  type OutState,
+} from "../../../convex/lib/outReason"
+import { teamTableRules, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
 
@@ -43,12 +49,15 @@ export function connectedLives(
 }
 
 export function connectedOutState(
-  { system, format, table, commanderDamage }: ConnectedOutGame,
+  { system, format, table, commanderDamage, variant }: ConnectedOutGame,
   lives: OutState["lives"],
 ): OutState {
+  const teams = connectedTeams({ variant, table })
+  const rules = playTableRules(system, format)
   return {
+    ...(teams ? { teams } : {}),
     counter: playSystemRules(system).counter,
-    tableRules: playTableRules(system, format),
+    tableRules: teams ? teamTableRules(rules) : rules,
     table,
     lives,
     commanderDamage: commanderOutState(
@@ -60,8 +69,14 @@ export function connectedOutState(
 
 export type ConnectedOutGame = Pick<
   ConnectedProjection,
-  "system" | "format" | "table" | "commanderDamage"
+  "system" | "format" | "table" | "commanderDamage" | "variant"
 >
+
+export const connectedTeams = ({
+  variant,
+  table,
+}: Pick<ConnectedProjection, "variant" | "table">) =>
+  variant === TWO_HEADED_GIANT ? table?.turnGroups : undefined
 
 export function projectionOutState(projection: ConnectedProjection) {
   return connectedOutState(
@@ -72,4 +87,8 @@ export function projectionOutState(projection: ConnectedProjection) {
 
 export function connectedLastStanding(projection: ConnectedDisplayProjection): string | undefined {
   return lastStanding(projectionOutState(projection))
+}
+
+export function connectedStandingWinners(projection: ConnectedDisplayProjection) {
+  return standingWinners(projectionOutState(projection))
 }

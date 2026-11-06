@@ -13,8 +13,10 @@ import type {
   GameMenuStatusLine,
   RadialMenuAction,
 } from "@/components/GameRadialMenu"
+import type { TeamDesign } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
+import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
@@ -45,7 +47,10 @@ export interface BoardChromeOptions {
     value: PlayerGridLayoutVariant
     onChange: (layout: PlayerGridLayoutVariant) => void
     seats?: ReactNode
+    teamDesign?: { value: TeamDesign; onChange: (design: TeamDesign) => void }
   }
+  /** why: a Two-Headed Giant board seats team panels, so the menu and tabs sit by the teams. */
+  teamCount?: number
   petals: readonly [BoardPetal, BoardPetal]
   attack: Pick<CommanderAttack, "dispatch">
   onDiceTool?: () => void
@@ -69,6 +74,7 @@ export function useBoardChrome({
   players,
   layout,
   petals: [third, end],
+  teamCount,
   attack: { dispatch },
   onDiceTool,
   onLog,
@@ -102,7 +108,7 @@ export function useBoardChrome({
     if (rules?.kind === "text") prefetchRules(rules)
   }, [rules])
   const hasRules = Boolean(rules && (rules.kind === "link" || onRules))
-  const playerCount = players.length
+  const playerCount = teamCount ?? players.length
   const canPickLayout = getPlayerGridLayoutOptions(playerCount).length > 1 || Boolean(layout.seats)
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
@@ -201,6 +207,7 @@ export function useBoardChrome({
     dialogOrigin,
     dice,
     playerCount,
+    teamBoard: teamCount !== undefined,
     layout,
     closeLayout,
     menu: {
@@ -233,7 +240,7 @@ function petal({ onPress: _onPress, ...shown }: BoardPetal) {
 
 export type GameBoardProps = Omit<
   GameBoardStageProps,
-  "playerCount" | "layoutVariant" | "menu" | "windowOverlay"
+  "playerCount" | "teamBoard" | "layoutVariant" | "menu" | "windowOverlay"
 > & { chrome: BoardChrome }
 
 export function GameBoard({ chrome, ...stage }: GameBoardProps) {
@@ -243,6 +250,7 @@ export function GameBoard({ chrome, ...stage }: GameBoardProps) {
       <GameBoardStage
         {...stage}
         playerCount={chrome.playerCount}
+        teamBoard={chrome.teamBoard}
         layoutVariant={layout.value}
         menu={chrome.menu}
         windowOverlay={navigation ? <FloatingAppNavigation {...navigation} /> : null}
@@ -262,7 +270,7 @@ export function GameBoard({ chrome, ...stage }: GameBoardProps) {
 
 function LayoutDialog({
   playerCount,
-  layout: { value, onChange, seats },
+  layout: { value, onChange, seats, teamDesign },
   origin,
   onClose,
 }: {
@@ -300,6 +308,21 @@ function LayoutDialog({
               onClose()
             }}
           />
+        ) : null}
+        {teamDesign ? (
+          <>
+            <Text tx="board:teams.panel" preset="subheading" style={themed($dialogText)} />
+            <SegmentedControl
+              testID="team-design"
+              accessibilityLabel={translate("board:teams.panel")}
+              segments={[
+                { id: "merged", label: translate("board:teams.merged") },
+                { id: "split", label: translate("board:teams.split") },
+              ]}
+              selectedId={teamDesign.value}
+              onSelect={(id) => teamDesign.onChange(id === "split" ? "split" : "merged")}
+            />
+          </>
         ) : null}
         {seats ? (
           <>

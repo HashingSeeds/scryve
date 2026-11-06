@@ -5,6 +5,7 @@ import type { Service } from "react-native-zeroconf"
 
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
+import { PLAYABLE_VARIANTS } from "@/features/connected/playableVariants"
 import {
   SyncLatency,
   type PeerLatency,
@@ -583,7 +584,7 @@ export class LanSession {
       protocol: LAN_PROTOCOL,
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
-      variants: ["treachery"],
+      variants: PLAYABLE_VARIANTS,
       editsAnySeat: true,
       tableVersion: TABLE_VERSION,
       ...(this.pass ? { pass: this.pass } : {}),

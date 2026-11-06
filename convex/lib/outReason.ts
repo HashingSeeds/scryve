@@ -1,5 +1,6 @@
 import { isCounterOut, type CounterDefinition, type TableDefinition } from "./systems"
 import { counterValue, type TableState } from "./table"
+import { turnGroupOf, type TurnGroups } from "./turns"
 
 export type OutReason<Id extends string = string> =
   | { readonly cause: "commanderDamage"; readonly fromPlayerId: Id; readonly total: number }
@@ -9,6 +10,7 @@ export type OutReason<Id extends string = string> =
 export interface CommanderTotal<Id extends string = string> {
   readonly fromPlayerId: Id
   readonly toPlayerId: Id
+  readonly commander?: number
   readonly total: number
 }
 
@@ -21,6 +23,8 @@ export interface OutState<Id extends string = string> {
     readonly lethal: number
     readonly totals: readonly CommanderTotal<Id>[]
   }
+  /** why: Two-Headed Giant teams win and lose together (CR 810.8a), so one teammate out puts out the team. */
+  readonly teams?: TurnGroups
 }
 
 export function commanderOutState<Id extends string>(
@@ -31,6 +35,39 @@ export function commanderOutState<Id extends string>(
 }
 
 export function outReason<Id extends string>(
+  state: OutState<Id>,
+  playerId: Id,
+): OutReason<Id> | undefined {
+  if (!state.teams) return seatOutReason(state, playerId)
+  const team = turnGroupOf(state.teams, playerId) as readonly Id[]
+  const lethal = teamCommanderLethal(state, team)
+  if (lethal) return lethal
+  const seats = { ...state, commanderDamage: undefined }
+  for (const seat of team) {
+    const reason = seatOutReason(seats, seat)
+    if (reason) return reason
+  }
+  return undefined
+}
+
+/** why: Wizards' 2HG Commander counts 21 from one commander across both teammates. */
+function teamCommanderLethal<Id extends string>(
+  { commanderDamage }: OutState<Id>,
+  team: readonly Id[],
+): OutReason<Id> | undefined {
+  if (!commanderDamage) return undefined
+  const sums = new Map<string, { fromPlayerId: Id; total: number }>()
+  for (const { fromPlayerId, toPlayerId, commander, total } of commanderDamage.totals) {
+    if (!team.includes(toPlayerId) || team.includes(fromPlayerId)) continue
+    const key = `${fromPlayerId}#${commander ?? 0}`
+    sums.set(key, { fromPlayerId, total: (sums.get(key)?.total ?? 0) + total })
+  }
+  for (const { fromPlayerId, total } of sums.values())
+    if (total >= commanderDamage.lethal) return { cause: "commanderDamage", fromPlayerId, total }
+  return undefined
+}
+
+function seatOutReason<Id extends string>(
   state: OutState<Id>,
   playerId: Id,
 ): OutReason<Id> | undefined {
@@ -60,4 +97,17 @@ export function outReason<Id extends string>(
 export function lastStanding<Id extends string>(state: OutState<Id>): Id | undefined {
   const standing = state.lives.filter(({ playerId }) => !outReason(state, playerId))
   return standing.length === 1 ? standing[0].playerId : undefined
+}
+
+/** why: the seats left once every other seat is out: one player, or one whole team. */
+export function standingWinners<Id extends string>(state: OutState<Id>): Id[] | undefined {
+  const standing = state.lives
+    .filter(({ playerId }) => !outReason(state, playerId))
+    .map(({ playerId }) => playerId)
+  if (standing.length === 0) return undefined
+  const team = turnGroupOf(state.teams, standing[0])
+  return standing.every((playerId) => team.includes(playerId)) &&
+    standing.length < state.lives.length
+    ? standing
+    : undefined
 }

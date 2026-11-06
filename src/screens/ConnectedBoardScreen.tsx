@@ -20,6 +20,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard"
+import type { TeamDesign } from "@/components/PlayerGrid"
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -37,7 +38,8 @@ import {
 } from "@/features/connected/boardSyncSignal"
 import {
   connectedBoardView,
-  connectedLastStanding,
+  connectedStandingWinners,
+  connectedTeams,
   connectedLives,
   connectedOutState,
   projectionOutState,
@@ -76,6 +78,7 @@ import {
   playCommanderLethal,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
+import { teamName } from "@/features/game/teams"
 import {
   HideTurnsDialog,
   reportTurnsGame,
@@ -469,9 +472,15 @@ export function ConnectedBoardWithRuntime({
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
   )
   const { pending } = runtime
+  const lifeTeams = useStructurallyStable(
+    runtime.status === "ready" ? connectedTeams(runtime.projection) : undefined,
+  )
   const lifeLog = useMemo(
-    (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
-    [cloud, publicId, pending],
+    (): LifeLogSource | undefined =>
+      cloud
+        ? { kind: "connected", publicId, pending, ...(lifeTeams ? { teams: lifeTeams } : {}) }
+        : undefined,
+    [cloud, publicId, pending, lifeTeams],
   )
   const tableState = useStructurallyStable(runtime.table)
   const {
@@ -728,8 +737,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }
   function toggleWinner(playerId: string) {
     setDrawSelected(false)
+    // why: a Two-Headed Giant team wins together, so choosing a head chooses the team.
+    const team = turnGroupOf(teams, playerId)
     setWinnerPlayerIds((current) =>
-      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
+      current.includes(playerId)
+        ? current.filter((id) => !team.includes(id))
+        : teams
+          ? [...team]
+          : [...current, playerId],
     )
   }
 
@@ -757,13 +772,29 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     ],
     [controlled, game.players],
   )
+  const teams = useMemo(() => {
+    const groups = connectedTeams({ variant: game.variant, table: table?.table })
+    // why: this device's team sits last, where its own seat would.
+    return (
+      groups &&
+      [...groups].sort(
+        (a, b) =>
+          Number(a.some((id) => controlled.has(id))) - Number(b.some((id) => controlled.has(id))),
+      )
+    )
+  }, [controlled, game.variant, table?.table])
+  const cellCount = teams?.length ?? players.length
+  const [teamDesign, setTeamDesign] = useState(() => localGameRepository.teamDesign())
+  /** why: a head's device changes its team's life from either half, writing as the head it holds, so the log knows who did it. */
+  const actingHead = (playerId: string) =>
+    turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
   const layoutVariant =
-    layoutChoice?.playerCount === players.length
+    layoutChoice?.playerCount === cellCount
       ? layoutChoice.layout
       : playerGridLayoutForCount(
-          players.length,
+          cellCount,
           game.layout,
-          defaultConnectedLayout(players.length),
+          teams ? "auto" : defaultConnectedLayout(players.length),
         )
   const commanderLethal = playCommanderLethal(system, game.format || game.ruleset)
   const commanderDamageEnabled = commanderLethal !== undefined && game.commanderDamage !== undefined
@@ -897,13 +928,25 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     gameId: publicId,
     system,
     players,
+    teamCount: teams?.length,
     layout: {
       value: layoutVariant,
       onChange: (layout) => {
-        const choice = { playerCount: players.length, layout }
+        const choice = { playerCount: cellCount, layout }
         setLayoutChoice(choice)
         saveLayoutChoice(publicId, choice)
       },
+      ...(teams
+        ? {
+            teamDesign: {
+              value: teamDesign,
+              onChange: (design: TeamDesign) => {
+                localGameRepository.saveTeamDesign(design)
+                setTeamDesign(design)
+              },
+            },
+          }
+        : {}),
     },
     petals: [
       {
@@ -935,10 +978,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               const projection = runtime.status === "ready" ? runtime.projection : undefined
               const outcome = projection?.treacheryOutcome
               const standing =
-                projection && !outcome ? connectedLastStanding(projection) : undefined
+                projection && !outcome ? connectedStandingWinners(projection) : undefined
               setDrawSelected(outcome?.kind === "draw")
               setWinnerPlayerIds(
-                outcome?.kind === "win" ? outcome.winnerPlayerIds : standing ? [standing] : [],
+                outcome?.kind === "win" ? outcome.winnerPlayerIds : (standing ?? []),
               )
               setConfirmingFinish(true)
             },
@@ -968,6 +1011,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       color: player.color,
       shape: shownMarkShape(player),
     }))
+  const seatName = (playerId: string) =>
+    teamName(
+      turnSeats.map(({ playerId: id, name }) => ({ id, name })),
+      teams,
+      playerId,
+    )
   // why: any device holding a seat in the active group may act for it, and the engine checks the acting seat shares the turn.
   const actingSeat = turn && turnGroupOf(turnGroups, turn.playerId).find((id) => controlled.has(id))
   const myTurn = actingSeat !== undefined
@@ -995,7 +1044,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       passerId: actingSeat,
       message: translate("board:turn.passed", {
         number: turn.number + 1,
-        name: turnSeats.find(({ playerId }) => playerId === next)?.name ?? "",
+        name: seatName(next) ?? "",
       }),
     })
   }
@@ -1005,7 +1054,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       ? {
           turn,
           canPress: myTurn,
-          nameOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId)?.name,
+          nameOf: seatName,
           onStart: () => actingSeat && table?.startTurn(actingSeat),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
@@ -1113,8 +1162,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             {...(anySeat
               ? {}
               : {
-                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(player.id),
-                  isPlayerOwned: (player: GamePlayer) => controlled.has(player.id),
+                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(actingHead(player.id)),
+                  isPlayerOwned: (player: GamePlayer) => controlled.has(actingHead(player.id)),
                 })}
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
@@ -1145,7 +1194,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 : undefined
             }
             dice={seatGrid}
-            onChange={controls.changeLife}
+            teams={teams}
+            teamDesign={teamDesign}
+            onChange={(playerId, delta) =>
+              controls.changeLife(asPlayerId(actingHead(playerId)), delta)
+            }
           />
         )}
       />
@@ -1408,15 +1461,32 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             <Text size="xs" tx="connected:board.finish.subtitle" tone="dim" />
           </View>
           <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
-            {game.players.map((player) => (
-              <WinnerChoice
-                key={player.playerId}
-                player={player}
-                system={system}
-                selected={winnerPlayerIds.includes(player.playerId)}
-                onPress={() => toggleWinner(player.playerId)}
-              />
-            ))}
+            {game.players
+              .filter(({ playerId }) => !teams || teams.some(([lead]) => lead === playerId))
+              .map((player) => (
+                <WinnerChoice
+                  key={player.playerId}
+                  player={
+                    teams
+                      ? {
+                          ...player,
+                          displayName:
+                            teamName(
+                              game.players.map(({ playerId: id, displayName: name }) => ({
+                                id,
+                                name,
+                              })),
+                              teams,
+                              player.playerId,
+                            ) ?? player.displayName,
+                        }
+                      : player
+                  }
+                  system={system}
+                  selected={winnerPlayerIds.includes(player.playerId)}
+                  onPress={() => toggleWinner(player.playerId)}
+                />
+              ))}
             <ChoiceButton
               tx="connected:board.finish.draw"
               accentColor={colors.palette.neutral400}
