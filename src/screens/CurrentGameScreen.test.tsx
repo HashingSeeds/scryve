@@ -763,6 +763,7 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("end-game-button"))
     expect(view.queryByTestId("end-game-winner-1")).toBeNull()
     expect(view.queryByTestId("end-game-winner-3")).toBeNull()
+    expect(view.getAllByTestId("team-marks")).toHaveLength(2)
     fireEvent.press(view.getByTestId("end-game-winner-2"))
     expect(view.getByLabelText("Katherine & Dorothy, 2 life, winner")).toBeTruthy()
     fireEvent.press(view.getByTestId("confirm-end-game-button"))

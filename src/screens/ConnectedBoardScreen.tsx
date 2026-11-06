@@ -21,9 +21,10 @@ import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard"
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
-import { DrawMark, PlayerMark } from "@/components/PlayerMark"
+import { DrawMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Sheet } from "@/components/Sheet"
+import { TeamMarks } from "@/components/TeamMarks"
 import { Text, type TextProps } from "@/components/Text"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -1430,7 +1431,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                   key={id}
                   player={player}
                   name={teamName(named, turnGroups, id) ?? player.displayName}
-                  members={teamMembers(named, turnGroups, id).map((member) => member.id)}
+                  team={teamMembers(named, turnGroups, id).flatMap(
+                    (member) => game.players.find(({ playerId }) => playerId === member.id) ?? [],
+                  )}
                   system={system}
                   selected={winnerPlayerIds.includes(id)}
                   onPress={() => toggleWinner(id)}
@@ -1634,19 +1637,20 @@ function ConnectedLifeGrid({
 function WinnerChoice({
   player,
   name,
-  members,
+  team,
   system,
   selected,
   onPress,
 }: {
   player: ConnectedBoardSeat
   name: string
-  members: readonly string[]
+  team: readonly ConnectedBoardSeat[]
   system: ConnectedBoardView["system"]
   selected: boolean
   onPress: () => void
 }) {
   const lives = useContext(ConnectedLivesContext)
+  const members = team.map(({ playerId }) => playerId)
   const life = teamValueLabel(
     members.map((id) => ({ id, life: lives[id] ?? 0 })),
     [members],
@@ -1660,12 +1664,15 @@ function WinnerChoice({
       detail={life.shown}
       accentColor={player.color}
       Leading={({ color }) => (
-        <PlayerMark
-          seatNumber={player.seat}
-          shape={shownMarkShape(player)}
-          foil={player.foil}
+        <TeamMarks
+          marks={team.map((member) => ({
+            seatNumber: member.seat,
+            shape: shownMarkShape(member),
+            foil: member.foil,
+            color: member.color,
+          }))}
           color={color}
-          size={28}
+          selected={selected}
         />
       )}
       accessibilityLabel={translate(
