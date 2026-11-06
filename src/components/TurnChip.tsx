@@ -121,7 +121,7 @@ export function TurnChip({
     theme: { colors },
   } = useAppTheme()
   const { turn, canPress } = state
-  const next = useTurnSpotlight()?.next
+  const next = useTurnSpotlight()?.passTo
   const now = useNow(!turn.waiting)
   const bank = bankLeft(turn, turn.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0

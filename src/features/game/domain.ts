@@ -72,6 +72,7 @@ import {
   applyTurnAction,
   isTurnAction,
   startedByChange,
+  turnLead,
   type Turn,
 } from "../../../convex/lib/turns"
 
@@ -477,12 +478,13 @@ export function withFirstTurn(
   const turn = game.turn
   if (turn && (turn.number > 1 || turn.previous)) return game
   if (!playerId) return withTurn(game, undefined, context.now)
-  if (turn?.playerId === playerId) return game
+  const lead = turnLead(game.turnGroups, playerId)
+  if (turn?.playerId === lead) return game
   const { turnLog: _log, turn: _turn, ...board } = game
   return withTurn(
     board,
     {
-      playerId,
+      playerId: lead,
       number: 1,
       startedAt: context.now,
       operationId: context.operationId,
@@ -502,15 +504,16 @@ export function applyLocalTableAction(
     const turn = applyTurnAction(game.turn, action, {
       ...context,
       isSeat: (playerId) => game.players.some(({ id }) => id === playerId),
+      groups: game.turnGroups,
     })
     return turn === null ? game : withTurn(game, turn, context.now)
   }
   const applied = applyBoardTableAction(game, action, context)
-  return applied === game ? game : startTurnBy(applied, action.playerId, context.now)
+  return applied === game ? game : startTurnOnChange(applied, context.now)
 }
 
-export function startTurnBy(game: LocalGame, playerId: string, now: number): LocalGame {
-  const turn = startedByChange(game.turn, playerId, now)
+export function startTurnOnChange(game: LocalGame, now: number): LocalGame {
+  const turn = startedByChange(game.turn, now)
   return turn ? withTurn(game, turn, now) : game
 }
 

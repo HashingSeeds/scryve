@@ -1,11 +1,13 @@
 import {
   applyTurnAction,
   bankLeft,
+  isValidTurnGroups,
   startedByChange,
   nextTurnSeat,
   turnTimeSpent,
   type Turn,
   type TurnAction,
+  type TurnGroups,
 } from "./turns"
 
 const seats = new Set(["ada", "bo", "cy"])
@@ -91,14 +93,14 @@ describe("waiting first turn", () => {
     at(0),
   )!
 
-  it("starts on its player's first change and on nobody else's", () => {
+  it("starts on the table's first change, and later changes leave it running", () => {
     expect(turnTimeSpent(first, "ada", 60_000)).toBe(0)
-    expect(startedByChange(first, "bo", 5_000)).toBeUndefined()
-    const started = startedByChange(first, "ada", 5_000)!
+    const started = startedByChange(first, 5_000)!
     expect(started).toMatchObject({ playerId: "ada", number: 1, startedAt: 5_000 })
     expect(started.waiting).toBeUndefined()
     expect(turnTimeSpent(started, "ada", 65_000)).toBe(60_000)
-    expect(startedByChange(started, "ada", 9_000)).toBeUndefined()
+    expect(startedByChange(started, 9_000)).toBeUndefined()
+    expect(startedByChange(undefined, 9_000)).toBeUndefined()
   })
 
   it("starts on a tap, and a later tap changes nothing", () => {
@@ -106,7 +108,7 @@ describe("waiting first turn", () => {
     const started = applyTurnAction(first, start, at(7_000))!
     expect(started).toMatchObject({ startedAt: 7_000 })
     expect(applyTurnAction(started, start, at(9_000))).toBe(started)
-    expect(applyTurnAction(first, { ...start, playerId: "bo" }, at(7_000))).toBeNull()
+    expect(applyTurnAction(undefined, start, at(7_000))).toBeNull()
   })
 })
 
@@ -146,5 +148,98 @@ describe("nextTurnSeat", () => {
     expect(nextTurnSeat(["ada", "bo", "cy"], "cy")).toBe("ada")
     expect(nextTurnSeat(["ada", "bo", "cy"], "ada", (id) => id === "bo")).toBe("cy")
     expect(nextTurnSeat(["ada", "bo"], "ada", (id) => id === "bo")).toBeUndefined()
+  })
+})
+
+describe("turn groups", () => {
+  const teams: TurnGroups = [
+    ["ada", "bo"],
+    ["cy", "dee"],
+  ]
+  const table = new Set(["ada", "bo", "cy", "dee"])
+  const grouped = (now: number, operationId = `op-${now}`) => ({
+    operationId,
+    now,
+    isSeat: (id: string) => table.has(id),
+    groups: teams,
+  })
+  const first = applyTurnAction(
+    undefined,
+    { kind: "turn.set", playerId: "bo", toPlayerId: "bo" },
+    grouped(0),
+  )!
+
+  it("gives the turn to the group's first seat, and any seat in the group may pass it", () => {
+    expect(first).toMatchObject({ playerId: "ada", number: 1 })
+    const passed = applyTurnAction(
+      { ...first, waiting: undefined },
+      { kind: "turn.passed", playerId: "bo", toPlayerId: "dee" },
+      grouped(60_000),
+    )!
+    expect(passed).toMatchObject({ playerId: "cy", number: 2, startedAt: 60_000 })
+    expect(turnTimeSpent(passed, "ada", 60_000)).toBe(60_000)
+    expect(
+      applyTurnAction(
+        passed,
+        { kind: "turn.passed", playerId: "ada", toPlayerId: "bo" },
+        grouped(1),
+      ),
+    ).toBeNull()
+  })
+
+  it("lets any seat of the group that passed take it back, and no one else", () => {
+    const passed = applyTurnAction(
+      first,
+      { kind: "turn.passed", playerId: "ada", toPlayerId: "cy" },
+      grouped(5_000, "pass-1"),
+    )!
+    const undo = { kind: "turn.undone", turnOperationId: "pass-1" } as const
+    expect(applyTurnAction(passed, { ...undo, playerId: "dee" }, grouped(6_000))).toBeNull()
+    expect(applyTurnAction(passed, { ...undo, playerId: "bo" }, grouped(6_000))).toEqual(first)
+  })
+
+  it("ignores a hand-off inside the group and refuses a claim for another group", () => {
+    expect(
+      applyTurnAction(
+        first,
+        { kind: "turn.passed", playerId: "ada", toPlayerId: "bo" },
+        grouped(1),
+      ),
+    ).toBeNull()
+    expect(
+      applyTurnAction(first, { kind: "turn.set", playerId: "bo", toPlayerId: "ada" }, grouped(1)),
+    ).toBe(first)
+    expect(
+      applyTurnAction(
+        undefined,
+        { kind: "turn.set", playerId: "ada", toPlayerId: "cy" },
+        grouped(1),
+      ),
+    ).toBeNull()
+  })
+
+  it("orders groups by their first seat clockwise, and skips a group only when all of it is out", () => {
+    const order = ["ada", "cy", "bo", "dee"]
+    expect(nextTurnSeat(order, "bo", undefined, teams)).toBe("cy")
+    expect(nextTurnSeat(order, "dee", undefined, teams)).toBe("ada")
+    expect(nextTurnSeat(order, "ada", (id) => id === "cy", teams)).toBe("cy")
+    expect(nextTurnSeat(order, "ada", (id) => id === "cy" || id === "dee", teams)).toBeUndefined()
+    const archenemy: TurnGroups = [["boss"], ["ada", "bo", "cy"]]
+    expect(nextTurnSeat(["boss", "ada", "bo", "cy"], "boss", undefined, archenemy)).toBe("ada")
+    expect(nextTurnSeat(["boss", "ada", "bo", "cy"], "bo", undefined, archenemy)).toBe("boss")
+  })
+
+  it("treats a seat in no group as its own group", () => {
+    const pair: TurnGroups = [["ada", "bo"]]
+    expect(nextTurnSeat(["ada", "bo", "cy"], "bo", undefined, pair)).toBe("cy")
+    expect(nextTurnSeat(["ada", "bo", "cy"], "cy", undefined, pair)).toBe("ada")
+  })
+
+  it("accepts only groups of known seats, each seat in one group", () => {
+    expect(isValidTurnGroups(teams, table)).toBe(true)
+    expect(isValidTurnGroups([["ada"], ["ada", "bo"]], table)).toBe(false)
+    expect(isValidTurnGroups([["zed"]], table)).toBe(false)
+    expect(isValidTurnGroups([[]], table)).toBe(false)
+    expect(isValidTurnGroups("ada", table)).toBe(false)
   })
 })

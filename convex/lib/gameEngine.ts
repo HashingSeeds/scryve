@@ -63,7 +63,15 @@ const MISMATCH = writeError(
 export const engineGameOf = (
   game: Pick<
     Doc<"games">,
-    "status" | "system" | "game" | "format" | "ruleset" | "designations" | "lifeEditing" | "turn"
+    | "status"
+    | "system"
+    | "game"
+    | "format"
+    | "ruleset"
+    | "designations"
+    | "lifeEditing"
+    | "turn"
+    | "turnGroups"
   >,
 ): EngineGame => ({
   status: game.status,
@@ -72,6 +80,7 @@ export const engineGameOf = (
   designations: game.designations ?? {},
   ...(game.lifeEditing ? { lifeEditing: game.lifeEditing } : {}),
   ...(game.turn ? { turn: game.turn } : {}),
+  ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
 })
 
 export interface EngineGame {
@@ -81,6 +90,7 @@ export interface EngineGame {
   designations: TableState["designations"]
   lifeEditing?: LifeEditing
   turn?: Turn
+  turnGroups?: TableState["turnGroups"]
 }
 
 export interface EngineSeat extends SeatOwner, PlayerTable {
@@ -328,11 +338,15 @@ export function* writeGame(
   const invalid = rejectRequest(write) ?? rejectForGame(store.game, write)
   if (invalid) return failed(invalid)
   const actor = { ...identity, deviceId: write.deviceId }
-  const stamped = withLastWrite(store, {
+  const lastWrite = withLastWrite(store, {
     actorUserId: actor.userId,
     deviceId: actor.deviceId,
     ...(isTapTime(write.tappedAt) ? { tappedAt: write.tappedAt } : {}),
   })
+  const stamped =
+    write.kind === "table" && isTurnAction(write.action)
+      ? lastWrite
+      : withTurnStarted(lastWrite, now)
   if (write.kind === "life") return yield* writeLife(stamped, actor, write, now)
   if (write.kind === "table") return yield* writeTable(stamped, actor, write, now)
   if (write.kind === "commander.claim") return yield* writeClaim(stamped, actor, write, now)
@@ -418,7 +432,7 @@ function* writeLife(
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
   const { currentLife, changes } = changeLife(store.game, seat, request, now)
-  yield* read(store.apply(withTurnStarted(store.game, seat.id, changes, now)))
+  yield* read(store.apply(changes))
   return acknowledged({ operationId, deduplicated: false, currentLife })
 }
 
@@ -493,6 +507,7 @@ export function changeTable(
     designations: game.designations,
     players: Object.fromEntries([...rows.values()].map((row) => [row.id, seatTable(row)])),
     ...(game.turn ? { turn: game.turn } : {}),
+    ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
   }
   const result = applyTableAction(table, action, {
     rules: tableRules(game.system, game.format),
@@ -580,25 +595,19 @@ function* writeTable(
   const related = relatedId === undefined ? undefined : yield* read(store.seat(relatedId))
   const outcome = changeTable(store.game, seat, related, request, now)
   if (isEngineError(outcome)) return failed(outcome)
-  yield* read(
-    store.apply(
-      isTurnAction(action)
-        ? outcome.changes
-        : withTurnStarted(store.game, seat.id, outcome.changes, now),
-    ),
-  )
+  yield* read(store.apply(outcome.changes))
   return acknowledged({ operationId, deduplicated: false })
 }
 
-/** why: the first turn's clock starts on its player's first change to their own card, on the authority, so every device and every older client agrees. */
-function withTurnStarted(
-  game: EngineGame,
-  seatId: string,
-  changes: GameChange[],
-  now: number,
-): GameChange[] {
-  const turn = startedByChange(game.turn, seatId, now)
-  return turn ? [...changes, { kind: "turn.set", turn }] : changes
+/** why: the first turn's clock starts on the table's first change from any seat or write, on the authority, so every device and every older client agrees. */
+function withTurnStarted(store: GameStore, now: number): GameStore {
+  return {
+    ...store,
+    apply: (changes) => {
+      const turn = startedByChange(store.game.turn, now)
+      return store.apply(turn ? [...changes, { kind: "turn.set", turn }] : changes)
+    },
+  }
 }
 
 export const declinedClaimOperationId = (operationId: string) => `${operationId}_declined`

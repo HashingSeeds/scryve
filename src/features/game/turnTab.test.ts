@@ -4,7 +4,7 @@ import {
   withFirstTurn,
   applyLocalTableAction,
   asActorId,
-  startTurnBy,
+  startTurnOnChange,
 } from "./domain"
 import { gameLog, withTurnDividers } from "./LifeLog"
 import { clockwiseSlots, offersToHideTurns } from "./turnTab"
@@ -34,7 +34,7 @@ describe("offersToHideTurns", () => {
 })
 
 describe("local turn clock", () => {
-  it("starts on the first player's own life change, not another seat's", () => {
+  it("starts on the table's first change, whoever makes it", () => {
     const game = createLocalGame({
       players: [
         { name: "Ada", color: "#f00" },
@@ -43,7 +43,7 @@ describe("local turn clock", () => {
       startingLife: 20,
       now: 0,
     })
-    const [ada, bo] = game.players
+    const [ada] = game.players
     const waiting = applyLocalTableAction(
       game,
       { kind: "turn.set", playerId: ada.id, toPlayerId: ada.id },
@@ -52,13 +52,35 @@ describe("local turn clock", () => {
     expect(waiting.turn?.waiting).toBe(true)
     const rolled = withFirstTurn(game, ada.id, { operationId: "roll-1", now: 1_000 })
     expect(rolled.turn?.waiting).toBe(true)
-    expect(startTurnBy(waiting, bo.id, 2_000).turn?.waiting).toBe(true)
-    const started = startTurnBy(waiting, ada.id, 3_000)
-    expect(started.turn).toMatchObject({ startedAt: 3_000, operationId: "turn-1" })
+    const started = startTurnOnChange(waiting, 3_000)
+    expect(started.turn).toMatchObject({
+      playerId: ada.id,
+      startedAt: 3_000,
+      operationId: "turn-1",
+    })
     expect(started.turn?.waiting).toBeUndefined()
     expect(started.turnLog).toEqual([
       { operationId: "turn-1", playerId: ada.id, number: 1, at: 3_000 },
     ])
+    expect(startTurnOnChange(started, 9_000)).toBe(started)
+  })
+
+  it("gives a shared turn to its group, whichever seat is rolled", () => {
+    const game = createLocalGame({
+      players: ["Ada", "Bo", "Cy"].map((name) => ({ name, color: "#f00" })),
+      startingLife: 20,
+      now: 0,
+    })
+    const [ada, bo, cy] = game.players
+    const teams = { ...game, turnGroups: [[ada.id, bo.id]] }
+    const rolled = withFirstTurn(teams, bo.id, { operationId: "roll-1", now: 1_000 })
+    expect(rolled.turn?.playerId).toBe(ada.id)
+    const passed = applyLocalTableAction(
+      rolled,
+      { kind: "turn.passed", playerId: bo.id, toPlayerId: cy.id },
+      { operationId: "turn-2", now: 2_000 },
+    )
+    expect(passed.turn).toMatchObject({ playerId: cy.id, number: 2 })
   })
 })
 

@@ -531,6 +531,7 @@ export function lanProjection(
               designations: memory.designations,
               players: Object.fromEntries(seatsOf.map((seat) => [seat.id, playerTableOf(seat)])),
               ...(memory.turn ? { turn: memory.turn } : {}),
+              ...(memory.turnGroups ? { turnGroups: memory.turnGroups } : {}),
             },
             tableVersion,
           ),

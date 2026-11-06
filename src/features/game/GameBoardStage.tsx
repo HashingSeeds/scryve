@@ -36,6 +36,7 @@ import type { PlaySystemId } from "./playSystems"
 import type { RoundClock } from "./roundClock"
 import { clockwiseSlots } from "./turnTab"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
+import { turnGroupOf, type TurnGroups } from "../../../convex/lib/turns"
 import {
   SCREEN_PINNING_AVAILABLE,
   ScreenPinnedView,
@@ -65,6 +66,7 @@ export interface BoardRoundClock {
 /** why: only the grid knows where seats sit, so the stage hands its slots in clockwise order and the screen names the seat after the active one. */
 export interface BoardTurns {
   active?: string
+  groups?: TurnGroups
   nextOf: (clockwiseSlots: number[]) => string | undefined
 }
 
@@ -251,14 +253,25 @@ function useSpotlight(
 ): TurnSpotlight | undefined {
   const active = turns?.active
   const nextOf = turns?.nextOf
-  const next = useMemo(
+  const groups = turns?.groups
+  const passTo = useMemo(
     () =>
       active && nextOf
         ? nextOf(clockwiseSlots(getPlayerGridRows(playerCount, gridLayout)))
         : undefined,
     [active, nextOf, playerCount, gridLayout],
   )
-  return useMemo(() => (active ? { active, next } : undefined), [active, next])
+  return useMemo(
+    () =>
+      active
+        ? {
+            active: turnGroupOf(groups, active),
+            next: passTo ? turnGroupOf(groups, passTo) : [],
+            passTo,
+          }
+        : undefined,
+    [active, groups, passTo],
+  )
 }
 
 function BoardTabs({

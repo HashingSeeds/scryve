@@ -7,6 +7,7 @@ import {
   isValidTurn,
   remapTurn,
   turnActionValidators,
+  turnGroupsValidator,
   turnValidator,
 } from "./turns"
 
@@ -65,6 +66,7 @@ export const tableStateValidator = v.object({
   designations: v.record(v.string(), v.string()),
   players: v.record(v.string(), playerTableValidator),
   turn: v.optional(turnValidator),
+  turnGroups: v.optional(turnGroupsValidator),
 })
 
 export const tableActionValidator = v.union(
@@ -381,6 +383,7 @@ export function applyTableAction(
       operationId: context.operationId,
       now: context.now ?? Date.now(),
       isSeat: (playerId) => context.lifeOf(playerId) !== undefined,
+      groups: table.turnGroups,
     })
     if (turn === null) return null
     if (turn === table.turn) return unchanged
@@ -652,7 +655,7 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
 
 export function tableForVersion(table: TableState, tableVersion = 1): TableState {
   if (tableVersion >= TABLE_VERSION) return table
-  const { turn: _newer, ...beforeTurns } = table
+  const { turn: _newer, turnGroups: _groups, ...beforeTurns } = table
   if (tableVersion >= 2) return beforeTurns
   return {
     ...beforeTurns,

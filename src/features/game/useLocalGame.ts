@@ -20,7 +20,7 @@ import {
   localTableRules,
   restartMatchGame,
   soleLoserSeat,
-  startTurnBy,
+  startTurnOnChange,
   undoableTurn,
   withFirstChooser,
   withFirstTurn,
@@ -94,8 +94,8 @@ export function useLocalGame(
       const changed = applyGameCommand(gameRef.current, command, context)
       if (changed === gameRef.current) return changed
       const applied =
-        command.type === "life.change"
-          ? startTurnBy(changed, command.playerId, Date.now())
+        command.type === "life.change" || command.type === "commanderDamage.assign"
+          ? startTurnOnChange(changed, Date.now())
           : changed
       const next = withFirstPlayerSettled(applied)
       if (next.status === "active") {
@@ -195,7 +195,11 @@ export function useLocalGame(
           if (current.status !== "active") return null
           const table = current.table ?? EMPTY_TABLE
           return {
-            table: current.turn ? { ...table, turn: current.turn } : table,
+            table: {
+              ...table,
+              ...(current.turn ? { turn: current.turn } : {}),
+              ...(current.turnGroups ? { turnGroups: current.turnGroups } : {}),
+            },
             rules: localTableRules(current),
             playerIds: current.players.map(({ id }) => id),
             lifeOf: (playerId) => current.players.find(({ id }) => id === playerId)?.life,

@@ -100,7 +100,7 @@ import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
-import { nextTurnSeat } from "../../convex/lib/turns"
+import { nextTurnSeat, sharesTurn, turnGroupOf } from "../../convex/lib/turns"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -674,6 +674,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const rematchPublicId = game.rematchPublicId
   const table = useContext(ConnectedTableContext)
   const turn = turns ? table?.table.turn : undefined
+  const turnGroups = table?.table.turnGroups
   const [turnPrefs, setTurnPrefs] = useTurnPrefs(localGameRepository)
   const [turnOpen, setTurnOpen] = useState(false)
   const [turnToast, setTurnToast] = useState<{
@@ -967,7 +968,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       color: player.color,
       shape: shownMarkShape(player),
     }))
-  const myTurn = turn !== undefined && controlled.has(turn.playerId)
+  // why: any device holding a seat in the active group may act for it, and the engine checks the acting seat shares the turn.
+  const actingSeat = turn && turnGroupOf(turnGroups, turn.playerId).find((id) => controlled.has(id))
+  const myTurn = actingSeat !== undefined
+  const undoSeat =
+    turn?.previous &&
+    turnGroupOf(turnGroups, turn.previous.playerId).find((id) => controlled.has(id))
   // why: lives stay out of this memoized board, so who is out is read from the runtime when asked.
   function nextPlayerId() {
     const runtime = controls.current()
@@ -977,15 +983,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       turnSeats.map(({ playerId }) => playerId),
       turn.playerId,
       (id) => outReason(outState, id) !== undefined,
+      turnGroups,
     )
   }
   function passTo(next: string) {
-    if (!turn || !myTurn || !table) return
-    const operationId = table.passTurn(turn.playerId, next)
+    if (!turn || !actingSeat || !table) return
+    const operationId = table.passTurn(actingSeat, next)
     if (!operationId) return
     setTurnToast({
       operationId,
-      passerId: turn.playerId,
+      passerId: actingSeat,
       message: translate("board:turn.passed", {
         number: turn.number + 1,
         name: turnSeats.find(({ playerId }) => playerId === next)?.name ?? "",
@@ -999,7 +1006,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turn,
           canPress: myTurn,
           nameOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId)?.name,
-          onStart: () => table?.startTurn(turn.playerId),
+          onStart: () => actingSeat && table?.startTurn(actingSeat),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
         }
@@ -1009,7 +1016,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     ...dice.grid,
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
-      if (turnChip && player.id === turnChip.turn.playerId)
+      if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
         return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
       return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
     },
@@ -1071,7 +1078,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       <GameBoard
         testID="connected-game-board"
         chrome={chrome}
-        turns={turnChip ? { active: turnChip.turn.playerId, nextOf: nextPlayerId } : undefined}
+        turns={
+          turnChip
+            ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf: nextPlayerId }
+            : undefined
+        }
         toast={
           turnToast ? (
             <GameToast
@@ -1146,14 +1157,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           pick={{
             canPick: (playerId) => (turn ? myTurn : controlled.has(playerId)),
             onPick: (playerId) => {
-              table.setTurn(turn?.playerId ?? playerId, playerId)
+              table.setTurn(actingSeat ?? playerId, playerId)
               setTurnOpen(false)
             },
           }}
           onUndo={
-            turn?.previous && controlled.has(turn.previous.playerId)
+            turn && undoSeat
               ? () => {
-                  table.undoTurn(turn.previous!.playerId, turn.operationId)
+                  table.undoTurn(undoSeat, turn.operationId)
                   setTurnToast(undefined)
                   setTurnOpen(false)
                 }

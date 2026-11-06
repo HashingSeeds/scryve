@@ -64,7 +64,7 @@ import type { GameEndSource } from "@/utils/analytics"
 
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
-import { nextTurnSeat, type Turn } from "../../convex/lib/turns"
+import { nextTurnSeat, sharesTurn, type Turn } from "../../convex/lib/turns"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
@@ -302,6 +302,7 @@ export function CurrentGameScreen({
   }))
   const { passTurn, setTurn, undoTurn, setBank, startTurn, changeClock } = runtime
   const nameOf = (playerId: string) => runtime.game.players.find(({ id }) => id === playerId)?.name
+  const { turnGroups } = runtime.game
   function nextOf(clockwiseSlots: number[]) {
     if (!turn) return undefined
     const { players, seatOrder } = runtime.game
@@ -309,7 +310,12 @@ export function CurrentGameScreen({
       const player = players[seatOrder?.[slot] ?? slot]
       return player ? [player.id] : []
     })
-    return nextTurnSeat(order, turn.playerId, (id) => outReason(outState, id) !== undefined)
+    return nextTurnSeat(
+      order,
+      turn.playerId,
+      (id) => outReason(outState, id) !== undefined,
+      turnGroups,
+    )
   }
   function passTo(next: string) {
     if (!turn) return
@@ -363,7 +369,7 @@ export function CurrentGameScreen({
     ...dice.grid,
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
-      if (turnChip && player.id === turnChip.turn.playerId)
+      if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
         return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]
     },
@@ -458,7 +464,9 @@ export function CurrentGameScreen({
           onBoardSizeChange={setBoardSize}
           firstPlayer={firstPlayer}
           roundClock={clock && active ? { clock, system, onPress: openClock } : undefined}
-          turns={turnChip ? { active: turnChip.turn.playerId, nextOf } : undefined}
+          turns={
+            turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
+          }
           toast={
             saved ? (
               <GameToast

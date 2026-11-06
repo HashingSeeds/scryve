@@ -56,7 +56,7 @@ import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchRes
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { parseTableState } from "../../../convex/lib/table"
-import { isValidTurn } from "../../../convex/lib/turns"
+import { isValidTurn, isValidTurnGroups } from "../../../convex/lib/turns"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -462,6 +462,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const playerIds = new Set<string>(players.map(({ id }) => id))
   const turn = isValidTurn(value.turn, playerIds) ? value.turn : undefined
   const turnLog = turn ? parseTurnLog(value.turnLog, playerIds) : undefined
+  const turnGroups = isValidTurnGroups(value.turnGroups, playerIds) ? value.turnGroups : undefined
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -499,6 +500,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
       : {}),
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
+    ...(turnGroups ? { turnGroups } : {}),
   }
 }
 

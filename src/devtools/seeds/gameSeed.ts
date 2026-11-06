@@ -28,6 +28,7 @@ import type { LocalGame } from "@/features/game/types"
 
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { isValidTurnGroups } from "../../../convex/lib/turns"
 
 function integer(name: string, value: string): number {
   const parsed = Number(value)
@@ -135,6 +136,16 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
     if (game.players[index].life !== target)
       throw new SeedError(`life ${target} for seat ${index + 1} was rejected by the game rules.`)
   })
+
+  // why: groups=1+2,3+4 seats players who share a turn, until a game mode sets its own.
+  const groups = list(params.groups).map((entry) =>
+    entry.split("+").map((value) => game.players[integer("groups seat", value) - 1]?.id ?? value),
+  )
+  if (groups.length > 0) {
+    if (!isValidTurnGroups(groups, new Set(game.players.map(({ id }) => id))))
+      throw new SeedError(`groups name each seat once, like 1+2,3+4, got "${params.groups}".`)
+    game = { ...game, turnGroups: groups }
+  }
   return game
 }
 

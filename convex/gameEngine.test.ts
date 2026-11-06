@@ -492,13 +492,7 @@ describe("engine parity: turns", () => {
       delta: -1,
       ...sent("turn-life-joiner-01", JOINER_DEVICE),
     })
-    expect(await game.expectSameTurn()).toMatchObject({ waiting: true })
-    await game.write("host", {
-      kind: "life",
-      playerId: hostSeat,
-      delta: -1,
-      ...sent("turn-life-host-0001"),
-    })
+    expect(await game.expectSameTurn()).toMatchObject({ playerId: hostSeat })
     expect((await game.expectSameTurn())?.waiting).toBeUndefined()
     await game.write(
       "joiner",
@@ -766,5 +760,75 @@ describe("memory engine: partner commanders", () => {
     expect(claim("claim-partner-commander", 6, 1)).toMatchObject({ ack: { status: "pending" } })
     expect(confirm("claim-first-commander")).toMatchObject({ ack: { total: 5, currentLife: 35 } })
     expect(confirm("claim-partner-commander")).toMatchObject({ ack: { total: 6, currentLife: 29 } })
+  })
+})
+
+describe("memory engine: turn groups", () => {
+  const seat = (id: string) => ({ id, userId: id, deviceId: `device-${id}`, currentLife: 40 })
+  const tableWrite = (by: string, operationId: string, action: TableAction) =>
+    ({
+      kind: "table",
+      action,
+      operationId,
+      deviceId: `device-${by}`,
+      clientCreatedAt: CREATED_AT,
+    }) as const
+  const actor = (id: string) => ({ userId: id, isHost: id === "ada" })
+
+  it("starts the first turn on another seat's commander damage, and lets either teammate pass", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      turnGroups: [
+        ["ada", "bo"],
+        ["cy", "dee"],
+      ],
+      seats: new Map(["ada", "bo", "cy", "dee"].map((id) => [id, seat(id)])),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const write = (by: string, operationId: string, action: TableAction, now = CREATED_AT) =>
+      writeMemoryGame(memory, actor(by), tableWrite(by, operationId, action), now)
+
+    expect(
+      write("bo", "turn-claim-bo-0001", { kind: "turn.set", playerId: "bo", toPlayerId: "bo" }),
+    ).toMatchObject({ ok: true })
+    expect(memory.turn).toMatchObject({ playerId: "ada", waiting: true })
+
+    writeMemoryGame(
+      memory,
+      actor("cy"),
+      {
+        kind: "commander.claim",
+        fromPlayerId: "cy",
+        toPlayerId: "dee",
+        delta: 2,
+        operationId: "claim-cy-dee-00001",
+        deviceId: "device-cy",
+        clientCreatedAt: CREATED_AT,
+      },
+      CREATED_AT + 5_000,
+    )
+    expect(memory.turn).toMatchObject({ playerId: "ada", startedAt: CREATED_AT + 5_000 })
+    expect(memory.turn?.waiting).toBeUndefined()
+
+    expect(
+      write("cy", "turn-pass-cy-00001", { kind: "turn.passed", playerId: "cy", toPlayerId: "ada" }),
+    ).toMatchObject({ ok: false })
+    expect(
+      write("bo", "turn-pass-bo-00001", { kind: "turn.passed", playerId: "bo", toPlayerId: "dee" }),
+    ).toMatchObject({ ok: true })
+    expect(memory.turn).toMatchObject({ playerId: "cy", number: 2, previous: { playerId: "ada" } })
+    expect(
+      write("ada", "turn-undo-ada-0001", {
+        kind: "turn.undone",
+        playerId: "ada",
+        turnOperationId: "turn-pass-bo-00001",
+      }),
+    ).toMatchObject({ ok: true })
+    expect(memory.turn).toMatchObject({ playerId: "ada", number: 1 })
   })
 })

@@ -335,7 +335,34 @@ describe("CurrentGameScreen", () => {
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[1].id)
   })
 
-  it("lands the turn chip on the first player, waiting until their own card changes", () => {
+  it("frames and chips every seat of a shared turn, and passes group to group", () => {
+    const four = game(4)
+    const [ada, grace, katherine, dorothy] = four.players.map(({ id }) => id)
+    const initial = {
+      ...four,
+      turnGroups: [
+        [ada, grace],
+        [katherine, dorothy],
+      ],
+    }
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-2-claim"))
+    expect(view.getByTestId("turn-chip-1")).toHaveTextContent("Start")
+    expect(view.getByTestId("turn-chip-2")).toHaveTextContent("Start")
+    expect(view.getAllByTestId("seat-spotlight-active")).toHaveLength(2)
+    expect(view.getAllByTestId("seat-spotlight-next")).toHaveLength(2)
+
+    fireEvent.press(view.getByTestId("turn-chip-2"))
+    fireEvent.press(view.getByTestId("turn-chip-2"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: katherine, number: 2 })
+    expect(view.queryByTestId("turn-chip-1")).toBeNull()
+    expect(view.getByTestId("turn-chip-3")).toBeTruthy()
+    expect(view.getByTestId("turn-chip-4")).toBeTruthy()
+  })
+
+  it("lands the turn chip on the first player, waiting until the table's first change", () => {
     const initial = game()
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = renderGame(initial, repository)
@@ -345,8 +372,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("seat-spotlight-active")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("life-seat-2-1"))
-    expect(repository.loadActiveGame()?.turn?.waiting).toBe(true)
-    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: initial.players[0].id })
     expect(repository.loadActiveGame()?.turn?.waiting).toBeUndefined()
     expect(view.getByTestId("turn-chip-time")).toBeTruthy()
 

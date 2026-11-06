@@ -128,6 +128,7 @@ export interface LocalGame {
   /** why: kept beside the events rather than in them, so an older build a rollback falls back to still opens the game. */
   turn?: Turn
   turnLog?: TurnLogEntry[]
+  turnGroups?: string[][]
 }
 
 export interface TurnLogEntry {

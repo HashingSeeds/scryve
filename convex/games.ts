@@ -2074,6 +2074,7 @@ function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): Tab
     designations: game.designations ?? {},
     players: Object.fromEntries(players.map((player) => [player._id, seatTable(player)])),
     ...(game.turn ? { turn: game.turn } : {}),
+    ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
   }
 }
 

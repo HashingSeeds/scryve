@@ -6,11 +6,20 @@ const turnFields = {
   startedAt: v.number(),
   operationId: v.string(),
   spent: v.optional(v.record(v.string(), v.number())),
-  /** why: the first turn's clock waits for its player to tap the chip or touch their own card, so setup time never counts against them. */
+  /** why: the first turn's clock waits for a Start tap or the table's first change, so setup time never counts against the first player. */
   waiting: v.optional(v.literal(true)),
 }
 
 export const previousTurnValidator = v.object(turnFields)
+
+/**
+ * why: seats that share a turn, such as a Two-Headed Giant team or Archenemy's opponents. The turn
+ * moves group to group in the board's clockwise order of each group's first seat. A seat in no
+ * group is a group of its own, so a game without groups passes seat to seat. Each group's first
+ * seat holds the turn record, so turn time and the chess bank count per group.
+ */
+export const turnGroupsValidator = v.array(v.array(v.string()))
+export type TurnGroups = readonly (readonly string[])[]
 
 /** why: `base` is each seat's time already spent when the bank was set, so a bank chosen mid-game starts everyone full. */
 export const turnBankValidator = v.object({
@@ -56,7 +65,18 @@ export interface TurnContext {
   operationId: string
   now: number
   isSeat: (playerId: string) => boolean
+  groups?: TurnGroups
 }
+
+export const turnGroupOf = (groups: TurnGroups | undefined, playerId: string): readonly string[] =>
+  groups?.find((group) => group.includes(playerId)) ?? [playerId]
+
+/** why: the group's first seat stands for the whole group in the turn record. */
+export const turnLead = (groups: TurnGroups | undefined, playerId: string) =>
+  turnGroupOf(groups, playerId)[0]
+
+export const sharesTurn = (groups: TurnGroups | undefined, playerId: string, otherId: string) =>
+  turnGroupOf(groups, playerId).includes(otherId)
 
 const settled = ({ previous: _previous, bank: _bank, ...turn }: Turn): PreviousTurn => turn
 
@@ -88,8 +108,9 @@ function withBank(turn: Turn, bankMs: number | undefined, now: number): Turn | n
 
 /**
  * why: one reducer for local games, the connected overlay, Convex, and a nearby host, so every
- * device lands on the same turn. An undo restores the passer's start time too, so their clock runs
- * on as if the pass never happened.
+ * device lands on the same turn. Any seat in the group holding the turn may pass it, and any seat
+ * in the group that passed may take it back. An undo restores the passer's start time too, so
+ * their clock runs on as if the pass never happened.
  */
 export function applyTurnAction(
   turn: Turn | undefined,
@@ -99,33 +120,27 @@ export function applyTurnAction(
   if (action.kind === "turn.undone") {
     const previous = turn?.previous
     if (!turn || !previous || turn.operationId !== action.turnOperationId) return null
-    if (previous.playerId !== action.playerId) return null
+    if (!sharesTurn(context.groups, previous.playerId, action.playerId)) return null
     return turn.bank ? { ...previous, bank: turn.bank } : previous
   }
   if (action.kind === "turn.clock") return turn ? withBank(turn, action.bankMs, context.now) : null
-  if (action.kind === "turn.started") {
-    if (!turn || turn.playerId !== action.playerId) return null
-    return startedTurn(turn, context.now) ?? turn
-  }
+  if (action.kind === "turn.started") return turn ? (startedTurn(turn, context.now) ?? turn) : null
   if (!context.isSeat(action.toPlayerId)) return null
+  const to = turnLead(context.groups, action.toPlayerId)
   if (!turn) {
-    if (action.kind === "turn.passed" || action.toPlayerId !== action.playerId) return null
+    if (action.kind === "turn.passed") return null
+    if (!sharesTurn(context.groups, action.toPlayerId, action.playerId)) return null
     return {
-      playerId: action.toPlayerId,
+      playerId: to,
       number: 1,
       startedAt: context.now,
       operationId: context.operationId,
       waiting: true,
     }
   }
-  if (turn.playerId !== action.playerId) return null
-  if (action.toPlayerId === turn.playerId) return action.kind === "turn.set" ? turn : null
-  return handOff(
-    turn,
-    action.toPlayerId,
-    action.kind === "turn.passed" ? turn.number + 1 : turn.number,
-    context,
-  )
+  if (!sharesTurn(context.groups, turn.playerId, action.playerId)) return null
+  if (to === turn.playerId) return action.kind === "turn.set" ? turn : null
+  return handOff(turn, to, action.kind === "turn.passed" ? turn.number + 1 : turn.number, context)
 }
 
 function startedTurn(turn: Turn, now: number): Turn | undefined {
@@ -134,22 +149,49 @@ function startedTurn(turn: Turn, now: number): Turn | undefined {
   return { ...running, startedAt: now }
 }
 
-export function startedByChange(turn: Turn | undefined, playerId: string, now: number) {
-  return turn?.playerId === playerId ? startedTurn(turn, now) : undefined
+/** why: the first player usually acts on someone else's card first, so any change anywhere on the table starts a waiting first turn. */
+export function startedByChange(turn: Turn | undefined, now: number) {
+  return turn ? startedTurn(turn, now) : undefined
 }
 
+/**
+ * why: `order` is every seat clockwise around the board. Groups follow the clockwise position of
+ * their first seat there, and a group passes only once every seat in it is out.
+ */
 export function nextTurnSeat(
   order: readonly string[],
   current: string,
   isOut: (playerId: string) => boolean = () => false,
+  groups?: TurnGroups,
 ): string | undefined {
-  const start = order.indexOf(current)
+  const leads = [...new Set(order.map((playerId) => turnLead(groups, playerId)))]
+  const start = leads.indexOf(turnLead(groups, current))
   if (start < 0) return undefined
-  for (let step = 1; step < order.length; step += 1) {
-    const candidate = order[(start + step) % order.length]
-    if (!isOut(candidate)) return candidate
+  for (let step = 1; step < leads.length; step += 1) {
+    const candidate = leads[(start + step) % leads.length]
+    if (!turnGroupOf(groups, candidate).every(isOut)) return candidate
   }
   return undefined
+}
+
+/** why: a seat in two groups, or a group of no seats, would leave the turn with no single holder. */
+export function isValidTurnGroups(
+  value: unknown,
+  playerIds: ReadonlySet<string>,
+): value is string[][] {
+  if (!Array.isArray(value)) return false
+  const seen = new Set<string>()
+  return value.every(
+    (group) =>
+      Array.isArray(group) &&
+      group.length > 0 &&
+      group.every((playerId) => {
+        if (typeof playerId !== "string" || !playerIds.has(playerId) || seen.has(playerId))
+          return false
+        seen.add(playerId)
+        return true
+      }),
+  )
 }
 
 export const turnElapsed = (turn: Pick<Turn, "startedAt" | "waiting">, now: number) =>
