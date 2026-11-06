@@ -18,6 +18,7 @@ const USAGE = `Stand-in players for connected games on a Convex preview.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
                  [--variant treachery]  (players default to 4)
+                 [--archenemy <seat>] [--schemes <deck id>] [--planechase <deck id>|own]
   pnpm bots join <CODE> [--count 1] [--first 1]
 
 Play
@@ -53,6 +54,17 @@ function parseDuration(value, name) {
   return Number(match[1]) * { ms: 1, s: 1000, m: 60_000 }[match[2] ?? "s"]
 }
 
+// why: decks are checked by createLobby against convex/lib/modeDecks.ts, so a typo fails there with its message.
+function modeSetupOf({ archenemy, schemes, planechase }) {
+  if (!archenemy && !planechase) return undefined
+  return {
+    ...(planechase ? { planechase: planechase === "own" ? {} : { decks: [planechase] } } : {}),
+    ...(archenemy
+      ? { archenemy: { seat: Number(archenemy), ...(schemes ? { deck: schemes } : {}) } }
+      : {}),
+  }
+}
+
 function parseCount(value, name, min, max) {
   const count = Number(value)
   if (!Number.isInteger(count) || count < min || count > max)
@@ -70,6 +82,9 @@ function parseCli(argv) {
       "fill": { type: "string", default: "0" },
       "format": { type: "string", default: "commander" },
       "variant": { type: "string" },
+      "archenemy": { type: "string" },
+      "schemes": { type: "string" },
+      "planechase": { type: "string" },
       "reveal": { type: "boolean", default: false },
       "life": { type: "string" },
       "count": { type: "string", default: "1" },
@@ -112,7 +127,8 @@ function parseCli(argv) {
     fill,
     system: none ? "none" : "mtg",
     format: values.format,
-    variant: values.variant,
+    variant: values.archenemy ? "archenemy" : values.variant,
+    modeSetup: modeSetupOf(values),
     reveal: values.reveal,
     life: values.life
       ? parseCount(values.life, "life", 1, 999)
@@ -230,7 +246,7 @@ class Bot {
       await this.client.mutation(api.games.abandonGame, { publicId: game.publicId })
       this.report(this, "abandoned-leftover", { publicId: game.publicId })
     }
-    const { players, system, format, variant, life } = this.options
+    const { players, system, format, variant, modeSetup, life } = this.options
     const lobby = await this.client.mutation(api.games.createLobby, {
       ...lobbyIdentifiers(),
       playerCount: players,
@@ -239,6 +255,7 @@ class Bot {
       system,
       ...(system === "none" ? {} : { format }),
       ...(variant ? { variant } : {}),
+      ...(modeSetup ? { modeSetup } : {}),
       hostDisplayName: this.name,
       hostColor: COLORS[0],
       deviceId: this.deviceId,
