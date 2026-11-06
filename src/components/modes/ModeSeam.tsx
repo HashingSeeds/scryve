@@ -356,7 +356,8 @@ const $plateText: ViewStyle = { flexShrink: 1 }
 const $kicker: TextStyle = { fontSize: 9, lineHeight: 11 }
 const $name: TextStyle = { fontSize: 12, lineHeight: 14 }
 const $die: ViewStyle = {
-  width: DIE_SIZE,
+  minWidth: DIE_SIZE,
+  paddingHorizontal: 4,
   height: DIE_SIZE,
   borderRadius: 10,
   borderWidth: 2,
