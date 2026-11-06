@@ -221,6 +221,8 @@ export default {
     hexagon: "hexagone",
     plus: "plus",
     shield: "bouclier",
+    moon: "lune",
+    ring: "anneau",
     circle: "cercle",
     crown: "couronne",
     flame: "flamme",

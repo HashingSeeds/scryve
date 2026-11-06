@@ -216,6 +216,8 @@ export default {
     hexagon: "षट्भुज",
     plus: "जमा",
     shield: "ढाल",
+    moon: "चाँद",
+    ring: "छल्ला",
     circle: "वृत्त",
     crown: "मुकुट",
     flame: "लौ",

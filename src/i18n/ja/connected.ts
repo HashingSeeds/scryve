@@ -153,6 +153,8 @@ export default {
       hexagon: "六角形",
       plus: "プラス",
       shield: "盾",
+      moon: "月",
+      ring: "リング",
       circle: "丸",
       crown: "王冠",
       flame: "炎",
