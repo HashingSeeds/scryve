@@ -41,7 +41,7 @@ export function NewerGameScreen({
       <View style={themed($copy)}>
         <Text tx="play:launch.updateTitle" preset="heading" accessibilityRole="header" />
         <Text tx="play:launch.updateMessage" />
-        {check === "none" || check === "failed" ? (
+        {!storeUpdate && (check === "none" || check === "failed") ? (
           <Text
             tx={check === "none" ? "play:launch.noUpdate" : "play:launch.updateCheckFailed"}
             tone="dim"

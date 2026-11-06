@@ -273,19 +273,26 @@ describe("shipping index route", () => {
     expect(localGameRepository.hasNewerActiveGame()).toBe(false)
   })
 
-  it("sends a game saved by a newer version to the store when the store has a newer build", () => {
+  it("sends a game saved by a newer version to the store once the store has a newer build", async () => {
     storage.set(
       LOCAL_KEYS.active,
       JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
     )
-    mockStoreUpdate = { labelTx: "play:launch.openAppStore", url: "https://apps.example/scryve" }
-
-    const view = render(
+    const screen = () => (
       <ThemeProvider initialContext="dark">
         <Index />
-      </ThemeProvider>,
+      </ThemeProvider>
     )
+    const view = render(screen())
+    await act(async () => {
+      fireEvent.press(view.getByRole("button", { name: "Check for updates" }))
+    })
+    expect(view.getByText(/No update is available yet/)).toBeTruthy()
 
+    mockStoreUpdate = { labelTx: "play:launch.openAppStore", url: "https://apps.example/scryve" }
+    view.rerender(screen())
+
+    expect(view.queryByText(/No update is available yet/)).toBeNull()
     expect(view.queryByRole("button", { name: "Check for updates" })).toBeNull()
     fireEvent.press(view.getByRole("button", { name: "Open App Store" }))
     expect(mockUpdateFromStore).toHaveBeenCalled()
