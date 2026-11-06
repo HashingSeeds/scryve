@@ -342,11 +342,15 @@ class Tracker {
       return
     }
     if (error.lost) return void (this.counts.lost += 1)
+    this.refuse(command.kind, error)
+  }
+
+  refuse(kind, error) {
     this.counts.refused += 1
     // why: Convex wraps a thrown Error's text in a request id and stack, so only its first line groups.
     const text =
       error.data?.message ?? /Uncaught \w+: (.*)/.exec(error.message)?.[1] ?? error.message
-    const reason = `${command.kind}: ${text}`
+    const reason = `${kind}: ${text}`
     this.refusals.set(reason, (this.refusals.get(reason) ?? 0) + 1)
   }
 
@@ -721,6 +725,7 @@ class NearbyLink {
         return
       case "rejected":
         this.rejected = true
+        bot.tracker.refuse("join", new Error(message.code ?? message.reason))
         bot.report(bot, "rejected", { reason: message.reason, code: message.code })
         this.socket?.destroy()
         return bot.stop(`rejected-${message.reason}`)
@@ -811,20 +816,21 @@ async function startConvex(options, tracker, report, bots) {
   const joins = []
   for (let slot = options.first; slot < last; slot += 1) {
     const bot = player(slot)
+    // why: a refusal must be handled the moment it lands; one left for later during the sleep below ends the process.
     joins.push(
       bot.link.join(code).then(
         () => bot.churn(),
         (error) => {
+          tracker.refuse("join", error)
           bot.stop("join-failed")
-          throw error
+          return error
         },
       ),
     )
     // why: a room checks in over minutes; 50 ms apart still races the event's player count.
     await sleep(50)
   }
-  const failed = (await Promise.allSettled(joins)).filter(({ status }) => status === "rejected")
-  for (const { reason } of failed) report(null, "join-failed", { message: reason.message })
+  const failed = (await Promise.all(joins)).filter((result) => result instanceof Error)
   report(null, "joined", { bots: options.players - failed.length, code })
   if (!organizer) return
   for (let guest = 1; guest <= options.guests; guest += 1)
