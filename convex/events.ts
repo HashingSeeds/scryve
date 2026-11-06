@@ -97,7 +97,7 @@ async function requireActor(ctx: Ctx, event: Doc<"events">): Promise<EventActor>
   return { kind: "player", playerId: player._id }
 }
 
-async function loadPlayers(ctx: Ctx, eventId: Id<"events">) {
+async function loadPlayers(ctx: Pick<Ctx, "db">, eventId: Id<"events">) {
   return await ctx.db
     .query("eventPlayers")
     .withIndex("by_event", (q) => q.eq("eventId", eventId))
@@ -111,7 +111,7 @@ async function loadTables(ctx: Ctx, eventId: Id<"events">, throughRound = MAX_EV
     .take(MAX_EVENT_TABLES)
 }
 
-async function roundTables(ctx: Ctx, eventId: Id<"events">, round: number) {
+async function roundTables(ctx: Pick<Ctx, "db">, eventId: Id<"events">, round: number) {
   return await ctx.db
     .query("eventTables")
     .withIndex("by_event_and_round", (q) => q.eq("eventId", eventId).eq("round", round))
@@ -589,7 +589,7 @@ export const byCode = query({
   },
 })
 
-async function eventBoard(ctx: QueryCtx, event: Doc<"events">) {
+async function eventBoard(ctx: Pick<QueryCtx, "db">, event: Doc<"events">) {
   const [players, tables] = await Promise.all([
     loadPlayers(ctx, event._id),
     roundTables(ctx, event._id, event.round),
@@ -648,13 +648,13 @@ async function viewerOf(ctx: QueryCtx, event: Doc<"events">) {
 
 /**
  * why: Convex caches a query per account once it reads the caller, so a board that read them reran for
- * every phone on every change. Never reading the caller lets one result serve the whole room.
+ * every phone on every change. The handler takes only `db`, so reading the caller here fails to compile.
  */
 export const board = query({
   args: { eventId: v.id("events") },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.eventId)
-    return event ? await eventBoard(ctx, event) : null
+  handler: async ({ db }, args) => {
+    const event = await db.get(args.eventId)
+    return event ? await eventBoard({ db }, event) : null
   },
 })
 
