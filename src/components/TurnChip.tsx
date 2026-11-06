@@ -87,6 +87,8 @@ export function TurnChipLayer({
   const run = Math.abs(rotation) === 90 ? cardSize.height : cardSize.width
   const insets = contentInsetsFor(rotation, contentInsets)
   const left = turnChipLeft({ run, width, rotation, menuCorner, menuEdgeCenter })
+  // why: with the pentagon centered on this edge the chip has only half the edge, so a mode's control moves to the seam instead (seamPlan's chipCrowdedBySeam).
+  const beside = menuEdgeCenter === CONTENT_EDGES[rotation].top ? undefined : state.beside
   return (
     <View
       testID={`turn-chip-layer-seat-${seatNumber}`}
@@ -98,7 +100,24 @@ export function TurnChipLayer({
         onLayout={({ nativeEvent: { layout } }) => setWidth(layout.width)}
         style={[$slot, { top: EDGE_GAP + insets.top, left }, width === 0 && $measuring]}
       >
-        <TurnChip state={state} seatNumber={seatNumber} foreground={foreground} compact={compact} />
+        {beside ? (
+          <View pointerEvents="box-none" style={$beside}>
+            {beside}
+            <TurnChip
+              state={state}
+              seatNumber={seatNumber}
+              foreground={foreground}
+              compact={compact}
+            />
+          </View>
+        ) : (
+          <TurnChip
+            state={state}
+            seatNumber={seatNumber}
+            foreground={foreground}
+            compact={compact}
+          />
+        )}
       </View>
     </View>
   )
@@ -219,6 +238,7 @@ function PlayGlyph({ color }: { color: string }) {
 
 const $layer: ViewStyle = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }
 const $slot: ViewStyle = { position: "absolute" }
+const $beside: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
 const $measuring: ViewStyle = { opacity: 0 }
 const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",

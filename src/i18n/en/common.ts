@@ -61,6 +61,9 @@ const common = {
       yourDeck: "Opens the your deck choices",
       system: "Opens the system choices",
       list: "Opens the list choices",
+      planechase: "Opens the planar deck choices",
+      archenemy: "Opens the archenemy choices",
+      schemes: "Opens the scheme deck choices",
     },
     closeLabel: {
       format: "Close format choices",
@@ -71,6 +74,9 @@ const common = {
       yourDeck: "Close your deck choices",
       system: "Close system choices",
       list: "Close list choices",
+      planechase: "Close planar deck choices",
+      archenemy: "Close archenemy choices",
+      schemes: "Close scheme deck choices",
     },
   },
   valueField: {

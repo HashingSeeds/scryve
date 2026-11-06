@@ -8,6 +8,7 @@ import { lifeEditingValidator } from "./lib/gameRules"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { pokemonBoardValidator } from "./lib/table"
+import { modeSetupValidator, tableModesValidator } from "./lib/tableModes"
 import { gameVariantValidator, treacheryRoleValidator } from "./lib/treachery"
 import { turnGroupsValidator, turnValidator } from "./lib/turns"
 
@@ -145,6 +146,8 @@ export default defineSchema({
     designations: v.optional(v.record(v.string(), v.id("gamePlayers"))),
     turn: v.optional(turnValidator),
     turnGroups: v.optional(turnGroupsValidator),
+    modeSetup: v.optional(modeSetupValidator),
+    modes: v.optional(tableModesValidator),
   })
     .index("by_public_id", ["publicId"])
     .index("by_host_status", ["hostUserId", "status"])

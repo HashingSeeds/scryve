@@ -59,6 +59,11 @@ import type {
 } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { useLocalGame } from "@/features/game/useLocalGame"
+import { modeChipBeside } from "@/features/modes/modeChipBeside"
+import { modeLogRow } from "@/features/modes/modeLogRow"
+import { ModesDialog } from "@/features/modes/ModesDialog"
+import { modeSeamFor } from "@/features/modes/modeSeamFor"
+import { useBoardModes } from "@/features/modes/useBoardModes"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -344,6 +349,16 @@ export function CurrentGameScreen({
       changeClock((current) => stepRoundTurn(current, system, -1))
     setTurnToast(undefined)
   }
+  const boardModes = useBoardModes({
+    modes: runtime.game.table?.modes,
+    turn,
+    groups: turnGroups,
+    players: runtime.game.players,
+    controls: () => true,
+    act: runtime.tableRuntime.modeAction,
+  })
+  // why: the turn chip's spot is kept clear of every seat's marks and controls, so the die rides there whenever turns show.
+  const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -355,6 +370,12 @@ export function CurrentGameScreen({
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
+  const slotOf = (playerId: string) => {
+    const index = runtime.game.players.findIndex(({ id }) => id === playerId)
+    if (index < 0) return undefined
+    const slot = runtime.game.seatOrder?.indexOf(index)
+    return slot === undefined || slot < 0 ? index : slot
+  }
   function answerHideOffer(hide: boolean) {
     if (!hideOffer) return
     if (hide) setTurnPrefs({ enabled: false })
@@ -375,7 +396,19 @@ export function CurrentGameScreen({
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
-        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+        return [
+          ...chips.filter(({ kind }) => kind === "roll"),
+          {
+            kind: "turn",
+            state: {
+              ...turnChip,
+              beside: modeChipBeside(boardModes, player.id, {
+                dieOnChip,
+                plays: () => true,
+              }),
+            },
+          },
+        ]
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -472,6 +505,7 @@ export function CurrentGameScreen({
           turns={
             turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
           }
+          seam={modeSeamFor(boardModes, { dieOnChip, slotOf })}
           toast={
             saved ? (
               <GameToast
@@ -561,6 +595,7 @@ export function CurrentGameScreen({
         />
       ) : null}
 
+      <ModesDialog modes={boardModes} />
       {clockOpen && clock ? (
         <RoundClockDialog
           clock={clock}
@@ -617,6 +652,7 @@ export function CurrentGameScreen({
           events={events}
           turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
           groups={turnGroups}
+          modes={boardModes.log.map(modeLogRow)}
           canUndo={runtime.canUndo}
           origin={chrome.dialogOrigin}
           onUndo={runtime.undo}

@@ -16,7 +16,13 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { gameLog, withTurnDividers, type GameLogItem } from "./LifeLog"
+import {
+  gameLog,
+  withModeRows,
+  withTurnDividers,
+  type GameLogItem,
+  type GameModeRow,
+} from "./LifeLog"
 import { teamName } from "./teams"
 import type { GameEvent, GamePlayer, TurnLogEntry } from "./types"
 import type { TurnGroups } from "../../../convex/lib/turns"
@@ -26,6 +32,7 @@ export function GameLogDialog({
   events,
   turns,
   groups,
+  modes,
   canUndo,
   origin,
   onUndo,
@@ -35,6 +42,7 @@ export function GameLogDialog({
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
+  modes?: readonly GameModeRow[]
   canUndo: boolean
   origin?: DialogOrigin
   onUndo: () => void
@@ -45,8 +53,8 @@ export function GameLogDialog({
     theme: { colors },
   } = useAppTheme()
   const rows = useMemo(
-    () => withTurnDividers(gameLog(players, events), turns ?? []),
-    [players, events, turns],
+    () => withTurnDividers(withModeRows(gameLog(players, events), modes ?? []), turns ?? []),
+    [players, events, turns, modes],
   )
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
@@ -85,6 +93,29 @@ export function GameLogDialog({
             size="xxs"
             style={{ color: colors.textDim }}
           />
+        </View>
+      )
+    }
+    if (item.kind === "mode") {
+      const seat = seats.get(item.playerId)
+      return (
+        <View testID={`game-log-mode-${item.id}`} accessible style={themed($row)}>
+          {seat ? (
+            <PlayerMark
+              seatNumber={seat.seatNumber}
+              color={seat.color}
+              shape={seat.shape}
+              size={MARK}
+            />
+          ) : null}
+          <View style={$lines}>
+            <Text text={item.text} weight="medium" numberOfLines={2} />
+            <Text
+              text={relativeTime(item.at, openedAt)}
+              size="xxs"
+              style={{ color: colors.textDim }}
+            />
+          </View>
         </View>
       )
     }
@@ -172,7 +203,13 @@ export function GameLogDialog({
         <FlatList
           testID="game-log-list"
           data={rows}
-          keyExtractor={(item) => (item.kind === "turn" ? `turn:${item.operationId}` : item.id)}
+          keyExtractor={(item) =>
+            item.kind === "turn"
+              ? `turn:${item.operationId}`
+              : item.kind === "mode"
+                ? `mode:${item.id}`
+                : item.id
+          }
           renderItem={renderRow}
           style={$list}
         />

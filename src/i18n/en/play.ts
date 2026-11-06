@@ -47,6 +47,19 @@ const play = {
       "By playing, you agree to the <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
   },
   newGame: {
+    // Setup for Planechase, an add-on to any Magic game that uses a deck of plane cards. Keep "Planechase" and "planar deck" as official terms.
+    planechase: "Planechase",
+    planechaseOff: "Off",
+    // Players bring their own physical planar deck; the app only rolls the die and tracks its cost.
+    ownPlanarDeck: "I have my cards",
+    // A whole product's decks combined into one shared planar deck, as in "Planechase 2012, all 4 decks".
+    allDecks: "{{product}}, all {{count}} decks",
+    // Setup for Archenemy: which player is the archenemy, chosen by seat or rolled at the start.
+    archenemy: "Archenemy",
+    rollArchenemy: "Roll at start",
+    schemeDeck: "Scheme deck",
+    // The archenemy brings their own physical scheme deck.
+    ownSchemeDeck: "I have my cards",
     setupTitle: "Game setup",
     newTitle: "New game",
     connectionLabel: "Game connection",

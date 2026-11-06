@@ -636,3 +636,40 @@ describe("nearby games where anyone edits any seat", () => {
     ])
   })
 })
+
+describe("nearby Planechase and Archenemy", () => {
+  it("broadcasts only revealed cards, and turns away guests that can't play the modes", () => {
+    const setup: LanSetup = {
+      ...commander,
+      playerCount: 3,
+      startingLife: 20,
+      ruleset: "constructed",
+      format: "constructed",
+      variant: "archenemy",
+      modeSetup: {
+        archenemy: { seat: 1, deck: "e01-archenemy-nicol-bolas" },
+        planechase: { decks: ["pc12-chaos-reigns"] },
+      },
+    }
+    const older = admitLanGuest(lobby(setup), tokens, join("older"), unused)
+    expect(older).toEqual({ rejected: expect.any(String) })
+    let game = lobby(setup)
+    for (const key of ["guest-a", "guest-b"]) {
+      const admitted = admitLanGuest(
+        game,
+        tokens,
+        { ...join(key), variants: ["archenemy", "planechase"] },
+        { key, token: `token-${key}` },
+      )
+      if ("rejected" in admitted) throw new Error(admitted.rejected)
+      game = admitted.game
+    }
+    const round = startLanRound(game, NOW)
+    const authority = round.memory?.modes
+    expect(authority?.archenemy?.order).toHaveLength(20)
+    const modes = lanProjection(round, "guest-a").table?.modes
+    expect(JSON.stringify(modes)).not.toContain("order")
+    expect(modes?.planechase?.faceUp).toBe(authority?.planechase?.order?.[0])
+    expect(modes?.archenemy).toEqual({ playerId: "host", deck: "e01-archenemy-nicol-bolas" })
+  })
+})

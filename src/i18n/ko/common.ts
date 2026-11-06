@@ -62,6 +62,9 @@ export default {
       yourDeck: "내 덱 선택지를 엽니다",
       system: "시스템 선택지를 엽니다",
       list: "목록 선택지를 엽니다",
+      planechase: "차원 덱 선택지를 엽니다",
+      archenemy: "아크에너미 선택지를 엽니다",
+      schemes: "음모 덱 선택지를 엽니다",
     },
     closeLabel: {
       format: "포맷 선택지 닫기",
@@ -72,6 +75,9 @@ export default {
       yourDeck: "내 덱 선택지 닫기",
       system: "시스템 선택지 닫기",
       list: "목록 선택지 닫기",
+      planechase: "차원 덱 선택지 닫기",
+      archenemy: "아크에너미 선택지 닫기",
+      schemes: "음모 덱 선택지 닫기",
     },
   },
   valueField: {

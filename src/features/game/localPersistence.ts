@@ -55,7 +55,8 @@ import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
-import { parseTableState } from "../../../convex/lib/table"
+import { matchesValidator, parseTableState, type TableState } from "../../../convex/lib/table"
+import { isValidModes, modeSetupValidator } from "../../../convex/lib/tableModes"
 import { isValidTurn, isValidTurnGroups } from "../../../convex/lib/turns"
 
 export const MAX_HISTORY_GAMES = 30
@@ -455,14 +456,17 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   if (!players || events.some((event) => event.gameId !== value.id)) return null
   const result = parseResult(value.result)
   const commanderDamage = parseCommanderDamage(value.commanderDamage)
-  const table = parseTableState(value.table)
+  const playerIds = new Set<string>(players.map(({ id }) => id))
+  const table = withReadableModes(parseTableState(value.table), playerIds)
   const account = parseAccount(value.account, value.system)
   const match = parseMatch(value.match, players.length)
   const clock = parseRoundClock(value.clock)
-  const playerIds = new Set<string>(players.map(({ id }) => id))
   const turn = isValidTurn(value.turn, playerIds) ? value.turn : undefined
   const turnLog = turn ? parseTurnLog(value.turnLog, playerIds) : undefined
   const turnGroups = isValidTurnGroups(value.turnGroups, playerIds) ? value.turnGroups : undefined
+  const modeSetup = matchesValidator(modeSetupValidator, value.modeSetup)
+    ? value.modeSetup
+    : undefined
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -501,7 +505,15 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
+    ...(modeSetup ? { modeSetup } : {}),
   }
+}
+
+// why: a stored game whose modes no longer read, such as a deck since dropped from the catalog, keeps its board without them.
+function withReadableModes(table: TableState | undefined, playerIds: ReadonlySet<string>) {
+  if (!table?.modes || isValidModes(table.modes, playerIds)) return table
+  const { modes: _unreadable, ...rest } = table
+  return rest
 }
 
 function parseTurnLog(value: unknown, playerIds: ReadonlySet<string>): TurnLogEntry[] | undefined {

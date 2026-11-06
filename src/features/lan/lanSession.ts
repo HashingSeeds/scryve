@@ -57,6 +57,7 @@ import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount
 import { nearbyCodeFor, nearbyServiceName } from "./nearbyCode"
 import type { MemoryGame } from "../../../convex/lib/gameEngineMemory"
 import { TABLE_VERSION } from "../../../convex/lib/table"
+import { CLIENT_VARIANTS } from "../../../convex/lib/tableModes"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -583,7 +584,7 @@ export class LanSession {
       protocol: LAN_PROTOCOL,
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
-      variants: ["treachery"],
+      variants: CLIENT_VARIANTS,
       editsAnySeat: true,
       tableVersion: TABLE_VERSION,
       ...(this.pass ? { pass: this.pass } : {}),

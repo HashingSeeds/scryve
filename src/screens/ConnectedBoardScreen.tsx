@@ -89,6 +89,10 @@ import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
+import { modeChipBeside } from "@/features/modes/modeChipBeside"
+import { ModesDialog } from "@/features/modes/ModesDialog"
+import { modeSeamFor } from "@/features/modes/modeSeamFor"
+import { useBoardModes } from "@/features/modes/useBoardModes"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -496,6 +500,7 @@ export function ConnectedBoardWithRuntime({
     undoTurn,
     setBank,
     startTurn,
+    modeAction,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -518,6 +523,7 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      modeAction,
     }),
     [
       tableState,
@@ -539,6 +545,7 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      modeAction,
     ],
   )
   const latest = useRef(runtime)
@@ -1016,6 +1023,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     })
   }
   const turnsOn = tabOn && active && table !== undefined
+  const boardModes = useBoardModes({
+    modes: active ? table?.table.modes : undefined,
+    turn: table?.table.turn,
+    groups: turnGroups,
+    players: turnSeats.map(({ playerId, name }) => ({ id: playerId, name })),
+    controls: (playerId) => controlled.has(playerId),
+    act: (action) => table?.modeAction(action) ?? false,
+  })
+  // why: the turn chip's spot is kept clear of every seat's marks and controls, so the die rides there whenever turns show.
+  const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -1033,7 +1050,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
-        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+        return [
+          ...chips.filter(({ kind }) => kind === "roll"),
+          {
+            kind: "turn",
+            state: {
+              ...turnChip,
+              beside: modeChipBeside(boardModes, player.id, {
+                dieOnChip,
+                plays: (seat) => controlled.has(seat),
+              }),
+            },
+          },
+        ]
       return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -1099,6 +1128,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf: nextPlayerId }
             : undefined
         }
+        seam={modeSeamFor(boardModes, {
+          dieOnChip,
+          slotOf: (playerId) => {
+            const slot = players.findIndex(({ id }) => id === playerId)
+            return slot < 0 ? undefined : slot
+          },
+        })}
         toast={
           turnToast ? (
             <GameToast
@@ -1373,6 +1409,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
+      <ModesDialog modes={boardModes} />
       {roleOpen && myRole?.role && onRevealRole ? (
         <TreacheryRoleDialog
           role={myRole.role}

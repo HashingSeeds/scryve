@@ -12,6 +12,7 @@ import {
 } from "@/components/FirstPlayerTabs"
 import {
   ANCHOR_LOW_ON_SCREEN,
+  COMPACT_MENU_BUTTON_SIZE,
   GameMenuBackdrop,
   GameMenuCluster,
   GameRadialMenu,
@@ -24,7 +25,11 @@ import {
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
-import { getPlayerGridRows } from "@/components/playerGridGeometry"
+import {
+  getMenuSeamNeighbors,
+  getPlayerGridRows,
+  getPlayerSlotFacings,
+} from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
@@ -51,6 +56,8 @@ export interface GameBoardStageProps {
   firstPlayer?: FirstPlayerOffer
   roundClock?: BoardRoundClock
   turns?: BoardTurns
+  /** why: Planechase and Archenemy sit on the menu's seam; the screen picks each plate's facing from the grid's slot facings. */
+  seam?: (geometry: BoardSeamGeometry) => ReactNode
   windowOverlay?: ReactNode
   toast?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
@@ -70,6 +77,15 @@ export interface BoardTurns {
   nextOf: (clockwiseSlots: number[]) => string | undefined
 }
 
+export interface BoardSeamGeometry {
+  anchor: { x: number; y: number }
+  facings: readonly number[]
+  edgeTabs: boolean
+  sides: ReturnType<typeof getMenuSeamNeighbors>
+  width: number
+  menuSize: number
+}
+
 export interface BoardSize {
   width: number
   height: number
@@ -85,6 +101,7 @@ function PinnedGameBoardStage({
   firstPlayer,
   roundClock,
   turns,
+  seam,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -117,6 +134,10 @@ function PinnedGameBoardStage({
   const tabs = useMemo(
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout)),
     [boardAnchor, playerCount, gridLayout],
+  )
+  const facings = useMemo(
+    () => getPlayerSlotFacings(playerCount, gridLayout),
+    [playerCount, gridLayout],
   )
   const holderAnchor = useMemo(
     () => boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle),
@@ -151,6 +172,16 @@ function PinnedGameBoardStage({
                 {renderGrid(boardOrientation)}
               </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
+            {seam && !menu.open
+              ? seam({
+                  anchor: boardAnchor,
+                  facings,
+                  edgeTabs: tabsShown,
+                  sides: getMenuSeamNeighbors(playerCount, gridLayout),
+                  width,
+                  menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+                })
+              : null}
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
               open={menu.open}
@@ -188,6 +219,7 @@ function LegacyGameBoardStage({
   firstPlayer,
   roundClock,
   turns,
+  seam,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -211,6 +243,10 @@ function LegacyGameBoardStage({
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
     [boardAnchor, playerCount, gridLayout, rotation],
   )
+  const facings = useMemo(
+    () => getPlayerSlotFacings(playerCount, gridLayout),
+    [playerCount, gridLayout],
+  )
   const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
 
@@ -226,6 +262,16 @@ function LegacyGameBoardStage({
           {renderGrid(boardOrientation)}
         </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
+      {seam && !menu.open && rotation === 0
+        ? seam({
+            anchor: boardAnchor,
+            facings,
+            edgeTabs: tabsShown,
+            sides: getMenuSeamNeighbors(playerCount, gridLayout),
+            width,
+            menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+          })
+        : null}
       <GameRadialMenu
         {...menu}
         anchor={menuAnchor}

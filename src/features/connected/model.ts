@@ -17,7 +17,13 @@ import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
-import { parseTableState, type TableAction, type TableState } from "../../../convex/lib/table"
+import {
+  matchesValidator,
+  parseTableState,
+  type TableAction,
+  type TableState,
+} from "../../../convex/lib/table"
+import { modeSetupValidator, type ModeSetup } from "../../../convex/lib/tableModes"
 import {
   isTreacheryRole,
   type GameVariant,
@@ -124,6 +130,7 @@ export interface ConnectedProjection {
   system?: PlaySystemId
   format?: string
   variant?: GameVariant
+  modeSetup?: ModeSetup
   layout?: PlayerGridLayoutVariant
   deckRequired?: boolean
   startingLife: number
@@ -342,7 +349,12 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
           format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
         }
       : {}),
-    ...(value.variant === "treachery" ? { variant: value.variant } : {}),
+    ...(value.variant === "treachery" || value.variant === "archenemy"
+      ? { variant: value.variant }
+      : {}),
+    ...(matchesValidator(modeSetupValidator, value.modeSetup)
+      ? { modeSetup: value.modeSetup }
+      : {}),
     ...(isPlayerGridLayoutVariant(value.layout) ? { layout: value.layout } : {}),
     deckRequired: value.deckRequired ?? false,
     startingLife: value.startingLife,

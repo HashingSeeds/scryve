@@ -72,6 +72,7 @@ export const engineGameOf = (
     | "lifeEditing"
     | "turn"
     | "turnGroups"
+    | "modes"
   >,
 ): EngineGame => ({
   status: game.status,
@@ -81,6 +82,7 @@ export const engineGameOf = (
   ...(game.lifeEditing ? { lifeEditing: game.lifeEditing } : {}),
   ...(game.turn ? { turn: game.turn } : {}),
   ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+  ...(game.modes ? { modes: game.modes } : {}),
 })
 
 export interface EngineGame {
@@ -91,6 +93,7 @@ export interface EngineGame {
   lifeEditing?: LifeEditing
   turn?: Turn
   turnGroups?: TableState["turnGroups"]
+  modes?: TableState["modes"]
 }
 
 export interface EngineSeat extends SeatOwner, PlayerTable {
@@ -165,6 +168,7 @@ export type GameChange =
   | (CommanderPair & { kind: "pair.put"; total: number; updatedAt: number })
   | { kind: "designations.set"; designations: TableState["designations"] }
   | { kind: "turn.set"; turn: Turn | undefined }
+  | { kind: "modes.set"; modes: TableState["modes"] }
 
 export interface WriteRequest {
   operationId: string
@@ -508,6 +512,7 @@ export function changeTable(
     players: Object.fromEntries([...rows.values()].map((row) => [row.id, seatTable(row)])),
     ...(game.turn ? { turn: game.turn } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+    ...(game.modes ? { modes: game.modes } : {}),
   }
   const result = applyTableAction(table, action, {
     rules: tableRules(game.system, game.format),
@@ -540,6 +545,8 @@ export function changeTable(
   if (result.table.designations !== table.designations)
     changes.push({ kind: "designations.set", designations: result.table.designations })
   if (result.table.turn !== table.turn) changes.push({ kind: "turn.set", turn: result.table.turn })
+  if (result.table.modes !== table.modes)
+    changes.push({ kind: "modes.set", modes: result.table.modes })
 
   const lifeChange = result.life[0]
   const actionDelta = tableActionDelta(action)
