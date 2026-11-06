@@ -82,6 +82,8 @@ const common = {
   optionGrid: {
     // Screen reader label for the pencil button after a row of number choices; it opens a field to type a different number.
     other: "Other value",
+    // Screen reader label for a "7+" button after a row of number choices; it reveals the larger numbers. {{label}} is the row's heading, such as "Players".
+    more: "{{label}}: {{from}} or more",
   },
 }
 

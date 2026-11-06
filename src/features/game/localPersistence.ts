@@ -51,6 +51,7 @@ import type {
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
+import { MAX_PLAYERS, MIN_PLAYERS } from "../../../convex/lib/policy"
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { parseTableState } from "../../../convex/lib/table"
@@ -218,7 +219,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parsePlayers(value: unknown): GamePlayer[] | null {
-  if (!Array.isArray(value) || value.length < 2 || value.length > 6) return null
+  if (!Array.isArray(value) || value.length < MIN_PLAYERS || value.length > MAX_PLAYERS) return null
   const players: GamePlayer[] = []
   for (const candidate of value) {
     if (
@@ -499,8 +500,8 @@ function parseSettings(value: unknown): LocalSettings | null {
   if (
     migrated.schemaVersion !== 1 ||
     typeof migrated.defaultPlayerCount !== "number" ||
-    migrated.defaultPlayerCount < 2 ||
-    migrated.defaultPlayerCount > 6 ||
+    migrated.defaultPlayerCount < MIN_PLAYERS ||
+    migrated.defaultPlayerCount > MAX_PLAYERS ||
     typeof migrated.defaultStartingLife !== "number" ||
     migrated.defaultStartingLife < startingValue.min ||
     migrated.defaultStartingLife > startingValue.max ||

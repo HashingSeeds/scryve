@@ -43,7 +43,19 @@ Target
 
 const PRODUCTION_DEPLOYMENT = "dashing-curlew-34"
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-const COLORS = ["#B85636", "#41476E", "#39755C", "#94632D", "#77558A", "#A33A52", "#117B9C"]
+const COLORS = [
+  "#B85636",
+  "#41476E",
+  "#39755C",
+  "#94632D",
+  "#77558A",
+  "#A33A52",
+  "#117B9C",
+  "#857200",
+  "#507C24",
+  "#A8458F",
+]
+const MAX_SEATS = 10
 const FINISHED = new Set(["finished", "abandoned"])
 
 function parseDuration(value, name) {
@@ -99,8 +111,13 @@ function parseCli(argv) {
     throw new Error("--variant must be treachery")
   if (!["stay", "leave", "finish"].includes(values.end))
     throw new Error("--end must be stay, leave or finish")
-  const players = parseCount(values.players ?? (values.variant ? "4" : "2"), "players", 2, 6)
-  if (values.variant === "treachery" && players < 4)
+  const players = parseCount(
+    values.players ?? (values.variant ? "4" : "2"),
+    "players",
+    2,
+    MAX_SEATS,
+  )
+  if (values.variant === "treachery" && (players < 4 || players > 6))
     throw new Error("--variant treachery needs --players 4 to 6")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
   const none = values.format === "none"
@@ -225,6 +242,7 @@ class Bot {
     await this.client.mutation(api.users.syncCurrent, { displayName: this.name })
     const { page } = await this.client.query(api.games.activeConnectedGames, {
       paginationOpts: { numItems: 10, cursor: null },
+      maxSeats: MAX_SEATS,
     })
     for (const game of page.filter((game) => game.isHost)) {
       await this.client.mutation(api.games.abandonGame, { publicId: game.publicId })
@@ -242,6 +260,7 @@ class Bot {
       hostDisplayName: this.name,
       hostColor: COLORS[0],
       deviceId: this.deviceId,
+      maxSeats: MAX_SEATS,
     })
     this.publicId = lobby.publicId
     this.watch()
@@ -257,6 +276,7 @@ class Bot {
       deviceId: this.deviceId,
       systems: SYSTEM_IDS,
       variants: ["treachery"],
+      maxSeats: MAX_SEATS,
     })
     this.publicId = seat.publicId
     this.report(this, "joined", { seat: seat.seat })

@@ -131,6 +131,21 @@ describe("nearby lobby", () => {
     expect(setLanPlayerCount(playing, 4)).toBe(playing)
   })
 
+  it("keeps guests that draw at most six seats out of bigger tables", () => {
+    const big = lobby({ ...commander, playerCount: 8 })
+    const current = { ...join("new"), maxSeats: 10 }
+
+    expect(admitLanGuest(big, tokens, join("old"), unused)).toEqual({
+      rejected: "Update Scryve to join this game.",
+    })
+    const seated = admitLanGuest(big, tokens, current, { key: "new", token: "t" })
+    expect(seated).toHaveProperty("game.seats.1.key", "new")
+    if ("rejected" in seated) return
+    expect(setLanPlayerCount(seated.game, 10).setup.playerCount).toBe(10)
+    const withOld = seatGuest(setLanPlayerCount(seated.game, 4), "old")
+    expect(setLanPlayerCount(withOld, 7)).toBe(withOld)
+  })
+
   it("is ready to start only when every chosen seat is filled and present", () => {
     const full = seatGuest(lobby(), "guest")
 

@@ -22,6 +22,7 @@ import {
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
 import { outReason } from "../../../convex/lib/outReason"
+import { clientSeesSeats } from "../../../convex/lib/policy"
 import {
   identitySection,
   startingValueRange,
@@ -113,6 +114,7 @@ export interface LanDealtRole {
 
 export interface LanGame extends LanLobby {
   hostKey: string
+  seatLimits?: Readonly<Record<string, number>>
   roles?: Readonly<Record<string, LanDealtRole>>
   memory?: MemoryGame
   recentOperationIds: string[]
@@ -134,6 +136,7 @@ export type LanGuestMessage =
       systems?: readonly PlaySystemId[]
       variants?: readonly GameVariant[]
       editsAnySeat?: boolean
+      maxSeats?: number
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
@@ -227,7 +230,8 @@ export function admitLanGuest(
   if (
     join.protocol !== LAN_PROTOCOL ||
     (system && !systems.includes(system)) ||
-    (variant && !join.variants?.includes(variant))
+    (variant && !join.variants?.includes(variant)) ||
+    !clientSeesSeats(game.setup.playerCount, join.maxSeats)
   )
     return { rejected: LAN_REJECTIONS.update }
   const { pass } = join
@@ -254,7 +258,14 @@ export function admitLanGuest(
     connected: true,
     ...editsAnySeat,
   }
-  return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
+  return {
+    game: {
+      ...game,
+      seats: [...game.seats, seat],
+      ...(join.maxSeats ? { seatLimits: { ...game.seatLimits, [fresh.key]: join.maxSeats } } : {}),
+    },
+    pass: fresh,
+  }
 }
 
 export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
@@ -263,7 +274,10 @@ export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
     !Number.isInteger(playerCount) ||
     playerCount < Math.max(LAN_MIN_PLAYERS, game.seats.length) ||
     playerCount > LAN_MAX_SEATS ||
-    !fitsVariant(game.setup, playerCount)
+    !fitsVariant(game.setup, playerCount) ||
+    game.seats.some(
+      ({ key }) => key !== game.hostKey && !clientSeesSeats(playerCount, game.seatLimits?.[key]),
+    )
   )
     return game
   return { ...game, setup: { ...game.setup, playerCount } }
@@ -693,6 +707,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
         ? { variants: value.variants.filter((variant) => variant === "treachery") }
         : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
+      ...(isCount(value.maxSeats) ? { maxSeats: value.maxSeats } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }

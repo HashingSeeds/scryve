@@ -6,6 +6,7 @@ import {
 import type { LifeCardContentRotation } from "./playerCardTypes"
 
 const SINGLE_PLAYER_ROW_FLEX = 0.8
+const BIG_TABLE_FROM = 7
 
 export function getPlayerGridRows(
   playerCount: number,
@@ -101,6 +102,8 @@ export function getPlayerContentRotation(input: {
     return input.slot === 0 ? 180 : 0
 
   const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
+  if (input.playerCount >= BIG_TABLE_FROM && occupiedColumns.length > 2)
+    return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
   if (occupiedColumns.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
   if (input.columnIndex === occupiedColumns[0]) return 90
   if (input.columnIndex === occupiedColumns[occupiedColumns.length - 1]) return -90
@@ -157,15 +160,19 @@ export function getPlayerGridLayout(input: {
   const largeText = (input.fontScale ?? 1) >= 1.4
   const denseColumnCount = input.spansHinge ? (landscape ? 2 : 3) : landscape ? 3 : 2
   const automaticColumnCount =
-    input.playerCount === 2
+    input.playerCount > BIG_TABLE_FROM - 1
       ? landscape
-        ? 2
-        : 1
-      : input.playerCount === 3 && landscape
-        ? 3
-        : input.playerCount >= 5
-          ? denseColumnCount
-          : 2
+        ? Math.ceil(input.playerCount / 2)
+        : 2
+      : input.playerCount === 2
+        ? landscape
+          ? 2
+          : 1
+        : input.playerCount === 3 && landscape
+          ? 3
+          : input.playerCount >= 5
+            ? denseColumnCount
+            : 2
   const variant = playerGridLayoutForCount(input.playerCount, input.layoutVariant)
   const columnCount =
     variant === "featured-first" ||

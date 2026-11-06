@@ -4,7 +4,7 @@ import Constants from "expo-constants"
 import type PostHog from "posthog-react-native"
 
 import { DICE_TOOLS, type DiceTool } from "@/features/game/dice"
-import { createClientId } from "@/features/game/domain"
+import { createClientId, MAX_PLAYERS, MIN_PLAYERS } from "@/features/game/domain"
 import type { GameShape } from "@/features/game/gameShape"
 import { isPlaySystemId, playSystemFormats } from "@/features/game/playSystems"
 import { buildEnvironment } from "@/utils/buildEnvironment"
@@ -202,7 +202,12 @@ export function analyticsProperties(event: string, properties: Record<string, un
           ? String(value)
           : "none"
     } else if (key === "player_count") {
-      if (typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= 6)
+      if (
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= MIN_PLAYERS &&
+        value <= MAX_PLAYERS
+      )
         result[key] = value
     } else if (NUMBER_KEYS.has(key)) {
       if (typeof value === "number" && Number.isFinite(value) && value >= 0)

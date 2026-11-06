@@ -190,6 +190,7 @@ export interface LocalConnectFeed {
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
+const MORE_PLAYER_COUNTS = [7, 8, 9, 10]
 const NEW_GAME_FIELDS = [
   "system",
   "format",
@@ -961,6 +962,7 @@ function NewGameForm({
                     : translate("play:newGame.players")
                 }
                 options={PLAYER_COUNTS}
+                more={treachery ? undefined : MORE_PLAYER_COUNTS}
                 value={playerCount}
                 isDisabled={treachery ? (count) => !isTreacheryPlayerCount(count) : undefined}
                 onSelect={(value) => {

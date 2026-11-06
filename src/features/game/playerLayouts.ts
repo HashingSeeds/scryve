@@ -33,6 +33,16 @@ function layoutLabels(playerCount: number): [PlayerGridLayoutVariant, PlayerGrid
       ["featured-first", "topFocus"],
       ["even-grid", "evenGrid"],
     ]
+  if (playerCount === 8 || playerCount === 10)
+    return [
+      ["auto", "balanced"],
+      ["tabletop", "table"],
+    ]
+  if (playerCount === 7 || playerCount === 9)
+    return [
+      ["auto", "bottomFocus"],
+      ["featured-first", "topFocus"],
+    ]
   return [["auto", "balanced"]]
 }
 
@@ -64,7 +74,7 @@ export function playerGridLayoutForCount(
 
 export function defaultConnectedLayout(playerCount: number): PlayerGridLayoutVariant {
   if (playerCount === 3) return "featured-last"
-  if (playerCount === 4 || playerCount >= 6) return "tabletop"
+  if (playerCount === 4 || playerCount === 6) return "tabletop"
   return "auto"
 }
 

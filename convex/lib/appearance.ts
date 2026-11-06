@@ -14,6 +14,21 @@ export const ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES = [
   "circle",
 ] as const
 
+/** why: only builds that draw more than six seats can sit at a bigger table, and those draw every free mark. */
+export const MANY_SEAT_MARK_SHAPES = [
+  "heart",
+  "triangle",
+  "square",
+  "diamond",
+  "star",
+  "hexagon",
+  "plus",
+  "shield",
+  "moon",
+  "ring",
+  "circle",
+] as const
+
 export const PLAYER_MARK_SHAPES = [
   "heart",
   "triangle",
@@ -23,6 +38,8 @@ export const PLAYER_MARK_SHAPES = [
   "hexagon",
   "plus",
   "shield",
+  "moon",
+  "ring",
 ] as const
 
 /** why: Pro marks render only in builds that know them, so they never join the seat-default or connected lists that every installed client must draw. */
@@ -53,6 +70,8 @@ export const PLAYER_COLOR_CHOICES = [
   "#A33A52",
   "#117B9C",
   "#857200",
+  "#507C24",
+  "#A8458F",
 ] as const
 
 export type PlayerAppearance = { color: string; shape: PlayerMarkShape }

@@ -38,7 +38,7 @@ describe("game seed", () => {
   it.each([
     [{ system: "hearthstone" }, /system must be one of/],
     [{ format: "vintage-cube" }, /format for mtg must be one of/],
-    [{ players: "7" }, /players must be 2-6/],
+    [{ players: "11" }, /players must be 2-10/],
     [{ players: "4", life: "40,40" }, /life lists 2 values for 4 players/],
     [{ players: "2", layout: "tabletop" }, /layout for 2 players/],
     [{ cmd: "1>2:5" }, /cmd needs system=mtg&format=commander/],
