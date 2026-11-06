@@ -79,6 +79,7 @@ import {
   seatMarkArt,
 } from "../SeatIdentity"
 import { Text } from "../Text"
+import { TurnChipLayer } from "../TurnChip"
 
 export interface PokemonSeatCardProps {
   playerId: string
@@ -169,6 +170,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const sideways = Math.abs(contentRotation) === 90
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
+  const turnChip = diceChips?.flatMap((chip) => (chip.kind === "turn" ? [chip.state] : []))[0]
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const layer = sideways
     ? { width: cardSize.height, height: cardSize.width }
@@ -858,6 +860,19 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+        />
+      ) : null}
+      {turnChip && !dice?.view && !sheetMode && !diceCovers ? (
+        <TurnChipLayer
+          state={turnChip}
+          seatNumber={seatNumber}
+          foreground={ink}
+          compact={cramped}
+          rotation={contentRotation}
+          cardSize={cardSize}
+          contentInsets={contentInsets}
+          menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
         />
       ) : null}
       {dice && diceCovers ? (

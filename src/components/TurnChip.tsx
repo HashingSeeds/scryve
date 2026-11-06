@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react"
+import { useEffect, useReducer, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import Svg, { Path } from "react-native-svg"
@@ -10,14 +10,21 @@ import type { ThemedStyle } from "@/theme/types"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
 import { BoardPressable } from "./BoardPressable"
+import type {
+  LifeCardContentInsets,
+  LifeCardContentRotation,
+  LifeCardMenuCorner,
+  LifeCardMenuEdge,
+} from "./playerCardTypes"
+import { CONTENT_EDGES, contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
 import { Text } from "./Text"
 import { useTurnSpotlight } from "./TurnSpotlight"
 import { bankLeft, turnElapsed } from "../../convex/lib/turns"
 
-// why: prototype switch for the round 4 screenshots; one design ships.
-export const TURN_CHIP_DESIGN: "word" | "chevron" | "filled" = "word"
-
 const TICK_MS = 1_000
+/** why: half the largest (80pt) menu pentagon plus an 8pt gap, measured along the edge from the pentagon's center. */
+const MENU_HALF_RUN = 48
+const EDGE_GAP = 8
 
 /** why: only the chip's text ticks, so the card around it never re-renders with the clock. */
 function useNow(ticking: boolean) {
@@ -31,9 +38,73 @@ function useNow(ticking: boolean) {
 }
 
 /**
- * why: the chip passes to the seat the board frames as next, so the frame and the pass can never
- * disagree about who comes after.
+ * why: the chip sits centered on the card's far edge from its player. Where the menu pentagon
+ * shares that edge, it slides along the edge just clear of the pentagon, toward the side with more
+ * room, so it never moves down toward the life total.
  */
+export function turnChipLeft(input: {
+  run: number
+  width: number
+  rotation: LifeCardContentRotation
+  menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
+}) {
+  const { run, width, rotation, menuCorner, menuEdgeCenter } = input
+  const edges = CONTENT_EDGES[rotation]
+  const centered = (run - width) / 2
+  const clamp = (left: number) => Math.min(Math.max(left, EDGE_GAP), run - width - EDGE_GAP)
+  if (menuEdgeCenter === edges.top) return clamp(run / 2 + MENU_HALF_RUN)
+  const corner = menuCorner?.toLowerCase()
+  if (!corner?.includes(edges.top)) return centered
+  return corner.includes(edges.left)
+    ? clamp(Math.max(centered, MENU_HALF_RUN))
+    : clamp(Math.min(centered, run - MENU_HALF_RUN - width))
+}
+
+export function TurnChipLayer({
+  state,
+  seatNumber,
+  foreground,
+  compact,
+  rotation,
+  cardSize,
+  contentInsets,
+  menuCorner,
+  menuEdgeCenter,
+}: {
+  state: TurnChipState
+  seatNumber: number
+  foreground: string
+  compact?: boolean
+  rotation: LifeCardContentRotation
+  cardSize: { width: number; height: number }
+  contentInsets?: LifeCardContentInsets
+  menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
+}) {
+  const [width, setWidth] = useState(0)
+  if (cardSize.width === 0 || cardSize.height === 0) return null
+  const run = Math.abs(rotation) === 90 ? cardSize.height : cardSize.width
+  const insets = contentInsetsFor(rotation, contentInsets)
+  const left = turnChipLeft({ run, width, rotation, menuCorner, menuEdgeCenter })
+  return (
+    <View
+      testID={`turn-chip-layer-seat-${seatNumber}`}
+      pointerEvents="box-none"
+      style={[$layer, rotatedLayerStyle(rotation, cardSize.width, cardSize.height)]}
+    >
+      <View
+        pointerEvents="box-none"
+        onLayout={({ nativeEvent: { layout } }) => setWidth(layout.width)}
+        style={[$slot, { top: EDGE_GAP + insets.top, left }, width === 0 && $measuring]}
+      >
+        <TurnChip state={state} seatNumber={seatNumber} foreground={foreground} compact={compact} />
+      </View>
+    </View>
+  )
+}
+
+/** why: the chip passes to the seat the board frames as next, so the frame and the pass can never disagree about who comes after. */
 export function TurnChip({
   state,
   seatNumber,
@@ -56,8 +127,7 @@ export function TurnChip({
   const outOfTime = bank !== undefined && bank <= 0
   const time = formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
   const tick = Math.floor(now / TICK_MS) % 2 === 0
-  const filled = TURN_CHIP_DESIGN === "filled" && canPress
-  const ink = outOfTime ? colors.board.text : filled ? inverse(foreground) : foreground
+  const ink = outOfTime ? colors.board.text : foreground
   const name = state.nameOf(turn.playerId) ?? ""
   const nextName = next ? state.nameOf(next) : undefined
   const label = [
@@ -93,20 +163,22 @@ export function TurnChip({
         weight="bold"
         style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
       />
-      {canPress && !outOfTime && TURN_CHIP_DESIGN === "word" ? (
+      {canPress && !outOfTime ? (
         <>
           <View style={[$rule, { backgroundColor: ink }]} />
-          <Text tx="board:turn.pass" weight="medium" style={[$word, { color: ink }]} />
+          <Text
+            tx="board:turn.pass"
+            weight="semiBold"
+            style={[compact ? $compactWord : $word, { color: ink }]}
+          />
         </>
       ) : null}
-      {canPress && !outOfTime && TURN_CHIP_DESIGN === "chevron" ? <Chevron color={ink} /> : null}
     </>
   )
 
   const shape: ViewStyle[] = [
     themed(compact ? $compactChip : $chip),
     { borderColor: foreground },
-    ...(filled ? [{ backgroundColor: foreground }] : []),
     ...(outOfTime ? [{ backgroundColor: colors.error, borderColor: colors.error }] : []),
     ...(canPress ? [] : [$passive]),
   ]
@@ -137,8 +209,6 @@ export function TurnChip({
   )
 }
 
-const inverse = (color: string) => (color.toUpperCase() === "#FFFFFF" ? "#000000" : "#FFFFFF")
-
 function PlayGlyph({ color }: { color: string }) {
   return (
     <Svg width={10} height={10} viewBox="0 0 24 24">
@@ -147,21 +217,9 @@ function PlayGlyph({ color }: { color: string }) {
   )
 }
 
-function Chevron({ color }: { color: string }) {
-  return (
-    <Svg width={8} height={12} viewBox="0 0 8 12">
-      <Path
-        d="M2 1.5 6.5 6 2 10.5"
-        stroke={color}
-        strokeWidth={2.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </Svg>
-  )
-}
-
+const $layer: ViewStyle = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }
+const $slot: ViewStyle = { position: "absolute" }
+const $measuring: ViewStyle = { opacity: 0 }
 const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
@@ -176,17 +234,18 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
-  gap: spacing.xxxs,
+  gap: spacing.xxs,
   minHeight: 32,
-  paddingHorizontal: spacing.xxs,
+  paddingHorizontal: spacing.xs,
   borderRadius: radius.md,
   borderWidth: 1.5,
 })
 const $value: ThemedStyle<TextStyle> = () => ({ fontSize: 15, lineHeight: 18 })
-const $compactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 13, lineHeight: 16 })
+const $compactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 14, lineHeight: 17 })
 const $digits: TextStyle = { fontVariant: ["tabular-nums"] }
-const $word: TextStyle = { fontSize: 11, lineHeight: 14, opacity: 0.85 }
-const $rule: ViewStyle = { width: 1, alignSelf: "stretch", marginVertical: 8, opacity: 0.4 }
+const $word: TextStyle = { fontSize: 12, lineHeight: 15 }
+const $compactWord: TextStyle = { fontSize: 11, lineHeight: 14 }
+const $rule: ViewStyle = { width: 1, alignSelf: "stretch", marginVertical: 8, opacity: 0.6 }
 const $dot: ViewStyle = { width: 5, height: 5, borderRadius: 3 }
 const $tickOn: ViewStyle = { opacity: 0.9 }
 const $tickOff: ViewStyle = { opacity: 0.3 }

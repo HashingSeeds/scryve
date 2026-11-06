@@ -18,7 +18,6 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 import { BoardPressable } from "./BoardPressable"
 import { DieFace } from "./DiceGlyph"
 import { Text } from "./Text"
-import { TurnChip } from "./TurnChip"
 
 export const DICE_CHIP_HEIGHT = 36
 export const COMPACT_DICE_CHIP_HEIGHT = 32
@@ -51,7 +50,7 @@ export function DiceChips({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [rowOffset, setRowOffset] = useState<Point>()
-  if (chips.length === 0) return null
+  if (!chips.some(({ kind }) => kind !== "turn")) return null
   const flight =
     reducedMotion === false && bloomCenterInRow && rowOffset
       ? { x: bloomCenterInRow.x - rowOffset.x, y: bloomCenterInRow.y - rowOffset.y }
@@ -75,17 +74,8 @@ export function DiceChips({
       style={themed($row)}
     >
       {chips.map((chip) => {
-        if (chip.kind === "turn")
-          return (
-            <ChipFlight key="turn" entering={entering} awaiting={false}>
-              <TurnChip
-                state={chip.state}
-                seatNumber={seatNumber}
-                foreground={foreground}
-                compact={compact}
-              />
-            </ChipFlight>
-          )
+        // why: the turn chip has its own spot at the top of the card, out of the name's row.
+        if (chip.kind === "turn") return null
         const key = chipKey(chip)
         const claim = chip.kind === "claim"
         const label =
