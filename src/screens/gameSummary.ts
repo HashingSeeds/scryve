@@ -18,6 +18,7 @@ import { appLocale, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 
 import type { HistoryOutcome, HistorySource } from "./historyEntries"
+import type { GameVariant } from "../../convex/lib/treachery"
 import { turnGroupOf, type TurnGroups } from "../../convex/lib/turns"
 
 export type SummaryOutcome = HistoryOutcome
@@ -132,6 +133,7 @@ export interface ConnectedSummaryDocument {
   startingLife: number
   system?: string
   format?: string
+  variant?: GameVariant
   ruleset: string
   eventCount: number
   finishedAt: number
@@ -171,7 +173,14 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
     startingLife: summary.startingLife,
     system,
     format: system
-      ? playFormatLabel(system, summary.format || summary.ruleset)
+      ? summary.variant
+        ? gameTypeLabel({
+            id: summary.variant,
+            system,
+            format: summary.format || summary.ruleset,
+            variant: summary.variant,
+          })
+        : playFormatLabel(system, summary.format || summary.ruleset)
       : counterValueLabel(system, summary.startingLife),
     changeCount: summary.eventCount,
     terminalReason: unusualEnding(summary.terminalReason),

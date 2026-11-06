@@ -753,6 +753,7 @@ async function terminalizeGame(
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
     ...(options.matchId ? { matchId: options.matchId } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+    ...(game.variant ? { variant: game.variant } : {}),
   })
   const summary = (await ctx.db.get(summaryId))!
   const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()
