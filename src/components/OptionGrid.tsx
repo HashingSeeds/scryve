@@ -41,7 +41,7 @@ export function OptionGrid({
     if (next !== value) onSelect(next)
   }
 
-  // why: Done sits outside the sheet's scroll view, so a tap there can close the sheet before the field blurs; each keystroke that lands in range is picked at once.
+  // why: the action that consumes the value (Start, Done) can sit outside the scroll view, so a tap there can land before the field blurs; each keystroke that lands in range is picked at once.
   function type(text: string) {
     if (!custom) return
     const digits = text.replace(/\D/g, "").slice(0, String(custom.max).length)

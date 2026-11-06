@@ -1,5 +1,5 @@
 import { router } from "expo-router"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import {
   applyGameCommand,
@@ -144,7 +144,7 @@ describe("new local game route", () => {
     expect(view.getByTestId("game-type-commander").props.accessibilityState.selected).toBe(true)
     fireEvent.press(view.getByTestId("mode-connected"))
     expect(view.getByTestId("game-type-treachery").props.accessibilityState.selected).toBe(true)
-    expect(view.getByText("5 seats · 40 life")).toBeTruthy()
+    expectSetup(view, 5, 40)
     fireEvent.press(view.getByTestId("mode-local"))
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(router.dismissTo).toHaveBeenCalled()
@@ -176,7 +176,7 @@ describe("new local game route", () => {
     fireEvent.press(view.getByTestId("game-tab-ygo"))
     fireEvent.press(view.getByTestId("mode-connected"))
     expect(view.getByTestId("game-type-ygo-advanced").props.accessibilityState.selected).toBe(true)
-    expect(view.getByText("2 seats · 8000 Life Points")).toBeTruthy()
+    expectSetup(view, 2, 8000)
   })
 
   it("connects setup to persisted current-game navigation", () => {
@@ -222,7 +222,7 @@ describe("new local game route", () => {
     mockSearchParams = {}
     view.rerender(renderRoute())
     expect(view.queryByTestId("guard-resume-game-button")).toBeNull()
-    expect(view.getByText(/players · 40 life/)).toBeTruthy()
+    expect(view.getByTestId("starting-counter-40").props.accessibilityState.selected).toBe(true)
     fireEvent.press(view.getByTestId("start-game-button"))
     expect(view.queryByText("Reset this game?")).toBeNull()
     const started = localGameRepository.loadActiveGame()
@@ -296,7 +296,7 @@ describe("new local game route", () => {
     expect(view.getByTestId("start-game-button")).toBeEnabled()
   })
 
-  it("keeps a staged setup through a closed end prompt, and New game starts it", () => {
+  it("stages a setup change over a running game until New game, and keeps it through a closed end prompt", () => {
     const game = createLocalGame({
       startingLife: 20,
       players: [
@@ -312,13 +312,13 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     fireEvent.changeText(view.getByTestId("player-name-1"), "Alex")
-    fireEvent.press(view.getByTestId("setup-change-button"))
     fireEvent.press(view.getByTestId("player-count-3"))
-    fireEvent.press(view.getByTestId("setup-options-done"))
+    expect(view.queryByTestId("end-game-dialog")).toBeNull()
+    fireEvent.press(view.getByTestId("start-game-button"))
     expect(view.getByTestId("end-game-dialog")).toBeTruthy()
     fireEvent.press(view.getByTestId("end-game-backdrop"))
     expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
-    expect(view.getByText(/^3 players/)).toBeTruthy()
+    expectSetup(view, 3)
 
     fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-winner-1"))
@@ -597,3 +597,15 @@ describe("new local game route while signed in", () => {
     })
   })
 })
+
+function expectSetup(
+  view: Pick<ReturnType<typeof within>, "getByTestId" | "queryByTestId">,
+  players: number,
+  life?: number,
+) {
+  expect(view.getByTestId(`player-count-${players}`).props.accessibilityState.selected).toBe(true)
+  if (life === undefined) return
+  const chip =
+    view.queryByTestId(`starting-counter-${life}`) ?? view.getByTestId("starting-counter-custom")
+  expect(chip.props.accessibilityState.selected).toBe(true)
+}

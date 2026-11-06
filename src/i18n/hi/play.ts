@@ -49,7 +49,7 @@ export default {
     resumeHostedGame: "होस्ट किया गया गेम फिर शुरू करें",
     moreFormats_one: "{{count}} और",
     moreFormats_other: "{{count}} और",
-    change: "बदलें",
+    moreOptions: "और विकल्प",
     closeOptions: "गेम विकल्प बंद करें",
     seatsCount_one: "{{count}} सीट",
     seatsCount_other: "{{count}} सीट",
