@@ -127,6 +127,28 @@ export function getPlayerGridFacings(
   return [...new Set(facings.filter((facing) => acrossBoard(facing) === keepAcross))]
 }
 
+/** why: the seam's plates turn toward one seat, so they need each slot's own facing, indexed by slot. */
+export function getPlayerSlotFacings(
+  playerCount: number,
+  layout: ReturnType<typeof getPlayerGridLayout>,
+): LifeCardContentRotation[] {
+  const facings: LifeCardContentRotation[] = []
+  getPlayerGridRows(playerCount, layout).forEach((row, rowIndex) =>
+    row.forEach((slot, columnIndex) => {
+      if (slot !== null)
+        facings[slot] = getPlayerContentRotation({
+          playerCount,
+          layout,
+          row,
+          rowIndex,
+          columnIndex,
+          slot,
+        })
+    }),
+  )
+  return facings
+}
+
 export function chunkSeats(
   seats: number[],
   columnCount: number,

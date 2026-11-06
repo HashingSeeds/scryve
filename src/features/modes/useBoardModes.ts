@@ -83,7 +83,7 @@ export function useBoardModes({ modes, turn, groups, players, controls, act }: B
     ? {
         card: faceUpPlane(planechase),
         phenomenon: faceUpPlane(planechase)?.kind === "phenomenon",
-        cost: rollCost(planechase, turn, roller ?? turn?.playerId ?? ""),
+        cost: rollCost(planechase, turn, roller ?? lastRolled?.playerId ?? ""),
         roller,
         activeId: turn?.playerId,
         lastRoll: lastRolled?.face ? { face: lastRolled.face, at: lastRolled.at } : undefined,

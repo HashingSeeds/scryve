@@ -24,7 +24,7 @@ import {
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
-import { getPlayerGridRows } from "@/components/playerGridGeometry"
+import { getPlayerGridRows, getPlayerSlotFacings } from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
@@ -123,11 +123,14 @@ function PinnedGameBoardStage({
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
+  const tabs = useMemo(
+    () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout)),
+    [boardAnchor, playerCount, gridLayout],
+  )
   const facings = useMemo(
-    () => getPlayerGridFacings(playerCount, gridLayout),
+    () => getPlayerSlotFacings(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
-  const tabs = useMemo(() => firstPlayerTabs(boardAnchor, facings), [boardAnchor, facings])
   const holderAnchor = useMemo(
     () => boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle),
     [boardAnchor, width, height, holderAngle],
@@ -161,7 +164,9 @@ function PinnedGameBoardStage({
                 {renderGrid(boardOrientation)}
               </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
-            {seam && !menu.open ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown }) : null}
+            {seam && !menu.open
+              ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown })
+              : null}
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
               open={menu.open}
@@ -219,13 +224,13 @@ function LegacyGameBoardStage({
     () => rotateGameBoardAnchor(boardAnchor, rotation),
     [boardAnchor, rotation],
   )
-  const facings = useMemo(
-    () => getPlayerGridFacings(playerCount, gridLayout),
-    [playerCount, gridLayout],
-  )
   const tabs = useMemo(
-    () => firstPlayerTabs(boardAnchor, facings, rotation),
-    [boardAnchor, facings, rotation],
+    () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
+    [boardAnchor, playerCount, gridLayout, rotation],
+  )
+  const facings = useMemo(
+    () => getPlayerSlotFacings(playerCount, gridLayout),
+    [playerCount, gridLayout],
   )
   const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
@@ -242,7 +247,9 @@ function LegacyGameBoardStage({
           {renderGrid(boardOrientation)}
         </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
-      {seam && !menu.open && rotation === 0 ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown }) : null}
+      {seam && !menu.open && rotation === 0
+        ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown })
+        : null}
       <GameRadialMenu
         {...menu}
         anchor={menuAnchor}

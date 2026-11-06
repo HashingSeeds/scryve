@@ -256,7 +256,7 @@ class Bot {
       color: COLORS[this.slot % COLORS.length],
       deviceId: this.deviceId,
       systems: SYSTEM_IDS,
-      variants: ["treachery"],
+      variants: ["treachery", "archenemy", "planechase"],
     })
     this.publicId = seat.publicId
     this.report(this, "joined", { seat: seat.seat })
