@@ -1,4 +1,11 @@
-import { applyTurnAction, nextTurnSeat, turnTimeSpent, type Turn, type TurnAction } from "./turns"
+import {
+  applyTurnAction,
+  bankLeft,
+  nextTurnSeat,
+  turnTimeSpent,
+  type Turn,
+  type TurnAction,
+} from "./turns"
 
 const seats = new Set(["ada", "bo", "cy"])
 const at = (now: number, operationId = `op-${now}`) => ({
@@ -72,6 +79,37 @@ describe("applyTurnAction", () => {
         [{ kind: "turn.passed", playerId: "ada", toPlayerId: "zed" }, 1],
       ]),
     ).toBeNull()
+  })
+})
+
+describe("chess bank", () => {
+  it("starts every seat full when set mid-game, survives a pass and its undo, and runs out", () => {
+    const minute = 60_000
+    const started = play([
+      [{ kind: "turn.set", playerId: "ada", toPlayerId: "ada" }, 0],
+      [{ kind: "turn.passed", playerId: "ada", toPlayerId: "bo" }, 5 * minute],
+      [{ kind: "turn.clock", playerId: "cy", bankMs: 10 * minute }, 6 * minute],
+    ])!
+    expect(bankLeft(started, "ada", 6 * minute)).toBe(10 * minute)
+    expect(bankLeft(started, "bo", 8 * minute)).toBe(8 * minute)
+    const passed = applyTurnAction(
+      started,
+      { kind: "turn.passed", playerId: "bo", toPlayerId: "cy" },
+      at(9 * minute, "pass-bo"),
+    )!
+    const undone = applyTurnAction(
+      passed,
+      { kind: "turn.undone", playerId: "bo", turnOperationId: "pass-bo" },
+      at(9 * minute),
+    )!
+    expect(undone.bank).toEqual(started.bank)
+    expect(bankLeft(undone, "bo", 17 * minute)).toBe(-minute)
+    expect(
+      applyTurnAction(undone, { kind: "turn.clock", playerId: "ada", bankMs: 5 }, at(0)),
+    ).toBeNull()
+    expect(
+      applyTurnAction(undone, { kind: "turn.clock", playerId: "ada" }, at(0))?.bank,
+    ).toBeUndefined()
   })
 })
 

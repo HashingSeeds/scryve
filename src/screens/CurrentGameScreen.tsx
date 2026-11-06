@@ -300,18 +300,18 @@ export function CurrentGameScreen({
     shape: player.shape,
   }))
   const turnSeat = turnSeats.find(({ playerId }) => playerId === turn?.playerId)
-  const { passTurn, setTurn, undoTurn, changeClock } = runtime
-  function passFrom(current: Turn, clockwiseSlots: number[]) {
+  const { passTurn, setTurn, undoTurn, setBank, changeClock } = runtime
+  function nextPlayerId(current: Turn, clockwiseSlots: number[]) {
     const { players, seatOrder } = runtime.game
     const order = clockwiseSlots.flatMap((slot) => {
       const player = players[seatOrder?.[slot] ?? slot]
       return player ? [player.id] : []
     })
-    const next = nextTurnSeat(
-      order,
-      current.playerId,
-      (id) => outReason(outState, id) !== undefined,
-    )
+    return nextTurnSeat(order, current.playerId, (id) => outReason(outState, id) !== undefined)
+  }
+  function passFrom(current: Turn, clockwiseSlots: number[]) {
+    const { players } = runtime.game
+    const next = nextPlayerId(current, clockwiseSlots)
     if (!next) return
     const operationId = passTurn(current.playerId, next)
     if (!operationId) return
@@ -339,7 +339,10 @@ export function CurrentGameScreen({
           canPass: true,
           clockStyle: turnPrefs.clock,
           passStyle: turnPrefs.pass,
-          chessBankMs: turnPrefs.chessMinutes * 60_000,
+          nextSeat: (slots) => {
+            const next = turn && nextPlayerId(turn, slots)
+            return turnSeats.find(({ playerId }) => playerId === next)
+          },
           roundClock: clock,
           system,
           copies: "both",
@@ -579,6 +582,7 @@ export function CurrentGameScreen({
           }
           prefs={turnPrefs}
           onPrefs={setTurnPrefs}
+          onBank={turn ? (bankMs) => setBank(turn.playerId, bankMs) : undefined}
           onRoundClock={
             clock && active
               ? () => {

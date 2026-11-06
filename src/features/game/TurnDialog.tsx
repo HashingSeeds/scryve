@@ -30,6 +30,7 @@ export interface TurnDialogProps {
   onUndo?: () => void
   prefs: TurnTabPrefs
   onPrefs: (prefs: Partial<TurnTabPrefs>) => void
+  onBank?: (bankMs: number | undefined) => void
   onRoundClock?: () => void
   onClose: () => void
 }
@@ -41,6 +42,7 @@ export function TurnDialog({
   onUndo,
   prefs,
   onPrefs,
+  onBank,
   onRoundClock,
   onClose,
 }: TurnDialogProps) {
@@ -105,15 +107,18 @@ export function TurnDialog({
           selected={prefs.clock}
           onSelect={(clock) => onPrefs({ clock })}
         />
-        {prefs.clock === "chess" ? (
+        {prefs.clock === "chess" && onBank ? (
           <Choices
             tx="board:turn.chessBank"
-            options={CHESS_BANK_MINUTES.map((minutes) => ({
-              id: minutes,
-              label: translate("board:turn.chessMinutes", { minutes }),
-            }))}
-            selected={prefs.chessMinutes}
-            onSelect={(chessMinutes) => onPrefs({ chessMinutes })}
+            options={[
+              { id: 0, label: translate("board:turn.chessOff") },
+              ...CHESS_BANK_MINUTES.map((minutes) => ({
+                id: minutes,
+                label: translate("board:turn.chessMinutes", { minutes }),
+              })),
+            ]}
+            selected={turn?.bank ? turn.bank.ms / 60_000 : 0}
+            onSelect={(minutes) => onBank(minutes === 0 ? undefined : minutes * 60_000)}
           />
         ) : null}
         <Choices

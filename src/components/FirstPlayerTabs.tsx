@@ -28,8 +28,18 @@ export interface FirstPlayerTab {
 
 const TAB_LENGTH = 56
 const TAB_DEPTH = 40
-/** why: the first-player tab becomes the larger turn tab in the same place, so seats clear the turn tab's size from the start and their chrome never shifts between the two. */
-export const FIRST_PLAYER_TAB = { length: 84, depth: 46 } as const
+export const TURN_TAB_FACE = { width: 48, height: 74 } as const
+export const TURN_TAB_BORDER = 4
+/**
+ * why: the first-player tab becomes the turn tab in the same place, so seats clear the turn tab
+ * from the start and their chrome never shifts between the two. Beside seats at the sides the turn
+ * tab's face runs into the board, so along the edge it is as short as the first-player tab and the
+ * names beside it keep their room; it reaches deeper instead.
+ */
+export const FIRST_PLAYER_TAB = {
+  length: Math.max(TAB_LENGTH, TURN_TAB_FACE.width + 2 * TURN_TAB_BORDER),
+  depth: Math.max(TAB_DEPTH, TURN_TAB_FACE.height + TURN_TAB_BORDER),
+} as const
 const FIRST_TAB_SIZE = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
 export const FirstPlayerTabsShownContext = createContext(false)

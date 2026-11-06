@@ -523,6 +523,15 @@ describe("engine parity: turns", () => {
       }),
     )
     expect(await game.expectSameTurn()).toMatchObject({ playerId: hostSeat, number: 1 })
+    await game.write(
+      "joiner",
+      table(
+        "turn-bank-joiner-1",
+        { kind: "turn.clock", playerId: joinerSeat, bankMs: 600_000 },
+        JOINER_DEVICE,
+      ),
+    )
+    expect(await game.projectedTurn(TABLE_VERSION)).toMatchObject({ bank: { ms: 600_000 } })
     await game.expectSameState()
   })
 })

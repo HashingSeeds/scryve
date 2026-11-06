@@ -2,7 +2,7 @@ import type { Turn } from "../../../convex/lib/turns"
 
 export const TURN_CLOCK_STYLES = ["stacked", "swap", "ring", "chess"] as const
 export type TurnClockStyle = (typeof TURN_CLOCK_STYLES)[number]
-export const TURN_PASS_STYLES = ["icon", "label"] as const
+export const TURN_PASS_STYLES = ["next", "label", "none"] as const
 export type TurnPassStyle = (typeof TURN_PASS_STYLES)[number]
 export const CHESS_BANK_MINUTES = [10, 20, 30] as const
 
@@ -10,15 +10,13 @@ export interface TurnTabPrefs {
   enabled: boolean
   clock: TurnClockStyle
   pass: TurnPassStyle
-  chessMinutes: number
   hideOffered: boolean
 }
 
 export const DEFAULT_TURN_TAB_PREFS: TurnTabPrefs = {
   enabled: true,
   clock: "stacked",
-  pass: "icon",
-  chessMinutes: 20,
+  pass: "next",
   hideOffered: false,
 }
 
@@ -26,8 +24,6 @@ export const isTurnClockStyle = (value: unknown): value is TurnClockStyle =>
   TURN_CLOCK_STYLES.some((style) => style === value)
 export const isTurnPassStyle = (value: unknown): value is TurnPassStyle =>
   TURN_PASS_STYLES.some((style) => style === value)
-export const isChessBankMinutes = (value: unknown): value is number =>
-  CHESS_BANK_MINUTES.some((minutes) => minutes === value)
 
 export function clockwiseSlots(rows: readonly (readonly (number | null)[])[]): number[] {
   const seated = rows.map((row) => row.filter((slot): slot is number => slot !== null))

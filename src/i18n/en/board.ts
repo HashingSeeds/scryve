@@ -514,6 +514,11 @@ const board = {
     label: "Turn {{number}}, {{name}}",
     roundLabel: "Round {{time}}",
     passHint: "Tap to pass",
+    passHintTo: "Tap to pass to {{name}}",
+    // Screen reader text for a player's chess clock, as in "Time bank 4:12".
+    bankLabel: "Time bank {{time}}",
+    // Shown in the turn tab when a player's chess clock bank has run out. Play continues. Very short, may wrap to two lines.
+    outOfTime: "Out of time",
     longPressHint: "Long press for turn controls",
     // Title of the turn controls dialog, as in "Turn 4".
     title: "Turn {{number}}",
@@ -539,10 +544,14 @@ const board = {
     },
     chessBank: "Time per player",
     chessMinutes: "{{minutes}} min",
-    passStyle: "Pass button",
+    chessOff: "Off",
+    passStyle: "Pass cue",
     passStyles: {
-      icon: "Icon",
+      // The next player's mark, shown small beside the active player's.
+      next: "Next up",
       label: "Word",
+      // No cue; the whole tab is the button.
+      none: "None",
     },
     roundClock: "Round clock",
     // The log divider at the start of each turn, as in "Turn 4 · Ada".

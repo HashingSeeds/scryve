@@ -491,6 +491,7 @@ export function ConnectedBoardWithRuntime({
     passTurn,
     setTurn,
     undoTurn,
+    setBank,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -511,6 +512,7 @@ export function ConnectedBoardWithRuntime({
       passTurn,
       setTurn,
       undoTurn,
+      setBank,
     }),
     [
       tableState,
@@ -530,6 +532,7 @@ export function ConnectedBoardWithRuntime({
       passTurn,
       setTurn,
       undoTurn,
+      setBank,
     ],
   )
   const latest = useRef(runtime)
@@ -961,15 +964,20 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       shape: shownMarkShape(player),
     }))
   const myTurn = turn !== undefined && controlled.has(turn.playerId)
-  function passTurn() {
+  // why: lives stay out of this memoized board, so who is out is read from the runtime when asked.
+  function nextPlayerId() {
     const runtime = controls.current()
-    if (!turn || !myTurn || !table || runtime.status !== "ready") return
+    if (!turn || runtime.status !== "ready") return undefined
     const outState = projectionOutState(runtime.projection)
-    const next = nextTurnSeat(
+    return nextTurnSeat(
       turnSeats.map(({ playerId }) => playerId),
       turn.playerId,
       (id) => outReason(outState, id) !== undefined,
     )
+  }
+  function passTurn() {
+    if (!turn || !myTurn || !table) return
+    const next = nextPlayerId()
     const operationId = next && table.passTurn(turn.playerId, next)
     if (!operationId) return
     setTurnToast({
@@ -989,7 +997,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           canPass: myTurn,
           clockStyle: turnPrefs.clock,
           passStyle: turnPrefs.pass,
-          chessBankMs: turnPrefs.chessMinutes * 60_000,
+          nextSeat: () => {
+            const next = myTurn ? nextPlayerId() : undefined
+            return turnSeats.find(({ playerId }) => playerId === next)
+          },
           system,
           copies: "holder",
           onPress: () => (turn ? passTurn() : setTurnOpen(true)),
@@ -1134,6 +1145,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           }
           prefs={turnPrefs}
           onPrefs={setTurnPrefs}
+          onBank={(() => {
+            const mine = turnSeats.find(({ playerId }) => controlled.has(playerId))
+            return turn && mine ? (bankMs) => table.setBank(mine.playerId, bankMs) : undefined
+          })()}
           onClose={() => setTurnOpen(false)}
         />
       ) : null}

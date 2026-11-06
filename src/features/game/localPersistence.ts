@@ -38,7 +38,6 @@ import {
 import { isRoundClockSetup, type RoundClock } from "./roundClock"
 import {
   DEFAULT_TURN_TAB_PREFS,
-  isChessBankMinutes,
   isTurnClockStyle,
   isTurnPassStyle,
   type TurnClockStyle,
@@ -108,7 +107,6 @@ export interface LocalSettings {
   turnTabHideOffered?: true
   turnClock?: TurnClockStyle
   turnPass?: TurnPassStyle
-  chessMinutes?: number
 }
 
 export const COMMANDER_SEATS = 4
@@ -571,7 +569,6 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
     ...(isTurnClockStyle(migrated.turnClock) ? { turnClock: migrated.turnClock } : {}),
     ...(isTurnPassStyle(migrated.turnPass) ? { turnPass: migrated.turnPass } : {}),
-    ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
   }
 }
 
@@ -782,7 +779,6 @@ export class LocalGameRepository {
       enabled: settings.turnTab !== false,
       clock: settings.turnClock ?? DEFAULT_TURN_TAB_PREFS.clock,
       pass: settings.turnPass ?? DEFAULT_TURN_TAB_PREFS.pass,
-      chessMinutes: settings.chessMinutes ?? DEFAULT_TURN_TAB_PREFS.chessMinutes,
       hideOffered: settings.turnTabHideOffered === true,
     }
   }
@@ -797,7 +793,6 @@ export class LocalGameRepository {
       ...(next.hideOffered ? { turnTabHideOffered: true } : {}),
       turnClock: next.clock,
       turnPass: next.pass,
-      chessMinutes: next.chessMinutes,
     })
     return next
   }

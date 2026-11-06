@@ -10,10 +10,17 @@ const turnFields = {
 
 export const previousTurnValidator = v.object(turnFields)
 
+/** why: `base` is each seat's time already spent when the bank was set, so a bank chosen mid-game starts everyone full. */
+export const turnBankValidator = v.object({
+  ms: v.number(),
+  base: v.record(v.string(), v.number()),
+})
+
 export const turnValidator = v.object({
   ...turnFields,
   /** why: one level is enough to take back an accidental pass, and keeps every projection small. */
   previous: v.optional(previousTurnValidator),
+  bank: v.optional(turnBankValidator),
 })
 
 /**
@@ -24,10 +31,14 @@ export const turnActionValidators = [
   v.object({ kind: v.literal("turn.passed"), playerId: v.string(), toPlayerId: v.string() }),
   v.object({ kind: v.literal("turn.set"), playerId: v.string(), toPlayerId: v.string() }),
   v.object({ kind: v.literal("turn.undone"), playerId: v.string(), turnOperationId: v.string() }),
+  /** why: any seat may set the chess clock, and every device reads the same bank from the authority. */
+  v.object({ kind: v.literal("turn.clock"), playerId: v.string(), bankMs: v.optional(v.number()) }),
 ] as const
 
 export type Turn = Infer<typeof turnValidator>
 export type PreviousTurn = Infer<typeof previousTurnValidator>
+export type TurnBank = Infer<typeof turnBankValidator>
+export const MAX_BANK_MS = 180 * 60_000
 export type TurnAction = Infer<(typeof turnActionValidators)[number]>
 export type TurnActionKind = TurnAction["kind"]
 
@@ -44,7 +55,9 @@ export interface TurnContext {
   isSeat: (playerId: string) => boolean
 }
 
-const settled = ({ previous: _previous, ...turn }: Turn): PreviousTurn => turn
+const settled = ({ previous: _previous, bank: _bank, ...turn }: Turn): PreviousTurn => turn
+
+const isBankMs = (ms: number) => Number.isInteger(ms) && ms >= 60_000 && ms <= MAX_BANK_MS
 
 function spentAfter(turn: Turn, now: number): Record<string, number> {
   const held = Math.max(0, now - turn.startedAt)
@@ -59,7 +72,15 @@ function handOff(turn: Turn, toPlayerId: string, number: number, context: TurnCo
     operationId: context.operationId,
     spent: spentAfter(turn, context.now),
     previous: settled(turn),
+    ...(turn.bank ? { bank: turn.bank } : {}),
   }
+}
+
+function withBank(turn: Turn, bankMs: number | undefined, now: number): Turn | null {
+  const { bank: _before, ...rest } = turn
+  if (bankMs === undefined) return rest
+  if (!isBankMs(bankMs)) return null
+  return { ...rest, bank: { ms: bankMs, base: spentAfter(turn, now) } }
 }
 
 /**
@@ -75,8 +96,10 @@ export function applyTurnAction(
   if (action.kind === "turn.undone") {
     const previous = turn?.previous
     if (!turn || !previous || turn.operationId !== action.turnOperationId) return null
-    return previous.playerId === action.playerId ? previous : null
+    if (previous.playerId !== action.playerId) return null
+    return turn.bank ? { ...previous, bank: turn.bank } : previous
   }
+  if (action.kind === "turn.clock") return turn ? withBank(turn, action.bankMs, context.now) : null
   if (!context.isSeat(action.toPlayerId)) return null
   if (!turn) {
     if (action.kind === "turn.passed" || action.toPlayerId !== action.playerId) return null
@@ -119,6 +142,11 @@ export function turnTimeSpent(turn: Turn, playerId: string, now: number) {
   return turn.playerId === playerId ? before + turnElapsed(turn, now) : before
 }
 
+export function bankLeft(turn: Turn, playerId: string, now: number) {
+  if (!turn.bank) return undefined
+  return turn.bank.ms - (turnTimeSpent(turn, playerId, now) - (turn.bank.base[playerId] ?? 0))
+}
+
 const isRecordOfNumbers = (value: unknown): value is Record<string, number> =>
   typeof value === "object" &&
   value !== null &&
@@ -144,8 +172,17 @@ function isPreviousTurn(value: unknown, playerIds: ReadonlySet<string>): value i
 
 export function isValidTurn(value: unknown, playerIds: ReadonlySet<string>): value is Turn {
   if (!isPreviousTurn(value, playerIds)) return false
-  const { previous } = value as Turn
-  return previous === undefined || isPreviousTurn(previous, playerIds)
+  const { previous, bank } = value as Turn
+  return (
+    (previous === undefined || isPreviousTurn(previous, playerIds)) &&
+    (bank === undefined ||
+      (typeof bank === "object" &&
+        bank !== null &&
+        typeof bank.ms === "number" &&
+        isBankMs(bank.ms) &&
+        isRecordOfNumbers(bank.base) &&
+        Object.keys(bank.base).every((id) => playerIds.has(id))))
+  )
 }
 
 export function remapTurn(turn: Turn, idOf: (playerId: string) => string): Turn {
@@ -160,5 +197,12 @@ export function remapTurn(turn: Turn, idOf: (playerId: string) => string): Turn 
         }
       : {}),
   })
-  return { ...remap(turn), ...(turn.previous ? { previous: remap(turn.previous) } : {}) }
+  const remapped = Object.fromEntries(
+    Object.entries(turn.bank?.base ?? {}).map(([playerId, ms]) => [idOf(playerId), ms]),
+  )
+  return {
+    ...remap(turn),
+    ...(turn.previous ? { previous: remap(turn.previous) } : {}),
+    ...(turn.bank ? { bank: { ms: turn.bank.ms, base: remapped } } : {}),
+  }
 }

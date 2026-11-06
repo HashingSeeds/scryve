@@ -13,11 +13,17 @@ import { formatElapsed } from "@/utils/useElapsedSince"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { EDGE_SLIDES, edgeStyle, FIRST_PLAYER_TAB, type FirstPlayerTab } from "./FirstPlayerTabs"
+import {
+  EDGE_SLIDES,
+  edgeStyle,
+  TURN_TAB_BORDER,
+  TURN_TAB_FACE,
+  type FirstPlayerTab,
+} from "./FirstPlayerTabs"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
-import { turnElapsed, turnTimeSpent, type Turn } from "../../convex/lib/turns"
+import { bankLeft, turnElapsed, type Turn } from "../../convex/lib/turns"
 
 export interface TurnTabSeat {
   playerId: string
@@ -31,19 +37,42 @@ export interface TurnTabProps {
   tabs: readonly FirstPlayerTab[]
   turn: Turn | undefined
   seat: TurnTabSeat | undefined
+  nextSeat?: TurnTabSeat
   canPass: boolean
   clockStyle: TurnClockStyle
   passStyle: TurnPassStyle
-  chessBankMs: number
   roundClock?: RoundClock
   system?: PlaySystemId
   onPress: () => void
   onLongPress: () => void
 }
 
-const MARK = 20
+const PAD_X = 6
+const PAD_Y = 4
+const MARK = 26
+const NEXT_MARK = 13
 const SWAP_MS = 4_000
 const TICK_MS = 1_000
+
+/**
+ * why: the face's long side runs into the board whenever it turns toward seats at the sides,
+ * so along the edge the tab is no longer than the first-player tab and the names beside it keep
+ * their room. Only the two-seat board, where nothing sits beside the seam, runs it along the edge.
+ */
+export function turnTabSize({ edge, facing }: Pick<FirstPlayerTab, "edge" | "facing">) {
+  const alongSide = edge === "left" || edge === "right"
+  const upright = facing % 180 === 0
+  const faceRunsAlongEdge = alongSide === upright
+  return faceRunsAlongEdge
+    ? {
+        length: TURN_TAB_FACE.height + 2 * TURN_TAB_BORDER,
+        depth: TURN_TAB_FACE.width + TURN_TAB_BORDER,
+      }
+    : {
+        length: TURN_TAB_FACE.width + 2 * TURN_TAB_BORDER,
+        depth: TURN_TAB_FACE.height + TURN_TAB_BORDER,
+      }
+}
 
 /** why: only the tab's text ticks, so the seats never re-render with the clock. */
 function useNow(ticking: boolean) {
@@ -59,36 +88,33 @@ function useNow(ticking: boolean) {
 /**
  * why: the tab stays where the first-player tab was, at the menu's seam on the board's side
  * edges, and never follows the turn around the table. Arrows only point at a seat when there are
- * two, so the active seat's own mark and color say whose turn it is. Every copy runs the same
- * action, so screen readers and keyboards get only the first.
+ * two, so the active seat's own mark says whose turn it is; the border stays the board's, so a
+ * seat color never sits against two other seats' colors. Every copy runs the same action, so
+ * screen readers and keyboards get only the first.
  */
 export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
   const {
     theme: { colors },
   } = useAppTheme()
   const animateFully = useReducedMotion() === false
-  const { tabs, seat, turn, onPress, onLongPress } = props
+  const { tabs, turn, onPress, onLongPress } = props
   const now = useNow(turn !== undefined)
   const label = turnTabLabel(props, now)
+  const ink = colors.gameMenu.anchorGlyph
 
   return (
     <>
       {tabs.map((tab, index) => {
         const primary = index === 0
-        const along = tab.edge === "left" || tab.edge === "right"
-        const upright = tab.facing % 180 === 0
-        const wide = along ? !upright : upright
-        // why: the attached edge has no border, so the press area is one border short there.
-        const press = along
-          ? {
-              width: FIRST_PLAYER_TAB.depth - TAB_BORDER,
-              height: FIRST_PLAYER_TAB.length - 2 * TAB_BORDER,
-            }
-          : {
-              width: FIRST_PLAYER_TAB.length - 2 * TAB_BORDER,
-              height: FIRST_PLAYER_TAB.depth - TAB_BORDER,
-            }
-        const inner = upright ? press : { width: press.height, height: press.width }
+        const size = turnTabSize(tab)
+        const alongSide = tab.edge === "left" || tab.edge === "right"
+        const box = alongSide
+          ? { width: size.depth, height: size.length }
+          : { width: size.length, height: size.depth }
+        const press = {
+          width: box.width - (alongSide ? 1 : 2) * TURN_TAB_BORDER,
+          height: box.height - (alongSide ? 2 : 1) * TURN_TAB_BORDER,
+        }
         return (
           <Animated.View
             key={`${tab.edge}:${tab.at}`}
@@ -99,10 +125,10 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
             importantForAccessibility={primary ? "auto" : "no-hide-descendants"}
             style={[
               $tab,
-              edgeStyle(tab, FIRST_PLAYER_TAB),
+              edgeStyle(tab, size),
               {
                 backgroundColor: colors.gameMenu.anchor,
-                borderColor: seat?.color ?? colors.gameMenu.anchorBorder,
+                borderColor: colors.gameMenu.anchorBorder,
               },
             ]}
           >
@@ -115,21 +141,22 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
               onPress={onPress}
               onLongPress={onLongPress}
               delayLongPress={450}
-              style={({ pressed }) => [$press, pressed && $pressed]}
+              style={({ pressed }) => [$press, pressed && { backgroundColor: `${ink}2E` }]}
             >
-              <View
-                style={[
-                  $inner,
-                  inner,
-                  {
-                    left: (press.width - inner.width) / 2,
-                    top: (press.height - inner.height) / 2,
-                    transform: [{ rotate: `${tab.facing}deg` }],
-                  },
-                ]}
-              >
-                <TurnTabFace {...props} wide={wide} now={now} />
-              </View>
+              {({ pressed }) => (
+                <View
+                  style={[
+                    $face,
+                    {
+                      left: (press.width - TURN_TAB_FACE.width) / 2,
+                      top: (press.height - TURN_TAB_FACE.height) / 2,
+                      transform: [{ rotate: `${tab.facing}deg` }, { scale: pressed ? 0.92 : 1 }],
+                    },
+                  ]}
+                >
+                  <TurnTabFace {...props} now={now} />
+                </View>
+              )}
             </BoardPressable>
           </Animated.View>
         )
@@ -141,36 +168,35 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
 function TurnTabFace({
   turn,
   seat,
+  nextSeat,
   canPass,
   clockStyle,
   passStyle,
-  chessBankMs,
   roundClock,
   system,
-  wide,
   now,
-}: TurnTabProps & { wide: boolean; now: number }) {
+}: TurnTabProps & { now: number }) {
   const {
     theme: { colors },
   } = useAppTheme()
   const ink = colors.gameMenu.anchorGlyph
   const dim: TextStyle = { color: ink, opacity: 0.62 }
-  const direction: ViewStyle = wide ? $row : $column
 
   if (!turn || !seat)
     return (
-      <View style={[$face, direction]}>
+      <>
         <StartGlyph color={ink} />
         <Text size="xxs" weight="semiBold" style={{ color: ink }} tx="board:turn.whoFirst" />
-      </View>
+      </>
     )
 
   const round = roundClock ? roundClockText(roundClockView(roundClock, system, now)) : undefined
   const turnTime = formatElapsed(turnElapsed(turn, now))
-  const bankLeft = chessBankMs - turnTimeSpent(turn, seat.playerId, now)
+  const bank = bankLeft(turn, seat.playerId, now)
   const swapToRound = round !== undefined && Math.floor(now / SWAP_MS) % 2 === 1
+  const showsNext = canPass && passStyle === "next" && nextSeat !== undefined
 
-  const mark =
+  const markView =
     clockStyle === "ring" ? (
       <RingMark seat={seat} fraction={ringFraction(turn, roundClock, system, now)} ink={ink} />
     ) : (
@@ -178,16 +204,27 @@ function TurnTabFace({
     )
 
   const time =
-    clockStyle === "chess" ? (
-      <Text
-        size="xxs"
-        weight="semiBold"
-        testID="turn-tab-bank"
-        style={[$digits, { color: bankLeft < 0 ? colors.error : ink }]}
-        text={`${bankLeft < 0 ? "−" : ""}${formatElapsed(Math.abs(bankLeft))}`}
-      />
+    clockStyle === "chess" && bank !== undefined ? (
+      bank > 0 ? (
+        <Text
+          size="xxs"
+          weight="semiBold"
+          testID="turn-tab-bank"
+          style={[$digits, { color: ink }]}
+          text={formatElapsed(bank)}
+        />
+      ) : (
+        <Text
+          size="xxs"
+          weight="bold"
+          testID="turn-tab-out-of-time"
+          numberOfLines={2}
+          style={[$small, $center, { color: colors.error }]}
+          tx="board:turn.outOfTime"
+        />
+      )
     ) : clockStyle === "swap" && swapToRound ? (
-      <View style={wide ? $inline : $texts}>
+      <View style={$column}>
         <ClockGlyph color={ink} />
         <Text size="xxs" weight="semiBold" style={[$digits, { color: ink }]} text={round} />
       </View>
@@ -202,46 +239,66 @@ function TurnTabFace({
     )
 
   const second =
-    clockStyle === "stacked" && round ? (
+    (clockStyle === "stacked" || clockStyle === "ring") && round ? (
       <Text size="xxs" style={[$digits, $small, dim]} testID="turn-tab-round" text={round} />
-    ) : clockStyle === "chess" ? (
+    ) : clockStyle === "chess" && bank !== undefined ? (
       <Text size="xxs" style={[$digits, $small, dim]} text={turnTime} />
-    ) : clockStyle === "ring" && round ? (
-      <Text size="xxs" style={[$digits, $small, dim]} text={round} />
     ) : null
 
-  const pass = canPass ? (
-    passStyle === "label" ? (
-      <Text size="xxs" weight="semiBold" style={[$small, dim]} tx="board:turn.pass" />
-    ) : (
-      <PassGlyph color={ink} />
-    )
-  ) : null
-
   return (
-    <View style={[$face, direction]}>
-      {mark}
-      <View style={wide ? $textsWide : $texts}>
-        {time}
-        {second}
-        {passStyle === "label" ? pass : null}
+    <>
+      <View>
+        {markView}
+        {showsNext ? (
+          <View testID="turn-tab-next" style={[$next, { backgroundColor: colors.gameMenu.anchor }]}>
+            <PlayerMark
+              seatNumber={nextSeat.seatNumber}
+              shape={nextSeat.shape}
+              color={nextSeat.color}
+              size={NEXT_MARK}
+            />
+          </View>
+        ) : null}
       </View>
-      {passStyle === "icon" ? pass : null}
-    </View>
+      {time}
+      {second}
+      {canPass && passStyle === "label" ? (
+        <Text
+          size="xxs"
+          weight="semiBold"
+          testID="turn-tab-pass-label"
+          style={[$small, dim]}
+          tx="board:turn.pass"
+        />
+      ) : null}
+    </>
   )
 }
 
-function turnTabLabel({ turn, seat, canPass, roundClock, system }: TurnTabProps, now: number) {
+function turnTabLabel(
+  { turn, seat, nextSeat, canPass, roundClock, system }: TurnTabProps,
+  now: number,
+) {
   if (!turn || !seat) return translate("board:turn.whoFirstLabel")
+  const bank = bankLeft(turn, seat.playerId, now)
   const parts = [
     translate("board:turn.label", { number: turn.number, name: seat.name }),
     formatElapsed(turnElapsed(turn, now)),
+    bank === undefined
+      ? undefined
+      : bank > 0
+        ? translate("board:turn.bankLabel", { time: formatElapsed(bank) })
+        : translate("board:turn.outOfTime"),
     roundClock
       ? translate("board:turn.roundLabel", {
           time: roundClockText(roundClockView(roundClock, system, now)),
         })
       : undefined,
-    canPass ? translate("board:turn.passHint") : undefined,
+    canPass
+      ? nextSeat
+        ? translate("board:turn.passHintTo", { name: nextSeat.name })
+        : translate("board:turn.passHint")
+      : undefined,
   ]
   return parts.filter(Boolean).join(". ")
 }
@@ -261,8 +318,8 @@ function ringFraction(
   return (turnElapsed(turn, now) % 60_000) / 60_000
 }
 
-const RING = 26
-const RING_WIDTH = 2
+const RING = 30
+const RING_WIDTH = 2.5
 
 function RingMark({ seat, fraction, ink }: { seat: TurnTabSeat; fraction: number; ink: string }) {
   const center = RING / 2
@@ -294,24 +351,9 @@ function RingMark({ seat, fraction, ink }: { seat: TurnTabSeat; fraction: number
         ) : null}
       </Svg>
       <View style={$ringMark}>
-        <PlayerMark seatNumber={seat.seatNumber} shape={seat.shape} color={seat.color} size={16} />
+        <PlayerMark seatNumber={seat.seatNumber} shape={seat.shape} color={seat.color} size={21} />
       </View>
     </View>
-  )
-}
-
-function PassGlyph({ color }: { color: string }) {
-  return (
-    <Svg width={12} height={12} viewBox="0 0 24 24" testID="turn-tab-pass-icon">
-      <Path
-        d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4.5h-4.5"
-        stroke={color}
-        strokeWidth={2.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </Svg>
   )
 }
 
@@ -326,25 +368,35 @@ function ClockGlyph({ color }: { color: string }) {
 
 function StartGlyph({ color }: { color: string }) {
   return (
-    <Svg width={14} height={14} viewBox="0 0 24 24">
+    <Svg width={16} height={16} viewBox="0 0 24 24">
       <Path d="M8 5.5v13l10-6.5z" fill={color} />
     </Svg>
   )
 }
 
-const TAB_BORDER = 3
-const $tab: ViewStyle = { position: "absolute", borderWidth: TAB_BORDER, overflow: "hidden" }
+const $tab: ViewStyle = { position: "absolute", borderWidth: TURN_TAB_BORDER, overflow: "hidden" }
 const $press: ViewStyle = { flex: 1 }
-const $pressed: ViewStyle = { opacity: 0.72 }
-const $inner: ViewStyle = { position: "absolute", alignItems: "center", justifyContent: "center" }
-const $face: ViewStyle = { alignItems: "center", justifyContent: "center", gap: 3 }
-const $row: ViewStyle = { flexDirection: "row", gap: 5 }
-const $column: ViewStyle = { flexDirection: "column", gap: 2 }
-const $texts: ViewStyle = { alignItems: "center" }
-const $textsWide: ViewStyle = { alignItems: "flex-start" }
-const $inline: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 2 }
+const $face: ViewStyle = {
+  position: "absolute",
+  width: TURN_TAB_FACE.width,
+  height: TURN_TAB_FACE.height,
+  paddingHorizontal: PAD_X,
+  paddingVertical: PAD_Y,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+}
+const $column: ViewStyle = { alignItems: "center" }
+const $next: ViewStyle = {
+  position: "absolute",
+  right: -7,
+  bottom: -4,
+  borderRadius: NEXT_MARK,
+  padding: 1.5,
+}
 const $digits: TextStyle = { fontVariant: ["tabular-nums"], lineHeight: 13 }
 const $small: TextStyle = { fontSize: 9, lineHeight: 11 }
+const $center: TextStyle = { textAlign: "center" }
 const $fill: ViewStyle = { position: "absolute", left: 0, top: 0 }
 const $ringMark: ViewStyle = {
   position: "absolute",

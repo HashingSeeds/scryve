@@ -26,7 +26,7 @@ import {
 } from "@/components/PlayerGrid"
 import { getPlayerGridRows } from "@/components/playerGridGeometry"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
-import { TurnTabs, type TurnTabProps } from "@/components/TurnTabs"
+import { TurnTabs, type TurnTabProps, type TurnTabSeat } from "@/components/TurnTabs"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
@@ -53,8 +53,9 @@ export interface GameBoardStageProps {
 }
 
 /** why: only the grid knows where seats sit, so the stage hands the press its slots clockwise and the board passes to the seat beside the active one. */
-export type BoardTurnTab = Omit<TurnTabProps, "tabs" | "onPress"> & {
+export type BoardTurnTab = Omit<TurnTabProps, "tabs" | "onPress" | "nextSeat"> & {
   onPress: (clockwiseSlots: number[]) => void
+  nextSeat: (clockwiseSlots: number[]) => TurnTabSeat | undefined
   copies: "both" | "holder"
 }
 
@@ -249,12 +250,15 @@ function BoardTabs({
 }) {
   if (firstPlayer) return <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
   if (!turnTab) return null
-  const { onPress, copies, ...tab } = turnTab
+  const { onPress, nextSeat, copies, ...tab } = turnTab
+  const slots = clockwiseSlots(rows)
   const shown =
     copies === "both"
       ? tabs
       : [tabs.find(({ facing }) => ((facing % 360) + 360) % 360 === 0) ?? tabs[tabs.length - 1]]
-  return <TurnTabs {...tab} tabs={shown} onPress={() => onPress(clockwiseSlots(rows))} />
+  return (
+    <TurnTabs {...tab} tabs={shown} nextSeat={nextSeat(slots)} onPress={() => onPress(slots)} />
+  )
 }
 
 /** why: the tabs sit where the menu's row meets the board's left and right edges, clear of the camera cutout and home indicator, each turned toward the players nearest it. `rotation` turns a board drawn sideways onto the screen. */

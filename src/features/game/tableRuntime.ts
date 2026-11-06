@@ -45,6 +45,7 @@ export interface TableActions {
   passTurn: (playerId: string, toPlayerId: string) => string | null
   setTurn: (playerId: string, toPlayerId: string) => string | null
   undoTurn: (playerId: string, turnOperationId: string) => string | null
+  setBank: (playerId: string, bankMs: number | undefined) => string | null
 }
 
 export interface TableRuntime extends TableActions {
@@ -144,5 +145,8 @@ export function createTableActions(
       run({ kind: "turn.set", playerId, toPlayerId })?.operationId ?? null,
     undoTurn: (playerId, turnOperationId) =>
       run({ kind: "turn.undone", playerId, turnOperationId })?.operationId ?? null,
+    setBank: (playerId, bankMs) =>
+      run({ kind: "turn.clock", playerId, ...(bankMs === undefined ? {} : { bankMs }) })
+        ?.operationId ?? null,
   }
 }
