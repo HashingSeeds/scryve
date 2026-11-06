@@ -40,3 +40,11 @@ and the Expo development-client chooser is handled consistently. Prefer stable R
 
 Connected-play flows require real Clerk/Convex development credentials and at least two separately
 addressable app installations. Keep those flows separate from the deterministic local smoke suite.
+
+## Agent flows
+
+`.maestro/agent/` holds flows that set up a state for an agent rather than test one, run with
+`agent-device replay <flow> --maestro`. `HostConnected.yaml` and `HostNearby.yaml` leave a lobby's
+invite sheet open on its join code. They default `MAESTRO_APP_ID` to the development build and do
+not clear state. Sign-in is not a flow: `pnpm -s dev:signin` prints a dev link that signs a test
+account in through a Clerk ticket.

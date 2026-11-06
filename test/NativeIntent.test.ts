@@ -71,8 +71,17 @@ describe("connected invite native intent", () => {
     )
   })
 
+  it.each(["scryve-dev://dev/auth?ticket=abc.def_1", "/dev/auth?ticket=abc"])(
+    "keeps dev sign-in link %s with its ticket",
+    (path) =>
+      expect(redirectSystemPath({ path, initial: true })).toBe(
+        `/dev/auth${path.slice(path.indexOf("?"))}`,
+      ),
+  )
+
   it.each([
     "scryve-dev://dev/settings?x=1",
+    "scryve-dev://dev/auth/extra?ticket=abc",
     "scryve-dev://dev/seed/game/extra?x=1",
     "//dev/seed/game?players=6",
     "/settings/../dev/seed/game?players=6",
@@ -84,11 +93,14 @@ describe("connected invite native intent", () => {
     expect(redirectSystemPath({ path, initial: true })).toBe("/"),
   )
 
-  it("drops seed links outside development builds", () => {
+  it("drops dev links outside development builds", () => {
     const development = __DEV__
     Reflect.set(globalThis, "__DEV__", false)
     try {
       expect(redirectSystemPath({ path: "scryve-dev://dev/seed/game", initial: false })).toBe("/")
+      expect(redirectSystemPath({ path: "scryve-dev://dev/auth?ticket=abc", initial: true })).toBe(
+        "/",
+      )
     } finally {
       Reflect.set(globalThis, "__DEV__", development)
     }

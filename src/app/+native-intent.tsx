@@ -9,8 +9,8 @@ function isSafeInternalPath(path: string): boolean {
   return /^\/(?:[A-Za-z0-9_-]+\/?)+$/.test(path)
 }
 
-const DEV_SEED_LINK =
-  /^(?:(?:scryve|count)(?:-dev|-preview)?:\/\/\/?|\/)dev\/seed\/([a-z]+)(\?[^#\s\u0000-\u001F\u007F]*)?$/
+const DEV_LINK =
+  /^(?:(?:scryve|count)(?:-dev|-preview)?:\/\/\/?|\/)dev\/(seed\/[a-z]+|auth)(\?[^#\s\u0000-\u001F\u007F]*)?$/
 
 /**
  * why: preview builds open PR previews from `scryve-preview://preview/pr-123`, or from the QR code
@@ -23,9 +23,9 @@ const PR_PREVIEW_LINK =
 const LAN_TEST_LINK =
   /^(?:(?:scryve|count)-(?:dev|preview):\/\/\/?|\/)lan(\?(?:[A-Za-z0-9=&]|%[0-9A-Fa-f]{2})+)?$/
 
-function devSeedPath(path: string): string | null {
-  const match = DEV_SEED_LINK.exec(path)
-  return match ? `/dev/seed/${match[1]}${match[2] ?? ""}` : null
+function devPath(path: string): string | null {
+  const match = DEV_LINK.exec(path)
+  return match ? `/dev/${match[1]}${match[2] ?? ""}` : null
 }
 
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
@@ -37,8 +37,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (invite?.kind === "code") return `/connected/join?code=${encodeURIComponent(invite.code)}`
   const preview = PR_PREVIEW_LINK.exec(path)?.[1]
   if (preview) return `/preview/${preview}`
-  const seed = __DEV__ ? devSeedPath(path) : null
-  if (seed) return seed
+  const dev = __DEV__ ? devPath(path) : null
+  if (dev) return dev
   const lan = __DEV__ || isPreviewBuild() ? LAN_TEST_LINK.exec(path) : null
   if (lan) return `/lan${lan[1] ?? ""}`
   // Warm intents may preserve only a deliberately small absolute in-app route grammar.
