@@ -40,12 +40,15 @@ Play
   --drop 0                 chance each bot leaves the event after each round
   --round-gap 5s           the host bot waits this long to pair the next round
   --no-finish              the host bot leaves the event running after its last round
+  --expect <n>             the host bot pairs once n players are in, so bots from other
+                           processes (convex join) can fill one event past one CPU
 
 Failure
   --disconnect-every off   cut each bot's connection this often
   --disconnect-for 5s      how long each cut lasts
   --skip-patch 0           nearby: chance a bot loses a patch and must notice the gap
-  --legacy 0               nearby: bots that join without patches, like older apps
+  --legacy 0               bots that act like older apps: nearby without patches, convex
+                           loading events.view instead of events.board and events.viewer
 
 Run
   --duration 30m           stop after this long (off runs until the event finishes or Ctrl-C)
@@ -102,6 +105,7 @@ function parseCli(argv) {
       "players": { type: "string", default: "16" },
       "first": { type: "string", default: "1" },
       "guests": { type: "string", default: "0" },
+      "expect": { type: "string" },
       "structure": { type: "string", default: "swiss" },
       "best-of": { type: "string" },
       "rounds": { type: "string", default: "3" },
@@ -139,6 +143,7 @@ function parseCli(argv) {
     players,
     first: parseCount(values.first, "first", 1, 10_000),
     guests,
+    expect: values.expect === undefined ? 0 : parseCount(values.expect, "expect", 1, MAX_PLAYERS),
     structure,
     bestOf,
     rounds: parseCount(values.rounds, "rounds", 1, 15),
@@ -217,7 +222,10 @@ function playerMove(view, playerId, options, random = Math.random) {
 }
 
 function organizerMove(view, options, ready, random = Math.random) {
-  if (view.status === "registration") return ready ? { kind: "startRound" } : undefined
+  if (view.status === "registration")
+    return ready && view.players.length >= (options.expect ?? 0)
+      ? { kind: "startRound" }
+      : undefined
   if (view.status !== "active") return undefined
   const guestTable = view.tables.find((table) => table.status === "open" && hasGuest(view, table))
   if (guestTable)
@@ -506,8 +514,8 @@ class Bot {
 }
 
 class ConvexLink {
-  constructor(bot, credentials, slot) {
-    Object.assign(this, { bot, credentials })
+  constructor(bot, credentials, slot, legacy) {
+    Object.assign(this, { bot, credentials, legacy })
     this.inflight = new Set()
     this.identity = {
       issuer: "https://scryve-bots.invalid",
@@ -567,29 +575,57 @@ class ConvexLink {
 
   watch() {
     const fail = (error) => this.bot.report(this.bot, "error", { message: error.message })
+    const args = { eventId: this.eventId }
     this.through = undefined
-    this.unwatch = this.client.onUpdate(
-      api.events.view,
-      { eventId: this.eventId },
-      (view) => {
-        this.view = view
-        if (!view) return this.bot.stop("event-gone")
-        // why: the app follows standings through the last complete round, so bots load the same query.
-        const through = standingsThroughRound(view)
-        if (through !== this.through) {
-          this.through = through
-          this.unstand?.()
-          this.unstand = this.client.onUpdate(
-            api.events.standings,
-            { eventId: this.eventId, throughRound: through },
-            (standings) => this.bot.onView(this.view, standings ?? undefined),
-            fail,
-          )
-        }
-        this.bot.onView(view, this.bot.standings)
+    const show = (view) => {
+      this.view = view
+      if (!view) return this.bot.stop("event-gone")
+      // why: the app follows standings through the last complete round, so bots load the same query.
+      const through = standingsThroughRound(view)
+      if (through !== this.through) {
+        this.through = through
+        this.unstand?.()
+        this.unstand = this.client.onUpdate(
+          api.events.standings,
+          { ...args, throughRound: through },
+          (standings) => this.bot.onView(this.view, standings ?? undefined),
+          fail,
+        )
+      }
+      this.bot.onView(view, this.bot.standings)
+    }
+    if (this.legacy) {
+      this.unwatch = this.client.onUpdate(api.events.view, args, show, fail)
+      return
+    }
+    // why: the app loads the shared board and its own viewer row separately, so bots load the same pair.
+    const parts = {}
+    const combine = () => {
+      if ("board" in parts && "viewer" in parts)
+        show(parts.board && parts.viewer && { ...parts.board, ...parts.viewer })
+    }
+    const unboard = this.client.onUpdate(
+      api.events.board,
+      args,
+      (board) => {
+        parts.board = board
+        combine()
       },
       fail,
     )
+    const unviewer = this.client.onUpdate(
+      api.events.viewer,
+      args,
+      (viewer) => {
+        parts.viewer = viewer
+        combine()
+      },
+      fail,
+    )
+    this.unwatch = () => {
+      unboard()
+      unviewer()
+    }
   }
 
   mutation(command) {
@@ -798,7 +834,7 @@ async function startConvex(options, tracker, report, bots) {
   report(null, "preview", { name: preview, deployment: credentials.deploymentName })
   const player = (slot) => {
     const bot = new Bot({ name: `Bot ${slot}`, options, tracker, report })
-    bot.link = new ConvexLink(bot, credentials, slot)
+    bot.link = new ConvexLink(bot, credentials, slot, slot - options.first < options.legacy)
     bots.push(bot)
     return bot
   }
