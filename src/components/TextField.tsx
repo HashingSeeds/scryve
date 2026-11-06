@@ -87,7 +87,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
 
   const {
     themed,
-    theme: { colors },
+    theme: { colors, isDark },
   } = useAppTheme()
 
   const disabled = TextInputProps.editable === false || status === "disabled"
@@ -171,6 +171,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
           textAlignVertical={multiline ? "top" : "center"}
           placeholder={placeholderContent}
           placeholderTextColor={colors.textDim}
+          keyboardAppearance={isDark ? "dark" : "light"}
           {...TextInputProps}
           editable={!disabled}
           style={themed($inputStyles)}

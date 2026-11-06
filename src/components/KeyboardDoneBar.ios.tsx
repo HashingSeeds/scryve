@@ -29,8 +29,10 @@ export function KeyboardDoneBar() {
 
 const $offscreen: ViewStyle = { position: "absolute", top: "100%", left: 0, right: 0 }
 
+// why: on iOS 26 the library insets its glass capsule 20pt from each screen edge, so the label needs that much more room.
 const $button: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "flex-end",
+  marginEnd: spacing.lg,
   paddingHorizontal: spacing.lg,
   paddingVertical: spacing.sm,
 })
