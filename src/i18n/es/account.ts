@@ -120,6 +120,11 @@ export default {
     copyDebugInfo: "Copiar info de depuración",
     copied: "Copiado",
     copyFailed: "No se pudo copiar. Inténtalo de nuevo.",
+    turns: {
+      label: "Turnos",
+      helper:
+        "Resalta el asiento activo y muestra un reloj de turno en su tarjeta. Toca el reloj para pasar.",
+    },
     syncStats: {
       label: "Estadísticas para nerds",
       helper:

@@ -11,6 +11,7 @@ import {
   applyGameCommand,
   applyLocalTableAction,
   canUndo,
+  createClientId,
   createNextMatchGame,
   leaveMatch,
   createRematch,
@@ -20,7 +21,10 @@ import {
   localTableRules,
   restartMatchGame,
   soleLoserSeat,
+  startTurnOnChange,
+  undoableTurn,
   withFirstChooser,
+  withFirstTurn,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
@@ -88,8 +92,12 @@ export function useLocalGame(
 
   const dispatch = useCallback(
     (command: GameCommand, endSource?: GameEndSource): LocalGame => {
-      const applied = applyGameCommand(gameRef.current, command, context)
-      if (applied === gameRef.current) return applied
+      const changed = applyGameCommand(gameRef.current, command, context)
+      if (changed === gameRef.current) return changed
+      const applied =
+        command.type === "life.change" || command.type === "commanderDamage.assign"
+          ? startTurnOnChange(changed, Date.now())
+          : changed
       const next = withFirstPlayerSettled(applied)
       if (next.status === "active") {
         save(next)
@@ -186,8 +194,13 @@ export function useLocalGame(
         () => {
           const current = gameRef.current
           if (current.status !== "active") return null
+          const table = current.table ?? EMPTY_TABLE
           return {
-            table: current.table ?? EMPTY_TABLE,
+            table: {
+              ...table,
+              ...(current.turn ? { turn: current.turn } : {}),
+              ...(current.turnGroups ? { turnGroups: current.turnGroups } : {}),
+            },
             rules: localTableRules(current),
             playerIds: current.players.map(({ id }) => id),
             lifeOf: (playerId) => current.players.find(({ id }) => id === playerId)?.life,
@@ -236,7 +249,16 @@ export function useLocalGame(
       )
         return
       const { firstPlayerId: _previous, ...board } = current
-      replaceBoard(playerId === undefined ? board : { ...board, firstPlayerId: playerId })
+      replaceBoard(
+        withFirstTurn(
+          playerId === undefined ? board : { ...board, firstPlayerId: playerId },
+          playerId,
+          {
+            operationId: createClientId("operation"),
+            now: Date.now(),
+          },
+        ),
+      )
     },
     [replaceBoard],
   )
@@ -306,13 +328,17 @@ export function useLocalGame(
     game,
     ...tableRuntime,
     tableRuntime,
-    canUndo: canUndo(game, context.actorId),
+    canUndo: canUndo(game, context.actorId) || undoableTurn(game, context.actorId) !== undefined,
     changeLife,
     assignCommanderDamage,
     changeLayout,
     changeSeatOrder,
     changeClock,
-    undo: () => dispatch({ type: "life.undo" }),
+    undo: () => {
+      const turn = undoableTurn(gameRef.current, context.actorId)
+      if (turn) tableActions.undoTurn(turn.playerId, turn.turnOperationId)
+      else dispatch({ type: "life.undo" })
+    },
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
       dispatch({ type: "game.finish", result }, endSource),
     abandon: () => dispatch({ type: "game.abandon" }),

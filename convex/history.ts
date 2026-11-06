@@ -115,6 +115,10 @@ export const entries = query({
         players: maskSummaryPlayersForViewer(summary.players, user._id, blocked, {
           localGame: entry.source === "local",
         }),
+        ...(summary.resultKind === "win" && summary.winnerPlayerIds
+          ? { winnerPlayerIds: summary.winnerPlayerIds }
+          : {}),
+        ...(summary.turnGroups ? { turnGroups: summary.turnGroups } : {}),
       })
     }
     return {

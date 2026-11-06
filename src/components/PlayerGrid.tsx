@@ -58,6 +58,7 @@ import {
 } from "./playerGridGeometry"
 import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
+import { SeatSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
@@ -482,6 +483,7 @@ export function PlayerGrid({
                         insets: Platform.OS === "web" ? insets : undefined,
                       })}
                     />
+                    <SeatSpotlight playerId={player.id} />
                   </View>
                 )
               }
@@ -628,6 +630,7 @@ export function PlayerGrid({
                       insets: Platform.OS === "web" ? insets : undefined,
                     })}
                   />
+                  <SeatSpotlight playerId={player.id} />
                 </View>
               )
             })}

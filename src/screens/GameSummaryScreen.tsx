@@ -87,6 +87,7 @@ function StandingRow({
       ? undefined
       : counterDeltaFromStartLabel(system, player.life, seatStartingLife)
   const detail = [
+    player.team,
     player.username ? `@${player.username}` : undefined,
     player.deckLabel,
     player.deleted ? translate("play:summary.deletedPlayer") : undefined,

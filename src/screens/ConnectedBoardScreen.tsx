@@ -21,9 +21,10 @@ import { ChoiceButton } from "@/components/ChoiceButton"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard"
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
-import { DrawMark, PlayerMark } from "@/components/PlayerMark"
+import { DrawMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Sheet } from "@/components/Sheet"
+import { TeamMarks } from "@/components/TeamMarks"
 import { Text, type TextProps } from "@/components/Text"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -37,9 +38,10 @@ import {
 } from "@/features/connected/boardSyncSignal"
 import {
   connectedBoardView,
-  connectedLastStanding,
+  connectedStandingWinners,
   connectedLives,
   connectedOutState,
+  projectionOutState,
   type ConnectedOutGame,
   type ConnectedBoardSeat,
   type ConnectedBoardView,
@@ -60,8 +62,10 @@ import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connecte
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
 import type { OthersChange } from "@/features/game/commanderAttack"
+import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import { asPlayerId } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
+import { GameToast } from "@/features/game/GameToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { defaultConnectedLayout, playerGridLayoutForCount } from "@/features/game/playerLayouts"
@@ -74,6 +78,14 @@ import {
   playCommanderLethal,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
+import { teamChoices, teamMembers, teamName, teamValueLabel } from "@/features/game/teams"
+import {
+  HideTurnsDialog,
+  reportTurnsGame,
+  TurnDialog,
+  useTurnPrefs,
+} from "@/features/game/TurnDialog"
+import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
@@ -89,7 +101,9 @@ import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
 import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
+import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
+import { nextTurnSeat, sharesTurn, turnGroupOf } from "../../convex/lib/turns"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -269,6 +283,7 @@ type ConnectedBoardReadyProps = {
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline: boolean
+  turns: boolean
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -347,6 +362,7 @@ interface ConnectedBoardRuntimeProps {
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
   partners?: boolean
+  turns?: boolean
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline?: boolean
@@ -415,6 +431,7 @@ export function ConnectedBoardWithRuntime({
   ownerId,
   cloud = true,
   partners = cloud,
+  turns = cloud,
   awayPlayerIds,
   onRevealRole,
   roleRevealOnline = false,
@@ -474,6 +491,11 @@ export function ConnectedBoardWithRuntime({
     undoKnockout,
     setPokemonCondition,
     checkupPokemon,
+    passTurn,
+    setTurn,
+    undoTurn,
+    setBank,
+    startTurn,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -491,6 +513,11 @@ export function ConnectedBoardWithRuntime({
       undoKnockout,
       setPokemonCondition,
       checkupPokemon,
+      passTurn,
+      setTurn,
+      undoTurn,
+      setBank,
+      startTurn,
     }),
     [
       tableState,
@@ -507,6 +534,11 @@ export function ConnectedBoardWithRuntime({
       undoKnockout,
       setPokemonCondition,
       checkupPokemon,
+      passTurn,
+      setTurn,
+      undoTurn,
+      setBank,
+      startTurn,
     ],
   )
   const latest = useRef(runtime)
@@ -583,6 +615,7 @@ export function ConnectedBoardWithRuntime({
               awayPlayerIds={awayPlayerIds}
               onRevealRole={onRevealRole}
               roleRevealOnline={roleRevealOnline}
+              turns={turns}
             />
             <SyncStatsOverlay latency={runtime.latency} peers={peerLatency} />
           </LifeLogContext.Provider>
@@ -615,6 +648,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   awayPlayerIds = [],
   onRevealRole,
   roleRevealOnline,
+  turns,
 }: ConnectedBoardReadyProps) {
   const {
     themed,
@@ -641,20 +675,72 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const { syncSignal, offlineSince, finishBlocker } = view
   const terminalStatus = game.status
   const rematchPublicId = game.rematchPublicId
+  const table = useContext(ConnectedTableContext)
+  const turn = turns ? table?.table.turn : undefined
+  const turnGroups = table?.table.turnGroups
+  const [turnPrefs, setTurnPrefs] = useTurnPrefs(localGameRepository)
+  const [turnOpen, setTurnOpen] = useState(false)
+  const [turnToast, setTurnToast] = useState<{
+    operationId: string
+    passerId: string
+    message: string
+  }>()
+  const [hideOffer, setHideOffer] = useState(false)
+  const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
+  const endedTurn = useRef(turn)
+  endedTurn.current = turn
+  const leaveFinished = useCallback(() => {
+    if (rematchPublicId && onRematch) onRematch(rematchPublicId)
+    else onGameEnded?.(publicId)
+  }, [rematchPublicId, onRematch, onGameEnded, publicId])
+  const tabOn = turns && turnPrefs.enabled
+  const playerCount = game.players.length
+  // why: the board leaves when the game ends, so the hide offer holds it until answered.
   useEffect(() => {
     if (terminalStatus === "finished") {
       if (navigatedTerminal.current) return
       navigatedTerminal.current = true
-      if (rematchPublicId && onRematch) onRematch(rematchPublicId)
-      else onGameEnded?.(publicId)
+      if (turns && offersToHideTurns(turnPrefs, endedTurn.current)) {
+        setTurnPrefs({ hideOffered: true })
+        setHideOffer(true)
+        return
+      }
+      reportTurnsGame({
+        prefs: { enabled: tabOn },
+        turn: endedTurn.current,
+        playerCount,
+        mode: "connected",
+        hideOffer: "none",
+      })
+      leaveFinished()
     } else if (terminalStatus === "abandoned" && !navigatedTerminal.current) {
       setAbandonedOpen(true)
     }
-  }, [terminalStatus, rematchPublicId, onRematch, onGameEnded, publicId])
+  }, [terminalStatus, leaveFinished, turns, turnPrefs, setTurnPrefs, tabOn, playerCount])
+  function answerHideOffer(hide: boolean) {
+    if (hide) setTurnPrefs({ enabled: false })
+    reportTurnsGame({
+      prefs: { enabled: true },
+      turn: endedTurn.current,
+      playerCount,
+      mode: "connected",
+      hideOffer: hide ? "accepted" : "shown",
+    })
+    setHideOffer(false)
+    leaveFinished()
+  }
+  const named = game.players.map(({ playerId, displayName }) => ({
+    id: playerId,
+    name: displayName,
+  }))
+  // why: a team wins together, so choosing it chooses every seat in it.
   function toggleWinner(playerId: string) {
     setDrawSelected(false)
+    const team = teamMembers(named, turnGroups, playerId).map(({ id }) => id)
     setWinnerPlayerIds((current) =>
-      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
+      current.includes(playerId)
+        ? current.filter((id) => !team.includes(id))
+        : [...current, ...team],
     )
   }
 
@@ -865,10 +951,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               const projection = runtime.status === "ready" ? runtime.projection : undefined
               const outcome = projection?.treacheryOutcome
               const standing =
-                projection && !outcome ? connectedLastStanding(projection) : undefined
+                projection && !outcome ? connectedStandingWinners(projection) : undefined
               setDrawSelected(outcome?.kind === "draw")
               setWinnerPlayerIds(
-                outcome?.kind === "win" ? outcome.winnerPlayerIds : standing ? [standing] : [],
+                outcome?.kind === "win" ? outcome.winnerPlayerIds : (standing ?? []),
               )
               setConfirmingFinish(true)
             },
@@ -889,6 +975,76 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     onAccount,
   })
   const { menuOpen, dice, dialogOrigin: menuDialogOrigin } = chrome
+  const turnSeats = [...game.players]
+    .sort((left, right) => left.seat - right.seat)
+    .map((player) => ({
+      playerId: player.playerId,
+      seatNumber: player.seat,
+      name: player.displayName,
+      color: player.color,
+      shape: shownMarkShape(player),
+    }))
+  // why: any device holding a seat in the active group may act for it, and the engine checks the acting seat shares the turn.
+  const actingSeat = turn && turnGroupOf(turnGroups, turn.playerId).find((id) => controlled.has(id))
+  const myTurn = actingSeat !== undefined
+  const undoSeat =
+    turn?.previous &&
+    turnGroupOf(turnGroups, turn.previous.playerId).find((id) => controlled.has(id))
+  // why: lives stay out of this memoized board, so who is out is read from the runtime when asked.
+  function nextPlayerId() {
+    const runtime = controls.current()
+    if (!turn || runtime.status !== "ready") return undefined
+    const outState = projectionOutState(runtime.projection)
+    return nextTurnSeat(
+      turnSeats.map(({ playerId }) => playerId),
+      turn.playerId,
+      (id) => outReason(outState, id) !== undefined,
+      turnGroups,
+    )
+  }
+  function passTo(next: string) {
+    if (!turn || !actingSeat || !table) return
+    const operationId = table.passTurn(actingSeat, next)
+    if (!operationId) return
+    setTurnToast({
+      operationId,
+      passerId: actingSeat,
+      message: translate("board:turn.passed", {
+        number: turn.number + 1,
+        name: teamName(named, turnGroups, next) ?? "",
+      }),
+    })
+  }
+  const turnsOn = tabOn && active && table !== undefined
+  const turnChip: TurnChipState | undefined =
+    turnsOn && turn
+      ? {
+          turn,
+          canPress: myTurn,
+          nameOf: (playerId) => teamName(named, turnGroups, playerId),
+          onStart: () => actingSeat && table?.startTurn(actingSeat),
+          onPass: passTo,
+          onLongPress: () => setTurnOpen(true),
+        }
+      : undefined
+  // why: with turns on and nobody holding the first turn, each of this device's seats carries an empty 1st that takes it.
+  const seatGrid = {
+    ...dice.grid,
+    chipsFor: (player: GamePlayer): DiceSeatChip[] => {
+      const chips = dice.grid.chipsFor(player)
+      if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
+        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+      return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
+    },
+    onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
+      // why: the turn chip marks who went first here, so a claim never leaves a local 1st badge behind.
+      if (chip.kind === "claim") {
+        if (!turn) table?.setTurn(player.id, player.id)
+        return
+      }
+      dice.grid.onPressChip(player, chip)
+    },
+  }
   useStoreReview(
     game.status === "finished" &&
       !menuOpen &&
@@ -938,6 +1094,29 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       <GameBoard
         testID="connected-game-board"
         chrome={chrome}
+        turns={
+          turnChip
+            ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf: nextPlayerId }
+            : undefined
+        }
+        toast={
+          turnToast ? (
+            <GameToast
+              key={turnToast.operationId}
+              inline
+              message={turnToast.message}
+              actionTx="common:undo"
+              testID="turn-passed-toast"
+              actionTestID="turn-passed-undo"
+              onAction={() => {
+                table?.undoTurn(turnToast.passerId, turnToast.operationId)
+                setTurnToast(undefined)
+              }}
+              visibleMs={PASS_UNDO_MS}
+              onDismiss={dismissTurnToast}
+            />
+          ) : null
+        }
         renderGrid={(boardOrientation) => (
           <ConnectedLifeGrid
             boardOrientation={boardOrientation}
@@ -981,11 +1160,41 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                   }
                 : undefined
             }
-            dice={dice.grid}
+            dice={seatGrid}
             onChange={controls.changeLife}
           />
         )}
       />
+
+      {turnOpen && table ? (
+        <TurnDialog
+          turn={turn}
+          seats={turnSeats}
+          pick={{
+            canPick: (playerId) => (turn ? myTurn : controlled.has(playerId)),
+            onPick: (playerId) => {
+              table.setTurn(actingSeat ?? playerId, playerId)
+              setTurnOpen(false)
+            },
+          }}
+          onUndo={
+            turn && undoSeat
+              ? () => {
+                  table.undoTurn(undoSeat, turn.operationId)
+                  setTurnToast(undefined)
+                  setTurnOpen(false)
+                }
+              : undefined
+          }
+          onBank={(() => {
+            const mine = turnSeats.find(({ playerId }) => controlled.has(playerId))
+            return turn && mine ? (bankMs) => table.setBank(mine.playerId, bankMs) : undefined
+          })()}
+          onClose={() => setTurnOpen(false)}
+        />
+      ) : null}
+
+      {hideOffer ? <HideTurnsDialog onAnswer={answerHideOffer} /> : null}
 
       {inviteSheet.shown && shownInvitation ? (
         <Sheet
@@ -1215,15 +1424,22 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             <Text size="xs" tx="connected:board.finish.subtitle" tone="dim" />
           </View>
           <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
-            {game.players.map((player) => (
-              <WinnerChoice
-                key={player.playerId}
-                player={player}
-                system={system}
-                selected={winnerPlayerIds.includes(player.playerId)}
-                onPress={() => toggleWinner(player.playerId)}
-              />
-            ))}
+            {teamChoices(named, turnGroups).map(({ id }) => {
+              const player = game.players.find(({ playerId }) => playerId === id)!
+              return (
+                <WinnerChoice
+                  key={id}
+                  player={player}
+                  name={teamName(named, turnGroups, id) ?? player.displayName}
+                  team={teamMembers(named, turnGroups, id).flatMap(
+                    (member) => game.players.find(({ playerId }) => playerId === member.id) ?? [],
+                  )}
+                  system={system}
+                  selected={winnerPlayerIds.includes(id)}
+                  onPress={() => toggleWinner(id)}
+                />
+              )
+            })}
             <ChoiceButton
               tx="connected:board.finish.draw"
               accentColor={colors.palette.neutral400}
@@ -1420,33 +1636,48 @@ function ConnectedLifeGrid({
 
 function WinnerChoice({
   player,
+  name,
+  team,
   system,
   selected,
   onPress,
 }: {
   player: ConnectedBoardSeat
+  name: string
+  team: readonly ConnectedBoardSeat[]
   system: ConnectedBoardView["system"]
   selected: boolean
   onPress: () => void
 }) {
-  const life = counterValueLabel(system, useContext(ConnectedLivesContext)[player.playerId] ?? 0)
+  const lives = useContext(ConnectedLivesContext)
+  const members = team.map(({ playerId }) => playerId)
+  const life = teamValueLabel(
+    members.map((id) => ({ id, life: lives[id] ?? 0 })),
+    [members],
+    members[0],
+    (value) => counterValueLabel(system, value),
+  )
   return (
     <ChoiceButton
-      text={player.displayName}
-      detail={life}
+      text={name}
+      TextProps={{ numberOfLines: 3 }}
+      detail={life.shown}
       accentColor={player.color}
       Leading={({ color }) => (
-        <PlayerMark
-          seatNumber={player.seat}
-          shape={shownMarkShape(player)}
-          foil={player.foil}
+        <TeamMarks
+          marks={team.map((member) => ({
+            seatNumber: member.seat,
+            shape: shownMarkShape(member),
+            foil: member.foil,
+            color: member.color,
+          }))}
           color={color}
-          size={28}
+          selected={selected}
         />
       )}
       accessibilityLabel={translate(
         selected ? "connected:board.finish.winnerOption" : "connected:board.finish.playerOption",
-        { name: player.displayName, life },
+        { name, life: life.spoken },
       )}
       selected={selected}
       onPress={onPress}

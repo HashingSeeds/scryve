@@ -120,6 +120,10 @@ export default {
     copyDebugInfo: "디버그 정보 복사",
     copied: "복사됨",
     copyFailed: "복사할 수 없습니다. 다시 시도해 주세요.",
+    turns: {
+      label: "턴",
+      helper: "현재 자리를 강조하고 해당 카드에 턴 시계를 표시합니다. 시계를 탭하면 턴을 넘깁니다.",
+    },
     syncStats: {
       label: "괴짜용 통계",
       helper:

@@ -120,6 +120,11 @@ export default {
     copyDebugInfo: "デバッグ情報をコピー",
     copied: "コピーしました",
     copyFailed: "コピーできませんでした。もう一度お試しください。",
+    turns: {
+      label: "ターン",
+      helper:
+        "現在の席を枠で強調し、カードにターンタイマーを表示します。タイマーをタップするとパスします。",
+    },
     syncStats: {
       label: "開発者向け統計",
       helper:

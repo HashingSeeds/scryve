@@ -24,12 +24,19 @@ import {
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
+import { getPlayerGridRows } from "@/components/playerGridGeometry"
+import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
+import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
+import type { PlaySystemId } from "./playSystems"
+import type { RoundClock } from "./roundClock"
+import { clockwiseSlots } from "./turnTab"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
+import { turnGroupOf, type TurnGroups } from "../../../convex/lib/turns"
 import {
   SCREEN_PINNING_AVAILABLE,
   ScreenPinnedView,
@@ -42,10 +49,25 @@ export interface GameBoardStageProps {
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   firstPlayer?: FirstPlayerOffer
+  roundClock?: BoardRoundClock
+  turns?: BoardTurns
   windowOverlay?: ReactNode
   toast?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
   testID?: string
+}
+
+export interface BoardRoundClock {
+  clock: RoundClock
+  system?: PlaySystemId
+  onPress: () => void
+}
+
+/** why: only the grid knows where seats sit, so the stage hands its slots in clockwise order and the screen names the seat after the active one. */
+export interface BoardTurns {
+  active?: string
+  groups?: TurnGroups
+  nextOf: (clockwiseSlots: number[]) => string | undefined
 }
 
 export interface BoardSize {
@@ -61,6 +83,8 @@ function PinnedGameBoardStage({
   renderGrid,
   menu,
   firstPlayer,
+  roundClock,
+  turns,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -114,7 +138,8 @@ function PinnedGameBoardStage({
         : undefined,
     [pinned, width, height, fontScale, metrics.insets, holderAngle],
   )
-  const tabsShown = !!firstPlayer && !menu.open
+  const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
+  const spotlight = useSpotlight(turns, playerCount, gridLayout)
 
   return (
     <View testID={testID} style={$stage}>
@@ -122,7 +147,9 @@ function PinnedGameBoardStage({
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             <FirstPlayerTabsShownContext.Provider value={tabsShown}>
-              {renderGrid(boardOrientation)}
+              <TurnSpotlightContext.Provider value={spotlight}>
+                {renderGrid(boardOrientation)}
+              </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
@@ -137,7 +164,9 @@ function PinnedGameBoardStage({
               statusLine={menu.statusLine}
               onToggle={menu.onToggle}
             />
-            {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
+            {tabsShown ? (
+              <BoardTabs firstPlayer={firstPlayer} roundClock={roundClock} tabs={tabs} />
+            ) : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
@@ -157,6 +186,8 @@ function LegacyGameBoardStage({
   renderGrid,
   menu,
   firstPlayer,
+  roundClock,
+  turns,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -180,7 +211,8 @@ function LegacyGameBoardStage({
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
     [boardAnchor, playerCount, gridLayout, rotation],
   )
-  const tabsShown = !!firstPlayer && !menu.open
+  const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
+  const spotlight = useSpotlight(turns, playerCount, gridLayout)
 
   return (
     <Animated.View
@@ -190,7 +222,9 @@ function LegacyGameBoardStage({
       style={$stage}
     >
       <FirstPlayerTabsShownContext.Provider value={tabsShown}>
-        {renderGrid(boardOrientation)}
+        <TurnSpotlightContext.Provider value={spotlight}>
+          {renderGrid(boardOrientation)}
+        </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
       <GameRadialMenu
         {...menu}
@@ -199,7 +233,9 @@ function LegacyGameBoardStage({
         nativeFrame={boardOrientation.nativeFrame}
         compact={playerCount > 2}
       />
-      {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
+      {tabsShown ? (
+        <BoardTabs firstPlayer={firstPlayer} roundClock={roundClock} tabs={tabs} />
+      ) : null}
       {toast ? (
         <BoardToastSlot anchor={menuAnchor} hidden={menu.open}>
           {toast}
@@ -208,6 +244,48 @@ function LegacyGameBoardStage({
       {windowOverlay}
     </Animated.View>
   )
+}
+
+function useSpotlight(
+  turns: BoardTurns | undefined,
+  playerCount: number,
+  gridLayout: Parameters<typeof getPlayerGridRows>[1],
+): TurnSpotlight | undefined {
+  const active = turns?.active
+  const nextOf = turns?.nextOf
+  const groups = turns?.groups
+  const passTo = useMemo(
+    () =>
+      active && nextOf
+        ? nextOf(clockwiseSlots(getPlayerGridRows(playerCount, gridLayout)))
+        : undefined,
+    [active, nextOf, playerCount, gridLayout],
+  )
+  return useMemo(
+    () =>
+      active
+        ? {
+            active: turnGroupOf(groups, active),
+            next: passTo ? turnGroupOf(groups, passTo) : [],
+            passTo,
+          }
+        : undefined,
+    [active, groups, passTo],
+  )
+}
+
+function BoardTabs({
+  firstPlayer,
+  roundClock,
+  tabs,
+}: {
+  firstPlayer?: FirstPlayerOffer
+  roundClock?: BoardRoundClock
+  tabs: readonly FirstPlayerTab[]
+}) {
+  if (firstPlayer) return <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
+  if (!roundClock) return null
+  return <RoundClockTabs {...roundClock} tabs={tabs} />
 }
 
 /** why: the tabs sit where the menu's row meets the board's left and right edges, clear of the camera cutout and home indicator, each turned toward the players nearest it. `rotation` turns a board drawn sideways onto the screen. */

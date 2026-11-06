@@ -9,6 +9,7 @@ import {
   playSystemShortLabel,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import { winnerNames as teamWinnerNames } from "@/features/game/teams"
 import type { LocalGameMatch, LocalGameSummary } from "@/features/game/types"
 import { appLocale, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -195,9 +196,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
   const result = game.result
   const winnerNames =
     result?.kind === "win"
-      ? game.players
-          .filter((player) => result.winnerPlayerIds.includes(player.id))
-          .map((player) => player.name)
+      ? teamWinnerNames(game.players, game.turnGroups, result.winnerPlayerIds)
       : []
   return {
     key: `local:${game.id}`,
@@ -273,6 +272,8 @@ export function connectedHistoryEntry(game: {
   terminalStatus?: string
   match?: ScryveMatchSummary
   matchGameNumber?: number
+  winnerPlayerIds?: readonly string[]
+  turnGroups?: readonly (readonly string[])[]
   players: {
     playerId?: string
     displayName?: string
@@ -282,6 +283,15 @@ export function connectedHistoryEntry(game: {
 }): HistoryEntry {
   const system = storedPlaySystem(game.system)
   const source = game.source ?? "connected"
+  const players = (game.players ?? []).map((player, index) => ({
+    id: player.playerId ?? `${game.publicId}:${index}`,
+    name: player.displayName ?? "",
+    color: player.color,
+    deckName: player.deckNameAtFinish,
+  }))
+  const winnerNames = game.winnerPlayerIds
+    ? teamWinnerNames(players, game.turnGroups, game.winnerPlayerIds)
+    : []
   return {
     key: `${source}:${game.publicId}`,
     source,
@@ -289,15 +299,11 @@ export function connectedHistoryEntry(game: {
     finishedAt: game.finishedAt,
     status: game.terminalStatus === "abandoned" ? "abandoned" : "finished",
     outcome: toHistoryOutcome(game.outcome),
+    ...(winnerNames.length > 0 ? { winnerNames } : {}),
     ...(game.match ? { scryveMatch: serverMatchRef(game.match, game.matchGameNumber) } : {}),
     eventCount: game.eventCount,
     system,
-    players: (game.players ?? []).map((player, index) => ({
-      id: player.playerId ?? `${game.publicId}:${index}`,
-      name: player.displayName ?? "",
-      color: player.color,
-      deckName: player.deckNameAtFinish,
-    })),
+    players,
     format:
       system && (game.format || game.ruleset)
         ? playFormatLabel(system, game.format || game.ruleset)

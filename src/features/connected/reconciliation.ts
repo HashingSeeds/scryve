@@ -57,6 +57,7 @@ export function overlayPendingDeltas(
       const change = applyTableAction(table, event.action, {
         rules,
         operationId: event.operationId,
+        now: event.clientCreatedAt,
         lifeOf: (playerId) => {
           const player = confirmed.players.find((candidate) => candidate.playerId === playerId)
           return player && player.currentLife + (deltas.get(playerId) ?? 0)

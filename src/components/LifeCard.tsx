@@ -100,6 +100,7 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
+import { TurnChipLayer } from "./TurnChip"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 // why: matches the attacker's power boxes swapping in, so the life total moves and its − and + fade with them.
@@ -215,6 +216,7 @@ export const LifeCard = memo(function LifeCard({
   const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
+  const turnChip = diceChips?.flatMap((chip) => (chip.kind === "turn" ? [chip.state] : []))[0]
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const cornerSlide = useCornerSlide()
@@ -1054,6 +1056,25 @@ export const LifeCard = memo(function LifeCard({
             </BoardPressable>
           ) : null}
         </Animated.View>
+      ) : null}
+      {turnChip &&
+      !dice?.view &&
+      !editorOpen &&
+      !tableSheetOpen &&
+      !commanderCovers &&
+      !diceCovers &&
+      !attackerSide ? (
+        <TurnChipLayer
+          state={turnChip}
+          seatNumber={seatNumber}
+          foreground={foreground}
+          compact={compact}
+          rotation={contentRotation}
+          cardSize={cardSize}
+          contentInsets={contentInsets}
+          menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
+        />
       ) : null}
       {claims?.length ? (
         <CommanderClaimBanner

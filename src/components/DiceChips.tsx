@@ -50,7 +50,7 @@ export function DiceChips({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [rowOffset, setRowOffset] = useState<Point>()
-  if (chips.length === 0) return null
+  if (!chips.some(({ kind }) => kind !== "turn")) return null
   const flight =
     reducedMotion === false && bloomCenterInRow && rowOffset
       ? { x: bloomCenterInRow.x - rowOffset.x, y: bloomCenterInRow.y - rowOffset.y }
@@ -74,6 +74,8 @@ export function DiceChips({
       style={themed($row)}
     >
       {chips.map((chip) => {
+        // why: the turn chip has its own spot at the top of the card, out of the name's row.
+        if (chip.kind === "turn") return null
         const key = chipKey(chip)
         const claim = chip.kind === "claim"
         const label =
@@ -182,7 +184,7 @@ function ChipFlight({
   )
 }
 
-function chipKey(chip: DiceSeatChip) {
+function chipKey(chip: Exclude<DiceSeatChip, { kind: "turn" }>) {
   return chip.kind === "roll" ? chip.roll.tool : chip.kind
 }
 

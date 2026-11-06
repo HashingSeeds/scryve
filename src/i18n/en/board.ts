@@ -95,6 +95,10 @@ const board = {
     evenGrid: "Even grid",
     table: "Table",
   },
+  teams: {
+    // A team of players who share a turn, named by its players, as in "Ada & Grace" or "Ada, Grace & Kim".
+    name: "{{first}} & {{second}}",
+  },
   seats: {
     title: "Swap seats",
     seat: "{{name}}'s seat",
@@ -516,6 +520,43 @@ const board = {
     collapses: "Collapses the game controls",
     expands: "Expands the game controls",
     actionWithDetail: "{{label}}, {{detail}}",
+  },
+  turn: {
+    // On the active player's turn chip, before their turn clock starts. Tapping starts it. Very short.
+    start: "Start",
+    startHint: "Tap to start the turn clock",
+    // Very short tap target on the turn chip that ends this player's turn and starts the next player's. Never "End turn".
+    pass: "Pass",
+    // Screen reader label for the turn chip, as in "Turn 4, Ada".
+    label: "Turn {{number}}, {{name}}",
+    passHintTo: "Tap to pass to {{name}}",
+    // Screen reader text when a player's chess clock bank has run out. Play continues.
+    outOfTime: "Out of time",
+    longPressHint: "Long press for turn controls",
+    // Title of the turn controls dialog, as in "Turn 4".
+    title: "Turn {{number}}",
+    noTurnTitle: "Turns",
+    // Above the list of players in the turn controls, to fix whose turn it is after a mistake.
+    whoseTurn: "Whose turn is it?",
+    whoFirstHeading: "Who goes first?",
+    // Shown instead of the player list in event play, where only passing changes the turn.
+    eventPlay: "Event play: only passing changes the turn",
+    undoPass: "Take back the pass",
+    // A toast after a pass, as in "Turn 5, Grace".
+    passed: "Turn {{number}}, {{name}}",
+    // A chess clock: each player's own time bank counts down only on their turn.
+    chessBank: "Time per player",
+    chessMinutes: "{{minutes}} min",
+    chessOff: "Off",
+    roundClock: "Round clock",
+    // The log divider at the start of each turn, as in "Turn 4 · Ada".
+    divider: "Turn {{number}} · {{name}}",
+    hideOffer: {
+      title: "Stop tracking turns?",
+      body: "You can turn it back on in Settings.",
+      hide: "Stop",
+      keep: "Keep",
+    },
   },
   log: {
     close: "Close log",

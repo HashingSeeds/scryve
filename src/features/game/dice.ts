@@ -2,6 +2,7 @@ import { translate } from "@/i18n/translate"
 
 import type { GamePlayer, PlayerId } from "./types"
 import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/lib/systems"
+import type { Turn } from "../../../convex/lib/turns"
 
 export type DiceRules = Pick<FirstPlayerDefinition, "die" | "winnerChooses">
 export type Die = DiceRules["die"]
@@ -51,7 +52,20 @@ export type DiceSeatView =
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
 
-export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" } | { kind: "claim" }
+export interface TurnChipState {
+  turn: Turn
+  canPress: boolean
+  nameOf: (playerId: string) => string | undefined
+  onStart: () => void
+  onPass: (nextPlayerId: string) => void
+  onLongPress: () => void
+}
+
+export type DiceSeatChip =
+  | { kind: "roll"; roll: DiceRoll }
+  | { kind: "first" }
+  | { kind: "claim" }
+  | { kind: "turn"; state: TurnChipState }
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
 

@@ -11,7 +11,7 @@ import {
   createNextMatchGame,
   createRematch,
   defaultCommandContext,
-  lastPlayerStanding,
+  localStandingWinners,
   matchContextLabel,
   matchScoreAfter,
   restartMatchGame,
@@ -104,7 +104,7 @@ describe("local match", () => {
       { type: "life.change", playerId: game.players[1].id, delta: -6 },
       defaultCommandContext(asDeviceId("device")),
     )
-    expect(lastPlayerStanding(tookAll)).toBe(tookAll.players[1].id)
+    expect(localStandingWinners(tookAll)).toEqual([tookAll.players[1].id])
     expect(defaultMatchOutcomes(tookAll)).toEqual(["loss", "draw"])
   })
 
