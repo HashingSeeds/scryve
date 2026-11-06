@@ -16,7 +16,7 @@ import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
-import type { AttackChange } from "@/features/game/commanderAttack"
+import type { AttackChange, OthersChange } from "@/features/game/commanderAttack"
 import { CLAIM_CHIP, systemDice, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import {
   canContinueMatch,
@@ -24,6 +24,7 @@ import {
   hasLocalGameStarted,
   hasPlayBegun,
   incomingCommanderDamage,
+  isMatchInProgress,
   localOutState,
   localTeams,
   matchContextLabel,
@@ -170,6 +171,8 @@ export function CurrentGameScreen({
       changes.forEach(({ toPlayerId, commander, delta }) =>
         runtime.assignCommanderDamage(from, toPlayerId, delta, commander),
       ),
+    loseLife: (changes: readonly OthersChange[]) =>
+      changes.forEach(({ toPlayerId, amount }) => runtime.changeLife(toPlayerId, -amount)),
   }
   const attack = useCommanderAttack(commanderPort, { seatDeck })
   const attackDispatch = attack.dispatch
@@ -259,10 +262,9 @@ export function CurrentGameScreen({
   const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
   const playerCount = runtime.game.players.length
   const { events } = runtime.game
-  const lifeTeams = localTeams(runtime.game)
   const lifeLog = useMemo(
-    (): LifeLogSource => ({ kind: "local", events, ...(lifeTeams ? { teams: lifeTeams } : {}) }),
-    [events, lifeTeams],
+    (): LifeLogSource => ({ kind: "local", events, ...(teams ? { teams: teams } : {}) }),
+    [events, teams],
   )
   const firstPlayer = useMemo<FirstPlayerOffer | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
@@ -314,8 +316,9 @@ export function CurrentGameScreen({
     shape: player.shape,
   }))
   const { passTurn, setTurn, undoTurn, setBank, startTurn, changeClock } = runtime
-  const nameOf = (playerId: string) => teamName(runtime.game.players, teams, playerId)
   const { turnGroups } = runtime.game
+  // why: a turn shared by a team is named for the team, in the chip, the pass toast, and the log.
+  const nameOf = (playerId: string) => teamName(runtime.game.players, turnGroups, playerId)
   function nextOf(clockwiseSlots: number[]) {
     if (!turn) return undefined
     const { players, seatOrder } = runtime.game
@@ -627,7 +630,8 @@ export function CurrentGameScreen({
           players={runtime.game.players}
           events={events}
           turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
-          teams={lifeTeams}
+          groups={turnGroups}
+          sharedLife={!!teams}
           canUndo={runtime.canUndo}
           origin={chrome.dialogOrigin}
           onUndo={runtime.undo}
@@ -671,14 +675,27 @@ export function CurrentGameScreen({
               <Text size="xs" text={drawsLabel(match.draws)} style={themed($dialogText)} />
             ) : null}
           </View>
-          <Button
-            testID="end-match-button"
-            tx="board:matchEnd.end"
-            disabled={match.gameNumber === 1 || hasLocalGameStarted(runtime.game)}
-            accessibilityHint={translate("board:match.endHint")}
-            style={themed($menuItem)}
-            onPress={openEndMatch}
-          />
+          {isMatchInProgress(runtime.game) ? (
+            <Button
+              testID="end-match-button"
+              tx="board:matchEnd.end"
+              disabled={match.gameNumber === 1 || hasLocalGameStarted(runtime.game)}
+              accessibilityHint={translate("board:match.endHint")}
+              style={themed($menuItem)}
+              onPress={openEndMatch}
+            />
+          ) : (
+            <Button
+              testID="leave-match-button"
+              tx="board:match.leave"
+              accessibilityHint={translate("board:match.leaveHint")}
+              style={themed($menuItem)}
+              onPress={() => {
+                setMatchOpen(false)
+                runtime.leaveMatch()
+              }}
+            />
+          )}
           <Button tx="common:close" style={themed($menuItem)} onPress={() => setMatchOpen(false)} />
         </DialogCard>
       ) : null}

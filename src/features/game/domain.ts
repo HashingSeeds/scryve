@@ -57,7 +57,6 @@ import {
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
 import {
   commanderOutState,
-  lastStanding,
   outReason,
   standingWinners,
   type OutState,
@@ -330,6 +329,12 @@ export function isMatchInProgress(game: LocalGame) {
   return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
 }
 
+export function leaveMatch(game: LocalGame): LocalGame {
+  if (isMatchInProgress(game)) throw new Error("A match in progress ends with End match.")
+  const { match: _match, ...board } = game
+  return board
+}
+
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")
   return withFirstChooser(
@@ -447,9 +452,8 @@ export function incomingCommanderDamage(
 }
 
 export function localOutState(game: LocalGame): OutState<PlayerId> {
-  const teams = localTeams(game)
   return {
-    ...(teams ? { teams } : {}),
+    ...(localTeams(game) ? { sharedFate: true as const } : {}),
     counter: playSystemRules(game.system).counter,
     tableRules: localTableRules(game),
     table: game.table,
@@ -467,6 +471,7 @@ export function localOutState(game: LocalGame): OutState<PlayerId> {
         ),
       ),
     ),
+    ...(game.turnGroups ? { groups: game.turnGroups } : {}),
   }
 }
 
@@ -589,10 +594,6 @@ function applyBoardTableAction(
     players,
     updatedAt: Math.max(game.updatedAt, context.now),
   }
-}
-
-export function lastPlayerStanding(game: LocalGame) {
-  return lastStanding(localOutState(game))
 }
 
 export function localStandingWinners(game: LocalGame) {

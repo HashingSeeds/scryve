@@ -2,6 +2,12 @@ import { clampedCommanderDelta, COMMANDER_SLOTS, MAX_COMMANDER_DAMAGE } from "./
 import type { CommanderSlot, PlayerId } from "./types"
 
 export type AttackChange = { toPlayerId: PlayerId; commander?: CommanderSlot; delta: number }
+/** why: damage from the attacker's other creatures takes life but never counts toward commander lethal. A negative amount gives life back on undo. */
+export type OthersChange = { toPlayerId: PlayerId; amount: number }
+
+type Hit = { steps: readonly number[]; others: number }
+/** why: a box on the attacker's card, a commander by slot or Others. */
+export type AttackBox = number | "others"
 
 export type AttackState = {
   armed: PlayerId | null
@@ -9,14 +15,22 @@ export type AttackState = {
   powers: Partial<Record<`${PlayerId}:${number}`, number>>
   acted: boolean
   /** why: each defender's hits this attack, newest last, so undo takes back exactly the last hit rather than the current power. */
-  hits: Partial<Record<PlayerId, readonly (readonly number[])[]>>
+  hits: Partial<Record<PlayerId, readonly Hit[]>>
   staged: readonly AttackChange[]
+  /** why: what each tap deals from the attacker's other creatures. Every attack starts it at 1 and sat out, since those creatures change from turn to turn and most hits are the commander's alone. */
+  others: number
+  /** why: a connected attack holds Others damage until Send, like its commander damage. */
+  stagedOthers: Partial<Record<PlayerId, number>>
+  /** why: boxes sat out of this attack by tapping their names. They keep their number, so tapping again brings them back at the same power. */
+  sitting: readonly AttackBox[]
 }
 
 export type AttackAction =
   | { type: "press"; playerId: PlayerId }
   | { type: "send" }
   | { type: "power"; slot: number; power: number }
+  | { type: "others"; power: number }
+  | { type: "sit"; box: AttackBox }
   | { type: "hit"; to: PlayerId }
   | { type: "undo"; to: PlayerId }
 
@@ -25,9 +39,15 @@ export type AttackBoard = {
   commanders: readonly { name?: string; power?: number }[]
   /** why: only a connected game buffers, since assignment and confirmation live on separate devices there. Local play has nobody to confirm to, so each step commits as it is pressed and there is nothing to stage or send. */
   buffered: boolean
+  /** why: Others damage lowers another seat's life, which only a game where anyone edits any seat accepts; elsewhere the attack has no Others. */
+  others: boolean
 }
 
-export type AttackCommit = { from: PlayerId; changes: readonly AttackChange[] }
+export type AttackCommit = {
+  from: PlayerId
+  changes: readonly AttackChange[]
+  others: readonly OthersChange[]
+}
 
 export const IDLE_ATTACK: AttackState = {
   armed: null,
@@ -35,6 +55,10 @@ export const IDLE_ATTACK: AttackState = {
   acted: false,
   hits: {},
   staged: [],
+  others: 1,
+  stagedOthers: {},
+  // why: Others and a second partner start each attack sat out, so a fresh hit lands on one commander; tapping a name brings it in at its printed power.
+  sitting: ["others", 1],
 }
 
 /** why: a partner sits a hit out at 0, so one commander can carry the whole hit. A lone commander always hits for at least 1. */
@@ -63,26 +87,54 @@ function restage(
 
 export function attackView(state: AttackState, board: AttackBoard, to: PlayerId) {
   const { armed } = state
+  const hits = state.hits[to] ?? []
   const commanders = board.commanders.map(({ name, power }, slot) => {
     const commander = COMMANDER_SLOTS[slot]
-    // why: the second partner starts at 0, so a fresh attack lands on one commander until the player raises the other.
-    const starting = slot > 0 ? 0 : (power ?? 1)
+    const total = armed
+      ? board.recorded(armed, to, commander) + heldIn(state.staged, to, commander)
+      : 0
     return {
       name,
-      power: (armed ? state.powers[`${armed}:${slot}`] : undefined) ?? starting,
-      total: armed ? board.recorded(armed, to, commander) + heldIn(state.staged, to, commander) : 0,
+      power: (armed ? state.powers[`${armed}:${slot}`] : undefined) ?? power ?? 1,
+      sitting: state.sitting.includes(slot),
+      total,
+      // why: the part of the total this attack's hits dealt, which the defender's ring shows apart until the attack ends.
+      landed: Math.min(total, sum(hits.map(({ steps }) => steps[slot] ?? 0))),
     }
   })
-  const steps = commanders.map(({ power, total }) =>
-    Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
+  const steps = commanders.map(({ power, total, sitting }) =>
+    sitting ? 0 : Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
   )
-  const lastHit = state.hits[to]?.at(-1) ?? commanders.map(({ power }) => power)
-  const takeBacks = commanders.map(({ total }, slot) => Math.min(lastHit[slot] ?? 0, total))
-  return { commanders, steps, dealt: sum(steps), takeBacks, takeBack: sum(takeBacks) }
+  const othersSitting = !board.others || state.sitting.includes("others")
+  const othersStep = othersSitting ? 0 : state.others
+  const lastHit = hits.at(-1)
+  const lastSteps = lastHit?.steps ?? commanders.map(({ power }) => power)
+  const takeBacks = commanders.map(({ total }, slot) => Math.min(lastSteps[slot] ?? 0, total))
+  const othersTakeBack = lastHit?.others ?? 0
+  const othersLanded = sum(hits.map(({ others }) => others))
+  // why: a local hit lowers the defender's life as it lands; a buffered one waits for Send, so none of it is on their life yet.
+  const applied = board.buffered ? 0 : sum(commanders.map(({ landed }) => landed)) + othersLanded
+  return {
+    commanders,
+    steps,
+    others: state.others,
+    othersShown: board.others,
+    othersSitting,
+    othersStep,
+    othersLanded,
+    othersTakeBack,
+    dealt: sum(steps) + othersStep,
+    takeBacks,
+    takeBack: sum(takeBacks) + othersTakeBack,
+    applied,
+  }
 }
 
 export function stagedTargets(state: AttackState) {
-  return new Set(state.staged.map(({ toPlayerId }) => toPlayerId)).size
+  return new Set([
+    ...state.staged.map(({ toPlayerId }) => toPlayerId),
+    ...Object.keys(state.stagedOthers),
+  ]).size
 }
 
 type AttackResult = { state: AttackState; commit?: AttackCommit }
@@ -109,13 +161,30 @@ export function reduceAttack(
       const power = Math.min(MAX_COMMANDER_DAMAGE, Math.max(lowest, Math.trunc(action.power)))
       return { state: { ...state, powers: { ...state.powers, [key]: power } } }
     }
+    case "others": {
+      if (!armed || !Number.isFinite(action.power)) return { state }
+      const others = Math.min(MAX_COMMANDER_DAMAGE, Math.max(0, Math.trunc(action.power)))
+      return { state: { ...state, others } }
+    }
+    case "sit": {
+      if (!armed) return { state }
+      const { box } = action
+      const sitting = state.sitting.includes(box)
+        ? state.sitting.filter((held) => held !== box)
+        : [...state.sitting, box]
+      return { state: { ...state, sitting } }
+    }
     case "hit": {
       const view = attackView(state, board, action.to)
       if (!armed || armed === action.to || view.dealt <= 0) return { state }
-      const hits = [...(state.hits[action.to] ?? []), view.steps]
+      const hits = [
+        ...(state.hits[action.to] ?? []),
+        { steps: view.steps, others: view.othersStep },
+      ]
       return land({ ...state, hits: { ...state.hits, [action.to]: hits } }, board, armed, {
         to: action.to,
         deltas: view.steps,
+        others: view.othersStep,
       })
     }
     case "undo": {
@@ -125,6 +194,7 @@ export function reduceAttack(
       return land({ ...state, hits: { ...state.hits, [action.to]: hits } }, board, armed, {
         to: action.to,
         deltas: view.takeBacks.map((amount) => -amount),
+        others: -view.othersTakeBack,
       })
     }
   }
@@ -132,8 +202,14 @@ export function reduceAttack(
 
 function finish(state: AttackState): AttackResult {
   if (!state.armed) return { state }
+  const others = Object.entries(state.stagedOthers).map(([toPlayerId, amount = 0]) => ({
+    toPlayerId: toPlayerId as PlayerId,
+    amount,
+  }))
   const commit =
-    state.armed && state.staged.length ? { from: state.armed, changes: state.staged } : undefined
+    state.staged.length || others.length
+      ? { from: state.armed, changes: state.staged, others }
+      : undefined
   return {
     state: {
       ...state,
@@ -141,6 +217,9 @@ function finish(state: AttackState): AttackResult {
       acted: false,
       hits: {},
       staged: [],
+      others: IDLE_ATTACK.others,
+      stagedOthers: {},
+      sitting: IDLE_ATTACK.sitting,
     },
     commit,
   }
@@ -151,7 +230,7 @@ function land(
   state: AttackState,
   board: AttackBoard,
   from: PlayerId,
-  { to, deltas }: { to: PlayerId; deltas: readonly number[] },
+  { to, deltas, others }: { to: PlayerId; deltas: readonly number[]; others: number },
 ): AttackResult {
   let next = state.staged
   const changes: AttackChange[] = []
@@ -163,9 +242,15 @@ function land(
     if (board.buffered) next = restage(next, to, commander, held + step)
     else changes.push({ toPlayerId: to, ...(commander ? { commander } : {}), delta: step })
   })
-  if (!changes.length && next === state.staged) return { state }
+  const held = (state.stagedOthers[to] ?? 0) + others
+  const { [to]: _, ...rest } = state.stagedOthers
+  const stagedOthers =
+    board.buffered && others ? (held ? { ...rest, [to]: held } : rest) : state.stagedOthers
+  const lifeChanges = !board.buffered && others ? [{ toPlayerId: to, amount: others }] : []
+  if (!changes.length && !lifeChanges.length && next === state.staged && !others) return { state }
   return {
-    state: { ...state, staged: next, acted: true },
-    commit: changes.length ? { from, changes } : undefined,
+    state: { ...state, staged: next, stagedOthers, acted: true },
+    commit:
+      changes.length || lifeChanges.length ? { from, changes, others: lifeChanges } : undefined,
   }
 }

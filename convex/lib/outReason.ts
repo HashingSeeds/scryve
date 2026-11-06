@@ -23,8 +23,10 @@ export interface OutState<Id extends string = string> {
     readonly lethal: number
     readonly totals: readonly CommanderTotal<Id>[]
   }
-  /** why: Two-Headed Giant teams win and lose together (CR 810.8a), so one teammate out puts out the team. */
-  readonly teams?: TurnGroups
+  /** why: seats that share a turn also win and lose together, such as a Two-Headed Giant team or Archenemy's opponents. */
+  readonly groups?: TurnGroups
+  /** why: a Two-Headed Giant team has one life (CR 810.8a), so one head out puts out the team, and 21 from one commander counts across both heads. */
+  readonly sharedFate?: true
 }
 
 export function commanderOutState<Id extends string>(
@@ -38,8 +40,8 @@ export function outReason<Id extends string>(
   state: OutState<Id>,
   playerId: Id,
 ): OutReason<Id> | undefined {
-  if (!state.teams) return seatOutReason(state, playerId)
-  const team = turnGroupOf(state.teams, playerId) as readonly Id[]
+  if (!state.sharedFate) return seatOutReason(state, playerId)
+  const team = turnGroupOf(state.groups, playerId) as readonly Id[]
   const lethal = teamCommanderLethal(state, team)
   if (lethal) return lethal
   const seats = { ...state, commanderDamage: undefined }
@@ -50,7 +52,6 @@ export function outReason<Id extends string>(
   return undefined
 }
 
-/** why: Wizards' 2HG Commander counts 21 from one commander across both teammates. */
 function teamCommanderLethal<Id extends string>(
   { commanderDamage }: OutState<Id>,
   team: readonly Id[],
@@ -94,20 +95,18 @@ function seatOutReason<Id extends string>(
   return isCounterOut(state.counter, life, others) ? { cause: "life" } : undefined
 }
 
-export function lastStanding<Id extends string>(state: OutState<Id>): Id | undefined {
-  const standing = state.lives.filter(({ playerId }) => !outReason(state, playerId))
-  return standing.length === 1 ? standing[0].playerId : undefined
+/** why: a group is out only once every seat in it is; a teammate who is out still shares the group's win. */
+export function isGroupOut<Id extends string>(state: OutState<Id>, playerId: Id): boolean {
+  return turnGroupOf(state.groups, playerId).every(
+    (seat) => outReason(state, seat as Id) !== undefined,
+  )
 }
 
-/** why: the seats left once every other seat is out: one player, or one whole team. */
+/** why: the game is decided once one group is left standing: one player, or a whole team with any of its fallen seats. */
 export function standingWinners<Id extends string>(state: OutState<Id>): Id[] | undefined {
-  const standing = state.lives
-    .filter(({ playerId }) => !outReason(state, playerId))
-    .map(({ playerId }) => playerId)
+  const standing = state.lives.filter(({ playerId }) => !outReason(state, playerId))
   if (standing.length === 0) return undefined
-  const team = turnGroupOf(state.teams, standing[0])
-  return standing.every((playerId) => team.includes(playerId)) &&
-    standing.length < state.lives.length
-    ? standing
-    : undefined
+  const group = turnGroupOf(state.groups, standing[0].playerId)
+  if (!standing.every(({ playerId }) => group.includes(playerId))) return undefined
+  return state.lives.flatMap(({ playerId }) => (group.includes(playerId) ? [playerId] : []))
 }

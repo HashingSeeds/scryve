@@ -9,6 +9,7 @@ import {
   playSystemShortLabel,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import { winnerNames as teamWinnerNames } from "@/features/game/teams"
 import type { LocalGameMatch, LocalGameSummary } from "@/features/game/types"
 import { appLocale, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -195,9 +196,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
   const result = game.result
   const winnerNames =
     result?.kind === "win"
-      ? game.players
-          .filter((player) => result.winnerPlayerIds.includes(player.id))
-          .map((player) => player.name)
+      ? teamWinnerNames(game.players, game.turnGroups, result.winnerPlayerIds)
       : []
   return {
     key: `local:${game.id}`,

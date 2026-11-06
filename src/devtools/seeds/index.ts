@@ -1,10 +1,12 @@
 import type { Href } from "expo-router"
 
 import { seedGame } from "./gameSeed"
+import { seedNewerGame } from "./newerGameSeed"
 import { SeedError, type SeedParams } from "./seedTypes"
 
 const SEEDS = {
   game: seedGame,
+  newer: seedNewerGame,
 } satisfies Record<string, (params: SeedParams) => Href | Promise<Href>>
 
 type SeedKind = keyof typeof SEEDS

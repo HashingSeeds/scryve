@@ -25,7 +25,8 @@ export function GameLogDialog({
   players,
   events,
   turns,
-  teams,
+  groups,
+  sharedLife = false,
   canUndo,
   origin,
   onUndo,
@@ -34,7 +35,9 @@ export function GameLogDialog({
   players: readonly Pick<GamePlayer, "id" | "name" | "life" | "color" | "shape">[]
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
-  teams?: TurnGroups
+  groups?: TurnGroups
+  /** why: Two-Headed Giant heads share one life, so a row names the team, says which head made it, and counts the team's total. */
+  sharedLife?: boolean
   canUndo: boolean
   origin?: DialogOrigin
   onUndo: () => void
@@ -45,8 +48,8 @@ export function GameLogDialog({
     theme: { colors },
   } = useAppTheme()
   const rows = useMemo(
-    () => withTurnDividers(gameLog(players, events, teams), turns ?? []),
-    [players, events, turns, teams],
+    () => withTurnDividers(gameLog(players, events, sharedLife ? groups : undefined), turns ?? []),
+    [players, events, turns, groups, sharedLife],
   )
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
@@ -60,7 +63,7 @@ export function GameLogDialog({
       const holder = seats.get(item.playerId)
       const label = translate("board:turn.divider", {
         number: item.number,
-        name: teamName(players, teams, item.playerId) ?? holder?.name ?? "",
+        name: teamName(players, groups, item.playerId) ?? "",
       })
       return (
         <View
@@ -90,8 +93,8 @@ export function GameLogDialog({
     }
     const seat = seats.get(item.playerId)
     const source = item.fromPlayerId ? seats.get(item.fromPlayerId) : undefined
-    const name = teamName(players, teams, item.playerId) ?? seat?.name ?? ""
-    const head = teams && !source ? seat : undefined
+    const name = (sharedLife ? teamName(players, groups, item.playerId) : seat?.name) ?? ""
+    const head = sharedLife && !source ? seat : undefined
     const delta = signed(item.delta)
     const when = relativeTime(item.at, openedAt)
     return (

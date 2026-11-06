@@ -536,7 +536,9 @@ export function lanProjection(
       ...roleFor(seat.key),
     })),
     ...(commander ? { commanderDamage: commander } : {}),
-    ...(memory && (tableRulesApply(rules) || (memory.turn && tableVersion >= TABLE_VERSION))
+    ...(memory &&
+    (tableRulesApply(rules) ||
+      ((memory.turn || memory.turnGroups) && tableVersion >= TABLE_VERSION))
       ? {
           table: tableForVersion(
             {

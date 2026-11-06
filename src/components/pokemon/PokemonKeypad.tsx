@@ -19,8 +19,8 @@ const LETTERS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"] as const
 const DIGITS = ["123", "456", "789"] as const
 const SYMBOLS = ["-", "'", ".", ":", "é", "&", "♀", "♂"] as const
 
-const KEY_HEIGHT = 40
-const COMPACT_KEY_HEIGHT = 32
+export const KEY_HEIGHT = 40
+export const COMPACT_KEY_HEIGHT = 32
 const ROW_GAP = spacing.xxs + 1
 
 export function tallestKeypadHeight(compact?: boolean) {

@@ -8,6 +8,7 @@ import {
   storedPlaySystem,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import { teamName } from "@/features/game/teams"
 import type {
   CommanderDamageAssignedEvent,
   LifeChangedEvent,
@@ -17,6 +18,7 @@ import { appLocale, type TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 
 import type { HistoryOutcome, HistorySource } from "./historyEntries"
+import { turnGroupOf, type TurnGroups } from "../../convex/lib/turns"
 
 export type SummaryOutcome = HistoryOutcome
 
@@ -31,6 +33,8 @@ export interface SummaryPlayer {
   startingLife?: number
   outcome: SummaryOutcome
   deleted?: boolean
+  /** why: a seat that shared turns with others shows its team, since the team won or lost together. */
+  team?: string
 }
 
 export interface SummaryChange {
@@ -102,6 +106,7 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
       life: player.life,
       ...(player.startingLife === undefined ? {} : { startingLife: player.startingLife }),
       outcome: localOutcome(game.result, player.id),
+      ...teamOf(game.players, game.turnGroups, player.id),
     })),
   }
 }
@@ -130,6 +135,7 @@ export interface ConnectedSummaryDocument {
   ruleset: string
   eventCount: number
   finishedAt: number
+  turnGroups?: string[][]
   players: {
     playerId: string
     seat: number
@@ -191,8 +197,23 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
           ? player.outcome
           : "unrecorded",
       deleted: Boolean(player.deletedAt),
+      ...teamOf(
+        summary.players.map(({ playerId, displayName }) => ({ id: playerId, name: displayName })),
+        summary.turnGroups,
+        player.playerId,
+      ),
     })),
   }
+}
+
+function teamOf(
+  players: readonly { id: string; name: string }[],
+  groups: TurnGroups | undefined,
+  playerId: string,
+) {
+  return turnGroupOf(groups, playerId).length > 1
+    ? { team: teamName(players, groups, playerId) }
+    : {}
 }
 
 export function connectedChanges(
