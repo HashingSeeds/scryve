@@ -5,6 +5,7 @@ import { Button } from "@/components/Button"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -13,12 +14,16 @@ type UpdateCheck = "none" | "failed" | "restarting"
 
 interface NewerGameScreenProps {
   onCheckForUpdates: () => Promise<UpdateCheck>
+  storeUpdate: { labelTx: TxKeyPath } | null
+  onStoreUpdate: () => void
   onSupport: () => void
   onDeleteGame: () => void
 }
 
 export function NewerGameScreen({
   onCheckForUpdates,
+  storeUpdate,
+  onStoreUpdate,
   onSupport,
   onDeleteGame,
 }: NewerGameScreenProps) {
@@ -55,6 +60,13 @@ export function NewerGameScreen({
             void onCheckForUpdates().then(setCheck)
           }}
         />
+        {storeUpdate ? (
+          <Button
+            tx={storeUpdate.labelTx}
+            style={themed($secondaryAction)}
+            onPress={onStoreUpdate}
+          />
+        ) : null}
         <Button
           tx="play:launch.contactSupport"
           style={themed($secondaryAction)}

@@ -15,6 +15,7 @@ import { settingsForWhatYouPlay } from "@/features/game/whatYouPlay"
 import { lanPlayAvailable, savedHostedGame } from "@/features/lan/lanAvailability"
 import { rulesHref } from "@/features/rules/gameRules"
 import { restartIntoNewestUpdate } from "@/features/updates/appUpdate"
+import { updateFromStore, useStoreUpdate } from "@/features/updates/storeUpdate"
 import { translate } from "@/i18n/translate"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { NewerGameScreen } from "@/screens/NewerGameScreen"
@@ -116,6 +117,7 @@ export default function Index() {
   }, [reload])
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
   const newestResumeGame = useNewestResumeGame()
+  const storeUpdate = useStoreUpdate()
   const resumeRedirect = resumeRedirectFor(
     activeGame?.updatedAt,
     destination,
@@ -153,6 +155,8 @@ export default function Index() {
     return (
       <NewerGameScreen
         onCheckForUpdates={restartIntoNewestUpdate}
+        storeUpdate={storeUpdate}
+        onStoreUpdate={updateFromStore}
         onSupport={() => router.push("/support")}
         onDeleteGame={() => {
           localGameRepository.clearActiveGame()
