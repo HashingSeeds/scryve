@@ -73,6 +73,7 @@ jest.mock("@expo/ui/swift-ui", () => {
     Host: passThrough,
     Group: passThrough,
     RNHostView: passThrough,
+    Button: () => null,
     BottomSheet: function BottomSheet({
       isPresented,
       onDismiss,
@@ -111,11 +112,16 @@ jest.mock("@expo/ui/swift-ui", () => {
   }
 })
 jest.mock("@expo/ui/swift-ui/modifiers", () => ({
+  buttonBorderShape: () => ({}),
+  buttonStyle: () => ({}),
+  controlSize: () => ({}),
   frame: () => ({}),
   interactiveDismissDisabled: () => ({}),
+  labelStyle: () => ({}),
   presentationBackground: () => ({}),
   presentationDetents: () => ({}),
   presentationDragIndicator: () => ({}),
+  tint: () => ({}),
 }))
 
 jest.mock("react-native-keyboard-controller", () => ({

@@ -1,4 +1,12 @@
-import { ComponentType, forwardRef, Ref, useImperativeHandle, useRef } from "react"
+import {
+  ComponentType,
+  forwardRef,
+  Ref,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+} from "react"
 import {
   ImageStyle,
   StyleProp,
@@ -18,6 +26,8 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
 
 import { PressableIcon } from "./Icon"
+import { KeyboardDismiss } from "./KeyboardDismiss"
+import { needsKeyboardDismiss } from "./needsKeyboardDismiss"
 import { Text, TextProps } from "./Text"
 
 export interface TextFieldAccessoryProps {
@@ -84,6 +94,14 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   } = props
   const input = useRef<TextInput>(null)
   const multiline = TextInputProps.multiline ?? false
+  const accessoryID = useId()
+  const dismissible = needsKeyboardDismiss(TextInputProps)
+  // why: iOS reads a field's accessory only as it gains focus, and the accessory attaches after native autoFocus already fired.
+  const deferredFocus = dismissible && TextInputProps.autoFocus
+  useEffect(() => {
+    if (deferredFocus) input.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const {
     themed,
@@ -172,10 +190,13 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
           placeholder={placeholderContent}
           placeholderTextColor={colors.textDim}
           keyboardAppearance={isDark ? "dark" : "light"}
+          inputAccessoryViewID={dismissible ? accessoryID : undefined}
           {...TextInputProps}
           editable={!disabled}
+          autoFocus={deferredFocus ? false : TextInputProps.autoFocus}
           style={themed($inputStyles)}
         />
+        {dismissible && <KeyboardDismiss nativeID={accessoryID} />}
 
         {clearable && !disabled && !!TextInputProps.value && (
           <PressableIcon
