@@ -404,6 +404,14 @@ export default {
     customName: "Nombre del contador",
     customAdd: "Añadir",
     customRecent: "Añadir {{label}}",
+    starter: {
+      speed: "Velocidad",
+      rad: "Radiación",
+      storm: "Tormenta",
+    },
+    more_one: "{{identity}}, {{count}} contador más",
+    more_many: "{{identity}}, {{count}} contadores más",
+    more_other: "{{identity}}, {{count}} contadores más",
   },
   seat: {
     identity: "Asiento {{seat}}, {{name}}",
@@ -580,6 +588,7 @@ export default {
     commanderFrom: "Del comandante de {{name}}",
     row: "{{name}} {{delta}} a {{life}}",
     commanderRow: "{{name}} {{delta}} por el comandante de {{from}}, a {{life}}",
+    counterRow: "{{name}} {{counter}} {{delta}} a {{value}}",
     undoLast: "Deshacer el último cambio",
   },
   calculator: {

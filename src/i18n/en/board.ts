@@ -381,6 +381,15 @@ const board = {
     customAdd: "Add",
     // Screen reader label for a recently used counter name; tapping it adds that counter. {{label}} is the name.
     customRecent: "Add {{label}}",
+    // Screen reader label for a "+2" button on a seat; it opens the seat's counters that didn't fit on the card.
+    // Suggested names for a player's own counter, before they've named any. Use the term printed on Magic cards in this language. Keep under 20 characters.
+    starter: {
+      speed: "Speed",
+      rad: "Rad",
+      storm: "Storm",
+    },
+    more_one: "{{identity}}, {{count}} more counter",
+    more_other: "{{identity}}, {{count}} more counters",
   },
   seat: {
     identity: "Seat {{seat}}, {{name}}",
@@ -560,6 +569,8 @@ const board = {
     row: "{{name}} {{delta}} to {{life}}",
     // A commander damage row, as in "Ada −5 from Grace's commander, to 12".
     commanderRow: "{{name}} {{delta}} from {{from}}'s commander, to {{life}}",
+    // A counter row in the game log, as in "Ada poison +1 to 3". {{counter}} is a counter such as poison, or a name the player gave their own counter.
+    counterRow: "{{name}} {{counter}} {{delta}} to {{value}}",
     undoLast: "Undo the last change",
   },
   calculator: {

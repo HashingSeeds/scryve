@@ -105,6 +105,15 @@ describe("custom counters", () => {
     expect(apply(custom("Speed", 2), custom("SPEED", -2))?.players.me).toEqual({})
   })
 
+  it("are on in games with no system", () => {
+    expect(
+      run(EMPTY_TABLE, custom("Rad", 2), { rules: tableRules(undefined, undefined) }),
+    ).not.toBeNull()
+    expect(
+      run(EMPTY_TABLE, custom("Rad", 2), { rules: tableRules("none", undefined) }),
+    ).not.toBeNull()
+  })
+
   it("refuses blank or long names, systems without them, and a fifth counter", () => {
     expect(apply(custom("   ", 1))).toBeNull()
     expect(apply(custom("x".repeat(21), 1))).toBeNull()

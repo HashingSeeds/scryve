@@ -1,3 +1,4 @@
+import { translate } from "@/i18n/translate"
 import { load, save } from "@/utils/storage"
 
 import { customCounterName } from "../../../convex/lib/table"
@@ -13,6 +14,16 @@ export function recentCounterNames(): string[] {
       typeof value === "string" && customCounterName(value) === value ? [value] : [],
     )
     .slice(0, MAX_RECENT_COUNTER_NAMES)
+}
+
+export function suggestedCounterNames(): string[] {
+  const recent = recentCounterNames()
+  if (recent.length > 0) return recent
+  return [
+    translate("board:counters.starter.speed"),
+    translate("board:counters.starter.rad"),
+    translate("board:counters.starter.storm"),
+  ].flatMap((name) => customCounterName(name) ?? [])
 }
 
 export function rememberCounterName(name: string) {

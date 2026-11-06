@@ -611,6 +611,7 @@ export function CurrentGameScreen({
           players={runtime.game.players}
           events={events}
           turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
+          counters={runtime.game.counterLog}
           canUndo={runtime.canUndo}
           origin={chrome.dialogOrigin}
           onUndo={runtime.undo}

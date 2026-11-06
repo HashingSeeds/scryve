@@ -37,10 +37,18 @@ export function formatDefinition(system: unknown, format: unknown): FormatDefini
 }
 
 export const NO_TABLE: TableDefinition = { counters: [], designations: [] }
+const NO_SYSTEM_TABLE: TableDefinition = { ...NO_TABLE, customCounters: true }
+
+export const hasTable = (rules: TableDefinition) =>
+  rules.counters.length > 0 ||
+  rules.designations.length > 0 ||
+  rules.pokemon !== undefined ||
+  rules.customCounters === true
 
 const tableRulesCache = new Map<string, TableDefinition>()
 
 export function tableRules(system: unknown, format: string | undefined): TableDefinition {
+  if (system === undefined || system === "none") return NO_SYSTEM_TABLE
   const definition = systemDefinition(system)
   if (!definition) return NO_TABLE
   const key = `${String(system)}:${format ?? ""}`

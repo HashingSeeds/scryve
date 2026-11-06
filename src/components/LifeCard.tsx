@@ -241,7 +241,7 @@ export const LifeCard = memo(function LifeCard({
   const resolvedLifeFontSize = fontSizeFor(shownDigits)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
-  const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
+  const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number; width: number }>()
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -842,9 +842,9 @@ export const LifeCard = memo(function LifeCard({
             layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
-                current?.x === layout.x && current.y === layout.y
+                current?.x === layout.x && current.y === layout.y && current.width === layout.width
                   ? current
-                  : { x: layout.x, y: layout.y },
+                  : { x: layout.x, y: layout.y, width: layout.width },
               )
             }
             style={[
@@ -1009,6 +1009,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+          nameEnd={identityRowAt && identityRowAt.x + identityRowAt.width}
           onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}

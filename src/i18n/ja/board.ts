@@ -377,6 +377,12 @@ export default {
     customName: "カウンター名",
     customAdd: "追加",
     customRecent: "{{label}}を追加",
+    starter: {
+      speed: "速度",
+      rad: "放射能",
+      storm: "ストーム",
+    },
+    more_other: "{{identity}}、ほかにカウンター{{count}}個",
   },
   seat: {
     identity: "席{{seat}}、{{name}}",
@@ -534,6 +540,7 @@ export default {
     commanderFrom: "{{name}}の統率者から",
     row: "{{name}} {{delta}}(ライフ{{life}})",
     commanderRow: "{{name}} {{delta}}({{from}}の統率者から、ライフ{{life}})",
+    counterRow: "{{name}} {{counter}} {{delta}} → {{value}}",
     undoLast: "直前の変更を取り消す",
   },
   calculator: {

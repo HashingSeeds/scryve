@@ -23,6 +23,7 @@ import {
 } from "../../../convex/lib/layouts"
 import { outReason } from "../../../convex/lib/outReason"
 import {
+  hasTable,
   identitySection,
   startingValueRange,
   systemDefinition,
@@ -442,9 +443,6 @@ export const lanSeatAppearance = (seat: number) => ({
   shape: shapeForSeat(seat),
 })
 
-const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
-  rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
-
 const playerTableOf = (seat: PlayerTable): PlayerTable => ({
   ...(seat.counters ? { counters: seat.counters } : {}),
   ...(seat.customCounters ? { customCounters: seat.customCounters } : {}),
@@ -526,7 +524,7 @@ export function lanProjection(
       ...roleFor(seat.key),
     })),
     ...(commander ? { commanderDamage: commander } : {}),
-    ...(memory && (tableRulesApply(rules) || (memory.turn && tableVersion >= TURN_TABLE_VERSION))
+    ...(memory && (hasTable(rules) || (memory.turn && tableVersion >= TURN_TABLE_VERSION))
       ? {
           table: tableForVersion(
             {

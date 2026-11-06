@@ -6,6 +6,7 @@ import type { PendingLifeAction } from "@/features/connected/model"
 
 import type {
   CommanderDamageAssignedEvent,
+  CounterLogEntry,
   GameEvent,
   GamePlayer,
   LifeChangedEvent,
@@ -102,12 +103,41 @@ export function gameLog(
   return rows.filter(({ delta }) => delta !== 0)
 }
 
+export type GameCounterRow = Omit<CounterLogEntry, "operationId"> & { kind: "counter"; id: string }
+
+export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[] {
+  const rows: GameCounterRow[] = []
+  let newerAt = Infinity
+  for (const { operationId, ...entry } of [...entries].reverse()) {
+    const newer = rows.at(-1)
+    if (
+      newer?.playerId === entry.playerId &&
+      newer.counterId === entry.counterId &&
+      newerAt - entry.at <= LIFE_BURST_MS
+    )
+      newer.delta += entry.delta
+    else rows.push({ kind: "counter", id: operationId, ...entry })
+    newerAt = entry.at
+  }
+  return rows.filter(({ delta }) => delta !== 0)
+}
+
+type GameLogChange = GameLogRow | GameCounterRow
+
+export function mergedLog(
+  life: readonly GameLogRow[],
+  counters: readonly GameCounterRow[],
+): GameLogChange[] {
+  return [...life, ...counters].sort((left, right) => right.at - left.at)
+}
+
 export type GameLogItem =
   | (GameLogRow & { kind?: undefined })
+  | GameCounterRow
   | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
 
 export function withTurnDividers(
-  rows: readonly GameLogRow[],
+  rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],
 ): GameLogItem[] {
   const items: GameLogItem[] = []

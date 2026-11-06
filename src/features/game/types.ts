@@ -129,6 +129,16 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
+  counterLog?: CounterLogEntry[]
+}
+
+export interface CounterLogEntry {
+  operationId: string
+  playerId: PlayerId
+  counterId: string
+  delta: number
+  value: number
+  at: number
 }
 
 export interface TurnLogEntry {

@@ -253,6 +253,10 @@ export function customCounterId(name: string) {
   return `${CUSTOM_COUNTER_PREFIX}${name}`
 }
 
+export function findCustomCounter(player: PlayerTable, name: string): CustomCounter | undefined {
+  return player.customCounters?.find((counter) => sameName(counter.name, name))
+}
+
 export function customCounterNameOf(counterId: string): string | undefined {
   return counterId.startsWith(CUSTOM_COUNTER_PREFIX)
     ? counterId.slice(CUSTOM_COUNTER_PREFIX.length)

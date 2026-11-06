@@ -2733,6 +2733,30 @@ describe("Convex game write rate limits", () => {
     expect(await seat(3)).toEqual({})
   })
 
+  it("keeps a counter a player names in a game with no system", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, { system: "none", ruleset: "none", startingLife: 20 })
+    await game.joiner.mutation(api.games.tableAction, {
+      publicId: game.publicId,
+      operationId: "custom-counter-none-0001",
+      deviceId: "device-joiner-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      action: {
+        kind: "customCounter.changed",
+        playerId: game.joinerPlayerId,
+        name: "Rad",
+        delta: 3,
+      },
+    })
+    const projection = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+      tableVersion: TABLE_VERSION,
+    })
+    expect(projection.table?.players[game.joinerPlayerId]).toEqual({
+      customCounters: [{ name: "Rad", value: 3 }],
+    })
+  })
+
   it("rate-limits table actions the same way and still acknowledges a replay", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)

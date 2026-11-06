@@ -6,7 +6,7 @@ import Svg, { Circle, Path } from "react-native-svg"
 
 import { toolLabel, type DiceTool } from "@/features/game/dice"
 import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features/game/playSystems"
-import { recentCounterNames, rememberCounterName } from "@/features/game/recentCounterNames"
+import { rememberCounterName, suggestedCounterNames } from "@/features/game/recentCounterNames"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
 import { translate } from "@/i18n/translate"
@@ -77,7 +77,8 @@ export function seatTableState(
 ): Pick<SeatTable, "rules" | "counters" | "held"> | undefined {
   if (!runtime) return undefined
   const { table, tableRules: rules } = runtime
-  if (rules.counters.length === 0 && rules.designations.length === 0) return undefined
+  if (rules.counters.length === 0 && rules.designations.length === 0 && !rules.customCounters)
+    return undefined
   const seat = playerTableOf(table, playerId)
   const counters = seat.counters ?? NO_COUNTERS
   const custom = rules.customCounters ? (seat.customCounters ?? []) : []
@@ -223,7 +224,39 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
+  nameEnd?: number
   onSheetOpenChange?: (open: boolean) => void
+}
+
+type ChipItem =
+  | { kind: "designation"; key: string; designation: { id: string; label: string } }
+  | {
+      kind: "counter"
+      key: string
+      counter: TableRules["counters"][number]
+      value: number
+      lethal: boolean
+    }
+
+const OVERFLOW_KEY = "\u0000overflow"
+
+export function fitChips(
+  widths: readonly number[],
+  room: number,
+  gap: number,
+  overflowWidth: number,
+): { shown: number; overflow: number } {
+  const all = widths.reduce((total, width, index) => total + width + (index ? gap : 0), 0)
+  if (all <= room) return { shown: widths.length, overflow: 0 }
+  if (overflowWidth > room) return { shown: 0, overflow: 0 }
+  let used = overflowWidth
+  let shown = 0
+  for (const width of widths) {
+    if (used + gap + width > room) break
+    used += gap + width
+    shown += 1
+  }
+  return { shown, overflow: widths.length - shown }
 }
 
 export function chipRowOrigin(input: {
@@ -258,6 +291,7 @@ export const CounterChips = memo(function CounterChips({
   contentInsets,
   menuEdgeCenter,
   cardSize,
+  nameEnd,
   dice,
   bagAt,
   onSheetOpenChange,
@@ -279,8 +313,30 @@ export const CounterChips = memo(function CounterChips({
     setSheet(next)
   }
   const { rules, counters, held, editable } = seat
-  const shown = rules.counters.filter(({ id }) => (counters[id] ?? 0) > 0)
-  const heldDesignations = rules.designations.filter(({ id }) => held.includes(id))
+  const items: ChipItem[] = [
+    ...rules.designations.flatMap((designation) =>
+      held.includes(designation.id)
+        ? [{ kind: "designation" as const, key: designation.id, designation }]
+        : [],
+    ),
+    ...rules.counters.flatMap((counter) => {
+      const value = counters[counter.id] ?? 0
+      return value > 0
+        ? [
+            {
+              kind: "counter" as const,
+              key: counter.id,
+              counter,
+              value,
+              lethal: counter.losesAt !== undefined && value >= counter.losesAt,
+            },
+          ]
+        : []
+    }),
+  ]
+  const [widths, setWidths] = useState<Readonly<Record<string, number>>>({})
+  const measure = (key: string, width: number) =>
+    setWidths((current) => (current[key] === width ? current : { ...current, [key]: width }))
   const webAnnouncement = useAnnouncements(seat, identity)
   const sheetOpen = sheet !== null
 
@@ -318,6 +374,66 @@ export const CounterChips = memo(function CounterChips({
   })
   const bagSlop = targetSlop({ width: bagSize, height: bagSize }, bagAt)
   const bagShown = editable || !!dice
+  const chipGap = compact ? spacing.xxxs : spacing.xxs
+  const rowRight = bagAt.right + (bagShown ? bagSize + chipGap : 0)
+  const menuOnRow = menuEdgeCenter === CONTENT_EDGES[contentRotation].bottom
+  const room = Math.max(
+    0,
+    Math.min(
+      frameWidth - rowRight - (nameEnd ?? frameWidth / 2) - chipGap,
+      menuOnRow
+        ? frameWidth / 2 - (compact ? COMPACT_MENU_CLEARANCE : MENU_CLEARANCE) - rowRight
+        : Infinity,
+    ),
+  )
+  // why: a chip counts at its smallest until it is measured, so the first frame is close to the settled row.
+  const unmeasured = compact ? COMPACT_CHIP_WIDTH : CHIP_SIZE
+  const fit = fitChips(
+    items.map((item) => widths[item.key] ?? unmeasured),
+    room,
+    chipGap,
+    widths[OVERFLOW_KEY] ?? unmeasured,
+  )
+  const chipBox = themed(compact ? $compactChip : $chip)
+  const chipStyleOf = (item: ChipItem) => [
+    chipBox,
+    item.kind === "counter" && item.lethal && { borderColor: foreground },
+  ]
+  const chipFace = (item: ChipItem) => {
+    if (item.kind === "designation")
+      return <TableGlyph id={item.designation.id} size={glyphSize} color={foreground} />
+    const customName = customCounterNameOf(item.counter.id)
+    return (
+      <>
+        {customName === undefined ? (
+          <TableGlyph id={item.counter.id} size={glyphSize} color={foreground} />
+        ) : (
+          <Text
+            text={customName}
+            size="xxs"
+            weight="bold"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
+            style={[compact ? $compactCustomChipName : $customChipName, { color: foreground }]}
+          />
+        )}
+        <Text
+          text={String(item.value)}
+          weight={item.lethal ? "bold" : "medium"}
+          maxFontSizeMultiplier={1.2}
+          style={[themed(compact ? $compactValue : $value), { color: foreground }]}
+        />
+      </>
+    )
+  }
+  const overflowFace = (count: number) => (
+    <Text
+      text={`+${count}`}
+      weight="bold"
+      maxFontSizeMultiplier={1.2}
+      style={[themed(compact ? $compactValue : $value), { color: foreground }]}
+    />
+  )
   return (
     <>
       {Platform.OS === "web" ? (
@@ -328,72 +444,83 @@ export const CounterChips = memo(function CounterChips({
           style={$visuallyHidden}
         />
       ) : null}
-      {!sheetOpen && (shown.length > 0 || heldDesignations.length > 0) ? (
+      {!sheetOpen && items.length > 0 ? (
         <View
           testID={`counter-chips-frame-seat-${seatNumber}`}
           pointerEvents="box-none"
           style={[frame, $layer]}
         >
           <View
+            pointerEvents="none"
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[$measureRow, { gap: chipGap }]}
+          >
+            {items.map((item) => (
+              <View
+                key={item.key}
+                onLayout={({ nativeEvent }) => measure(item.key, nativeEvent.layout.width)}
+                style={chipStyleOf(item)}
+              >
+                {chipFace(item)}
+              </View>
+            ))}
+            <View
+              onLayout={({ nativeEvent }) => measure(OVERFLOW_KEY, nativeEvent.layout.width)}
+              style={chipBox}
+            >
+              {overflowFace(items.length)}
+            </View>
+          </View>
+          <View
             testID={`counter-chips-seat-${seatNumber}`}
             pointerEvents="box-none"
-            style={[themed(compact ? $compactRow : $row), { top }]}
+            style={[
+              $bottomRow,
+              { gap: chipGap, right: rowRight, bottom: bagAt.bottom, height: bagSize },
+            ]}
           >
-            {shown.map((counter) => {
-              const value = counters[counter.id] ?? 0
-              const lethal = counter.losesAt !== undefined && value >= counter.losesAt
-              const customName = customCounterNameOf(counter.id)
-              const content = (
-                <>
-                  {customName === undefined ? (
-                    <TableGlyph id={counter.id} size={glyphSize} color={foreground} />
-                  ) : (
-                    <Text
-                      text={compact ? customName.slice(0, 3) : customName}
-                      size="xxs"
-                      weight="bold"
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={1.2}
-                      style={[$customChipName, { color: foreground }]}
-                    />
-                  )}
-                  <Text
-                    text={String(value)}
-                    weight={lethal ? "bold" : "medium"}
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed(compact ? $compactValue : $value), { color: foreground }]}
-                  />
-                </>
-              )
+            {items.slice(0, fit.shown).map((item) => {
+              const style = chipStyleOf(item)
+              if (item.kind === "designation")
+                return (
+                  <View
+                    key={item.key}
+                    testID={`designation-chip-${seatNumber}-${item.designation.id}`}
+                    accessible
+                    accessibilityLabel={translate("board:counters.seatItem", {
+                      identity,
+                      label: tableItemLabel(item.designation),
+                    })}
+                    style={style}
+                  >
+                    {chipFace(item)}
+                  </View>
+                )
+              const { counter, value } = item
               const counterLabel = tableItemLabel(counter)
-              const label = translate("board:counters.seatItem", {
-                identity,
-                label: counterLabel,
-              })
+              const label = translate("board:counters.seatItem", { identity, label: counterLabel })
               const valueText =
                 counter.losesAt !== undefined
                   ? translate("board:counters.valueOutOf", { value, max: counter.losesAt })
                   : String(value)
-              const chipStyle = [
-                themed(compact ? $compactChip : $chip),
-                lethal && { borderColor: foreground },
-              ]
               if (!editable)
                 return (
                   <View
-                    key={counter.id}
+                    key={item.key}
                     testID={`counter-chip-${seatNumber}-${counter.id}`}
                     accessible
                     accessibilityLabel={label}
                     accessibilityValue={{ text: valueText }}
-                    style={chipStyle}
+                    style={style}
                   >
-                    {content}
+                    {chipFace(item)}
                   </View>
                 )
               return (
                 <BoardPressable
-                  key={counter.id}
+                  key={item.key}
                   ref={trigger(counter.id)}
                   testID={`counter-chip-${seatNumber}-${counter.id}`}
                   accessibilityRole="adjustable"
@@ -430,38 +557,46 @@ export const CounterChips = memo(function CounterChips({
                     seat.adjustCounter(counter.id, counter.step)
                   }}
                   style={({ pressed }) => [
-                    chipStyle,
+                    style,
                     pressed && { backgroundColor: overlayTint(foreground, 0.14) },
                   ]}
                 >
-                  {content}
+                  {chipFace(item)}
                 </BoardPressable>
               )
             })}
-            {heldDesignations.map((designation) => (
-              <View
-                key={designation.id}
-                testID={`designation-chip-${seatNumber}-${designation.id}`}
-                accessible
-                accessibilityLabel={translate("board:counters.seatItem", {
-                  identity,
-                  label: tableItemLabel(designation),
-                })}
-                style={themed(compact ? $compactChip : $chip)}
-              >
-                <TableGlyph id={designation.id} size={glyphSize} color={foreground} />
-                {compact ? null : (
-                  <Text
-                    text={tableItemLabel(designation)}
-                    weight="bold"
-                    size="xxs"
-                    maxFontSizeMultiplier={1.2}
-                    numberOfLines={1}
-                    style={{ color: foreground }}
-                  />
-                )}
-              </View>
-            ))}
+            {fit.overflow > 0 ? (
+              bagShown ? (
+                <BoardPressable
+                  testID={`counter-overflow-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("board:counters.more", {
+                    identity,
+                    count: fit.overflow,
+                  })}
+                  hitSlop={{ top: 6, bottom: 6 }}
+                  onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
+                  style={({ pressed }) => [
+                    chipBox,
+                    pressed && { backgroundColor: overlayTint(foreground, 0.14) },
+                  ]}
+                >
+                  {overflowFace(fit.overflow)}
+                </BoardPressable>
+              ) : (
+                <View
+                  testID={`counter-overflow-seat-${seatNumber}`}
+                  accessible
+                  accessibilityLabel={translate("board:counters.more", {
+                    identity,
+                    count: fit.overflow,
+                  })}
+                  style={chipBox}
+                >
+                  {overflowFace(fit.overflow)}
+                </View>
+              )
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -599,7 +734,8 @@ function CounterSheet({
   const slide = useCornerSlide()
   const ink = accessibleForeground(sheetColor)
   const gap = compact ? spacing.xxs : spacing.xs
-  const trackers = seat.rules.counters.length + seat.rules.designations.length > 0
+  const trackers =
+    seat.rules.counters.length + seat.rules.designations.length > 0 || !!seat.rules.customCounters
   // why: with both, dice take the bag's half of the card and trackers the other, so neither scrolls; only the dice half keeps clear of Close in its corner.
   const split = !!dice && trackers && sheet.kind === "add"
   const [allDice, setAllDice] = useState(false)
@@ -917,7 +1053,7 @@ function NameCounter({
   const { themed } = useAppTheme()
   const [draft, setDraft] = useState("")
   const [recent] = useState(() =>
-    recentCounterNames().filter(
+    suggestedCounterNames().filter(
       (name) => !taken.some((held) => held.toLocaleLowerCase() === name.toLocaleLowerCase()),
     ),
   )
@@ -1235,6 +1371,21 @@ function SheetOption({
 const $layer: ViewStyle = { zIndex: 10 }
 
 const $customChipName: TextStyle = { maxWidth: 72 }
+const $compactCustomChipName: TextStyle = { maxWidth: 48 }
+
+const $measureRow: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  flexDirection: "row",
+  opacity: 0,
+}
+
+const $bottomRow: ViewStyle = {
+  position: "absolute",
+  flexDirection: "row-reverse",
+  alignItems: "center",
+}
 
 const $nameCounter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
@@ -1263,27 +1414,6 @@ const $recentName: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   minHeight: 32,
   justifyContent: "center",
   paddingHorizontal: spacing.xs,
-})
-
-const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  left: spacing.xs,
-  right: spacing.xs,
-  flexDirection: "row",
-  flexWrap: "wrap",
-  justifyContent: "center",
-  alignItems: "center",
-  gap: spacing.xxxs,
-})
-
-const $compactRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  left: spacing.xxs,
-  right: spacing.xxs,
-  flexDirection: "row",
-  flexWrap: "wrap",
-  justifyContent: "center",
-  alignItems: "center",
 })
 
 const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({

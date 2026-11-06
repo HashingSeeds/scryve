@@ -93,7 +93,13 @@ import {
 } from "./lib/policy"
 import { recordGameResults, recordPlayerResult, refreshGameOpponents } from "./lib/results"
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
-import { attachesDecks, startingValueRange, systemDefinition, tableRules } from "./lib/systems"
+import {
+  attachesDecks,
+  hasTable,
+  startingValueRange,
+  systemDefinition,
+  tableRules,
+} from "./lib/systems"
 import {
   canonicalJson,
   isValidTableSnapshot,
@@ -2015,8 +2021,7 @@ export const lobbyProjection = query({
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
       ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
-      ...(tableRulesApply(gameTableRules(game)) ||
-      (game.turn && (args.tableVersion ?? 1) >= TABLE_VERSION)
+      ...(hasTable(gameTableRules(game)) || (game.turn && (args.tableVersion ?? 1) >= TABLE_VERSION)
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
     }
@@ -2063,10 +2068,6 @@ function decidedTreacheryOutcome(
         : [{ playerId: player._id, role: player.role, inGame: !outReason(outState, player._id) }],
     ),
   )
-}
-
-function tableRulesApply(rules: ReturnType<typeof gameTableRules>) {
-  return rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
 }
 
 function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): TableState {
