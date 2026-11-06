@@ -136,7 +136,7 @@ function parseCli(argv) {
       : values.format === "commander"
         ? 40
         : 20,
-    count: parseCount(values.count, "count", 1, 5),
+    count: parseCount(values.count, "count", 1, MAX_SEATS - 1),
     first: parseCount(values.first, "first", 1, 50),
     start: values.start,
     lifeEvery: parseDuration(values["life-every"], "life-every"),
