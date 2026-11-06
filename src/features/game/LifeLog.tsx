@@ -9,6 +9,7 @@ import type {
   GameEvent,
   GamePlayer,
   LifeChangedEvent,
+  PlayerId,
   TurnLogEntry,
 } from "./types"
 import { api } from "../../../convex/_generated/api"
@@ -102,12 +103,30 @@ export function gameLog(
   return rows.filter(({ delta }) => delta !== 0)
 }
 
+/** why: a Planechase or Archenemy log entry, already worded with its player's name and card. */
+export interface GameModeRow {
+  kind: "mode"
+  id: string
+  playerId: PlayerId
+  at: number
+  text: string
+}
+
+type GameLogChange = (GameLogRow & { kind?: undefined }) | GameModeRow
+
 export type GameLogItem =
-  | (GameLogRow & { kind?: undefined })
+  | GameLogChange
   | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
 
-export function withTurnDividers(
+export function withModeRows(
   rows: readonly GameLogRow[],
+  modes: readonly GameModeRow[],
+): GameLogChange[] {
+  return [...rows, ...modes].sort((left, right) => right.at - left.at)
+}
+
+export function withTurnDividers(
+  rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],
 ): GameLogItem[] {
   const items: GameLogItem[] = []

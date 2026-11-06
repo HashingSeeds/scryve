@@ -60,6 +60,7 @@ import type {
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
+import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { modeSeamFor } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
@@ -651,6 +652,7 @@ export function CurrentGameScreen({
           events={events}
           turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
           groups={turnGroups}
+          modes={boardModes.log.map(modeLogRow)}
           canUndo={runtime.canUndo}
           origin={chrome.dialogOrigin}
           onUndo={runtime.undo}

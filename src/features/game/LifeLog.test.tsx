@@ -13,7 +13,15 @@ import {
   asPlayerId,
   createLocalGame,
 } from "./domain"
-import { gameLog, LifeLog, LifeLogContext, lifeLog, localLifeChanges } from "./LifeLog"
+import {
+  gameLog,
+  LifeLog,
+  LifeLogContext,
+  lifeLog,
+  localLifeChanges,
+  withModeRows,
+  withTurnDividers,
+} from "./LifeLog"
 import type { CommandContext, GameCommand } from "./types"
 
 jest.mock("convex/react", () => ({ usePaginatedQuery: jest.fn() }))
@@ -175,5 +183,25 @@ describe("life log", () => {
     )
 
     expect(view.getByTestId("log")).toHaveProp("accessibilityLabel", "8000 6000 4800 5300")
+  })
+
+  it("places Planechase and Archenemy entries among life changes, under the turn they happened in", () => {
+    const ada = asPlayerId("ada")
+    const life = { id: "hit", playerId: ada, delta: -2, life: 18, at: 3_000, operationIds: ["hit"] }
+    const roll = { kind: "mode" as const, id: "roll", playerId: ada, at: 5_000, text: "Ada rolled" }
+    const scheme = {
+      kind: "mode" as const,
+      id: "scheme",
+      playerId: ada,
+      at: 1_000,
+      text: "Ada set",
+    }
+    const turns = [{ operationId: "turn-2", playerId: ada, number: 2, at: 2_000 }]
+
+    expect(
+      withTurnDividers(withModeRows([life], [scheme, roll]), turns).map((item) =>
+        item.kind === "turn" ? `turn ${item.number}` : item.id,
+      ),
+    ).toEqual(["turn 2", "roll", "hit", "scheme"])
   })
 })
