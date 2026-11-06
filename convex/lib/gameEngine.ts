@@ -176,7 +176,7 @@ export interface WriteRequest {
 export type ClaimDecision = "confirmed" | "declined"
 
 export type GameWrite =
-  | (WriteRequest & { kind: "life"; playerId: string; delta: number })
+  | (WriteRequest & { kind: "life"; playerId: string; delta: number; undoOf?: string })
   | (WriteRequest & { kind: "table"; action: TableAction })
   | (WriteRequest & {
       kind: "commander.claim"
@@ -271,12 +271,14 @@ const checkActive = (game: Pick<EngineGame, "status">) =>
 export function rejectRequest(write: GameWrite): EngineError | null {
   if (write.kind === "life")
     return (
+      (write.undoOf === undefined ? null : checkOperationId(write.undoOf)) ??
       (isLifeDelta(write.delta)
         ? null
         : writeError(
             "invalid_life_delta",
             "Life delta must be a non-zero whole number from -999999 to 999999",
-          )) ?? checkWrite(write)
+          )) ??
+      checkWrite(write)
     )
   if (write.kind === "table") return checkWrite(write)
   if (write.kind === "commander.claim")
@@ -386,7 +388,7 @@ export function matchLifeRetry(
 export function changeLife(
   game: Pick<EngineGame, "system">,
   seat: EngineSeat,
-  request: LifeChangeRequest & { operationId: string },
+  request: LifeChangeRequest & { operationId: string; undoOf?: string },
   now: number,
 ) {
   const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, request.delta)
@@ -399,6 +401,7 @@ export function changeLife(
         kind: "life.changed",
         ...(delta === 0 ? {} : { delta }),
         ...(delta === request.delta ? {} : { actionIdentity: String(request.delta) }),
+        ...(request.undoOf === undefined ? {} : { undoOfOperationId: request.undoOf }),
         actorUserId: request.actorUserId,
         deviceId: request.deviceId,
         clientCreatedAt: request.clientCreatedAt,
@@ -428,6 +431,11 @@ function* writeLife(
   if (retry === "duplicate")
     return acknowledged({ operationId, deduplicated: true, currentLife: seat.currentLife })
   if (retry !== "new") return failed(retry)
+  if (write.undoOf !== undefined) {
+    const undone = yield* read(store.event(write.undoOf))
+    if (!isOwnLifeChange(undone, request))
+      return failed(writeError("invalid_undo", "Only your own life change can be taken back"))
+  }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
@@ -435,6 +443,16 @@ function* writeLife(
   yield* read(store.apply(changes))
   return acknowledged({ operationId, deduplicated: false, currentLife })
 }
+
+/** why: the game log hides a change and its undo together, so an undo may only name a standing life change the same account made on the same seat. */
+const isOwnLifeChange = (
+  event: GameEventRecord | undefined,
+  request: Pick<LifeChangeRequest, "playerId" | "actorUserId">,
+) =>
+  event?.kind === "life.changed" &&
+  event.undoOfOperationId === undefined &&
+  event.playerId === request.playerId &&
+  event.actorUserId === request.actorUserId
 
 function gatedCard<Card extends PokemonCard>(card: Card): Card {
   return card.name !== undefined && nameFailsGate(card.name) ? { ...card, name: undefined } : card

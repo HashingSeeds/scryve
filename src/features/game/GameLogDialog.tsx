@@ -27,7 +27,9 @@ export function GameLogDialog({
   turns,
   groups,
   canUndo,
+  undoLabel = translate("board:log.undoLast"),
   origin,
+  onMore,
   onUndo,
   onClose,
 }: {
@@ -36,7 +38,10 @@ export function GameLogDialog({
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
   canUndo: boolean
+  undoLabel?: string
   origin?: DialogOrigin
+  /** why: a connected game's log arrives a page at a time. */
+  onMore?: () => void
   onUndo: () => void
   onClose: () => void
 }) {
@@ -174,6 +179,7 @@ export function GameLogDialog({
           data={rows}
           keyExtractor={(item) => (item.kind === "turn" ? `turn:${item.operationId}` : item.id)}
           renderItem={renderRow}
+          onEndReached={onMore}
           style={$list}
         />
       )}
@@ -181,7 +187,7 @@ export function GameLogDialog({
         <Button
           testID="game-log-undo"
           tx="common:undo"
-          accessibilityLabel={translate("board:log.undoLast")}
+          accessibilityLabel={undoLabel}
           disabled={!canUndo}
           style={themed($dialogButton)}
           onPress={onUndo}

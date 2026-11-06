@@ -11,6 +11,7 @@ export const PERMANENT_GAME_WRITE_CODES = [
   "invalid_client_timestamp",
   "invalid_life_delta",
   "invalid_table_action",
+  "invalid_undo",
 ] as const
 
 export type GameWriteErrorCode = (typeof PERMANENT_GAME_WRITE_CODES)[number]

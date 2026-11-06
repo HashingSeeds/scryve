@@ -70,7 +70,12 @@ export function localLifeChanges(events: readonly GameEvent[], playerId: string)
     .reverse()
 }
 
-export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number; at: number }
+export type GameLogRow = ReturnType<typeof lifeChangeOf> & {
+  id: string
+  life: number
+  at: number
+  operationIds: string[]
+}
 
 // why: a seat's card sums quick taps into one number until it rests this long, so the log reads the same burst as one change.
 export const LIFE_BURST_MS = 1800
@@ -95,7 +100,15 @@ export function gameLog(
     ) {
       newer.delta += change.delta
       newer.id = event.operationId
-    } else rows.push({ id: event.operationId, life, at: event.clientCreatedAt, ...change })
+      newer.operationIds.push(event.operationId)
+    } else
+      rows.push({
+        id: event.operationId,
+        life,
+        at: event.clientCreatedAt,
+        operationIds: [event.operationId],
+        ...change,
+      })
     newerAt = event.clientCreatedAt
   }
   // why: a burst that nets to nothing, like a stray tap taken back, changed nothing at the table.

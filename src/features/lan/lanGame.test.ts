@@ -5,6 +5,7 @@ import {
   endLanRound,
   LAN_PROTOCOL,
   lanLobbyOf,
+  lanLog,
   lanProjection,
   lanSeatsReady,
   parseGuestMessage,
@@ -534,6 +535,37 @@ describe("nearby messages", () => {
       playerCount: 4,
     })
     expect(lanProjection(lobby(tabletop), "guest").layout).toBe("tabletop")
+  })
+})
+
+describe("nearby game log", () => {
+  it("sends each guest the log on request, marking only its own changes and undos", () => {
+    const tapped = write(started(), "guest", life("life-guest-tap-0001", "guest", -3)).next
+    const { next, result } = write(
+      tapped,
+      "guest",
+      op({
+        type: "life.changed",
+        operationId: "life-guest-undo-001",
+        playerId: "guest",
+        delta: 3,
+        compensatesOperationId: "life-guest-tap-0001",
+      }),
+    )
+    expect(result).toMatchObject({ ok: true })
+    expect(parseGuestMessage(JSON.stringify({ type: "log" }))).toEqual({ type: "log" })
+
+    const received = parseHostMessage(
+      JSON.stringify({ type: "log", events: lanLog(next, "guest") }),
+    )
+    expect(received).toMatchObject({
+      type: "log",
+      events: [
+        { operationId: "life-guest-tap-0001", delta: -3, mine: true },
+        { operationId: "life-guest-undo-001", undoOf: "life-guest-tap-0001", mine: true },
+      ],
+    })
+    expect(lanLog(next, "host").some((event) => event.mine)).toBe(false)
   })
 })
 

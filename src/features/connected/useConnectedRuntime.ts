@@ -35,6 +35,7 @@ interface ConnectedGameRuntimeBase extends TableRuntime {
   failed: FailedLifeAction[]
   connectionStatus: ConnectionStatus
   changeLife: (playerId: string, delta: LifeDelta) => void
+  undoLife: (changes: readonly { operationId: string; playerId: string; delta: number }[]) => void
   submitCommanderDamage: (
     fromPlayerId: string,
     changes: readonly ConnectedCommanderDamageChange[],
@@ -204,6 +205,7 @@ export function useConnectedRuntime(
       finishError: snapshot.finishError,
       finishing: snapshot.finishing,
       changeLife: controller.changeLife,
+      undoLife: controller.undoLife,
       submitCommanderDamage: controller.submitCommanderDamage,
       resolveCommanderDamageClaim: controller.resolveCommanderDamage,
       finish: controller.finish,

@@ -544,6 +544,7 @@ export default {
     row: "{{name}} {{delta}}, 현재 {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}}의 커맨더에게서, 현재 {{life}}",
     undoLast: "마지막 변경 취소",
+    undoMine: "내 마지막 변경 취소하기",
   },
   calculator: {
     damage: "− 데미지",
