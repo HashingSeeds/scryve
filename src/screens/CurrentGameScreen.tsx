@@ -47,7 +47,7 @@ import {
   TurnDialog,
   useTurnTabPrefs,
 } from "@/features/game/TurnDialog"
-import { offersToHideTurnTab } from "@/features/game/turnTab"
+import { DENSE_TABLE_FROM, offersToHideTurnTab, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type {
   CommanderSlot,
   GamePlayer,
@@ -290,6 +290,8 @@ export function CurrentGameScreen({
   ])
   const turn = runtime.game.turn
   const active = runtime.game.status === "active"
+  const dense = runtime.game.players.length >= DENSE_TABLE_FROM
+  const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
   // why: a countdown is how a judge's official time is kept, so a counting-down game is treated as event play, where only a pass moves the turn.
   const casual = clock?.setup.mode !== "countdown"
   const turnSeats: TurnTabSeat[] = runtime.game.players.map((player, index) => ({
@@ -343,7 +345,7 @@ export function CurrentGameScreen({
             const next = turn && nextPlayerId(turn, slots)
             return turnSeats.find(({ playerId }) => playerId === next)
           },
-          roundClock: clock,
+          ...(dense ? { dense } : { roundClock: clock }),
           system,
           copies: "both",
           onPress: (slots) => (turn ? passFrom(turn, slots) : setTurnOpen(true)),
@@ -489,7 +491,8 @@ export function CurrentGameScreen({
                 testID="turn-passed-toast"
                 actionTestID="turn-passed-undo"
                 onAction={undoToastPass}
-                onDismiss={() => setTurnToast(undefined)}
+                visibleMs={PASS_UNDO_MS}
+                onDismiss={dismissTurnToast}
               />
             ) : null
           }
@@ -524,7 +527,7 @@ export function CurrentGameScreen({
           )}
         />
       </LifeLogContext.Provider>
-      {(match || (clock && !turnTab)) && !menuOpen ? (
+      {(match || (clock && (!turnTab || dense))) && !menuOpen ? (
         <BoardContextLabels
           match={
             match && matchLine
@@ -537,7 +540,7 @@ export function CurrentGameScreen({
                 }
               : undefined
           }
-          clock={turnTab ? undefined : clock}
+          clock={turnTab && !dense ? undefined : clock}
           system={system}
           top={insets.top}
           bottom={insets.bottom}

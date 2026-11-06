@@ -1,4 +1,4 @@
-import { memo, useEffect, useReducer } from "react"
+import { memo, useEffect, useReducer, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import Animated from "react-native-reanimated"
@@ -9,6 +9,7 @@ import { roundClockText, roundClockView, type RoundClock } from "@/features/game
 import type { TurnClockStyle, TurnPassStyle } from "@/features/game/turnTab"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { accessibleForeground } from "@/utils/colorContrast"
 import { formatElapsed } from "@/utils/useElapsedSince"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -17,7 +18,7 @@ import {
   EDGE_SLIDES,
   edgeStyle,
   TURN_TAB_BORDER,
-  TURN_TAB_FACE,
+  TURN_TAB_FACE_WIDTH,
   type FirstPlayerTab,
 } from "./FirstPlayerTabs"
 import { PlayerMark } from "./PlayerMark"
@@ -43,35 +44,33 @@ export interface TurnTabProps {
   passStyle: TurnPassStyle
   roundClock?: RoundClock
   system?: PlaySystemId
+  dense?: boolean
   onPress: () => void
   onLongPress: () => void
 }
 
 const PAD_X = 5
 const PAD_Y = 4
-const MARK = 26
-const NEXT_MARK = 13
+const GAP = 2
+const TIME_ROW = 15
+const SMALL_ROW = 11
 const SWAP_MS = 4_000
 const TICK_MS = 1_000
 
 /**
  * why: the face's long side runs into the board whenever it turns toward seats at the sides,
  * so along the edge the tab is no longer than the first-player tab and the names beside it keep
- * their room. Only the two-seat board, where nothing sits beside the seam, runs it along the edge.
+ * their room. It reaches only as deep as its rows need, so a dense table's narrow seats keep theirs.
  */
-export function turnTabSize({ edge, facing }: Pick<FirstPlayerTab, "edge" | "facing">) {
+export function turnTabSize(
+  { edge, facing }: Pick<FirstPlayerTab, "edge" | "facing">,
+  faceHeight: number,
+) {
   const alongSide = edge === "left" || edge === "right"
   const upright = facing % 180 === 0
-  const faceRunsAlongEdge = alongSide === upright
-  return faceRunsAlongEdge
-    ? {
-        length: TURN_TAB_FACE.height + 2 * TURN_TAB_BORDER,
-        depth: TURN_TAB_FACE.width + TURN_TAB_BORDER,
-      }
-    : {
-        length: TURN_TAB_FACE.width + 2 * TURN_TAB_BORDER,
-        depth: TURN_TAB_FACE.height + TURN_TAB_BORDER,
-      }
+  return alongSide === upright
+    ? { length: faceHeight + 2 * TURN_TAB_BORDER, depth: TURN_TAB_FACE_WIDTH + TURN_TAB_BORDER }
+    : { length: TURN_TAB_FACE_WIDTH + 2 * TURN_TAB_BORDER, depth: faceHeight + TURN_TAB_BORDER }
 }
 
 /** why: only the tab's text ticks, so the seats never re-render with the clock. */
@@ -101,12 +100,17 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
   const now = useNow(turn !== undefined)
   const label = turnTabLabel(props, now)
   const ink = colors.gameMenu.anchorGlyph
+  const { rows, gap } = useFaceRows(props, now)
+  const faceHeight =
+    2 * PAD_Y +
+    rows.reduce((total, row) => total + row.height, 0) +
+    gap * Math.max(0, rows.length - 1)
 
   return (
     <>
       {tabs.map((tab, index) => {
         const primary = index === 0
-        const size = turnTabSize(tab)
+        const size = turnTabSize(tab, faceHeight)
         const alongSide = tab.edge === "left" || tab.edge === "right"
         const box = alongSide
           ? { width: size.depth, height: size.length }
@@ -148,13 +152,19 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
                   style={[
                     $face,
                     {
-                      left: (press.width - TURN_TAB_FACE.width) / 2,
-                      top: (press.height - TURN_TAB_FACE.height) / 2,
+                      height: faceHeight,
+                      gap,
+                      left: (press.width - TURN_TAB_FACE_WIDTH) / 2,
+                      top: (press.height - faceHeight) / 2,
                       transform: [{ rotate: `${tab.facing}deg` }, { scale: pressed ? 0.92 : 1 }],
                     },
                   ]}
                 >
-                  <TurnTabFace {...props} now={now} />
+                  {rows.map((row) => (
+                    <View key={row.key} style={[$row, { height: row.height }]}>
+                      {row.node}
+                    </View>
+                  ))}
                 </View>
               )}
             </BoardPressable>
@@ -165,104 +175,142 @@ export const TurnTabs = memo(function TurnTabs(props: TurnTabProps) {
   )
 })
 
-function TurnTabFace({
-  turn,
-  seat,
-  nextSeat,
-  canPass,
-  clockStyle,
-  passStyle,
-  roundClock,
-  system,
-  now,
-}: TurnTabProps & { now: number }) {
+interface FaceRow {
+  key: string
+  height: number
+  node: ReactNode
+}
+
+/** why: the tab's depth follows these rows, so a row only exists when it has something to say. */
+function useFaceRows(
+  { turn, seat, nextSeat, canPass, clockStyle, passStyle, roundClock, system, dense }: TurnTabProps,
+  now: number,
+): { rows: FaceRow[]; gap: number } {
   const {
     theme: { colors },
   } = useAppTheme()
   const ink = colors.gameMenu.anchorGlyph
   const dim: TextStyle = { color: ink, opacity: 0.62 }
-
   if (!turn || !seat)
-    return (
-      <>
-        <StartGlyph color={ink} />
-        <Text size="xxs" weight="semiBold" style={{ color: ink }} tx="board:turn.whoFirst" />
-      </>
-    )
+    return {
+      gap: GAP,
+      rows: [
+        { key: "start", height: 16, node: <StartGlyph color={ink} /> },
+        {
+          key: "first",
+          height: 14,
+          node: (
+            <Text size="xxs" weight="semiBold" style={{ color: ink }} tx="board:turn.whoFirst" />
+          ),
+        },
+      ],
+    }
 
   const round = roundClock ? roundClockText(roundClockView(roundClock, system, now)) : undefined
   const turnTime = formatElapsed(turnElapsed(turn, now))
-  const bank = bankLeft(turn, seat.playerId, now)
-  const swapToRound = round !== undefined && Math.floor(now / SWAP_MS) % 2 === 1
+  const bank = clockStyle === "chess" ? bankLeft(turn, seat.playerId, now) : undefined
+  const swapToRound =
+    clockStyle === "swap" && round !== undefined && Math.floor(now / SWAP_MS) % 2 === 1
+  const second =
+    bank !== undefined
+      ? turnTime
+      : clockStyle === "stacked" || clockStyle === "ring"
+        ? round
+        : undefined
   const showsNext = canPass && passStyle === "next" && nextSeat !== undefined
+  const showsWord = canPass && passStyle === "label"
+  // why: with a second clock line and a pass cue the face has four rows; its tiles step down so the tab stays clear of the seats' own controls.
+  const compact = dense || (second !== undefined && (showsNext || showsWord))
+  const tile = compact ? 24 : 28
+  const gap = compact ? 1 : GAP
+  const rows: FaceRow[] = []
 
-  const markView =
-    clockStyle === "ring" ? (
-      <RingMark seat={seat} fraction={ringFraction(turn, roundClock, system, now)} ink={ink} />
-    ) : (
-      <PlayerMark seatNumber={seat.seatNumber} shape={seat.shape} color={seat.color} size={MARK} />
-    )
+  rows.push(
+    clockStyle === "ring"
+      ? {
+          key: "mark",
+          height: tile + 4,
+          node: (
+            <RingMark
+              seat={seat}
+              size={tile + 4}
+              fraction={ringFraction(turn, roundClock, system, now)}
+              ink={ink}
+            />
+          ),
+        }
+      : { key: "mark", height: tile, node: <SeatTile seat={seat} size={tile} /> },
+  )
 
-  const time =
-    clockStyle === "chess" && bank !== undefined ? (
-      bank > 0 ? (
+  if (bank !== undefined && bank <= 0)
+    rows.push({
+      key: "time",
+      height: TIME_ROW,
+      node: (
+        <View testID="turn-tab-out-of-time" style={[$chip, { backgroundColor: colors.error }]}>
+          <Text
+            size="xxs"
+            weight="bold"
+            style={[$digits, { color: colors.board.text }]}
+            text={formatElapsed(0)}
+          />
+        </View>
+      ),
+    })
+  else if (swapToRound)
+    rows.push({
+      key: "time",
+      height: TIME_ROW + 9,
+      node: (
+        <View style={$column}>
+          <ClockGlyph color={ink} />
+          <Text size="xxs" weight="semiBold" style={[$digits, { color: ink }]} text={round} />
+        </View>
+      ),
+    })
+  else
+    rows.push({
+      key: "time",
+      height: TIME_ROW,
+      node: (
         <Text
           size="xxs"
           weight="semiBold"
-          testID="turn-tab-bank"
+          testID={bank === undefined ? "turn-tab-time" : "turn-tab-bank"}
           style={[$digits, { color: ink }]}
-          text={formatElapsed(bank)}
+          text={bank === undefined ? turnTime : formatElapsed(bank)}
         />
-      ) : (
-        <Text
-          size="xxs"
-          weight="bold"
-          testID="turn-tab-out-of-time"
-          numberOfLines={2}
-          style={[$small, $center, { color: colors.error }]}
-          tx="board:turn.outOfTime"
-        />
-      )
-    ) : clockStyle === "swap" && swapToRound ? (
-      <View style={$column}>
-        <ClockGlyph color={ink} />
-        <Text size="xxs" weight="semiBold" style={[$digits, { color: ink }]} text={round} />
-      </View>
-    ) : (
-      <Text
-        size="xxs"
-        weight="semiBold"
-        testID="turn-tab-time"
-        style={[$digits, { color: ink }]}
-        text={turnTime}
-      />
-    )
+      ),
+    })
 
-  const second =
-    (clockStyle === "stacked" || clockStyle === "ring") && round ? (
-      <Text size="xxs" style={[$digits, $small, dim]} testID="turn-tab-round" text={round} />
-    ) : clockStyle === "chess" && bank !== undefined ? (
-      <Text size="xxs" style={[$digits, $small, dim]} text={turnTime} />
-    ) : null
+  if (second)
+    rows.push({
+      key: "second",
+      height: SMALL_ROW,
+      node: (
+        <Text size="xxs" style={[$digits, $small, dim]} testID="turn-tab-round" text={second} />
+      ),
+    })
 
-  return (
-    <>
-      <View>
-        {markView}
-        {showsNext ? (
-          <View testID="turn-tab-next" style={[$next, { backgroundColor: colors.gameMenu.anchor }]}>
-            <PlayerMark
-              seatNumber={nextSeat.seatNumber}
-              shape={nextSeat.shape}
-              color={nextSeat.color}
-              size={NEXT_MARK}
-            />
-          </View>
-        ) : null}
-      </View>
-      {time}
-      {second}
-      {canPass && passStyle === "label" ? (
+  if (showsNext) {
+    const nextTile = compact ? 16 : 18
+    rows.push({
+      key: "next",
+      height: nextTile,
+      node: (
+        <View testID="turn-tab-next" style={$nextRow}>
+          <NextGlyph color={ink} />
+          <SeatTile seat={nextSeat} size={nextTile} />
+        </View>
+      ),
+    })
+  }
+
+  if (showsWord)
+    rows.push({
+      key: "pass",
+      height: SMALL_ROW,
+      node: (
         <Text
           size="xxs"
           weight="semiBold"
@@ -270,9 +318,10 @@ function TurnTabFace({
           style={[$small, dim]}
           tx="board:turn.pass"
         />
-      ) : null}
-    </>
-  )
+      ),
+    })
+
+  return { rows, gap }
 }
 
 function turnTabLabel(
@@ -318,19 +367,28 @@ function ringFraction(
   return (turnElapsed(turn, now) % 60_000) / 60_000
 }
 
-const RING = 30
 const RING_WIDTH = 2.5
 
-function RingMark({ seat, fraction, ink }: { seat: TurnTabSeat; fraction: number; ink: string }) {
-  const center = RING / 2
+function RingMark({
+  seat,
+  size,
+  fraction,
+  ink,
+}: {
+  seat: TurnTabSeat
+  size: number
+  fraction: number
+  ink: string
+}) {
+  const center = size / 2
   const radius = center - RING_WIDTH / 2
   const angle = 2 * Math.PI * Math.min(Math.max(fraction, 0), 0.9999)
   const x = center + radius * Math.sin(angle)
   const y = center - radius * Math.cos(angle)
   const large = angle > Math.PI ? 1 : 0
   return (
-    <View style={{ width: RING, height: RING }} testID="turn-tab-ring">
-      <Svg width={RING} height={RING} style={$fill}>
+    <View style={{ width: size, height: size }} testID="turn-tab-ring">
+      <Svg width={size} height={size} style={$fill}>
         <Circle
           cx={center}
           cy={center}
@@ -351,9 +409,52 @@ function RingMark({ seat, fraction, ink }: { seat: TurnTabSeat; fraction: number
         ) : null}
       </Svg>
       <View style={$ringMark}>
-        <PlayerMark seatNumber={seat.seatNumber} shape={seat.shape} color={seat.color} size={21} />
+        <SeatTile seat={seat} size={size - 8} round />
       </View>
     </View>
+  )
+}
+
+/**
+ * why: a seat's mark on its own color, the way the board draws every seat, so a dark seat color
+ * still reads against the dark tab and the tile says "that seat" at a glance.
+ */
+function SeatTile({ seat, size, round }: { seat: TurnTabSeat; size: number; round?: boolean }) {
+  return (
+    <View
+      style={[
+        $tile,
+        {
+          width: size,
+          height: size,
+          borderRadius: round ? size / 2 : Math.round(size * 0.26),
+          backgroundColor: seat.color,
+        },
+      ]}
+    >
+      <PlayerMark
+        seatNumber={seat.seatNumber}
+        shape={seat.shape}
+        color={accessibleForeground(seat.color)}
+        size={Math.round(size * 0.74)}
+      />
+    </View>
+  )
+}
+
+function NextGlyph({ color }: { color: string }) {
+  return (
+    <Svg width={7} height={10} viewBox="0 0 7 10">
+      <Path
+        d="M1.5 1.5 5 5l-3.5 3.5"
+        stroke={color}
+        strokeOpacity={0.62}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
   )
 }
 
@@ -378,25 +479,23 @@ const $tab: ViewStyle = { position: "absolute", borderWidth: TURN_TAB_BORDER, ov
 const $press: ViewStyle = { flex: 1 }
 const $face: ViewStyle = {
   position: "absolute",
-  width: TURN_TAB_FACE.width,
-  height: TURN_TAB_FACE.height,
+  width: TURN_TAB_FACE_WIDTH,
   paddingHorizontal: PAD_X,
   paddingVertical: PAD_Y,
   alignItems: "center",
-  justifyContent: "center",
-  gap: 2,
 }
+const $row: ViewStyle = { alignItems: "center", justifyContent: "center" }
+const $tile: ViewStyle = { alignItems: "center", justifyContent: "center" }
 const $column: ViewStyle = { alignItems: "center" }
-const $next: ViewStyle = {
-  position: "absolute",
-  right: -7,
-  bottom: -4,
-  borderRadius: NEXT_MARK,
-  padding: 1.5,
+const $nextRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 2 }
+const $chip: ViewStyle = {
+  borderRadius: 4,
+  paddingHorizontal: 4,
+  height: TIME_ROW,
+  justifyContent: "center",
 }
-const $digits: TextStyle = { fontVariant: ["tabular-nums"], lineHeight: 13 }
+const $digits: TextStyle = { fontVariant: ["tabular-nums"], lineHeight: 14 }
 const $small: TextStyle = { fontSize: 9, lineHeight: 11 }
-const $center: TextStyle = { textAlign: "center" }
 const $fill: ViewStyle = { position: "absolute", left: 0, top: 0 }
 const $ringMark: ViewStyle = {
   position: "absolute",

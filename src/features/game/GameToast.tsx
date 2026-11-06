@@ -18,6 +18,7 @@ export function GameToast({
   testID,
   actionTestID,
   inline = false,
+  visibleMs = VISIBLE_MS,
   onAction,
   onDismiss,
 }: {
@@ -26,6 +27,7 @@ export function GameToast({
   testID: string
   actionTestID: string
   inline?: boolean
+  visibleMs?: number
   onAction: () => void
 } & ({ persistent?: false; onDismiss: () => void } | { persistent: true; onDismiss?: never })) {
   const { themed, theme } = useAppTheme()
@@ -40,15 +42,15 @@ export function GameToast({
     }
     // why: Android users can ask for more time to act on notifications; react-native-web lacks this API.
     if (Platform.OS === "android")
-      AccessibilityInfo.getRecommendedTimeoutMillis(VISIBLE_MS).then(schedule, () =>
-        schedule(VISIBLE_MS),
+      AccessibilityInfo.getRecommendedTimeoutMillis(visibleMs).then(schedule, () =>
+        schedule(visibleMs),
       )
-    else schedule(VISIBLE_MS)
+    else schedule(visibleMs)
     return () => {
       active = false
       clearTimeout(timeout)
     }
-  }, [message, onDismiss])
+  }, [message, onDismiss, visibleMs])
 
   const toast = (
     <View testID={testID} accessibilityLiveRegion="polite" style={themed($toast)}>

@@ -5,6 +5,10 @@ export type TurnClockStyle = (typeof TURN_CLOCK_STYLES)[number]
 export const TURN_PASS_STYLES = ["next", "label", "none"] as const
 export type TurnPassStyle = (typeof TURN_PASS_STYLES)[number]
 export const CHESS_BANK_MINUTES = [10, 20, 30] as const
+/** why: from seven seats the seats beside the tab are too narrow for the round clock inside it, so it stays on the board's edge label. */
+export const DENSE_TABLE_FROM = 7
+/** why: a pass at a real table is noticed late, so its undo waits longer than other toasts. */
+export const PASS_UNDO_MS = 15_000
 
 export interface TurnTabPrefs {
   enabled: boolean

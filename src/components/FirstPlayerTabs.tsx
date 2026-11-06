@@ -28,7 +28,9 @@ export interface FirstPlayerTab {
 
 const TAB_LENGTH = 52
 const TAB_DEPTH = 40
-export const TURN_TAB_FACE = { width: 44, height: 74 } as const
+export const TURN_TAB_FACE_WIDTH = 44
+/** why: the turn tab's face grows a row at a time, and seats facing the seam must clear its deepest one. */
+const TURN_TAB_DEEPEST_FACE = 84
 export const TURN_TAB_BORDER = 4
 /**
  * why: the first-player tab becomes the turn tab in the same place, so seats clear the turn tab
@@ -37,8 +39,8 @@ export const TURN_TAB_BORDER = 4
  * names beside it keep their room; it reaches deeper instead.
  */
 export const FIRST_PLAYER_TAB = {
-  length: Math.max(TAB_LENGTH, TURN_TAB_FACE.width + 2 * TURN_TAB_BORDER),
-  depth: Math.max(TAB_DEPTH, TURN_TAB_FACE.height + TURN_TAB_BORDER),
+  length: Math.max(TAB_LENGTH, TURN_TAB_FACE_WIDTH + 2 * TURN_TAB_BORDER),
+  depth: Math.max(TAB_DEPTH, TURN_TAB_DEEPEST_FACE + TURN_TAB_BORDER),
 } as const
 const FIRST_TAB_SIZE = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */

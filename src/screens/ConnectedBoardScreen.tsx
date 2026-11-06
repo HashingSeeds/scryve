@@ -82,7 +82,7 @@ import {
   TurnDialog,
   useTurnTabPrefs,
 } from "@/features/game/TurnDialog"
-import { offersToHideTurnTab } from "@/features/game/turnTab"
+import { DENSE_TABLE_FROM, offersToHideTurnTab, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
@@ -679,6 +679,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     message: string
   }>()
   const [hideOffer, setHideOffer] = useState(false)
+  const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
   const endedTurn = useRef(turn)
   endedTurn.current = turn
   const leaveFinished = useCallback(() => {
@@ -1003,6 +1004,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           },
           system,
           copies: "holder",
+          ...(game.players.length >= DENSE_TABLE_FROM ? { dense: true } : {}),
           onPress: () => (turn ? passTurn() : setTurnOpen(true)),
           onLongPress: () => setTurnOpen(true),
         }
@@ -1070,7 +1072,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 table?.undoTurn(turnToast.passerId, turnToast.operationId)
                 setTurnToast(undefined)
               }}
-              onDismiss={() => setTurnToast(undefined)}
+              visibleMs={PASS_UNDO_MS}
+              onDismiss={dismissTurnToast}
             />
           ) : null
         }
