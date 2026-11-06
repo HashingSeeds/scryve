@@ -102,6 +102,12 @@ export default {
     evenGrid: "균등 격자",
     table: "테이블",
   },
+  teams: {
+    panel: "팀 패널",
+    merged: "하나의 총합",
+    split: "카드 두 장",
+    name: "{{first}} & {{second}}",
+  },
   seats: {
     title: "자리 바꾸기",
     seat: "{{name}}님의 자리",
@@ -529,6 +535,7 @@ export default {
     close: "기록 닫기",
     empty: "아직 변경 내역이 없습니다",
     commanderFrom: "{{name}}의 커맨더로부터",
+    by: "{{name}} 님",
     row: "{{name}} {{delta}}, 현재 {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}}의 커맨더에게서, 현재 {{life}}",
     undoLast: "마지막 변경 취소",

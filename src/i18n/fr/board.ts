@@ -104,6 +104,12 @@ export default {
     evenGrid: "Grille égale",
     table: "Table",
   },
+  teams: {
+    panel: "Panneau d'équipe",
+    merged: "Un seul total",
+    split: "Deux cartes",
+    name: "{{first}} & {{second}}",
+  },
   seats: {
     title: "Échanger les places",
     seat: "Place de {{name}}",
@@ -572,6 +578,7 @@ export default {
     close: "Fermer le journal",
     empty: "Aucun changement pour l'instant",
     commanderFrom: "Du commandant de {{name}}",
+    by: "Par {{name}}",
     row: "{{name}} {{delta}} à {{life}}",
     commanderRow: "{{name}} {{delta}} du commandant de {{from}}, à {{life}}",
     undoLast: "Annuler le dernier changement",

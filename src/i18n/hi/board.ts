@@ -103,6 +103,12 @@ export default {
     evenGrid: "समान ग्रिड",
     table: "टेबल",
   },
+  teams: {
+    panel: "टीम पैनल",
+    merged: "एक कुल",
+    split: "दो कार्ड",
+    name: "{{first}} और {{second}}",
+  },
   seats: {
     title: "सीट बदलें",
     seat: "{{name}} की सीट",
@@ -549,6 +555,7 @@ export default {
     close: "लॉग बंद करें",
     empty: "अभी तक कोई बदलाव नहीं",
     commanderFrom: "{{name}} के कमांडर से",
+    by: "{{name}} द्वारा",
     row: "{{name}} {{delta}} से {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}} के कमांडर से, कुल {{life}}",
     undoLast: "पिछला बदलाव पूर्ववत करें",
