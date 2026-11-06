@@ -161,6 +161,7 @@ export function NearbyLobbyScreen({
           ? (playerCount) => lanSession.updateSettings({ playerCount })
           : undefined
       }
+      onSwapSeats={isHost && lobby.status === "lobby" ? lanSession.swapSeats : undefined}
       decks={
         lobby.setup.system && lobby.status !== "active"
           ? {

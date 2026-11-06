@@ -39,6 +39,7 @@ import {
   setLanDeck,
   setLanPlayerCount,
   startLanRound,
+  swapLanSeats,
   type LanGame,
   type LanGuestMessage,
   type LanHostMessage,
@@ -690,6 +691,13 @@ export class LanSession {
     const game = this.game
     if (this.state.role !== "host" || !game) return
     const next = setLanPlayerCount(game, playerCount)
+    if (next !== game) this.publish(next)
+  }
+
+  swapSeats = (first: number, second: number) => {
+    const game = this.game
+    if (this.state.role !== "host" || !game) return
+    const next = swapLanSeats(game, first, second)
     if (next !== game) this.publish(next)
   }
 

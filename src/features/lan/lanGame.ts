@@ -263,19 +263,43 @@ export function admitLanGuest(
   if (game.seats.length >= game.setup.playerCount) return { rejected: LAN_REJECTIONS.full }
   const seat: LanSeat = {
     key: fresh.key,
-    seat: game.seats.length + 1,
+    seat: firstOpenSeat(game.seats),
     name: join.name,
     connected: true,
     ...editsAnySeat,
   }
-  return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
+  return {
+    game: { ...game, seats: [...game.seats, seat].sort((left, right) => left.seat - right.seat) },
+    pass: fresh,
+  }
+}
+
+const firstOpenSeat = (seats: readonly LanSeat[]) => {
+  let seat = 1
+  while (seats.some((taken) => taken.seat === seat)) seat += 1
+  return seat
+}
+
+/** why: the host trades two seats to change Two-Headed Giant teams. An open seat trades too, so a lobby may keep a gap, which the next guest fills. */
+export function swapLanSeats(game: LanGame, first: number, second: number): LanGame {
+  const inRange = (seat: number) =>
+    Number.isInteger(seat) && seat >= 1 && seat <= game.setup.playerCount
+  if (game.status !== "lobby" || first === second || !inRange(first) || !inRange(second))
+    return game
+  const traded = (seat: number) => (seat === first ? second : seat === second ? first : seat)
+  return {
+    ...game,
+    seats: game.seats
+      .map((seat) => ({ ...seat, seat: traded(seat.seat) }))
+      .sort((left, right) => left.seat - right.seat),
+  }
 }
 
 export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
   if (
     game.status !== "lobby" ||
     !Number.isInteger(playerCount) ||
-    playerCount < Math.max(LAN_MIN_PLAYERS, game.seats.length) ||
+    playerCount < Math.max(LAN_MIN_PLAYERS, ...game.seats.map(({ seat }) => seat)) ||
     playerCount > LAN_MAX_SEATS ||
     !fitsVariant(game.setup, playerCount)
   )
@@ -294,15 +318,10 @@ export function setLanDeck(game: LanGame, key: string, deck: LanSeatDeck | null)
 export const setLanConnected = (game: LanGame, key: string, connected: boolean) =>
   withSeat(game, key, (seat) => ({ ...seat, connected }))
 
-// why: only the lobby frees a seat; once a game has started, a departed guest keeps it to reconnect with its pass.
+// why: only the lobby frees a seat; once a game has started, a departed guest keeps it to reconnect with its pass. Everyone else keeps their seat, so teams the host traded stay put.
 export function releaseLanSeat(game: LanGame, key: string): LanGame {
   if (game.status !== "lobby") return setLanConnected(game, key, false)
-  return {
-    ...game,
-    seats: game.seats
-      .filter((seat) => seat.key !== key)
-      .map((seat, index) => ({ ...seat, seat: index + 1 })),
-  }
+  return { ...game, seats: game.seats.filter((seat) => seat.key !== key) }
 }
 
 function dealLanRoles(game: LanGame, random: () => number) {
