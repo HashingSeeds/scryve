@@ -178,7 +178,7 @@ it("normalizes deck links and uses a fixed fetch path for guests", async () => {
       identifiers: publicDeck.cards.slice(0, 3).map((row) => ({ id: row.card.uid })),
     })
     await t.run(async (ctx) => {
-      await deckRateLimiter.limit(ctx, "guestDeckImport", { count: 19 })
+      await deckRateLimiter.limit(ctx, "guestShare", { count: 19 })
     })
     await expect(
       t.action(importDeck, { url: "https://archidekt.com/decks/200" }),
