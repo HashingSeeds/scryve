@@ -11,6 +11,7 @@ import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
+import type { TurnTabSeat } from "@/components/TurnTabs"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
@@ -30,14 +31,23 @@ import {
 } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import type { BoardSize } from "@/features/game/GameBoardStage"
+import type { BoardTurnTab } from "@/features/game/GameBoardStage"
 import { GameLogDialog } from "@/features/game/GameLogDialog"
 import { GameToast } from "@/features/game/GameToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
-import type { LocalGameRepository } from "@/features/game/localPersistence"
+import { localGameRepository, type LocalGameRepository } from "@/features/game/localPersistence"
 import { playCommanderLethal } from "@/features/game/playSystems"
+import { stepRoundTurn } from "@/features/game/roundClock"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
+import {
+  HideTurnTabDialog,
+  reportTurnTabGame,
+  TurnDialog,
+  useTurnTabPrefs,
+} from "@/features/game/TurnDialog"
+import { offersToHideTurnTab } from "@/features/game/turnTab"
 import type {
   CommanderSlot,
   GamePlayer,
@@ -53,7 +63,9 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
 
+import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
+import { nextTurnSeat, type Turn } from "../../convex/lib/turns"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
@@ -118,6 +130,15 @@ export function CurrentGameScreen({
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
+  const [turnPrefs, setTurnPrefs] = useTurnTabPrefs(repository ?? localGameRepository)
+  const [turnOpen, setTurnOpen] = useState(false)
+  const [turnToast, setTurnToast] = useState<{
+    operationId: string
+    passerId: string
+    message: string
+    steppedRound: boolean
+  }>()
+  const [hideOffer, setHideOffer] = useState<{ turn?: Turn; playerCount: number }>()
   const [logOpen, setLogOpen] = useState(false)
   const openLog = useCallback(() => setLogOpen(true), [])
   const clock = runtime.game.clock
@@ -267,6 +288,78 @@ export function CurrentGameScreen({
     playerCount,
     system,
   ])
+  const turn = runtime.game.turn
+  const active = runtime.game.status === "active"
+  // why: a countdown is how a judge's official time is kept, so a counting-down game is treated as event play, where only a pass moves the turn.
+  const casual = clock?.setup.mode !== "countdown"
+  const turnSeats: TurnTabSeat[] = runtime.game.players.map((player, index) => ({
+    playerId: player.id,
+    seatNumber: index + 1,
+    name: player.name,
+    color: player.color,
+    shape: player.shape,
+  }))
+  const turnSeat = turnSeats.find(({ playerId }) => playerId === turn?.playerId)
+  const { passTurn, setTurn, undoTurn, changeClock } = runtime
+  function passFrom(current: Turn, clockwiseSlots: number[]) {
+    const { players, seatOrder } = runtime.game
+    const order = clockwiseSlots.flatMap((slot) => {
+      const player = players[seatOrder?.[slot] ?? slot]
+      return player ? [player.id] : []
+    })
+    const next = nextTurnSeat(
+      order,
+      current.playerId,
+      (id) => outReason(outState, id) !== undefined,
+    )
+    if (!next) return
+    const operationId = passTurn(current.playerId, next)
+    if (!operationId) return
+    const steppedRound = clock !== undefined && stepRoundTurn(clock, system, 1) !== clock
+    if (steppedRound) changeClock((current) => stepRoundTurn(current, system, 1))
+    const name = players.find(({ id }) => id === next)?.name ?? ""
+    setTurnToast({
+      operationId,
+      passerId: current.playerId,
+      message: translate("board:turn.passed", { number: current.number + 1, name }),
+      steppedRound,
+    })
+  }
+  function undoToastPass() {
+    if (!turnToast) return
+    if (undoTurn(turnToast.passerId, turnToast.operationId) && turnToast.steppedRound)
+      changeClock((current) => stepRoundTurn(current, system, -1))
+    setTurnToast(undefined)
+  }
+  const turnTab: BoardTurnTab | undefined =
+    turnPrefs.enabled && active && !firstPlayer
+      ? {
+          turn,
+          seat: turnSeat,
+          canPass: true,
+          clockStyle: turnPrefs.clock,
+          passStyle: turnPrefs.pass,
+          chessBankMs: turnPrefs.chessMinutes * 60_000,
+          roundClock: clock,
+          system,
+          copies: "both",
+          onPress: (slots) => (turn ? passFrom(turn, slots) : setTurnOpen(true)),
+          onLongPress: () => setTurnOpen(true),
+        }
+      : undefined
+  function answerHideOffer(hide: boolean) {
+    if (!hideOffer) return
+    if (hide) setTurnPrefs({ enabled: false })
+    reportTurnTabGame({
+      prefs: { enabled: true },
+      turn: hideOffer.turn,
+      playerCount: hideOffer.playerCount,
+      mode: "local",
+      hideOffer: hide ? "accepted" : "shown",
+    })
+    setHideOffer(undefined)
+  }
+
   // why: while the offer stands, every seat carries an empty 1st that claims first in one tap.
   const claimingGrid = firstPlayer
     ? {
@@ -298,6 +391,12 @@ export function CurrentGameScreen({
       setMatchPrompt(ended)
       return
     }
+    const ending = { turn: ended.turn, playerCount: ended.players.length }
+    if (offersToHideTurnTab(turnPrefs, ended.turn)) {
+      setTurnPrefs({ hideOffered: true })
+      setHideOffer(ending)
+    } else reportTurnTabGame({ prefs: turnPrefs, ...ending, mode: "local", hideOffer: "none" })
+    setTurnToast(undefined)
     runtime.rematch()
     setEndSource(undefined)
     setSaved({
@@ -354,6 +453,7 @@ export function CurrentGameScreen({
           chrome={chrome}
           onBoardSizeChange={setBoardSize}
           firstPlayer={firstPlayer}
+          turnTab={turnTab}
           toast={
             saved ? (
               <GameToast
@@ -376,6 +476,17 @@ export function CurrentGameScreen({
                 actionTestID="game-abandoned-undo-button"
                 persistent
                 onAction={runtime.undoAbandon}
+              />
+            ) : turnToast ? (
+              <GameToast
+                key={turnToast.operationId}
+                inline
+                message={turnToast.message}
+                actionTx="common:undo"
+                testID="turn-passed-toast"
+                actionTestID="turn-passed-undo"
+                onAction={undoToastPass}
+                onDismiss={() => setTurnToast(undefined)}
               />
             ) : null
           }
@@ -410,7 +521,7 @@ export function CurrentGameScreen({
           )}
         />
       </LifeLogContext.Provider>
-      {(match || clock) && !menuOpen ? (
+      {(match || (clock && !turnTab)) && !menuOpen ? (
         <BoardContextLabels
           match={
             match && matchLine
@@ -423,7 +534,7 @@ export function CurrentGameScreen({
                 }
               : undefined
           }
-          clock={clock}
+          clock={turnTab ? undefined : clock}
           system={system}
           top={insets.top}
           bottom={insets.bottom}
@@ -441,10 +552,52 @@ export function CurrentGameScreen({
         />
       ) : null}
 
+      {turnOpen ? (
+        <TurnDialog
+          turn={turn}
+          seats={turnSeats}
+          pick={
+            !turn || casual
+              ? {
+                  canPick: () => true,
+                  onPick: (playerId) => {
+                    setTurn(turn?.playerId ?? playerId, playerId)
+                    markFirstPlayerUsed()
+                    setTurnOpen(false)
+                  },
+                }
+              : undefined
+          }
+          onUndo={
+            turn?.previous
+              ? () => {
+                  undoTurn(turn.previous!.playerId, turn.operationId)
+                  setTurnToast(undefined)
+                  setTurnOpen(false)
+                }
+              : undefined
+          }
+          prefs={turnPrefs}
+          onPrefs={setTurnPrefs}
+          onRoundClock={
+            clock && active
+              ? () => {
+                  setTurnOpen(false)
+                  setClockOpen(true)
+                }
+              : undefined
+          }
+          onClose={() => setTurnOpen(false)}
+        />
+      ) : null}
+
+      {hideOffer ? <HideTurnTabDialog onAnswer={answerHideOffer} /> : null}
+
       {logOpen ? (
         <GameLogDialog
           players={runtime.game.players}
           events={events}
+          turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
           canUndo={runtime.canUndo}
           origin={chrome.dialogOrigin}
           onUndo={runtime.undo}

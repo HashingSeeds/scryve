@@ -42,6 +42,9 @@ export interface TableActions {
     coin?: Coin,
     takerPlayerId?: string,
   ) => TableKnockout | null
+  passTurn: (playerId: string, toPlayerId: string) => string | null
+  setTurn: (playerId: string, toPlayerId: string) => string | null
+  undoTurn: (playerId: string, turnOperationId: string) => string | null
 }
 
 export interface TableRuntime extends TableActions {
@@ -70,6 +73,7 @@ export function createTableActions(
       rules: source.rules,
       operationId,
       lifeOf: source.lifeOf,
+      now: Date.now(),
     })
     if (!change || change.table === source.table) return null
     return submit(action, operationId) ? { change, operationId } : null
@@ -134,5 +138,11 @@ export function createTableActions(
         ...(coin === undefined ? {} : { coin }),
         takerPlayerId,
       }),
+    passTurn: (playerId, toPlayerId) =>
+      run({ kind: "turn.passed", playerId, toPlayerId })?.operationId ?? null,
+    setTurn: (playerId, toPlayerId) =>
+      run({ kind: "turn.set", playerId, toPlayerId })?.operationId ?? null,
+    undoTurn: (playerId, turnOperationId) =>
+      run({ kind: "turn.undone", playerId, turnOperationId })?.operationId ?? null,
   }
 }

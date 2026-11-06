@@ -504,6 +504,56 @@ const board = {
     expands: "Expands the game controls",
     actionWithDetail: "{{label}}, {{detail}}",
   },
+  turn: {
+    // The turn tab before anyone has the first turn. Tapping it picks who goes first. Very short.
+    whoFirst: "1st?",
+    whoFirstLabel: "Who goes first? Opens the turn controls",
+    // Very short tap target on the turn tab that ends this player's turn and starts the next player's. Never "End turn".
+    pass: "Pass",
+    // Screen reader label for the turn tab, as in "Turn 4, Ada".
+    label: "Turn {{number}}, {{name}}",
+    roundLabel: "Round {{time}}",
+    passHint: "Tap to pass",
+    longPressHint: "Long press for turn controls",
+    // Title of the turn controls dialog, as in "Turn 4".
+    title: "Turn {{number}}",
+    noTurnTitle: "Turns",
+    // Above the list of players in the turn controls, to fix whose turn it is after a mistake.
+    whoseTurn: "Whose turn is it?",
+    whoFirstHeading: "Who goes first?",
+    // Shown instead of the player list in event play, where only passing changes the turn.
+    eventPlay: "Event play: only passing changes the turn",
+    undoPass: "Take back the pass",
+    // A toast after a pass, as in "Turn 5, Grace".
+    passed: "Turn {{number}}, {{name}}",
+    clockStyle: "Clock",
+    clockStyles: {
+      // Turn time with the round time under it.
+      stacked: "Stacked",
+      // Turn time and round time take turns in one line.
+      swap: "Swap",
+      // The round time drains as a ring around the player's mark.
+      ring: "Ring",
+      // Each player's own time bank counts down only on their turn.
+      chess: "Chess",
+    },
+    chessBank: "Time per player",
+    chessMinutes: "{{minutes}} min",
+    passStyle: "Pass button",
+    passStyles: {
+      icon: "Icon",
+      label: "Word",
+    },
+    roundClock: "Round clock",
+    // The log divider at the start of each turn, as in "Turn 4 · Ada".
+    divider: "Turn {{number}} · {{name}}",
+    hideOffer: {
+      title: "Hide the turn tab?",
+      body: "You can bring it back in Settings.",
+      hide: "Hide",
+      keep: "Keep",
+    },
+  },
   log: {
     close: "Close log",
     empty: "No changes yet",

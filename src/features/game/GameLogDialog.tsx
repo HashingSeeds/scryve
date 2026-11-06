@@ -16,12 +16,13 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { gameLog, type GameLogRow } from "./LifeLog"
-import type { GameEvent, GamePlayer } from "./types"
+import { gameLog, withTurnDividers, type GameLogItem } from "./LifeLog"
+import type { GameEvent, GamePlayer, TurnLogEntry } from "./types"
 
 export function GameLogDialog({
   players,
   events,
+  turns,
   canUndo,
   origin,
   onUndo,
@@ -29,6 +30,7 @@ export function GameLogDialog({
 }: {
   players: readonly Pick<GamePlayer, "id" | "name" | "life" | "color" | "shape">[]
   events: readonly GameEvent[]
+  turns?: readonly TurnLogEntry[]
   canUndo: boolean
   origin?: DialogOrigin
   onUndo: () => void
@@ -38,7 +40,10 @@ export function GameLogDialog({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const rows = useMemo(() => gameLog(players, events), [players, events])
+  const rows = useMemo(
+    () => withTurnDividers(gameLog(players, events), turns ?? []),
+    [players, events, turns],
+  )
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
     () =>
@@ -46,7 +51,39 @@ export function GameLogDialog({
     [players],
   )
 
-  function renderRow({ item }: { item: GameLogRow }) {
+  function renderRow({ item }: { item: GameLogItem }) {
+    if (item.kind === "turn") {
+      const holder = seats.get(item.playerId)
+      const label = translate("board:turn.divider", {
+        number: item.number,
+        name: holder?.name ?? "",
+      })
+      return (
+        <View
+          testID={`game-log-turn-${item.number}`}
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={label}
+          style={themed($turnRow)}
+        >
+          {holder ? (
+            <PlayerMark
+              seatNumber={holder.seatNumber}
+              color={holder.color}
+              shape={holder.shape}
+              size={TURN_MARK}
+            />
+          ) : null}
+          <Text text={label} size="xxs" weight="semiBold" style={{ color: colors.textDim }} />
+          <View style={[$rule, { backgroundColor: colors.separator }]} />
+          <Text
+            text={relativeTime(item.at, openedAt)}
+            size="xxs"
+            style={{ color: colors.textDim }}
+          />
+        </View>
+      )
+    }
     const seat = seats.get(item.playerId)
     const source = item.fromPlayerId ? seats.get(item.fromPlayerId) : undefined
     const name = seat?.name ?? ""
@@ -131,7 +168,7 @@ export function GameLogDialog({
         <FlatList
           testID="game-log-list"
           data={rows}
-          keyExtractor={({ id }) => id}
+          keyExtractor={(item) => (item.kind === "turn" ? `turn:${item.operationId}` : item.id)}
           renderItem={renderRow}
           style={$list}
         />
@@ -156,6 +193,14 @@ function signed(delta: number) {
 }
 
 const MARK = 32
+const TURN_MARK = 14
+const $turnRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+  minHeight: 28,
+})
+const $rule: ViewStyle = { flex: 1, height: 1 }
 const SOURCE_MARK = 18
 const $list: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({

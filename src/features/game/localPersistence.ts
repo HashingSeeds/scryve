@@ -36,6 +36,15 @@ import {
   type RecentSetup,
 } from "./recentSetups"
 import { isRoundClockSetup, type RoundClock } from "./roundClock"
+import {
+  DEFAULT_TURN_TAB_PREFS,
+  isChessBankMinutes,
+  isTurnClockStyle,
+  isTurnPassStyle,
+  type TurnClockStyle,
+  type TurnPassStyle,
+  type TurnTabPrefs,
+} from "./turnTab"
 import type {
   CommanderDamageTotals,
   GameEvent,
@@ -48,12 +57,14 @@ import type {
   MatchSeatOutcome,
   NewPlayerInput,
   SeatPassHashes,
+  TurnLogEntry,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { parseTableState } from "../../../convex/lib/table"
+import { isValidTurn } from "../../../convex/lib/turns"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -93,6 +104,11 @@ export interface LocalSettings {
   defaultFormat?: string
   askWhatYouPlay?: true
   syncStats?: boolean
+  turnTab?: boolean
+  turnTabHideOffered?: true
+  turnClock?: TurnClockStyle
+  turnPass?: TurnPassStyle
+  chessMinutes?: number
 }
 
 export const COMMANDER_SEATS = 4
@@ -454,6 +470,9 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const account = parseAccount(value.account, value.system)
   const match = parseMatch(value.match, players.length)
   const clock = parseRoundClock(value.clock)
+  const playerIds = new Set<string>(players.map(({ id }) => id))
+  const turn = isValidTurn(value.turn, playerIds) ? value.turn : undefined
+  const turnLog = turn ? parseTurnLog(value.turnLog, playerIds) : undefined
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -489,7 +508,33 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     players.some(({ id }) => id === value.firstPlayerId)
       ? { firstPlayerId: asPlayerId(value.firstPlayerId) }
       : {}),
+    ...(turn ? { turn } : {}),
+    ...(turnLog ? { turnLog } : {}),
   }
+}
+
+function parseTurnLog(value: unknown, playerIds: ReadonlySet<string>): TurnLogEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const entries = value.flatMap((entry): TurnLogEntry[] =>
+    isRecord(entry) &&
+    typeof entry.operationId === "string" &&
+    typeof entry.playerId === "string" &&
+    playerIds.has(entry.playerId) &&
+    typeof entry.number === "number" &&
+    Number.isInteger(entry.number) &&
+    typeof entry.at === "number" &&
+    Number.isFinite(entry.at)
+      ? [
+          {
+            operationId: entry.operationId,
+            playerId: asPlayerId(entry.playerId),
+            number: entry.number,
+            at: entry.at,
+          },
+        ]
+      : [],
+  )
+  return entries.length > 0 ? entries : undefined
 }
 
 function parseSettings(value: unknown): LocalSettings | null {
@@ -522,6 +567,11 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...systemPreference,
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
+    ...(migrated.turnTab === false ? { turnTab: false } : {}),
+    ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
+    ...(isTurnClockStyle(migrated.turnClock) ? { turnClock: migrated.turnClock } : {}),
+    ...(isTurnPassStyle(migrated.turnPass) ? { turnPass: migrated.turnPass } : {}),
+    ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
   }
 }
 
@@ -724,6 +774,32 @@ export class LocalGameRepository {
     this.saveSettings(settings)
     if (legacy) this.storage.delete(LOCAL_KEYS.legacySettings)
     return settings
+  }
+
+  turnTabPrefs(): TurnTabPrefs {
+    const settings = this.loadSettings()
+    return {
+      enabled: settings.turnTab !== false,
+      clock: settings.turnClock ?? DEFAULT_TURN_TAB_PREFS.clock,
+      pass: settings.turnPass ?? DEFAULT_TURN_TAB_PREFS.pass,
+      chessMinutes: settings.chessMinutes ?? DEFAULT_TURN_TAB_PREFS.chessMinutes,
+      hideOffered: settings.turnTabHideOffered === true,
+    }
+  }
+
+  saveTurnTabPrefs(prefs: Partial<TurnTabPrefs>): TurnTabPrefs {
+    const settings = this.loadSettings()
+    const { turnTab: _on, turnTabHideOffered: _offered, ...rest } = settings
+    const next = { ...this.turnTabPrefs(), ...prefs }
+    this.saveSettings({
+      ...rest,
+      ...(next.enabled ? {} : { turnTab: false }),
+      ...(next.hideOffered ? { turnTabHideOffered: true } : {}),
+      turnClock: next.clock,
+      turnPass: next.pass,
+      chessMinutes: next.chessMinutes,
+    })
+    return next
   }
 
   hapticsEnabled(): boolean {

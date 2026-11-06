@@ -12,7 +12,7 @@ import {
   type GameWrite as MemoryWrite,
 } from "./lib/gameEngine"
 import { writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
-import type { TableAction } from "./lib/table"
+import { TABLE_VERSION, type TableAction } from "./lib/table"
 
 const token = "t".repeat(43)
 const HOST_DEVICE = "device-host-0001"
@@ -239,12 +239,36 @@ async function parityGame(
     ).toEqual(stored.pairs.map((pair) => [`${pair.fromPlayerId}>${pair.toPlayerId}`, pair.total]))
   }
 
+  // why: Convex stamps server time and the memory engine the time it is given, so only who holds which turn is compared.
+  async function expectSameTurn() {
+    const stored = await t.run(async (ctx) => (await ctx.db.get(game._id))?.turn)
+    const holder = (turn: typeof stored) =>
+      turn && {
+        playerId: turn.playerId,
+        number: turn.number,
+        operationId: turn.operationId,
+        previous: turn.previous && [turn.previous.playerId, turn.previous.number],
+      }
+    expect(holder(memory.turn)).toEqual(holder(stored))
+    return memory.turn
+  }
+
+  const projectedTurn = async (tableVersion?: number) =>
+    (
+      await joiner.query(api.games.lobbyProjection, {
+        publicId,
+        ...(tableVersion === undefined ? {} : { tableVersion }),
+      })
+    ).table?.turn
+
   return {
     hostSeat: hostRow._id as string,
     joinerSeat: joinerRow._id as string,
     write,
     end,
     expectSameState,
+    expectSameTurn,
+    projectedTurn,
   }
 }
 
@@ -437,6 +461,68 @@ describe("engine parity: tableAction", () => {
       ack: { deduplicated: true },
     })
     await game.write("host", table("table-after-end-001", poison))
+    await game.expectSameState()
+  })
+})
+
+describe("engine parity: turns", () => {
+  const table = (operationId: string, action: TableAction, deviceId?: string) =>
+    ({ kind: "table", action, ...sent(operationId, deviceId) }) as const
+
+  it("passes, refuses the wrong seat, undoes, and hides the turn from older clients", async () => {
+    const game = await parityGame(makeConvexTest(), {
+      system: "ygo",
+      format: "advanced",
+      startingLife: 8000,
+    })
+    const { hostSeat, joinerSeat } = game
+    await game.write(
+      "joiner",
+      table("turn-start-host-01", { kind: "turn.set", playerId: hostSeat, toPlayerId: hostSeat }),
+    )
+    await game.write(
+      "host",
+      table("turn-start-host-02", { kind: "turn.set", playerId: hostSeat, toPlayerId: hostSeat }),
+    )
+    await game.write(
+      "joiner",
+      table(
+        "turn-pass-joiner-1",
+        { kind: "turn.passed", playerId: joinerSeat, toPlayerId: hostSeat },
+        JOINER_DEVICE,
+      ),
+    )
+    await game.write(
+      "host",
+      table("turn-pass-host-001", {
+        kind: "turn.passed",
+        playerId: hostSeat,
+        toPlayerId: joinerSeat,
+      }),
+    )
+    expect(await game.expectSameTurn()).toMatchObject({ playerId: joinerSeat, number: 2 })
+    expect(await game.projectedTurn(TABLE_VERSION)).toMatchObject({ playerId: joinerSeat })
+    // why: an installed client's strict parser drops a table with a field it does not know.
+    expect(await game.projectedTurn(2)).toBeUndefined()
+    expect(await game.projectedTurn()).toBeUndefined()
+
+    await game.write(
+      "joiner",
+      table(
+        "turn-undo-joiner-1",
+        { kind: "turn.undone", playerId: hostSeat, turnOperationId: "turn-pass-host-001" },
+        JOINER_DEVICE,
+      ),
+    )
+    await game.write(
+      "host",
+      table("turn-undo-host-001", {
+        kind: "turn.undone",
+        playerId: hostSeat,
+        turnOperationId: "turn-pass-host-001",
+      }),
+    )
+    expect(await game.expectSameTurn()).toMatchObject({ playerId: hostSeat, number: 1 })
     await game.expectSameState()
   })
 })

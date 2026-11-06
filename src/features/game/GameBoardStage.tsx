@@ -24,11 +24,14 @@ import {
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
+import { getPlayerGridRows } from "@/components/playerGridGeometry"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
+import { TurnTabs, type TurnTabProps } from "@/components/TurnTabs"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
+import { clockwiseSlots } from "./turnTab"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
 import {
   SCREEN_PINNING_AVAILABLE,
@@ -42,10 +45,17 @@ export interface GameBoardStageProps {
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   firstPlayer?: FirstPlayerOffer
+  turnTab?: BoardTurnTab
   windowOverlay?: ReactNode
   toast?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
   testID?: string
+}
+
+/** why: only the grid knows where seats sit, so the stage hands the press its slots clockwise and the board passes to the seat beside the active one. */
+export type BoardTurnTab = Omit<TurnTabProps, "tabs" | "onPress"> & {
+  onPress: (clockwiseSlots: number[]) => void
+  copies: "both" | "holder"
 }
 
 export interface BoardSize {
@@ -61,6 +71,7 @@ function PinnedGameBoardStage({
   renderGrid,
   menu,
   firstPlayer,
+  turnTab,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -114,7 +125,7 @@ function PinnedGameBoardStage({
         : undefined,
     [pinned, width, height, fontScale, metrics.insets, holderAngle],
   )
-  const tabsShown = !!firstPlayer && !menu.open
+  const tabsShown = (!!firstPlayer || !!turnTab) && !menu.open
 
   return (
     <View testID={testID} style={$stage}>
@@ -137,7 +148,14 @@ function PinnedGameBoardStage({
               statusLine={menu.statusLine}
               onToggle={menu.onToggle}
             />
-            {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
+            {tabsShown ? (
+              <BoardTabs
+                firstPlayer={firstPlayer}
+                turnTab={turnTab}
+                tabs={tabs}
+                rows={getPlayerGridRows(playerCount, gridLayout)}
+              />
+            ) : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
@@ -157,6 +175,7 @@ function LegacyGameBoardStage({
   renderGrid,
   menu,
   firstPlayer,
+  turnTab,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -180,7 +199,7 @@ function LegacyGameBoardStage({
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
     [boardAnchor, playerCount, gridLayout, rotation],
   )
-  const tabsShown = !!firstPlayer && !menu.open
+  const tabsShown = (!!firstPlayer || !!turnTab) && !menu.open
 
   return (
     <Animated.View
@@ -199,7 +218,14 @@ function LegacyGameBoardStage({
         nativeFrame={boardOrientation.nativeFrame}
         compact={playerCount > 2}
       />
-      {tabsShown && firstPlayer ? <FirstPlayerTabs offer={firstPlayer} tabs={tabs} /> : null}
+      {tabsShown ? (
+        <BoardTabs
+          firstPlayer={firstPlayer}
+          turnTab={turnTab}
+          tabs={tabs}
+          rows={getPlayerGridRows(playerCount, gridLayout)}
+        />
+      ) : null}
       {toast ? (
         <BoardToastSlot anchor={menuAnchor} hidden={menu.open}>
           {toast}
@@ -208,6 +234,27 @@ function LegacyGameBoardStage({
       {windowOverlay}
     </Animated.View>
   )
+}
+
+function BoardTabs({
+  firstPlayer,
+  turnTab,
+  tabs,
+  rows,
+}: {
+  firstPlayer?: FirstPlayerOffer
+  turnTab?: BoardTurnTab
+  tabs: readonly FirstPlayerTab[]
+  rows: (number | null)[][]
+}) {
+  if (firstPlayer) return <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
+  if (!turnTab) return null
+  const { onPress, copies, ...tab } = turnTab
+  const shown =
+    copies === "both"
+      ? tabs
+      : [tabs.find(({ facing }) => ((facing % 360) + 360) % 360 === 0) ?? tabs[tabs.length - 1]]
+  return <TurnTabs {...tab} tabs={shown} onPress={() => onPress(clockwiseSlots(rows))} />
 }
 
 /** why: the tabs sit where the menu's row meets the board's left and right edges, clear of the camera cutout and home indicator, each turned toward the players nearest it. `rotation` turns a board drawn sideways onto the screen. */

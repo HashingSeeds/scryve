@@ -11,6 +11,7 @@ import {
   applyGameCommand,
   applyLocalTableAction,
   canUndo,
+  createClientId,
   createNextMatchGame,
   createRematch,
   defaultCommandContext,
@@ -19,7 +20,9 @@ import {
   localTableRules,
   restartMatchGame,
   soleLoserSeat,
+  undoableTurn,
   withFirstChooser,
+  withFirstTurn,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
@@ -185,8 +188,9 @@ export function useLocalGame(
         () => {
           const current = gameRef.current
           if (current.status !== "active") return null
+          const table = current.table ?? EMPTY_TABLE
           return {
-            table: current.table ?? EMPTY_TABLE,
+            table: current.turn ? { ...table, turn: current.turn } : table,
             rules: localTableRules(current),
             playerIds: current.players.map(({ id }) => id),
             lifeOf: (playerId) => current.players.find(({ id }) => id === playerId)?.life,
@@ -235,7 +239,16 @@ export function useLocalGame(
       )
         return
       const { firstPlayerId: _previous, ...board } = current
-      replaceBoard(playerId === undefined ? board : { ...board, firstPlayerId: playerId })
+      replaceBoard(
+        withFirstTurn(
+          playerId === undefined ? board : { ...board, firstPlayerId: playerId },
+          playerId,
+          {
+            operationId: createClientId("operation"),
+            now: Date.now(),
+          },
+        ),
+      )
     },
     [replaceBoard],
   )
@@ -305,13 +318,17 @@ export function useLocalGame(
     game,
     ...tableRuntime,
     tableRuntime,
-    canUndo: canUndo(game, context.actorId),
+    canUndo: canUndo(game, context.actorId) || undoableTurn(game, context.actorId) !== undefined,
     changeLife,
     assignCommanderDamage,
     changeLayout,
     changeSeatOrder,
     changeClock,
-    undo: () => dispatch({ type: "life.undo" }),
+    undo: () => {
+      const turn = undoableTurn(gameRef.current, context.actorId)
+      if (turn) tableActions.undoTurn(turn.playerId, turn.turnOperationId)
+      else dispatch({ type: "life.undo" })
+    },
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
       dispatch({ type: "game.finish", result }, endSource),
     abandon: () => dispatch({ type: "game.abandon" }),

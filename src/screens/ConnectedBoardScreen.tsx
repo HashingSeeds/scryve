@@ -40,6 +40,7 @@ import {
   connectedLastStanding,
   connectedLives,
   connectedOutState,
+  projectionOutState,
   type ConnectedOutGame,
   type ConnectedBoardSeat,
   type ConnectedBoardView,
@@ -61,6 +62,8 @@ import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
 import { asPlayerId } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
+import type { BoardTurnTab } from "@/features/game/GameBoardStage"
+import { GameToast } from "@/features/game/GameToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { defaultConnectedLayout, playerGridLayoutForCount } from "@/features/game/playerLayouts"
@@ -73,6 +76,13 @@ import {
   playCommanderLethal,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
+import {
+  HideTurnTabDialog,
+  reportTurnTabGame,
+  TurnDialog,
+  useTurnTabPrefs,
+} from "@/features/game/TurnDialog"
+import { offersToHideTurnTab } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
@@ -88,7 +98,9 @@ import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
 import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
+import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
+import { nextTurnSeat } from "../../convex/lib/turns"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -268,6 +280,7 @@ type ConnectedBoardReadyProps = {
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline: boolean
+  turns: boolean
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -346,6 +359,7 @@ interface ConnectedBoardRuntimeProps {
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
   partners?: boolean
+  turns?: boolean
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline?: boolean
@@ -414,6 +428,7 @@ export function ConnectedBoardWithRuntime({
   ownerId,
   cloud = true,
   partners = cloud,
+  turns = cloud,
   awayPlayerIds,
   onRevealRole,
   roleRevealOnline = false,
@@ -473,6 +488,9 @@ export function ConnectedBoardWithRuntime({
     undoKnockout,
     setPokemonCondition,
     checkupPokemon,
+    passTurn,
+    setTurn,
+    undoTurn,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -490,6 +508,9 @@ export function ConnectedBoardWithRuntime({
       undoKnockout,
       setPokemonCondition,
       checkupPokemon,
+      passTurn,
+      setTurn,
+      undoTurn,
     }),
     [
       tableState,
@@ -506,6 +527,9 @@ export function ConnectedBoardWithRuntime({
       undoKnockout,
       setPokemonCondition,
       checkupPokemon,
+      passTurn,
+      setTurn,
+      undoTurn,
     ],
   )
   const latest = useRef(runtime)
@@ -582,6 +606,7 @@ export function ConnectedBoardWithRuntime({
               awayPlayerIds={awayPlayerIds}
               onRevealRole={onRevealRole}
               roleRevealOnline={roleRevealOnline}
+              turns={turns}
             />
             <SyncStatsOverlay latency={runtime.latency} peers={peerLatency} />
           </LifeLogContext.Provider>
@@ -614,6 +639,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   awayPlayerIds = [],
   onRevealRole,
   roleRevealOnline,
+  turns,
 }: ConnectedBoardReadyProps) {
   const {
     themed,
@@ -640,16 +666,58 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const { syncSignal, offlineSince, finishBlocker } = view
   const terminalStatus = game.status
   const rematchPublicId = game.rematchPublicId
+  const table = useContext(ConnectedTableContext)
+  const turn = turns ? table?.table.turn : undefined
+  const [turnPrefs, setTurnPrefs] = useTurnTabPrefs(localGameRepository)
+  const [turnOpen, setTurnOpen] = useState(false)
+  const [turnToast, setTurnToast] = useState<{
+    operationId: string
+    passerId: string
+    message: string
+  }>()
+  const [hideOffer, setHideOffer] = useState(false)
+  const endedTurn = useRef(turn)
+  endedTurn.current = turn
+  const leaveFinished = useCallback(() => {
+    if (rematchPublicId && onRematch) onRematch(rematchPublicId)
+    else onGameEnded?.(publicId)
+  }, [rematchPublicId, onRematch, onGameEnded, publicId])
+  const tabOn = turns && turnPrefs.enabled
+  const playerCount = game.players.length
+  // why: the board leaves when the game ends, so the hide offer holds it until answered.
   useEffect(() => {
     if (terminalStatus === "finished") {
       if (navigatedTerminal.current) return
       navigatedTerminal.current = true
-      if (rematchPublicId && onRematch) onRematch(rematchPublicId)
-      else onGameEnded?.(publicId)
+      if (turns && offersToHideTurnTab(turnPrefs, endedTurn.current)) {
+        setTurnPrefs({ hideOffered: true })
+        setHideOffer(true)
+        return
+      }
+      reportTurnTabGame({
+        prefs: { enabled: tabOn },
+        turn: endedTurn.current,
+        playerCount,
+        mode: "connected",
+        hideOffer: "none",
+      })
+      leaveFinished()
     } else if (terminalStatus === "abandoned" && !navigatedTerminal.current) {
       setAbandonedOpen(true)
     }
-  }, [terminalStatus, rematchPublicId, onRematch, onGameEnded, publicId])
+  }, [terminalStatus, leaveFinished, turns, turnPrefs, setTurnPrefs, tabOn, playerCount])
+  function answerHideOffer(hide: boolean) {
+    if (hide) setTurnPrefs({ enabled: false })
+    reportTurnTabGame({
+      prefs: { enabled: true },
+      turn: endedTurn.current,
+      playerCount,
+      mode: "connected",
+      hideOffer: hide ? "accepted" : "shown",
+    })
+    setHideOffer(false)
+    leaveFinished()
+  }
   function toggleWinner(playerId: string) {
     setDrawSelected(false)
     setWinnerPlayerIds((current) =>
@@ -883,6 +951,51 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     onAccount,
   })
   const { menuOpen, dice, dialogOrigin: menuDialogOrigin } = chrome
+  const turnSeats = [...game.players]
+    .sort((left, right) => left.seat - right.seat)
+    .map((player) => ({
+      playerId: player.playerId,
+      seatNumber: player.seat,
+      name: player.displayName,
+      color: player.color,
+      shape: shownMarkShape(player),
+    }))
+  const myTurn = turn !== undefined && controlled.has(turn.playerId)
+  function passTurn() {
+    const runtime = controls.current()
+    if (!turn || !myTurn || !table || runtime.status !== "ready") return
+    const outState = projectionOutState(runtime.projection)
+    const next = nextTurnSeat(
+      turnSeats.map(({ playerId }) => playerId),
+      turn.playerId,
+      (id) => outReason(outState, id) !== undefined,
+    )
+    const operationId = next && table.passTurn(turn.playerId, next)
+    if (!operationId) return
+    setTurnToast({
+      operationId,
+      passerId: turn.playerId,
+      message: translate("board:turn.passed", {
+        number: turn.number + 1,
+        name: turnSeats.find(({ playerId }) => playerId === next)?.name ?? "",
+      }),
+    })
+  }
+  const turnTab: BoardTurnTab | undefined =
+    tabOn && active && table
+      ? {
+          turn,
+          seat: turnSeats.find(({ playerId }) => playerId === turn?.playerId),
+          canPass: myTurn,
+          clockStyle: turnPrefs.clock,
+          passStyle: turnPrefs.pass,
+          chessBankMs: turnPrefs.chessMinutes * 60_000,
+          system,
+          copies: "holder",
+          onPress: () => (turn ? passTurn() : setTurnOpen(true)),
+          onLongPress: () => setTurnOpen(true),
+        }
+      : undefined
   useStoreReview(
     game.status === "finished" &&
       !menuOpen &&
@@ -932,6 +1045,24 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       <GameBoard
         testID="connected-game-board"
         chrome={chrome}
+        turnTab={turnTab}
+        toast={
+          turnToast ? (
+            <GameToast
+              key={turnToast.operationId}
+              inline
+              message={turnToast.message}
+              actionTx="common:undo"
+              testID="turn-passed-toast"
+              actionTestID="turn-passed-undo"
+              onAction={() => {
+                table?.undoTurn(turnToast.passerId, turnToast.operationId)
+                setTurnToast(undefined)
+              }}
+              onDismiss={() => setTurnToast(undefined)}
+            />
+          ) : null
+        }
         renderGrid={(boardOrientation) => (
           <ConnectedLifeGrid
             boardOrientation={boardOrientation}
@@ -980,6 +1111,34 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           />
         )}
       />
+
+      {turnOpen && table ? (
+        <TurnDialog
+          turn={turn}
+          seats={turnSeats}
+          pick={{
+            canPick: (playerId) => (turn ? myTurn : controlled.has(playerId)),
+            onPick: (playerId) => {
+              table.setTurn(turn?.playerId ?? playerId, playerId)
+              setTurnOpen(false)
+            },
+          }}
+          onUndo={
+            turn?.previous && controlled.has(turn.previous.playerId)
+              ? () => {
+                  table.undoTurn(turn.previous!.playerId, turn.operationId)
+                  setTurnToast(undefined)
+                  setTurnOpen(false)
+                }
+              : undefined
+          }
+          prefs={turnPrefs}
+          onPrefs={setTurnPrefs}
+          onClose={() => setTurnOpen(false)}
+        />
+      ) : null}
+
+      {hideOffer ? <HideTurnTabDialog onAnswer={answerHideOffer} /> : null}
 
       {inviteSheet.shown && shownInvitation ? (
         <Sheet

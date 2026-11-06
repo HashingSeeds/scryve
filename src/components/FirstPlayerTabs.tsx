@@ -28,7 +28,9 @@ export interface FirstPlayerTab {
 
 const TAB_LENGTH = 56
 const TAB_DEPTH = 40
-export const FIRST_PLAYER_TAB = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
+/** why: the first-player tab becomes the larger turn tab in the same place, so seats clear the turn tab's size from the start and their chrome never shifts between the two. */
+export const FIRST_PLAYER_TAB = { length: 84, depth: 46 } as const
+const FIRST_TAB_SIZE = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
 export const FirstPlayerTabsShownContext = createContext(false)
 const TAB_BORDER = 4
@@ -56,7 +58,7 @@ function edgeSlides(edge: BoardEdge) {
   }
 }
 
-const EDGE_SLIDES = {
+export const EDGE_SLIDES = {
   left: edgeSlides("left"),
   right: edgeSlides("right"),
   top: edgeSlides("top"),
@@ -91,7 +93,7 @@ export const FirstPlayerTabs = memo(function FirstPlayerTabs({
             importantForAccessibility={primary ? "auto" : "no-hide-descendants"}
             style={[
               $tab,
-              edgeStyle(tab),
+              edgeStyle(tab, FIRST_TAB_SIZE),
               {
                 backgroundColor: colors.gameMenu.anchor,
                 borderColor: "color" in glyph ? glyph.color : colors.gameMenu.anchorBorder,
@@ -130,9 +132,11 @@ export const FirstPlayerTabs = memo(function FirstPlayerTabs({
   )
 })
 
-const RADIUS = TAB_DEPTH / 2
-
-function edgeStyle({ edge, at }: FirstPlayerTab): ViewStyle {
+export function edgeStyle(
+  { edge, at }: FirstPlayerTab,
+  { length: TAB_LENGTH, depth: TAB_DEPTH }: { length: number; depth: number },
+): ViewStyle {
+  const RADIUS = TAB_DEPTH / 2
   const along = `${at * 100}%` as const
   switch (edge) {
     case "left":

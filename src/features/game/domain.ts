@@ -18,6 +18,7 @@ import {
   type PlaySystemId,
 } from "./playSystems"
 import { isRoundClockSetup, startRoundClock, type RoundClockSetup } from "./roundClock"
+import { turnsPassed } from "./turnTab"
 import type {
   ActorId,
   CommanderDamageAssignedEvent,
@@ -38,6 +39,7 @@ import type {
   NewPlayerInput,
   OperationId,
   PlayerId,
+  TurnLogEntry,
 } from "./types"
 import {
   PLAYER_COLOR_CHOICES,
@@ -66,6 +68,7 @@ import {
   tableHasState,
   type TableAction,
 } from "../../../convex/lib/table"
+import { applyTurnAction, isTurnAction, type Turn } from "../../../convex/lib/turns"
 
 export {
   isCommanderDamageDelta,
@@ -429,12 +432,64 @@ export function localTableRules(game: Pick<LocalGame, "system" | "format">) {
   return playTableRules(game.system, game.format)
 }
 
+const MAX_TURN_LOG = 400
+
+/** why: an undo lands on a turn the log already holds, so it drops the start it took back instead of adding one. */
+export function withTurn(game: LocalGame, turn: Turn | undefined, now: number): LocalGame {
+  if (turn === game.turn) return game
+  const { turn: _turn, turnLog: log = [], ...rest } = game
+  const turnLog: TurnLogEntry[] = !turn
+    ? []
+    : log.some(({ operationId }) => operationId === turn.operationId)
+      ? log.filter(({ operationId }) => operationId !== game.turn?.operationId)
+      : [
+          ...log,
+          {
+            operationId: turn.operationId,
+            playerId: turn.playerId as PlayerId,
+            number: turn.number,
+            at: turn.startedAt,
+          },
+        ]
+  return {
+    ...rest,
+    ...(turn ? { turn } : {}),
+    ...(turnLog.length > 0 ? { turnLog: turnLog.slice(-MAX_TURN_LOG) } : {}),
+    updatedAt: Math.max(game.updatedAt, now),
+  }
+}
+
+/** why: the first turn begins when the first player is known, so its clock starts as the game does. A first player chosen again before anyone passes replaces it. */
+export function withFirstTurn(
+  game: LocalGame,
+  playerId: PlayerId | undefined,
+  context: { operationId: string; now: number },
+): LocalGame {
+  const turn = game.turn
+  if (turn && (turn.number > 1 || turn.previous)) return game
+  if (!playerId) return withTurn(game, undefined, context.now)
+  if (turn?.playerId === playerId) return game
+  const { turnLog: _log, turn: _turn, ...board } = game
+  return withTurn(
+    board,
+    { playerId, number: 1, startedAt: context.now, operationId: context.operationId },
+    context.now,
+  )
+}
+
 export function applyLocalTableAction(
   game: LocalGame,
   action: TableAction,
   context: { operationId: string; now: number },
 ): LocalGame {
   if (game.status !== "active") return game
+  if (isTurnAction(action)) {
+    const turn = applyTurnAction(game.turn, action, {
+      ...context,
+      isSeat: (playerId) => game.players.some(({ id }) => id === playerId),
+    })
+    return turn === null ? game : withTurn(game, turn, context.now)
+  }
   const table = game.table ?? EMPTY_TABLE
   const change = applyTableAction(table, action, {
     rules: localTableRules(game),
@@ -670,6 +725,7 @@ export function applyGameCommand(
 }
 
 export function hasPlayBegun(game: LocalGame): boolean {
+  if (turnsPassed(game.turn) > 0) return true
   if (
     game.events.some(({ type }) => type === "life.changed" || type === "commanderDamage.assigned")
   )
@@ -689,6 +745,7 @@ export function hasPlayBegun(game: LocalGame): boolean {
 export function hasLocalGameStarted(game: LocalGame): boolean {
   return (
     game.events.length > 0 ||
+    turnsPassed(game.turn) > 0 ||
     game.players.some((player) => player.life !== (player.startingLife ?? game.startingLife)) ||
     Object.values(game.commanderDamage ?? {}).some((damage) => damage !== 0) ||
     tableHasState(game.table)
@@ -704,6 +761,22 @@ export function canUndo(game: LocalGame, actorId: ActorId): boolean {
       event.actorId === actorId &&
       !compensated.has(event.operationId),
   )
+}
+
+/** why: the log's Undo takes back whatever happened last, so a pass is undone only when it is newer than this device's newest life change. */
+export function undoableTurn(game: LocalGame, actorId: ActorId) {
+  const turn = game.turn
+  if (!turn?.previous) return undefined
+  const compensated = compensatedOperationIds(game)
+  const lastChange = game.events.findLast(
+    (event): event is CompensatableEvent =>
+      isCompensatable(event) &&
+      !event.compensatesOperationId &&
+      event.actorId === actorId &&
+      !compensated.has(event.operationId),
+  )
+  if (lastChange && lastChange.clientCreatedAt > turn.startedAt) return undefined
+  return { playerId: turn.previous.playerId, turnOperationId: turn.operationId }
 }
 
 export function defaultCommandContext(deviceId: DeviceId): CommandContext {

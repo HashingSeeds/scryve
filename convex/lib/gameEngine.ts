@@ -35,6 +35,7 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
+import type { Turn } from "./turns"
 import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
@@ -62,7 +63,7 @@ const MISMATCH = writeError(
 export const engineGameOf = (
   game: Pick<
     Doc<"games">,
-    "status" | "system" | "game" | "format" | "ruleset" | "designations" | "lifeEditing"
+    "status" | "system" | "game" | "format" | "ruleset" | "designations" | "lifeEditing" | "turn"
   >,
 ): EngineGame => ({
   status: game.status,
@@ -70,6 +71,7 @@ export const engineGameOf = (
   format: game.format ?? game.ruleset,
   designations: game.designations ?? {},
   ...(game.lifeEditing ? { lifeEditing: game.lifeEditing } : {}),
+  ...(game.turn ? { turn: game.turn } : {}),
 })
 
 export interface EngineGame {
@@ -78,6 +80,7 @@ export interface EngineGame {
   format: string | undefined
   designations: TableState["designations"]
   lifeEditing?: LifeEditing
+  turn?: Turn
 }
 
 export interface EngineSeat extends SeatOwner, PlayerTable {
@@ -151,6 +154,7 @@ export type GameChange =
     }
   | (CommanderPair & { kind: "pair.put"; total: number; updatedAt: number })
   | { kind: "designations.set"; designations: TableState["designations"] }
+  | { kind: "turn.set"; turn: Turn | undefined }
 
 export interface WriteRequest {
   operationId: string
@@ -488,11 +492,13 @@ export function changeTable(
   const table: TableState = {
     designations: game.designations,
     players: Object.fromEntries([...rows.values()].map((row) => [row.id, seatTable(row)])),
+    ...(game.turn ? { turn: game.turn } : {}),
   }
   const result = applyTableAction(table, action, {
     rules: tableRules(game.system, game.format),
     operationId: request.operationId,
     lifeOf: (playerId) => rows.get(playerId)?.currentLife,
+    now,
   })
   if (!result) return writeError("invalid_table_action", "This table change no longer applies")
 
@@ -518,6 +524,7 @@ export function changeTable(
   }
   if (result.table.designations !== table.designations)
     changes.push({ kind: "designations.set", designations: result.table.designations })
+  if (result.table.turn !== table.turn) changes.push({ kind: "turn.set", turn: result.table.turn })
 
   const lifeChange = result.life[0]
   const actionDelta = tableActionDelta(action)
@@ -530,9 +537,11 @@ export function changeTable(
       actionIdentity: request.actionIdentity,
       ...(lifeChange
         ? { toPlayerId: lifeChange.playerId, delta: lifeChange.delta }
-        : actionDelta === undefined
-          ? {}
-          : { delta: actionDelta }),
+        : "toPlayerId" in action
+          ? { toPlayerId: action.toPlayerId }
+          : actionDelta === undefined
+            ? {}
+            : { delta: actionDelta }),
       ...(action.kind === "pokemon.knockoutUndone"
         ? { undoOfOperationId: action.knockoutOperationId }
         : {}),

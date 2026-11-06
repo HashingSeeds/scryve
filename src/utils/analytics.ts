@@ -36,6 +36,7 @@ const values = {
   scope: ["event"],
   peak_heat: ["nominal", "fair", "serious", "critical"],
   result: ["win", "draw", "none"],
+  hide_offer: ["none", "shown", "accepted"],
 } as const
 
 const LATENCY_KEYS = [
@@ -71,6 +72,7 @@ const GAME_SHAPE_KEYS = [
 ] as const satisfies readonly (keyof GameShape)[]
 const BOOLEAN_KEYS = new Set<string>([
   "first_player_known",
+  "tab_enabled",
   "seat_out",
   "commander_damage_used",
   "counters_used",
@@ -83,6 +85,7 @@ const NUMBER_KEYS = new Set<string>([
   "open_count",
   ...GAME_SHAPE_NUMBER_KEYS,
   "attempt_count",
+  "pass_count",
   ...LATENCY_KEYS,
   ...SCAN_COUNT_KEYS,
 ])
@@ -133,6 +136,13 @@ type Events = {
   rules_search: { system: string; result_count: number; top_results: string; query?: string }
   rules_opened: { system: string; rank: number; open_count: number }
   keyword_viewed: { system: string; rule: string }
+  turn_tab_game_ended: {
+    tab_enabled: boolean
+    pass_count: number
+    player_count: number
+    mode: "local" | "connected"
+    hide_offer: (typeof values.hide_offer)[number]
+  }
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -160,6 +170,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   rules_search: ["system", "result_count", "top_results", "query"],
   rules_opened: ["system", "rank", "open_count"],
   keyword_viewed: ["system", "rule"],
+  turn_tab_game_ended: ["tab_enabled", "pass_count", "player_count", "mode", "hide_offer"],
 }
 
 const RULE_ID = /^\d{1,3}(\.\d{1,3}){0,2}[a-z]{0,2}$/

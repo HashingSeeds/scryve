@@ -99,6 +99,7 @@ import {
   isValidTableSnapshot,
   remapTableState,
   seatTable,
+  TABLE_VERSION,
   tableActionIdentity,
   tableForVersion,
   tableStateValidator,
@@ -2014,7 +2015,8 @@ export const lobbyProjection = query({
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
       ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
-      ...(tableRulesApply(gameTableRules(game))
+      ...(tableRulesApply(gameTableRules(game)) ||
+      (game.turn && (args.tableVersion ?? 1) >= TABLE_VERSION)
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
     }
@@ -2071,6 +2073,7 @@ function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): Tab
   return {
     designations: game.designations ?? {},
     players: Object.fromEntries(players.map((player) => [player._id, seatTable(player)])),
+    ...(game.turn ? { turn: game.turn } : {}),
   }
 }
 

@@ -53,6 +53,7 @@ export function applyGameChanges(game: MemoryGame, changes: readonly GameChange[
       if (claim) game.claims.set(change.operationId, { ...claim, ...change.patch })
     } else if (change.kind === "pair.put")
       game.pairs.set(pairKey(change), { total: change.total, updatedAt: change.updatedAt })
+    else if (change.kind === "turn.set") game.turn = change.turn
     else game.designations = change.designations
   }
 }
