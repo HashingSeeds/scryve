@@ -102,6 +102,9 @@ export default {
     evenGrid: "균등 격자",
     table: "테이블",
   },
+  teams: {
+    name: "{{first}} & {{second}}",
+  },
   seats: {
     title: "자리 바꾸기",
     seat: "{{name}}님의 자리",

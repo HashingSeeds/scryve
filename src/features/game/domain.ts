@@ -57,7 +57,7 @@ import {
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
 import {
   commanderOutState,
-  lastStanding,
+  standingWinners,
   outReason,
   type OutState,
 } from "../../../convex/lib/outReason"
@@ -427,6 +427,7 @@ export function localOutState(game: LocalGame): OutState<PlayerId> {
         ),
       ),
     ),
+    ...(game.turnGroups ? { groups: game.turnGroups } : {}),
   }
 }
 
@@ -543,8 +544,8 @@ function applyBoardTableAction(
   }
 }
 
-export function lastPlayerStanding(game: LocalGame) {
-  return lastStanding(localOutState(game))
+export function localStandingWinners(game: LocalGame) {
+  return standingWinners(localOutState(game))
 }
 
 type CompensatableEvent = LifeChangedEvent | CommanderDamageAssignedEvent

@@ -37,7 +37,7 @@ import {
 } from "@/features/connected/boardSyncSignal"
 import {
   connectedBoardView,
-  connectedLastStanding,
+  connectedStandingWinners,
   connectedLives,
   connectedOutState,
   projectionOutState,
@@ -76,6 +76,7 @@ import {
   playCommanderLethal,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
+import { teamChoices, teamMembers, teamName, teamValueLabel } from "@/features/game/teams"
 import {
   HideTurnsDialog,
   reportTurnsGame,
@@ -726,10 +727,18 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     setHideOffer(false)
     leaveFinished()
   }
+  const named = game.players.map(({ playerId, displayName }) => ({
+    id: playerId,
+    name: displayName,
+  }))
+  // why: a team wins together, so choosing it chooses every seat in it.
   function toggleWinner(playerId: string) {
     setDrawSelected(false)
+    const team = teamMembers(named, turnGroups, playerId).map(({ id }) => id)
     setWinnerPlayerIds((current) =>
-      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
+      current.includes(playerId)
+        ? current.filter((id) => !team.includes(id))
+        : [...current, ...team],
     )
   }
 
@@ -935,10 +944,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               const projection = runtime.status === "ready" ? runtime.projection : undefined
               const outcome = projection?.treacheryOutcome
               const standing =
-                projection && !outcome ? connectedLastStanding(projection) : undefined
+                projection && !outcome ? connectedStandingWinners(projection) : undefined
               setDrawSelected(outcome?.kind === "draw")
               setWinnerPlayerIds(
-                outcome?.kind === "win" ? outcome.winnerPlayerIds : standing ? [standing] : [],
+                outcome?.kind === "win" ? outcome.winnerPlayerIds : (standing ?? []),
               )
               setConfirmingFinish(true)
             },
@@ -995,7 +1004,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       passerId: actingSeat,
       message: translate("board:turn.passed", {
         number: turn.number + 1,
-        name: turnSeats.find(({ playerId }) => playerId === next)?.name ?? "",
+        name: teamName(named, turnGroups, next) ?? "",
       }),
     })
   }
@@ -1005,7 +1014,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       ? {
           turn,
           canPress: myTurn,
-          nameOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId)?.name,
+          nameOf: (playerId) => teamName(named, turnGroups, playerId),
           onStart: () => actingSeat && table?.startTurn(actingSeat),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
@@ -1408,15 +1417,20 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             <Text size="xs" tx="connected:board.finish.subtitle" tone="dim" />
           </View>
           <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
-            {game.players.map((player) => (
-              <WinnerChoice
-                key={player.playerId}
-                player={player}
-                system={system}
-                selected={winnerPlayerIds.includes(player.playerId)}
-                onPress={() => toggleWinner(player.playerId)}
-              />
-            ))}
+            {teamChoices(named, turnGroups).map(({ id }) => {
+              const player = game.players.find(({ playerId }) => playerId === id)!
+              return (
+                <WinnerChoice
+                  key={id}
+                  player={player}
+                  name={teamName(named, turnGroups, id) ?? player.displayName}
+                  members={teamMembers(named, turnGroups, id).map((member) => member.id)}
+                  system={system}
+                  selected={winnerPlayerIds.includes(id)}
+                  onPress={() => toggleWinner(id)}
+                />
+              )
+            })}
             <ChoiceButton
               tx="connected:board.finish.draw"
               accentColor={colors.palette.neutral400}
@@ -1613,19 +1627,29 @@ function ConnectedLifeGrid({
 
 function WinnerChoice({
   player,
+  name,
+  members,
   system,
   selected,
   onPress,
 }: {
   player: ConnectedBoardSeat
+  name: string
+  members: readonly string[]
   system: ConnectedBoardView["system"]
   selected: boolean
   onPress: () => void
 }) {
-  const life = counterValueLabel(system, useContext(ConnectedLivesContext)[player.playerId] ?? 0)
+  const lives = useContext(ConnectedLivesContext)
+  const life = teamValueLabel(
+    members.map((id) => ({ id, life: lives[id] ?? 0 })),
+    [members],
+    members[0],
+    (value) => counterValueLabel(system, value),
+  )
   return (
     <ChoiceButton
-      text={player.displayName}
+      text={name}
       detail={life}
       accentColor={player.color}
       Leading={({ color }) => (
@@ -1639,7 +1663,7 @@ function WinnerChoice({
       )}
       accessibilityLabel={translate(
         selected ? "connected:board.finish.winnerOption" : "connected:board.finish.playerOption",
-        { name: player.displayName, life },
+        { name, life },
       )}
       selected={selected}
       onPress={onPress}

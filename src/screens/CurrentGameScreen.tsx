@@ -39,6 +39,7 @@ import { localGameRepository, type LocalGameRepository } from "@/features/game/l
 import { playCommanderLethal } from "@/features/game/playSystems"
 import { stepRoundTurn } from "@/features/game/roundClock"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
+import { teamName } from "@/features/game/teams"
 import {
   HideTurnsDialog,
   reportTurnsGame,
@@ -301,8 +302,9 @@ export function CurrentGameScreen({
     shape: player.shape,
   }))
   const { passTurn, setTurn, undoTurn, setBank, startTurn, changeClock } = runtime
-  const nameOf = (playerId: string) => runtime.game.players.find(({ id }) => id === playerId)?.name
   const { turnGroups } = runtime.game
+  // why: a turn shared by a team is named for the team, in the chip, the pass toast, and the log.
+  const nameOf = (playerId: string) => teamName(runtime.game.players, turnGroups, playerId)
   function nextOf(clockwiseSlots: number[]) {
     if (!turn) return undefined
     const { players, seatOrder } = runtime.game
@@ -611,6 +613,7 @@ export function CurrentGameScreen({
           players={runtime.game.players}
           events={events}
           turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
+          groups={turnGroups}
           canUndo={runtime.canUndo}
           origin={chrome.dialogOrigin}
           onUndo={runtime.undo}

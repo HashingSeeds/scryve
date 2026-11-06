@@ -103,6 +103,9 @@ export default {
     evenGrid: "均等グリッド",
     table: "テーブル",
   },
+  teams: {
+    name: "{{first}}と{{second}}",
+  },
   seats: {
     title: "席を入れ替え",
     seat: "{{name}}の席",

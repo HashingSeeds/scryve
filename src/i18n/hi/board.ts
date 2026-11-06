@@ -103,6 +103,9 @@ export default {
     evenGrid: "समान ग्रिड",
     table: "टेबल",
   },
+  teams: {
+    name: "{{first}} और {{second}}",
+  },
   seats: {
     title: "सीट बदलें",
     seat: "{{name}} की सीट",

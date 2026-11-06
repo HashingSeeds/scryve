@@ -1,4 +1,4 @@
-import { lastStanding, outReason, type OutState } from "./outReason"
+import { isGroupOut, outReason, standingWinners, type OutState } from "./outReason"
 import { systemDefinition, tableRules } from "./systems"
 
 function commander(overrides: Partial<OutState> = {}): OutState {
@@ -66,6 +66,29 @@ describe("outReason", () => {
       ],
     }
     expect(outReason(state, "b")).toEqual({ cause: "life" })
-    expect(lastStanding(state)).toBe("a")
+    expect(standingWinners(state)).toEqual(["a"])
+  })
+})
+
+describe("groups", () => {
+  const lives = (values: Record<string, number>): OutState => ({
+    counter: systemDefinition("mtg")?.counter,
+    tableRules: tableRules("mtg", undefined),
+    lives: Object.entries(values).map(([playerId, life]) => ({ playerId, life })),
+    groups: [["boss"], ["ada", "bo", "cy"]],
+  })
+
+  it("puts a group out only once every seat in it is out", () => {
+    const state = lives({ boss: 20, ada: 0, bo: 0, cy: 3 })
+    expect(outReason(state, "ada")).toEqual({ cause: "life" })
+    expect(isGroupOut(state, "ada")).toBe(false)
+    expect(isGroupOut(lives({ boss: 20, ada: 0, bo: 0, cy: 0 }), "cy")).toBe(true)
+    expect(isGroupOut(state, "boss")).toBe(false)
+  })
+
+  it("names the last group standing as the winners, fallen teammates included", () => {
+    expect(standingWinners(lives({ boss: 0, ada: 0, bo: 4, cy: 9 }))).toEqual(["ada", "bo", "cy"])
+    expect(standingWinners(lives({ boss: 7, ada: 0, bo: 0, cy: 0 }))).toEqual(["boss"])
+    expect(standingWinners(lives({ boss: 7, ada: 0, bo: 1, cy: 0 }))).toBeUndefined()
   })
 })

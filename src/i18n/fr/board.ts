@@ -104,6 +104,9 @@ export default {
     evenGrid: "Grille égale",
     table: "Table",
   },
+  teams: {
+    name: "{{first}} & {{second}}",
+  },
   seats: {
     title: "Échanger les places",
     seat: "Place de {{name}}",

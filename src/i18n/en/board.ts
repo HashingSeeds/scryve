@@ -93,6 +93,10 @@ const board = {
     evenGrid: "Even grid",
     table: "Table",
   },
+  teams: {
+    // A team of players who share a turn, named by its players, as in "Ada & Grace" or "Ada, Grace & Kim".
+    name: "{{first}} & {{second}}",
+  },
   seats: {
     title: "Swap seats",
     seat: "{{name}}'s seat",

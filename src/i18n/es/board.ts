@@ -104,6 +104,9 @@ export default {
     evenGrid: "Cuadrícula uniforme",
     table: "Mesa",
   },
+  teams: {
+    name: "{{first}} y {{second}}",
+  },
   seats: {
     title: "Intercambiar asientos",
     seat: "Asiento de {{name}}",

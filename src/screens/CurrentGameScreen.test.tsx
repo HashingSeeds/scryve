@@ -357,6 +357,7 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("turn-chip-2"))
     fireEvent.press(view.getByTestId("turn-chip-2"))
     expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: katherine, number: 2 })
+    expect(view.getByTestId("turn-passed-toast")).toHaveTextContent(/^Turn 2, Katherine & Dorothy/)
     expect(view.queryByTestId("turn-chip-1")).toBeNull()
     expect(view.getByTestId("turn-chip-3")).toBeTruthy()
     expect(view.getByTestId("turn-chip-4")).toBeTruthy()
@@ -742,6 +743,36 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     expect(repository.loadHistory()).toEqual([])
+  })
+
+  it("offers a team as one winner choice and records every seat in it", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const four = game(4)
+    const [ada, grace, katherine, dorothy] = four.players.map(({ id }) => id)
+    const initial = {
+      ...four,
+      turnGroups: [
+        [ada, grace],
+        [katherine, dorothy],
+      ],
+    }
+    repository.saveActiveGame(initial)
+    const view = renderGame(initial, repository)
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    expect(view.queryByTestId("end-game-winner-1")).toBeNull()
+    expect(view.queryByTestId("end-game-winner-3")).toBeNull()
+    fireEvent.press(view.getByTestId("end-game-winner-2"))
+    expect(view.getByLabelText("Katherine & Dorothy, 2 life, winner")).toBeTruthy()
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    await waitFor(() => {
+      expect(repository.loadHistory()[0]).toMatchObject({
+        result: { kind: "win", winnerPlayerIds: [katherine, dorothy] },
+        turnGroups: initial.turnGroups,
+      })
+    })
   })
 
   it("records the winner the host picks before ending the game", async () => {
