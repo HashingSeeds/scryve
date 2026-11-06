@@ -58,16 +58,21 @@ function source(eventView: EventView): EventSource {
   }
 }
 
+// why: the row list draws nothing until it knows its size, which only a device's layout pass reports.
 function renderEvent(events: EventSource) {
-  return render(
+  const rendered = render(
     <ThemeProvider initialContext="dark">
       <EventScreen source={events} onBack={jest.fn()} onRemoved={jest.fn()} />
     </ThemeProvider>,
   )
+  const rows = screen.queryByTestId("event-rows")
+  if (rows)
+    fireEvent(rows, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 844 } } })
+  return rendered
 }
 
 describe("EventScreen", () => {
-  it("mounts a screenful of a big event's rows instead of all of them", () => {
+  it("mounts a screenful of a big event's rows instead of all of them", async () => {
     const players = Array.from({ length: 96 }, (_, index) => ({
       id: `p${index}`,
       name: `Player ${index}`,
@@ -103,10 +108,10 @@ describe("EventScreen", () => {
     renderEvent(events)
     const mounted = (pattern: RegExp) => screen.queryAllByTestId(pattern).length
 
-    expect(mounted(/^table-\d+$/)).toBeGreaterThan(0)
+    await waitFor(() => expect(mounted(/^table-\d+$/)).toBeGreaterThan(0))
     expect(mounted(/^table-\d+$/)).toBeLessThan(40)
     fireEvent.press(screen.getByText("Standings"))
-    expect(mounted(/^standing-p\d+$/)).toBeGreaterThan(0)
+    await waitFor(() => expect(mounted(/^standing-p\d+$/)).toBeGreaterThan(0))
     expect(mounted(/^standing-p\d+$/)).toBeLessThan(40)
   })
 
