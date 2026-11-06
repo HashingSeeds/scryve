@@ -70,7 +70,7 @@ describe("Planechase and Archenemy games", () => {
   })
 
   it("starts the chosen archenemy at 40, first, alone against one team", async () => {
-    const { host } = await archenemyGame(4)
+    const { t, host } = await archenemyGame(4)
     const view = await host.query(api.games.lobbyProjection, {
       publicId,
       tableVersion: TABLE_VERSION,
@@ -82,8 +82,9 @@ describe("Planechase and Archenemy games", () => {
       [first.playerId, ...team.map((player) => player.playerId)],
     ])
     expect(view.table?.turn).toMatchObject({ playerId: archenemy.playerId, waiting: true })
-    expect(view.table?.modes?.archenemy?.order).toHaveLength(20)
-    expect(view.table?.modes?.planechase?.order).toHaveLength(10)
+    const authority = (await t.run((ctx) => ctx.db.query("games").first()))!.modes!
+    expect(authority.archenemy?.order).toHaveLength(20)
+    expect(authority.planechase?.order).toHaveLength(10)
     const older = await host.query(api.games.lobbyProjection, { publicId, tableVersion: 3 })
     expect(older.table?.modes).toBeUndefined()
   })
@@ -116,5 +117,49 @@ describe("Planechase and Archenemy games", () => {
     const after = await host.query(api.games.lobbyProjection, { publicId, tableVersion: 4 })
     expect(after.table?.modes?.log?.map((entry) => entry.kind)).toEqual(["revealed", "rolled"])
     expect(after.table?.turn?.waiting).toBeUndefined()
+  })
+
+  it("never sends a client a face-down plane or scheme", async () => {
+    const { t, host, joiners } = await archenemyGame(4)
+    const view = await host.query(api.games.lobbyProjection, { publicId, tableVersion: 4 })
+    const archenemyId = view.players[1].playerId
+    for (const [index, kind] of (
+      ["scheme.revealed", "scheme.revealed", "planar.walked"] as const
+    ).entries())
+      await joiners[0].mutation(api.games.tableAction, {
+        publicId,
+        operationId: `operation-hidden-${index}0000000`,
+        deviceId: "device-joiner-2",
+        clientCreatedAt: 1_700_000_000_000,
+        action: { kind, playerId: archenemyId },
+      })
+    const authority = (await t.run((ctx) => ctx.db.query("games").first()))!.modes!
+    const revealedEver = (kind: "walked" | "revealed") =>
+      new Set((authority.log ?? []).flatMap((entry) => (entry.kind === kind ? [entry.card] : [])))
+    const walked = revealedEver("walked")
+    const revealed = revealedEver("revealed")
+    const facedown = {
+      planar: new Set(authority.planechase!.order!.slice(1).filter((card) => !walked.has(card))),
+      scheme: new Set(authority.archenemy!.order!.filter((card) => !revealed.has(card))),
+    }
+    expect(facedown.scheme.size).toBeGreaterThan(0)
+    for (const client of [host, ...joiners]) {
+      const { table } = await client.query(api.games.lobbyProjection, { publicId, tableVersion: 4 })
+      const modes = table!.modes!
+      expect(JSON.stringify(modes)).not.toContain("order")
+      const log = modes.log ?? []
+      const planar = [
+        modes.planechase!.faceUp,
+        ...log.filter((entry) => entry.kind === "walked").map((entry) => entry.card),
+      ]
+      const scheme = [
+        modes.archenemy!.shown,
+        ...(modes.archenemy!.ongoing ?? []),
+        ...log.filter((entry) => entry.kind === "revealed").map((entry) => entry.card),
+      ]
+      expect(planar.filter((card) => card !== undefined && facedown.planar.has(card))).toEqual([])
+      expect(scheme.filter((card) => card !== undefined && facedown.scheme.has(card))).toEqual([])
+      expect(modes.planechase!.faceUp).toBe(authority.planechase!.order![0])
+    }
   })
 })

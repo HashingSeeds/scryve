@@ -127,6 +127,39 @@ export function getPlayerGridFacings(
   return [...new Set(facings.filter((facing) => acrossBoard(facing) === keepAcross))]
 }
 
+export interface SeamNeighbor {
+  slot: number
+  leftFraction: number
+  rightFraction: number
+}
+
+export type SeamSide = { upper?: SeamNeighbor; lower?: SeamNeighbor }
+
+/** why: the menu's seam is where Planechase and Archenemy plates sit, and what may sit there depends on the cards that touch it on each side of the pentagon. */
+export function getMenuSeamNeighbors(
+  playerCount: number,
+  layout: ReturnType<typeof getPlayerGridLayout>,
+): { left: SeamSide; right: SeamSide } {
+  const rows = getPlayerGridRows(playerCount, layout)
+  const junction = getFourCardMenuJunction(rows)
+  const boundary = junction?.boundary ?? getCentralMenuBoundary(rows, layout)
+  const anchorX = getPlayerGridMenuAnchor(playerCount, layout).x
+  const neighbor = (row: (number | null)[] | undefined, side: "left" | "right") => {
+    if (!row) return undefined
+    const column =
+      side === "left" ? Math.ceil(anchorX * row.length) - 1 : Math.floor(anchorX * row.length)
+    const slot = row[Math.min(Math.max(column, 0), row.length - 1)]
+    if (slot === null || slot === undefined) return undefined
+    const index = row.indexOf(slot)
+    return { slot, leftFraction: index / row.length, rightFraction: (index + 1) / row.length }
+  }
+  const sideOf = (side: "left" | "right"): SeamSide => ({
+    upper: neighbor(rows[boundary - 1], side),
+    lower: neighbor(rows[boundary], side),
+  })
+  return { left: sideOf("left"), right: sideOf("right") }
+}
+
 /** why: the seam's plates turn toward one seat, so they need each slot's own facing, indexed by slot. */
 export function getPlayerSlotFacings(
   playerCount: number,

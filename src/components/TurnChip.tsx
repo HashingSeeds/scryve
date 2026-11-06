@@ -87,6 +87,8 @@ export function TurnChipLayer({
   const run = Math.abs(rotation) === 90 ? cardSize.height : cardSize.width
   const insets = contentInsetsFor(rotation, contentInsets)
   const left = turnChipLeft({ run, width, rotation, menuCorner, menuEdgeCenter })
+  // why: with the pentagon centered on this edge the chip has only half the edge, so a mode's control moves to the seam instead (seamPlan's dieOnSeam).
+  const beside = menuEdgeCenter === CONTENT_EDGES[rotation].top ? undefined : state.beside
   return (
     <View
       testID={`turn-chip-layer-seat-${seatNumber}`}
@@ -98,9 +100,9 @@ export function TurnChipLayer({
         onLayout={({ nativeEvent: { layout } }) => setWidth(layout.width)}
         style={[$slot, { top: EDGE_GAP + insets.top, left }, width === 0 && $measuring]}
       >
-        {state.beside ? (
+        {beside ? (
           <View pointerEvents="box-none" style={$beside}>
-            {state.beside}
+            {beside}
             <TurnChip
               state={state}
               seatNumber={seatNumber}

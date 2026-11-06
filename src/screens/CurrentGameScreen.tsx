@@ -58,7 +58,6 @@ import type {
 } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { useLocalGame } from "@/features/game/useLocalGame"
-import { usePlanarPlacement } from "@/features/modes/modeCards"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { modeSeamFor } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
@@ -352,8 +351,8 @@ export function CurrentGameScreen({
     controls: () => true,
     act: runtime.tableRuntime.modeAction,
   })
-  const planarPlacement = usePlanarPlacement()
-  const dieOnChip = planarPlacement === "chip" && turnsOn && !!turn && !!boardModes.planar
+  // why: the turn chip's spot is kept clear of every seat's marks and controls, so the die rides there whenever turns show.
+  const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -363,9 +362,6 @@ export function CurrentGameScreen({
           onStart: () => startTurn(turn.playerId),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
-          ...(dieOnChip && boardModes.planar
-            ? { beside: <PlanarDieButton planar={boardModes.planar} testID="planar-die-chip" /> }
-            : {}),
         }
       : undefined
   const slotOf = (playerId: string) => {
@@ -394,7 +390,26 @@ export function CurrentGameScreen({
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
-        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+        return [
+          ...chips.filter(({ kind }) => kind === "roll"),
+          {
+            kind: "turn",
+            state:
+              dieOnChip && boardModes.planar
+                ? {
+                    ...turnChip,
+                    beside: (
+                      <PlanarDieButton
+                        planar={boardModes.planar}
+                        seat={player.id}
+                        size={36}
+                        testID={`planar-die-chip-${player.id}`}
+                      />
+                    ),
+                  }
+                : turnChip,
+          },
+        ]
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -491,7 +506,7 @@ export function CurrentGameScreen({
           turns={
             turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
           }
-          seam={modeSeamFor(boardModes, { dieOnSeam: !dieOnChip, slotOf })}
+          seam={modeSeamFor(boardModes, { dieOnChip, slotOf })}
           toast={
             saved ? (
               <GameToast

@@ -16,7 +16,7 @@ import {
   type PlanarFace,
   type TableModes,
 } from "../../../convex/lib/tableModes"
-import type { Turn, TurnGroups } from "../../../convex/lib/turns"
+import { turnGroupOf, type Turn, type TurnGroups } from "../../../convex/lib/turns"
 
 export interface BoardModesInput {
   modes: TableModes | undefined
@@ -27,14 +27,18 @@ export interface BoardModesInput {
   act: (action: ModeAction) => boolean
 }
 
-export interface PlanarView {
+export interface PlanarDie {
+  cost: number
+  canRoll: boolean
+  roll: () => void
+}
+
+export interface PlanarView extends PlanarDie {
   card?: ModeCard
   phenomenon: boolean
-  cost: number
   roller?: string
-  activeId?: string
+  dieFor: (seat: string) => PlanarDie
   lastRoll?: { face: PlanarFace; at: number }
-  roll: () => void
   walk: () => void
   reset: () => void
   manualReset: boolean
@@ -79,18 +83,22 @@ export function useBoardModes({ modes, turn, groups, players, controls, act }: B
   const log = modes?.log ?? []
   const lastRolled = [...log].reverse().find((entry) => entry.kind === "rolled")
 
+  const phenomenon = faceUpPlane(planechase)?.kind === "phenomenon"
+  const dieFor = (seat: string | undefined): PlanarDie => ({
+    cost: planechase && seat ? rollCost(planechase, turn, seat) : 0,
+    canRoll: !!seat && controls(seat) && mayRoll(turn, groups, seat) && !phenomenon,
+    roll: () => {
+      if (seat) act({ kind: "planar.rolled", playerId: seat, face: PLANAR_DIE[randomIndex(6)] })
+    },
+  })
   const planar: PlanarView | undefined = planechase
     ? {
+        ...dieFor(roller ?? lastRolled?.playerId),
         card: faceUpPlane(planechase),
-        phenomenon: faceUpPlane(planechase)?.kind === "phenomenon",
-        cost: rollCost(planechase, turn, roller ?? lastRolled?.playerId ?? ""),
+        phenomenon,
         roller,
-        activeId: turn?.playerId,
+        dieFor,
         lastRoll: lastRolled?.face ? { face: lastRolled.face, at: lastRolled.at } : undefined,
-        roll: () => {
-          if (roller)
-            act({ kind: "planar.rolled", playerId: roller, face: PLANAR_DIE[randomIndex(6)] })
-        },
         walk: () => {
           if (actor) act({ kind: "planar.walked", playerId: actor })
         },
@@ -130,7 +138,7 @@ export function useBoardModes({ modes, turn, groups, players, controls, act }: B
   return {
     planar,
     scheme,
-    activeId: turn?.playerId,
+    activeGroup: turn ? turnGroupOf(groups, turn.playerId) : [],
     log: rows,
     nameOf,
     dialog,

@@ -112,6 +112,7 @@ import {
   isValidModeSetup,
   modeSetupValidator,
   PLANECHASE_CAPABILITY,
+  revealedModes,
   modeGameFields,
   startModes,
   systemPlaysModeSetup,
@@ -2104,7 +2105,7 @@ function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): Tab
     players: Object.fromEntries(players.map((player) => [player._id, seatTable(player)])),
     ...(game.turn ? { turn: game.turn } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
-    ...(game.modes ? { modes: game.modes } : {}),
+    ...(game.modes ? { modes: revealedModes(game.modes) } : {}),
   }
 }
 

@@ -87,7 +87,6 @@ import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
-import { usePlanarPlacement } from "@/features/modes/modeCards"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { modeSeamFor } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
@@ -1016,8 +1015,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     controls: (playerId) => controlled.has(playerId),
     act: (action) => table?.modeAction(action) ?? false,
   })
-  const planarPlacement = usePlanarPlacement()
-  const dieOnChip = planarPlacement === "chip" && turnsOn && !!turn && !!boardModes.planar
+  // why: the turn chip's spot is kept clear of every seat's marks and controls, so the die rides there whenever turns show.
+  const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -1027,9 +1026,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onStart: () => actingSeat && table?.startTurn(actingSeat),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
-          ...(dieOnChip && boardModes.planar && myTurn
-            ? { beside: <PlanarDieButton planar={boardModes.planar} testID="planar-die-chip" /> }
-            : {}),
         }
       : undefined
   // why: with turns on and nobody holding the first turn, each of this device's seats carries an empty 1st that takes it.
@@ -1038,7 +1034,26 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
-        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+        return [
+          ...chips.filter(({ kind }) => kind === "roll"),
+          {
+            kind: "turn",
+            state:
+              dieOnChip && boardModes.planar
+                ? {
+                    ...turnChip,
+                    beside: (
+                      <PlanarDieButton
+                        planar={boardModes.planar}
+                        seat={player.id}
+                        size={36}
+                        testID={`planar-die-chip-${player.id}`}
+                      />
+                    ),
+                  }
+                : turnChip,
+          },
+        ]
       return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -1105,7 +1120,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             : undefined
         }
         seam={modeSeamFor(boardModes, {
-          dieOnSeam: !dieOnChip,
+          dieOnChip,
           slotOf: (playerId) => {
             const slot = players.findIndex(({ id }) => id === playerId)
             return slot < 0 ? undefined : slot

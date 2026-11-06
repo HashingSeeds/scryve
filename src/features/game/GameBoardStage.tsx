@@ -12,6 +12,7 @@ import {
 } from "@/components/FirstPlayerTabs"
 import {
   ANCHOR_LOW_ON_SCREEN,
+  COMPACT_MENU_BUTTON_SIZE,
   GameMenuBackdrop,
   GameMenuCluster,
   GameRadialMenu,
@@ -24,7 +25,11 @@ import {
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
-import { getPlayerGridRows, getPlayerSlotFacings } from "@/components/playerGridGeometry"
+import {
+  getMenuSeamNeighbors,
+  getPlayerGridRows,
+  getPlayerSlotFacings,
+} from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
@@ -76,6 +81,9 @@ export interface BoardSeamGeometry {
   anchor: { x: number; y: number }
   facings: readonly number[]
   edgeTabs: boolean
+  sides: ReturnType<typeof getMenuSeamNeighbors>
+  width: number
+  menuSize: number
 }
 
 export interface BoardSize {
@@ -165,7 +173,14 @@ function PinnedGameBoardStage({
               </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
             {seam && !menu.open
-              ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown })
+              ? seam({
+                  anchor: boardAnchor,
+                  facings,
+                  edgeTabs: tabsShown,
+                  sides: getMenuSeamNeighbors(playerCount, gridLayout),
+                  width,
+                  menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+                })
               : null}
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
@@ -248,7 +263,14 @@ function LegacyGameBoardStage({
         </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
       {seam && !menu.open && rotation === 0
-        ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown })
+        ? seam({
+                  anchor: boardAnchor,
+                  facings,
+                  edgeTabs: tabsShown,
+                  sides: getMenuSeamNeighbors(playerCount, gridLayout),
+                  width,
+                  menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+                })
         : null}
       <GameRadialMenu
         {...menu}

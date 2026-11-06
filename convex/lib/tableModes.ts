@@ -48,6 +48,8 @@ export type ModeLogEntry = Infer<typeof modeLogValidator>
 export const planechaseValidator = v.object({
   decks: v.optional(v.array(v.string())),
   order: v.optional(v.array(v.number())),
+  /** why: clients get the face-up plane instead of `order`, which only the authority holds. */
+  faceUp: v.optional(v.number()),
   rolls: v.record(v.string(), v.number()),
   rollsTurn: v.optional(v.number()),
 })
@@ -114,7 +116,7 @@ export function schemeCards(deck: string | undefined): readonly ModeCard[] {
 }
 
 export function faceUpPlane(planechase: Planechase | undefined) {
-  const index = planechase?.order?.[0]
+  const index = planechase?.order?.[0] ?? planechase?.faceUp
   return index === undefined ? undefined : planarCards(planechase?.decks)[index]
 }
 
@@ -264,7 +266,7 @@ export function applyModeAction(
           archenemy: {
             ...archenemy,
             ongoing: archenemy.ongoing.filter((card) => card !== action.card),
-            order: [...(archenemy.order ?? []), action.card],
+            ...(archenemy.order ? { order: [...archenemy.order, action.card] } : {}),
           },
         },
         { kind: "abandoned", playerId, at, card: action.card },
@@ -272,8 +274,9 @@ export function applyModeAction(
     }
     const revealedTurn = context.turn ? { revealedTurn: context.turn.number } : {}
     const [top, ...rest] = archenemy.order ?? []
+    // why: a client's projection has no order, so it logs the reveal and the authority's answer names the scheme.
     if (top === undefined)
-      return archenemy.deck
+      return archenemy.order?.length === 0
         ? null
         : logged(
             { ...modes, archenemy: { ...archenemy, ...revealedTurn } },
@@ -364,6 +367,32 @@ export function isValidModes(modes: TableModes, playerIds: ReadonlySet<string>) 
     (modes.archenemy === undefined || isValidArchenemy(modes.archenemy, playerIds)) &&
     (modes.log ?? []).every((entry) => playerIds.has(entry.playerId))
   )
+}
+
+/**
+ * why: every device but the authority gets this, so no client can read an unrevealed plane or
+ * scheme off the wire. It keeps the face-up plane, the revealed and ongoing schemes, and the log,
+ * whose cards were all revealed when logged; deck sizes come from the catalog.
+ */
+export function revealedModes(modes: TableModes): TableModes {
+  const { planechase, archenemy } = modes
+  const faceUp = planechase?.order?.[0]
+  return {
+    ...modes,
+    ...(planechase
+      ? {
+          planechase: {
+            ...withoutOrder(planechase),
+            ...(faceUp === undefined ? {} : { faceUp }),
+          },
+        }
+      : {}),
+    ...(archenemy ? { archenemy: withoutOrder(archenemy) } : {}),
+  }
+}
+
+function withoutOrder<Deck extends { order?: number[] }>({ order: _hidden, ...shown }: Deck) {
+  return shown
 }
 
 export function remapModes(modes: TableModes, idOf: (playerId: string) => string): TableModes {

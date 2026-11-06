@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react"
-
 import { translate } from "@/i18n/translate"
 
 import type { ModeCard } from "../../../convex/lib/modeDecks"
@@ -43,26 +41,4 @@ export function modeLogText(
     case "abandoned":
       return translate("board:scheme.abandoned", { name, scheme: scheme ?? "" })
   }
-}
-
-export type PlanarPlacement = "seam" | "chip"
-
-let placement: PlanarPlacement = "seam"
-const listeners = new Set<() => void>()
-
-/** why: a prototype switch so both die placements can be compared on one build; the dev seed sets it. */
-export function setPlanarPlacement(next: PlanarPlacement) {
-  placement = next
-  for (const listener of listeners) listener()
-}
-
-export function usePlanarPlacement() {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    () => placement,
-    () => placement,
-  )
 }

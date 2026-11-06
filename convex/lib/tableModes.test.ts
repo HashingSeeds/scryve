@@ -2,6 +2,7 @@ import { PLANAR_DECKS, SCHEME_DECKS } from "./modeDecks"
 import {
   applyModeAction,
   faceUpPlane,
+  revealedModes,
   rollCost,
   schemeCards,
   startModes,
@@ -160,5 +161,36 @@ describe("Archenemy", () => {
     const revealed = play(own, [[reveal, turn("ada", 1)]])!
     expect(revealed.log).toEqual([{ kind: "revealed", playerId: "ada", at: 1 }])
     expect(revealed.archenemy?.revealedTurn).toBe(1)
+  })
+})
+
+describe("revealedModes", () => {
+  const { modes } = startModes(
+    {
+      planechase: { decks: [deckWithPhenomenon.id] },
+      archenemy: { seat: 1, deck: "e01-archenemy-nicol-bolas" },
+    },
+    ["ada", "bo", "cy"],
+  )
+
+  it("keeps the face-up plane and drops both deck orders", () => {
+    const shown = revealedModes(modes!)
+    expect(shown.planechase).toEqual({
+      decks: [deckWithPhenomenon.id],
+      faceUp: modes!.planechase!.order![0],
+      rolls: {},
+    })
+    expect(shown.archenemy).toEqual({ playerId: "ada", deck: "e01-archenemy-nicol-bolas" })
+    expect(faceUpPlane(shown.planechase)).toBe(faceUpPlane(modes!.planechase))
+  })
+
+  it("still lets a client log a reveal or a planeswalk it can't see yet", () => {
+    const shown = revealedModes(modes!)
+    const at = turn("ada", 1)
+    const revealed = play(shown, [[{ kind: "scheme.revealed", playerId: "ada" }, at]])!
+    expect(revealed.log).toEqual([{ kind: "revealed", playerId: "ada", at: 1 }])
+    const walked = play(shown, [[{ kind: "planar.walked", playerId: "ada" }, at]])!
+    expect(walked.log).toEqual([{ kind: "walked", playerId: "ada", at: 1 }])
+    expect(walked.planechase).toEqual(shown.planechase)
   })
 })

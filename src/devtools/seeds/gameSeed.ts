@@ -25,7 +25,6 @@ import {
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
-import { setPlanarPlacement } from "@/features/modes/modeCards"
 
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
@@ -152,9 +151,8 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   return game
 }
 
-/** why: planechase=<deck id>|own, archenemy=<seat>|roll, schemes=<deck id>|own, planar=seam|chip. Decks are in convex/lib/modeDecks.ts. */
+/** why: planechase=<deck id>|own, archenemy=<seat>|roll, schemes=<deck id>|own. Decks are in convex/lib/modeDecks.ts. */
 function modeSetupOf(params: SeedParams, playerCount: number) {
-  if (params.planar === "seam" || params.planar === "chip") setPlanarPlacement(params.planar)
   const planechase =
     params.planechase === undefined
       ? undefined

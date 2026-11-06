@@ -1,36 +1,59 @@
 import { ModeSeam } from "@/components/modes/ModeSeam"
 import type { BoardSeamGeometry } from "@/features/game/GameBoardStage"
 
+import { dieOnSeam, planSeam, seamRoom, type SeamItem } from "./seamPlan"
 import type { BoardModes } from "./useBoardModes"
 
-/** why: a plate reads right side up for the seat it faces; seats on the board's sides read it sideways, so it stays level for them. */
-const plateRotation = (facing: number | undefined) => (facing === 180 ? 180 : 0)
-/** why: the active seat's turn chip sits on its edge of the seam, so the plates lean into the other card. */
-const SEAM_SHIFT = 12
-const seamShift = (facing: number | undefined) =>
-  facing === 180 ? SEAM_SHIFT : facing === 0 ? -SEAM_SHIFT : 0
+const EDGE = 8
+/** why: clears the first-player and round clock tabs at the board's edges while they show. */
+const EDGE_WITH_TABS = 40
 
 export function modeSeamFor(
   modes: BoardModes,
-  { dieOnSeam, slotOf }: { dieOnSeam: boolean; slotOf: (playerId: string) => number | undefined },
+  { dieOnChip, slotOf }: { dieOnChip: boolean; slotOf: (playerId: string) => number | undefined },
 ) {
   const { planar, scheme } = modes
   if (!planar && !scheme) return undefined
-  return function renderSeam({ anchor, facings, edgeTabs }: BoardSeamGeometry) {
-    const facingOf = (playerId: string | undefined) => {
-      const slot = playerId === undefined ? undefined : slotOf(playerId)
-      return slot === undefined ? undefined : facings[slot]
+  return function renderSeam({
+    anchor,
+    facings,
+    edgeTabs,
+    sides,
+    width,
+    menuSize,
+  }: BoardSeamGeometry) {
+    const busySlots = new Set(
+      modes.activeGroup.flatMap((playerId) => {
+        const slot = slotOf(playerId)
+        return slot === undefined ? [] : [slot]
+      }),
+    )
+    const geometry = {
+      sides,
+      facings,
+      anchorX: anchor.x,
+      width,
+      menuSize,
+      edge: edgeTabs ? EDGE_WITH_TABS : EDGE,
     }
+    const items: SeamItem[] = [
+      ...(planar ? ["plane" as const] : []),
+      ...(planar && (!dieOnChip || dieOnSeam(geometry, busySlots)) ? ["die" as const] : []),
+      ...(scheme ? ["scheme" as const] : []),
+    ]
+    const plan = planSeam(
+      {
+        left: seamRoom(geometry, "left", busySlots),
+        right: seamRoom(geometry, "right", busySlots),
+      },
+      items,
+    )
     return (
       <ModeSeam
-        anchor={anchor}
-        shift={seamShift(facingOf(modes.activeId))}
-        edgeTabs={edgeTabs}
+        anchorY={anchor.y}
+        plan={plan}
         planar={planar}
         scheme={scheme}
-        dieOnSeam={dieOnSeam}
-        planeRotation={plateRotation(facingOf(planar?.activeId ?? planar?.roller))}
-        schemeRotation={plateRotation(facingOf(scheme?.archenemyId))}
         onOpen={modes.openDialog}
       />
     )
