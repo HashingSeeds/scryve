@@ -533,6 +533,7 @@ export function PlayerGrid({
                             commanders: strike?.commanders,
                             dealt: strike?.dealt,
                             takeBack: strike?.takeBack,
+                            applied: strike?.applied,
                             onPower: stable(`power:${player.id}`, (power: number, slot: number) =>
                               attack.dispatch({ type: "power", slot, power }),
                             ),

@@ -473,17 +473,32 @@ describe("LifeCard", () => {
     )
   })
 
-  it("previews where the next hit lands toward lethal, and shows nothing when a tap deals nothing", () => {
-    const view = render(defendingCard({ commanders: [{ power: 3, total: 6 }], dealt: 3 }))
+  it("fills earlier damage bright and grows this attack's hits as a faint stretch past it", () => {
+    const view = render(defendingCard({ commanders: [{ power: 3, total: 9, landed: 3 }] }))
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
       nativeEvent: { layout: { width: 193, height: 420 } },
     })
+    expect(arcSweep(view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" }))).toBeCloseTo(
+      6 / 21,
+    )
     expect(
       arcSweep(view.UNSAFE_getByProps({ testID: "commander-hit-preview-seat-2" })),
     ).toBeCloseTo(9 / 21)
 
-    view.rerender(defendingCard({ commanders: [{ power: 3, total: 21 }], dealt: 0 }))
+    view.rerender(defendingCard({ commanders: [{ power: 3, total: 9 }] }))
     expect(view.UNSAFE_queryAllByProps({ testID: "commander-hit-preview-seat-2" })).toHaveLength(0)
+  })
+
+  it("names the life a defender started the attack from, less what the attack has dealt", () => {
+    const view = render(defendingCard({ commanders: [{ power: 1, total: 6 }] }))
+    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent(/^$/)
+
+    view.rerender(defendingCard({ commanders: [{ power: 2, total: 10, landed: 4 }], applied: 4 }))
+    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("34 − 4")
+
+    // why: a connected attack holds its hits until Send, so the life shown is still the starting life.
+    view.rerender(defendingCard({ commanders: [{ power: 2, total: 10, landed: 4 }], applied: 0 }))
+    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("30 − 4")
   })
 
   it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {

@@ -87,6 +87,28 @@ describe("commander attack", () => {
     expect(board.view(grace).takeBack).toBe(0)
   })
 
+  it("counts what this attack's hits landed, apart from earlier damage, until the attack ends", () => {
+    const board = attack({ recorded: { [commanderDamageKey(ada, grace)]: 4 } })
+    board.run(press(ada), { type: "power", slot: 0, power: 3 }, hit(grace), hit(grace))
+    expect(board.view(grace).commanders[0]).toMatchObject({ total: 10, landed: 6 })
+
+    board.run(undo(grace))
+    expect(board.view(grace).commanders[0]).toMatchObject({ total: 7, landed: 3 })
+
+    board.run(send, press(ada))
+    expect(board.view(grace).commanders[0]).toMatchObject({ total: 7, landed: 0 })
+  })
+
+  it("reports a hit as already on the defender's life only when it commits as it lands", () => {
+    const local = attack()
+    local.run(press(ada), hit(grace), hit(grace))
+    expect(local.view(grace).applied).toBe(2)
+
+    const connected = attack({ buffered: true })
+    connected.run(press(ada), hit(grace), hit(grace))
+    expect(connected.view(grace)).toMatchObject({ applied: 0, commanders: [{ landed: 2 }] })
+  })
+
   it("never deals past the storage cap, whether it commits or stages", () => {
     const recorded = { [commanderDamageKey(ada, grace)]: 97 }
     const local = attack({ recorded, commanders: [{ power: 5 }] })
@@ -144,8 +166,8 @@ describe("commander attack", () => {
     board.run({ type: "power", slot: 0, power: -2 }, { type: "power", slot: 1, power: 7.6 })
     board.run(send, press(ada))
     expect(board.view(grace).commanders).toEqual([
-      { name: undefined, power: 0, total: 0 },
-      { name: undefined, power: 7, total: 0 },
+      { name: undefined, power: 0, total: 0, landed: 0 },
+      { name: undefined, power: 7, total: 0, landed: 0 },
     ])
 
     const lone = attack({ commanders: [{}] })

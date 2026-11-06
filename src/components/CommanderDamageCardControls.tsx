@@ -44,7 +44,8 @@ export type CommanderAttacker = {
   rotation?: LifeCardContentRotation
 }
 
-export type ArmedCommander = { name?: string; power: number; total: number }
+/** why: `landed` is the part of `total` dealt by this attack's hits so far; absent means none. */
+export type ArmedCommander = { name?: string; power: number; total: number; landed?: number }
 
 type AssignmentTarget = {
   kind: "target"
@@ -429,8 +430,8 @@ function DefenderControls({
   const discY = content.height / 2 + (takeover?.discOffset.y ?? 0)
   const ring = (disc + DISC_RING) * 2
   const lead = Math.max(...totals)
-  // why: the hit a tap would deal shows as a faint stretch of the arc ahead of the lead total; a tap that deals nothing shows none.
-  const next = dealt > 0 ? Math.max(...commanders.map(({ power, total }) => total + power)) : lead
+  // why: damage from before this attack fills the arc bright; this attack's hits grow a faint stretch past it until the attack ends.
+  const before = Math.max(...commanders.map(({ total, landed = 0 }) => total - landed))
 
   return (
     <>
@@ -456,8 +457,8 @@ function DefenderControls({
           <DamageArc
             seatNumber={seatNumber}
             size={ring}
-            fraction={Math.min(lead, mode.lethal) / mode.lethal}
-            ghost={Math.min(next, mode.lethal) / mode.lethal}
+            fraction={Math.min(before, mode.lethal) / mode.lethal}
+            ghost={Math.min(lead, mode.lethal) / mode.lethal}
             style={$centeredAt(discX - ring / 2, discY - ring / 2)}
           />
         ) : null}
@@ -645,7 +646,7 @@ function arcPath(center: number, radius: number, fraction: number) {
   return `M ${center} ${center - radius} A ${radius} ${radius} 0 ${large} 1 ${x} ${y}`
 }
 
-/** why: damage toward lethal reads as a red arc filling a faint full ring, clockwise from the top of the seat's own upright view. `ghost` reaches as far as the next hit would take it. */
+/** why: damage toward lethal reads as a red arc filling a faint full ring, clockwise from the top of the seat's own upright view. `fraction` is the damage from before this attack; `ghost` reaches as far as this attack has dealt. */
 function DamageArc({
   seatNumber,
   size,
