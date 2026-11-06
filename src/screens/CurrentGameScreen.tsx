@@ -24,6 +24,7 @@ import {
   hasLocalGameStarted,
   hasPlayBegun,
   incomingCommanderDamage,
+  isMatchInProgress,
   localOutState,
   matchContextLabel,
   matchScoreAfter,
@@ -488,14 +489,27 @@ export function CurrentGameScreen({
               <Text size="xs" text={drawsLabel(match.draws)} style={themed($dialogText)} />
             ) : null}
           </View>
-          <Button
-            testID="end-match-button"
-            tx="board:matchEnd.end"
-            disabled={match.gameNumber === 1 || hasLocalGameStarted(runtime.game)}
-            accessibilityHint={translate("board:match.endHint")}
-            style={themed($menuItem)}
-            onPress={openEndMatch}
-          />
+          {isMatchInProgress(runtime.game) ? (
+            <Button
+              testID="end-match-button"
+              tx="board:matchEnd.end"
+              disabled={match.gameNumber === 1 || hasLocalGameStarted(runtime.game)}
+              accessibilityHint={translate("board:match.endHint")}
+              style={themed($menuItem)}
+              onPress={openEndMatch}
+            />
+          ) : (
+            <Button
+              testID="leave-match-button"
+              tx="board:match.leave"
+              accessibilityHint={translate("board:match.leaveHint")}
+              style={themed($menuItem)}
+              onPress={() => {
+                setMatchOpen(false)
+                runtime.leaveMatch()
+              }}
+            />
+          )}
           <Button tx="common:close" style={themed($menuItem)} onPress={() => setMatchOpen(false)} />
         </DialogCard>
       ) : null}

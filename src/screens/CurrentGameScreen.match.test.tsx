@@ -260,6 +260,23 @@ describe("CurrentGameScreen match mode", () => {
     expect(repository.loadHistory().map((game) => game.id)).toEqual([initial.id])
   })
 
+  it("leaves the match from an unstarted first game and keeps the board as a single game", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(matchGame(1))
+    const { view, initial } = mount(repository)
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByLabelText("Game 1 · 0-0 · Best of 1"))
+
+    fireEvent.press(view.getByTestId("leave-match-button"))
+
+    expect(view.queryByTestId("match-dialog")).toBeNull()
+    expect(view.queryByTestId("match-context")).toBeNull()
+    const active = repository.loadActiveGame()!
+    expect(active.id).toBe(initial.id)
+    expect(active.match).toBeUndefined()
+    expect(repository.loadHistory()).toEqual([])
+  })
+
   it("holds the board at the tenth game until the match result is confirmed", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const first = matchGame(1)
