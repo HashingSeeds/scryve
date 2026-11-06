@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native"
+import { Dimensions, StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { PLAYER_COLORS } from "@/features/game/domain"
@@ -238,6 +238,28 @@ describe("LifeControls", () => {
       justifyContent: "flex-start",
       alignItems: "center",
     })
+  })
+
+  it("keeps the − centered beside a commander grid on a 4-player phone seat", () => {
+    const window = Dimensions.get("window")
+    Dimensions.set({ window: { ...window, fontScale: 1 } })
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeControls
+          playerName="Ada"
+          contentRotation={90}
+          obstacle={{ edge: "top", bounds: { x: 12, y: 12, width: 62, height: 62 } }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-control-zones"), "layout", {
+      nativeEvent: { layout: { width: 185, height: 404 } },
+    })
+    const style = StyleSheet.flatten(view.getByTestId("life-seat-1--1").props.style)
+    Dimensions.set({ window })
+    expect(style.paddingLeft).toBeUndefined()
+    expect(style.paddingRight).toBeUndefined()
   })
 })
 

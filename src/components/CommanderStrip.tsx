@@ -48,8 +48,8 @@ import { seatIdentityMetrics } from "./SeatIdentity"
 import { Text } from "./Text"
 import { targetSlop } from "./touchTarget"
 
-// why: the own cell carries the seat's mark with its sword so the grid reads as the way to start an attack, and the cells are big enough for the sword to read.
-const DISC_SIZE = 32
+// why: the own cell carries the seat's mark with its sword so the grid reads as the way to start an attack, and the cells are big enough for the sword to read; on a 4-player phone seat the grid still ends short of the − at the middle of its end.
+const DISC_SIZE = 26
 const COMPACT_DISC_SIZE = 22
 
 export interface CommanderStripProps {

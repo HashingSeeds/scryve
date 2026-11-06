@@ -26,7 +26,7 @@ import type { ThemedStyle } from "@/theme/types"
 import type { ReducedMotionPreference } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import type { ReadoutInk } from "./commanderDamageLayout"
+import { DIGIT_INK_HEIGHT, type ReadoutInk } from "./commanderDamageLayout"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   getDeltaFontSizeThatFits,
@@ -314,12 +314,18 @@ export function LifeControls({
               })
             : undefined
           // why: a sideways glyph turns inside its unturned box, so a delta wider than the line height would reach past the card edge; move it inward by that overhang.
+          const glyphScale = Math.min(fontScale, LIFE_MAX_FONT_SCALE)
           const lineHeight =
-            (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) *
-            Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+            (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) * glyphScale
+          // why: the grid only has to clear what the glyph inks, a delta's digits at most, not its taller line box.
           const slide =
             obstacle?.edge === zoneEdge
-              ? glyphSlide(obstacle, zonesSize, lineHeight, spacing.xxs)
+              ? glyphSlide(
+                  obstacle,
+                  zonesSize,
+                  DIGIT_INK_HEIGHT * (compact ? COMPACT_GLYPH_SIZE : GLYPH_SIZE) * glyphScale,
+                  spacing.xxs,
+                )
               : undefined
           const overhang =
             sideways && deltaSize

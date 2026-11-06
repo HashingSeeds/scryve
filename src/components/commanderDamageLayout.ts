@@ -145,7 +145,7 @@ export const DISC_RING = 4
 const MIN_FIT = 0.6
 // why: Rubik Bold digits ink about 0.64em wide and 0.72em tall, and the disc keeps clear of the ink box's corners by DISC_CLEARANCE.
 const DIGIT_INK_WIDTH = 0.64
-const DIGIT_INK_HEIGHT = 0.72
+export const DIGIT_INK_HEIGHT = 0.72
 const DISC_CLEARANCE = 0.08
 // why: a total's line box is centred on the card, but its digits sit high in it (measured on iOS; Android and web from Rubik's metrics and each line-height model), so the disc rises to meet them.
 const DIGIT_RISE = Platform.select({ ios: 0.043, android: 0.037, default: 0.0125 })
