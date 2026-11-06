@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react"
 import type { ViewStyle } from "react-native"
-import { FlatList, ScrollView, StyleSheet, View } from "react-native"
+import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native"
+import { LegendList } from "@legendapp/list/react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { EmptyState } from "@/components/EmptyState"
@@ -19,10 +20,8 @@ export interface EventRows<Row> {
   readonly render: (row: Row) => ReactElement
 }
 
-// why: a 256-player event's lists took 1.2 s to mount on a Pixel 6a when switching tabs, and every result re-rendered all of them; a FlatList builds only the rows on screen.
-const ROWS_ON_FIRST_FRAME = 20
-// why: FlatList's default 21-screen window kept rendering until nearly every row existed, so a tab switch still paid to unmount them all.
-const SCREENS_KEPT = 5
+// why: a 256-player event's lists took 1.2 s to mount on a Pixel 6a when switching tabs, and every result re-rendered all of them; the list builds only the rows near the screen.
+const ROW_HEIGHT = 52
 
 export function EventFrame<Row>({
   title,
@@ -49,6 +48,7 @@ export function EventFrame<Row>({
   children: ReactNode
 }) {
   const { themed } = useAppTheme()
+  const window = useWindowDimensions()
   const blocked = access && !access.ready && !access.loading
   const waiting = loading || access?.loading
   return (
@@ -75,7 +75,8 @@ export function EventFrame<Row>({
       ) : (
         <>
           {rows ? (
-            <FlatList
+            <LegendList
+              testID="event-rows"
               style={$styles.flex1}
               contentContainerStyle={themed($listContent)}
               keyboardShouldPersistTaps="handled"
@@ -83,8 +84,10 @@ export function EventFrame<Row>({
               data={rows.data}
               keyExtractor={rows.key}
               renderItem={({ item }) => rows.render(item)}
-              initialNumToRender={ROWS_ON_FIRST_FRAME}
-              windowSize={SCREENS_KEPT}
+              estimatedItemSize={ROW_HEIGHT}
+              // why: without a size the list waits a layout pass before drawing any row.
+              estimatedListSize={{ width: window.width, height: window.height }}
+              recycleItems
             />
           ) : (
             <ScrollView
