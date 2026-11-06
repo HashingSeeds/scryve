@@ -589,62 +589,91 @@ export const byCode = query({
   },
 })
 
-/** why: public, so a signed-out store screen can show the event from its code alone. */
+async function eventBoard(ctx: QueryCtx, event: Doc<"events">) {
+  const [players, tables] = await Promise.all([
+    loadPlayers(ctx, event._id),
+    roundTables(ctx, event._id, event.round),
+  ])
+  const users = await Promise.all(
+    players.map((player) => (player.userId ? ctx.db.get(player.userId) : null)),
+  )
+  return {
+    id: event._id,
+    code: event.code,
+    name: event.name,
+    system: event.system,
+    format: event.format,
+    structure: event.structure,
+    bestOf: event.bestOf,
+    points: event.points,
+    plannedRounds: event.plannedRounds,
+    roundMinutes: event.roundMinutes,
+    status: event.status,
+    round: event.round,
+    clock: event.clock ?? null,
+    players: players.map((player, index) => {
+      const user = users[index]
+      return {
+        id: player._id,
+        name: user ? accountName(user) : player.name,
+        guest: player.userId === undefined,
+        dropped: player.droppedAt !== undefined,
+      }
+    }),
+    tables: tables
+      .map((table) => ({
+        id: table._id,
+        table: table.table,
+        playerIds: table.playerIds,
+        status: table.status,
+        result: table.result ?? null,
+        reportedBy: table.reportedBy ?? null,
+      }))
+      .sort((a, b) => a.table - b.table),
+  }
+}
+
+async function viewerOf(ctx: QueryCtx, event: Doc<"events">) {
+  const identity = await ctx.auth.getUserIdentity()
+  const user = identity
+    ? await ctx.db
+        .query("users")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
+        .unique()
+    : null
+  if (!user) return { isOrganizer: false, myPlayerId: null }
+  const player = await playerFor(ctx, event._id, user._id)
+  return { isOrganizer: event.ownerUserId === user._id, myPlayerId: player?._id ?? null }
+}
+
+/**
+ * why: Convex caches a query per account once it reads the caller, so a board that read them reran for
+ * every phone on every change. Never reading the caller lets one result serve the whole room.
+ */
+export const board = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId)
+    return event ? await eventBoard(ctx, event) : null
+  },
+})
+
+export const viewer = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId)
+    return event ? await viewerOf(ctx, event) : null
+  },
+})
+
+/** why: installed apps from before board and viewer still call this; public, so a signed-out store screen can show the event from its code alone. */
 export const view = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
     const event = await ctx.db.get(args.eventId)
     if (!event) return null
-    const identity = await ctx.auth.getUserIdentity()
-    const viewer = identity
-      ? await ctx.db
-          .query("users")
-          .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
-          .unique()
-      : null
-    const [players, tables] = await Promise.all([
-      loadPlayers(ctx, event._id),
-      roundTables(ctx, event._id, event.round),
-    ])
-    const users = await Promise.all(
-      players.map((player) => (player.userId ? ctx.db.get(player.userId) : null)),
-    )
-    return {
-      id: event._id,
-      code: event.code,
-      name: event.name,
-      system: event.system,
-      format: event.format,
-      structure: event.structure,
-      bestOf: event.bestOf,
-      points: event.points,
-      plannedRounds: event.plannedRounds,
-      roundMinutes: event.roundMinutes,
-      status: event.status,
-      round: event.round,
-      clock: event.clock ?? null,
-      isOrganizer: viewer !== null && event.ownerUserId === viewer._id,
-      myPlayerId: (viewer && players.find((player) => player.userId === viewer._id)?._id) ?? null,
-      players: players.map((player, index) => {
-        const user = users[index]
-        return {
-          id: player._id,
-          name: user ? accountName(user) : player.name,
-          guest: player.userId === undefined,
-          dropped: player.droppedAt !== undefined,
-        }
-      }),
-      tables: tables
-        .map((table) => ({
-          id: table._id,
-          table: table.table,
-          playerIds: table.playerIds,
-          status: table.status,
-          result: table.result ?? null,
-          reportedBy: table.reportedBy ?? null,
-        }))
-        .sort((a, b) => a.table - b.table),
-    }
+    const [board, viewer] = await Promise.all([eventBoard(ctx, event), viewerOf(ctx, event)])
+    return { ...board, ...viewer }
   },
 })
 

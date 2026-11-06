@@ -72,6 +72,27 @@ describe("events", () => {
     expect(view!.tables[1]).toMatchObject({ status: "confirmed", result: { kind: "bye" } })
   })
 
+  it("serves every caller one board, says who is asking apart, and keeps view for older apps", async () => {
+    const { t, organizer, eventId, actors } = await setup(["ana", "ben"])
+    const ana = actors.get("ana")!
+    const board = await t.query(api.events.board, { eventId })
+    expect(await organizer.query(api.events.board, { eventId })).toEqual(board)
+    expect(await ana.query(api.events.board, { eventId })).toEqual(board)
+    expect(board).not.toHaveProperty("isOrganizer")
+
+    const anaViewer = await ana.query(api.events.viewer, { eventId })
+    expect(anaViewer).toEqual({ isOrganizer: false, myPlayerId: board!.players[0].id })
+    expect(await organizer.query(api.events.viewer, { eventId })).toEqual({
+      isOrganizer: true,
+      myPlayerId: null,
+    })
+    expect(await t.query(api.events.viewer, { eventId })).toEqual({
+      isOrganizer: false,
+      myPlayerId: null,
+    })
+    expect(await ana.query(api.events.view, { eventId })).toEqual({ ...board, ...anaViewer })
+  })
+
   it("lets one player report and another at the table confirm", async () => {
     const { t, organizer, eventId, actors } = await setup(["ana", "ben"])
     await organizer.mutation(api.events.startNextRound, { eventId })
