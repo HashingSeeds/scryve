@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react"
 import type { ViewStyle } from "react-native"
-import { ScrollView, StyleSheet, View } from "react-native"
+import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native"
+import { LegendList } from "@legendapp/list/react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { EmptyState } from "@/components/EmptyState"
@@ -13,7 +14,16 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 
-export function EventFrame({
+export interface EventRows<Row> {
+  readonly data: readonly Row[]
+  readonly key: (row: Row) => string
+  readonly render: (row: Row) => ReactElement
+}
+
+// why: a 256-player event's lists took 1.2 s to mount on a Pixel 6a when switching tabs, and every result re-rendered all of them; the list builds only the rows near the screen.
+const ROW_HEIGHT = 52
+
+export function EventFrame<Row>({
   title,
   access,
   loading = false,
@@ -21,6 +31,7 @@ export function EventFrame({
   footer,
   headerAction,
   blockedAction,
+  rows,
   children,
 }: {
   title: string
@@ -33,9 +44,11 @@ export function EventFrame({
   footer?: ReactNode
   headerAction?: ReactElement
   blockedAction?: ReactNode
+  rows?: EventRows<Row>
   children: ReactNode
 }) {
   const { themed } = useAppTheme()
+  const window = useWindowDimensions()
   const blocked = access && !access.ready && !access.loading
   const waiting = loading || access?.loading
   return (
@@ -61,13 +74,30 @@ export function EventFrame({
         />
       ) : (
         <>
-          <ScrollView
-            style={$styles.flex1}
-            contentContainerStyle={themed($content)}
-            keyboardShouldPersistTaps="handled"
-          >
-            {children}
-          </ScrollView>
+          {rows ? (
+            <LegendList
+              testID="event-rows"
+              style={$styles.flex1}
+              contentContainerStyle={themed($listContent)}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={<View style={themed($listHeader)}>{children}</View>}
+              data={rows.data}
+              keyExtractor={rows.key}
+              renderItem={({ item }) => rows.render(item)}
+              estimatedItemSize={ROW_HEIGHT}
+              // why: without a size the list waits a layout pass before drawing any row.
+              estimatedListSize={{ width: window.width, height: window.height }}
+              recycleItems
+            />
+          ) : (
+            <ScrollView
+              style={$styles.flex1}
+              contentContainerStyle={themed($content)}
+              keyboardShouldPersistTaps="handled"
+            >
+              {children}
+            </ScrollView>
+          )}
           {footer ? <BottomActionBar>{footer}</BottomActionBar> : null}
         </>
       )}
@@ -85,6 +115,15 @@ export const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.lg,
   paddingHorizontal: spacing.md,
   paddingBottom: spacing.xl,
+})
+const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingVertical: spacing.lg,
+  paddingHorizontal: spacing.md,
+  paddingBottom: spacing.xl,
+})
+const $listHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.lg,
+  paddingBottom: spacing.xs,
 })
 export const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 export const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
