@@ -10,7 +10,6 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 import {
   applyGameCommand,
   applyLocalTableAction,
-  canUndo,
   createClientId,
   createNextMatchGame,
   createRematch,
@@ -21,11 +20,11 @@ import {
   restartMatchGame,
   soleLoserSeat,
   startTurnOnChange,
-  undoableTurn,
   withFirstChooser,
   withFirstTurn,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
+import { newestLogUndo, undoLogRow } from "./logUndo"
 import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
 import type { RoundClock } from "./roundClock"
 import { createTableActions, type TableRuntime } from "./tableRuntime"
@@ -327,16 +326,22 @@ export function useLocalGame(
     game,
     ...tableRuntime,
     tableRuntime,
-    canUndo: canUndo(game, context.actorId) || undoableTurn(game, context.actorId) !== undefined,
+    canUndo: (turns: boolean) => newestLogUndo(game, context.actorId, { turns }) !== undefined,
     changeLife,
     assignCommanderDamage,
     changeLayout,
     changeSeatOrder,
     changeClock,
-    undo: () => {
-      const turn = undoableTurn(gameRef.current, context.actorId)
-      if (turn) tableActions.undoTurn(turn.playerId, turn.turnOperationId)
-      else dispatch({ type: "life.undo" })
+    undo: (turns: boolean) => {
+      const current = gameRef.current
+      const undo =
+        current.status === "active" ? newestLogUndo(current, context.actorId, { turns }) : undefined
+      if (!undo) return
+      if (undo.kind === "turn") tableActions.undoTurn(undo.playerId, undo.turnOperationId)
+      else {
+        const next = undoLogRow(current, undo, context)
+        if (next !== current) replaceBoard(next)
+      }
     },
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
       dispatch({ type: "game.finish", result }, endSource),

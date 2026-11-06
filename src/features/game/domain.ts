@@ -753,7 +753,9 @@ export function commandToEvent(
       (event): event is CompensatableEvent =>
         isCompensatable(event) &&
         !event.compensatesOperationId &&
-        event.actorId === context.actorId &&
+        (command.operationId === undefined
+          ? event.actorId === context.actorId
+          : event.operationId === command.operationId) &&
         !compensated.has(event.operationId),
     )
     if (!target) return null

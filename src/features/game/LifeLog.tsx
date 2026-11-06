@@ -71,7 +71,12 @@ export function localLifeChanges(events: readonly GameEvent[], playerId: string)
     .reverse()
 }
 
-export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number; at: number }
+export type GameLogRow = ReturnType<typeof lifeChangeOf> & {
+  id: string
+  life: number
+  at: number
+  operationIds: string[]
+}
 
 // why: a seat's card sums quick taps into one number until it rests this long, so the log reads the same burst as one change.
 export const LIFE_BURST_MS = 1800
@@ -96,14 +101,26 @@ export function gameLog(
     ) {
       newer.delta += change.delta
       newer.id = event.operationId
-    } else rows.push({ id: event.operationId, life, at: event.clientCreatedAt, ...change })
+      newer.operationIds.push(event.operationId)
+    } else
+      rows.push({
+        id: event.operationId,
+        life,
+        at: event.clientCreatedAt,
+        operationIds: [event.operationId],
+        ...change,
+      })
     newerAt = event.clientCreatedAt
   }
   // why: a burst that nets to nothing, like a stray tap taken back, changed nothing at the table.
   return rows.filter(({ delta }) => delta !== 0)
 }
 
-export type GameCounterRow = Omit<CounterLogEntry, "operationId"> & { kind: "counter"; id: string }
+export type GameCounterRow = Omit<CounterLogEntry, "operationId"> & {
+  kind: "counter"
+  id: string
+  operationIds: string[]
+}
 
 export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[] {
   const rows: GameCounterRow[] = []
@@ -114,9 +131,10 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
       newer?.playerId === entry.playerId &&
       newer.counterId === entry.counterId &&
       newerAt - entry.at <= LIFE_BURST_MS
-    )
+    ) {
       newer.delta += entry.delta
-    else rows.push({ kind: "counter", id: operationId, ...entry })
+      newer.operationIds.push(operationId)
+    } else rows.push({ kind: "counter", id: operationId, operationIds: [operationId], ...entry })
     newerAt = entry.at
   }
   return rows.filter(({ delta }) => delta !== 0)
