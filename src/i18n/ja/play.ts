@@ -49,7 +49,7 @@ export default {
     joinWithCode: "コードで参加",
     resumeHostedGame: "ホストしたゲームを再開",
     moreFormats_other: "他{{count}}件",
-    change: "変更",
+    moreOptions: "その他のオプション",
     closeOptions: "ゲームオプションを閉じる",
     seatsCount_other: "{{count}}席",
     clockMinutes: "{{minutes}}分タイマー",

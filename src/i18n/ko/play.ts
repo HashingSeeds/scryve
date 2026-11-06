@@ -47,7 +47,7 @@ export default {
     joinWithCode: "코드로 참가",
     resumeHostedGame: "만든 게임 이어하기",
     moreFormats_other: "{{count}}개 더",
-    change: "변경",
+    moreOptions: "옵션 더 보기",
     closeOptions: "게임 옵션 닫기",
     seatsCount_other: "자리 {{count}}개",
     clockMinutes: "{{minutes}}분 시계",

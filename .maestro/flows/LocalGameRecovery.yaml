@@ -14,14 +14,10 @@ onFlowStart:
     id: "setup-button"
 - assertVisible: "New game"
 - tapOn:
-    id: "setup-change-button"
-- tapOn:
     id: "player-count-6"
 - assertVisible:
     id: "player-count-6"
     selected: true
-- tapOn:
-    id: "setup-options-done"
 - tapOn:
     id: "start-game-button"
 - assertVisible:

@@ -51,7 +51,7 @@ export default {
     moreFormats_one: "{{count}} más",
     moreFormats_many: "{{count}} más",
     moreFormats_other: "{{count}} más",
-    change: "Cambiar",
+    moreOptions: "Más opciones",
     closeOptions: "Cerrar opciones de partida",
     seatsCount_one: "{{count}} asiento",
     seatsCount_many: "{{count}} asientos",

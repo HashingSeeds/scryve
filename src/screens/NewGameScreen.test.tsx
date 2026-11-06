@@ -91,6 +91,18 @@ function closeOptions() {
   fireEvent.press(screen.getByTestId("setup-options-done"))
 }
 
+function expectSetup(
+  view: Pick<ReturnType<typeof within>, "getByTestId" | "queryByTestId">,
+  players: number,
+  life?: number,
+) {
+  expect(view.getByTestId(`player-count-${players}`).props.accessibilityState.selected).toBe(true)
+  if (life === undefined) return
+  const chip =
+    view.queryByTestId(`starting-counter-${life}`) ?? view.getByTestId("starting-counter-custom")
+  expect(chip.props.accessibilityState.selected).toBe(true)
+}
+
 /** A two-player local game in progress, which puts the setup screen in its managing state. */
 function runningLocalGame() {
   return createLocalGame({
@@ -178,7 +190,7 @@ describe("NewGameScreen", () => {
       ),
     )
     expect(view.queryByTestId("resume-connected-arriving")).toBeNull()
-    expect(within(form).getByText("3 seats · 20 life")).toBeTruthy()
+    expectSetup(within(form), 3, 20)
     expect(within(form).queryByText("Games in progress")).toBeNull()
     fireEvent.press(view.getByTestId("setup-back"))
     expect(props.onResumeConnected).toHaveBeenCalledWith(
@@ -392,7 +404,7 @@ describe("NewGameScreen", () => {
       ],
       undefined,
     )
-    expect(view.getByText("3 players · 20 life")).toBeTruthy()
+    expectSetup(view, 3, 20)
   })
 
   it("shows an autosave failure and lets the player retry on blur", () => {
@@ -459,7 +471,7 @@ describe("NewGameScreen", () => {
     })
 
     expect(view.getByTestId("game-type-ygo-advanced").props.accessibilityState.selected).toBe(true)
-    expect(view.getByText("2 players · 8000 Life Points")).toBeTruthy()
+    expectSetup(view, 2, 8000)
     fireEvent.press(view.getByTestId("start-game-button"))
 
     expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 8000, {
@@ -484,7 +496,7 @@ describe("NewGameScreen", () => {
     })
 
     expect(view.getByTestId("game-type-none").props.accessibilityState.selected).toBe(true)
-    expect(view.getByText("2 players · 40 life")).toBeTruthy()
+    expectSetup(view, 2, 40)
   })
 
   it("leaves an untouched setup on Back", () => {
@@ -695,7 +707,7 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("game-type-ygo-advanced").props.accessibilityState.selected).toBe(true)
     fireEvent.press(view.getByTestId("game-tab-mtg"))
     expect(view.getByTestId("game-type-mtg-brawl").props.accessibilityState.selected).toBe(true)
-    expect(view.getByText("2 players · 25 life")).toBeTruthy()
+    expectSetup(view, 2, 25)
     openOptions()
     fireEvent.press(view.getByTestId("player-count-4"))
     closeOptions()
@@ -804,7 +816,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("game-tab-mtg"))
     fireEvent.press(view.getByTestId("game-type-treachery"))
     expect(view.getByTestId("game-type-treachery").props.accessibilityState.selected).toBe(true)
-    expect(view.getByText("4 seats · 40 life")).toBeTruthy()
+    expectSetup(view, 4, 40)
     fireEvent.press(view.getByTestId("host-connected-button"))
     expect(host).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -850,7 +862,7 @@ describe("NewGameScreen", () => {
     closeOptions()
     fireEvent.press(view.getByTestId("join-with-code-button"))
     expect(onJoin).toHaveBeenCalledTimes(1)
-    expect(view.getByText("3 seats · 20 life")).toBeTruthy()
+    expectSetup(view, 3, 20)
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("resume-connected-resume-game"))
 
@@ -1047,7 +1059,7 @@ describe("NewGameScreen", () => {
     fireEvent.press(view.getByTestId("end-connected-hosted-game"))
     expect(view.getByText("End this game?")).toBeTruthy()
     fireEvent.press(view.getByTestId("cancel-connected-game-exit"))
-    expect(view.getByText("3 seats · 20 life")).toBeTruthy()
+    expectSetup(view, 3, 20)
 
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("leave-connected-joined-game"))
@@ -1726,7 +1738,7 @@ describe("NewGameScreen", () => {
       recentSetups: [{ savedAt: 1, mode: "connected", lobby }],
     })
     expect(screen.getByTestId("game-type-treachery").props.accessibilityState.selected).toBe(true)
-    expect(screen.getByText("5 seats · 40 life")).toBeTruthy()
+    expectSetup(screen, 5, 40)
     fireEvent.press(screen.getByTestId("host-connected-button"))
     expect(host).toHaveBeenCalledWith(lobby)
   })
@@ -1775,14 +1787,15 @@ describe("NewGameScreen", () => {
     openOptions()
     closeOptions()
     expect(screen.queryByTestId("setup-options-dialog")).toBeNull()
-    expect(screen.getByText("2 seats · 40 life")).toBeTruthy()
+    expectSetup(screen, 2, 40)
 
     setup()
     openOptions()
     fireEvent.press(screen.getByTestId("match-mode-on"))
     fireEvent.press(screen.getByTestId("clock-mode-countdown"))
     closeOptions()
-    expect(screen.getByText("2 players · 20 life · Best of 3 · 50 min clock")).toBeTruthy()
+    expectSetup(screen, 2, 20)
+    expect(screen.getByText("Best of 3 · 50 min clock")).toBeTruthy()
   })
 })
 

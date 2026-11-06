@@ -48,7 +48,7 @@ const play = {
     resumeHostedGame: "Resume hosted game",
     moreFormats_one: "{{count}} more",
     moreFormats_other: "{{count}} more",
-    change: "Change",
+    moreOptions: "More options",
     closeOptions: "Close game options",
     seatsCount_one: "{{count}} seat",
     seatsCount_other: "{{count}} seats",

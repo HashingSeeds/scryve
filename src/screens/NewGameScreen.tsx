@@ -459,11 +459,7 @@ function NewGameForm({
       }),
     [connectedMode, defaults.defaultFormat, defaults.defaultSystem, recentSetups],
   )
-  const setupSummary = [
-    connectedMode
-      ? translate("play:newGame.seatsCount", { count: playerCount })
-      : translate("play:summary.playerCount", { count: playerCount }),
-    counterValueLabel(system, startingLife),
+  const optionsSummary = [
     ...(!connectedMode && !localGame && matchBestOf
       ? [translate("play:newGame.bestOfCount", { bestOf: matchBestOf })]
       : []),
@@ -474,6 +470,13 @@ function NewGameForm({
             : translate("play:newGame.clockStopwatch"),
         ]
       : []),
+  ].join(" · ")
+  const setupSummary = [
+    connectedMode
+      ? translate("play:newGame.seatsCount", { count: playerCount })
+      : translate("play:summary.playerCount", { count: playerCount }),
+    counterValueLabel(system, startingLife),
+    ...(optionsSummary ? [optionsSummary] : []),
   ].join(" · ")
   const matchLocked = Boolean(
     initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
@@ -946,18 +949,52 @@ function NewGameForm({
             onChoose={pickGameType}
           />
 
-          <View style={themed($summaryRow)}>
+          {matchLocksSetup ? (
             <Text size="xs" text={setupSummary} style={themed($summaryText)} />
-            {matchLocksSetup ? null : (
-              <Button
-                testID="setup-change-button"
-                tx="play:newGame.change"
-                accessibilityLabel={`${translate("play:newGame.change")}, ${setupSummary}`}
-                style={themed($changeButton)}
-                onPress={openOptions}
+          ) : (
+            <>
+              <OptionGrid
+                testID="player-count"
+                label={
+                  connectedMode
+                    ? translate("play:newGame.seats")
+                    : translate("play:newGame.players")
+                }
+                options={PLAYER_COUNTS}
+                value={playerCount}
+                isDisabled={treachery ? (count) => !isTreacheryPlayerCount(count) : undefined}
+                onSelect={(value) => {
+                  choosePlayerCount(value)
+                  setEdited(true)
+                }}
               />
-            )}
-          </View>
+              {lifeOptions.length > 0 ? (
+                <OptionGrid
+                  testID="starting-counter"
+                  label={counterHeading(system)}
+                  options={lifeOptions}
+                  value={startingLife}
+                  custom={startingValueRange(system)}
+                  onSelect={(value) => {
+                    setStartingLife(value)
+                    setEdited(true)
+                  }}
+                />
+              ) : null}
+              <View style={themed($summaryRow)}>
+                <Text size="xs" text={optionsSummary} style={themed($summaryText)} />
+                <Button
+                  testID="setup-change-button"
+                  tx="play:newGame.moreOptions"
+                  accessibilityLabel={[translate("play:newGame.moreOptions"), optionsSummary]
+                    .filter(Boolean)
+                    .join(", ")}
+                  style={themed($changeButton)}
+                  onPress={openOptions}
+                />
+              </View>
+            </>
+          )}
 
           {connectedMode && onNearby ? (
             <View style={themed($section)}>
@@ -1271,27 +1308,6 @@ function NewGameForm({
         testID="setup-options-dialog"
       >
         <ScrollView style={$sheetScroll} contentContainerStyle={themed($statusDetails)}>
-          <OptionGrid
-            testID="player-count"
-            label={
-              connectedMode ? translate("play:newGame.seats") : translate("play:newGame.players")
-            }
-            options={PLAYER_COUNTS}
-            value={playerCount}
-            isDisabled={treachery ? (count) => !isTreacheryPlayerCount(count) : undefined}
-            onSelect={choosePlayerCount}
-          />
-          {lifeOptions.length > 0 ? (
-            <OptionGrid
-              testID="starting-counter"
-              label={counterHeading(system)}
-              options={lifeOptions}
-              value={startingLife}
-              custom={startingValueRange(system)}
-              onSelect={setStartingLife}
-            />
-          ) : null}
-
           {!connectedMode && !localGame ? (
             <View style={themed($section)}>
               <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />

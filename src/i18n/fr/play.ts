@@ -51,7 +51,7 @@ export default {
     moreFormats_one: "{{count}} de plus",
     moreFormats_many: "{{count}} de plus",
     moreFormats_other: "{{count}} de plus",
-    change: "Modifier",
+    moreOptions: "Plus d'options",
     closeOptions: "Fermer les options de partie",
     seatsCount_one: "{{count}} place",
     seatsCount_many: "{{count}} de places",
