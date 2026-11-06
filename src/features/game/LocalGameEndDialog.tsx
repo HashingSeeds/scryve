@@ -6,7 +6,8 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, type DialogOrigin } from "@/components/DialogCard"
-import { DrawMark, PlayerMark } from "@/components/PlayerMark"
+import { DrawMark } from "@/components/PlayerMark"
+import { TeamMarks } from "@/components/TeamMarks"
 import { Text } from "@/components/Text"
 import { localStandingWinners } from "@/features/game/domain"
 import { counterValueLabel } from "@/features/game/playSystems"
@@ -84,7 +85,6 @@ export function LocalGameEndDialog({
       <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
         {teamChoices(game.players, groups).map((player) => {
           const selected = winnerPlayerIds.includes(player.id)
-          const seat = game.players.indexOf(player)
           const name = teamName(game.players, groups, player.id) ?? player.name
           const value = teamValueLabel(game.players, groups, player.id, (life) =>
             counterValueLabel(system, life),
@@ -94,11 +94,19 @@ export function LocalGameEndDialog({
               key={player.id}
               testID={`end-game-winner-${player.seat}`}
               text={name}
-              TextProps={{ numberOfLines: 2 }}
+              TextProps={{ numberOfLines: 3 }}
               detail={value.shown}
               accentColor={player.color}
               Leading={({ color }) => (
-                <PlayerMark seatNumber={seat + 1} shape={player.shape} color={color} size={28} />
+                <TeamMarks
+                  marks={teamMembers(game.players, groups, player.id).map((member) => ({
+                    seatNumber: game.players.indexOf(member) + 1,
+                    shape: member.shape,
+                    color: member.color,
+                  }))}
+                  color={color}
+                  selected={selected}
+                />
               )}
               accessibilityLabel={translate(
                 selected ? "board:endGame.playerWinner" : "board:endGame.player",
