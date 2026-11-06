@@ -1,4 +1,5 @@
 import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
+import { gameTypeLabel } from "@/features/game/gameTypes"
 import {
   counterChangeLabel,
   counterValueLabel,
@@ -88,7 +89,9 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
     system,
     format:
       system && game.format
-        ? playFormatLabel(system, game.format)
+        ? game.variant
+          ? gameTypeLabel({ id: game.variant, system, format: game.format, variant: game.variant })
+          : playFormatLabel(system, game.format)
         : counterValueLabel(system, game.startingLife),
     changeCount: localChanges(game).length,
     players: game.players.map((player) => ({

@@ -2,6 +2,7 @@ import type { Href } from "expo-router"
 
 import {
   applyGameCommand,
+  applyLocalTableAction,
   commanderDamageBetween,
   createLocalGame,
   defaultCommandContext,
@@ -155,11 +156,28 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       throw new SeedError(`groups name each seat once, like 1+2,3+4, got "${params.groups}".`)
     game = { ...game, turnGroups: groups }
   }
+
+  // why: poison=1:12 gives seat 1 twelve poison, through the same rules a tap uses.
+  for (const entry of list(params.poison)) {
+    const [seatValue, amount] = entry.split(":")
+    game = applyLocalTableAction(
+      game,
+      {
+        kind: "counter.changed",
+        playerId: seat(seatValue ?? "").id,
+        counterId: "poison",
+        delta: integer("poison", amount ?? ""),
+      },
+      { operationId: context.operationId(), now: context.now() },
+    )
+  }
   return game
 }
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {
   const game = buildSeededGame(params, repository)
+  if (params.design === "split" || params.design === "merged")
+    repository.saveTeamDesign(params.design)
   repository.clearActiveGame()
   repository.saveActiveGame(game)
   return { pathname: "/", params: { destination: "play" } }

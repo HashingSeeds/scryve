@@ -61,6 +61,7 @@ import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import {
   headBox,
+  type Box,
   menuPlacementAt,
   panelBoxes,
   seamEdge,
@@ -313,9 +314,11 @@ export function PlayerGrid({
     layout,
     gap: spacing.xxs,
   })
-  const lifeTargetSize = layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
+  // why: a team panel's heads are as small as the cards of a game with that many seats.
+  const compact = layout.compact || (!!teams && players.length >= 5)
+  const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const sidewaysGlyphReserve =
-    2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
+    2 * ((compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
   const lifeFontSizeFor = useCallback(
     (digits: number) =>
       getLifeFontSize({
@@ -366,15 +369,19 @@ export function PlayerGrid({
   const seatedRowFlexes = seated.flexes
   const panelBoxMap = panelBoxes(rows, rowFlexes)
   const menuAnchor = getPlayerGridMenuAnchor(cellCount, layout)
-  const halfLifeFontSizeFor = (rotation: LifeCardContentRotation) => (digits: number) =>
-    getLifeFontSize({
-      cellWidth: Math.abs(rotation) === 90 ? cellSize.cellWidth : cellSize.cellWidth / 2,
-      cellHeight: Math.abs(rotation) === 90 ? cellSize.cellHeight / 2 : cellSize.cellHeight,
-      digits,
-      fontScale,
-      targetSize: lifeTargetSize,
-      sidewaysGlyphReserve,
-    })
+  const headLifeFontSizeFor = (index: number, box: Box | undefined) =>
+    stable(`font:${index}`, (digits: number) =>
+      box
+        ? getLifeFontSize({
+            cellWidth: (box.x1 - box.x0) * board.width,
+            cellHeight: (box.y1 - box.y0) * (board.height - topEdgeBand),
+            digits,
+            fontScale,
+            targetSize: lifeTargetSize,
+            sidewaysGlyphReserve,
+          })
+        : undefined,
+    )
   const menuJunction = getFourCardMenuJunction(rows)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const tabRow = useContext(FirstPlayerTabsShownContext)
@@ -428,7 +435,7 @@ export function PlayerGrid({
           foil={isPlayerFoil?.(player)}
           prizes={player.life}
           color={player.color}
-          compact={layout.compact}
+          compact={compact}
           contentRotation={contentRotation}
           contentInsets={place.contentInsets}
           screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
@@ -460,7 +467,7 @@ export function PlayerGrid({
         foil={isPlayerFoil?.(player)}
         life={player.life}
         color={place.color ?? player.color}
-        compact={layout.compact}
+        compact={compact}
         contentRotation={contentRotation}
         boardRotation={boardOrientation?.touchRotation ?? boardRotation}
         contentInsets={place.contentInsets}
@@ -627,7 +634,7 @@ export function PlayerGrid({
             menuEdgeCenter: menu.edgeCenter,
             color: teamColor,
             teamZone: merged ? (head === 0 ? -1 : 1) : undefined,
-            lifeFontSizeFor: halfLifeFontSizeFor(rotation),
+            lifeFontSizeFor: headLifeFontSizeFor(index, box),
             style: headCornerStyle(screenEdges, seam, Platform.OS === "web" ? insets : undefined),
           })}
         </View>
@@ -648,7 +655,7 @@ export function PlayerGrid({
             shown={merged}
             foreground={foreground}
             rotation={rotation}
-            compact={layout.compact}
+            compact={compact}
             system={system}
             seatNumber={slot + 1}
             turnChip={teamChip}
