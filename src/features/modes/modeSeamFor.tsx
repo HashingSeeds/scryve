@@ -5,6 +5,10 @@ import type { BoardModes } from "./useBoardModes"
 
 /** why: a plate reads right side up for the seat it faces; seats on the board's sides read it sideways, so it stays level for them. */
 const plateRotation = (facing: number | undefined) => (facing === 180 ? 180 : 0)
+/** why: the active seat's turn chip sits on its edge of the seam, so the plates lean into the other card. */
+const SEAM_SHIFT = 12
+const seamShift = (facing: number | undefined) =>
+  facing === 180 ? SEAM_SHIFT : facing === 0 ? -SEAM_SHIFT : 0
 
 export function modeSeamFor(
   modes: BoardModes,
@@ -12,7 +16,7 @@ export function modeSeamFor(
 ) {
   const { planar, scheme } = modes
   if (!planar && !scheme) return undefined
-  return function renderSeam({ anchor, facings }: BoardSeamGeometry) {
+  return function renderSeam({ anchor, facings, edgeTabs }: BoardSeamGeometry) {
     const facingOf = (playerId: string | undefined) => {
       const slot = playerId === undefined ? undefined : slotOf(playerId)
       return slot === undefined ? undefined : facings[slot]
@@ -20,6 +24,8 @@ export function modeSeamFor(
     return (
       <ModeSeam
         anchor={anchor}
+        shift={seamShift(facingOf(modes.activeId))}
+        edgeTabs={edgeTabs}
         planar={planar}
         scheme={scheme}
         dieOnSeam={dieOnSeam}

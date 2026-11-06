@@ -17,8 +17,9 @@ import { Text } from "../Text"
 const PLATE_HEIGHT = 40
 const DIE_SIZE = 44
 const MENU_CLEARANCE = MENU_BUTTON_SIZE / 2 + 10
-/** why: clears the first-player and round clock tabs at the board's edges. */
-const EDGE = 40
+const EDGE = 8
+/** why: clears the first-player and round clock tabs at the board's edges while they show. */
+const EDGE_WITH_TABS = 40
 /** why: a fresh roll shows its face long enough to read across the table, then the die goes back to showing its cost. */
 const RESULT_MS = 4_000
 
@@ -266,6 +267,8 @@ function SchemePlate({
  */
 export function ModeSeam({
   anchor,
+  shift,
+  edgeTabs,
   planar,
   scheme,
   dieOnSeam,
@@ -274,6 +277,8 @@ export function ModeSeam({
   onOpen,
 }: {
   anchor: { x: number; y: number }
+  shift: number
+  edgeTabs: boolean
   planar?: PlanarView
   scheme?: SchemeView
   dieOnSeam: boolean
@@ -282,16 +287,17 @@ export function ModeSeam({
   onOpen: (dialog: "planar" | "scheme") => void
 }) {
   const showDie = planar && dieOnSeam
+  const edge = edgeTabs ? EDGE_WITH_TABS : EDGE
   return (
     <View
       testID="mode-seam"
       pointerEvents="box-none"
-      style={[$seam, { top: `${anchor.y * 100}%` }]}
+      style={[$seam, { top: `${anchor.y * 100}%`, marginTop: shift }]}
     >
       {planar ? (
         <View
           pointerEvents="box-none"
-          style={[$side, $before, { right: `${(1 - anchor.x) * 100}%`, left: EDGE }]}
+          style={[$side, $before, { right: `${(1 - anchor.x) * 100}%`, left: edge }]}
         >
           <PlanePlate planar={planar} rotation={planeRotation} onPress={() => onOpen("planar")} />
         </View>
@@ -299,7 +305,7 @@ export function ModeSeam({
       {showDie || scheme ? (
         <View
           pointerEvents="box-none"
-          style={[$side, $after, { left: `${anchor.x * 100}%`, right: EDGE }]}
+          style={[$side, $after, { left: `${anchor.x * 100}%`, right: edge }]}
         >
           {showDie ? <PlanarDieButton planar={planar} rotation={planeRotation} /> : null}
           {scheme ? (

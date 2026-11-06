@@ -75,6 +75,7 @@ export interface BoardTurns {
 export interface BoardSeamGeometry {
   anchor: { x: number; y: number }
   facings: readonly number[]
+  edgeTabs: boolean
 }
 
 export interface BoardSize {
@@ -160,7 +161,7 @@ function PinnedGameBoardStage({
                 {renderGrid(boardOrientation)}
               </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
-            {seam && !menu.open ? seam({ anchor: boardAnchor, facings }) : null}
+            {seam && !menu.open ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown }) : null}
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
               open={menu.open}
@@ -241,7 +242,7 @@ function LegacyGameBoardStage({
           {renderGrid(boardOrientation)}
         </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
-      {seam && !menu.open && rotation === 0 ? seam({ anchor: boardAnchor, facings }) : null}
+      {seam && !menu.open && rotation === 0 ? seam({ anchor: boardAnchor, facings, edgeTabs: tabsShown }) : null}
       <GameRadialMenu
         {...menu}
         anchor={menuAnchor}

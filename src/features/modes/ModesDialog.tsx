@@ -48,13 +48,13 @@ function PlaneImage({ card }: { card: ModeCard }) {
   )
 }
 
-function SchemeImage({ card, small }: { card: ModeCard; small?: boolean }) {
+function SchemeImage({ card }: { card: ModeCard }) {
   return (
     <Image
       accessibilityLabel={card.name}
       source={modeCardImage(card, "large")}
       contentFit="contain"
-      style={small ? $schemeSmall : $scheme}
+      style={$scheme}
     />
   )
 }
@@ -143,30 +143,28 @@ export function ModesDialog({ modes }: { modes: BoardModes }) {
             {!scheme.mine ? (
               <Text size="xs" style={themed($muted)} tx="board:scheme.archenemyOnly" />
             ) : null}
-            {scheme.shown ? (
-              <View style={themed($section)}>
-                <Text size="xs" weight="medium" tx="board:scheme.last" />
-                <SchemeImage card={scheme.shown} />
-              </View>
-            ) : null}
-            {scheme.ongoing.length > 0 ? (
-              <View style={themed($section)}>
-                <Text size="xs" weight="medium" tx="board:scheme.ongoing" />
-                <View style={themed($ongoing)}>
-                  {scheme.ongoing.map(({ index, card }) => (
-                    <View key={index} style={themed($ongoingCard)}>
-                      <SchemeImage card={card} small />
-                      {scheme.mine ? (
-                        <Button
-                          testID={`scheme-abandon-${index}`}
-                          tx="board:scheme.abandon"
-                          style={themed($small)}
-                          onPress={() => scheme.abandon(index)}
-                        />
-                      ) : null}
-                    </View>
-                  ))}
-                </View>
+            {scheme.shown || scheme.ongoing.length > 0 ? (
+              <View style={themed($ongoing)}>
+                {scheme.shown ? (
+                  <View style={themed($schemeCell)}>
+                    <Text size="xs" weight="medium" tx="board:scheme.last" />
+                    <SchemeImage card={scheme.shown} />
+                  </View>
+                ) : null}
+                {scheme.ongoing.map(({ index, card }) => (
+                  <View key={index} style={themed($schemeCell)}>
+                    <Text size="xs" weight="medium" tx="board:scheme.ongoing" />
+                    <SchemeImage card={card} />
+                    {scheme.mine ? (
+                      <Button
+                        testID={`scheme-abandon-${index}`}
+                        tx="board:scheme.abandon"
+                        style={themed($small)}
+                        onPress={() => scheme.abandon(index)}
+                      />
+                    ) : null}
+                  </View>
+                ))}
               </View>
             ) : null}
             <ModeLog rows={schemeRows} />
@@ -199,14 +197,16 @@ const $small: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 36,
   paddingHorizontal: spacing.sm,
 })
-const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $ongoing: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
   gap: spacing.sm,
 })
-const $ongoingCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({ width: 120, gap: spacing.xs })
+const $schemeCell: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: "47%",
+  flexGrow: 1,
+  gap: spacing.xs,
+})
 const $scheme = { width: "100%" as const, aspectRatio: 488 / 680, borderRadius: 12 }
-const $schemeSmall = { width: 120, height: 120 / (488 / 680), borderRadius: 8 }
 const $log: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $logRow: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

@@ -127,7 +127,15 @@ export function useBoardModes({ modes, turn, groups, players, controls, act }: B
     }))
     .reverse()
 
-  return { planar, scheme, log: rows, nameOf, dialog, openDialog: setDialog }
+  return {
+    planar,
+    scheme,
+    activeId: turn?.playerId,
+    log: rows,
+    nameOf,
+    dialog,
+    openDialog: setDialog,
+  }
 }
 
 export type BoardModes = ReturnType<typeof useBoardModes>
