@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url"
 import { gzipSync } from "node:zlib"
 
 import {
+  compareCardNames,
   type MagicDataset,
   type MagicDatasetCard,
   magicDatasetCard,
@@ -71,7 +72,7 @@ export async function buildMagicDataset(fetcher: Fetch = fetch): Promise<MagicDa
     const card = magicDatasetCard(JSON.parse(line))
     if (card) cards.push(card)
   }
-  return { version, cards }
+  return { version, cards: cards.sort(compareCardNames) }
 }
 
 export async function syncMagicDataset(options: SyncOptions) {

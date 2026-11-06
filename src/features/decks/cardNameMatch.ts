@@ -21,14 +21,16 @@ export type CardNameIndex = {
 
 export type CardNameMatch = { name: string; similarity: number; printedName?: string }
 
+const NON_ASCII = /[^\x00-\x7f]/
+
+function foldAccents(text: string) {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/æ/g, "ae")
+}
+
+/** why: the Magic file keys 30k names on load, and Unicode normalization is slow on Hermes. */
 export function matchKey(text: string) {
-  return text
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/æ/g, "ae")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
+  const folded = NON_ASCII.test(text) ? foldAccents(text) : text.toLowerCase()
+  return folded.replace(/[^a-z0-9]+/g, " ").trim()
 }
 
 function trigrams(key: string) {
