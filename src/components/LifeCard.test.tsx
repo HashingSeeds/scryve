@@ -1172,6 +1172,8 @@ describe("LifeCard", () => {
     expect(StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style).opacity).toBe(0)
     fireEvent.press(view.getByTestId("pokemon-key-1-seat-1"))
     fireEvent.press(view.getByTestId("pokemon-key-2-seat-1"))
+    // why: the box shows the power the attack holds, here the unchanged prop, not the typed digits.
+    expect(view.getByTestId("commander-power-input-seat-1")).toHaveTextContent("3")
     fireEvent.press(view.getByTestId("pokemon-key-3-seat-1"))
     // why: a − or + while typing replaces the typed number, so the box shows the power the next hit deals.
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))

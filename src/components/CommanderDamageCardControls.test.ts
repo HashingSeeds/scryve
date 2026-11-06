@@ -1,4 +1,4 @@
-import { attackerLayout, pulseFrame } from "./CommanderDamageCardControls"
+import { attackerLayout, keypadPlacement, pulseFrame } from "./CommanderDamageCardControls"
 
 describe("attackerLayout", () => {
   const rowWidth = (layout: ReturnType<typeof attackerLayout>) =>
@@ -39,6 +39,16 @@ describe("attackerLayout", () => {
     expect(layout.lifeFont).toBeGreaterThan(
       attackerLayout({ space, count: 1, grid: { width: 86, height: 80 } }).lifeFont,
     )
+  })
+})
+
+describe("keypadPlacement", () => {
+  it("stacks the keypad under the box when a narrow seat leaves no room beside it", () => {
+    const space = { width: 150, height: 220 }
+    const keypad = keypadPlacement(space, attackerLayout({ space, count: 1, others: false }), true)
+    expect(keypad).toMatchObject({ stacked: true, compact: true })
+    expect(keypad.width).toBeGreaterThanOrEqual(100)
+    expect(keypad.height).toBeGreaterThan(0)
   })
 })
 

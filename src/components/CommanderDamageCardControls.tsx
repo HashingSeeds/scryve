@@ -719,6 +719,8 @@ const KEYPAD_ROW_GAP = 5
 const KEYPAD_MAX_WIDTH = 280
 // why: beside the box, the keypad keeps to about three thumb-wide keys so the pair stays centered and clear of the card's corner marks.
 const KEYPAD_BESIDE_WIDTH = 150
+// why: three keys of about 30pt and their gaps, below which the beside keypad is no longer tappable.
+const MIN_KEYPAD_WIDTH = 100
 
 /** why: the in-card keypad for a power. It sits under the box when the card has room for four rows of full keys there, and beside it otherwise, with compact keys that give up height to fit a short seat. */
 export function keypadPlacement(
@@ -736,11 +738,23 @@ export function keypadPlacement(
       width: Math.min(KEYPAD_MAX_WIDTH, space.width - UNIT_GAP * 2),
       height: rowsHeight(KEY_HEIGHT),
     }
+  const beside = Math.min(KEYPAD_BESIDE_WIDTH, space.width - layout.width - UNIT_GAP * 3)
+  if (beside >= MIN_KEYPAD_WIDTH)
+    return {
+      stacked,
+      compact: true,
+      width: beside,
+      height: Math.max(0, Math.min(rowsHeight(COMPACT_KEY_HEIGHT), space.height - UNIT_GAP * 2)),
+    }
+  // why: a seat too narrow for the keypad beside the box stacks it under the box, its compact rows giving up height to fit.
   return {
-    stacked,
+    stacked: true,
     compact: true,
-    width: Math.max(0, Math.min(KEYPAD_BESIDE_WIDTH, space.width - layout.width - UNIT_GAP * 3)),
-    height: Math.max(0, Math.min(rowsHeight(COMPACT_KEY_HEIGHT), space.height - UNIT_GAP * 2)),
+    width: Math.max(0, Math.min(KEYPAD_MAX_WIDTH, space.width - UNIT_GAP * 2)),
+    height: Math.max(
+      0,
+      Math.min(rowsHeight(COMPACT_KEY_HEIGHT), space.height - boxHeight - UNIT_GAP * 3),
+    ),
   }
 }
 
@@ -1103,7 +1117,7 @@ function PowerBox({
   const lowest = lowestPower(partner)
   // why: a box narrowed to its lane still fits two digits, so the number shrinks to the middle of its row rather than wrapping out of sight; the platform shrinks it further if the font runs wider than this estimate.
   const valueWidth = (width * VALUE_FLEX) / (VALUE_FLEX + HALF_FLEX * 2)
-  const digits = Math.max(1, String(draft || power).length)
+  const digits = Math.max(1, String(power).length)
   const fontSize = Math.min(height * 0.62, valueWidth / (digits * DIGIT_ADVANCE))
   const numberStyle = { color: ink, fontSize, lineHeight: height * 0.8 }
   const half = (step: 1 | -1) => {
@@ -1178,10 +1192,10 @@ function PowerBox({
             pressed && pressedTint,
           ]}
         >
-          {/* why: the keypad opens empty with the current power dimmed in its place, so typing replaces it; closing empty keeps it. */}
+          {/* why: the keypad opens empty with the current power dimmed in its place, so typing replaces it; closing empty keeps it. The box shows the power as the attack holds it, so a typed 0 on a lone commander reads as the 1 it deals. */}
           <Text
             testID={editing ? `commander-power-input-seat-${suffix}` : undefined}
-            text={draft || `${power}`}
+            text={`${power}`}
             weight="bold"
             numberOfLines={1}
             adjustsFontSizeToFit
