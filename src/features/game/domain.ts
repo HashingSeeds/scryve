@@ -299,6 +299,12 @@ export function isMatchInProgress(game: LocalGame) {
   return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
 }
 
+export function leaveMatch(game: LocalGame): LocalGame {
+  if (isMatchInProgress(game)) throw new Error("A match in progress ends with End match.")
+  const { match: _match, ...board } = game
+  return board
+}
+
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")
   return withFirstChooser(

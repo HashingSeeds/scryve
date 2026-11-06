@@ -1,4 +1,4 @@
-import { AppState, Linking, Pressable, StyleSheet } from "react-native"
+import { AppState, Pressable, StyleSheet } from "react-native"
 import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
@@ -57,6 +57,13 @@ jest.mock("expo-router", () => ({
     mockRedirect(props)
     return null
   },
+}))
+let mockStoreUpdate: { labelTx: "play:launch.openAppStore"; url: string } | null = null
+const mockUpdateFromStore = jest.fn()
+jest.mock("@/features/updates/storeUpdate", () => ({
+  ...jest.requireActual("@/features/updates/storeUpdate"),
+  useStoreUpdate: () => mockStoreUpdate,
+  updateFromStore: () => mockUpdateFromStore(),
 }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ ...mockAuth, openAuth: mockOpenAuth }),
@@ -234,12 +241,11 @@ describe("shipping index route", () => {
     jest.restoreAllMocks()
   })
 
-  it("keeps a game saved by a newer version until the player replaces it", () => {
+  it("keeps a game saved by a newer version until the player confirms deleting it", async () => {
     storage.set(
       LOCAL_KEYS.active,
       JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
     )
-    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
 
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -247,15 +253,50 @@ describe("shipping index route", () => {
       </ThemeProvider>,
     )
 
-    expect(view.getByText("Update Scryve")).toBeTruthy()
+    expect(view.getByText("This game needs an update")).toBeTruthy()
     expect(view.queryByTestId("game-board")).toBeNull()
-    fireEvent.press(view.getByRole("button", { name: "Open App Store" }))
-    expect(openURL).toHaveBeenCalledWith("https://apps.apple.com/app/id6798955244")
+    await act(async () => {
+      fireEvent.press(view.getByRole("button", { name: "Check for updates" }))
+    })
+    expect(view.getByText(/No update is available yet/)).toBeTruthy()
+
+    fireEvent.press(view.getByRole("button", { name: "Contact Support" }))
+    expect(router.push).toHaveBeenCalledWith("/support")
+
+    fireEvent.press(view.getByRole("button", { name: "Delete game" }))
+    fireEvent.press(view.getByTestId("newer-game-delete-cancel"))
     expect(localGameRepository.hasNewerActiveGame()).toBe(true)
 
-    fireEvent.press(view.getByRole("button", { name: "Replace with a new game" }))
+    fireEvent.press(view.getByRole("button", { name: "Delete game" }))
+    fireEvent.press(view.getByTestId("newer-game-delete-confirm"))
     expect(view.getByTestId("game-board")).toBeTruthy()
     expect(localGameRepository.hasNewerActiveGame()).toBe(false)
+  })
+
+  it("sends a game saved by a newer version to the store once the store has a newer build", async () => {
+    storage.set(
+      LOCAL_KEYS.active,
+      JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
+    )
+    const screen = () => (
+      <ThemeProvider initialContext="dark">
+        <Index />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    await act(async () => {
+      fireEvent.press(view.getByRole("button", { name: "Check for updates" }))
+    })
+    expect(view.getByText(/No update is available yet/)).toBeTruthy()
+
+    mockStoreUpdate = { labelTx: "play:launch.openAppStore", url: "https://apps.example/scryve" }
+    view.rerender(screen())
+
+    expect(view.queryByText(/No update is available yet/)).toBeNull()
+    expect(view.queryByRole("button", { name: "Check for updates" })).toBeNull()
+    fireEvent.press(view.getByRole("button", { name: "Open App Store" }))
+    expect(mockUpdateFromStore).toHaveBeenCalled()
+    mockStoreUpdate = null
   })
 
   it("uses saved system defaults on the immediate play mat", () => {

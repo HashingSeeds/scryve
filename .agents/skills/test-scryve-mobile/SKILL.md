@@ -151,6 +151,9 @@ xcrun simctl openurl booted "$link"
 adb shell "am start -a android.intent.action.VIEW -d '$link'"
 ```
 
+`scryve-dev://dev/seed/newer` replaces the active game with a save only a
+newer build can open, which shows the update-needed launch screen.
+
 An unknown seed kind or bad param shows `Seed failed` with the reason. A link
 that is not shaped like `/dev/seed/<kind>` opens the root route (`/`) instead. Consent and auth
 still go through the real flows.

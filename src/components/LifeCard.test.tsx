@@ -463,6 +463,21 @@ describe("LifeCard", () => {
     }
   })
 
+  it("names Others damage apart from commander damage on the hit and undo", () => {
+    const view = render(defendingCard({ dealt: 4, othersStep: 1, takeBack: 3, othersTakeBack: 2 }))
+    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 193, height: 420 } },
+    })
+    expect(view.getByTestId("commander-hit-seat-2")).toHaveProp(
+      "accessibilityLabel",
+      "Deal 3 commander damage and 1 from other attackers to Grace",
+    )
+    expect(view.getByTestId("commander-undo-seat-2")).toHaveProp(
+      "accessibilityLabel",
+      "Take back 1 commander damage and 2 from other attackers",
+    )
+  })
+
   it("fills the ring at lethal damage, not at the storage cap", () => {
     const view = render(defendingCard())
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
@@ -473,17 +488,47 @@ describe("LifeCard", () => {
     )
   })
 
-  it("previews where the next hit lands toward lethal, and shows nothing when a tap deals nothing", () => {
-    const view = render(defendingCard({ commanders: [{ power: 3, total: 6 }], dealt: 3 }))
+  it("fills earlier damage bright and grows this attack's hits as a faint stretch past it", () => {
+    const view = render(defendingCard({ commanders: [{ power: 3, total: 9, landed: 3 }] }))
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
       nativeEvent: { layout: { width: 193, height: 420 } },
     })
+    expect(arcSweep(view.UNSAFE_getByProps({ testID: "commander-progress-seat-2" }))).toBeCloseTo(
+      6 / 21,
+    )
     expect(
       arcSweep(view.UNSAFE_getByProps({ testID: "commander-hit-preview-seat-2" })),
     ).toBeCloseTo(9 / 21)
 
-    view.rerender(defendingCard({ commanders: [{ power: 3, total: 21 }], dealt: 0 }))
+    view.rerender(defendingCard({ commanders: [{ power: 3, total: 9 }] }))
     expect(view.UNSAFE_queryAllByProps({ testID: "commander-hit-preview-seat-2" })).toHaveLength(0)
+  })
+
+  it("names the life a defender started the attack from, less what the attack has dealt", () => {
+    // why: the life holds still until the first hit, so nothing hangs under it before then.
+    const view = render(defendingCard({ commanders: [{ power: 1, total: 6 }] }))
+    expect(view.queryByTestId("life-incoming-seat-2")).toBeNull()
+
+    view.rerender(defendingCard({ commanders: [{ power: 2, total: 10, landed: 4 }], applied: 4 }))
+    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("34 − 4")
+
+    // why: a connected attack holds its hits until Send, so the life shown is still the starting life.
+    view.rerender(defendingCard({ commanders: [{ power: 2, total: 10, landed: 4 }], applied: 0 }))
+    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("30 − 4")
+
+    view.rerender(
+      defendingCard({ commanders: [{ power: 2, total: 6 }], othersLanded: 3, applied: 3 }),
+    )
+    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("33 − 3")
+
+    view.rerender(
+      defendingCard({
+        commanders: [{ power: 2, total: 10, landed: 4 }],
+        othersLanded: 3,
+        applied: 7,
+      }),
+    )
+    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("37 − 4 − 3")
   })
 
   it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
@@ -1020,6 +1065,32 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Krenko")
   })
 
+  it("offers Others beside the commander only where the game takes it", () => {
+    const attacker = (othersShown?: boolean) => (
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          commanderDamage={commanderDamage({
+            armedPlayerId: commanderIds[0],
+            commanders: [{ name: "Krenko", power: 1, total: 0 }],
+            othersShown,
+            onPressSword: jest.fn(),
+          })}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(attacker())
+    expect(view.getByTestId("commander-name-seat-1-others")).toHaveTextContent("Others")
+
+    view.rerender(attacker(false))
+    expect(view.queryByTestId("commander-name-seat-1-others")).toBeNull()
+    expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Krenko")
+  })
+
   it("names each partner on a compact attacking card", () => {
     const view = render(
       <ThemeProvider initialContext="light">
@@ -1074,10 +1145,7 @@ describe("LifeCard", () => {
       nativeEvent: { layout: { width: 200, height: 300 } },
     })
     expect(view.getAllByText("20")).toHaveLength(1)
-    const slot = attackerLifeSlot(
-      attackerLayout({ space: { width: 200, height: 300 }, count: 1 }),
-      darkTheme.spacing,
-    )
+    const slot = attackerLifeSlot(attackerLayout({ space: { width: 200, height: 300 }, count: 1 }))
     const [, slotDrop, { scale }] = StyleSheet.flatten(
       view.getByTestId("life-readout-seat-1").props.style,
     ).transform
@@ -1095,16 +1163,32 @@ describe("LifeCard", () => {
     ).toHaveProp("pointerEvents", "none")
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
     fireEvent.press(view.getByTestId("commander-power-down-seat-1"))
+    // why: the power opens an in-card keypad that sets the power with each key and hides the card's own total while it is open.
+    fireEvent(view.getByTestId("commander-attacker-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 200, height: 300 } },
+    })
     fireEvent.press(view.getByTestId("commander-power-seat-1"))
-    const field = view.getByTestId("commander-power-input-seat-1")
-    expect(field).toHaveProp("keyboardType", "number-pad")
-    fireEvent.changeText(field, "1x2")
-    fireEvent(field, "blur")
+    expect(view.getByTestId("commander-power-input-seat-1")).toHaveTextContent("3")
+    expect(StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style).opacity).toBe(0)
+    fireEvent.press(view.getByTestId("pokemon-key-1-seat-1"))
+    fireEvent.press(view.getByTestId("pokemon-key-2-seat-1"))
+    // why: the box shows the power the attack holds, here the unchanged prop, not the typed digits.
+    expect(view.getByTestId("commander-power-input-seat-1")).toHaveTextContent("3")
+    fireEvent.press(view.getByTestId("pokemon-key-3-seat-1"))
+    // why: a − or + while typing replaces the typed number, so the box shows the power the next hit deals.
+    fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
+    expect(view.getByTestId("commander-power-input-seat-1")).toHaveTextContent("3")
+    fireEvent.press(view.getByTestId("pokemon-key-hide-keypad-seat-1"))
     expect(view.queryByTestId("commander-power-input-seat-1")).toBeNull()
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style).opacity,
+    ).toBeUndefined()
     expect(onPower.mock.calls).toEqual([
       [4, 0],
       [2, 0],
+      [1, 0],
       [12, 0],
+      [4, 0],
     ])
     fireEvent.press(view.getByTestId("commander-exit-seat-1"))
     expect(onPressSword).toHaveBeenCalledTimes(1)
