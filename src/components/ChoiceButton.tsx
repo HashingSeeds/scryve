@@ -43,6 +43,7 @@ export function ChoiceButton(props: ChoiceButtonProps) {
   const fill = accentColor ?? colors.tint
   const foreground = selected ? accessibleForeground(fill) : colors.text
   const selectedStyle: ViewStyle = { backgroundColor: fill, borderColor: fill }
+  const labelled = rest.text !== undefined || rest.tx !== undefined || rest.children != null
 
   return (
     <Button
@@ -62,7 +63,7 @@ export function ChoiceButton(props: ChoiceButtonProps) {
       LeftAccessory={
         Leading
           ? () => (
-              <View style={themed($leading)}>
+              <View style={labelled && themed($leading)}>
                 {Leading({ color: selected ? foreground : fill })}
               </View>
             )

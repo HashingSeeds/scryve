@@ -30,6 +30,22 @@ describe("TextField", () => {
     expect(view.getByText("Notes optional")).toBeTruthy()
   })
 
+  it("adds a dismiss accessory only where Return cannot put the keyboard away", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <TextField testID="search" value="" returnKeyType="search" />
+        <TextField testID="life" value="" keyboardType="number-pad" />
+        <TextField testID="notes" value="" multiline />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("search").props.inputAccessoryViewID).toBeUndefined()
+    for (const testID of ["life", "notes"]) {
+      const nativeID = view.getByTestId(testID).props.inputAccessoryViewID
+      expect(view.UNSAFE_getByProps({ nativeID })).toBeTruthy()
+    }
+  })
+
   it("clears its text from the x", () => {
     const view = renderField("bolt")
 
