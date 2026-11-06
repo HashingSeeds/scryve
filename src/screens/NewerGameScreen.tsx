@@ -50,23 +50,25 @@ export function NewerGameScreen({
         ) : null}
       </View>
       <View style={themed($actions)}>
-        <Button
-          tx={checking ? "play:launch.checkingForUpdates" : "play:launch.checkForUpdates"}
-          preset="primary"
-          style={themed($primaryAction)}
-          disabled={checking}
-          onPress={() => {
-            setCheck("checking")
-            void onCheckForUpdates().then(setCheck)
-          }}
-        />
         {storeUpdate ? (
           <Button
             tx={storeUpdate.labelTx}
-            style={themed($secondaryAction)}
+            preset="primary"
+            style={themed($primaryAction)}
             onPress={onStoreUpdate}
           />
-        ) : null}
+        ) : (
+          <Button
+            tx={checking ? "play:launch.checkingForUpdates" : "play:launch.checkForUpdates"}
+            preset="primary"
+            style={themed($primaryAction)}
+            disabled={checking}
+            onPress={() => {
+              setCheck("checking")
+              void onCheckForUpdates().then(setCheck)
+            }}
+          />
+        )}
         <Button
           tx="play:launch.contactSupport"
           style={themed($secondaryAction)}

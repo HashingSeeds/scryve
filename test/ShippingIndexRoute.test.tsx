@@ -273,7 +273,7 @@ describe("shipping index route", () => {
     expect(localGameRepository.hasNewerActiveGame()).toBe(false)
   })
 
-  it("offers the store for a game saved by a newer version when the store has a newer build", () => {
+  it("sends a game saved by a newer version to the store when the store has a newer build", () => {
     storage.set(
       LOCAL_KEYS.active,
       JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
@@ -286,6 +286,7 @@ describe("shipping index route", () => {
       </ThemeProvider>,
     )
 
+    expect(view.queryByRole("button", { name: "Check for updates" })).toBeNull()
     fireEvent.press(view.getByRole("button", { name: "Open App Store" }))
     expect(mockUpdateFromStore).toHaveBeenCalled()
     mockStoreUpdate = null
