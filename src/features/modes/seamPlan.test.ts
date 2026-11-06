@@ -52,4 +52,18 @@ describe("seamPlan", () => {
   it("leaves the die on the chip of a side-facing seat", () => {
     expect(chipCrowdedBySeam(geometryFor(4, 390, 844), new Set([0]))).toBe(false)
   })
+
+  it("keeps a due scheme readable on the active archenemy's side when their chip is crowded", () => {
+    const geometry = geometryFor(3, 390, 844)
+    const archenemyOnTop = new Set([0])
+    const rooms = {
+      left: seamRoom(geometry, "left", archenemyOnTop),
+      right: seamRoom(geometry, "right", archenemyOnTop),
+    }
+    expect(chipCrowdedBySeam(geometry, archenemyOnTop)).toBe(true)
+    expect(planSeam(rooms, ["plane", "die", "schemeDue"])).toMatchObject({
+      left: { items: ["plane"] },
+      right: { items: ["die", "schemeDue"], room: { inActiveCard: true } },
+    })
+  })
 })

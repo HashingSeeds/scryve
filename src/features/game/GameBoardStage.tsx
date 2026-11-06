@@ -264,13 +264,13 @@ function LegacyGameBoardStage({
       </FirstPlayerTabsShownContext.Provider>
       {seam && !menu.open && rotation === 0
         ? seam({
-                  anchor: boardAnchor,
-                  facings,
-                  edgeTabs: tabsShown,
-                  sides: getMenuSeamNeighbors(playerCount, gridLayout),
-                  width,
-                  menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
-                })
+            anchor: boardAnchor,
+            facings,
+            edgeTabs: tabsShown,
+            sides: getMenuSeamNeighbors(playerCount, gridLayout),
+            width,
+            menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+          })
         : null}
       <GameRadialMenu
         {...menu}
