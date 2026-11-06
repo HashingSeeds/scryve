@@ -67,6 +67,49 @@ function renderEvent(events: EventSource) {
 }
 
 describe("EventScreen", () => {
+  it("mounts a screenful of a big event's rows instead of all of them", () => {
+    const players = Array.from({ length: 96 }, (_, index) => ({
+      id: `p${index}`,
+      name: `Player ${index}`,
+      guest: false,
+      dropped: false,
+    }))
+    const big = source(
+      view({
+        isOrganizer: true,
+        myPlayerId: null,
+        round: 2,
+        players,
+        tables: Array.from({ length: 48 }, (_, index) => ({
+          ...openTable,
+          id: `t${index}`,
+          table: index + 1,
+          playerIds: [`p${index * 2}`, `p${index * 2 + 1}`],
+        })),
+      }),
+    )
+    const events: EventSource = {
+      ...big,
+      standings: players.map((player, index) => ({
+        playerId: player.id,
+        rank: index + 1,
+        points: 3,
+        wins: 1,
+        losses: 0,
+        draws: 0,
+        tiebreakers: [0.5],
+      })),
+    }
+    renderEvent(events)
+    const mounted = (pattern: RegExp) => screen.queryAllByTestId(pattern).length
+
+    expect(mounted(/^table-\d+$/)).toBeGreaterThan(0)
+    expect(mounted(/^table-\d+$/)).toBeLessThan(40)
+    fireEvent.press(screen.getByText("Standings"))
+    expect(mounted(/^standing-p\d+$/)).toBeGreaterThan(0)
+    expect(mounted(/^standing-p\d+$/)).toBeLessThan(40)
+  })
+
   it("lets a player report their table in seat order", async () => {
     const events = source(view())
     renderEvent(events)
