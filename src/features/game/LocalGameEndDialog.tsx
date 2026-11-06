@@ -94,7 +94,7 @@ export function LocalGameEndDialog({
               key={player.id}
               testID={`end-game-winner-${player.seat}`}
               text={name}
-              TextProps={{ numberOfLines: 2 }}
+              TextProps={{ numberOfLines: 3 }}
               detail={value.shown}
               accentColor={player.color}
               Leading={({ color }) => (

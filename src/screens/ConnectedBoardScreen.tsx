@@ -1660,7 +1660,7 @@ function WinnerChoice({
   return (
     <ChoiceButton
       text={name}
-      TextProps={{ numberOfLines: 2 }}
+      TextProps={{ numberOfLines: 3 }}
       detail={life.shown}
       accentColor={player.color}
       Leading={({ color }) => (
