@@ -20,6 +20,7 @@ import {
   localTableRules,
   restartMatchGame,
   soleLoserSeat,
+  startTurnBy,
   undoableTurn,
   withFirstChooser,
   withFirstTurn,
@@ -90,8 +91,12 @@ export function useLocalGame(
 
   const dispatch = useCallback(
     (command: GameCommand, endSource?: GameEndSource): LocalGame => {
-      const applied = applyGameCommand(gameRef.current, command, context)
-      if (applied === gameRef.current) return applied
+      const changed = applyGameCommand(gameRef.current, command, context)
+      if (changed === gameRef.current) return changed
+      const applied =
+        command.type === "life.change"
+          ? startTurnBy(changed, command.playerId, Date.now())
+          : changed
       const next = withFirstPlayerSettled(applied)
       if (next.status === "active") {
         save(next)

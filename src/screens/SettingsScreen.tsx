@@ -185,9 +185,9 @@ export function SettingsScreen({
         />
       )}
       <Switch
-        testID="turn-tab-switch"
-        labelTx="account:settings.turnTab.label"
-        helperTx="account:settings.turnTab.helper"
+        testID="turns-switch"
+        labelTx="account:settings.turns.label"
+        helperTx="account:settings.turns.helper"
         value={settings.turnTab !== false}
         onValueChange={(value) => update(value ? { turnTab: true } : { turnTab: false })}
       />

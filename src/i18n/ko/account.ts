@@ -120,9 +120,9 @@ export default {
     copyDebugInfo: "디버그 정보 복사",
     copied: "복사됨",
     copyFailed: "복사할 수 없습니다. 다시 시도해 주세요.",
-    turnTab: {
-      label: "턴 탭",
-      helper: "현재 누구의 턴인지와 진행 시간을 표시합니다. 탭하면 턴을 넘깁니다.",
+    turns: {
+      label: "턴",
+      helper: "현재 자리를 강조하고 해당 카드에 턴 시계를 표시합니다. 시계를 탭하면 턴을 넘깁니다.",
     },
     syncStats: {
       label: "괴짜용 통계",

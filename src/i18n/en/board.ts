@@ -505,19 +505,15 @@ const board = {
     actionWithDetail: "{{label}}, {{detail}}",
   },
   turn: {
-    // The turn tab before anyone has the first turn. Tapping it picks who goes first. Very short.
-    whoFirst: "1st?",
-    whoFirstLabel: "Who goes first? Opens the turn controls",
-    // Very short tap target on the turn tab that ends this player's turn and starts the next player's. Never "End turn".
+    // On the active player's turn chip, before their turn clock starts. Tapping starts it. Very short.
+    start: "Start",
+    startHint: "Tap to start the turn clock",
+    // Very short tap target on the turn chip that ends this player's turn and starts the next player's. Never "End turn".
     pass: "Pass",
-    // Screen reader label for the turn tab, as in "Turn 4, Ada".
+    // Screen reader label for the turn chip, as in "Turn 4, Ada".
     label: "Turn {{number}}, {{name}}",
-    roundLabel: "Round {{time}}",
-    passHint: "Tap to pass",
     passHintTo: "Tap to pass to {{name}}",
-    // Screen reader text for a player's chess clock, as in "Time bank 4:12".
-    bankLabel: "Time bank {{time}}",
-    // Shown in the turn tab when a player's chess clock bank has run out. Play continues. Very short, may wrap to two lines.
+    // Screen reader text when a player's chess clock bank has run out. Play continues.
     outOfTime: "Out of time",
     longPressHint: "Long press for turn controls",
     // Title of the turn controls dialog, as in "Turn 4".
@@ -531,35 +527,17 @@ const board = {
     undoPass: "Take back the pass",
     // A toast after a pass, as in "Turn 5, Grace".
     passed: "Turn {{number}}, {{name}}",
-    clockStyle: "Clock",
-    clockStyles: {
-      // Turn time with the round time under it.
-      stacked: "Stacked",
-      // Turn time and round time take turns in one line.
-      swap: "Swap",
-      // The round time drains as a ring around the player's mark.
-      ring: "Ring",
-      // Each player's own time bank counts down only on their turn.
-      chess: "Chess",
-    },
+    // A chess clock: each player's own time bank counts down only on their turn.
     chessBank: "Time per player",
     chessMinutes: "{{minutes}} min",
     chessOff: "Off",
-    passStyle: "Pass cue",
-    passStyles: {
-      // The next player's mark, shown small beside the active player's.
-      next: "Next up",
-      label: "Word",
-      // No cue; the whole tab is the button.
-      none: "None",
-    },
     roundClock: "Round clock",
     // The log divider at the start of each turn, as in "Turn 4 · Ada".
     divider: "Turn {{number}} · {{name}}",
     hideOffer: {
-      title: "Hide the turn tab?",
-      body: "You can bring it back in Settings.",
-      hide: "Hide",
+      title: "Stop tracking turns?",
+      body: "You can turn it back on in Settings.",
+      hide: "Stop",
       keep: "Keep",
     },
   },

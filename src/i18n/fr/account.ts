@@ -121,9 +121,10 @@ export default {
     copyDebugInfo: "Copier les infos de débogage",
     copied: "Copié",
     copyFailed: "Copie impossible. Réessayez.",
-    turnTab: {
-      label: "Onglet du tour",
-      helper: "Indique à qui est le tour et depuis combien de temps. Touchez pour passer.",
+    turns: {
+      label: "Tours",
+      helper:
+        "Encadre la place active et affiche un chronomètre de tour sur sa carte. Touchez le chronomètre pour passer.",
     },
     syncStats: {
       label: "Stats pour les geeks",

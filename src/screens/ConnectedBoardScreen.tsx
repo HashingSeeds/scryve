@@ -60,9 +60,9 @@ import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/Tr
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
+import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import { asPlayerId } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
-import type { BoardTurnTab } from "@/features/game/GameBoardStage"
 import { GameToast } from "@/features/game/GameToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
@@ -77,12 +77,12 @@ import {
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import {
-  HideTurnTabDialog,
-  reportTurnTabGame,
+  HideTurnsDialog,
+  reportTurnsGame,
   TurnDialog,
-  useTurnTabPrefs,
+  useTurnPrefs,
 } from "@/features/game/TurnDialog"
-import { DENSE_TABLE_FROM, offersToHideTurnTab, PASS_UNDO_MS } from "@/features/game/turnTab"
+import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
@@ -492,6 +492,7 @@ export function ConnectedBoardWithRuntime({
     setTurn,
     undoTurn,
     setBank,
+    startTurn,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -513,6 +514,7 @@ export function ConnectedBoardWithRuntime({
       setTurn,
       undoTurn,
       setBank,
+      startTurn,
     }),
     [
       tableState,
@@ -533,6 +535,7 @@ export function ConnectedBoardWithRuntime({
       setTurn,
       undoTurn,
       setBank,
+      startTurn,
     ],
   )
   const latest = useRef(runtime)
@@ -671,7 +674,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const rematchPublicId = game.rematchPublicId
   const table = useContext(ConnectedTableContext)
   const turn = turns ? table?.table.turn : undefined
-  const [turnPrefs, setTurnPrefs] = useTurnTabPrefs(localGameRepository)
+  const [turnPrefs, setTurnPrefs] = useTurnPrefs(localGameRepository)
   const [turnOpen, setTurnOpen] = useState(false)
   const [turnToast, setTurnToast] = useState<{
     operationId: string
@@ -693,12 +696,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     if (terminalStatus === "finished") {
       if (navigatedTerminal.current) return
       navigatedTerminal.current = true
-      if (turns && offersToHideTurnTab(turnPrefs, endedTurn.current)) {
+      if (turns && offersToHideTurns(turnPrefs, endedTurn.current)) {
         setTurnPrefs({ hideOffered: true })
         setHideOffer(true)
         return
       }
-      reportTurnTabGame({
+      reportTurnsGame({
         prefs: { enabled: tabOn },
         turn: endedTurn.current,
         playerCount,
@@ -712,7 +715,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }, [terminalStatus, leaveFinished, turns, turnPrefs, setTurnPrefs, tabOn, playerCount])
   function answerHideOffer(hide: boolean) {
     if (hide) setTurnPrefs({ enabled: false })
-    reportTurnTabGame({
+    reportTurnsGame({
       prefs: { enabled: true },
       turn: endedTurn.current,
       playerCount,
@@ -976,10 +979,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       (id) => outReason(outState, id) !== undefined,
     )
   }
-  function passTurn() {
+  function passTo(next: string) {
     if (!turn || !myTurn || !table) return
-    const next = nextPlayerId()
-    const operationId = next && table.passTurn(turn.playerId, next)
+    const operationId = table.passTurn(turn.playerId, next)
     if (!operationId) return
     setTurnToast({
       operationId,
@@ -990,25 +992,36 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       }),
     })
   }
-  const turnTab: BoardTurnTab | undefined =
-    tabOn && active && table
+  const turnsOn = tabOn && active && table !== undefined
+  const turnChip: TurnChipState | undefined =
+    turnsOn && turn
       ? {
           turn,
-          seat: turnSeats.find(({ playerId }) => playerId === turn?.playerId),
-          canPass: myTurn,
-          clockStyle: turnPrefs.clock,
-          passStyle: turnPrefs.pass,
-          nextSeat: () => {
-            const next = myTurn ? nextPlayerId() : undefined
-            return turnSeats.find(({ playerId }) => playerId === next)
-          },
-          system,
-          copies: "holder",
-          ...(game.players.length >= DENSE_TABLE_FROM ? { dense: true } : {}),
-          onPress: () => (turn ? passTurn() : setTurnOpen(true)),
+          canPress: myTurn,
+          nameOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId)?.name,
+          onStart: () => table?.startTurn(turn.playerId),
+          onPass: passTo,
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
+  // why: with turns on and nobody holding the first turn, each of this device's seats carries an empty 1st that takes it.
+  const seatGrid = {
+    ...dice.grid,
+    chipsFor: (player: GamePlayer): DiceSeatChip[] => {
+      const chips = dice.grid.chipsFor(player)
+      if (turnChip && player.id === turnChip.turn.playerId)
+        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+      return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
+    },
+    onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
+      // why: the turn chip marks who went first here, so a claim never leaves a local 1st badge behind.
+      if (chip.kind === "claim") {
+        if (!turn) table?.setTurn(player.id, player.id)
+        return
+      }
+      dice.grid.onPressChip(player, chip)
+    },
+  }
   useStoreReview(
     game.status === "finished" &&
       !menuOpen &&
@@ -1058,7 +1071,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       <GameBoard
         testID="connected-game-board"
         chrome={chrome}
-        turnTab={turnTab}
+        turns={turnChip ? { active: turnChip.turn.playerId, nextOf: nextPlayerId } : undefined}
         toast={
           turnToast ? (
             <GameToast
@@ -1120,7 +1133,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                   }
                 : undefined
             }
-            dice={dice.grid}
+            dice={seatGrid}
             onChange={controls.changeLife}
           />
         )}
@@ -1146,8 +1159,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 }
               : undefined
           }
-          prefs={turnPrefs}
-          onPrefs={setTurnPrefs}
           onBank={(() => {
             const mine = turnSeats.find(({ playerId }) => controlled.has(playerId))
             return turn && mine ? (bankMs) => table.setBank(mine.playerId, bankMs) : undefined
@@ -1156,7 +1167,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
-      {hideOffer ? <HideTurnTabDialog onAnswer={answerHideOffer} /> : null}
+      {hideOffer ? <HideTurnsDialog onAnswer={answerHideOffer} /> : null}
 
       {inviteSheet.shown && shownInvitation ? (
         <Sheet

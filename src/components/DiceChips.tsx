@@ -18,6 +18,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 import { BoardPressable } from "./BoardPressable"
 import { DieFace } from "./DiceGlyph"
 import { Text } from "./Text"
+import { TurnChip } from "./TurnChip"
 
 export const DICE_CHIP_HEIGHT = 36
 export const COMPACT_DICE_CHIP_HEIGHT = 32
@@ -74,6 +75,17 @@ export function DiceChips({
       style={themed($row)}
     >
       {chips.map((chip) => {
+        if (chip.kind === "turn")
+          return (
+            <ChipFlight key="turn" entering={entering} awaiting={false}>
+              <TurnChip
+                state={chip.state}
+                seatNumber={seatNumber}
+                foreground={foreground}
+                compact={compact}
+              />
+            </ChipFlight>
+          )
         const key = chipKey(chip)
         const claim = chip.kind === "claim"
         const label =
@@ -182,7 +194,7 @@ function ChipFlight({
   )
 }
 
-function chipKey(chip: DiceSeatChip) {
+function chipKey(chip: Exclude<DiceSeatChip, { kind: "turn" }>) {
   return chip.kind === "roll" ? chip.roll.tool : chip.kind
 }
 

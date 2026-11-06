@@ -28,21 +28,8 @@ export interface FirstPlayerTab {
 
 const TAB_LENGTH = 52
 const TAB_DEPTH = 40
-export const TURN_TAB_FACE_WIDTH = 44
-/** why: the turn tab's face grows a row at a time, and seats facing the seam must clear its deepest one. */
-const TURN_TAB_DEEPEST_FACE = 84
-export const TURN_TAB_BORDER = 4
-/**
- * why: the first-player tab becomes the turn tab in the same place, so seats clear the turn tab
- * from the start and their chrome never shifts between the two. Beside seats at the sides the turn
- * tab's face runs into the board, so along the edge it is as short as the first-player tab and the
- * names beside it keep their room; it reaches deeper instead.
- */
-export const FIRST_PLAYER_TAB = {
-  length: Math.max(TAB_LENGTH, TURN_TAB_FACE_WIDTH + 2 * TURN_TAB_BORDER),
-  depth: Math.max(TAB_DEPTH, TURN_TAB_DEEPEST_FACE + TURN_TAB_BORDER),
-} as const
-const FIRST_TAB_SIZE = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
+/** why: the round clock tab takes the first-player tab's place at the same size, so seats clear one footprint and their chrome never shifts between the two. */
+export const FIRST_PLAYER_TAB = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
 export const FirstPlayerTabsShownContext = createContext(false)
 const TAB_BORDER = 4
@@ -105,7 +92,7 @@ export const FirstPlayerTabs = memo(function FirstPlayerTabs({
             importantForAccessibility={primary ? "auto" : "no-hide-descendants"}
             style={[
               $tab,
-              edgeStyle(tab, FIRST_TAB_SIZE),
+              edgeStyle(tab, FIRST_PLAYER_TAB),
               {
                 backgroundColor: colors.gameMenu.anchor,
                 borderColor: "color" in glyph ? glyph.color : colors.gameMenu.anchorBorder,

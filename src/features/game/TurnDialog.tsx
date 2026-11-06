@@ -7,29 +7,29 @@ import { ChoiceButton } from "@/components/ChoiceButton"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
-import type { TurnTabSeat } from "@/components/TurnTabs"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
 import type { LocalGameRepository } from "./localPersistence"
-import {
-  CHESS_BANK_MINUTES,
-  TURN_CLOCK_STYLES,
-  TURN_PASS_STYLES,
-  turnsPassed,
-  type TurnTabPrefs,
-} from "./turnTab"
+import { CHESS_BANK_MINUTES, turnsPassed, type TurnPrefs } from "./turnTab"
+import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { Turn } from "../../../convex/lib/turns"
+
+export interface TurnSeat {
+  playerId: string
+  seatNumber: number
+  name: string
+  color: string
+  shape?: PlayerMarkShape
+}
 
 export interface TurnDialogProps {
   turn: Turn | undefined
-  seats: readonly TurnTabSeat[]
+  seats: readonly TurnSeat[]
   pick?: { canPick: (playerId: string) => boolean; onPick: (playerId: string) => void }
   onUndo?: () => void
-  prefs: TurnTabPrefs
-  onPrefs: (prefs: Partial<TurnTabPrefs>) => void
   onBank?: (bankMs: number | undefined) => void
   onRoundClock?: () => void
   onClose: () => void
@@ -40,8 +40,6 @@ export function TurnDialog({
   seats,
   pick,
   onUndo,
-  prefs,
-  onPrefs,
   onBank,
   onRoundClock,
   onClose,
@@ -98,16 +96,7 @@ export function TurnDialog({
           <Text size="xs" tone="dim" tx="board:turn.eventPlay" />
         )}
         {onUndo ? <Button testID="turn-undo" tx="board:turn.undoPass" onPress={onUndo} /> : null}
-        <Choices
-          tx="board:turn.clockStyle"
-          options={TURN_CLOCK_STYLES.map((style) => ({
-            id: style,
-            label: translate(`board:turn.clockStyles.${style}`),
-          }))}
-          selected={prefs.clock}
-          onSelect={(clock) => onPrefs({ clock })}
-        />
-        {prefs.clock === "chess" && onBank ? (
+        {onBank ? (
           <Choices
             tx="board:turn.chessBank"
             options={[
@@ -121,15 +110,6 @@ export function TurnDialog({
             onSelect={(minutes) => onBank(minutes === 0 ? undefined : minutes * 60_000)}
           />
         ) : null}
-        <Choices
-          tx="board:turn.passStyle"
-          options={TURN_PASS_STYLES.map((style) => ({
-            id: style,
-            label: translate(`board:turn.passStyles.${style}`),
-          }))}
-          selected={prefs.pass}
-          onSelect={(pass) => onPrefs({ pass })}
-        />
       </ScrollView>
       <View style={themed($dialogActions)}>
         {onRoundClock ? (
@@ -152,7 +132,7 @@ function Choices<Id extends string | number>({
   selected,
   onSelect,
 }: {
-  tx: "board:turn.clockStyle" | "board:turn.chessBank" | "board:turn.passStyle"
+  tx: "board:turn.chessBank"
   options: readonly { id: Id; label: string }[]
   selected: Id
   onSelect: (id: Id) => void
@@ -188,25 +168,25 @@ const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $choice: ViewStyle = { flexGrow: 1 }
 
-export function useTurnTabPrefs(repository: LocalGameRepository) {
-  const [prefs, setPrefs] = useState(() => repository.turnTabPrefs())
+export function useTurnPrefs(repository: LocalGameRepository) {
+  const [prefs, setPrefs] = useState(() => repository.turnPrefs())
   const update = useCallback(
-    (changes: Partial<TurnTabPrefs>) => setPrefs(repository.saveTurnTabPrefs(changes)),
+    (changes: Partial<TurnPrefs>) => setPrefs(repository.saveTurnPrefs(changes)),
     [repository],
   )
   return [prefs, update] as const
 }
 
 /** why: the game-end analytics event waits for the hide offer's answer, so one event carries it. */
-export function reportTurnTabGame(input: {
-  prefs: Pick<TurnTabPrefs, "enabled">
+export function reportTurnsGame(input: {
+  prefs: Pick<TurnPrefs, "enabled">
   turn: Pick<Turn, "number"> | undefined
   playerCount: number
   mode: "local" | "connected"
   hideOffer: "none" | "shown" | "accepted"
 }) {
-  captureAnalytics("turn_tab_game_ended", {
-    tab_enabled: input.prefs.enabled,
+  captureAnalytics("turns_game_ended", {
+    turns_enabled: input.prefs.enabled,
     pass_count: turnsPassed(input.turn),
     player_count: input.playerCount,
     mode: input.mode,
@@ -214,28 +194,28 @@ export function reportTurnTabGame(input: {
   })
 }
 
-export function HideTurnTabDialog({ onAnswer }: { onAnswer: (hide: boolean) => void }) {
+export function HideTurnsDialog({ onAnswer }: { onAnswer: (hide: boolean) => void }) {
   const { themed } = useAppTheme()
   return (
     <DialogCard
       visible
       onClose={() => onAnswer(false)}
-      backdropTestID="hide-turn-tab-backdrop"
+      backdropTestID="hide-turns-backdrop"
       backdropAccessibilityLabel={translate("board:turn.hideOffer.keep")}
-      dialogTestID="hide-turn-tab-dialog"
+      dialogTestID="hide-turns-dialog"
       dialogAccessibilityRole="alert"
     >
       <Text preset="subheading" tx="board:turn.hideOffer.title" />
       <Text tx="board:turn.hideOffer.body" />
       <View style={themed($dialogActions)}>
         <Button
-          testID="hide-turn-tab-keep"
+          testID="hide-turns-keep"
           tx="board:turn.hideOffer.keep"
           style={themed($dialogButton)}
           onPress={() => onAnswer(false)}
         />
         <Button
-          testID="hide-turn-tab-hide"
+          testID="hide-turns-hide"
           tx="board:turn.hideOffer.hide"
           preset="primary"
           style={themed($dialogButton)}

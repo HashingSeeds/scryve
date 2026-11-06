@@ -35,7 +35,7 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
-import type { Turn } from "./turns"
+import { isTurnAction, startedByChange, type Turn } from "./turns"
 import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
@@ -418,7 +418,7 @@ function* writeLife(
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
   const { currentLife, changes } = changeLife(store.game, seat, request, now)
-  yield* read(store.apply(changes))
+  yield* read(store.apply(withTurnStarted(store.game, seat.id, changes, now)))
   return acknowledged({ operationId, deduplicated: false, currentLife })
 }
 
@@ -580,8 +580,25 @@ function* writeTable(
   const related = relatedId === undefined ? undefined : yield* read(store.seat(relatedId))
   const outcome = changeTable(store.game, seat, related, request, now)
   if (isEngineError(outcome)) return failed(outcome)
-  yield* read(store.apply(outcome.changes))
+  yield* read(
+    store.apply(
+      isTurnAction(action)
+        ? outcome.changes
+        : withTurnStarted(store.game, seat.id, outcome.changes, now),
+    ),
+  )
   return acknowledged({ operationId, deduplicated: false })
+}
+
+/** why: the first turn's clock starts on its player's first change to their own card, on the authority, so every device and every older client agrees. */
+function withTurnStarted(
+  game: EngineGame,
+  seatId: string,
+  changes: GameChange[],
+  now: number,
+): GameChange[] {
+  const turn = startedByChange(game.turn, seatId, now)
+  return turn ? [...changes, { kind: "turn.set", turn }] : changes
 }
 
 export const declinedClaimOperationId = (operationId: string) => `${operationId}_declined`

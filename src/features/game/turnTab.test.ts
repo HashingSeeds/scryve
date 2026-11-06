@@ -4,9 +4,10 @@ import {
   withFirstTurn,
   applyLocalTableAction,
   asActorId,
+  startTurnBy,
 } from "./domain"
 import { gameLog, withTurnDividers } from "./LifeLog"
-import { clockwiseSlots, offersToHideTurnTab } from "./turnTab"
+import { clockwiseSlots, offersToHideTurns } from "./turnTab"
 
 describe("clockwiseSlots", () => {
   it("walks the grid's edge clockwise", () => {
@@ -21,14 +22,43 @@ describe("clockwiseSlots", () => {
   })
 })
 
-describe("offersToHideTurnTab", () => {
+describe("offersToHideTurns", () => {
   const prefs = { enabled: true, hideOffered: false }
   it("offers once, and only after a game nobody passed in", () => {
-    expect(offersToHideTurnTab(prefs, undefined)).toBe(true)
-    expect(offersToHideTurnTab(prefs, { number: 1 })).toBe(true)
-    expect(offersToHideTurnTab(prefs, { number: 2 })).toBe(false)
-    expect(offersToHideTurnTab({ ...prefs, hideOffered: true }, undefined)).toBe(false)
-    expect(offersToHideTurnTab({ ...prefs, enabled: false }, undefined)).toBe(false)
+    expect(offersToHideTurns(prefs, undefined)).toBe(true)
+    expect(offersToHideTurns(prefs, { number: 1 })).toBe(true)
+    expect(offersToHideTurns(prefs, { number: 2 })).toBe(false)
+    expect(offersToHideTurns({ ...prefs, hideOffered: true }, undefined)).toBe(false)
+    expect(offersToHideTurns({ ...prefs, enabled: false }, undefined)).toBe(false)
+  })
+})
+
+describe("local turn clock", () => {
+  it("starts on the first player's own life change, not another seat's", () => {
+    const game = createLocalGame({
+      players: [
+        { name: "Ada", color: "#f00" },
+        { name: "Bo", color: "#00f" },
+      ],
+      startingLife: 20,
+      now: 0,
+    })
+    const [ada, bo] = game.players
+    const waiting = applyLocalTableAction(
+      game,
+      { kind: "turn.set", playerId: ada.id, toPlayerId: ada.id },
+      { operationId: "turn-1", now: 1_000 },
+    )
+    expect(waiting.turn?.waiting).toBe(true)
+    const rolled = withFirstTurn(game, ada.id, { operationId: "roll-1", now: 1_000 })
+    expect(rolled.turn?.waiting).toBe(true)
+    expect(startTurnBy(waiting, bo.id, 2_000).turn?.waiting).toBe(true)
+    const started = startTurnBy(waiting, ada.id, 3_000)
+    expect(started.turn).toMatchObject({ startedAt: 3_000, operationId: "turn-1" })
+    expect(started.turn?.waiting).toBeUndefined()
+    expect(started.turnLog).toEqual([
+      { operationId: "turn-1", playerId: ada.id, number: 1, at: 3_000 },
+    ])
   })
 })
 

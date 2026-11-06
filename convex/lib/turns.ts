@@ -6,6 +6,8 @@ const turnFields = {
   startedAt: v.number(),
   operationId: v.string(),
   spent: v.optional(v.record(v.string(), v.number())),
+  /** why: the first turn's clock waits for its player to tap the chip or touch their own card, so setup time never counts against them. */
+  waiting: v.optional(v.literal(true)),
 }
 
 export const previousTurnValidator = v.object(turnFields)
@@ -33,6 +35,7 @@ export const turnActionValidators = [
   v.object({ kind: v.literal("turn.undone"), playerId: v.string(), turnOperationId: v.string() }),
   /** why: any seat may set the chess clock, and every device reads the same bank from the authority. */
   v.object({ kind: v.literal("turn.clock"), playerId: v.string(), bankMs: v.optional(v.number()) }),
+  v.object({ kind: v.literal("turn.started"), playerId: v.string() }),
 ] as const
 
 export type Turn = Infer<typeof turnValidator>
@@ -60,7 +63,7 @@ const settled = ({ previous: _previous, bank: _bank, ...turn }: Turn): PreviousT
 const isBankMs = (ms: number) => Number.isInteger(ms) && ms >= 60_000 && ms <= MAX_BANK_MS
 
 function spentAfter(turn: Turn, now: number): Record<string, number> {
-  const held = Math.max(0, now - turn.startedAt)
+  const held = turnElapsed(turn, now)
   return { ...turn.spent, [turn.playerId]: (turn.spent?.[turn.playerId] ?? 0) + held }
 }
 
@@ -100,6 +103,10 @@ export function applyTurnAction(
     return turn.bank ? { ...previous, bank: turn.bank } : previous
   }
   if (action.kind === "turn.clock") return turn ? withBank(turn, action.bankMs, context.now) : null
+  if (action.kind === "turn.started") {
+    if (!turn || turn.playerId !== action.playerId) return null
+    return startedTurn(turn, context.now) ?? turn
+  }
   if (!context.isSeat(action.toPlayerId)) return null
   if (!turn) {
     if (action.kind === "turn.passed" || action.toPlayerId !== action.playerId) return null
@@ -108,6 +115,7 @@ export function applyTurnAction(
       number: 1,
       startedAt: context.now,
       operationId: context.operationId,
+      waiting: true,
     }
   }
   if (turn.playerId !== action.playerId) return null
@@ -118,6 +126,16 @@ export function applyTurnAction(
     action.kind === "turn.passed" ? turn.number + 1 : turn.number,
     context,
   )
+}
+
+function startedTurn(turn: Turn, now: number): Turn | undefined {
+  if (!turn.waiting) return undefined
+  const { waiting: _waiting, ...running } = turn
+  return { ...running, startedAt: now }
+}
+
+export function startedByChange(turn: Turn | undefined, playerId: string, now: number) {
+  return turn?.playerId === playerId ? startedTurn(turn, now) : undefined
 }
 
 export function nextTurnSeat(
@@ -134,8 +152,8 @@ export function nextTurnSeat(
   return undefined
 }
 
-export const turnElapsed = (turn: Pick<Turn, "startedAt">, now: number) =>
-  Math.max(0, now - turn.startedAt)
+export const turnElapsed = (turn: Pick<Turn, "startedAt" | "waiting">, now: number) =>
+  turn.waiting ? 0 : Math.max(0, now - turn.startedAt)
 
 export function turnTimeSpent(turn: Turn, playerId: string, now: number) {
   const before = turn.spent?.[playerId] ?? 0
@@ -165,6 +183,7 @@ function isPreviousTurn(value: unknown, playerIds: ReadonlySet<string>): value i
     typeof turn.startedAt === "number" &&
     Number.isFinite(turn.startedAt) &&
     typeof turn.operationId === "string" &&
+    (turn.waiting === undefined || turn.waiting === true) &&
     (turn.spent === undefined ||
       (isRecordOfNumbers(turn.spent) && Object.keys(turn.spent).every((id) => playerIds.has(id))))
   )

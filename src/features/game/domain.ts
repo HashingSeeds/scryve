@@ -68,7 +68,12 @@ import {
   tableHasState,
   type TableAction,
 } from "../../../convex/lib/table"
-import { applyTurnAction, isTurnAction, type Turn } from "../../../convex/lib/turns"
+import {
+  applyTurnAction,
+  isTurnAction,
+  startedByChange,
+  type Turn,
+} from "../../../convex/lib/turns"
 
 export {
   isCommanderDamageDelta,
@@ -440,17 +445,21 @@ export function withTurn(game: LocalGame, turn: Turn | undefined, now: number): 
   const { turn: _turn, turnLog: log = [], ...rest } = game
   const turnLog: TurnLogEntry[] = !turn
     ? []
-    : log.some(({ operationId }) => operationId === turn.operationId)
-      ? log.filter(({ operationId }) => operationId !== game.turn?.operationId)
-      : [
-          ...log,
-          {
-            operationId: turn.operationId,
-            playerId: turn.playerId as PlayerId,
-            number: turn.number,
-            at: turn.startedAt,
-          },
-        ]
+    : turn.operationId === game.turn?.operationId
+      ? log.map((entry) =>
+          entry.operationId === turn.operationId ? { ...entry, at: turn.startedAt } : entry,
+        )
+      : log.some(({ operationId }) => operationId === turn.operationId)
+        ? log.filter(({ operationId }) => operationId !== game.turn?.operationId)
+        : [
+            ...log,
+            {
+              operationId: turn.operationId,
+              playerId: turn.playerId as PlayerId,
+              number: turn.number,
+              at: turn.startedAt,
+            },
+          ]
   return {
     ...rest,
     ...(turn ? { turn } : {}),
@@ -472,7 +481,13 @@ export function withFirstTurn(
   const { turnLog: _log, turn: _turn, ...board } = game
   return withTurn(
     board,
-    { playerId, number: 1, startedAt: context.now, operationId: context.operationId },
+    {
+      playerId,
+      number: 1,
+      startedAt: context.now,
+      operationId: context.operationId,
+      waiting: true,
+    },
     context.now,
   )
 }
@@ -490,6 +505,20 @@ export function applyLocalTableAction(
     })
     return turn === null ? game : withTurn(game, turn, context.now)
   }
+  const applied = applyBoardTableAction(game, action, context)
+  return applied === game ? game : startTurnBy(applied, action.playerId, context.now)
+}
+
+export function startTurnBy(game: LocalGame, playerId: string, now: number): LocalGame {
+  const turn = startedByChange(game.turn, playerId, now)
+  return turn ? withTurn(game, turn, now) : game
+}
+
+function applyBoardTableAction(
+  game: LocalGame,
+  action: TableAction,
+  context: { operationId: string; now: number },
+): LocalGame {
   const table = game.table ?? EMPTY_TABLE
   const change = applyTableAction(table, action, {
     rules: localTableRules(game),

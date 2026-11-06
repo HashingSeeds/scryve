@@ -36,14 +36,7 @@ import {
   type RecentSetup,
 } from "./recentSetups"
 import { isRoundClockSetup, type RoundClock } from "./roundClock"
-import {
-  DEFAULT_TURN_TAB_PREFS,
-  isTurnClockStyle,
-  isTurnPassStyle,
-  type TurnClockStyle,
-  type TurnPassStyle,
-  type TurnTabPrefs,
-} from "./turnTab"
+import { type TurnPrefs } from "./turnTab"
 import type {
   CommanderDamageTotals,
   GameEvent,
@@ -105,8 +98,6 @@ export interface LocalSettings {
   syncStats?: boolean
   turnTab?: boolean
   turnTabHideOffered?: true
-  turnClock?: TurnClockStyle
-  turnPass?: TurnPassStyle
 }
 
 export const COMMANDER_SEATS = 4
@@ -567,8 +558,6 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === false ? { turnTab: false } : {}),
     ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
-    ...(isTurnClockStyle(migrated.turnClock) ? { turnClock: migrated.turnClock } : {}),
-    ...(isTurnPassStyle(migrated.turnPass) ? { turnPass: migrated.turnPass } : {}),
   }
 }
 
@@ -773,26 +762,22 @@ export class LocalGameRepository {
     return settings
   }
 
-  turnTabPrefs(): TurnTabPrefs {
+  turnPrefs(): TurnPrefs {
     const settings = this.loadSettings()
     return {
       enabled: settings.turnTab !== false,
-      clock: settings.turnClock ?? DEFAULT_TURN_TAB_PREFS.clock,
-      pass: settings.turnPass ?? DEFAULT_TURN_TAB_PREFS.pass,
       hideOffered: settings.turnTabHideOffered === true,
     }
   }
 
-  saveTurnTabPrefs(prefs: Partial<TurnTabPrefs>): TurnTabPrefs {
+  saveTurnPrefs(prefs: Partial<TurnPrefs>): TurnPrefs {
     const settings = this.loadSettings()
     const { turnTab: _on, turnTabHideOffered: _offered, ...rest } = settings
-    const next = { ...this.turnTabPrefs(), ...prefs }
+    const next = { ...this.turnPrefs(), ...prefs }
     this.saveSettings({
       ...rest,
       ...(next.enabled ? {} : { turnTab: false }),
       ...(next.hideOffered ? { turnTabHideOffered: true } : {}),
-      turnClock: next.clock,
-      turnPass: next.pass,
     })
     return next
   }

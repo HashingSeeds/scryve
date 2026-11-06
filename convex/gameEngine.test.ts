@@ -247,6 +247,7 @@ async function parityGame(
         playerId: turn.playerId,
         number: turn.number,
         operationId: turn.operationId,
+        waiting: turn.waiting,
         previous: turn.previous && [turn.previous.playerId, turn.previous.number],
       }
     expect(holder(memory.turn)).toEqual(holder(stored))
@@ -484,6 +485,21 @@ describe("engine parity: turns", () => {
       "host",
       table("turn-start-host-02", { kind: "turn.set", playerId: hostSeat, toPlayerId: hostSeat }),
     )
+    expect(await game.expectSameTurn()).toMatchObject({ playerId: hostSeat, waiting: true })
+    await game.write("joiner", {
+      kind: "life",
+      playerId: joinerSeat,
+      delta: -1,
+      ...sent("turn-life-joiner-01", JOINER_DEVICE),
+    })
+    expect(await game.expectSameTurn()).toMatchObject({ waiting: true })
+    await game.write("host", {
+      kind: "life",
+      playerId: hostSeat,
+      delta: -1,
+      ...sent("turn-life-host-0001"),
+    })
+    expect((await game.expectSameTurn())?.waiting).toBeUndefined()
     await game.write(
       "joiner",
       table(

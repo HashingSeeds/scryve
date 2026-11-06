@@ -11,14 +11,13 @@ import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
 import { Text } from "@/components/Text"
-import type { TurnTabSeat } from "@/components/TurnTabs"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import type { AttackChange } from "@/features/game/commanderAttack"
-import { CLAIM_CHIP, systemDice, type DiceSeatChip } from "@/features/game/dice"
+import { CLAIM_CHIP, systemDice, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import {
   canContinueMatch,
   drawsLabel,
@@ -31,7 +30,6 @@ import {
 } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import type { BoardSize } from "@/features/game/GameBoardStage"
-import type { BoardTurnTab } from "@/features/game/GameBoardStage"
 import { GameLogDialog } from "@/features/game/GameLogDialog"
 import { GameToast } from "@/features/game/GameToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
@@ -42,12 +40,13 @@ import { playCommanderLethal } from "@/features/game/playSystems"
 import { stepRoundTurn } from "@/features/game/roundClock"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
 import {
-  HideTurnTabDialog,
-  reportTurnTabGame,
+  HideTurnsDialog,
+  reportTurnsGame,
   TurnDialog,
-  useTurnTabPrefs,
+  useTurnPrefs,
+  type TurnSeat,
 } from "@/features/game/TurnDialog"
-import { DENSE_TABLE_FROM, offersToHideTurnTab, PASS_UNDO_MS } from "@/features/game/turnTab"
+import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
 import type {
   CommanderSlot,
   GamePlayer,
@@ -130,7 +129,7 @@ export function CurrentGameScreen({
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
-  const [turnPrefs, setTurnPrefs] = useTurnTabPrefs(repository ?? localGameRepository)
+  const [turnPrefs, setTurnPrefs] = useTurnPrefs(repository ?? localGameRepository)
   const [turnOpen, setTurnOpen] = useState(false)
   const [turnToast, setTurnToast] = useState<{
     operationId: string
@@ -290,40 +289,41 @@ export function CurrentGameScreen({
   ])
   const turn = runtime.game.turn
   const active = runtime.game.status === "active"
-  const dense = runtime.game.players.length >= DENSE_TABLE_FROM
+  const turnsOn = turnPrefs.enabled && active
   const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
   // why: a countdown is how a judge's official time is kept, so a counting-down game is treated as event play, where only a pass moves the turn.
   const casual = clock?.setup.mode !== "countdown"
-  const turnSeats: TurnTabSeat[] = runtime.game.players.map((player, index) => ({
+  const turnSeats: TurnSeat[] = runtime.game.players.map((player, index) => ({
     playerId: player.id,
     seatNumber: index + 1,
     name: player.name,
     color: player.color,
     shape: player.shape,
   }))
-  const turnSeat = turnSeats.find(({ playerId }) => playerId === turn?.playerId)
-  const { passTurn, setTurn, undoTurn, setBank, changeClock } = runtime
-  function nextPlayerId(current: Turn, clockwiseSlots: number[]) {
+  const { passTurn, setTurn, undoTurn, setBank, startTurn, changeClock } = runtime
+  const nameOf = (playerId: string) => runtime.game.players.find(({ id }) => id === playerId)?.name
+  function nextOf(clockwiseSlots: number[]) {
+    if (!turn) return undefined
     const { players, seatOrder } = runtime.game
     const order = clockwiseSlots.flatMap((slot) => {
       const player = players[seatOrder?.[slot] ?? slot]
       return player ? [player.id] : []
     })
-    return nextTurnSeat(order, current.playerId, (id) => outReason(outState, id) !== undefined)
+    return nextTurnSeat(order, turn.playerId, (id) => outReason(outState, id) !== undefined)
   }
-  function passFrom(current: Turn, clockwiseSlots: number[]) {
-    const { players } = runtime.game
-    const next = nextPlayerId(current, clockwiseSlots)
-    if (!next) return
-    const operationId = passTurn(current.playerId, next)
+  function passTo(next: string) {
+    if (!turn) return
+    const operationId = passTurn(turn.playerId, next)
     if (!operationId) return
     const steppedRound = clock !== undefined && stepRoundTurn(clock, system, 1) !== clock
     if (steppedRound) changeClock((current) => stepRoundTurn(current, system, 1))
-    const name = players.find(({ id }) => id === next)?.name ?? ""
     setTurnToast({
       operationId,
-      passerId: current.playerId,
-      message: translate("board:turn.passed", { number: current.number + 1, name }),
+      passerId: turn.playerId,
+      message: translate("board:turn.passed", {
+        number: turn.number + 1,
+        name: nameOf(next) ?? "",
+      }),
       steppedRound,
     })
   }
@@ -333,29 +333,21 @@ export function CurrentGameScreen({
       changeClock((current) => stepRoundTurn(current, system, -1))
     setTurnToast(undefined)
   }
-  const turnTab: BoardTurnTab | undefined =
-    turnPrefs.enabled && active && !firstPlayer
+  const turnChip: TurnChipState | undefined =
+    turnsOn && turn
       ? {
           turn,
-          seat: turnSeat,
-          canPass: true,
-          clockStyle: turnPrefs.clock,
-          passStyle: turnPrefs.pass,
-          nextSeat: (slots) => {
-            const next = turn && nextPlayerId(turn, slots)
-            return turnSeats.find(({ playerId }) => playerId === next)
-          },
-          ...(dense ? { dense } : { roundClock: clock }),
-          system,
-          copies: "both",
-          onPress: (slots) => (turn ? passFrom(turn, slots) : setTurnOpen(true)),
+          canPress: true,
+          nameOf,
+          onStart: () => startTurn(turn.playerId),
+          onPass: passTo,
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
   function answerHideOffer(hide: boolean) {
     if (!hideOffer) return
     if (hide) setTurnPrefs({ enabled: false })
-    reportTurnTabGame({
+    reportTurnsGame({
       prefs: { enabled: true },
       turn: hideOffer.turn,
       playerCount: hideOffer.playerCount,
@@ -365,17 +357,24 @@ export function CurrentGameScreen({
     setHideOffer(undefined)
   }
 
-  // why: while the offer stands, every seat carries an empty 1st that claims first in one tap.
-  const claimingGrid = firstPlayer
-    ? {
-        ...dice.grid,
-        chipsFor: (player: GamePlayer) => [...dice.grid.chipsFor(player), CLAIM_CHIP],
-        onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
-          if (chip.kind === "claim") markFirstPlayerUsed()
-          dice.grid.onPressChip(player, chip)
-        },
+  // why: while the offer stands, or turns are on and nobody has the first turn, every seat carries an empty 1st that claims first in one tap. The turn chip takes the 1st's slot on the active seat.
+  const claiming = !!firstPlayer || (turnsOn && !turn)
+  const seatGrid = {
+    ...dice.grid,
+    chipsFor: (player: GamePlayer): DiceSeatChip[] => {
+      const chips = dice.grid.chipsFor(player)
+      if (turnChip && player.id === turnChip.turn.playerId)
+        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+      return claiming ? [...chips, CLAIM_CHIP] : [...chips]
+    },
+    onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
+      if (chip.kind === "claim") {
+        markFirstPlayerUsed()
+        if (turnsOn && !turn) setTurn(player.id, player.id)
       }
-    : dice.grid
+      dice.grid.onPressChip(player, chip)
+    },
+  }
 
   function toggleSword(player: GamePlayer) {
     markFirstPlayerUsed()
@@ -397,10 +396,10 @@ export function CurrentGameScreen({
       return
     }
     const ending = { turn: ended.turn, playerCount: ended.players.length }
-    if (offersToHideTurnTab(turnPrefs, ended.turn)) {
+    if (offersToHideTurns(turnPrefs, ended.turn)) {
       setTurnPrefs({ hideOffered: true })
       setHideOffer(ending)
-    } else reportTurnTabGame({ prefs: turnPrefs, ...ending, mode: "local", hideOffer: "none" })
+    } else reportTurnsGame({ prefs: turnPrefs, ...ending, mode: "local", hideOffer: "none" })
     setTurnToast(undefined)
     runtime.rematch()
     setEndSource(undefined)
@@ -458,7 +457,8 @@ export function CurrentGameScreen({
           chrome={chrome}
           onBoardSizeChange={setBoardSize}
           firstPlayer={firstPlayer}
-          turnTab={turnTab}
+          roundClock={clock && active ? { clock, system, onPress: openClock } : undefined}
+          turns={turnChip ? { active: turnChip.turn.playerId, nextOf } : undefined}
           toast={
             saved ? (
               <GameToast
@@ -521,13 +521,13 @@ export function CurrentGameScreen({
               }
               getSeatDeck={(player) => seatDeck(player.id)}
               table={runtime.tableRuntime}
-              dice={claimingGrid}
+              dice={seatGrid}
               onChange={runtime.changeLife}
             />
           )}
         />
       </LifeLogContext.Provider>
-      {(match || (clock && (!turnTab || dense))) && !menuOpen ? (
+      {(match || (clock && firstPlayer)) && !menuOpen ? (
         <BoardContextLabels
           match={
             match && matchLine
@@ -540,7 +540,7 @@ export function CurrentGameScreen({
                 }
               : undefined
           }
-          clock={turnTab && !dense ? undefined : clock}
+          clock={firstPlayer ? clock : undefined}
           system={system}
           top={insets.top}
           bottom={insets.bottom}
@@ -583,8 +583,6 @@ export function CurrentGameScreen({
                 }
               : undefined
           }
-          prefs={turnPrefs}
-          onPrefs={setTurnPrefs}
           onBank={turn ? (bankMs) => setBank(turn.playerId, bankMs) : undefined}
           onRoundClock={
             clock && active
@@ -598,7 +596,7 @@ export function CurrentGameScreen({
         />
       ) : null}
 
-      {hideOffer ? <HideTurnTabDialog onAnswer={answerHideOffer} /> : null}
+      {hideOffer ? <HideTurnsDialog onAnswer={answerHideOffer} /> : null}
 
       {logOpen ? (
         <GameLogDialog

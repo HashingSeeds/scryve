@@ -1,6 +1,7 @@
 import {
   applyTurnAction,
   bankLeft,
+  startedByChange,
   nextTurnSeat,
   turnTimeSpent,
   type Turn,
@@ -31,12 +32,13 @@ describe("applyTurnAction", () => {
     ).toBeNull()
     expect(
       applyTurnAction(undefined, { kind: "turn.set", playerId: "ada", toPlayerId: "ada" }, at(5)),
-    ).toEqual({ playerId: "ada", number: 1, startedAt: 5, operationId: "op-5" })
+    ).toEqual({ playerId: "ada", number: 1, startedAt: 5, operationId: "op-5", waiting: true })
   })
 
   it("passes only from the seat holding the turn, and banks its time", () => {
     const turn = play([
       [{ kind: "turn.set", playerId: "ada", toPlayerId: "ada" }, 0],
+      [{ kind: "turn.started", playerId: "ada" }, 0],
       [{ kind: "turn.passed", playerId: "ada", toPlayerId: "bo" }, 60_000],
     ])
     expect(turn).toMatchObject({ playerId: "bo", number: 2, startedAt: 60_000 })
@@ -79,6 +81,32 @@ describe("applyTurnAction", () => {
         [{ kind: "turn.passed", playerId: "ada", toPlayerId: "zed" }, 1],
       ]),
     ).toBeNull()
+  })
+})
+
+describe("waiting first turn", () => {
+  const first = applyTurnAction(
+    undefined,
+    { kind: "turn.set", playerId: "ada", toPlayerId: "ada" },
+    at(0),
+  )!
+
+  it("starts on its player's first change and on nobody else's", () => {
+    expect(turnTimeSpent(first, "ada", 60_000)).toBe(0)
+    expect(startedByChange(first, "bo", 5_000)).toBeUndefined()
+    const started = startedByChange(first, "ada", 5_000)!
+    expect(started).toMatchObject({ playerId: "ada", number: 1, startedAt: 5_000 })
+    expect(started.waiting).toBeUndefined()
+    expect(turnTimeSpent(started, "ada", 65_000)).toBe(60_000)
+    expect(startedByChange(started, "ada", 9_000)).toBeUndefined()
+  })
+
+  it("starts on a tap, and a later tap changes nothing", () => {
+    const start = { kind: "turn.started", playerId: "ada" } as const
+    const started = applyTurnAction(first, start, at(7_000))!
+    expect(started).toMatchObject({ startedAt: 7_000 })
+    expect(applyTurnAction(started, start, at(9_000))).toBe(started)
+    expect(applyTurnAction(first, { ...start, playerId: "bo" }, at(7_000))).toBeNull()
   })
 })
 
