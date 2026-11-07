@@ -86,6 +86,7 @@ describe("connected log", () => {
     const inputs = connectedLogInputs(events, GAME, turnOf("op-pass-to-bo-02", 4))
     expect(gameLog(players, inputs.events)).toMatchObject([{ playerId: "ada", delta: -2 }])
     expect(inputs.turns.map(({ number, playerId }) => [number, playerId])).toEqual([
+      [1, "ada"],
       [2, "bo"],
       [3, "ada"],
       [4, "bo"],
@@ -151,6 +152,21 @@ describe("connected log", () => {
     expect(gameLog(players, connectedLogInputs(events, GAME, undefined).events)).toMatchObject([
       { playerId: "ada", delta: -3, life: 34 },
       { playerId: "bo", delta: -2, life: 40 },
+    ])
+  })
+
+  it("heads turn 1 with whoever passed it when the game began with the turn already set", () => {
+    const events = [
+      life("op-early-hit-0001", "ada", -1, 1_000),
+      pass("op-pass-to-bo-01", "ada", "bo", 2_000),
+    ]
+    expect(
+      connectedLogInputs(events, GAME, turnOf("op-pass-to-bo-01", 2)).turns.map(
+        ({ number, playerId }) => [number, playerId],
+      ),
+    ).toEqual([
+      [1, "ada"],
+      [2, "bo"],
     ])
   })
 })

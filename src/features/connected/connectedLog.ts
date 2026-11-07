@@ -120,6 +120,7 @@ function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): 
     ]
   const entries: TurnLogEntry[] = []
   let number = turn.number
+  let firstPasser: string | undefined
   for (const event of starts.slice(0, newest + 1).reverse()) {
     if (number < 1) break
     const { action } = event
@@ -131,8 +132,17 @@ function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): 
         number,
         at: event.clientCreatedAt,
       })
+    firstPasser = action.kind === "turn.passed" ? action.playerId : undefined
     if (action.kind === "turn.passed") number -= 1
   }
+  // why: a game can begin with its first turn already set, as Archenemy's does, so no change starts turn 1; its holder is whoever passed it on.
+  if (number === 1 && firstPasser && entries.at(-1)?.number !== 1)
+    entries.push({
+      operationId: `${turn.operationId}:first`,
+      playerId: asPlayerId(firstPasser),
+      number: 1,
+      at: 0,
+    })
   return entries.reverse()
 }
 
