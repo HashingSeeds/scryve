@@ -70,9 +70,14 @@ export function localLifeChanges(events: readonly GameEvent[], playerId: string)
     .reverse()
 }
 
-export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number; at: number }
+export type GameLogRow = ReturnType<typeof lifeChangeOf> & {
+  id: string
+  life: number
+  at: number
+  operationIds: string[]
+}
 
-// why: a seat's card sums quick taps into one number until it rests this long, so the log reads the same burst as one change.
+// why: a seat's card sums quick taps into one number until it rests this long, so the log reads the same burst as one change, even when another seat changes in between.
 export const LIFE_BURST_MS = 1800
 
 export function gameLog(
@@ -81,22 +86,30 @@ export function gameLog(
 ): GameLogRow[] {
   const totals = new Map<string, number>(players.map(({ id, life }) => [id, life]))
   const rows: GameLogRow[] = []
-  let newerAt = Infinity
+  const bursts = new Map<string, { row: GameLogRow; oldestAt: number }>()
   for (const event of standingLifeEvents(events).reverse()) {
     const change = lifeChangeOf(event)
     const life = totals.get(change.playerId)
     if (life === undefined) continue
     totals.set(change.playerId, life - change.delta)
-    const newer = rows.at(-1)
-    if (
-      newer?.playerId === change.playerId &&
-      newer.fromPlayerId === change.fromPlayerId &&
-      newerAt - event.clientCreatedAt <= LIFE_BURST_MS
-    ) {
-      newer.delta += change.delta
-      newer.id = event.operationId
-    } else rows.push({ id: event.operationId, life, at: event.clientCreatedAt, ...change })
-    newerAt = event.clientCreatedAt
+    const key = `${change.playerId}\u0000${change.fromPlayerId ?? ""}`
+    const burst = bursts.get(key)
+    if (burst && burst.oldestAt - event.clientCreatedAt <= LIFE_BURST_MS) {
+      burst.row.delta += change.delta
+      burst.row.id = event.operationId
+      burst.row.operationIds.push(event.operationId)
+      burst.oldestAt = event.clientCreatedAt
+    } else {
+      const row = {
+        id: event.operationId,
+        life,
+        at: event.clientCreatedAt,
+        operationIds: [event.operationId],
+        ...change,
+      }
+      rows.push(row)
+      bursts.set(key, { row, oldestAt: event.clientCreatedAt })
+    }
   }
   // why: a burst that nets to nothing, like a stray tap taken back, changed nothing at the table.
   return rows.filter(({ delta }) => delta !== 0)

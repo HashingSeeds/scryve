@@ -563,6 +563,7 @@ export default {
     row: "{{name}} {{delta}} से {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}} के कमांडर से, कुल {{life}}",
     undoLast: "पिछला बदलाव पूर्ववत करें",
+    undoMine: "अपना आखिरी बदलाव पूर्ववत करें",
   },
   calculator: {
     damage: "− डैमेज",

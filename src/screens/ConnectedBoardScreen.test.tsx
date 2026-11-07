@@ -15,6 +15,7 @@ import {
   connectedHarness,
   mockBlockPlayer,
   mockChangeLife,
+  mockUndoLife,
   mockDismissFailed,
   mockFinish,
   mockLeave,
@@ -1323,9 +1324,30 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
   })
 
-  it("shows Log disabled until connected games have one", () => {
+  it("opens the game log with this device's unsent change, and Undo takes it back", () => {
+    connectedHarness.activeGames = []
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      pending: [
+        {
+          event: {
+            type: "life.changed",
+            operationId: "operation-unsent-01",
+            gameId: "game-public",
+            playerId: "player-1",
+            delta: -3,
+            clientCreatedAt: Date.now(),
+          },
+        },
+      ],
+    }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
-    expect(screen.getByTestId("history-button").props.accessibilityState.disabled).toBe(true)
+    fireEvent.press(screen.getByTestId("history-button"))
+    expect(screen.getByTestId("game-log-row-operation-unsent-01")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("game-log-undo"))
+    expect(mockUndoLife).toHaveBeenCalledWith([
+      { operationId: "operation-unsent-01", playerId: "player-1", delta: -3 },
+    ])
   })
 })

@@ -588,6 +588,7 @@ export default {
     row: "{{name}} {{delta}} à {{life}}",
     commanderRow: "{{name}} {{delta}} du commandant de {{from}}, à {{life}}",
     undoLast: "Annuler le dernier changement",
+    undoMine: "Annuler votre dernière modification",
   },
   calculator: {
     damage: "− Dégâts",
