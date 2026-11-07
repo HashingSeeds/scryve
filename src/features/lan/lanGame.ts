@@ -1,6 +1,10 @@
 import { translate } from "@/i18n/translate"
 
-import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
+import {
+  MANY_SEAT_MARK_SHAPES,
+  PLAYER_COLOR_CHOICES,
+  shapeForSeat,
+} from "../../../convex/lib/appearance"
 import type {
   ClaimStatus,
   GameWrite as MemoryWrite,
@@ -441,9 +445,10 @@ export function applyLanWrite(
   }
 }
 
-export const lanSeatAppearance = (seat: number) => ({
+/** why: only apps that draw 7 or more seats join a game that big, so its seats can use every free mark, as Convex's do. */
+export const lanSeatAppearance = (seat: number, playerCount: number) => ({
   color: PLAYER_COLOR_CHOICES[(seat - 1) % PLAYER_COLOR_CHOICES.length],
-  shape: shapeForSeat(seat),
+  shape: shapeForSeat(seat, clientSeesSeats(playerCount) ? undefined : MANY_SEAT_MARK_SHAPES),
 })
 
 const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
@@ -516,7 +521,7 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       playerId: seat.key,
       seat: seat.seat,
       displayName: seat.name,
-      ...lanSeatAppearance(seat.seat),
+      ...lanSeatAppearance(seat.seat, setup.playerCount),
       currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
       ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
       controlledByMe: seat.key === viewerKey,

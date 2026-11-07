@@ -6,6 +6,7 @@ import {
   LAN_PROTOCOL,
   lanLobbyOf,
   lanProjection,
+  lanSeatAppearance,
   lanSeatsReady,
   parseGuestMessage,
   parseLanSetup,
@@ -483,6 +484,15 @@ describe("nearby rounds on the shared engine", () => {
     expect(lanProjection(again, "host").publicId).not.toBe(lanProjection(first, "host").publicId)
     expect(lifeOf(again, "host", "guest")).toBe(40)
     expect(lanProjection(again, "host").recentOperationIds).toEqual([])
+  })
+})
+
+describe("nearby seat marks", () => {
+  it("gives every seat of a 7 to 10 seat game its own mark, and a 6 seat game the marks older apps draw", () => {
+    const marks = (count: number) =>
+      Array.from({ length: count }, (_, index) => lanSeatAppearance(index + 1, count).shape)
+    expect(new Set(marks(10)).size).toBe(10)
+    expect(marks(6)).toEqual(marks(10).slice(0, 6))
   })
 })
 
