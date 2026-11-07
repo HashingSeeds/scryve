@@ -12,6 +12,7 @@ import {
   type ConnectedProfileState,
 } from "@/features/connected/useConnectedProfile"
 import { useResumeGames } from "@/features/connected/useResumeGames"
+import { MAX_PLAYERS } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -92,9 +93,13 @@ function ConnectedHostQuerySource({
   const [exitError, setExitError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const ready = connectedProfile.status === "ready"
-  const activeGames = usePaginatedQuery(api.games.activeConnectedGames, ready ? {} : "skip", {
-    initialNumItems: 10,
-  })
+  const activeGames = usePaginatedQuery(
+    api.games.activeConnectedGames,
+    ready ? { maxSeats: MAX_PLAYERS } : "skip",
+    {
+      initialNumItems: 10,
+    },
+  )
   const activeGamesState = useMemo(
     () => (ready ? remotePage(activeGames, 10) : { status: "loading" as const }),
     [ready, activeGames],
@@ -177,6 +182,7 @@ function ConnectedHostQuerySource({
         hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
         editsAnySeat: true,
+        maxSeats: MAX_PLAYERS,
       })
       requestSucceeded = true
       captureAnalytics("connection_attempt", { action: "create", stage: "succeeded" })

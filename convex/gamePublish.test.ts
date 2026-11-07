@@ -214,7 +214,7 @@ describe("publishLocalGame", () => {
         api.games.publishLocalGame,
         snapshotArgs({ players: baseSnapshot.players.slice(0, 1) }),
       ),
-    ).rejects.toThrow("2–6 seats")
+    ).rejects.toThrow("2–10 seats")
     await expect(
       host.mutation(api.games.publishLocalGame, snapshotArgs({ hostLocalId: "missing-local" })),
     ).rejects.toThrow("Host seat must be one of the snapshot players")

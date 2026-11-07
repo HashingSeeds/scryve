@@ -85,7 +85,7 @@ export function lanLocalGame(
       return {
         id: asPlayerId(seat.key),
         name: seat.name,
-        ...lanSeatAppearance(seat.seat),
+        ...lanSeatAppearance(seat.seat, setup.playerCount),
         life: memory?.seats.get(seat.key)?.currentLife ?? startingLife,
         seat: seat.seat - 1,
         ...(startingLife === setup.startingLife ? {} : { startingLife }),

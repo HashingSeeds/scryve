@@ -13,8 +13,8 @@ describe("connected lobby server policy", () => {
   it.each([2, 3, 4, 5, 6])("accepts %i players", (count) =>
     expect(() => assertPlayerCount(count)).not.toThrow(),
   )
-  it.each([0, 1, 7, 2.5])("rejects invalid player count %s", (count) =>
-    expect(() => assertPlayerCount(count)).toThrow("2–6"),
+  it.each([0, 1, 11, 2.5])("rejects invalid player count %s", (count) =>
+    expect(() => assertPlayerCount(count)).toThrow("2–10"),
   )
   it("validates life, names, colors, and 256-bit URL-safe tokens", () => {
     expect(() => assertStartingLife(0, { min: 1, max: 999 })).toThrow()

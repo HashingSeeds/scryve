@@ -1,4 +1,4 @@
-import { createLocalGame } from "./domain"
+import { createLocalGame, MAX_PLAYERS, MIN_PLAYERS } from "./domain"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import { isPlaySystemId, playSystemFormat, type PlaySystemId } from "./playSystems"
 import { isRoundClockSetup } from "./roundClock"
@@ -85,8 +85,8 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
   if (
     !isRecord(value) ||
     !isPositiveInteger(value.playerCount) ||
-    value.playerCount < 2 ||
-    value.playerCount > 6 ||
+    value.playerCount < MIN_PLAYERS ||
+    value.playerCount > MAX_PLAYERS ||
     !isWholeNumber(value.startingLife) ||
     typeof value.ruleset !== "string" ||
     !isPositiveInteger(value.lifeStep)
