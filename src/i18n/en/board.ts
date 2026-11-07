@@ -388,6 +388,25 @@ const board = {
     giveUp: "Give up {{label}}",
     take: "Take {{label}}",
     rule: "Rule {{rule}}",
+    // Opens a field where the player names their own counter, for a mechanic the app doesn't list (Speed, rad counters, the Ring).
+    custom: "Name a counter",
+    // Short form of "Name a counter" for a narrow button.
+    customShort: "Custom",
+    // Placeholder in the field for a counter's name.
+    customName: "Counter name",
+    // Adds the named counter to the player's seat.
+    customAdd: "Add",
+    // Screen reader label for a recently used counter name; tapping it adds that counter. {{label}} is the name.
+    customRecent: "Add {{label}}",
+    // Screen reader label for a "+2" button on a seat; it opens the seat's counters that didn't fit on the card.
+    // Suggested names for a player's own counter, before they've named any. Use the term printed on Magic cards in this language. Keep under 20 characters.
+    starter: {
+      speed: "Speed",
+      rad: "Rad",
+      storm: "Storm",
+    },
+    more_one: "{{identity}}, {{count}} more counter",
+    more_other: "{{identity}}, {{count}} more counters",
   },
   seat: {
     identity: "Seat {{seat}}, {{name}}",
@@ -567,6 +586,8 @@ const board = {
     row: "{{name}} {{delta}} to {{life}}",
     // A commander damage row, as in "Ada −5 from Grace's commander, to 12".
     commanderRow: "{{name}} {{delta}} from {{from}}'s commander, to {{life}}",
+    // A counter row in the game log, as in "Ada poison +1 to 3". {{counter}} is a counter such as poison, or a name the player gave their own counter.
+    counterRow: "{{name}} {{counter}} {{delta}} to {{value}}",
     undoLast: "Undo the last change",
   },
   calculator: {

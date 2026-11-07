@@ -64,9 +64,13 @@ import {
 import { attachesDecks, flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
 import {
   applyTableAction,
+  customCounterId,
   EMPTY_TABLE,
+  findCustomCounter,
+  playerTableOf,
   tableHasState,
   type TableAction,
+  type TableState,
 } from "../../../convex/lib/table"
 import {
   applyTurnAction,
@@ -536,6 +540,7 @@ function applyBoardTableAction(
     lifeOf: (playerId) => game.players.find(({ id }) => id === playerId)?.life,
   })
   if (!change || change.table === table) return game
+  const counted = countedChange(table, change.table, action)
   const players = game.players.map((player) => {
     const delta = change.life
       .filter((life) => life.playerId === player.id)
@@ -546,8 +551,38 @@ function applyBoardTableAction(
     ...game,
     table: change.table,
     players,
+    ...(counted
+      ? {
+          counterLog: [
+            ...(game.counterLog ?? []),
+            {
+              ...counted,
+              operationId: context.operationId,
+              playerId: action.playerId as PlayerId,
+              at: context.now,
+            },
+          ].slice(-MAX_COUNTER_LOG),
+        }
+      : {}),
     updatedAt: Math.max(game.updatedAt, context.now),
   }
+}
+
+const MAX_COUNTER_LOG = 400
+
+function countedChange(before: TableState, after: TableState, action: TableAction) {
+  if (action.kind === "counter.changed") {
+    const was = playerTableOf(before, action.playerId).counters?.[action.counterId] ?? 0
+    const now = playerTableOf(after, action.playerId).counters?.[action.counterId] ?? 0
+    return { counterId: action.counterId, delta: now - was, value: now }
+  }
+  if (action.kind !== "customCounter.changed") return undefined
+  const was = findCustomCounter(playerTableOf(before, action.playerId), action.name)
+  const now = findCustomCounter(playerTableOf(after, action.playerId), action.name)
+  const name = now?.name ?? was?.name
+  if (!name) return undefined
+  const value = now?.value ?? 0
+  return { counterId: customCounterId(name), delta: value - (was?.value ?? 0), value }
 }
 
 export function localStandingWinners(game: LocalGame) {
@@ -725,7 +760,9 @@ export function commandToEvent(
       (event): event is CompensatableEvent =>
         isCompensatable(event) &&
         !event.compensatesOperationId &&
-        event.actorId === context.actorId &&
+        (command.operationId === undefined
+          ? event.actorId === context.actorId
+          : event.operationId === command.operationId) &&
         !compensated.has(event.operationId),
     )
     if (!target) return null

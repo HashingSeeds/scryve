@@ -394,6 +394,18 @@ export default {
     giveUp: "{{label}} छोड़ें",
     take: "{{label}} लें",
     rule: "नियम {{rule}}",
+    custom: "काउंटर का नाम दें",
+    customShort: "कस्टम",
+    customName: "काउंटर का नाम",
+    customAdd: "जोड़ें",
+    customRecent: "{{label}} जोड़ें",
+    starter: {
+      speed: "स्पीड",
+      rad: "रेड",
+      storm: "स्टॉर्म",
+    },
+    more_one: "{{identity}}, {{count}} और काउंटर",
+    more_other: "{{identity}}, {{count}} और काउंटर",
   },
   seat: {
     identity: "सीट {{seat}}, {{name}}",
@@ -562,6 +574,7 @@ export default {
     commanderFrom: "{{name}} के कमांडर से",
     row: "{{name}} {{delta}} से {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}} के कमांडर से, कुल {{life}}",
+    counterRow: "{{name}} {{counter}} {{delta}}, अब {{value}}",
     undoLast: "पिछला बदलाव पूर्ववत करें",
   },
   calculator: {

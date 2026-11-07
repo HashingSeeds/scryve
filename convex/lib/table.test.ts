@@ -9,6 +9,7 @@ import {
   pokemonCardFromCatalog,
   pokemonPrizeValue,
   tableActionValidator,
+  tableForVersion,
   tableStateValidator,
   type TableAction,
   type TableState,
@@ -81,6 +82,67 @@ describe("table counters and designations", () => {
       { rules: commander },
     )!.table
     expect(released.designations).toEqual({})
+  })
+})
+
+describe("custom counters", () => {
+  const custom = (name: string, delta: number, playerId = "me"): TableAction => ({
+    kind: "customCounter.changed",
+    playerId,
+    name,
+    delta,
+  })
+  const apply = (...actions: TableAction[]) =>
+    actions.reduce<TableState | null>(
+      (table, action) => (table && run(table, action, { rules: commander })?.table) ?? null,
+      EMPTY_TABLE,
+    )
+
+  it("adds a named counter, matches its name loosely, and drops it at zero", () => {
+    expect(apply(custom("  Speed ", 1), custom("speed", 2))?.players.me.customCounters).toEqual([
+      { name: "Speed", value: 3 },
+    ])
+    expect(apply(custom("Speed", 2), custom("SPEED", -2))?.players.me).toEqual({})
+  })
+
+  it("are on in games with no system", () => {
+    expect(
+      run(EMPTY_TABLE, custom("Rad", 2), { rules: tableRules(undefined, undefined) }),
+    ).not.toBeNull()
+    expect(
+      run(EMPTY_TABLE, custom("Rad", 2), { rules: tableRules("none", undefined) }),
+    ).not.toBeNull()
+  })
+
+  it("refuses blank or long names, systems without them, and a fifth counter", () => {
+    expect(apply(custom("   ", 1))).toBeNull()
+    expect(apply(custom("x".repeat(21), 1))).toBeNull()
+    expect(run(EMPTY_TABLE, custom("Speed", 1), { rules: pokemon })).toBeNull()
+    expect(apply(custom("A", 1), custom("B", 1), custom("C", 1), custom("D", 1))).not.toBeNull()
+    expect(
+      apply(custom("A", 1), custom("B", 1), custom("C", 1), custom("D", 1), custom("E", 1)),
+    ).toBeNull()
+  })
+
+  it("validates snapshots and hides custom counters from clients before table version 4", () => {
+    const table = apply(custom("Rad", 4))!
+    const seats = new Set(["me", "them"])
+    expect(isValidTableSnapshot(table, commander, seats)).toBe(true)
+    expect(isValidTableSnapshot(table, pokemon, seats)).toBe(false)
+    const duplicate = {
+      ...table,
+      players: {
+        me: {
+          customCounters: [
+            { name: "Rad", value: 1 },
+            { name: "rad", value: 2 },
+          ],
+        },
+      },
+    }
+    expect(isValidTableSnapshot(duplicate, commander, seats)).toBe(false)
+    expect(tableForVersion(table, 3).players.me).toEqual({})
+    expect(tableForVersion(table, 4)).toBe(table)
   })
 })
 

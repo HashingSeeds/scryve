@@ -6,6 +6,7 @@ import type { PendingLifeAction } from "@/features/connected/model"
 
 import type {
   CommanderDamageAssignedEvent,
+  CounterLogEntry,
   GameEvent,
   GamePlayer,
   LifeChangedEvent,
@@ -70,7 +71,12 @@ export function localLifeChanges(events: readonly GameEvent[], playerId: string)
     .reverse()
 }
 
-export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number; at: number }
+export type GameLogRow = ReturnType<typeof lifeChangeOf> & {
+  id: string
+  life: number
+  at: number
+  operationIds: string[]
+}
 
 // why: a seat's card sums quick taps into one number until it rests this long, so the log reads the same burst as one change.
 export const LIFE_BURST_MS = 1800
@@ -95,19 +101,68 @@ export function gameLog(
     ) {
       newer.delta += change.delta
       newer.id = event.operationId
-    } else rows.push({ id: event.operationId, life, at: event.clientCreatedAt, ...change })
+      newer.operationIds.push(event.operationId)
+    } else
+      rows.push({
+        id: event.operationId,
+        life,
+        at: event.clientCreatedAt,
+        operationIds: [event.operationId],
+        ...change,
+      })
     newerAt = event.clientCreatedAt
   }
   // why: a burst that nets to nothing, like a stray tap taken back, changed nothing at the table.
   return rows.filter(({ delta }) => delta !== 0)
 }
 
-export type GameLogItem =
-  | (GameLogRow & { kind?: undefined })
-  | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
+export type GameCounterRow = Omit<CounterLogEntry, "operationId"> & {
+  kind: "counter"
+  id: string
+  operationIds: string[]
+}
+
+export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[] {
+  const rows: GameCounterRow[] = []
+  const bursts = new Map<string, { row: GameCounterRow; oldestAt: number }>()
+  for (const { operationId, ...entry } of [...entries].reverse()) {
+    const key = `${entry.playerId}\u0000${entry.counterId}`
+    const burst = bursts.get(key)
+    if (burst && burst.oldestAt - entry.at <= LIFE_BURST_MS) {
+      burst.row.delta += entry.delta
+      burst.row.operationIds.push(operationId)
+      burst.oldestAt = entry.at
+    } else {
+      const row: GameCounterRow = {
+        kind: "counter",
+        id: operationId,
+        operationIds: [operationId],
+        ...entry,
+      }
+      rows.push(row)
+      bursts.set(key, { row, oldestAt: entry.at })
+    }
+  }
+  return rows.filter(({ delta }) => delta !== 0)
+}
+
+type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
+
+export function mergedLog(
+  life: readonly GameLogRow[],
+  counters: readonly GameCounterRow[],
+): GameLogChange[] {
+  return [...life, ...counters].sort((left, right) => right.at - left.at)
+}
+
+type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & {
+  kind: "turn"
+}
+
+export type GameLogItem = GameLogChange | TurnDivider
 
 export function withTurnDividers(
-  rows: readonly GameLogRow[],
+  rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],
 ): GameLogItem[] {
   const items: GameLogItem[] = []

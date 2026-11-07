@@ -37,21 +37,30 @@ export function formatDefinition(system: unknown, format: unknown): FormatDefini
 }
 
 export const NO_TABLE: TableDefinition = { counters: [], designations: [] }
+const NO_SYSTEM_TABLE: TableDefinition = { ...NO_TABLE, customCounters: true }
+
+export const hasTable = (rules: TableDefinition) =>
+  rules.counters.length > 0 ||
+  rules.designations.length > 0 ||
+  rules.pokemon !== undefined ||
+  rules.customCounters === true
 
 const tableRulesCache = new Map<string, TableDefinition>()
 
 export function tableRules(system: unknown, format: string | undefined): TableDefinition {
+  if (system === undefined || system === "none") return NO_SYSTEM_TABLE
   const definition = systemDefinition(system)
   if (!definition) return NO_TABLE
   const key = `${String(system)}:${format ?? ""}`
   const cached = tableRulesCache.get(key)
   if (cached) return cached
   const commandZone = hasCommandZone(system, format)
-  const { counters, designations, pokemon } = definition.table
+  const { counters, designations, pokemon, customCounters } = definition.table
   const rules: TableDefinition = {
     counters: counters.filter((counter) => commandZone || !counter.commandZoneOnly),
     designations,
     ...(pokemon ? { pokemon } : {}),
+    ...(customCounters ? { customCounters } : {}),
   }
   tableRulesCache.set(key, rules)
   return rules
