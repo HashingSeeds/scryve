@@ -124,18 +124,24 @@ export type GameCounterRow = Omit<CounterLogEntry, "operationId"> & {
 
 export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[] {
   const rows: GameCounterRow[] = []
-  let newerAt = Infinity
+  const bursts = new Map<string, { row: GameCounterRow; oldestAt: number }>()
   for (const { operationId, ...entry } of [...entries].reverse()) {
-    const newer = rows.at(-1)
-    if (
-      newer?.playerId === entry.playerId &&
-      newer.counterId === entry.counterId &&
-      newerAt - entry.at <= LIFE_BURST_MS
-    ) {
-      newer.delta += entry.delta
-      newer.operationIds.push(operationId)
-    } else rows.push({ kind: "counter", id: operationId, operationIds: [operationId], ...entry })
-    newerAt = entry.at
+    const key = `${entry.playerId}\u0000${entry.counterId}`
+    const burst = bursts.get(key)
+    if (burst && burst.oldestAt - entry.at <= LIFE_BURST_MS) {
+      burst.row.delta += entry.delta
+      burst.row.operationIds.push(operationId)
+      burst.oldestAt = entry.at
+    } else {
+      const row: GameCounterRow = {
+        kind: "counter",
+        id: operationId,
+        operationIds: [operationId],
+        ...entry,
+      }
+      rows.push(row)
+      bursts.set(key, { row, oldestAt: entry.at })
+    }
   }
   return rows.filter(({ delta }) => delta !== 0)
 }

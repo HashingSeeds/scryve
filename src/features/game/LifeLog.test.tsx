@@ -220,4 +220,16 @@ describe("counter log rows", () => {
     ]
     expect(mergedLog(life, rows).map(({ at }) => at)).toEqual([9_000, 1_600, 1_550, 1_500])
   })
+
+  it("folds a counter's quick taps even when another counter changes in between", () => {
+    const rows = counterLog([
+      entry("a", "poison", 1, 1, 1_000),
+      entry("b", "custom:Speed", 1, 1, 1_200),
+      entry("c", "poison", 1, 2, 1_500),
+    ])
+    expect(rows.map(({ counterId, delta }) => [counterId, delta])).toEqual([
+      ["poison", 2],
+      ["custom:Speed", 1],
+    ])
+  })
 })
