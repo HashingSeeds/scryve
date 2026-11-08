@@ -1,9 +1,11 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
+const { setTimeout } = require("node:timers")
 
 const {
   applyHostMessage,
   digest,
+  laggedQueue,
   organizerMove,
   parseCli,
   playerMove,
@@ -137,4 +139,27 @@ test("cli reads the nearby host and refuses guests it cannot add", () => {
   assert.throws(() => parseCli(["convex", "join", "AB12CD", "--guests", "2"]), /--guests/)
   assert.throws(() => parseCli(["convex", "host", "--structure", "pods", "--best-of", "3"]), /Pod/)
   assert.throws(() => parseCli(["convex", "host", "--think", "5s-1s"]), /range/)
+  assert.deepEqual(
+    parseCli(["nearby", "AB12CD", "10.0.0.2:1", "--lag", "50ms-400ms"]).lag,
+    [50, 400],
+  )
+  assert.throws(() => parseCli(["convex", "host", "--lag", "100ms"]), /--lag needs nearby/)
+})
+
+test("lagged messages arrive late but never out of order", async () => {
+  const send = laggedQueue([5, 30])
+  const sent = []
+  const arrived = []
+  await new Promise((resolve) => {
+    // why: messages sent while earlier ones still wait often share a due time, which is when timers can swap them.
+    for (let i = 0; i < 200; i += 1)
+      setTimeout(() => {
+        sent.push(i)
+        send(() => {
+          arrived.push(i)
+          if (arrived.length === 200) resolve()
+        })
+      }, i % 40)
+  })
+  assert.deepEqual(arrived, sent)
 })

@@ -47,6 +47,7 @@ Failure
   --disconnect-every off   cut each bot's connection this often
   --disconnect-for 5s      how long each cut lasts
   --skip-patch 0           nearby: chance a bot loses a patch and must notice the gap
+  --lag off                nearby: delay each message both ways by a range like 50ms-400ms
   --legacy 0               bots that act like older apps: nearby without patches, convex
                            loading events.view instead of events.board and events.viewer
 
@@ -119,6 +120,7 @@ function parseCli(argv) {
       "disconnect-every": { type: "string", default: "off" },
       "disconnect-for": { type: "string", default: "5s" },
       "skip-patch": { type: "string", default: "0" },
+      "lag": { type: "string", default: "off" },
       "legacy": { type: "string", default: "0" },
       "duration": { type: "string", default: "30m" },
       "preview": { type: "string" },
@@ -138,6 +140,8 @@ function parseCli(argv) {
   const guests = parseCount(values.guests, "guests", 0, MAX_PLAYERS - players)
   if (guests > 0 && target.mode !== "host")
     throw new Error("--guests needs convex host; add guests on the organizer's device instead")
+  const lag = parseRange(values.lag, "lag")
+  if (lag[1] > 0 && target.transport !== "nearby") throw new Error("--lag needs nearby")
   return {
     ...target,
     players,
@@ -157,6 +161,7 @@ function parseCli(argv) {
     disconnectEvery: parseDuration(values["disconnect-every"], "disconnect-every"),
     disconnectFor: parseDuration(values["disconnect-for"], "disconnect-for"),
     skipPatch: parseChance(values["skip-patch"], "skip-patch"),
+    lag,
     legacy: parseCount(values.legacy, "legacy", 0, players),
     duration: parseDuration(values.duration, "duration"),
     preview: values.preview,
@@ -296,6 +301,18 @@ function percentile(values, p) {
 const connectionLost = (message) => Object.assign(new Error(message), { lost: true })
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const between = ([low, high]) => low + Math.random() * (high - low)
+
+// why: Wi-Fi delays packets unevenly but TCP never reorders them. Timers due together can fire in either order, so one chain delivers each message after the one before it.
+function laggedQueue(lag) {
+  let last = 0
+  let chain = Promise.resolve()
+  return (deliver) => {
+    if (!lag[1]) return deliver()
+    last = Math.max(last, Date.now() + between(lag))
+    const dueAt = last
+    chain = chain.then(() => sleep(Math.max(0, dueAt - Date.now()))).then(deliver)
+  }
+}
 
 function matches(table, expect) {
   if (!table) return false
@@ -679,8 +696,8 @@ class ConvexLink {
 }
 
 class NearbyLink {
-  constructor(bot, target, { patches, skipPatch }) {
-    Object.assign(this, { bot, target, patches, skipPatch })
+  constructor(bot, target, { patches, skipPatch, lag }) {
+    Object.assign(this, { bot, target, patches, skipPatch, lag })
     // why: the host knows a device by this token, so reusing it on every reconnect must return the same seat.
     this.token = randomBytes(16).toString("hex")
     this.nextId = 1
@@ -703,6 +720,10 @@ class NearbyLink {
     this.welcomed = false
     this.skipped = false
     this.feed = undefined
+    const incoming = laggedQueue(this.lag)
+    const outgoing = laggedQueue(this.lag)
+    // why: heartbeats share the lag, so the host's and the bot's silence checks see what a slow phone shows them.
+    this.send = (line) => outgoing(() => socket.destroyed || socket.write(line))
     const socket = net.connect(this.target.port, this.target.host, () =>
       this.write({
         t: "hello",
@@ -717,20 +738,24 @@ class NearbyLink {
     let lastHeard = Date.now()
     const heartbeat = setInterval(() => {
       if (Date.now() - lastHeard > NEARBY_SILENCE_MS) socket.destroy()
-      else socket.write("\n")
+      else this.send("\n")
     }, 1_000)
     socket.setEncoding("utf8")
     socket.setNoDelay(true)
-    socket.on("data", (chunk) => {
-      lastHeard = Date.now()
-      buffer += chunk
-      let newline
-      while ((newline = buffer.indexOf("\n")) !== -1) {
-        const line = buffer.slice(0, newline)
-        buffer = buffer.slice(newline + 1)
-        if (line) this.receive(JSON.parse(line))
-      }
-    })
+    socket.on("data", (chunk) =>
+      incoming(() => {
+        // why: a lagged chunk from a connection that has since closed belongs to a feed this bot already dropped.
+        if (this.socket !== socket) return
+        lastHeard = Date.now()
+        buffer += chunk
+        let newline
+        while ((newline = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, newline)
+          buffer = buffer.slice(newline + 1)
+          if (line) this.receive(JSON.parse(line))
+        }
+      }),
+    )
     socket.on("error", () => {})
     socket.on("close", () => {
       clearInterval(heartbeat)
@@ -745,7 +770,7 @@ class NearbyLink {
   }
 
   write(message) {
-    this.socket?.write(`${JSON.stringify(message)}\n`)
+    if (this.socket) this.send(`${JSON.stringify(message)}\n`)
   }
 
   receive(message) {
@@ -882,6 +907,7 @@ async function startNearby(options, tracker, report, bots) {
     bot.link = new NearbyLink(bot, options, {
       patches: slot - options.first >= options.legacy,
       skipPatch: options.skipPatch,
+      lag: options.lag,
     })
     bots.push(bot)
     bot.link.connect()
@@ -935,6 +961,7 @@ if (require.main === module) {
 module.exports = {
   applyHostMessage,
   digest,
+  laggedQueue,
   moveKey,
   organizerMove,
   parseCli,
