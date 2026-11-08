@@ -199,11 +199,9 @@ function chooseTargets(planned, requested) {
   })
 }
 
-// why: promote ships only a runtime's newest backport, so a new one must build on any still on beta or the older fix never reaches production.
 const promotedIds = (productionMessages) =>
   new Set(productionMessages.flatMap((m) => [...m.matchAll(PROMOTED)].map((x) => x[1])))
 
-// why: once promoted, production's own newest update is the base, so a rollback after promotion stays rolled back.
 const onPendingBackports = (targets, backports, promoted) =>
   targets.map((target) => {
     const newest = backports.find(
