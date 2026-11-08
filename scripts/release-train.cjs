@@ -24,7 +24,6 @@ const PLAYER_FACING_TYPES = new Set(["feat", "fix", "perf"])
 const INTERNAL_SCOPES = new Set(["ci", "deps", "docs", "repo", "scripts", "test", "tooling"])
 const MAX_NOTES = 8
 const PLATFORMS = ["android", "ios"]
-// Messages of updates `release-backport.cjs` publishes to beta. Those target older runtimes and are not on main.
 const BACKPORT_PREFIX = "Backport "
 
 const run = (command, args) =>

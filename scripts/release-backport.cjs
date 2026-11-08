@@ -1,23 +1,3 @@
-#!/usr/bin/env node
-/*
- * Backports merged JS-only fixes to runtimes main has moved past. The train only publishes for
- * main's runtime, so store installs on an older binary get nothing until they update the app.
- *
- *   node scripts/release-backport.cjs list                      runtimes a backport would reach
- *   --all                                                       every runtime EAS knows, not just store releases
- *   node scripts/release-backport.cjs <sha...>                  build and check every target, publish nothing
- *   node scripts/release-backport.cjs <sha...> --rehearse       also publish to backport-rehearsal, which no channel reads
- *   node scripts/release-backport.cjs <sha...> --yes            publish to beta
- *   node scripts/release-backport.cjs promote [--yes]           republish beta backports to production
- *   --target ios:337e20e1                                       only this runtime (repeatable)
- *   --target ios:<full runtime>@<commit>                        a runtime EAS has no record of, such as a local build
- *   --keep                                                      keep the worktrees
- *
- * Targets are the runtimes in published GitHub releases' manifests (see RELEASING.md), which
- * record what reached the stores. For each target it checks out the commit that runtime runs (its newest production update, or
- * the build's commit when it never got one), and stops unless the production fingerprint equals
- * that runtime before and after cherry-picking. It never publishes to production directly.
- */
 const { spawnSync } = require("node:child_process")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -100,6 +80,7 @@ function pages(args, size = 50) {
   }
 }
 
+// why: eas-cli returns update groups and builds newest first; planTargets and unpromoted take the first match as the newest.
 const updateGroups = (branch) =>
   pages(["update:list", "--branch", branch]).map((row) => ({
     group: row.group,
@@ -120,11 +101,7 @@ const productionBuilds = () =>
       version: build.appVersion,
     }))
 
-/**
- * Every runtime that production updates went to, plus the newest build of each app version.
- * Older rebuilds of a version are dropped: they were tester builds the store copy replaced.
- * Groups and builds arrive newest first.
- */
+// why: older rebuilds of an app version were tester builds that the store copy replaced.
 function planTargets({ groups, builds, current }) {
   const targets = new Map()
   for (const group of groups) {
@@ -159,7 +136,6 @@ function planTargets({ groups, builds, current }) {
   return [...targets.values()].filter((target) => current[target.platform] !== target.runtime)
 }
 
-/** The `runtime-version` and `git-sha` lines of a release manifest, one target per platform. */
 function parseManifest(tag, body) {
   const commit = /^git-sha:\s*([0-9a-f]{7,40})\b/m.exec(body)?.[1]
   const runtimes = /^runtime-version:(.*)$/m.exec(body)?.[1] ?? ""
@@ -181,7 +157,6 @@ const storeManifests = () =>
       ),
     )
 
-/** Store release runtimes, each at its newest production update, or its build when it never got one. */
 function manifestTargets({ manifests, groups, current }) {
   const targets = new Map()
   for (const { platform, runtime, commit, label } of manifests) {
@@ -199,7 +174,6 @@ function manifestTargets({ manifests, groups, current }) {
   return [...targets.values()]
 }
 
-// `ios:337e20e1` picks a planned runtime by prefix; `ios:<runtime>@<commit>` adds one EAS never saw.
 function parseTarget(value) {
   const match = /^(ios|android):([0-9a-f]+)(?:@([0-9a-f]{7,40}))?$/.exec(value)
   if (!match) throw new Error(`--target ${value}: expected ios|android:<runtime>[@<commit>]`)
@@ -241,7 +215,8 @@ function discover(requested, all) {
 
 function resolveBase(target) {
   const commit = target.group
-    ? eas(["update:view", target.group]).find((u) => u.platform === target.platform)?.gitCommitHash
+    ? retry(() => eas(["update:view", target.group])).find((u) => u.platform === target.platform)
+        ?.gitCommitHash
     : target.buildCommit
   if (!commit) throw new Error("its update records no commit")
   if (!hasCommit(commit))
@@ -250,7 +225,6 @@ function resolveBase(target) {
   return git(root, "rev-parse", commit)
 }
 
-/** The production profile's eas.json env, resolving `extends`, as the build saw it. */
 function profileEnv(dir) {
   const { build } = JSON.parse(fs.readFileSync(path.join(dir, "eas.json"), "utf8"))
   const resolve = (name) => {
@@ -276,7 +250,12 @@ function cherryPick(dir, commit) {
   })
   if (result.status === 0) return
   spawnSync("git", ["cherry-pick", "--abort"], { cwd: dir })
-  throw new Error(`${commit.slice(0, 8)} does not apply cleanly; backport it by hand`)
+  const detail = `${result.stdout ?? ""}${result.stderr ?? ""}`
+    .trim()
+    .split("\n")
+    .slice(-10)
+    .join("\n")
+  throw new Error(`${commit.slice(0, 8)} did not cherry-pick; backport it by hand\n${detail}`)
 }
 
 function checkBundle(dir, changed) {
@@ -296,7 +275,6 @@ function checkBundle(dir, changed) {
   }
 }
 
-/** Builds one base's backport and, when `branch` is set, publishes it there. */
 function backportBase({ base, targets, fixes, branch, keep }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `scryve-backport-${base.slice(0, 8)}-`))
   try {
@@ -486,10 +464,6 @@ function list(requested, all) {
   }
 }
 
-/**
- * The newest backport group for each platform's runtime, when production has not received it.
- * Groups arrive newest first; an older group would roll production back, so it is never a candidate.
- */
 function unpromoted(betaGroups, productionMessages) {
   const promoted = new Set(
     productionMessages.flatMap((m) => [...m.matchAll(PROMOTED)].map((x) => x[1])),
@@ -509,7 +483,7 @@ function unpromoted(betaGroups, productionMessages) {
 async function promote({ yes }) {
   const rows = updateGroups("beta").filter((row) => row.message.includes(`"${BACKPORT_PREFIX}`))
   const groups = [...new Set(rows.map((row) => row.group))].map((id) =>
-    summarizeGroup(eas(["update:view", id])),
+    summarizeGroup(retry(() => eas(["update:view", id]))),
   )
   const productionMessages = updateGroups("production").map((group) => group.message)
   const candidates = unpromoted(groups, productionMessages)
