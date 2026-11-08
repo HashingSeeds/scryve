@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react"
 import type { ViewStyle } from "react-native"
-import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native"
+import { ScrollView, StyleSheet, View } from "react-native"
 import { LegendList } from "@legendapp/list/react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -48,7 +48,6 @@ export function EventFrame<Row>({
   children: ReactNode
 }) {
   const { themed } = useAppTheme()
-  const window = useWindowDimensions()
   const blocked = access && !access.ready && !access.loading
   const waiting = loading || access?.loading
   return (
@@ -85,8 +84,6 @@ export function EventFrame<Row>({
               keyExtractor={rows.key}
               renderItem={({ item }) => rows.render(item)}
               estimatedItemSize={ROW_HEIGHT}
-              // why: without a size the list waits a layout pass before drawing any row.
-              estimatedListSize={{ width: window.width, height: window.height }}
               recycleItems
             />
           ) : (
