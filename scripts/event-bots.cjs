@@ -6,7 +6,9 @@
  */
 const { ConvexClient } = require("convex/browser")
 const { anyApi: api } = require("convex/server")
+const { spawn } = require("node:child_process")
 const { randomBytes } = require("node:crypto")
+const { lookup } = require("node:dns/promises")
 const net = require("node:net")
 const { clearInterval, clearTimeout, setInterval, setTimeout } = require("node:timers")
 const { parseArgs } = require("node:util")
@@ -26,9 +28,8 @@ const USAGE = `Stand-in players for events: on a Convex preview, or in a nearby 
   pnpm event-bots convex host [--players 16] [--guests 0] [--structure swiss|pods]
                               [--best-of 3] [--rounds 3] [--format standard]
   pnpm event-bots convex join <CODE> [--players 16] [--first 1]
-  pnpm event-bots nearby <CODE> <ip>:<port> [--players 16]
-      port: dns-sd -B _scryve._tcp then dns-sd -L "event-<CODE> <name>" _scryve._tcp (macOS),
-            or avahi-browse -rt _scryve._tcp (Linux)
+  pnpm event-bots nearby <CODE> [<ip>:<port>] [--players 16]
+      without <ip>:<port>, finds the event on the LAN with dns-sd (macOS) or avahi-browse (Linux)
 
 The first seat at each table reports and the others confirm. Tables with a guest wait for the
 organizer, which is the host bot on convex host and you everywhere else.
@@ -67,6 +68,8 @@ const NEARBY_RECONNECT_MS = 2_000
 const NEARBY_SILENCE_MS = 4_000
 const NEARBY_PROTOCOL = 1
 const MAX_TRIES = 3
+// why: a phone answers a Bonjour browse within a second or two, so longer means the event is not there.
+const DISCOVER_MS = 5_000
 
 function parseRange(value, name) {
   const [low, high = low] = value.split("-")
@@ -90,8 +93,9 @@ function parseTarget(positionals) {
   }
   if (transport === "nearby") {
     if (!first) throw new Error("nearby needs the event's code")
-    const address = /^(.+):(\d+)$/.exec(second ?? "")
-    if (!address) throw new Error("nearby needs the host's <ip>:<port>")
+    if (second === undefined) return { transport, code: first.toUpperCase() }
+    const address = /^(.+):(\d+)$/.exec(second)
+    if (!address) throw new Error("nearby takes the host as <ip>:<port>")
     return { transport, code: first.toUpperCase(), host: address[1], port: Number(address[2]) }
   }
   throw new Error(USAGE)
@@ -900,7 +904,79 @@ async function startConvex(options, tracker, report, bots) {
   organizer.schedule()
 }
 
+// why: avahi escapes spaces in names as \032, and the code must match whole, not as the start of a longer one.
+function servesCode(name, code) {
+  const plain = name.replace(/\\(\d{3})/g, (_, byte) => String.fromCharCode(Number(byte)))
+  return plain === `event-${code}` || plain.startsWith(`event-${code} `)
+}
+
+// why: a host keeps advertising finished events beside its live one, but they share the code only when they are the same event, so any IPv4 match will do.
+function parseAvahi(output, code) {
+  for (const line of output.split("\n")) {
+    const [kind, , protocol, name, , , , host, port] = line.split(";")
+    if (kind === "=" && protocol === "IPv4" && servesCode(name, code))
+      return { host, port: Number(port) }
+  }
+}
+
+function parseBrowse(output, code) {
+  for (const line of output.split("\n")) {
+    const name = /\sAdd\s.*\s_scryve\._tcp\.\s+(.+)$/.exec(line)?.[1]
+    if (name && servesCode(name, code)) return name
+  }
+}
+
+function parseResolve(output) {
+  const found = /can be reached at (\S+?)\.?:(\d+)/.exec(output)
+  return found && { host: found[1], port: Number(found[2]) }
+}
+
+// why: dns-sd never exits on its own, so every lookup stops at its first answer or the deadline.
+function watch(command, args, pick, deadline) {
+  return new Promise((resolve, reject) => {
+    let output = ""
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] })
+    const finish = (value) => {
+      clearTimeout(timer)
+      child.kill()
+      resolve(value)
+    }
+    const timer = setTimeout(finish, Math.max(deadline - Date.now(), 0))
+    child.on("error", (error) =>
+      reject(
+        error.code === "ENOENT" ? new Error(`${command} is missing; pass <ip>:<port>`) : error,
+      ),
+    )
+    child.stdout.on("data", (chunk) => {
+      output += chunk
+      // why: a chunk can end mid-line, before the port has arrived.
+      const value = pick(output.slice(0, output.lastIndexOf("\n") + 1))
+      if (value) finish(value)
+    })
+    child.on("close", () => finish(pick(output)))
+  })
+}
+
+async function discover(code) {
+  const deadline = Date.now() + DISCOVER_MS
+  let found
+  if (process.platform === "darwin") {
+    const pick = (output) => parseBrowse(output, code)
+    const name = await watch("dns-sd", ["-B", "_scryve._tcp"], pick, deadline)
+    const service =
+      name && (await watch("dns-sd", ["-L", name, "_scryve._tcp"], parseResolve, deadline))
+    found = service && { ...service, host: (await lookup(service.host, { family: 4 })).address }
+  } else {
+    const pick = (output) => parseAvahi(output, code)
+    found = await watch("avahi-browse", ["-rtp", "_scryve._tcp"], pick, deadline)
+  }
+  if (!found)
+    throw new Error(`no nearby event ${code} on this network after ${DISCOVER_MS / 1000}s`)
+  return found
+}
+
 async function startNearby(options, tracker, report, bots) {
+  if (options.host === undefined) Object.assign(options, await discover(options.code))
   const last = options.first + options.players
   for (let slot = options.first; slot < last; slot += 1) {
     const bot = new Bot({ name: `Bot ${slot}`, options, tracker, report })
@@ -964,7 +1040,10 @@ module.exports = {
   laggedQueue,
   moveKey,
   organizerMove,
+  parseAvahi,
+  parseBrowse,
   parseCli,
+  parseResolve,
   playerMove,
   randomResult,
 }

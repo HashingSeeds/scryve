@@ -7,7 +7,10 @@ const {
   digest,
   laggedQueue,
   organizerMove,
+  parseAvahi,
+  parseBrowse,
   parseCli,
+  parseResolve,
   playerMove,
   randomResult,
 } = require("./event-bots.cjs")
@@ -135,7 +138,8 @@ test("cli reads the nearby host and refuses guests it cannot add", () => {
   assert.equal(nearby.port, 51234)
   assert.deepEqual(nearby.think, [2000, 2000])
   assert.equal(parseCli(["convex", "host", "--structure", "pods"]).bestOf, 1)
-  assert.throws(() => parseCli(["nearby", "AB12CD"]), /<ip>:<port>/)
+  assert.equal(parseCli(["nearby", "ab12cd"]).host, undefined)
+  assert.throws(() => parseCli(["nearby", "AB12CD", "192.168.1.20"]), /<ip>:<port>/)
   assert.throws(() => parseCli(["convex", "join", "AB12CD", "--guests", "2"]), /--guests/)
   assert.throws(() => parseCli(["convex", "host", "--structure", "pods", "--best-of", "3"]), /Pod/)
   assert.throws(() => parseCli(["convex", "host", "--think", "5s-1s"]), /range/)
@@ -144,6 +148,31 @@ test("cli reads the nearby host and refuses guests it cannot add", () => {
     [50, 400],
   )
   assert.throws(() => parseCli(["convex", "host", "--lag", "100ms"]), /--lag needs nearby/)
+})
+
+test("discovery finds the event by its whole code in avahi and dns-sd output", () => {
+  const avahi = [
+    "+;wlo1;IPv4;event-KZ7SAQ\\032Keys;_scryve._tcp;local",
+    "=;wlo1;IPv6;event-KZ7SAQ\\032Keys;_scryve._tcp;local;Android.local;fe80::1;38581;",
+    "=;wlo1;IPv4;event-KZ7SAQX\\032Other;_scryve._tcp;local;Other.local;192.168.1.9;1111;",
+    "=;wlo1;IPv4;event-KZ7SAQ\\032Keys;_scryve._tcp;local;Android.local;192.168.1.53;38581;",
+  ].join("\n")
+  assert.deepEqual(parseAvahi(avahi, "KZ7SAQ"), { host: "192.168.1.53", port: 38581 })
+  assert.equal(parseAvahi(avahi, "AB12CD"), undefined)
+
+  const browse = [
+    "Timestamp     A/R    Flags  if Domain               Service Type         Instance Name",
+    "12:00:00.001  Add        3  14 local.               _scryve._tcp.        game-Matt",
+    "12:00:00.002  Add        2  14 local.               _scryve._tcp.        event-KZ7SAQ Friday Modern",
+  ].join("\n")
+  assert.equal(parseBrowse(browse, "KZ7SAQ"), "event-KZ7SAQ Friday Modern")
+  assert.equal(parseBrowse(browse, "AB12CD"), undefined)
+  assert.deepEqual(
+    parseResolve(
+      "12:00:00.100  event-KZ7SAQ\\032Friday\\032Modern._scryve._tcp.local. can be reached at Android.local.:38581 (interface 14)",
+    ),
+    { host: "Android.local", port: 38581 },
+  )
 })
 
 test("lagged messages arrive late but never out of order", async () => {
