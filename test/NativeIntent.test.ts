@@ -107,6 +107,37 @@ describe("connected invite native intent", () => {
   })
 
   it.each([
+    ["scryve-dev://events/nearby", "/events/nearby"],
+    ["count-dev:///events/nearby", "/events/nearby"],
+    ["scryve-preview://events/nearby", "/events/nearby"],
+    ["/events/nearby", "/events/nearby"],
+    ["scryve-dev://lan?name=Ada", "/lan?name=Ada"],
+  ])("routes nearby test link %s", (path, route) =>
+    expect(redirectSystemPath({ path, initial: true })).toBe(route),
+  )
+
+  it.each([
+    "scryve://events/nearby",
+    // why: the new-event form replaces an unsaved event without the list's confirmation.
+    "scryve-dev://events/nearby/new",
+    "scryve-dev://events/nearby/ABC234",
+    "scryve-dev://events/nearby?x=1",
+    "evil://events/nearby",
+  ])("drops other nearby link %s", (path) =>
+    expect(redirectSystemPath({ path, initial: true })).toBe("/"),
+  )
+
+  it("drops nearby test links outside dev and preview builds", () => {
+    const development = __DEV__
+    Reflect.set(globalThis, "__DEV__", false)
+    try {
+      expect(redirectSystemPath({ path: "scryve-dev://events/nearby", initial: true })).toBe("/")
+    } finally {
+      Reflect.set(globalThis, "__DEV__", development)
+    }
+  })
+
+  it.each([
     "scryve-preview://preview/pr-123",
     "count-preview://preview/pr-123",
     "scryve-preview://expo-development-client/?url=https://u.expo.dev/1e4ab9fb-230c-421d-a659-a4aaa4355d82?channel-name=pr-123",
