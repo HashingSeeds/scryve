@@ -24,6 +24,8 @@ const PLAYER_FACING_TYPES = new Set(["feat", "fix", "perf"])
 const INTERNAL_SCOPES = new Set(["ci", "deps", "docs", "repo", "scripts", "test", "tooling"])
 const MAX_NOTES = 8
 const PLATFORMS = ["android", "ios"]
+// Messages of updates `release-backport.cjs` publishes to beta. Those target older runtimes and are not on main.
+const BACKPORT_PREFIX = "Backport "
 
 const run = (command, args) =>
   execFileSync(command, args, {
@@ -107,6 +109,7 @@ function summarizeGroup(updates) {
 function pickRelease(groups, now, soakMs) {
   const releases = new Map()
   for (const group of groups) {
+    if (group.message.startsWith(BACKPORT_PREFIX)) continue
     const release = releases.get(group.commit)
     // why: re-running beta publishes a commit again, and beta devices run the newest group per platform.
     if (release?.platforms.some((platform) => group.platforms.includes(platform))) continue
@@ -324,4 +327,11 @@ if (require.main === module) {
   })
 }
 
-module.exports = { pickRelease, prNumbers, releaseNotes, summarizeGroup }
+module.exports = {
+  BACKPORT_PREFIX,
+  newIssues,
+  pickRelease,
+  prNumbers,
+  releaseNotes,
+  summarizeGroup,
+}

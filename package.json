@@ -62,7 +62,8 @@
     "ota:preview": "env APP_VARIANT=preview npx eas-cli@$npm_package_config_easCli update --channel preview --environment preview",
     "release:promote": "node scripts/release-train.cjs promote",
     "release:native": "node scripts/release-native.cjs cloud",
-    "release:live": "node scripts/release-native.cjs live"
+    "release:live": "node scripts/release-native.cjs live",
+    "release:backport": "node scripts/release-backport.cjs"
   },
   "dependencies": {
     "@clerk/expo": "4.14.1",

@@ -15,6 +15,18 @@ For a hotfix, promote with `--soak-minutes 0`. Do not run `eas update` against t
 
 Do not republish a preview update group to production. Preview has its own app identifier, runtime fingerprint, and RevenueCat Test Store key, so it installs beside the store app and `pnpm ota:preview` checks behavior but does not prove production compatibility. Test real store purchases with a TestFlight or Play internal production build.
 
+## Backports (fixes for older runtimes)
+
+The train publishes only for main's runtime, so installs on an older binary keep the last update their runtime got. To bring them a merged JS-only fix:
+
+1. `pnpm release:backport list` shows the runtimes of store releases, read from the published GitHub release manifests below, and the commit each runs: its newest production update, or the build's commit if it never got one. Main's runtime is skipped, since the train covers it. `--all` adds every runtime EAS knows.
+2. `pnpm release:backport <sha...>` checks out each of those commits, cherry-picks the fixes, typechecks, runs related tests, and exports the bundle. It publishes nothing. A target fails if the checkout does not fingerprint to its runtime, the pick conflicts, or the pick changes the fingerprint (the fix is not JS-only for that binary).
+3. `--rehearse` also publishes to `backport-rehearsal`, which no channel reads, and checks that EAS filed each update under the intended runtime.
+4. `--yes` publishes to beta and pushes a `backport/<commit>` tag so a later backport can build on it. To see it on a device, turn on Beta updates in an older store build.
+5. `pnpm release:backport promote --yes` republishes those beta groups to production if Sentry has no new issues from them. `release:promote` ignores backports.
+
+Narrow it with `--target ios:337e20e1`. A local build EAS never saw needs its full runtime and commit: `--target ios:<runtime>@<commit>`.
+
 ## Beta updates (opt-in OTA)
 
 Production builds have a hidden Beta updates switch: tap Version in Settings five times. It points that install at the `beta` channel, which runs the production build, runtime, and Convex backend. Settings and Sentry show `beta` as the channel after a restart. The beta workflow publishes every merge, so nothing is published to beta by hand.
@@ -47,7 +59,7 @@ Builds need a clean tree. The fingerprint skips the version (`ExpoConfigVersions
 
 ## Release record
 
-Every store release has its `v<version>` tag from the build. Give it a GitHub release whose notes contain this manifest:
+Every store release has its `v<version>` tag from the build. Give it a published GitHub release whose notes contain this manifest; backports target the runtimes it lists. Keep TestFlight-only versions as drafts:
 
 ```
 git-sha:
