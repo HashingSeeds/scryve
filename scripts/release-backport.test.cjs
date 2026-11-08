@@ -2,6 +2,7 @@ const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
 const {
+  onPendingBackports,
   manifestTargets,
   parseManifest,
   parseTarget,
@@ -159,4 +160,18 @@ test("store runtimes run their newest production update, or their build without 
       ["v0.1.1", null, "c-011"],
     ],
   )
+})
+
+test("a new backport builds on one still waiting on beta, so promote never drops its fix", () => {
+  const target = { platform: "ios", runtime: "rt-020", group: "prod-020" }
+  const other = { platform: "android", runtime: "rt-020", group: "prod-020-android" }
+  const backports = [
+    group("beta-new", "ios", "rt-020"),
+    group("beta-old", "ios", "rt-020"),
+    group("beta-012", "ios", "rt-012"),
+  ]
+  assert.deepEqual(onPendingBackports([target, other], backports), [
+    { ...target, group: "beta-new", pending: true },
+    other,
+  ])
 })

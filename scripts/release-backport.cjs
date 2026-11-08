@@ -59,7 +59,7 @@ const hasPick = (base, fix) =>
 const hasCommit = (commit) =>
   spawnSync("git", ["cat-file", "-e", `${commit}^{commit}`], { cwd: root }).status === 0
 
-// why: Expo's API fails some reads, and promote reads hundreds of beta groups. Only reads retry; a publish may have landed.
+// why: Expo's API fails some reads. Only reads retry; a publish may have landed.
 function retry(read, attempts = 3) {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -70,25 +70,30 @@ function retry(read, attempts = 3) {
   }
 }
 
-function pages(args, size = 50) {
+function pages(args, { size = 50, max = Infinity } = {}) {
   const rows = []
-  for (let offset = 0; ; offset += size) {
+  for (let offset = 0; offset < max * size; offset += size) {
     const page = retry(() => eas([...args, "--limit", String(size), "--offset", String(offset)]))
     const items = Array.isArray(page) ? page : page.currentPage
     rows.push(...items)
-    if (items.length < size) return rows
+    if (items.length < size) break
   }
+  return rows
 }
 
-// why: eas-cli returns update groups and builds newest first; planTargets and unpromoted take the first match as the newest.
-const updateGroups = (branch) =>
-  pages(["update:list", "--branch", branch]).map((row) => ({
+// why: eas-cli returns update groups and builds newest first; planTargets, discover and unpromoted take the first match as the newest.
+const updateGroups = (args, options) =>
+  pages(["update:list", ...args], options).map((row) => ({
     group: row.group,
     runtime: row.runtimeVersion,
     platforms: row.platforms.split(/,\s*/),
     message: row.message,
     isRollBackToEmbedded: row.isRollBackToEmbedded,
   }))
+
+const isBackport = (group) => group.message.includes(`"${BACKPORT_PREFIX}`)
+// why: beta holds every merge's groups, and Expo fails reads deep into that list.
+const recentBeta = (args = []) => updateGroups(["--branch", "beta", ...args], { max: 1 })
 
 const productionBuilds = () =>
   pages(["build:list", "--build-profile", "production", "--status", "finished"])
@@ -194,23 +199,38 @@ function chooseTargets(planned, requested) {
   })
 }
 
+// why: promote ships only a runtime's newest backport, so a new one must build on any still on beta or the older fix never reaches production.
+const onPendingBackports = (targets, backports) =>
+  targets.map((target) => {
+    const pending = backports.find(
+      (g) => g.runtime === target.runtime && g.platforms.includes(target.platform),
+    )
+    return pending ? { ...target, group: pending.group, pending: true } : target
+  })
+
 function discover(requested, all) {
-  const groups = updateGroups("production")
-  const beta = updateGroups("beta").filter(
-    (group) => !group.message.includes(`"${BACKPORT_PREFIX}`),
-  )
+  const groups = updateGroups(["--branch", "production"])
   const current = {}
-  for (const group of beta)
+  for (const group of recentBeta().filter((group) => !isBackport(group)))
     for (const platform of group.platforms) current[platform] ??= group.runtime
   const store = manifestTargets({ manifests: storeManifests(), groups, current })
-  if (!all && requested.length === 0) return store
-  const everything = planTargets({ groups, builds: productionBuilds(), current })
-  if (requested.length === 0) return everything
+  const everything =
+    all || requested.length > 0 ? planTargets({ groups, builds: productionBuilds(), current }) : []
   const known = new Set(everything.map((t) => `${t.platform}:${t.runtime}`))
-  return chooseTargets(
-    [...everything, ...store.filter((t) => !known.has(`${t.platform}:${t.runtime}`))],
-    requested,
+  const targets =
+    requested.length > 0
+      ? chooseTargets(
+          [...everything, ...store.filter((t) => !known.has(`${t.platform}:${t.runtime}`))],
+          requested,
+        )
+      : all
+        ? everything
+        : store
+  const runtimes = [...new Set(targets.map((target) => target.runtime))]
+  const backports = runtimes.flatMap((runtime) =>
+    recentBeta(["--runtime-version", runtime]).filter(isBackport),
   )
+  return onPendingBackports(targets, backports)
 }
 
 function resolveBase(target) {
@@ -457,10 +477,12 @@ function backport(fixArgs, { rehearse, yes, keep, all, targets: requested }) {
 
 function list(requested, all) {
   for (const target of discover(requested, all)) {
-    const base = target.group
-      ? `production update ${target.group}`
-      : `build ${target.buildCommit?.slice(0, 8)}`
-    console.log(`${describe(target)} runs ${base}`)
+    const base = target.pending
+      ? `beta backport ${target.group}`
+      : target.group
+        ? `production update ${target.group}`
+        : `build ${target.buildCommit?.slice(0, 8)}`
+    console.log(`${describe(target)} builds on ${base}`)
   }
 }
 
@@ -480,12 +502,12 @@ function unpromoted(betaGroups, productionMessages) {
   })
 }
 
-async function promote({ yes }) {
-  const rows = updateGroups("beta").filter((row) => row.message.includes(`"${BACKPORT_PREFIX}`))
-  const groups = [...new Set(rows.map((row) => row.group))].map((id) =>
+async function promote({ yes, all, targets: requested }) {
+  const pending = discover(requested, all).filter((target) => target.pending)
+  const groups = [...new Set(pending.map((target) => target.group))].map((id) =>
     summarizeGroup(retry(() => eas(["update:view", id]))),
   )
-  const productionMessages = updateGroups("production").map((group) => group.message)
+  const productionMessages = updateGroups(["--branch", "production"]).map((group) => group.message)
   const candidates = unpromoted(groups, productionMessages)
   if (candidates.length === 0)
     return console.log("No backports on beta are waiting for production.")
@@ -529,10 +551,10 @@ async function main() {
   const targets = values.target.map(parseTarget)
   const [command] = positionals
   if (command === "list") return list(targets, values.all)
-  if (command === "promote") return promote(values)
+  if (command === "promote") return promote({ ...values, targets })
   if (positionals.length > 0) return backport(positionals, { ...values, targets })
   throw new Error(
-    "Usage: release-backport.cjs list | <sha...> [--rehearse | --yes] | promote [--yes]",
+    "Usage: release-backport.cjs list | <sha...> [--rehearse | --yes] | promote [--yes] [--all | --target <platform:runtime>]",
   )
 }
 
@@ -543,4 +565,11 @@ if (require.main === module) {
   })
 }
 
-module.exports = { manifestTargets, parseManifest, parseTarget, planTargets, unpromoted }
+module.exports = {
+  onPendingBackports,
+  manifestTargets,
+  parseManifest,
+  parseTarget,
+  planTargets,
+  unpromoted,
+}
