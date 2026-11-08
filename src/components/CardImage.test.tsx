@@ -1,4 +1,5 @@
 import { Profiler } from "react"
+import { StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
@@ -331,4 +332,12 @@ it("spaces a deck's lookups by the server's retry hint after a rate limit", asyn
   } finally {
     jest.useRealTimers()
   }
+})
+
+it("rounds corners in proportion to width so baked-in white corners stay hidden", () => {
+  const view = render(cards("corners", "art", true))
+  const radius = (testID: string) =>
+    StyleSheet.flatten(view.getByTestId(testID).props.style).borderRadius
+  expect(radius("thumb")).toBeCloseTo(3.6)
+  expect(radius("preview")).toBeCloseTo(18)
 })
