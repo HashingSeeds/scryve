@@ -449,7 +449,6 @@ export function DeckView({
     </>
   )
 }
-// why: a 100-card deck took 1 s to switch to Build on a Pixel 6a while SectionList built every row; this list builds the rows near the screen and reuses them.
 const DECK_ROW_HEIGHT = 66
 const $flex: ViewStyle = { flex: 1 }
 const $stretch: ViewStyle = { alignItems: "stretch" }
