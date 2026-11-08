@@ -200,12 +200,18 @@ function chooseTargets(planned, requested) {
 }
 
 // why: promote ships only a runtime's newest backport, so a new one must build on any still on beta or the older fix never reaches production.
-const onPendingBackports = (targets, backports) =>
+const promotedIds = (productionMessages) =>
+  new Set(productionMessages.flatMap((m) => [...m.matchAll(PROMOTED)].map((x) => x[1])))
+
+// why: once promoted, production's own newest update is the base, so a rollback after promotion stays rolled back.
+const onPendingBackports = (targets, backports, promoted) =>
   targets.map((target) => {
-    const pending = backports.find(
+    const newest = backports.find(
       (g) => g.runtime === target.runtime && g.platforms.includes(target.platform),
     )
-    return pending ? { ...target, group: pending.group, pending: true } : target
+    return newest && !promoted.has(newest.group)
+      ? { ...target, group: newest.group, pending: true }
+      : target
   })
 
 function discover(requested, all) {
@@ -230,7 +236,7 @@ function discover(requested, all) {
   const backports = runtimes.flatMap((runtime) =>
     recentBeta(["--runtime-version", runtime]).filter(isBackport),
   )
-  return onPendingBackports(targets, backports)
+  return onPendingBackports(targets, backports, promotedIds(groups.map((g) => g.message)))
 }
 
 function resolveBase(target) {
@@ -401,7 +407,7 @@ function uploadSourceMaps(dir, env) {
 }
 
 function assertUnread(branch) {
-  const reader = pages(["channel:list"], 25).find((channel) =>
+  const reader = pages(["channel:list"], { size: 25 }).find((channel) =>
     channel.updateBranches.some((b) => b.name === branch),
   )
   if (reader)
@@ -487,9 +493,7 @@ function list(requested, all) {
 }
 
 function unpromoted(betaGroups, productionMessages) {
-  const promoted = new Set(
-    productionMessages.flatMap((m) => [...m.matchAll(PROMOTED)].map((x) => x[1])),
-  )
+  const promoted = promotedIds(productionMessages)
   const seen = new Set()
   return betaGroups.filter((group) => {
     if (!group.message.startsWith(BACKPORT_PREFIX)) return false

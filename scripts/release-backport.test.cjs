@@ -170,8 +170,14 @@ test("a new backport builds on one still waiting on beta, so promote never drops
     group("beta-old", "ios", "rt-020"),
     group("beta-012", "ios", "rt-012"),
   ]
-  assert.deepEqual(onPendingBackports([target, other], backports), [
+  assert.deepEqual(onPendingBackports([target, other], backports, new Set()), [
     { ...target, group: "beta-new", pending: true },
     other,
   ])
+})
+
+test("a promoted backport is not a base, so a production rollback stays rolled back", () => {
+  const target = { platform: "ios", runtime: "rt-020", group: "prod-020" }
+  const backports = [group("beta-new", "ios", "rt-020"), group("beta-old", "ios", "rt-020")]
+  assert.deepEqual(onPendingBackports([target], backports, new Set(["beta-new"])), [target])
 })
