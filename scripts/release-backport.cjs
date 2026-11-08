@@ -64,16 +64,39 @@ function isAncestor(ancestor, commit) {
   )
 }
 
+// why: a promoted backport's commit holds the fix as a cherry-pick, which has a different sha.
+const hasPick = (base, fix) =>
+  git(
+    root,
+    "log",
+    "-1",
+    "--format=%H",
+    "--fixed-strings",
+    `--grep=(cherry picked from commit ${fix})`,
+    base,
+  ) !== ""
+
 const hasCommit = (commit) =>
   spawnSync("git", ["cat-file", "-e", `${commit}^{commit}`], { cwd: root }).status === 0
 
-function pages(args) {
+// why: Expo's API fails some reads, and promote reads hundreds of beta groups. Only reads retry; a publish may have landed.
+function retry(read, attempts = 3) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return read()
+    } catch (error) {
+      if (attempt === attempts) throw error
+    }
+  }
+}
+
+function pages(args, size = 50) {
   const rows = []
-  for (let offset = 0; ; offset += 50) {
-    const page = eas([...args, "--limit", "50", "--offset", String(offset)])
+  for (let offset = 0; ; offset += size) {
+    const page = retry(() => eas([...args, "--limit", String(size), "--offset", String(offset)]))
     const items = Array.isArray(page) ? page : page.currentPage
     rows.push(...items)
-    if (items.length < 50) return rows
+    if (items.length < size) return rows
   }
 }
 
@@ -291,6 +314,8 @@ function backportBase({ base, targets, fixes, branch, keep }) {
     }
 
     for (const fix of fixes) cherryPick(dir, fix)
+    // why: a fix that changes dependencies or patches must be fingerprinted and bundled with them installed.
+    sh("pnpm", ["install", "--frozen-lockfile"], { cwd: dir })
     const head = git(dir, "rev-parse", "HEAD")
     const changed = git(dir, "diff", "--name-only", base, head).split("\n").filter(Boolean)
     const history = git(dir, "log", "--first-parent", "--max-count=200", "--format=%H%x1f%s")
@@ -378,9 +403,9 @@ function uploadSourceMaps(dir, env) {
 }
 
 function assertUnread(branch) {
-  const channels = eas(["channel:list"])
-  const list = Array.isArray(channels) ? channels : channels.currentPage
-  const reader = list.find((channel) => channel.updateBranches.some((b) => b.name === branch))
+  const reader = pages(["channel:list"], 25).find((channel) =>
+    channel.updateBranches.some((b) => b.name === branch),
+  )
   if (reader)
     throw new Error(`Channel ${reader.name} reads ${branch}, so a rehearsal would reach devices`)
 }
@@ -410,7 +435,7 @@ function backport(fixArgs, { rehearse, yes, keep, all, targets: requested }) {
   for (const target of discover(requested, all)) {
     try {
       const base = resolveBase(target)
-      const needed = fixes.filter((fix) => !isAncestor(fix, base))
+      const needed = fixes.filter((fix) => !isAncestor(fix, base) && !hasPick(base, fix))
       if (needed.length === 0) {
         results.push({ target, status: "already has the fix" })
         continue
@@ -461,15 +486,24 @@ function list(requested, all) {
   }
 }
 
-/** Backport groups on beta that production has not received yet. */
+/**
+ * The newest backport group for each platform's runtime, when production has not received it.
+ * Groups arrive newest first; an older group would roll production back, so it is never a candidate.
+ */
 function unpromoted(betaGroups, productionMessages) {
   const promoted = new Set(
     productionMessages.flatMap((m) => [...m.matchAll(PROMOTED)].map((x) => x[1])),
   )
-  return betaGroups.filter(
-    (group) =>
-      group.message.startsWith(BACKPORT_PREFIX) && !group.groups.some((id) => promoted.has(id)),
-  )
+  const seen = new Set()
+  return betaGroups.filter((group) => {
+    if (!group.message.startsWith(BACKPORT_PREFIX)) return false
+    const keys = Object.entries(group.runtimes).map(
+      ([platform, runtime]) => `${platform}:${runtime}`,
+    )
+    const newest = keys.every((key) => !seen.has(key))
+    for (const key of keys) seen.add(key)
+    return newest && !group.groups.some((id) => promoted.has(id))
+  })
 }
 
 async function promote({ yes }) {

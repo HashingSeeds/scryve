@@ -86,8 +86,16 @@ test("a manual target needs the full runtime when it names a commit", () => {
 
 test("promote skips backports production already has", () => {
   const beta = [
-    { message: "Backport abc onto def: fix", groups: ["11111111-1111-1111-1111-111111111111"] },
-    { message: "Backport abc onto 123: fix", groups: ["22222222-2222-2222-2222-222222222222"] },
+    {
+      message: "Backport abc onto def: fix",
+      groups: ["11111111-1111-1111-1111-111111111111"],
+      runtimes: { ios: "rt-020" },
+    },
+    {
+      message: "Backport abc onto 123: fix",
+      groups: ["22222222-2222-2222-2222-222222222222"],
+      runtimes: { ios: "rt-012" },
+    },
   ]
   const production = [
     '"Promote backport 11111111-1111-1111-1111-111111111111" (1 day ago by robot)',
@@ -96,6 +104,23 @@ test("promote skips backports production already has", () => {
     unpromoted(beta, production).map((g) => g.groups[0]),
     ["22222222-2222-2222-2222-222222222222"],
   )
+})
+
+const NEW = "33333333-3333-3333-3333-333333333333"
+const OLD = "44444444-4444-4444-4444-444444444444"
+const OTHER = "55555555-5555-5555-5555-555555555555"
+
+test("promote offers only the newest backport for a runtime, so production never rolls back", () => {
+  const beta = [
+    { message: "Backport b onto 1: newer", groups: [NEW], runtimes: { ios: "rt-020" } },
+    { message: "Backport a onto 1: older", groups: [OLD], runtimes: { ios: "rt-020" } },
+    { message: "Backport a onto 2: other", groups: [OTHER], runtimes: { android: "rt-020" } },
+  ]
+  assert.deepEqual(
+    unpromoted(beta, []).map((g) => g.groups[0]),
+    [NEW, OTHER],
+  )
+  assert.deepEqual(unpromoted(beta, [`"Promote backport ${NEW}"`]), [beta[2]])
 })
 
 const IOS = "337e20e19d3f9728c6fa4c787b1259d96aecbc4b"
