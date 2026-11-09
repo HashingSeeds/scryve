@@ -565,15 +565,16 @@ describe("LifeCard", () => {
       flexDirection: "row",
     })
     const art = MARK_ART_BOUNDS.heart
+    const scale = 32 / (art.bottom - art.top)
     expect(
       StyleSheet.flatten(
         view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
       ),
     ).toMatchObject({
-      width: 64,
-      height: 64,
-      marginLeft: -art.left * (64 / 44),
-      marginBottom: -(44 - art.bottom) * (64 / 44),
+      width: 44 * scale,
+      height: 44 * scale,
+      marginLeft: -art.left * scale,
+      marginBottom: -(44 - art.bottom) * scale,
     })
     expect(view.getByTestId("life-card-seat-1").props.accessibilityLabel).toBe("Seat 1, Ada")
   })
@@ -596,11 +597,9 @@ describe("LifeCard", () => {
         </ThemeProvider>,
       )
 
-      const art = MARK_ART_BOUNDS.eye
-      const scale = (compact ? 48 : 64) / 44
       expect(
         StyleSheet.flatten(view.getByTestId("life-identity-row-seat-1").props.style).height,
-      ).toBeCloseTo((art.bottom - art.top) * scale)
+      ).toBe(compact ? 24 : 32)
     },
   )
 
@@ -692,7 +691,7 @@ describe("LifeCard", () => {
   })
 
   it.each([
-    { inset: 34, bottom: 34 + 8 },
+    { inset: 34, bottom: 34 },
     { inset: 0, bottom: 16 },
   ])("sits the pair $bottom above a bottom seat with a $inset inset", ({ inset, bottom }) => {
     expect(
@@ -705,6 +704,41 @@ describe("LifeCard", () => {
         markHeight: 64,
       }).position.bottom,
     ).toBe(bottom)
+  })
+
+  it("centers a bottom seat's bag on its mark and name above the home indicator", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          contentInsets={{ top: 0, bottom: 34, left: 0, right: 0 }}
+          screenEdges={{ top: false, left: true, right: true, bottom: true }}
+          seatTable={{
+            rules: playTableRules("mtg", "commander"),
+            counters: {},
+            held: [],
+            editable: true,
+            adjustCounter: jest.fn(),
+            takeDesignation: jest.fn(),
+            releaseDesignation: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 300 } },
+    })
+
+    const row = StyleSheet.flatten(view.getByTestId("life-identity-row-seat-1").props.style)
+    const bag = StyleSheet.flatten(view.getByTestId("seat-bag-seat-1").props.style)
+    expect(row.bottom).toBe(34)
+    expect((bag.bottom as number) + (bag.height as number) / 2).toBe(
+      34 + (row.height as number) / 2,
+    )
   })
 
   it("swaps the identity layer's sides before turning a sideways card", () => {
@@ -1783,6 +1817,7 @@ describe("LifeCard", () => {
   })
 
   it("sizes the pair down with a compact card", () => {
+    const heart = MARK_ART_BOUNDS.heart
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeCard
@@ -1803,8 +1838,8 @@ describe("LifeCard", () => {
     expect(
       StyleSheet.flatten(
         view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
-      ),
-    ).toMatchObject({ width: 48, height: 48 })
+      ).width,
+    ).toBeCloseTo((44 * 24) / (heart.bottom - heart.top))
     expect(StyleSheet.flatten(view.getByTestId("player-name-seat-1").props.style)).toMatchObject({
       fontSize: 16,
     })

@@ -30,6 +30,7 @@ import {
   type LifeCardEdge,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
+import { seatIdentityMetrics } from "./SeatIdentity"
 import { Text } from "./Text"
 import { targetSlop } from "./touchTarget"
 import { NO_TABLE } from "../../convex/lib/systems"
@@ -163,8 +164,9 @@ const COMPACT_MENU_CLEARANCE = 37
 const CHIP_SIZE = 36
 const COMPACT_CHIP_SIZE = 32
 
+/** why: a seat's bag and calculator are buttons around an icon as tall as the seat mark. */
 export function seatBagSize(compact?: boolean) {
-  return compact ? COMPACT_CHIP_SIZE : CHIP_SIZE
+  return seatIdentityMetrics(compact).icon + 8
 }
 const COMPACT_CHIP_WIDTH = 28
 /** why: below this column width "0 Commander tax" no longer fits on one line, so items with a short label use it. */
@@ -444,7 +446,7 @@ export const CounterChips = memo(function CounterChips({
               pressed && { backgroundColor: overlayTint(foreground, 0.14) },
             ]}
           >
-            <DiceBagGlyph size={bagSize - 8} color={foreground} />
+            <DiceBagGlyph inkHeight={seatIdentityMetrics(compact).icon} color={foreground} />
           </BoardPressable>
         </View>
       ) : null}

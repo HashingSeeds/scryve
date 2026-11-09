@@ -4,6 +4,7 @@ import Animated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
+import { seatBagSize } from "@/components/CounterChips"
 import {
   FirstPlayerTabs,
   FirstPlayerTabsShownContext,
@@ -228,7 +229,7 @@ export function firstPlayerTabs(
 }
 
 // why: seats keep their name and mark at the outer edges, so a toast just past the menu, kept out of the side bands where sideways seats print theirs, never covers one. It stays mounted while the menu is open so a timed toast keeps its clock.
-const SEAT_IDENTITY_BAND = seatIdentityMetrics().edge + seatIdentityMetrics().mark
+const SEAT_IDENTITY_BAND = seatIdentityMetrics().edge + seatBagSize()
 const TOAST_MENU_CLEARANCE = MENU_BUTTON_SIZE / 2 + 8
 
 function BoardToastSlot({
