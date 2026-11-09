@@ -957,6 +957,43 @@ describe("memory engine: turn groups", () => {
     ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
   })
 
+  it("on a nearby host, passes to a 2HG team hit by 11 from a commander and 10 from its partner", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      variant: "twoHeadedGiant",
+      designations: {},
+      turnGroups: [
+        ["ada", "bo"],
+        ["cy", "dee"],
+      ],
+      turn: { playerId: "cy", number: 1, startedAt: CREATED_AT, operationId: "turn-cy" },
+      seats: new Map(
+        ["ada", "bo", "cy", "dee"].map((id) => [id, { ...seat(id), currentLife: 60 }]),
+      ),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map([
+        [["cy", "ada"].join("\u0000"), { total: 11, updatedAt: CREATED_AT }],
+        [["cy", "bo", "1"].join("\u0000"), { total: 10, updatedAt: CREATED_AT }],
+      ]),
+    }
+    expect(
+      writeMemoryGame(
+        memory,
+        actor("cy"),
+        tableWrite("cy", "turn-pass-cy-00002", {
+          kind: "turn.passed",
+          playerId: "cy",
+          toPlayerId: "ada",
+        }),
+        CREATED_AT + 1_000,
+      ),
+    ).toMatchObject({ ok: true })
+    expect(memory.turn).toMatchObject({ playerId: "ada", number: 2 })
+  })
+
   it("passes past a seat that went out after the passer's board last drew it", () => {
     const memory: MemoryGame = {
       status: "active",
