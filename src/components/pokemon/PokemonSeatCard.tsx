@@ -57,6 +57,7 @@ import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
+  seatCardRadius,
   clearOfCutout,
   cornerObstacles,
   cornerOffset,
@@ -1452,15 +1453,15 @@ const $drainTrack: ViewStyle = {
 }
 const $drainFill: ViewStyle = { width: "100%", height: "100%", transformOrigin: "left" }
 
-const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   overflow: "hidden",
   padding: spacing.xs,
-  borderRadius: radius.xxxl,
+  borderRadius: seatCardRadius(),
 })
-const $compactCard: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.xxs,
-  borderRadius: radius.xxl,
+  borderRadius: seatCardRadius(true),
 })
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.6 })
 const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.85 })

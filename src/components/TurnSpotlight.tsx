@@ -1,8 +1,10 @@
 import { createContext, useContext } from "react"
-import type { ViewStyle } from "react-native"
+import type { StyleProp, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
+
+import { seatCardRadius } from "./playerCardTypes"
 
 /** why: `passTo` is the next group's first seat, the seat a pass names; `active` and `next` are every seat in those groups, so a shared turn frames each of its seats. */
 export interface TurnSpotlight {
@@ -16,7 +18,20 @@ export const TurnSpotlightContext = createContext<TurnSpotlight | undefined>(und
 
 export const useTurnSpotlight = () => useContext(TurnSpotlightContext)
 
-export function SeatSpotlight({ playerId }: { playerId: string }) {
+/**
+ * why: the frame sits on its card's own rounded rect, with the card's radius and any corner the
+ * card squares against the screen, so no card color shows outside it at a corner. `corners` is the
+ * same corner style the card gets.
+ */
+export function SeatSpotlight({
+  playerId,
+  compact,
+  corners,
+}: {
+  playerId: string
+  compact?: boolean
+  corners?: StyleProp<ViewStyle>
+}) {
   const spotlight = useTurnSpotlight()
   const {
     theme: { colors },
@@ -28,7 +43,13 @@ export function SeatSpotlight({ playerId }: { playerId: string }) {
     <View
       pointerEvents="none"
       testID={active ? "seat-spotlight-active" : "seat-spotlight-next"}
-      style={[$frame, active ? $active : $next, { borderColor: colors.gameMenu.anchorGlyph }]}
+      style={[
+        $frame,
+        { borderRadius: seatCardRadius(compact) },
+        corners,
+        active ? $active : $next,
+        { borderColor: colors.gameMenu.anchorGlyph },
+      ]}
     />
   )
 }
@@ -39,7 +60,6 @@ const $frame: ViewStyle = {
   top: 0,
   right: 0,
   bottom: 0,
-  borderRadius: 24,
 }
 const $active: ViewStyle = { borderWidth: 4 }
 const $next: ViewStyle = { borderWidth: 3, borderStyle: "dashed", opacity: 0.8 }

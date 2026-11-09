@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react"
-import { SectionList, View } from "react-native"
+import { View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { router } from "expo-router"
+import { SectionList } from "@legendapp/list/section-list"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button, PlusAccessory } from "@/components/Button"
@@ -204,6 +205,8 @@ export function DeckView({
         sections={sections}
         keyExtractor={(card, index) => `${printingKey(card)}:${index}`}
         stickySectionHeadersEnabled={false}
+        estimatedItemSize={DECK_ROW_HEIGHT}
+        recycleItems
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <>
@@ -446,6 +449,7 @@ export function DeckView({
     </>
   )
 }
+const DECK_ROW_HEIGHT = 66
 const $flex: ViewStyle = { flex: 1 }
 const $stretch: ViewStyle = { alignItems: "stretch" }
 const $row: ViewStyle = { flexDirection: "row", alignItems: "center" }

@@ -24,7 +24,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { EventClockRow } from "./EventClockRow"
-import { $action, $actions, $grow, $row, $section, EventFrame } from "./EventFrame"
+import { $action, $actions, $grow, $row, $section, EventFrame, type EventRows } from "./EventFrame"
 import {
   canConfirm,
   canReport,
@@ -41,7 +41,7 @@ import {
   resultText,
   tablePlayers,
 } from "./eventLogic"
-import type { EventSource, EventTableView, EventView } from "./eventSource"
+import type { EventPlayer, EventSource, EventTableView, EventView } from "./eventSource"
 import { ResultDialog } from "./ResultDialog"
 import {
   MAX_ROUND_MINUTES,
@@ -50,12 +50,38 @@ import {
   startRoundBlocker,
   type RoundBlocker,
 } from "../../../convex/lib/events/commands"
-import { MAX_EVENT_ROUNDS } from "../../../convex/lib/events/model"
+import { MAX_EVENT_ROUNDS, type PlayerStanding } from "../../../convex/lib/events/model"
 import { suggestedSwissRounds } from "../../../convex/lib/events/pairing"
 
 const TABS = ["round", "players", "standings"] as const
 type Tab = (typeof TABS)[number]
 type Confirming = "finish" | "remove" | "drop" | "replaceGame"
+type EventRow =
+  | { readonly kind: "table"; readonly table: EventTableView }
+  | { readonly kind: "player"; readonly player: EventPlayer }
+  | { readonly kind: "standing"; readonly standing: PlayerStanding }
+
+const rowKey = (row: EventRow) =>
+  row.kind === "table"
+    ? row.table.id
+    : row.kind === "player"
+      ? row.player.id
+      : `standing-${row.standing.playerId}`
+
+const managesPlayers = (view: EventView) => view.isOrganizer && view.status !== "finished"
+
+function tabRows(view: EventView, tab: Tab, standings: EventSource["standings"]): EventRow[] {
+  switch (tab) {
+    case "round":
+      return view.isOrganizer ? view.tables.map((table) => ({ kind: "table", table })) : []
+    case "players":
+      return view.players.map((player) => ({ kind: "player", player }))
+    case "standings":
+      return standingsThroughRound(view) > 0
+        ? (standings ?? []).map((standing) => ({ kind: "standing", standing }))
+        : []
+  }
+}
 
 function useCommand() {
   const [busy, setBusy] = useState(false)
@@ -178,6 +204,40 @@ export function EventScreen({
       onPress: () => setDialog(id),
     }))
 
+  const rows: EventRows<EventRow> | undefined = view && {
+    data: tabRows(view, tab, source.standings),
+    key: rowKey,
+    render: (row) => {
+      switch (row.kind) {
+        case "table":
+          return (
+            <TableRow
+              view={view}
+              table={row.table}
+              onPress={canReport(view, row.table) ? () => setEditing(row.table.id) : undefined}
+            />
+          )
+        case "player":
+          return (
+            <PlayerRow
+              player={row.player}
+              managing={managesPlayers(view)}
+              busy={command.busy}
+              onToggleDrop={() =>
+                void command.run(() =>
+                  row.player.dropped
+                    ? source.undropPlayer(row.player.id)
+                    : source.dropPlayer(row.player.id),
+                )
+              }
+            />
+          )
+        case "standing":
+          return <StandingRow view={view} standing={row.standing} />
+      }
+    },
+  }
+
   async function confirmAction() {
     if (!view || !confirming) return
     if (confirming === "replaceGame") {
@@ -201,6 +261,7 @@ export function EventScreen({
       loading={view === undefined}
       onBack={onBack}
       footer={organizerFooter}
+      rows={rows}
       headerAction={
         actions.length > 0 ? (
           <HeaderIcon
@@ -249,7 +310,7 @@ export function EventScreen({
           {notice ? <AlertNote testID="event-notice" text={notice} /> : null}
           {command.error ? <AlertNote testID="event-error" text={command.error} /> : null}
           {tab === "round" ? (
-            <RoundTab
+            <RoundHeader
               view={view}
               busy={command.busy}
               onEdit={setEditing}
@@ -264,7 +325,7 @@ export function EventScreen({
               }
             />
           ) : tab === "players" ? (
-            <PlayersTab
+            <PlayersHeader
               view={view}
               source={source}
               busy={command.busy}
@@ -272,7 +333,7 @@ export function EventScreen({
               showStoreScreen={showStoreScreen}
             />
           ) : (
-            <StandingsTab view={view} source={source} />
+            <StandingsHeader view={view} empty={!rows?.data.length} />
           )}
           {editingTable ? (
             <ResultDialog
@@ -314,7 +375,7 @@ export function EventScreen({
   )
 }
 
-function RoundTab({
+function RoundHeader({
   view,
   busy,
   onEdit,
@@ -361,20 +422,11 @@ function RoundTab({
         <Text tone="dim" tx="events:waitingToStart" />
       ) : null}
       {view.isOrganizer && view.tables.length > 0 ? (
-        <View testID="tables" style={themed($section)}>
-          <SectionHeader
-            label={translate("events:tables")}
-            count={`${view.tables.filter((table) => table.result !== null).length}/${view.tables.length}`}
-          />
-          {view.tables.map((table) => (
-            <TableRow
-              key={table.id}
-              view={view}
-              table={table}
-              onPress={canReport(view, table) ? () => onEdit(table.id) : undefined}
-            />
-          ))}
-        </View>
+        <SectionHeader
+          testID="tables"
+          label={translate("events:tables")}
+          count={`${view.tables.filter((table) => table.result !== null).length}/${view.tables.length}`}
+        />
       ) : null}
     </>
   )
@@ -489,7 +541,7 @@ function TableRow({
   )
 }
 
-function PlayersTab({
+function PlayersHeader({
   view,
   source,
   busy,
@@ -511,7 +563,7 @@ function PlayersTab({
   }
   const [rounds, setRounds] = useState<number>()
   const [minutes, setMinutes] = useState<number>()
-  const managing = view.isOrganizer && view.status !== "finished"
+  const managing = managesPlayers(view)
   const active = view.players.filter((player) => !player.dropped).length
   const cloud = readPublicCloudConfig()
   const displayUrl =
@@ -584,88 +636,97 @@ function PlayersTab({
           </View>
         </>
       ) : null}
-      <View style={themed($section)}>
-        <SectionHeader label={translate("events:tabs.players")} count={active} />
-        {view.players.map((player) => (
-          <View key={player.id} testID={`player-${player.id}`} style={themed($row)}>
-            <Text style={$grow} numberOfLines={1} text={player.name} />
-            {player.guest || player.dropped ? (
-              <Text
-                size="xs"
-                tone="dim"
-                text={[
-                  ...(player.guest ? [translate("events:guest")] : []),
-                  ...(player.dropped ? [translate("events:dropped")] : []),
-                ].join(" · ")}
-              />
-            ) : null}
-            {managing ? (
-              <TextAction
-                testID={`${player.dropped ? "undrop" : "drop"}-${player.id}`}
-                tx={player.dropped ? "events:undrop" : "events:drop.action"}
-                disabled={busy}
-                onPress={() =>
-                  void run(() =>
-                    player.dropped ? source.undropPlayer(player.id) : source.dropPlayer(player.id),
-                  )
-                }
-              />
-            ) : null}
-          </View>
-        ))}
-      </View>
+      <SectionHeader label={translate("events:tabs.players")} count={active} />
     </>
   )
 }
 
-function StandingsTab({ view, source }: { view: EventView; source: EventSource }) {
+function PlayerRow({
+  player,
+  managing,
+  busy,
+  onToggleDrop,
+}: {
+  player: EventPlayer
+  managing: boolean
+  busy: boolean
+  onToggleDrop: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <View testID={`player-${player.id}`} style={themed($row)}>
+      <Text style={$grow} numberOfLines={1} text={player.name} />
+      {player.guest || player.dropped ? (
+        <Text
+          size="xs"
+          tone="dim"
+          text={[
+            ...(player.guest ? [translate("events:guest")] : []),
+            ...(player.dropped ? [translate("events:dropped")] : []),
+          ].join(" · ")}
+        />
+      ) : null}
+      {managing ? (
+        <TextAction
+          testID={`${player.dropped ? "undrop" : "drop"}-${player.id}`}
+          tx={player.dropped ? "events:undrop" : "events:drop.action"}
+          disabled={busy}
+          onPress={onToggleDrop}
+        />
+      ) : null}
+    </View>
+  )
+}
+
+function StandingsHeader({ view, empty }: { view: EventView; empty: boolean }) {
   const { themed } = useAppTheme()
   const tiebreaker = firstTiebreaker(view.system)
-  const rows = source.standings
-  if (!rows || rows.length === 0 || standingsThroughRound(view) === 0)
-    return <Text tone="dim" tx="events:standings.empty" />
+  if (empty) return <Text tone="dim" tx="events:standings.empty" />
   return (
-    <View testID="standings">
-      <View style={themed($row)}>
-        <Text preset="sectionLabel" style={$rank} tx="events:standings.rank" />
-        <Text preset="sectionLabel" style={$grow} tx="events:standings.player" />
+    <View testID="standings" style={themed($row)}>
+      <Text preset="sectionLabel" style={$rank} tx="events:standings.rank" />
+      <Text preset="sectionLabel" style={$grow} tx="events:standings.player" />
+      <TrailingNumber
+        adjustsFontSizeToFit
+        preset="sectionLabel"
+        value={translate("events:standings.points")}
+      />
+      <TrailingNumber
+        adjustsFontSizeToFit
+        preset="sectionLabel"
+        value={translate("events:standings.record")}
+      />
+      {tiebreaker ? (
         <TrailingNumber
           adjustsFontSizeToFit
           preset="sectionLabel"
-          value={translate("events:standings.points")}
+          value={translate(`events:tiebreaker.${tiebreaker}`)}
         />
+      ) : null}
+    </View>
+  )
+}
+
+function StandingRow({ view, standing }: { view: EventView; standing: PlayerStanding }) {
+  const { themed } = useAppTheme()
+  const tiebreaker = firstTiebreaker(view.system)
+  return (
+    <View testID={`standing-${standing.playerId}`} style={themed($row)}>
+      <Text size="xs" style={$rank} text={String(standing.rank)} />
+      <Text size="xs" style={$grow} numberOfLines={1} text={playerName(view, standing.playerId)} />
+      <TrailingNumber adjustsFontSizeToFit size="xs" weight="bold" value={standing.points} />
+      <TrailingNumber
+        adjustsFontSizeToFit
+        size="xs"
+        value={`${standing.wins}-${standing.losses}-${standing.draws}`}
+      />
+      {tiebreaker ? (
         <TrailingNumber
           adjustsFontSizeToFit
-          preset="sectionLabel"
-          value={translate("events:standings.record")}
+          size="xs"
+          value={percent(standing.tiebreakers[0] ?? 0)}
         />
-        {tiebreaker ? (
-          <TrailingNumber
-            adjustsFontSizeToFit
-            preset="sectionLabel"
-            value={translate(`events:tiebreaker.${tiebreaker}`)}
-          />
-        ) : null}
-      </View>
-      {rows.map((row) => (
-        <View key={row.playerId} testID={`standing-${row.playerId}`} style={themed($row)}>
-          <Text size="xs" style={$rank} text={String(row.rank)} />
-          <Text size="xs" style={$grow} numberOfLines={1} text={playerName(view, row.playerId)} />
-          <TrailingNumber adjustsFontSizeToFit size="xs" weight="bold" value={row.points} />
-          <TrailingNumber
-            adjustsFontSizeToFit
-            size="xs"
-            value={`${row.wins}-${row.losses}-${row.draws}`}
-          />
-          {tiebreaker ? (
-            <TrailingNumber
-              adjustsFontSizeToFit
-              size="xs"
-              value={percent(row.tiebreakers[0] ?? 0)}
-            />
-          ) : null}
-        </View>
-      ))}
+      ) : null}
     </View>
   )
 }
