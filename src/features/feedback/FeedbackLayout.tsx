@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { ScrollView, useWindowDimensions, View } from "react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -14,7 +14,6 @@ export function FeedbackLayout({
   title,
   heading = true,
   chat = false,
-  offline,
   onBack,
   footer,
   children,
@@ -22,7 +21,6 @@ export function FeedbackLayout({
   title: string
   heading?: boolean
   chat?: boolean
-  offline: boolean
   onBack: () => void
   footer?: ReactNode
   children: ReactNode
@@ -43,11 +41,6 @@ export function FeedbackLayout({
       }}
       contentContainerStyle={$fill}
     >
-      {offline ? (
-        <View style={themed($offline)} accessibilityRole="alert">
-          <Text tx="feedback:offline" size="xs" style={themed($offlineText)} />
-        </View>
-      ) : null}
       <ScrollView
         style={$grow}
         contentContainerStyle={themed($content)}
@@ -83,9 +76,3 @@ const $inlineFooter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   marginTop: spacing.md,
 })
-const $offline: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.xs,
-  backgroundColor: colors.surfaceRaised,
-})
-const $offlineText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.text })

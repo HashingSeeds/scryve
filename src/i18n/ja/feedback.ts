@@ -13,7 +13,7 @@ export default {
     noMatch: "「{{query}}」に該当する回答はありません。",
     ask: "「{{query}}」について問い合わせる",
   },
-  offline: "オフラインです。接続が戻るまで、下書きはここに残ります。",
+  offline: "オフラインです。接続が戻るまで下書きはここに保存されます。",
   suggest: {
     title: "フィードバックを送信",
     kind: "種類を選択",
@@ -24,18 +24,15 @@ export default {
       bug: "何が起きましたか?",
     },
     bodyPlaceholder: {
-      feature: "どんな場面で使いたいですか?",
-      bug: "何が起きたか、どう動くと思っていたかを教えてください",
+      feature: "どんな場面で使いますか?",
+      bug: "どうなると思いましたか?",
     },
     addScreenshot: "スクリーンショットを追加",
     removeScreenshot: "スクリーンショットを削除",
     selectedScreenshot: "選択したスクリーンショット",
     screenshotFailed: "スクリーンショットを追加できませんでした。別の画像をお試しください。",
-    notice: {
-      feature:
-        "どの言語でもOKです。AIが読むのを補助する場合があります。<privacy>プライバシー</privacy>",
-      bug: "どの言語でもOKです。AIが読むのを補助する場合があります。不具合報告にはデバイス情報が含まれます。<privacy>プライバシー</privacy>",
-    },
+    notice:
+      "どの言語でも書けます。AIが読解を補助することがあります。<privacy>プライバシー</privacy>",
     includeAccount: "アカウントを含める",
     includeAccountHelper: "返信はデバイス間で同期され、ユーザー名が開発者に表示されます。",
     sendFailed: "送信できませんでした。もう一度お試しください。",

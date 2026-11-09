@@ -35,7 +35,8 @@ function renderConversation(overrides: Partial<FeedbackConversationScreenProps> 
     screenshot: null,
     signedIn: false,
     includeAccount: false,
-    offline: false,
+    online: true,
+    showOffline: false,
     onKind: jest.fn(),
     onDraft: jest.fn(),
     onSend: jest.fn(),
@@ -68,25 +69,27 @@ describe("FeedbackConversationScreen", () => {
     fireEvent.press(empty.view.getByLabelText("Send"))
     expect(empty.props.onSend).not.toHaveBeenCalled()
 
-    const offline = renderConversation({ draft: "Please", offline: true })
+    const offline = renderConversation({ draft: "Please", online: false })
     fireEvent.press(offline.view.getByLabelText("Send"))
     expect(offline.props.onSend).not.toHaveBeenCalled()
+    expect(offline.view.queryByText(/^Offline\./)).toBeNull()
+    expect(
+      renderConversation({ online: false, showOffline: true }).view.getByText(/^Offline\./),
+    ).toBeTruthy()
 
     const loading = renderConversation({ draft: "Please", started: true, thread: undefined })
     fireEvent.press(loading.view.getByLabelText("Send"))
     expect(loading.props.onSend).not.toHaveBeenCalled()
   })
 
-  it("mentions device info only on bug reports, and links the Privacy Policy", () => {
+  it("asks a question for each kind, and links the Privacy Policy", () => {
     const feature = renderConversation()
     expect(feature.view.getByText("What would you like to see?")).toBeTruthy()
-    expect(feature.view.queryByText(/device info/)).toBeNull()
     fireEvent.press(feature.view.getByText("Privacy"))
     expect(feature.props.onOpenPrivacy).toHaveBeenCalled()
 
     const bug = renderConversation({ kind: "bug" })
     expect(bug.view.getByText("What went wrong?")).toBeTruthy()
-    expect(bug.view.getByText(/Bug reports include device info/)).toBeTruthy()
   })
 
   it("shows the thread as messages, marking the player's latest as sent", () => {

@@ -4,7 +4,6 @@ import { useQuery } from "convex/react"
 import Head from "expo-router/head"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
 import { translate } from "@/i18n/translate"
 import { SupportScreen, type SupportScreenProps } from "@/screens/SupportScreen"
@@ -33,22 +32,20 @@ export default function SupportRoute() {
 function LiveSupport() {
   // why: opening Support shouldn't make a feedback key for someone who never sent any.
   const key = useFeedbackKey({ create: false })
-  const online = useConvexOnline()
   const mine = useQuery(api.feedback.mine, key ? { key } : {})
   return (
     <Support
       unread={mine?.filter((item) => item.unread).length ?? 0}
       hasFeedback={Boolean(mine?.length)}
-      offline={!online}
     />
   )
 }
 
 function StaticSupport() {
-  return <Support unread={0} hasFeedback={false} offline={false} />
+  return <Support unread={0} hasFeedback={false} />
 }
 
-function Support(props: Pick<SupportScreenProps, "unread" | "hasFeedback" | "offline">) {
+function Support(props: Pick<SupportScreenProps, "unread" | "hasFeedback">) {
   return (
     <SupportScreen
       {...props}

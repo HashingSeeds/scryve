@@ -13,7 +13,7 @@ const feedback = {
     noMatch: "No answers for “{{query}}”.",
     ask: "Ask us about “{{query}}”",
   },
-  // Shown under the navigation bar while the app has no connection to Scryve's servers.
+  // Shown in a feedback conversation after the app has had no connection to Scryve's servers for a few seconds.
   offline: "Offline. Your draft stays here until you're back.",
   suggest: {
     title: "Send feedback",
@@ -25,19 +25,17 @@ const feedback = {
       feature: "What would you like to see?",
       bug: "What went wrong?",
     },
+    // Placeholders in a narrow composer next to two buttons. Keep each to one short line.
     bodyPlaceholder: {
       feature: "When would you use it?",
-      bug: "What happened, and what did you expect?",
+      bug: "What did you expect?",
     },
     addScreenshot: "Add screenshot",
     removeScreenshot: "Remove screenshot",
     selectedScreenshot: "Selected screenshot",
     screenshotFailed: "Couldn't add that screenshot. Try another image.",
     // One line above the composer. <privacy> links to the Privacy Policy.
-    notice: {
-      feature: "Any language works. AI may help us read it. <privacy>Privacy</privacy>",
-      bug: "Any language works. AI may help us read it. Bug reports include device info. <privacy>Privacy</privacy>",
-    },
+    notice: "Any language works. AI may help us read it. <privacy>Privacy</privacy>",
     includeAccount: "Include my account",
     includeAccountHelper: "Replies sync to your devices, and we see your username.",
     sendFailed: "Couldn't send. Try again.",

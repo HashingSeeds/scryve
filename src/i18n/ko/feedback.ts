@@ -13,7 +13,7 @@ export default {
     noMatch: "“{{query}}”에 대한 답변이 없습니다.",
     ask: "“{{query}}” 문의하기",
   },
-  offline: "오프라인입니다. 연결될 때까지 작성한 내용은 여기에 남아 있습니다.",
+  offline: "오프라인입니다. 연결될 때까지 초안은 여기에 그대로 남아 있습니다.",
   suggest: {
     title: "피드백 보내기",
     kind: "어떤 내용인가요?",
@@ -25,17 +25,14 @@ export default {
     },
     bodyPlaceholder: {
       feature: "언제 사용하실 건가요?",
-      bug: "어떤 일이 있었고, 어떻게 되길 기대하셨나요?",
+      bug: "어떤 동작을 예상하셨나요?",
     },
     addScreenshot: "스크린샷 추가",
     removeScreenshot: "스크린샷 삭제",
     selectedScreenshot: "선택한 스크린샷",
     screenshotFailed: "스크린샷을 추가하지 못했습니다. 다른 이미지를 선택하세요.",
-    notice: {
-      feature:
-        "어떤 언어든 괜찮습니다. AI가 내용을 읽는 데 도움을 줄 수 있습니다. <privacy>개인정보 처리방침</privacy>",
-      bug: "어떤 언어든 괜찮습니다. AI가 내용을 읽는 데 도움을 줄 수 있습니다. 버그 신고에는 기기 정보가 포함됩니다. <privacy>개인정보 처리방침</privacy>",
-    },
+    notice:
+      "어떤 언어든 괜찮습니다. AI가 읽는 데 도움을 줄 수 있습니다. <privacy>개인정보 처리방침</privacy>",
     includeAccount: "내 계정 포함",
     includeAccountHelper: "답변이 내 기기에 동기화되며, 사용자 이름이 우리에게 표시됩니다.",
     sendFailed: "보내지 못했습니다. 다시 시도하세요.",

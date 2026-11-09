@@ -15,7 +15,7 @@ export default {
     noMatch: "No hay respuestas para “{{query}}”.",
     ask: "Pregúntanos sobre “{{query}}”",
   },
-  offline: "Sin conexión. Tu borrador se queda aquí hasta que vuelvas.",
+  offline: "Sin conexión. Tu borrador se queda aquí hasta que vuelvas a conectarte.",
   suggest: {
     title: "Enviar comentarios",
     kind: "¿De qué se trata?",
@@ -26,18 +26,15 @@ export default {
       bug: "¿Qué salió mal?",
     },
     bodyPlaceholder: {
-      feature: "¿Cuándo la usarías?",
-      bug: "¿Qué pasó y qué esperabas que pasara?",
+      feature: "¿Cuándo lo usarías?",
+      bug: "¿Qué esperabas?",
     },
     addScreenshot: "Añadir captura de pantalla",
     removeScreenshot: "Quitar captura de pantalla",
     selectedScreenshot: "Captura de pantalla seleccionada",
     screenshotFailed: "No se pudo añadir esa captura. Prueba con otra imagen.",
-    notice: {
-      feature:
-        "Puedes escribir en cualquier idioma. Es posible que usemos IA para leerlo. <privacy>Privacidad</privacy>",
-      bug: "Puedes escribir en cualquier idioma. Es posible que usemos IA para leerlo. Los informes de errores incluyen información del dispositivo. <privacy>Privacidad</privacy>",
-    },
+    notice:
+      "Cualquier idioma sirve. Una IA puede ayudarnos a leerlo. <privacy>Privacidad</privacy>",
     includeAccount: "Incluir mi cuenta",
     includeAccountHelper:
       "Las respuestas se sincronizan con tus dispositivos y vemos tu nombre de usuario.",

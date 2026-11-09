@@ -31,7 +31,8 @@ export interface FeedbackConversationScreenProps {
   sentScreenshotUri?: string
   signedIn: boolean
   includeAccount: boolean
-  offline: boolean
+  online: boolean
+  showOffline: boolean
   error?: string
   onKind: (kind: SuggestKind) => void
   onDraft: (draft: string) => void
@@ -55,7 +56,8 @@ export function FeedbackConversationScreen({
   sentScreenshotUri,
   signedIn,
   includeAccount,
-  offline,
+  online,
+  showOffline,
   error,
   onKind,
   onDraft,
@@ -74,7 +76,7 @@ export function FeedbackConversationScreen({
   const lastFromPlayer = messages.filter((message) => message.from === "player").at(-1)
   const firstIsLatest = !outgoing && !lastFromPlayer
   const canSend =
-    Boolean(draft.trim()) && !offline && outgoing === undefined && (!started || Boolean(request))
+    Boolean(draft.trim()) && online && outgoing === undefined && (!started || Boolean(request))
   const opened = started || outgoing !== undefined
 
   return (
@@ -82,7 +84,6 @@ export function FeedbackConversationScreen({
       title={translate(opened ? "feedback:mine.title" : "feedback:suggest.title")}
       heading={false}
       chat
-      offline={offline}
       onBack={onBack}
       footer={
         thread === null ? undefined : (
@@ -108,7 +109,7 @@ export function FeedbackConversationScreen({
             {opened ? null : (
               <Text size="xs" tone="dim" style={$centered}>
                 <Trans
-                  i18nKey={`feedback:suggest.notice.${kind}`}
+                  i18nKey="feedback:suggest.notice"
                   components={{
                     privacy: (
                       <Text
@@ -143,7 +144,8 @@ export function FeedbackConversationScreen({
                 value={draft}
                 onChangeText={onDraft}
                 containerStyle={$grow}
-                inputWrapperStyle={themed($input)}
+                inputWrapperStyle={$inputWrapper}
+                style={$input}
               />
               <ComposerButton
                 label={translate("feedback:thread.send")}
@@ -182,8 +184,9 @@ export function FeedbackConversationScreen({
               onValueChange={onIncludeAccount}
             />
           ) : null}
-          <View style={$prompt}>
+          <View style={themed($prompt)}>
             <Text tx={`feedback:suggest.prompt.${kind}`} preset="subheading" style={$centered} />
+            {showOffline ? <OfflineNote /> : null}
           </View>
         </>
       )}
@@ -226,7 +229,14 @@ export function FeedbackConversationScreen({
       {request && !outgoing ? (
         <AccountStatus request={request} onLinkAccount={onLinkAccount} onSignIn={onSignIn} />
       ) : null}
+      {opened && showOffline ? <OfflineNote /> : null}
     </FeedbackLayout>
+  )
+}
+
+function OfflineNote() {
+  return (
+    <Text tx="feedback:offline" size="xs" tone="dim" accessibilityRole="alert" style={$centered} />
   )
 }
 
@@ -381,11 +391,9 @@ const $composer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-end",
   gap: spacing.xs,
 })
-const $input: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: COMPOSER_BUTTON_SIZE,
-  maxHeight: 140,
-  paddingVertical: spacing.xxs,
-})
+const $inputWrapper: ViewStyle = { minHeight: COMPOSER_BUTTON_SIZE }
+/** why: a stretched multiline input pins its first line to the top, above the buttons' center. */
+const $input: TextStyle = { alignSelf: "center", maxHeight: 120 }
 const $composerButton: ThemedStyle<ViewStyle> = () => ({
   width: COMPOSER_BUTTON_SIZE,
   height: COMPOSER_BUTTON_SIZE,
@@ -430,7 +438,11 @@ const $theirs: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $team: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $prompt: ViewStyle = { flex: 1, justifyContent: "center" }
+const $prompt: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  justifyContent: "center",
+  gap: spacing.xs,
+})
 const $centered: TextStyle = { textAlign: "center" }
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.tint,
