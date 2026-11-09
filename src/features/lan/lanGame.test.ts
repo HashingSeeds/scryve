@@ -777,4 +777,34 @@ describe("nearby Planechase and Archenemy", () => {
     expect(modes?.planechase?.faceUp).toBe(authority?.planechase?.order?.[0])
     expect(modes?.archenemy).toEqual({ playerId: "host", deck: "e01-archenemy-nicol-bolas" })
   })
+
+  it("keeps a rolled archenemy's seat in a rematch and reshuffles only the decks", () => {
+    let game = lobby({
+      ...commander,
+      playerCount: 3,
+      startingLife: 20,
+      ruleset: "constructed",
+      format: "constructed",
+      variant: "archenemy",
+      modeSetup: { archenemy: { deck: "e01-archenemy-nicol-bolas" } },
+    })
+    for (const key of ["guest-a", "guest-b"]) {
+      const admitted = admitLanGuest(
+        game,
+        tokens,
+        { ...join(key), variants: ["archenemy", "planechase"] },
+        { key, token: `token-${key}` },
+      )
+      if ("rejected" in admitted) throw new Error(admitted.rejected)
+      game = admitted.game
+    }
+    const first = startLanRound(game, NOW, () => 0.99)
+    expect(first.memory?.modes?.archenemy?.playerId).toBe("guest-b")
+
+    const rematch = startLanRound(endLanRound(first, "finished", NOW), NOW, () => 0)
+    expect(rematch.memory?.modes?.archenemy?.playerId).toBe("guest-b")
+    expect(rematch.memory?.modes?.archenemy?.order).not.toEqual(
+      first.memory?.modes?.archenemy?.order,
+    )
+  })
 })
