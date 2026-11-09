@@ -128,6 +128,22 @@ function harness(
 }
 
 describe("outbox sync controller", () => {
+  it("keeps changes in the order they were queued, though the clock jumped back, and after a restart", () => {
+    const { clock, controller, repository } = harness()
+    const queue = (time: number, playerId: string) => {
+      clock.time = time
+      controller.changeLife(playerId, -1)
+    }
+    queue(1_000, "player-1")
+    queue(11_000, "player-2")
+    queue(1_200, "player-1")
+    const seatsOf = (pending: readonly PendingLifeAction[]) =>
+      pending.map(({ event }) => (event.type === "life.changed" ? event.playerId : ""))
+
+    expect(seatsOf(controller.getSnapshot().pending)).toEqual(["player-1", "player-2", "player-1"])
+    expect(seatsOf(stored(repository).pending)).toEqual(["player-1", "player-2", "player-1"])
+  })
+
   it("drains a queued life change and acknowledges it", async () => {
     const { controller, repository, sent } = harness()
     controller.setEnvironment(ONLINE)

@@ -513,6 +513,9 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
       ? { variant: TWO_HEADED_GIANT }
       : {}),
     ...(counterLog ? { counterLog } : {}),
+    ...(Array.isArray(value.logOrder)
+      ? { logOrder: value.logOrder.filter((id): id is string => typeof id === "string") }
+      : {}),
   }
 }
 

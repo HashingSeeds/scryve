@@ -218,7 +218,10 @@ describe("counter log rows", () => {
     const life = [
       { id: "life", playerId: ada, delta: -3, life: 37, at: 1_550, operationIds: ["life"] },
     ]
-    expect(mergedLog(life, rows).map(({ at }) => at)).toEqual([9_000, 1_600, 1_550, 1_500])
+    const sequence = ["a", "b", "life", "c", "d"]
+    expect(mergedLog(life, rows, (id) => sequence.indexOf(id)).map(({ at }) => at)).toEqual([
+      9_000, 1_600, 1_550, 1_500,
+    ])
   })
 
   it("folds a counter's quick taps even when another counter changes in between", () => {

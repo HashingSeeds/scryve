@@ -52,8 +52,8 @@ export function GameLogDialog({
   origin?: DialogOrigin
   /** why: a connected game's log arrives a page at a time. */
   onMore?: () => void
-  /** why: a connected log places rows under turns by the authority's order, not device clocks. */
-  positionOf?: (operationId: string) => number | undefined
+  /** why: rows go under turns by sequence, never a clock: the authority's order, or a local game's apply order. */
+  positionOf: (operationId: string) => number | undefined
   onUndo: () => void
   onClose: () => void
 }) {

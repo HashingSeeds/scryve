@@ -1,5 +1,11 @@
-import { applyGameCommand, asOperationId, localTableRules, localTeams } from "./domain"
-import { counterLog, gameLog, mergedLog } from "./LifeLog"
+import {
+  applyGameCommand,
+  asOperationId,
+  localLogPositions,
+  localTableRules,
+  localTeams,
+} from "./domain"
+import { counterLog, gameLog, mergedLog, rowPosition } from "./LifeLog"
 import type { CommandContext, LocalGame } from "./types"
 import {
   applyTableAction,
@@ -14,9 +20,15 @@ import {
  * which show no row, don't hide it.
  */
 export function newestLogUndo(game: LocalGame, { turns }: { turns: boolean }) {
-  const [row] = mergedLog(gameLog(game.players, game.events), counterLog(game.counterLog ?? []))
+  const positionOf = localLogPositions(game)
+  const [row] = mergedLog(
+    gameLog(game.players, game.events),
+    counterLog(game.counterLog ?? []),
+    positionOf,
+  )
   const turn = turns ? game.turn : undefined
-  if (turn?.previous && (!row || turn.startedAt >= row.at))
+  const passPlace = turn ? (positionOf(turn.operationId) ?? -Infinity) : -Infinity
+  if (turn?.previous && (!row || passPlace >= rowPosition(row, positionOf)))
     return {
       kind: "turn" as const,
       playerId: turn.previous.playerId,
