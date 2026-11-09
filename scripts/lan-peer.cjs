@@ -18,7 +18,8 @@ let active = false
 
 const socket = net.connect(Number(port), host, () => {
   log(`connected to ${host}:${port}`)
-  send({ type: "join", protocol: 2, name })
+  // why: a host turns away a guest that doesn't say it draws 7 or more seats from a game that big.
+  send({ type: "join", protocol: 2, name, maxSeats: 10 })
 })
 const send = (message) => socket.write(`${JSON.stringify(message)}\n`)
 
