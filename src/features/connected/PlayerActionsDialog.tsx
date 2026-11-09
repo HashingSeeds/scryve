@@ -7,6 +7,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { DialogCard, type DialogOrigin } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import type { TxKeyPath } from "@/i18n"
@@ -107,8 +108,8 @@ export function PlayerActionsDialog({
         </View>
       ) : selected ? (
         <ScrollView
-          style={themed($list)}
-          contentContainerStyle={themed($section)}
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed([$sheetScrollContent, $section])}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
         >
@@ -192,7 +193,10 @@ export function PlayerActionsDialog({
           {error ? (
             <Text testID="player-actions-error" accessibilityRole="alert" text={error} />
           ) : null}
-          <ScrollView style={themed($list)}>
+          <ScrollView
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed($sheetScrollContent)}
+          >
             {opponents.length === 0 ? (
               <Text size="xs" tone="dim" tx="connected:playerActions.noOtherPlayers" />
             ) : null}
@@ -252,7 +256,6 @@ export function PlayerActionsDialog({
 const $dialog: ThemedStyle<ViewStyle> = ({ spacing }) => ({ maxHeight: "82%", gap: spacing.md })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $list: ThemedStyle<ViewStyle> = () => ({ flexGrow: 0 })
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
   marginBottom: spacing.sm,

@@ -7,7 +7,7 @@ import { DeckVersionDialog, type DeckVersionDraft } from "@/components/DeckVersi
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import { PressableIcon } from "@/components/Icon"
 import { Sheet } from "@/components/Sheet"
-import { $sheetScroll } from "@/components/sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -105,7 +105,10 @@ export function DeckVersionsDialogs<Id extends string>({
         dismissible={!busy}
         testID="deck-versions-dialog"
       >
-        <ScrollView style={$sheetScroll} contentContainerStyle={themed($versions)}>
+        <ScrollView
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed([$sheetScrollContent, $versions])}
+        >
           <Text preset="subheading" tx="decks:detail.versions" />
           {rows.map((row) => {
             const selected = row.id === activeId

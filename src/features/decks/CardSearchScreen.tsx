@@ -29,6 +29,7 @@ import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField, type TextFieldAccessoryProps } from "@/components/TextField"
@@ -975,8 +976,8 @@ export function CardSearch({
         >
           <Text preset="subheading" tx="decks:filters.label" />
           <ScrollView
-            style={themed($filterScroll)}
-            contentContainerStyle={themed($filterBody)}
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed([$sheetScrollContent, $filterBody])}
             keyboardShouldPersistTaps="handled"
           >
             <FilterGroup heading={translate("decks:cardSearch.colors")}>
@@ -1150,12 +1151,7 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 
 const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
 const $queryField: ViewStyle = { flex: 1 }
-// why: without bleeding into the dialog padding, the iOS scroll indicator covers full-width rows.
-const $filterScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginHorizontal: -spacing.lg })
-const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.md,
-  paddingHorizontal: spacing.lg,
-})
+const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $filterSection: ViewStyle = { gap: 8 }
 
 const $searchHeader: ViewStyle = { paddingBottom: 4 }

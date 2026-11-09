@@ -17,7 +17,7 @@ import { Header, HeaderBack, HeaderIcon } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Sheet } from "@/components/Sheet"
-import { $sheetScroll } from "@/components/sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -1154,7 +1154,10 @@ function DeckDetailContent({
           onDismissed={dialogs.onDismissed}
           testID="version-sync-conflict"
         >
-          <ScrollView style={$sheetScroll} contentContainerStyle={themed($syncFailure)}>
+          <ScrollView
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed([$sheetScrollContent, $syncFailure])}
+          >
             <Text
               preset="subheading"
               tx={
@@ -1244,7 +1247,10 @@ function DeckDetailContent({
           onDismissed={dialogs.onDismissed}
           testID="deck-sync-conflict"
         >
-          <ScrollView style={$sheetScroll} contentContainerStyle={themed($syncFailure)}>
+          <ScrollView
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed([$sheetScrollContent, $syncFailure])}
+          >
             <Text
               preset="subheading"
               tx={

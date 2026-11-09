@@ -6,6 +6,7 @@ import { useQuery } from "convex/react"
 import { Button } from "@/components/Button"
 import { CheckboxRow } from "@/components/CheckboxRow"
 import { DialogCard } from "@/components/DialogCard"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
@@ -138,7 +139,10 @@ function LocalDeckSyncPicker({
       style={themed($dialog)}
     >
       <Text preset="subheading" tx="decks:localSync.pickTitle" txOptions={{ count: free }} />
-      <ScrollView style={$choices}>
+      <ScrollView
+        style={themed([$sheetScroll, $choices])}
+        contentContainerStyle={themed($sheetScrollContent)}
+      >
         {localDecks.map((local) => (
           <CheckboxRow
             key={local.localId}

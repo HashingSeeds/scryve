@@ -8,6 +8,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { Button } from "./Button"
 import { DialogCard, type DialogOrigin } from "./DialogCard"
+import { $sheetScroll, $sheetScrollContent } from "./sheetStyles"
 import { Text } from "./Text"
 
 export interface ConfirmDialogProps {
@@ -65,7 +66,10 @@ export function ConfirmDialog({
       accessibilityViewIsModal
       style={themed($confirm)}
     >
-      <ScrollView style={$copyScroll} contentContainerStyle={themed($copy)}>
+      <ScrollView
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $copy])}
+      >
         <Text preset="subheading" text={title} />
         {message ? <Text size="sm" tone="dim" text={message} /> : null}
         {notice}
@@ -93,7 +97,6 @@ export function ConfirmDialog({
 
 const LARGE_FONT_SCALE = 1.35
 
-const $copyScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $stackedActions: ViewStyle = { flexDirection: "column-reverse" }
 const $stackedAction: ViewStyle = { flex: 0 }
 const $confirm: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })

@@ -7,6 +7,7 @@ import { Button } from "@/components/Button"
 import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { SegmentedControl } from "@/components/SegmentedControl"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { localOutReason, matchScoreAfter } from "@/features/game/domain"
 import type { LocalGame, MatchSeatOutcome } from "@/features/game/types"
@@ -127,7 +128,10 @@ export function LocalMatchEndDialog({
       wide
     >
       <Text tx="board:matchEnd.title" preset="subheading" />
-      <ScrollView style={$seatsScroll} contentContainerStyle={themed($seats)}>
+      <ScrollView
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $seats])}
+      >
         {game.players.map((player, seat) => (
           <View key={player.id} style={themed($seat)}>
             <View style={themed($seatName)}>
@@ -176,7 +180,6 @@ export function LocalMatchEndDialog({
   )
 }
 
-const $seatsScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $seats: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $seat: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
