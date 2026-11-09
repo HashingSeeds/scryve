@@ -5,7 +5,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { Sheet } from "./Sheet"
-import { $sheetScroll } from "./sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "./sheetStyles"
 import { Text } from "./Text"
 
 export type DeckAction = {
@@ -37,7 +37,7 @@ export function DeckActionsSheet({
       onDismissed={onDismissed}
       testID="deck-actions-sheet"
     >
-      <ScrollView style={$sheetScroll}>
+      <ScrollView style={themed($sheetScroll)} contentContainerStyle={themed($sheetScrollContent)}>
         {actions.map(({ id, label, onPress, destructive, detail, blocked }) => {
           const note = blocked ?? detail
           return (

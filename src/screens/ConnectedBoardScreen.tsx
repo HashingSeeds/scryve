@@ -24,6 +24,7 @@ import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Sheet } from "@/components/Sheet"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { TeamMarks } from "@/components/TeamMarks"
 import { Text, type TextProps } from "@/components/Text"
 import { useSheetPresence } from "@/components/useSheetPresence"
@@ -1359,7 +1360,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               <FinishAvailabilityRow blocker={finishBlocker} />
             </View>
           )}
-          <ScrollView style={themed($statusScroll)} contentContainerStyle={themed($statusList)}>
+          <ScrollView
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed([$sheetScrollContent, $statusList])}
+          >
             {view.failed.map((failure) => (
               <View
                 key={failure.action.event.operationId}
@@ -1505,7 +1509,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             <Text tx="connected:board.finish.title" preset="subheading" />
             <Text size="xs" tx="connected:board.finish.subtitle" tone="dim" />
           </View>
-          <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
+          <ScrollView
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed([$sheetScrollContent, $resultChoices])}
+          >
             {teamChoices(named, turnGroups).map(({ id }) => {
               const player = game.players.find(({ playerId }) => playerId === id)!
               return (
@@ -1669,7 +1676,6 @@ const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({
   textAlign: "center",
 })
 const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   flex: 1,
@@ -1845,7 +1851,6 @@ const $syncValue: ThemedStyle<TextStyle> = ({ colors }) => ({
   textAlign: "right",
   color: colors.board.text,
 })
-const $statusScroll: ThemedStyle<ViewStyle> = () => ({ flexGrow: 0 })
 const $statusList: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $failure: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   gap: spacing.xs,

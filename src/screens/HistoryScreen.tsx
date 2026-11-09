@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/EmptyState"
 import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistorySource"
 import type { LocalGameSummary } from "@/features/game/types"
@@ -584,7 +585,10 @@ export function HistoryScreen({
         backdropAccessibilityLabel={translate("play:history.dismissFilters")}
       >
         <Text preset="subheading" tx="play:history.filters" />
-        <ScrollView contentContainerStyle={themed($dialogBody)}>
+        <ScrollView
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed([$sheetScrollContent, $dialogBody])}
+        >
           <FilterGroup heading={translate("play:history.filterDate")}>
             {DATE_RANGES.map((range) => (
               <FilterPill

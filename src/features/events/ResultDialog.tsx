@@ -5,7 +5,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { Sheet } from "@/components/Sheet"
-import { $sheetScroll } from "@/components/sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { ValueField } from "@/components/ValueField"
 import { isPlaySystemId } from "@/features/game/playSystems"
@@ -70,7 +70,10 @@ export function ResultDialog({
       dismissible={!busy}
       testID="result-dialog"
     >
-      <ScrollView style={$sheetScroll} contentContainerStyle={themed($section)}>
+      <ScrollView
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $section])}
+      >
         <Text
           preset="subheading"
           accessibilityRole="header"
