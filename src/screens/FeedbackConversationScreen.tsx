@@ -31,7 +31,8 @@ export interface FeedbackConversationScreenProps {
   sentScreenshotUri?: string
   signedIn: boolean
   includeAccount: boolean
-  offline: boolean
+  online: boolean
+  showOffline: boolean
   error?: string
   onKind: (kind: SuggestKind) => void
   onDraft: (draft: string) => void
@@ -55,7 +56,8 @@ export function FeedbackConversationScreen({
   sentScreenshotUri,
   signedIn,
   includeAccount,
-  offline,
+  online,
+  showOffline,
   error,
   onKind,
   onDraft,
@@ -74,7 +76,7 @@ export function FeedbackConversationScreen({
   const lastFromPlayer = messages.filter((message) => message.from === "player").at(-1)
   const firstIsLatest = !outgoing && !lastFromPlayer
   const canSend =
-    Boolean(draft.trim()) && !offline && outgoing === undefined && (!started || Boolean(request))
+    Boolean(draft.trim()) && online && outgoing === undefined && (!started || Boolean(request))
   const opened = started || outgoing !== undefined
 
   return (
@@ -184,7 +186,7 @@ export function FeedbackConversationScreen({
           ) : null}
           <View style={themed($prompt)}>
             <Text tx={`feedback:suggest.prompt.${kind}`} preset="subheading" style={$centered} />
-            {offline ? <OfflineNote /> : null}
+            {showOffline ? <OfflineNote /> : null}
           </View>
         </>
       )}
@@ -227,7 +229,7 @@ export function FeedbackConversationScreen({
       {request && !outgoing ? (
         <AccountStatus request={request} onLinkAccount={onLinkAccount} onSignIn={onSignIn} />
       ) : null}
-      {opened && offline ? <OfflineNote /> : null}
+      {opened && showOffline ? <OfflineNote /> : null}
     </FeedbackLayout>
   )
 }

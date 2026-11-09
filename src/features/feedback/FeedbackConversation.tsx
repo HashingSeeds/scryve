@@ -35,7 +35,7 @@ export function FeedbackConversation({
   const auth = useAuthAccess()
   const key = useFeedbackKey()
   const online = useConvexOnline()
-  const offline = useLastingOffline(online)
+  const showOffline = useLastingOffline(online)
   const [requestId, setRequestId] = useState(openedId)
   const thread = useQuery(api.feedback.thread, key && requestId ? { key, requestId } : "skip")
   const submit = useMutation(api.feedback.submit)
@@ -142,7 +142,8 @@ export function FeedbackConversation({
       sentScreenshotUri={sentScreenshotUri}
       signedIn={auth.isSignedIn}
       includeAccount={includeAccount}
-      offline={offline}
+      online={online}
+      showOffline={showOffline}
       error={error}
       onKind={setKind}
       onDraft={setDraft}

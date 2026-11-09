@@ -35,7 +35,8 @@ function renderConversation(overrides: Partial<FeedbackConversationScreenProps> 
     screenshot: null,
     signedIn: false,
     includeAccount: false,
-    offline: false,
+    online: true,
+    showOffline: false,
     onKind: jest.fn(),
     onDraft: jest.fn(),
     onSend: jest.fn(),
@@ -68,10 +69,13 @@ describe("FeedbackConversationScreen", () => {
     fireEvent.press(empty.view.getByLabelText("Send"))
     expect(empty.props.onSend).not.toHaveBeenCalled()
 
-    const offline = renderConversation({ draft: "Please", offline: true })
+    const offline = renderConversation({ draft: "Please", online: false })
     fireEvent.press(offline.view.getByLabelText("Send"))
     expect(offline.props.onSend).not.toHaveBeenCalled()
-    expect(offline.view.getByText(/^Offline\./)).toBeTruthy()
+    expect(offline.view.queryByText(/^Offline\./)).toBeNull()
+    expect(
+      renderConversation({ online: false, showOffline: true }).view.getByText(/^Offline\./),
+    ).toBeTruthy()
 
     const loading = renderConversation({ draft: "Please", started: true, thread: undefined })
     fireEvent.press(loading.view.getByLabelText("Send"))
