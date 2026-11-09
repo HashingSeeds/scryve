@@ -468,7 +468,14 @@ export class OutboxSyncController {
     }
   }
 
-  private enqueueTableAction(action: TableAction, operationId: string): boolean {
+  /** why: one compensating write per change it takes back, each naming its change, so the log hides both. */
+  undoTable = (changes: readonly { operationId: string; action: TableAction }[]) => {
+    for (const { operationId, action } of changes)
+      if (!this.enqueueTableAction(action, createClientId("operation", this.now()), operationId))
+        break
+  }
+
+  private enqueueTableAction(action: TableAction, operationId: string, undoOf?: string): boolean {
     const now = this.now()
     const accepted = this.outbox.enqueue({
       schemaVersion: 1,
@@ -477,6 +484,7 @@ export class OutboxSyncController {
         operationId: asOperationId(operationId),
         gameId: asGameId(this.options.publicId),
         action,
+        ...(undoOf ? { undoOf: asOperationId(undoOf) } : {}),
         actorId: asActorId(this.options.ownerId),
         deviceId: this.options.deviceId,
         clientCreatedAt: now,

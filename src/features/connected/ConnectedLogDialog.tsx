@@ -7,7 +7,12 @@ import { GameLogDialog } from "@/features/game/GameLogDialog"
 import type { GamePlayer } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 
-import { connectedLogEvents, connectedLogInputs, connectedLogUndo } from "./connectedLog"
+import {
+  connectedLogEvents,
+  connectedLogInputs,
+  connectedLogUndo,
+  type CounterTable,
+} from "./connectedLog"
 import type { PendingLifeAction } from "./model"
 import type { ConnectedGameRuntime } from "./useConnectedRuntime"
 import { api } from "../../../convex/_generated/api"
@@ -32,6 +37,7 @@ export const ConnectedLogContext = createContext<
       pending: readonly PendingLifeAction[]
       lives: Readonly<Record<string, number>>
       undoLife: ConnectedGameRuntime["undoLife"]
+      undoTable: ConnectedGameRuntime["undoTable"]
     }
   | undefined
 >(undefined)
@@ -65,6 +71,7 @@ export function ConnectedLogDialog({
   seats,
   turn,
   groups,
+  counterTable,
   turnsShown,
   origin,
   onUndoTurn,
@@ -75,6 +82,7 @@ export function ConnectedLogDialog({
   seats: readonly Seat[]
   turn?: Turn
   groups?: TurnGroups
+  counterTable?: CounterTable
   turnsShown: boolean
   origin?: DialogOrigin
   onUndoTurn: (playerId: string, turnOperationId: string) => void
@@ -89,6 +97,7 @@ export function ConnectedLogDialog({
           seats={seats}
           turn={turn}
           groups={groups}
+          counterTable={counterTable}
           turnsShown={turnsShown}
           origin={origin}
           onUndoTurn={onUndoTurn}
@@ -105,6 +114,7 @@ function ConnectedLog({
   seats,
   turn,
   groups,
+  counterTable,
   turnsShown,
   origin,
   onUndoTurn,
@@ -121,20 +131,28 @@ function ConnectedLog({
     () => connectedLogEvents(feed.events, pending, publicId),
     [feed.events, pending, publicId],
   )
-  const inputs = useMemo(() => connectedLogInputs(events, publicId, turn), [events, publicId, turn])
-  const undo = connectedLogUndo(events, players, publicId, turn, { turns: turnsShown })
+  const inputs = useMemo(
+    () => connectedLogInputs(events, publicId, turn, counterTable),
+    [counterTable, events, publicId, turn],
+  )
+  const undo = connectedLogUndo(events, players, publicId, turn, {
+    turns: turnsShown,
+    table: counterTable,
+  })
   return (
     <GameLogDialog
       players={players}
       events={inputs.events}
       turns={turnsShown ? inputs.turns : undefined}
       groups={groups}
+      counters={inputs.counters}
       canUndo={undo !== undefined}
       undoLabel={translate("board:log.undoMine")}
       origin={origin}
       onMore={feed.more}
       onUndo={() => {
         if (undo?.kind === "turn") onUndoTurn(undo.playerId, undo.turnOperationId)
+        else if (undo?.kind === "counter") context?.undoTable(undo.changes)
         else if (undo) context?.undoLife(undo.changes)
       }}
       onClose={onClose}

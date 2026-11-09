@@ -263,6 +263,18 @@ export function customCounterNameOf(counterId: string): string | undefined {
     : undefined
 }
 
+/** why: the game log keys named counters by name, beside the system's own counters. */
+export function loggedCounterId(action: TableAction): string | undefined {
+  if (action.kind === "counter.changed") return action.counterId
+  return action.kind === "customCounter.changed" ? customCounterId(action.name) : undefined
+}
+
+export function loggedCounterValue(player: PlayerTable | undefined, counterId: string): number {
+  const name = customCounterNameOf(counterId)
+  if (name === undefined) return player?.counters?.[counterId] ?? 0
+  return (player && findCustomCounter(player, name)?.value) ?? 0
+}
+
 export function counterValue(table: TableState, playerId: string, counterId: string): number {
   return playerTableOf(table, playerId).counters?.[counterId] ?? 0
 }

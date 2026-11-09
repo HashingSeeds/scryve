@@ -109,6 +109,7 @@ export type MockConnectedRuntime = TableRuntime & {
   connectionStatus: "connected" | "offline" | "syncing"
   changeLife: jest.Mock
   undoLife: jest.Mock
+  undoTable: jest.Mock
   submitCommanderDamage: jest.Mock
   resolveCommanderDamageClaim: jest.Mock
   finish: jest.Mock
@@ -203,6 +204,7 @@ function defaultRuntime(): MockConnectedRuntime {
     connectionStatus: "connected",
     changeLife: mockChangeLife,
     undoLife: mockUndoLife,
+    undoTable: jest.fn(),
     submitCommanderDamage: mockSubmitCommanderDamage,
     resolveCommanderDamageClaim: mockResolveCommanderDamageClaim,
     finish: mockFinish,

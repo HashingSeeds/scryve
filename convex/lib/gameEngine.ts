@@ -27,6 +27,8 @@ import { tableRules } from "./systems"
 import {
   applyTableAction,
   seatTable,
+  loggedCounterId,
+  loggedCounterValue,
   tableActionDelta,
   tableActionIdentity,
   tableRelatedSeatId,
@@ -462,7 +464,7 @@ const appliedCounterDelta = (
   after: PlayerTable | undefined,
   counterId: string,
 ) => {
-  const delta = (after?.counters?.[counterId] ?? 0) - (before?.counters?.[counterId] ?? 0)
+  const delta = loggedCounterValue(after, counterId) - loggedCounterValue(before, counterId)
   return delta === 0 ? undefined : delta
 }
 
@@ -579,14 +581,11 @@ export function changeTable(
   if (result.table.turn !== table.turn) changes.push({ kind: "turn.set", turn: result.table.turn })
 
   const lifeChange = result.life[0]
+  const counterId = loggedCounterId(action)
   const actionDelta =
-    action.kind === "counter.changed"
-      ? appliedCounterDelta(
-          table.players[actor.id],
-          result.table.players[actor.id],
-          action.counterId,
-        )
-      : tableActionDelta(action)
+    counterId === undefined
+      ? tableActionDelta(action)
+      : appliedCounterDelta(table.players[actor.id], result.table.players[actor.id], counterId)
   changes.push({
     kind: "event.insert",
     event: {

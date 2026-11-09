@@ -169,4 +169,39 @@ describe("connected log", () => {
       [2, "bo"],
     ])
   })
+
+  it("counts counter rows back from the table, hides an undone tap, and takes back this account's own", () => {
+    const poison = (operationId: string, delta: number, at: number, undoOf?: string) =>
+      ({
+        operationId,
+        playerId: "ada",
+        kind: "counter.changed",
+        delta,
+        clientCreatedAt: at,
+        action: { kind: "counter.changed", playerId: "ada", counterId: "poison", delta },
+        mine: true,
+        ...(undoOf ? { undoOf } : {}),
+      }) satisfies ConnectedLogEvent
+    const events = [
+      poison("op-poison-00001", 2, 1_000),
+      poison("op-poison-00002", 1, 10_000),
+      poison("op-poison-undo-1", -1, 11_000, "op-poison-00002"),
+    ]
+    const table = {
+      players: { ada: { counters: { poison: 2 } } },
+      counterKey: (playerId: string, counterId: string) => `${playerId}:${counterId}`,
+    }
+    expect(connectedLogInputs(events, GAME, undefined, table).counters).toMatchObject([
+      { operationId: "op-poison-00001", delta: 2, value: 2 },
+    ])
+    expect(connectedLogUndo(events, players, GAME, undefined, { turns: true, table })).toEqual({
+      kind: "counter",
+      changes: [
+        {
+          operationId: "op-poison-00001",
+          action: { kind: "counter.changed", playerId: "ada", counterId: "poison", delta: -2 },
+        },
+      ],
+    })
+  })
 })

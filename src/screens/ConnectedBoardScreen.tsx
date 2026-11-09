@@ -486,8 +486,11 @@ export function ConnectedBoardWithRuntime({
     (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
     [cloud, publicId, pending],
   )
-  const { undoLife } = runtime
-  const logContext = useMemo(() => ({ pending, lives, undoLife }), [pending, lives, undoLife])
+  const { undoLife, undoTable } = runtime
+  const logContext = useMemo(
+    () => ({ pending, lives, undoLife, undoTable }),
+    [pending, lives, undoLife, undoTable],
+  )
   const tableState = useStructurallyStable(runtime.table)
   const {
     tableRules,
@@ -1226,6 +1229,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           seats={logSeats}
           turn={table?.table.turn}
           groups={turnGroups}
+          counterTable={{ players: table?.table.players }}
           turnsShown={tabOn}
           origin={menuDialogOrigin}
           onUndoTurn={(playerId, operationId) => {
