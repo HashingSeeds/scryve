@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react"
-import type { StyleProp, TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
+import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
+import { StyleSheet, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useConvex } from "convex/react"
 
@@ -94,6 +94,9 @@ function publishPaused(key: string, failed: Set<string>) {
     }, delay)
 }
 
+/** why: card JPGs bake white into their rounded corners, and on iOS a clip near the scan's own radius still leaks a white sliver; 10% of width was the smallest that hid it. */
+const CORNER_RADIUS_RATIO = 0.1
+
 export type CardImageIdentity = { game?: string; cardId?: string }
 type Props = CardImageIdentity & {
   source?: string
@@ -121,6 +124,16 @@ export function CardImage({
   const fallback = useSyncExternalStore(subscribe, snapshot, snapshot)
   const active = fallback && fallback.expiresAt > Date.now() ? fallback : undefined
   const imageUrl = active ? active.urls[0] : source
+  const [measuredWidth, setMeasuredWidth] = useState<number>()
+  const styleWidth = StyleSheet.flatten(style)?.width
+  const width = typeof styleWidth === "number" ? styleWidth : measuredWidth
+  const corners = width
+    ? ({ borderRadius: width * CORNER_RADIUS_RATIO, overflow: "hidden" } as const)
+    : undefined
+  const onLayout =
+    typeof styleWidth === "number"
+      ? undefined
+      : (event: LayoutChangeEvent) => setMeasuredWidth(event.nativeEvent.layout.width)
   const recover = useCallback(
     (failedUrl?: string) => {
       const current = fallbacks.get(key)
@@ -211,7 +224,8 @@ export function CardImage({
         accessibilityLabel={accessibilityLabel}
         source={imageUrl}
         placeholder={active ? undefined : placeholder}
-        style={style}
+        style={[style, corners]}
+        onLayout={onLayout}
         contentFit="contain"
         transition={150}
         cachePolicy="memory-disk"
@@ -228,7 +242,8 @@ export function CardImage({
           ? translate("decks:image.loadingLabel", { card: accessibilityLabel })
           : translate("decks:image.missingLabel", { card: accessibilityLabel })
       }
-      style={[style as StyleProp<ViewStyle>, $placeholder]}
+      style={[style as StyleProp<ViewStyle>, $placeholder, corners]}
+      onLayout={onLayout}
     >
       <Text
         tx={active?.loading ? "decks:image.loading" : "decks:image.missing"}

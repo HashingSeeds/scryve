@@ -60,7 +60,7 @@ export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
 export const MAX_HISTORY_EVENTS = 250
 const EVENT_CHUNK_SIZE = 100
-const ACTIVE_SCHEMA_VERSION = 1
+export const ACTIVE_SCHEMA_VERSION = 1
 
 export const LOCAL_KEYS = {
   device: "count.local.device.v1",

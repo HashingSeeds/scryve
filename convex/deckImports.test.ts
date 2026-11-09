@@ -1164,7 +1164,7 @@ it("resolves guest pasted lists and returns a retry delay when the guest work bu
     expect(result.unresolved).toEqual([])
     expect(result.cards[0]).toMatchObject({ name: "Forest", quantity: 60 })
     await t.run(async (ctx) => {
-      await deckRateLimiter.limit(ctx, "guestDeckImport", { count: 19 })
+      await deckRateLimiter.limit(ctx, "guestShare", { count: 19 })
     })
     await expect(
       t.action(api.deckImports.resolvePasted, { game: "mtg", list: "60 Forest" }),

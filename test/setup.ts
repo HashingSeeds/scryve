@@ -152,6 +152,11 @@ jest.mock("react-native-reanimated", () => ({
   LayoutAnimationConfig: ({ children }: { children: ReactNode }) => children,
 }))
 
+// why: Legend List draws no rows until a device layout pass sizes it; deck tests find rows by label.
+jest.mock("@legendapp/list/section-list", () => ({
+  SectionList: jest.requireActual<typeof import("react-native")>("react-native").SectionList,
+}))
+
 jest.mock("expo-notifications", () => ({
   ...jest.requireActual("expo-notifications"),
   setNotificationHandler: jest.fn(),

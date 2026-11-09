@@ -2,6 +2,7 @@ import { asActorId, canUndo, commanderDamageBetween } from "@/features/game/doma
 import { LocalGameRepository } from "@/features/game/localPersistence"
 
 import { buildSeededGame, seedGame } from "./gameSeed"
+import { seedNewerGame } from "./newerGameSeed"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 import { runSeed } from "./index"
@@ -65,7 +66,18 @@ describe("game seed", () => {
     expect(active?.players.map(({ life }) => life)).toEqual([1, 2, 3, 4, 5, 6])
   })
 
+  it("replaces the active game with one only a newer build can open", () => {
+    const storage = new MemoryStorage()
+    const repo = new LocalGameRepository(storage)
+    seedGame({ players: "2" }, repo)
+    seedNewerGame({}, storage)
+    expect(repo.loadActiveGame()).toBeNull()
+    expect(repo.hasNewerActiveGame()).toBe(true)
+  })
+
   it("names the known kinds for an unknown seed", async () => {
-    await expect(runSeed("deck", {})).rejects.toThrow('Unknown seed "deck". Try one of game.')
+    await expect(runSeed("deck", {})).rejects.toThrow(
+      'Unknown seed "deck". Try one of game, newer.',
+    )
   })
 })

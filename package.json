@@ -21,6 +21,8 @@
     "build:pages": "node scripts/pages-build.cjs",
     "convex:dev": "convex dev",
     "bots": "node scripts/bots.cjs",
+    "event-bots": "node scripts/event-bots.cjs",
+    "dev:signin": "node scripts/dev-signin.cjs",
     "preview:up": "node scripts/preview.cjs up",
     "preview:check": "node scripts/preview.cjs check",
     "prebuild:clean": "expo prebuild --clean",
@@ -60,7 +62,8 @@
     "ota:preview": "env APP_VARIANT=preview npx eas-cli@$npm_package_config_easCli update --channel preview --environment preview",
     "release:promote": "node scripts/release-train.cjs promote",
     "release:native": "node scripts/release-native.cjs cloud",
-    "release:live": "node scripts/release-native.cjs live"
+    "release:live": "node scripts/release-native.cjs live",
+    "release:backport": "node scripts/release-backport.cjs"
   },
   "dependencies": {
     "@clerk/expo": "4.14.1",
@@ -69,6 +72,7 @@
     "@expo/dom-webview": "~58.0.2",
     "@expo/metro-runtime": "~58.0.15",
     "@expo/ui": "~58.0.26",
+    "@legendapp/list": "3.6.0",
     "@legendapp/state": "3.0.0-beta.48",
     "@sentry/react-native": "~8.28.0",
     "buffer": "5.7.1",

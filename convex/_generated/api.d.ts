@@ -20,6 +20,7 @@ import type * as deckIdentityBackfill from "../deckIdentityBackfill.js";
 import type * as deckImports from "../deckImports.js";
 import type * as deckStats from "../deckStats.js";
 import type * as decks from "../decks.js";
+import type * as devAuth from "../devAuth.js";
 import type * as entitlements from "../entitlements.js";
 import type * as events from "../events.js";
 import type * as externalApiRateLimits from "../externalApiRateLimits.js";
@@ -125,6 +126,7 @@ declare const fullApi: ApiFromModules<{
   deckImports: typeof deckImports;
   deckStats: typeof deckStats;
   decks: typeof decks;
+  devAuth: typeof devAuth;
   entitlements: typeof entitlements;
   events: typeof events;
   externalApiRateLimits: typeof externalApiRateLimits;

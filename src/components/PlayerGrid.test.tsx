@@ -69,7 +69,7 @@ function CommanderGrid({
   onPressSword?: (player: GamePlayer) => void
 }) {
   const attack = useCommanderAttack(
-    { incoming: () => ({}), commit: () => {} },
+    { incoming: () => ({}), commit: () => {}, loseLife: () => {} },
     { seatDeck: () => undefined, singleCommander },
   )
   return (
@@ -332,8 +332,11 @@ describe("PlayerGrid", () => {
       const view = render(grid())
       armFirstSeat(view)
       expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("2")
-      // why: the second partner starts at 0, so a fresh attack lands on one commander.
-      expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("0")
+      // why: the second partner starts at its printed power but sat out, so a fresh attack lands on one commander.
+      expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("4")
+      expect(view.getByTestId("commander-sit-seat-1-partner")).toHaveProp("accessibilityState", {
+        checked: false,
+      })
 
       view.rerender(grid(true))
       expect(view.queryByTestId("commander-power-seat-1-partner")).toBeNull()
@@ -807,10 +810,10 @@ describe("PlayerGrid", () => {
       </ThemeProvider>,
     )
     expect(
-      StyleSheet.flatten(sixPlayerView.getByTestId("life-total-seat-1").props.style),
+      StyleSheet.flatten(sixPlayerView.getByTestId("life-upright-seat-1").props.style),
     ).toMatchObject({ transform: [{ rotate: "90deg" }] })
     expect(
-      StyleSheet.flatten(sixPlayerView.getByTestId("life-total-seat-2").props.style),
+      StyleSheet.flatten(sixPlayerView.getByTestId("life-upright-seat-2").props.style),
     ).toMatchObject({ transform: [{ rotate: "-90deg" }] })
 
     const twoPlayerView = render(
@@ -819,10 +822,10 @@ describe("PlayerGrid", () => {
       </ThemeProvider>,
     )
     expect(
-      StyleSheet.flatten(twoPlayerView.getByTestId("life-total-seat-1").props.style),
+      StyleSheet.flatten(twoPlayerView.getByTestId("life-upright-seat-1").props.style),
     ).toMatchObject({ transform: [{ rotate: "180deg" }] })
     expect(
-      StyleSheet.flatten(twoPlayerView.getByTestId("life-total-seat-2").props.style).transform,
+      StyleSheet.flatten(twoPlayerView.getByTestId("life-upright-seat-2").props.style).transform,
     ).toBe(undefined)
   })
 

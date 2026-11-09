@@ -1,0 +1,52 @@
+# flow: Host a connected game
+# intent: relaunch a signed-in development build and leave a new cloud lobby's invite sheet open on its join code.
+#
+#   agent-device replay .maestro/agent/HostConnected.yaml --maestro -e PLAYERS=4
+#   agent-device get text 'id="manual-code"'
+#   pnpm bots join <code> --count 3
+appId: ${MAESTRO_APP_ID}
+env:
+  MAESTRO_APP_ID: com.sowinghope.count.dev
+  PLAYERS: "2"
+---
+- launchApp:
+    stopApp: true
+- runFlow: ../shared/_DevClient.yaml
+# a relaunch reopens a lobby this device already hosts, which is reused
+- extendedWaitUntil:
+    visible:
+      id: "game-menu-button|open-invite-button"
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: "game-menu-button"
+    commands:
+      - tapOn:
+          id: "game-menu-button"
+      - tapOn:
+          id: "setup-button"
+      - tapOn:
+          id: "mode-connected"
+      - runFlow:
+          when:
+            visible:
+              id: "host-on-cloud"
+          commands:
+            - tapOn:
+                id: "host-on-cloud"
+      - tapOn:
+          id: "player-count-${PLAYERS}"
+      - tapOn:
+          id: "host-connected-button"
+      - extendedWaitUntil:
+          visible:
+            id: "open-invite-button"
+          timeout: 20000
+- waitForAnimationToEnd
+- tapOn:
+    id: "open-invite-button"
+- extendedWaitUntil:
+    visible:
+      id: "manual-code"
+    timeout: 5000
