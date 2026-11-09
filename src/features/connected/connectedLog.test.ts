@@ -1,5 +1,5 @@
 import { asPlayerId } from "@/features/game/domain"
-import { gameLog } from "@/features/game/LifeLog"
+import { gameLog, withTurnDividers } from "@/features/game/LifeLog"
 
 import { connectedLogEvents, connectedLogInputs, connectedLogUndo } from "./connectedLog"
 import type { PendingLifeAction } from "./model"
@@ -61,6 +61,28 @@ const turnOf = (operationId: string, number: number, previous = true): Turn => (
 })
 
 describe("connected log", () => {
+  it("puts a change under the turn the authority recorded it in, whatever the device clock said", () => {
+    // why: Bo's clock runs behind Ada's, so Bo's hit after Ada's pass carries an earlier time.
+    const confirmed = [
+      pass("pass-ada", "ada", "bo", 100),
+      life("hit-on-ada", "ada", -3, 50, { mine: true }),
+    ]
+    const turn: Turn = {
+      playerId: "bo",
+      number: 2,
+      startedAt: 0,
+      operationId: "pass-ada",
+      previous: { playerId: "ada", number: 1, startedAt: 0, operationId: "older" },
+    }
+    const inputs = connectedLogInputs(connectedLogEvents(confirmed, [], GAME), GAME, turn)
+    const items = withTurnDividers(gameLog(players, inputs.events), inputs.turns)
+    expect(items.map((item) => (item.kind === "turn" ? `turn ${item.number}` : item.id))).toEqual([
+      "turn 2",
+      "hit-on-ada",
+      "turn 1",
+    ])
+  })
+
   it("keeps passes in the authority's order when device clocks disagree", () => {
     // why: Ada's clock runs ahead of Bo's, so Bo's later pass carries the earlier timestamp.
     const confirmed = [pass("pass-ada", "ada", "bo", 100), pass("pass-bo", "bo", "ada", 50)]
