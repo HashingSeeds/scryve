@@ -418,6 +418,7 @@ function parseRoundClock(value: unknown): RoundClock | undefined {
     if (!isFiniteNumber(field)) return undefined
     clock[key] = field
   }
+  if (typeof value.steppedBy === "string") clock.steppedBy = value.steppedBy
   return clock
 }
 

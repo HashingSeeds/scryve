@@ -66,6 +66,8 @@ export interface TurnContext {
   now: number
   isSeat: (playerId: string) => boolean
   groups?: TurnGroups
+  /** why: a device names the next seat from what it last saw, so the authority, which knows who is out now, picks where a pass lands. */
+  nextSeat?: (from: string) => string | undefined
 }
 
 export const turnGroupOf = (groups: TurnGroups | undefined, playerId: string): readonly string[] =>
@@ -139,8 +141,11 @@ export function applyTurnAction(
     }
   }
   if (!sharesTurn(context.groups, turn.playerId, action.playerId)) return null
-  if (to === turn.playerId) return action.kind === "turn.set" ? turn : null
-  return handOff(turn, to, action.kind === "turn.passed" ? turn.number + 1 : turn.number, context)
+  const next =
+    action.kind === "turn.passed" && context.nextSeat ? context.nextSeat(turn.playerId) : to
+  if (next === undefined) return null
+  if (next === turn.playerId) return action.kind === "turn.set" ? turn : null
+  return handOff(turn, next, action.kind === "turn.passed" ? turn.number + 1 : turn.number, context)
 }
 
 function startedTurn(turn: Turn, now: number): Turn | undefined {

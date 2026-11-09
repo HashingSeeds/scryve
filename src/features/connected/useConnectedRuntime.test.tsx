@@ -147,6 +147,37 @@ describe("connected runtime analytics", () => {
   const started = () =>
     jest.mocked(captureGame).mock.calls.filter(([event]) => event === "game_started")
 
+  it("gives a Two-Headed Giant game its team counter rules", async () => {
+    const twoHeadedGiant = {
+      ...projection,
+      publicId: "two-headed-game",
+      system: "mtg",
+      format: "limited",
+      variant: "twoHeadedGiant",
+    }
+    const writes: ConnectedWrites = {
+      send: async (action) => ({ operationId: action.event.operationId }),
+      finish: async () => undefined,
+      abandon: async () => undefined,
+    }
+    const { result } = renderHook(() => {
+      const session = useConnectedSession({
+        publicId: "two-headed-game",
+        ownerId: "seat-1",
+        scope: "lan",
+        writes,
+        awaitProjectionBarrier: false,
+      })
+      return useConnectedRuntime(session, { remote: twoHeadedGiant, environment: reachable })
+    })
+
+    await waitFor(() => expect(result.current.status).toBe("ready"))
+    expect(result.current.tableRules.counters.find(({ id }) => id === "poison")).toMatchObject({
+      losesAt: 15,
+      shared: true,
+    })
+  })
+
   it("records a rematch start once, since rematches skip the lobby", async () => {
     const finished = renderGame("game-one", {
       ...projection,

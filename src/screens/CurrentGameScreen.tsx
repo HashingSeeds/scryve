@@ -39,7 +39,6 @@ import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import { localGameRepository, type LocalGameRepository } from "@/features/game/localPersistence"
 import { playCommanderLethal } from "@/features/game/playSystems"
-import { stepRoundTurn } from "@/features/game/roundClock"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
 import { teamName } from "@/features/game/teams"
 import {
@@ -143,7 +142,6 @@ export function CurrentGameScreen({
     operationId: string
     passerId: string
     message: string
-    steppedRound: boolean
   }>()
   const [hideOffer, setHideOffer] = useState<{ turn?: Turn; playerCount: number }>()
   const [logOpen, setLogOpen] = useState(false)
@@ -320,7 +318,7 @@ export function CurrentGameScreen({
     color: player.color,
     shape: player.shape,
   }))
-  const { passTurn, setTurn, undoTurn, setBank, startTurn, changeClock } = runtime
+  const { passTurn, setTurn, undoTurn, setBank, startTurn } = runtime
   const { turnGroups } = runtime.game
   // why: a turn shared by a team is named for the team, in the chip, the pass toast, and the log.
   const nameOf = (playerId: string) => teamName(runtime.game.players, turnGroups, playerId)
@@ -343,8 +341,6 @@ export function CurrentGameScreen({
     if (!turn) return
     const operationId = passTurn(turn.playerId, next)
     if (!operationId) return
-    const steppedRound = clock !== undefined && stepRoundTurn(clock, system, 1) !== clock
-    if (steppedRound) changeClock((current) => stepRoundTurn(current, system, 1))
     setTurnToast({
       operationId,
       passerId: turn.playerId,
@@ -352,13 +348,11 @@ export function CurrentGameScreen({
         number: turn.number + 1,
         name: nameOf(next) ?? "",
       }),
-      steppedRound,
     })
   }
   function undoToastPass() {
     if (!turnToast) return
-    if (undoTurn(turnToast.passerId, turnToast.operationId) && turnToast.steppedRound)
-      changeClock((current) => stepRoundTurn(current, system, -1))
+    undoTurn(turnToast.passerId, turnToast.operationId)
     setTurnToast(undefined)
   }
   const boardModes = useBoardModes({

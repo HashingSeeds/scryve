@@ -3,6 +3,7 @@ import {
   applyLifeChange,
   commanderClaimOutcome,
   commanderField,
+  commanderLethalDamage,
   confirmCommanderClaim,
   controlsSeat,
   isCommanderDamageDelta,
@@ -23,7 +24,8 @@ import {
 } from "./gameRules"
 import type { GameWriteErrorCode } from "./gameWriteErrors"
 import { nameFailsGate } from "./nameFilter"
-import { tableRules } from "./systems"
+import { commanderOutState, outReason, type CommanderTotal, type OutState } from "./outReason"
+import { systemDefinition, tableRules } from "./systems"
 import {
   applyTableAction,
   seatTable,
@@ -38,7 +40,7 @@ import {
   type TableState,
 } from "./table"
 import type { GameVariant } from "./treachery"
-import { isTurnAction, startedByChange, type Turn } from "./turns"
+import { isTurnAction, nextTurnSeat, startedByChange, type Turn } from "./turns"
 import { teammatesOf, teamTableRules, TWO_HEADED_GIANT } from "./twoHeadedGiant"
 import type { Doc } from "../_generated/dataModel"
 
@@ -226,9 +228,14 @@ export interface GameStore {
   readonly game: EngineGame
   seat(id: string): Read<EngineSeat | undefined>
   event(operationId: string): Read<GameEventRecord | undefined>
+  /** why: a change may be taken back once, so an undo checks no other undo already names it. */
+  undoneBy(operationId: string): Read<GameEventRecord | undefined>
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
+  /** why: in seat order; a pass reads every seat to skip those that are out. */
+  seats(): Read<readonly EngineSeat[]>
+  commanderTotals(): Read<readonly CommanderTotal[]>
   isMember(): Read<boolean>
   beforeNewWrite?(): Read<void>
   apply(changes: readonly GameChange[]): Read<void>
@@ -333,10 +340,12 @@ function* editableSeat(
   id: string,
   actor: SeatActor,
   message = "Seat-owner permission required",
+  anyoneMay = true,
 ) {
   const seat = yield* read(store.seat(id))
   if (seat && controlsSeat(seat, actor)) return seat
-  if (seat && store.game.lifeEditing === "anyone" && (yield* read(store.isMember()))) return seat
+  if (seat && anyoneMay && store.game.lifeEditing === "anyone" && (yield* read(store.isMember())))
+    return seat
   return writeError("seat_owner_required", message)
 }
 
@@ -404,8 +413,9 @@ export function changeLife(
   seat: EngineSeat,
   request: LifeChangeRequest & { operationId: string; undoOf?: string },
   now: number,
+  applying = request.delta,
 ) {
-  const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, request.delta)
+  const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, applying)
   const changes: GameChange[] = [
     {
       kind: "event.insert",
@@ -445,15 +455,20 @@ function* writeLife(
   if (retry === "duplicate")
     return acknowledged({ operationId, deduplicated: true, currentLife: seat.currentLife })
   if (retry !== "new") return failed(retry)
+  let applying = request.delta
   if (write.undoOf !== undefined) {
     const undone = yield* read(store.event(write.undoOf))
     if (!isOwnChange(undone, { ...request, kind: "life.changed" }))
       return failed(writeError("invalid_undo", "Only your own life change can be taken back"))
+    if (yield* read(store.undoneBy(write.undoOf)))
+      return failed(writeError("invalid_undo", "This change was already taken back"))
+    // why: a queued change can land clamped, so its undo reverses what the authority applied, not what the device asked for.
+    applying = -(undone?.delta ?? 0)
   }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
-  const { currentLife, changes } = changeLife(store.game, seat, request, now)
+  const { currentLife, changes } = changeLife(store.game, seat, request, now, applying)
   yield* read(store.apply(changes))
   return acknowledged({ operationId, deduplicated: false, currentLife })
 }
@@ -542,6 +557,7 @@ export function changeTable(
   related: EngineSeat | undefined,
   request: TableActionRequest,
   now: number,
+  nextTurnSeat?: (from: string) => string | undefined,
 ): { changes: GameChange[] } | EngineError {
   const { action } = request
   const rows = new Map<string, EngineSeat>([[actor.id, actor]])
@@ -558,6 +574,7 @@ export function changeTable(
     operationId: request.operationId,
     lifeOf: (playerId) => rows.get(playerId)?.currentLife,
     now,
+    nextTurnSeat,
   })
   if (!result) return writeError("invalid_table_action", "This table change no longer applies")
 
@@ -608,11 +625,13 @@ export function changeTable(
       actionIdentity: request.actionIdentity,
       ...(lifeChange
         ? { toPlayerId: lifeChange.playerId, delta: lifeChange.delta }
-        : "toPlayerId" in action
-          ? { toPlayerId: action.toPlayerId }
-          : actionDelta === undefined
-            ? {}
-            : { delta: actionDelta }),
+        : action.kind === "turn.passed" && result.table.turn
+          ? { toPlayerId: result.table.turn.playerId }
+          : "toPlayerId" in action
+            ? { toPlayerId: action.toPlayerId }
+            : actionDelta === undefined
+              ? {}
+              : { delta: actionDelta }),
       ...(action.kind === "pokemon.knockoutUndone"
         ? { undoOfOperationId: action.knockoutOperationId }
         : request.undoOf === undefined
@@ -627,6 +646,30 @@ export function changeTable(
   return { changes }
 }
 
+/** why: a device names the next seat from the board it last drew, which can lag a seat going out, so the authority picks the next group still in, in seat order. */
+function* passOrder(store: GameStore): GameSteps<(from: string) => string | undefined> {
+  const seats = yield* read(store.seats())
+  const totals = yield* read(store.commanderTotals())
+  const { game } = store
+  const rules = tableRules(game.system, game.format)
+  const twoHeadedGiant = game.variant === TWO_HEADED_GIANT
+  const state: OutState = {
+    ...(twoHeadedGiant ? { sharedFate: true as const } : {}),
+    counter: systemDefinition(game.system)?.counter,
+    tableRules: twoHeadedGiant ? teamTableRules(rules) : rules,
+    table: {
+      designations: game.designations,
+      players: Object.fromEntries(seats.map((seat) => [seat.id, seatTable(seat)])),
+    },
+    lives: seats.map(({ id, currentLife }) => ({ playerId: id, life: currentLife })),
+    commanderDamage: commanderOutState(commanderLethalDamage(game.system, game.format), totals),
+    ...(game.turnGroups ? { groups: game.turnGroups } : {}),
+  }
+  const order = seats.map(({ id }) => id)
+  return (from) =>
+    nextTurnSeat(order, from, (id) => outReason(state, id) !== undefined, game.turnGroups)
+}
+
 function* writeTable(
   store: GameStore,
   actor: SeatActor,
@@ -634,7 +677,8 @@ function* writeTable(
   now: number,
 ): GameSteps<GameWriteResult> {
   const action = gatedTableAction(write.action)
-  const seat = yield* editableSeat(store, action.playerId, actor)
+  // why: "anyone edits" lets the table fix each other's counts, not claim, pass or take back another seat's turn.
+  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request = {
@@ -650,13 +694,16 @@ function* writeTable(
     const undone = yield* read(store.event(write.undoOf))
     if (!isOwnChange(undone, { kind: action.kind, playerId: seat.id, actorUserId: actor.userId }))
       return failed(writeError("invalid_undo", "Only your own change can be taken back"))
+    if (yield* read(store.undoneBy(write.undoOf)))
+      return failed(writeError("invalid_undo", "This change was already taken back"))
   }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
   const relatedId = tableRelatedSeatId(action, seat)
   const related = relatedId === undefined ? undefined : yield* read(store.seat(relatedId))
-  const outcome = changeTable(store.game, seat, related, request, now)
+  const nextSeat = action.kind === "turn.passed" ? yield* passOrder(store) : undefined
+  const outcome = changeTable(store.game, seat, related, request, now, nextSeat)
   if (isEngineError(outcome)) return failed(outcome)
   yield* read(store.apply(outcome.changes))
   return acknowledged({ operationId, deduplicated: false })
