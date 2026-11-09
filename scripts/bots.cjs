@@ -23,6 +23,7 @@ const USAGE = `Stand-in players for connected games on a Convex preview.
 Play
   --life-every 3s          each bot changes its life (-1, +1, ...) this often
   --commander-every off    each bot deals 1 commander damage to a random opponent this often
+  --pass-after off         a bot holding the turn passes it to the next seat after this long
   --claims confirm         answer commander damage claims: confirm, decline or ignore
   --reveal                 turn each bot's Treachery role face up once the game starts
   --no-start               the host bot waits instead of starting when every seat is taken
@@ -76,6 +77,7 @@ function parseCli(argv) {
       "first": { type: "string", default: "1" },
       "start": { type: "boolean", default: true },
       "life-every": { type: "string", default: "3s" },
+      "pass-after": { type: "string", default: "off" },
       "commander-every": { type: "string", default: "off" },
       "claims": { type: "string", default: "confirm" },
       "duration": { type: "string", default: "10m" },
@@ -127,6 +129,7 @@ function parseCli(argv) {
     first: parseCount(values.first, "first", 1, 50),
     start: values.start,
     lifeEvery: parseDuration(values["life-every"], "life-every"),
+    passAfter: parseDuration(values["pass-after"], "pass-after"),
     commanderEvery: parseDuration(values["commander-every"], "commander-every"),
     claims: values.claims,
     duration: parseDuration(values.duration, "duration"),
@@ -270,7 +273,13 @@ class Bot {
   watch() {
     this.unsubscribe = this.client.onUpdate(
       api.games.lobbyProjection,
-      { publicId: this.publicId, deviceId: this.deviceId, includeRecentOperationIds: false },
+      {
+        publicId: this.publicId,
+        deviceId: this.deviceId,
+        includeRecentOperationIds: false,
+        // why: bots read the table loosely, so they ask for every field the server can send, the turn included.
+        tableVersion: Number.MAX_SAFE_INTEGER,
+      },
       (lobby) => this.onLobby(lobby),
       (error) => this.report(this, "error", { message: error.message }),
     )
@@ -289,6 +298,7 @@ class Bot {
       }
     }
     if (lobby.status === "active" && !this.playing) this.play()
+    if (lobby.status === "active") this.maybePass()
     if (this.options.claims !== "ignore") {
       for (const claim of lobby.commanderDamage?.pendingClaims ?? []) {
         if (this.answered.has(claim.operationId)) continue
@@ -321,6 +331,35 @@ class Bot {
     if (commanderEvery && this.lobby.commanderDamage)
       this.every(commanderEvery, () => this.dealCommander())
     if (dropEvery) this.every(dropEvery, () => this.drop())
+  }
+
+  /** why: without a pass, a game with turns stalls on the first bot that holds one. */
+  maybePass() {
+    const turn = this.lobby?.table?.turn
+    const groups = this.lobby?.table?.turnGroups ?? []
+    const groupOf = (id) => groups.find((group) => group.includes(id)) ?? [id]
+    if (!this.options.passAfter || !turn || !this.me) return
+    if (!groupOf(turn.playerId).includes(this.me.playerId) || this.passingFor === turn.operationId)
+      return
+    this.passingFor = turn.operationId
+    const seats = [...this.lobby.players].sort((a, b) => a.seat - b.seat)
+    const mine = seats.findIndex((player) => player.playerId === this.me.playerId)
+    const next = [...seats.slice(mine + 1), ...seats.slice(0, mine)].find(
+      (player) => !groupOf(this.me.playerId).includes(player.playerId),
+    )
+    if (!next) return
+    this.timers.push(
+      setTimeout(() => {
+        if (this.lobby?.table?.turn?.operationId !== turn.operationId) return
+        this.send(api.games.tableAction, {
+          publicId: this.publicId,
+          operationId: operationId(),
+          deviceId: this.deviceId,
+          clientCreatedAt: Date.now(),
+          action: { kind: "turn.passed", playerId: this.me.playerId, toPlayerId: next.playerId },
+        })
+      }, this.options.passAfter),
+    )
   }
 
   every(ms, fn) {
