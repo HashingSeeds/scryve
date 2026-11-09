@@ -179,6 +179,20 @@ describe("history.entries Scryve matches", () => {
   })
 })
 
+describe("history.entries winners", () => {
+  it("names who won each game, so a row can say Won by", async () => {
+    const t = makeConvexTest()
+    const actor = await signedIn(t, "history-owner", "Alice")
+    await actor.mutation(api.games.publishFinishedLocalGame, scryveMatchGame(1, "them"))
+    const [row] = (
+      await actor.query(api.history.entries, { paginationOpts: { cursor: null, numItems: 10 } })
+    ).page
+    if (row.kind !== "game") throw new Error("expected a game")
+    const grace = row.players.find((player) => player.displayName === "Grace")
+    expect(row.winnerPlayerIds).toEqual([grace?.playerId])
+  })
+})
+
 describe("history.manualMatch", () => {
   it("lets a player without a username save, open, and delete a result", async () => {
     const t = makeConvexTest()

@@ -639,7 +639,23 @@ export function PlayerGrid({
             menuAtSeam={panelMenu?.edgeCenter !== undefined}
           />
         )}
-        <SeatSpotlight playerId={lead.id} />
+        <SeatSpotlight
+          playerId={lead.id}
+          compact={compact}
+          corners={
+            panel &&
+            headCornerStyle(
+              {
+                top: panel.y0 < 0.001,
+                bottom: panel.y1 > 0.999,
+                left: panel.x0 < 0.001,
+                right: panel.x1 > 0.999,
+              },
+              undefined,
+              Platform.OS === "web" ? insets : undefined,
+            )
+          }
+        />
       </View>
     )
   }
@@ -700,6 +716,12 @@ export function PlayerGrid({
                   ? undefined
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const rowSeam = tabSeamOf(tabRow, rowIndex, rowIndex + 1)
+              const corners = getScreenCornerSquaringStyle({
+                rows,
+                rowIndex,
+                columnIndex,
+                insets: Platform.OS === "web" ? insets : undefined,
+              })
               return (
                 // why: keyed by seat, so a rematch's new player ids reuse the card; remounting every seat each game kept the old cards' native animation memory.
                 <View
@@ -721,14 +743,9 @@ export function PlayerGrid({
                     menuCorner:
                       menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner,
                     menuEdgeCenter: fallbackMenu?.edgeCenter,
-                    style: getScreenCornerSquaringStyle({
-                      rows,
-                      rowIndex,
-                      columnIndex,
-                      insets: Platform.OS === "web" ? insets : undefined,
-                    }),
+                    style: corners,
                   })}
-                  <SeatSpotlight playerId={player.id} />
+                  <SeatSpotlight playerId={player.id} compact={compact} corners={corners} />
                 </View>
               )
             })}
@@ -750,9 +767,10 @@ interface SeatPlace {
 }
 
 /** why: the heads of a team panel meet with square corners so the panel reads as one card. */
+/** why: with no `seam`, this is the team panel's outer shape, so the turn frame around the team squares the same screen corners its heads do. */
 function headCornerStyle(
   edges: Record<LifeCardEdge, boolean>,
-  seam: LifeCardEdge,
+  seam: LifeCardEdge | undefined,
   insets?: LifeCardContentInsets,
 ): ViewStyle {
   const reaches = (edge: LifeCardEdge, side: LifeCardEdge) =>
