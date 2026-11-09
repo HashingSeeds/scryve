@@ -1071,6 +1071,26 @@ describe("engine parity: counter undo", () => {
     const log = await game.log("host")
     expect(log.find((event) => event.operationId === "poison-clamp-undo1")?.delta).toBe(1)
   })
+
+  it("takes back what a clamped named counter tap changed, not what the device asked for", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const speed = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "table",
+        action: { kind: "customCounter.changed", playerId: game.hostSeat, name: "Speed", delta },
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", speed("speed-clamp-up-001", 1))
+    await game.write("host", speed("speed-clamp-down01", -3))
+    expect(
+      await game.write("host", speed("speed-clamp-undo01", 3, "speed-clamp-down01")),
+    ).toMatchObject({ ok: true })
+    await game.expectSameState()
+    const log = await game.log("host")
+    expect(log.find((event) => event.operationId === "speed-clamp-undo01")?.delta).toBe(1)
+  })
 })
 
 describe("memory engine: life undo", () => {

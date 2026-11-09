@@ -683,7 +683,7 @@ function* writeTable(
     if (yield* read(store.undoneBy(write.undoOf)))
       return failed(writeError("invalid_undo", "This change was already taken back"))
     // why: a counter stops at 0 and at its max, so its undo reverses what the authority recorded, not what the device asked for.
-    if (action.kind === "counter.changed") {
+    if (action.kind === "counter.changed" || action.kind === "customCounter.changed") {
       if (!undone?.delta) return failed(writeError("invalid_undo", "This change moved nothing"))
       request.action = { ...action, delta: -undone.delta }
     }
