@@ -18,7 +18,14 @@ let active = false
 
 const socket = net.connect(Number(port), host, () => {
   log(`connected to ${host}:${port}`)
-  send({ type: "join", protocol: 2, name })
+  // why: the host turns away a guest that doesn't list a table's variant, and sends the table this guest says it reads.
+  send({
+    type: "join",
+    protocol: 2,
+    name,
+    variants: ["treachery", "archenemy", "twoHeadedGiant", "planechase"],
+    tableVersion: Number.MAX_SAFE_INTEGER,
+  })
 })
 const send = (message) => socket.write(`${JSON.stringify(message)}\n`)
 
@@ -49,21 +56,24 @@ socket.on("error", (error) => log(`error: ${error.message}`))
 socket.on("close", () => process.exit(0))
 
 const heartbeat = setInterval(() => socket.write("\n"), 1000)
-const lose = setInterval(() => {
-  if (!active) return
-  writes += 1
-  send({
-    type: "op",
-    event: {
-      type: "life.changed",
-      operationId: `peer-${process.pid}-${String(writes).padStart(10, "0")}`,
-      gameId,
-      actorId: seatKey,
-      deviceId: "peer-device",
-      clientCreatedAt: Date.now(),
-      playerId: seatKey,
-      delta: -1,
-    },
-  })
-}, 3000)
+const lose = setInterval(
+  () => {
+    if (!active) return
+    writes += 1
+    send({
+      type: "op",
+      event: {
+        type: "life.changed",
+        operationId: `peer-${process.pid}-${String(writes).padStart(10, "0")}`,
+        gameId,
+        actorId: seatKey,
+        deviceId: "peer-device",
+        clientCreatedAt: Date.now(),
+        playerId: seatKey,
+        delta: -1,
+      },
+    })
+  },
+  Number(process.env.PEER_EVERY_MS ?? 3000),
+)
 process.on("exit", () => [heartbeat, lose].forEach((timer) => timer.unref()))
