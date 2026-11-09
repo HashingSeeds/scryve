@@ -21,7 +21,6 @@ const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
 export interface SupportScreenProps {
   unread: number
   hasFeedback: boolean
-  offline: boolean
   onBack: () => void
   onYourFeedback: () => void
   onEmailSupport: () => void
@@ -31,7 +30,6 @@ export interface SupportScreenProps {
 export function SupportScreen({
   unread,
   hasFeedback,
-  offline,
   onBack,
   onYourFeedback,
   onEmailSupport,
@@ -50,7 +48,7 @@ export function SupportScreen({
     : FAQS
 
   return (
-    <FeedbackLayout title={translate("account:support.title")} offline={offline} onBack={onBack}>
+    <FeedbackLayout title={translate("account:support.title")} onBack={onBack}>
       <View style={themed($sections)}>
         <View>
           <SupportRow

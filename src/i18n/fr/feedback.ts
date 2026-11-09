@@ -27,17 +27,14 @@ export default {
     },
     bodyPlaceholder: {
       feature: "Quand l'utiliseriez-vous ?",
-      bug: "Que s'est-il passé, et qu'attendiez-vous ?",
+      bug: "Qu'attendiez-vous ?",
     },
     addScreenshot: "Ajouter une capture d'écran",
     removeScreenshot: "Retirer la capture d'écran",
     selectedScreenshot: "Capture d'écran sélectionnée",
     screenshotFailed: "Impossible d'ajouter cette capture d'écran. Essayez une autre image.",
-    notice: {
-      feature:
-        "Toutes les langues sont acceptées. Une IA peut nous aider à vous lire. <privacy>Confidentialité</privacy>",
-      bug: "Toutes les langues sont acceptées. Une IA peut nous aider à vous lire. Les rapports de bug incluent des infos sur l'appareil. <privacy>Confidentialité</privacy>",
-    },
+    notice:
+      "Toutes les langues sont acceptées. Une IA peut nous aider à lire. <privacy>Confidentialité</privacy>",
     includeAccount: "Inclure mon compte",
     includeAccountHelper:
       "Les réponses se synchronisent sur vos appareils, et nous voyons votre nom d'utilisateur.",

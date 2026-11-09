@@ -8,7 +8,6 @@ function renderSupport(overrides: Partial<SupportScreenProps> = {}) {
   const props: SupportScreenProps = {
     unread: 0,
     hasFeedback: false,
-    offline: false,
     onBack: jest.fn(),
     onYourFeedback: jest.fn(),
     onEmailSupport: jest.fn(),

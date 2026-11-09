@@ -82,7 +82,6 @@ export function FeedbackConversationScreen({
       title={translate(opened ? "feedback:mine.title" : "feedback:suggest.title")}
       heading={false}
       chat
-      offline={offline}
       onBack={onBack}
       footer={
         thread === null ? undefined : (
@@ -108,7 +107,7 @@ export function FeedbackConversationScreen({
             {opened ? null : (
               <Text size="xs" tone="dim" style={$centered}>
                 <Trans
-                  i18nKey={`feedback:suggest.notice.${kind}`}
+                  i18nKey="feedback:suggest.notice"
                   components={{
                     privacy: (
                       <Text
@@ -143,7 +142,8 @@ export function FeedbackConversationScreen({
                 value={draft}
                 onChangeText={onDraft}
                 containerStyle={$grow}
-                inputWrapperStyle={themed($input)}
+                inputWrapperStyle={$inputWrapper}
+                style={$input}
               />
               <ComposerButton
                 label={translate("feedback:thread.send")}
@@ -182,8 +182,9 @@ export function FeedbackConversationScreen({
               onValueChange={onIncludeAccount}
             />
           ) : null}
-          <View style={$prompt}>
+          <View style={themed($prompt)}>
             <Text tx={`feedback:suggest.prompt.${kind}`} preset="subheading" style={$centered} />
+            {offline ? <OfflineNote /> : null}
           </View>
         </>
       )}
@@ -226,7 +227,14 @@ export function FeedbackConversationScreen({
       {request && !outgoing ? (
         <AccountStatus request={request} onLinkAccount={onLinkAccount} onSignIn={onSignIn} />
       ) : null}
+      {opened && offline ? <OfflineNote /> : null}
     </FeedbackLayout>
+  )
+}
+
+function OfflineNote() {
+  return (
+    <Text tx="feedback:offline" size="xs" tone="dim" accessibilityRole="alert" style={$centered} />
   )
 }
 
@@ -381,11 +389,9 @@ const $composer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-end",
   gap: spacing.xs,
 })
-const $input: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: COMPOSER_BUTTON_SIZE,
-  maxHeight: 140,
-  paddingVertical: spacing.xxs,
-})
+const $inputWrapper: ViewStyle = { minHeight: COMPOSER_BUTTON_SIZE }
+/** why: a stretched multiline input pins its first line to the top, above the buttons' center. */
+const $input: TextStyle = { alignSelf: "center", maxHeight: 120 }
 const $composerButton: ThemedStyle<ViewStyle> = () => ({
   width: COMPOSER_BUTTON_SIZE,
   height: COMPOSER_BUTTON_SIZE,
@@ -430,7 +436,11 @@ const $theirs: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $team: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $prompt: ViewStyle = { flex: 1, justifyContent: "center" }
+const $prompt: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  justifyContent: "center",
+  gap: spacing.xs,
+})
 const $centered: TextStyle = { textAlign: "center" }
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.tint,
