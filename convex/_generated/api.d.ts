@@ -8,207 +8,211 @@
  * @module
  */
 
-import type * as accountDeletion from "../accountDeletion.js"
-import type * as accountDeletionActions from "../accountDeletionActions.js"
-import type * as archidektImports from "../archidektImports.js"
-import type * as cardCatalog from "../cardCatalog.js"
-import type * as cardDatasetSync from "../cardDatasetSync.js"
-import type * as cards from "../cards.js"
-import type * as crons from "../crons.js"
-import type * as deckCatalogs from "../deckCatalogs.js"
-import type * as deckIdentityBackfill from "../deckIdentityBackfill.js"
-import type * as deckImports from "../deckImports.js"
-import type * as deckStats from "../deckStats.js"
-import type * as decks from "../decks.js"
-import type * as devAuth from "../devAuth.js"
-import type * as entitlements from "../entitlements.js"
-import type * as events from "../events.js"
-import type * as externalApiRateLimits from "../externalApiRateLimits.js"
-import type * as feedback from "../feedback.js"
-import type * as games from "../games.js"
-import type * as history from "../history.js"
-import type * as http from "../http.js"
-import type * as integrationManifest from "../integrationManifest.js"
-import type * as legal from "../legal.js"
-import type * as lib_actionCapabilities from "../lib/actionCapabilities.js"
-import type * as lib_appearance from "../lib/appearance.js"
-import type * as lib_auth from "../lib/auth.js"
-import type * as lib_authConfig from "../lib/authConfig.js"
-import type * as lib_cardImageFallback from "../lib/cardImageFallback.js"
-import type * as lib_deckFingerprint from "../lib/deckFingerprint.js"
-import type * as lib_deckGames from "../lib/deckGames.js"
-import type * as lib_deckIdentity from "../lib/deckIdentity.js"
-import type * as lib_deckKeys from "../lib/deckKeys.js"
-import type * as lib_deckRateLimits from "../lib/deckRateLimits.js"
-import type * as lib_deckResults from "../lib/deckResults.js"
-import type * as lib_deckRules from "../lib/deckRules.js"
-import type * as lib_deckShares from "../lib/deckShares.js"
-import type * as lib_deckSources from "../lib/deckSources.js"
-import type * as lib_deckStartingValue from "../lib/deckStartingValue.js"
-import type * as lib_deckSync from "../lib/deckSync.js"
-import type * as lib_deckVersions from "../lib/deckVersions.js"
-import type * as lib_documents from "../lib/documents.js"
-import type * as lib_entitlements from "../lib/entitlements.js"
-import type * as lib_events_commands from "../lib/events/commands.js"
-import type * as lib_events_model from "../lib/events/model.js"
-import type * as lib_events_pairing from "../lib/events/pairing.js"
-import type * as lib_events_pods from "../lib/events/pods.js"
-import type * as lib_events_rules from "../lib/events/rules.js"
-import type * as lib_events_standings from "../lib/events/standings.js"
-import type * as lib_events_validators from "../lib/events/validators.js"
-import type * as lib_feedback from "../lib/feedback.js"
-import type * as lib_gameEngine from "../lib/gameEngine.js"
-import type * as lib_gameEngineConvex from "../lib/gameEngineConvex.js"
-import type * as lib_gameEngineMemory from "../lib/gameEngineMemory.js"
-import type * as lib_gameRateLimits from "../lib/gameRateLimits.js"
-import type * as lib_gameRules from "../lib/gameRules.js"
-import type * as lib_gameWriteErrors from "../lib/gameWriteErrors.js"
-import type * as lib_games_archidekt from "../lib/games/archidekt.js"
-import type * as lib_games_cards from "../lib/games/cards.js"
-import type * as lib_games_decks from "../lib/games/decks.js"
-import type * as lib_games_fleshAndBlood from "../lib/games/fleshAndBlood.js"
-import type * as lib_games_limitless from "../lib/games/limitless.js"
-import type * as lib_games_lorcana from "../lib/games/lorcana.js"
-import type * as lib_games_magic from "../lib/games/magic.js"
-import type * as lib_games_pokemon from "../lib/games/pokemon.js"
-import type * as lib_games_providers from "../lib/games/providers.js"
-import type * as lib_games_riftbound from "../lib/games/riftbound.js"
-import type * as lib_games_yugioh from "../lib/games/yugioh.js"
-import type * as lib_games_yugiohDecks from "../lib/games/yugiohDecks.js"
-import type * as lib_integrations from "../lib/integrations.js"
-import type * as lib_layouts from "../lib/layouts.js"
-import type * as lib_magicDataset from "../lib/magicDataset.js"
-import type * as lib_matchResults from "../lib/matchResults.js"
-import type * as lib_moderation from "../lib/moderation.js"
-import type * as lib_moderationRetention from "../lib/moderationRetention.js"
-import type * as lib_nameFilter from "../lib/nameFilter.js"
-import type * as lib_notifications from "../lib/notifications.js"
-import type * as lib_opponentDecks from "../lib/opponentDecks.js"
-import type * as lib_outReason from "../lib/outReason.js"
-import type * as lib_pagination from "../lib/pagination.js"
-import type * as lib_pastedDeckList from "../lib/pastedDeckList.js"
-import type * as lib_policy from "../lib/policy.js"
-import type * as lib_results from "../lib/results.js"
-import type * as lib_revenueCat from "../lib/revenueCat.js"
-import type * as lib_scryfall from "../lib/scryfall.js"
-import type * as lib_scryfallCards from "../lib/scryfallCards.js"
-import type * as lib_seatPass from "../lib/seatPass.js"
-import type * as lib_systems_definitions from "../lib/systems/definitions.js"
-import type * as lib_systems_index from "../lib/systems/index.js"
-import type * as lib_table from "../lib/table.js"
-import type * as lib_treachery from "../lib/treachery.js"
-import type * as lib_usernameSuggestions from "../lib/usernameSuggestions.js"
-import type * as matches from "../matches.js"
-import type * as moderation from "../moderation.js"
-import type * as notifications from "../notifications.js"
-import type * as providerHealth from "../providerHealth.js"
-import type * as resultsBackfill from "../resultsBackfill.js"
-import type * as revenuecat from "../revenuecat.js"
-import type * as storeReleases from "../storeReleases.js"
-import type * as users from "../users.js"
+import type * as accountDeletion from "../accountDeletion.js";
+import type * as accountDeletionActions from "../accountDeletionActions.js";
+import type * as archidektImports from "../archidektImports.js";
+import type * as cardCatalog from "../cardCatalog.js";
+import type * as cardDatasetSync from "../cardDatasetSync.js";
+import type * as cards from "../cards.js";
+import type * as crons from "../crons.js";
+import type * as deckCatalogs from "../deckCatalogs.js";
+import type * as deckIdentityBackfill from "../deckIdentityBackfill.js";
+import type * as deckImports from "../deckImports.js";
+import type * as deckStats from "../deckStats.js";
+import type * as decks from "../decks.js";
+import type * as devAuth from "../devAuth.js";
+import type * as entitlements from "../entitlements.js";
+import type * as events from "../events.js";
+import type * as externalApiRateLimits from "../externalApiRateLimits.js";
+import type * as feedback from "../feedback.js";
+import type * as games from "../games.js";
+import type * as history from "../history.js";
+import type * as http from "../http.js";
+import type * as integrationManifest from "../integrationManifest.js";
+import type * as legal from "../legal.js";
+import type * as lib_actionCapabilities from "../lib/actionCapabilities.js";
+import type * as lib_appearance from "../lib/appearance.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as lib_authConfig from "../lib/authConfig.js";
+import type * as lib_cardImageFallback from "../lib/cardImageFallback.js";
+import type * as lib_deckFingerprint from "../lib/deckFingerprint.js";
+import type * as lib_deckGames from "../lib/deckGames.js";
+import type * as lib_deckIdentity from "../lib/deckIdentity.js";
+import type * as lib_deckKeys from "../lib/deckKeys.js";
+import type * as lib_deckRateLimits from "../lib/deckRateLimits.js";
+import type * as lib_deckResults from "../lib/deckResults.js";
+import type * as lib_deckRules from "../lib/deckRules.js";
+import type * as lib_deckShares from "../lib/deckShares.js";
+import type * as lib_deckSources from "../lib/deckSources.js";
+import type * as lib_deckStartingValue from "../lib/deckStartingValue.js";
+import type * as lib_deckSync from "../lib/deckSync.js";
+import type * as lib_deckVersions from "../lib/deckVersions.js";
+import type * as lib_documents from "../lib/documents.js";
+import type * as lib_entitlements from "../lib/entitlements.js";
+import type * as lib_events_commands from "../lib/events/commands.js";
+import type * as lib_events_model from "../lib/events/model.js";
+import type * as lib_events_pairing from "../lib/events/pairing.js";
+import type * as lib_events_pods from "../lib/events/pods.js";
+import type * as lib_events_rules from "../lib/events/rules.js";
+import type * as lib_events_standings from "../lib/events/standings.js";
+import type * as lib_events_validators from "../lib/events/validators.js";
+import type * as lib_feedback from "../lib/feedback.js";
+import type * as lib_gameEngine from "../lib/gameEngine.js";
+import type * as lib_gameEngineConvex from "../lib/gameEngineConvex.js";
+import type * as lib_gameEngineMemory from "../lib/gameEngineMemory.js";
+import type * as lib_gameRateLimits from "../lib/gameRateLimits.js";
+import type * as lib_gameRules from "../lib/gameRules.js";
+import type * as lib_gameWriteErrors from "../lib/gameWriteErrors.js";
+import type * as lib_games_archidekt from "../lib/games/archidekt.js";
+import type * as lib_games_cards from "../lib/games/cards.js";
+import type * as lib_games_decks from "../lib/games/decks.js";
+import type * as lib_games_fleshAndBlood from "../lib/games/fleshAndBlood.js";
+import type * as lib_games_limitless from "../lib/games/limitless.js";
+import type * as lib_games_lorcana from "../lib/games/lorcana.js";
+import type * as lib_games_magic from "../lib/games/magic.js";
+import type * as lib_games_pokemon from "../lib/games/pokemon.js";
+import type * as lib_games_providers from "../lib/games/providers.js";
+import type * as lib_games_riftbound from "../lib/games/riftbound.js";
+import type * as lib_games_yugioh from "../lib/games/yugioh.js";
+import type * as lib_games_yugiohDecks from "../lib/games/yugiohDecks.js";
+import type * as lib_integrations from "../lib/integrations.js";
+import type * as lib_layouts from "../lib/layouts.js";
+import type * as lib_magicDataset from "../lib/magicDataset.js";
+import type * as lib_matchResults from "../lib/matchResults.js";
+import type * as lib_moderation from "../lib/moderation.js";
+import type * as lib_moderationRetention from "../lib/moderationRetention.js";
+import type * as lib_nameFilter from "../lib/nameFilter.js";
+import type * as lib_notifications from "../lib/notifications.js";
+import type * as lib_opponentDecks from "../lib/opponentDecks.js";
+import type * as lib_outReason from "../lib/outReason.js";
+import type * as lib_pagination from "../lib/pagination.js";
+import type * as lib_pastedDeckList from "../lib/pastedDeckList.js";
+import type * as lib_policy from "../lib/policy.js";
+import type * as lib_results from "../lib/results.js";
+import type * as lib_revenueCat from "../lib/revenueCat.js";
+import type * as lib_scryfall from "../lib/scryfall.js";
+import type * as lib_scryfallCards from "../lib/scryfallCards.js";
+import type * as lib_seatPass from "../lib/seatPass.js";
+import type * as lib_systems_definitions from "../lib/systems/definitions.js";
+import type * as lib_systems_index from "../lib/systems/index.js";
+import type * as lib_table from "../lib/table.js";
+import type * as lib_treachery from "../lib/treachery.js";
+import type * as lib_usernameSuggestions from "../lib/usernameSuggestions.js";
+import type * as matches from "../matches.js";
+import type * as moderation from "../moderation.js";
+import type * as notifications from "../notifications.js";
+import type * as providerHealth from "../providerHealth.js";
+import type * as resultsBackfill from "../resultsBackfill.js";
+import type * as revenuecat from "../revenuecat.js";
+import type * as storeReleases from "../storeReleases.js";
+import type * as users from "../users.js";
 
-import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server"
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  "accountDeletion": typeof accountDeletion
-  "accountDeletionActions": typeof accountDeletionActions
-  "archidektImports": typeof archidektImports
-  "cardCatalog": typeof cardCatalog
-  "cardDatasetSync": typeof cardDatasetSync
-  "cards": typeof cards
-  "crons": typeof crons
-  "deckCatalogs": typeof deckCatalogs
-  "deckIdentityBackfill": typeof deckIdentityBackfill
-  "deckImports": typeof deckImports
-  "deckStats": typeof deckStats
-  "decks": typeof decks
-  "devAuth": typeof devAuth
-  "entitlements": typeof entitlements
-  "events": typeof events
-  "externalApiRateLimits": typeof externalApiRateLimits
-  "feedback": typeof feedback
-  "games": typeof games
-  "history": typeof history
-  "http": typeof http
-  "integrationManifest": typeof integrationManifest
-  "legal": typeof legal
-  "lib/actionCapabilities": typeof lib_actionCapabilities
-  "lib/appearance": typeof lib_appearance
-  "lib/auth": typeof lib_auth
-  "lib/authConfig": typeof lib_authConfig
-  "lib/cardImageFallback": typeof lib_cardImageFallback
-  "lib/deckFingerprint": typeof lib_deckFingerprint
-  "lib/deckGames": typeof lib_deckGames
-  "lib/deckIdentity": typeof lib_deckIdentity
-  "lib/deckKeys": typeof lib_deckKeys
-  "lib/deckRateLimits": typeof lib_deckRateLimits
-  "lib/deckResults": typeof lib_deckResults
-  "lib/deckRules": typeof lib_deckRules
-  "lib/deckShares": typeof lib_deckShares
-  "lib/deckSources": typeof lib_deckSources
-  "lib/deckStartingValue": typeof lib_deckStartingValue
-  "lib/deckSync": typeof lib_deckSync
-  "lib/deckVersions": typeof lib_deckVersions
-  "lib/documents": typeof lib_documents
-  "lib/entitlements": typeof lib_entitlements
-  "lib/events/commands": typeof lib_events_commands
-  "lib/events/model": typeof lib_events_model
-  "lib/events/pairing": typeof lib_events_pairing
-  "lib/events/pods": typeof lib_events_pods
-  "lib/events/rules": typeof lib_events_rules
-  "lib/events/standings": typeof lib_events_standings
-  "lib/events/validators": typeof lib_events_validators
-  "lib/feedback": typeof lib_feedback
-  "lib/gameEngine": typeof lib_gameEngine
-  "lib/gameEngineConvex": typeof lib_gameEngineConvex
-  "lib/gameEngineMemory": typeof lib_gameEngineMemory
-  "lib/gameRateLimits": typeof lib_gameRateLimits
-  "lib/gameRules": typeof lib_gameRules
-  "lib/gameWriteErrors": typeof lib_gameWriteErrors
-  "lib/games/archidekt": typeof lib_games_archidekt
-  "lib/games/cards": typeof lib_games_cards
-  "lib/games/decks": typeof lib_games_decks
-  "lib/games/fleshAndBlood": typeof lib_games_fleshAndBlood
-  "lib/games/limitless": typeof lib_games_limitless
-  "lib/games/lorcana": typeof lib_games_lorcana
-  "lib/games/magic": typeof lib_games_magic
-  "lib/games/pokemon": typeof lib_games_pokemon
-  "lib/games/providers": typeof lib_games_providers
-  "lib/games/riftbound": typeof lib_games_riftbound
-  "lib/games/yugioh": typeof lib_games_yugioh
-  "lib/games/yugiohDecks": typeof lib_games_yugiohDecks
-  "lib/integrations": typeof lib_integrations
-  "lib/layouts": typeof lib_layouts
-  "lib/magicDataset": typeof lib_magicDataset
-  "lib/matchResults": typeof lib_matchResults
-  "lib/moderation": typeof lib_moderation
-  "lib/moderationRetention": typeof lib_moderationRetention
-  "lib/nameFilter": typeof lib_nameFilter
-  "lib/notifications": typeof lib_notifications
-  "lib/opponentDecks": typeof lib_opponentDecks
-  "lib/outReason": typeof lib_outReason
-  "lib/pagination": typeof lib_pagination
-  "lib/pastedDeckList": typeof lib_pastedDeckList
-  "lib/policy": typeof lib_policy
-  "lib/results": typeof lib_results
-  "lib/revenueCat": typeof lib_revenueCat
-  "lib/scryfall": typeof lib_scryfall
-  "lib/scryfallCards": typeof lib_scryfallCards
-  "lib/seatPass": typeof lib_seatPass
-  "lib/systems/definitions": typeof lib_systems_definitions
-  "lib/systems/index": typeof lib_systems_index
-  "lib/table": typeof lib_table
-  "lib/treachery": typeof lib_treachery
-  "lib/usernameSuggestions": typeof lib_usernameSuggestions
-  "matches": typeof matches
-  "moderation": typeof moderation
-  "notifications": typeof notifications
-  "providerHealth": typeof providerHealth
-  "resultsBackfill": typeof resultsBackfill
-  "revenuecat": typeof revenuecat
-  "storeReleases": typeof storeReleases
-  "users": typeof users
-}>
+  accountDeletion: typeof accountDeletion;
+  accountDeletionActions: typeof accountDeletionActions;
+  archidektImports: typeof archidektImports;
+  cardCatalog: typeof cardCatalog;
+  cardDatasetSync: typeof cardDatasetSync;
+  cards: typeof cards;
+  crons: typeof crons;
+  deckCatalogs: typeof deckCatalogs;
+  deckIdentityBackfill: typeof deckIdentityBackfill;
+  deckImports: typeof deckImports;
+  deckStats: typeof deckStats;
+  decks: typeof decks;
+  devAuth: typeof devAuth;
+  entitlements: typeof entitlements;
+  events: typeof events;
+  externalApiRateLimits: typeof externalApiRateLimits;
+  feedback: typeof feedback;
+  games: typeof games;
+  history: typeof history;
+  http: typeof http;
+  integrationManifest: typeof integrationManifest;
+  legal: typeof legal;
+  "lib/actionCapabilities": typeof lib_actionCapabilities;
+  "lib/appearance": typeof lib_appearance;
+  "lib/auth": typeof lib_auth;
+  "lib/authConfig": typeof lib_authConfig;
+  "lib/cardImageFallback": typeof lib_cardImageFallback;
+  "lib/deckFingerprint": typeof lib_deckFingerprint;
+  "lib/deckGames": typeof lib_deckGames;
+  "lib/deckIdentity": typeof lib_deckIdentity;
+  "lib/deckKeys": typeof lib_deckKeys;
+  "lib/deckRateLimits": typeof lib_deckRateLimits;
+  "lib/deckResults": typeof lib_deckResults;
+  "lib/deckRules": typeof lib_deckRules;
+  "lib/deckShares": typeof lib_deckShares;
+  "lib/deckSources": typeof lib_deckSources;
+  "lib/deckStartingValue": typeof lib_deckStartingValue;
+  "lib/deckSync": typeof lib_deckSync;
+  "lib/deckVersions": typeof lib_deckVersions;
+  "lib/documents": typeof lib_documents;
+  "lib/entitlements": typeof lib_entitlements;
+  "lib/events/commands": typeof lib_events_commands;
+  "lib/events/model": typeof lib_events_model;
+  "lib/events/pairing": typeof lib_events_pairing;
+  "lib/events/pods": typeof lib_events_pods;
+  "lib/events/rules": typeof lib_events_rules;
+  "lib/events/standings": typeof lib_events_standings;
+  "lib/events/validators": typeof lib_events_validators;
+  "lib/feedback": typeof lib_feedback;
+  "lib/gameEngine": typeof lib_gameEngine;
+  "lib/gameEngineConvex": typeof lib_gameEngineConvex;
+  "lib/gameEngineMemory": typeof lib_gameEngineMemory;
+  "lib/gameRateLimits": typeof lib_gameRateLimits;
+  "lib/gameRules": typeof lib_gameRules;
+  "lib/gameWriteErrors": typeof lib_gameWriteErrors;
+  "lib/games/archidekt": typeof lib_games_archidekt;
+  "lib/games/cards": typeof lib_games_cards;
+  "lib/games/decks": typeof lib_games_decks;
+  "lib/games/fleshAndBlood": typeof lib_games_fleshAndBlood;
+  "lib/games/limitless": typeof lib_games_limitless;
+  "lib/games/lorcana": typeof lib_games_lorcana;
+  "lib/games/magic": typeof lib_games_magic;
+  "lib/games/pokemon": typeof lib_games_pokemon;
+  "lib/games/providers": typeof lib_games_providers;
+  "lib/games/riftbound": typeof lib_games_riftbound;
+  "lib/games/yugioh": typeof lib_games_yugioh;
+  "lib/games/yugiohDecks": typeof lib_games_yugiohDecks;
+  "lib/integrations": typeof lib_integrations;
+  "lib/layouts": typeof lib_layouts;
+  "lib/magicDataset": typeof lib_magicDataset;
+  "lib/matchResults": typeof lib_matchResults;
+  "lib/moderation": typeof lib_moderation;
+  "lib/moderationRetention": typeof lib_moderationRetention;
+  "lib/nameFilter": typeof lib_nameFilter;
+  "lib/notifications": typeof lib_notifications;
+  "lib/opponentDecks": typeof lib_opponentDecks;
+  "lib/outReason": typeof lib_outReason;
+  "lib/pagination": typeof lib_pagination;
+  "lib/pastedDeckList": typeof lib_pastedDeckList;
+  "lib/policy": typeof lib_policy;
+  "lib/results": typeof lib_results;
+  "lib/revenueCat": typeof lib_revenueCat;
+  "lib/scryfall": typeof lib_scryfall;
+  "lib/scryfallCards": typeof lib_scryfallCards;
+  "lib/seatPass": typeof lib_seatPass;
+  "lib/systems/definitions": typeof lib_systems_definitions;
+  "lib/systems/index": typeof lib_systems_index;
+  "lib/table": typeof lib_table;
+  "lib/treachery": typeof lib_treachery;
+  "lib/usernameSuggestions": typeof lib_usernameSuggestions;
+  matches: typeof matches;
+  moderation: typeof moderation;
+  notifications: typeof notifications;
+  providerHealth: typeof providerHealth;
+  resultsBackfill: typeof resultsBackfill;
+  revenuecat: typeof revenuecat;
+  storeReleases: typeof storeReleases;
+  users: typeof users;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
@@ -218,7 +222,10 @@ declare const fullApi: ApiFromModules<{
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-export declare const api: FilterApi<typeof fullApi, FunctionReference<any, "public">>
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
 
 /**
  * A utility for referencing Convex functions in your app's internal API.
@@ -228,8 +235,11 @@ export declare const api: FilterApi<typeof fullApi, FunctionReference<any, "publ
  * const myFunctionReference = internal.myModule.myFunction;
  * ```
  */
-export declare const internal: FilterApi<typeof fullApi, FunctionReference<any, "internal">>
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
 
 export declare const components: {
-  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">
-}
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};
