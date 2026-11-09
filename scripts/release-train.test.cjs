@@ -104,6 +104,19 @@ test("a commit published twice promotes only its newest groups", () => {
   ])
 })
 
+test("backports on beta are never the train's candidate", () => {
+  const backport = (platform) => ({
+    ...group("cherry", platform, 90),
+    message: "Backport abc onto def: fix",
+  })
+  const { candidate } = pickRelease(
+    [backport("ios"), backport("android"), group("main", "ios", 70), group("main", "android", 70)],
+    100 * MINUTE,
+    60 * MINUTE,
+  )
+  assert.equal(candidate.commit, "main")
+})
+
 test("shipped PRs come from squash subjects, minus reverted ones", () => {
   assert.deepEqual(
     prNumbers([
