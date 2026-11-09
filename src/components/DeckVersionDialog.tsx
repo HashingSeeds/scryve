@@ -10,7 +10,7 @@ import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
 import { SegmentedControl } from "./SegmentedControl"
 import { Sheet } from "./Sheet"
-import { $sheetScroll } from "./sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "./sheetStyles"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 
@@ -61,8 +61,8 @@ export function DeckVersionDialog({
       testID="deck-version-dialog"
     >
       <ScrollView
-        style={$sheetScroll}
-        contentContainerStyle={themed($content)}
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $content])}
         keyboardShouldPersistTaps="handled"
       >
         <Text preset="subheading" text={title} />

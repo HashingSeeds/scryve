@@ -10,7 +10,7 @@ import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
 import { SelectField } from "./SelectField"
 import { Sheet } from "./Sheet"
-import { $sheetScroll } from "./sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "./sheetStyles"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 import { deckFormats } from "../../convex/lib/deckGames"
@@ -52,8 +52,8 @@ export function DeckSettingsDialog({
       testID="deck-settings-dialog"
     >
       <ScrollView
-        style={$sheetScroll}
-        contentContainerStyle={themed($content)}
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $content])}
         keyboardShouldPersistTaps="handled"
       >
         <Text preset="subheading" tx="decks:settings.title" />
