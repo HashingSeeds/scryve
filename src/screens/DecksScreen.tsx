@@ -17,6 +17,7 @@ import { NUMBER_LANE_WIDTH, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -844,7 +845,10 @@ export function DecksScreen({
         style={$filtersDialog}
       >
         <Text preset="subheading" tx="decks:filters.label" />
-        <ScrollView style={$filtersScroll} contentContainerStyle={themed($dialogBody)}>
+        <ScrollView
+          style={themed([$sheetScroll, $filtersScroll])}
+          contentContainerStyle={themed([$sheetScrollContent, $dialogBody])}
+        >
           <SelectField
             testID="system-filter"
             label={translate("decks:shelf.system")}
@@ -934,7 +938,8 @@ const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $flex1: ViewStyle = { flex: 1 }
 const $filtersDialog: ViewStyle = { height: 560 }
-const $filtersScroll: ViewStyle = { flex: 1 }
+// why: the filters dialog has a fixed height, so the list fills it instead of fitting its content.
+const $filtersScroll: ViewStyle = { flexGrow: 1, flexBasis: 0 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.xs,

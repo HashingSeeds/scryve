@@ -6,7 +6,7 @@ import * as Application from "expo-application"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { ListItem } from "@/components/ListItem"
 import { Sheet } from "@/components/Sheet"
-import { $sheetScroll } from "@/components/sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import { ValueField } from "@/components/ValueField"
@@ -288,7 +288,10 @@ export function SettingsScreen({
         onClose={() => setChoosingGame(false)}
         testID="default-game-dialog"
       >
-        <ScrollView style={$sheetScroll} contentContainerStyle={themed($gameChoices)}>
+        <ScrollView
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed([$sheetScrollContent, $gameChoices])}
+        >
           <Text tx="account:settings.chooseGame" preset="subheading" accessibilityRole="header" />
           <GameTypeList
             types={gameTypes}

@@ -6,7 +6,7 @@ import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { SectionHeader } from "@/components/NumberLane"
 import { Sheet } from "@/components/Sheet"
-import { $sheetScroll } from "@/components/sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -75,7 +75,10 @@ export function SideboardSwapSheet({
     <Sheet visible={visible} onClose={onClose} onDismissed={onDismissed} testID="sideboard-sheet">
       <View style={themed($body)}>
         <Text preset="subheading" tx="decks:sideboard.title" />
-        <ScrollView style={$sheetScroll}>
+        <ScrollView
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed($sheetScrollContent)}
+        >
           <Section tx="decks:sideboard.inFromSide" count={inCount} />
           {inRows}
           <Section tx="decks:sideboard.outOfMain" count={outCount} />

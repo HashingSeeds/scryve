@@ -15,6 +15,7 @@ import type {
 } from "@/components/GameRadialMenu"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { gameRules, openRules } from "@/features/rules/gameRules"
 import { prefetchRules } from "@/features/rules/rulesSource"
@@ -286,8 +287,8 @@ function LayoutDialog({
       {/* why: layouts plus the seat map outgrow a small phone, so they scroll and the button stays put. */}
       <ScrollView
         testID="layout-picker-scroll"
-        style={$layoutScroll}
-        contentContainerStyle={themed($layoutContent)}
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $layoutContent])}
       >
         <Text tx="board:menu.layout" preset="subheading" style={themed($dialogText)} />
         {getPlayerGridLayoutOptions(playerCount).length > 1 ? (
@@ -317,6 +318,5 @@ function LayoutDialog({
   )
 }
 
-const $layoutScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $layoutContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.lg })
 const $dialogButton: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
