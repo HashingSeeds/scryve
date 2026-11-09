@@ -4,7 +4,7 @@ import { emitTelemetry } from "@/utils/telemetry"
 
 import type { PendingLifeAction } from "./model"
 import { OutboxSyncController, type OutboxSyncEnvironment } from "./OutboxSyncController"
-import { ConnectedGameRepository } from "./persistence"
+import { CONNECTED_KEYS, ConnectedGameRepository } from "./persistence"
 import { projection } from "../../../test/fixtures/connectedProjection"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
@@ -142,6 +142,43 @@ describe("outbox sync controller", () => {
 
     expect(seatsOf(controller.getSnapshot().pending)).toEqual(["player-1", "player-2", "player-1"])
     expect(seatsOf(stored(repository).pending)).toEqual(["player-1", "player-2", "player-1"])
+  })
+
+  it("keeps a change an older build queued after A after A, though it carries no sequence", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    repository
+      .outbox("game-public")
+      .enqueue({ ...action("operation-queued-first", -1, 1_000), sequence: 0 })
+    // why: a build from before `sequence` writes the record and its index entry, and nothing else.
+    const olderBuild = action("operation-older-build", -1, 2_000)
+    storage.set(
+      CONNECTED_KEYS.outboxRecord("game-public", "operation-older-build", "user-1"),
+      JSON.stringify(olderBuild),
+    )
+    const indexKey = CONNECTED_KEYS.outboxIndex("game-public", "user-1")
+    storage.set(
+      indexKey,
+      JSON.stringify([...JSON.parse(storage.getString(indexKey) ?? "[]"), "operation-older-build"]),
+    )
+
+    expect(stored(repository).pending.map(({ event }) => event.operationId)).toEqual([
+      "operation-queued-first",
+      "operation-older-build",
+    ])
+  })
+
+  it("gives two tabs of one game distinct, ordered sequences while both are offline", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const first = harness({ storage, repository }).controller
+    const second = harness({ storage, repository }).controller
+    first.changeLife("player-1", -1)
+    second.changeLife("player-2", -1)
+    first.changeLife("player-2", 1)
+
+    const sequences = stored(repository).pending.map(({ sequence }) => sequence)
+    expect(sequences).toEqual([0, 1, 2])
   })
 
   it("drains a queued life change and acknowledges it", async () => {
