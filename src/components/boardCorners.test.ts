@@ -2,7 +2,7 @@ import { boardCornerRadii, concentricRadius } from "./boardCorners"
 import { getScreenCornerSquaringStyle } from "./PlayerGrid"
 import type { CornerRadii } from "../../modules/display-corners"
 
-// Distinct radii make each corner traceable: 1 top left, 2 top right, 3 bottom right, 4 bottom left.
+// why: distinct radii show which window corner each board corner took: 1 top left, then clockwise.
 const window: CornerRadii = [1, 2, 3, 4]
 
 describe("boardCornerRadii", () => {
