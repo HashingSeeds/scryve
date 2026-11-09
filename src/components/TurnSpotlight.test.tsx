@@ -32,4 +32,8 @@ describe("SeatSpotlight", () => {
       borderStyle: "dashed",
     })
   })
+
+  it("says solid on the active frame, since Android keeps a next frame's dash when the style drops it", () => {
+    expect(frame({ playerId: "ada" }).borderStyle).toBe("solid")
+  })
 })
