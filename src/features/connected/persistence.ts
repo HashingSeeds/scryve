@@ -19,7 +19,7 @@ import type {
   PendingLifeAction,
   TableActionEvent,
 } from "./model"
-import { toConnectedProjection } from "./model"
+import { compareQueued, toConnectedProjection } from "./model"
 import { matchesValidator, tableActionValidator } from "../../../convex/lib/table"
 import {
   asActorId,
@@ -238,6 +238,9 @@ function parsePending(value: unknown): PendingLifeAction | null {
     schemaVersion: 1,
     event,
     queuedAt: value.queuedAt,
+    ...(typeof value.sequence === "number" && Number.isSafeInteger(value.sequence)
+      ? { sequence: value.sequence }
+      : {}),
     attempts,
     ...(typeof value.lastAttemptAt === "number" && Number.isFinite(value.lastAttemptAt)
       ? { lastAttemptAt: value.lastAttemptAt }
@@ -397,6 +400,7 @@ const fieldNames: Record<FieldName<PendingLifeAction | ConnectedActionEvent>, tr
   schemaVersion: true,
   event: true,
   queuedAt: true,
+  sequence: true,
   attempts: true,
   lastAttemptAt: true,
   type: true,
@@ -422,10 +426,7 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   parseFailed,
   createFailure: (action, reason, failedAt) => ({ schemaVersion: 1, action, reason, failedAt }),
   operationId: (action) => action.event.operationId,
-  compare: (left, right) =>
-    left.queuedAt - right.queuedAt ||
-    left.event.clientCreatedAt - right.event.clientCreatedAt ||
-    left.event.operationId.localeCompare(right.event.operationId),
+  compare: compareQueued,
   operationTypes: [
     "life.changed",
     "table.action",

@@ -517,10 +517,43 @@ export function applyLocalTableAction(
       isSeat: (playerId) => game.players.some(({ id }) => id === playerId),
       groups: game.turnGroups,
     })
-    return turn === null ? game : withTurn(game, turn, context.now)
+    return turn === null ? game : withLogged(withTurn(game, turn, context.now), context.operationId)
   }
   const applied = applyBoardTableAction(game, action, context)
-  return applied === game ? game : startTurnOnChange(applied, context.now)
+  return applied === game
+    ? game
+    : withLogged(startTurnOnChange(applied, context.now), context.operationId)
+}
+
+const withLogged = (game: LocalGame, operationId: string): LocalGame => ({
+  ...game,
+  logOrder: [...(game.logOrder ?? []), operationId],
+})
+
+/**
+ * why: the log's order is a sequence, never a clock, so a change sits where `logOrder` put it. A
+ * game saved before `logOrder` has no sequence for its older changes: they come first, each list
+ * in its own order, and only between those lists does time decide.
+ */
+export function localLogPositions(
+  game: Pick<LocalGame, "logOrder" | "events" | "turnLog">,
+  extra: readonly { operationId: string; at: number }[] = [],
+): (operationId: string) => number | undefined {
+  const logged = game.logOrder ?? []
+  const positions = new Map(logged.map((operationId, index) => [operationId, index]))
+  const older = [
+    game.events.map(({ operationId, clientCreatedAt }) => ({ operationId, at: clientCreatedAt })),
+    (game.turnLog ?? []).map(({ operationId, at }) => ({ operationId, at })),
+    extra,
+  ]
+    .flatMap((list) => {
+      const unlogged = list.filter(({ operationId }) => !positions.has(operationId))
+      let at = -Infinity
+      return unlogged.map((entry) => ({ ...entry, at: (at = Math.max(at, entry.at)) }))
+    })
+    .sort((left, right) => left.at - right.at)
+  older.forEach(({ operationId }, index) => positions.set(operationId, index - older.length))
+  return (operationId) => positions.get(operationId)
 }
 
 export function startTurnOnChange(game: LocalGame, now: number): LocalGame {
@@ -797,7 +830,9 @@ export function applyGameCommand(
   context: CommandContext,
 ): LocalGame {
   const event = commandToEvent(game, command, context)
-  return event ? reduceGameEvent(game, event) : game
+  if (!event) return game
+  const next = reduceGameEvent(game, event)
+  return next === game ? game : withLogged(next, event.operationId)
 }
 
 export function hasPlayBegun(game: LocalGame): boolean {
@@ -851,7 +886,12 @@ export function undoableTurn(game: LocalGame, actorId: ActorId) {
       event.actorId === actorId &&
       !compensated.has(event.operationId),
   )
-  if (lastChange && lastChange.clientCreatedAt > turn.startedAt) return undefined
+  const positionOf = localLogPositions(game)
+  if (
+    lastChange &&
+    (positionOf(lastChange.operationId) ?? -Infinity) > (positionOf(turn.operationId) ?? -Infinity)
+  )
+    return undefined
   return { playerId: turn.previous.playerId, turnOperationId: turn.operationId }
 }
 
