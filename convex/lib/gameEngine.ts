@@ -3,6 +3,7 @@ import {
   applyLifeChange,
   commanderClaimOutcome,
   commanderField,
+  commanderLethalDamage,
   confirmCommanderClaim,
   controlsSeat,
   isCommanderDamageDelta,
@@ -23,7 +24,8 @@ import {
 } from "./gameRules"
 import type { GameWriteErrorCode } from "./gameWriteErrors"
 import { nameFailsGate } from "./nameFilter"
-import { tableRules } from "./systems"
+import { commanderOutState, outReason, type CommanderTotal, type OutState } from "./outReason"
+import { systemDefinition, tableRules } from "./systems"
 import {
   applyTableAction,
   seatTable,
@@ -35,7 +37,7 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
-import { isTurnAction, startedByChange, type Turn } from "./turns"
+import { isTurnAction, nextTurnSeat, startedByChange, type Turn } from "./turns"
 import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
@@ -217,6 +219,9 @@ export interface GameStore {
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
+  /** why: in seat order; a pass reads every seat to skip those that are out. */
+  seats(): Read<readonly EngineSeat[]>
+  commanderTotals(): Read<readonly CommanderTotal[]>
   isMember(): Read<boolean>
   beforeNewWrite?(): Read<void>
   apply(changes: readonly GameChange[]): Read<void>
@@ -321,10 +326,12 @@ function* editableSeat(
   id: string,
   actor: SeatActor,
   message = "Seat-owner permission required",
+  anyoneMay = true,
 ) {
   const seat = yield* read(store.seat(id))
   if (seat && controlsSeat(seat, actor)) return seat
-  if (seat && store.game.lifeEditing === "anyone" && (yield* read(store.isMember()))) return seat
+  if (seat && anyoneMay && store.game.lifeEditing === "anyone" && (yield* read(store.isMember())))
+    return seat
   return writeError("seat_owner_required", message)
 }
 
@@ -529,6 +536,7 @@ export function changeTable(
   related: EngineSeat | undefined,
   request: TableActionRequest,
   now: number,
+  nextTurnSeat?: (from: string) => string | undefined,
 ): { changes: GameChange[] } | EngineError {
   const { action } = request
   const rows = new Map<string, EngineSeat>([[actor.id, actor]])
@@ -544,6 +552,7 @@ export function changeTable(
     operationId: request.operationId,
     lifeOf: (playerId) => rows.get(playerId)?.currentLife,
     now,
+    nextTurnSeat,
   })
   if (!result) return writeError("invalid_table_action", "This table change no longer applies")
 
@@ -589,11 +598,13 @@ export function changeTable(
       actionIdentity: request.actionIdentity,
       ...(lifeChange
         ? { toPlayerId: lifeChange.playerId, delta: lifeChange.delta }
-        : "toPlayerId" in action
-          ? { toPlayerId: action.toPlayerId }
-          : actionDelta === undefined
-            ? {}
-            : { delta: actionDelta }),
+        : action.kind === "turn.passed" && result.table.turn
+          ? { toPlayerId: result.table.turn.playerId }
+          : "toPlayerId" in action
+            ? { toPlayerId: action.toPlayerId }
+            : actionDelta === undefined
+              ? {}
+              : { delta: actionDelta }),
       ...(action.kind === "pokemon.knockoutUndone"
         ? { undoOfOperationId: action.knockoutOperationId }
         : request.undoOf === undefined
@@ -608,6 +619,27 @@ export function changeTable(
   return { changes }
 }
 
+/** why: a device names the next seat from the board it last drew, which can lag a seat going out, so the authority picks the next group still in, in seat order. */
+function* passOrder(store: GameStore): GameSteps<(from: string) => string | undefined> {
+  const seats = yield* read(store.seats())
+  const totals = yield* read(store.commanderTotals())
+  const { game } = store
+  const state: OutState = {
+    counter: systemDefinition(game.system)?.counter,
+    tableRules: tableRules(game.system, game.format),
+    table: {
+      designations: game.designations,
+      players: Object.fromEntries(seats.map((seat) => [seat.id, seatTable(seat)])),
+    },
+    lives: seats.map(({ id, currentLife }) => ({ playerId: id, life: currentLife })),
+    commanderDamage: commanderOutState(commanderLethalDamage(game.system, game.format), totals),
+    ...(game.turnGroups ? { groups: game.turnGroups } : {}),
+  }
+  const order = seats.map(({ id }) => id)
+  return (from) =>
+    nextTurnSeat(order, from, (id) => outReason(state, id) !== undefined, game.turnGroups)
+}
+
 function* writeTable(
   store: GameStore,
   actor: SeatActor,
@@ -615,7 +647,8 @@ function* writeTable(
   now: number,
 ): GameSteps<GameWriteResult> {
   const action = gatedTableAction(write.action)
-  const seat = yield* editableSeat(store, action.playerId, actor)
+  // why: "anyone edits" lets the table fix each other's counts, not claim, pass or take back another seat's turn.
+  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request = {
@@ -637,7 +670,8 @@ function* writeTable(
   if (inactive) return failed(inactive)
   const relatedId = tableRelatedSeatId(action, seat)
   const related = relatedId === undefined ? undefined : yield* read(store.seat(relatedId))
-  const outcome = changeTable(store.game, seat, related, request, now)
+  const nextSeat = action.kind === "turn.passed" ? yield* passOrder(store) : undefined
+  const outcome = changeTable(store.game, seat, related, request, now, nextSeat)
   if (isEngineError(outcome)) return failed(outcome)
   yield* read(store.apply(outcome.changes))
   return acknowledged({ operationId, deduplicated: false })

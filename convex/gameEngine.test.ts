@@ -874,6 +874,74 @@ describe("memory engine: turn groups", () => {
     ).toMatchObject({ ok: true })
     expect(memory.turn).toMatchObject({ playerId: "ada", number: 1 })
   })
+
+  it("lets no other seat claim, pass or take back a turn, even when anyone edits life", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      lifeEditing: "anyone",
+      seats: new Map(["ada", "bo"].map((id) => [id, seat(id)])),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const asBo = (operationId: string, action: TableAction) =>
+      writeMemoryGame(memory, actor("bo"), tableWrite("bo", operationId, action), CREATED_AT)
+
+    expect(
+      asBo("turn-claim-bo-0001", { kind: "turn.set", playerId: "ada", toPlayerId: "ada" }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+    memory.turn = { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-ada" }
+    expect(
+      asBo("turn-pass-bo-00001", { kind: "turn.passed", playerId: "ada", toPlayerId: "bo" }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+    memory.turn = {
+      playerId: "bo",
+      number: 2,
+      startedAt: CREATED_AT,
+      operationId: "turn-pass-ada",
+      previous: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-ada" },
+    }
+    expect(
+      asBo("turn-undo-bo-00001", {
+        kind: "turn.undone",
+        playerId: "ada",
+        turnOperationId: "turn-pass-ada",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+  })
+
+  it("passes past a seat that went out after the passer's board last drew it", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      turn: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-set-ada-0001" },
+      seats: new Map(
+        ["ada", "bo", "cy"].map((id) => [id, { ...seat(id), currentLife: id === "bo" ? 0 : 40 }]),
+      ),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    expect(
+      writeMemoryGame(
+        memory,
+        actor("ada"),
+        tableWrite("ada", "turn-pass-ada-0001", {
+          kind: "turn.passed",
+          playerId: "ada",
+          toPlayerId: "bo",
+        }),
+        CREATED_AT + 1_000,
+      ),
+    ).toMatchObject({ ok: true })
+    expect(memory.turn).toMatchObject({ playerId: "cy", number: 2 })
+    expect(memory.events.get("turn-pass-ada-0001")).toMatchObject({ toPlayerId: "cy" })
+  })
 })
 
 describe("engine parity: counter undo", () => {
