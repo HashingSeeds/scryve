@@ -27,7 +27,12 @@ const loggedAction = ({ kind, actionIdentity }: GameEventRecord): TableAction | 
     : (JSON.parse(actionIdentity) as TableAction)
 
 export function connectedLogEvent(event: GameEventRecord, viewer: string): ConnectedLogEvent {
-  const action = loggedAction(event)
+  const sent = loggedAction(event)
+  // why: the authority hands a pass to the next seat still in, which can differ from the seat the device named, and records the one it chose.
+  const action =
+    sent?.kind === "turn.passed" && event.toPlayerId !== undefined
+      ? { ...sent, toPlayerId: event.toPlayerId }
+      : sent
   return {
     operationId: event.operationId,
     playerId: event.playerId,

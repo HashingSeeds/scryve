@@ -12,6 +12,7 @@ import {
   type GameWrite as MemoryWrite,
 } from "./lib/gameEngine"
 import { writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
+import { connectedLogEvent } from "./lib/gameLog"
 import { PLANAR_DECKS, SCHEME_DECKS } from "./lib/modeDecks"
 import { TABLE_VERSION, type TableAction } from "./lib/table"
 import { startModes } from "./lib/tableModes"
@@ -1019,6 +1020,38 @@ describe("memory engine: turn groups", () => {
     expect(memory.turn).toMatchObject({ playerId: "cy", number: 2 })
     expect(memory.events.get("turn-pass-ada-0001")).toMatchObject({ toPlayerId: "cy" })
   })
+
+  it("names the seat the authority passed to in the log, not the one the device named", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      turn: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-set-ada-0001" },
+      seats: new Map(
+        ["ada", "bo", "cy"].map((id) => [id, { ...seat(id), currentLife: id === "bo" ? 0 : 40 }]),
+      ),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    writeMemoryGame(
+      memory,
+      actor("ada"),
+      tableWrite("ada", "turn-pass-ada-0002", {
+        kind: "turn.passed",
+        playerId: "ada",
+        toPlayerId: "bo",
+      }),
+      CREATED_AT + 1_000,
+    )
+    const pass = memory.events.get("turn-pass-ada-0002")
+    expect(pass && connectedLogEvent(pass, "ada").action).toEqual({
+      kind: "turn.passed",
+      playerId: "ada",
+      toPlayerId: "cy",
+    })
+  })
 })
 
 describe("engine parity: counter undo", () => {
@@ -1051,6 +1084,46 @@ describe("engine parity: counter undo", () => {
     expect(log.find((event) => event.operationId === "poison-floor-tap-01")?.delta).toBeUndefined()
     expect(log.find((event) => event.operationId === "poison-tap-000001")?.delta).toBe(2)
     expect(log.find((event) => event.operationId === "life-wrong-undo-01")).toBeUndefined()
+  })
+
+  it("takes back what a clamped counter tap changed, not what the device asked for", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const poison = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "table",
+        action: { kind: "counter.changed", playerId: game.hostSeat, counterId: "poison", delta },
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", poison("poison-clamp-up-01", 1))
+    await game.write("host", poison("poison-clamp-down1", -3))
+    expect(
+      await game.write("host", poison("poison-clamp-undo1", 3, "poison-clamp-down1")),
+    ).toMatchObject({ ok: true })
+    await game.expectSameState()
+    const log = await game.log("host")
+    expect(log.find((event) => event.operationId === "poison-clamp-undo1")?.delta).toBe(1)
+  })
+
+  it("takes back what a clamped named counter tap changed, not what the device asked for", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const speed = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "table",
+        action: { kind: "customCounter.changed", playerId: game.hostSeat, name: "Speed", delta },
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", speed("speed-clamp-up-001", 1))
+    await game.write("host", speed("speed-clamp-down01", -3))
+    expect(
+      await game.write("host", speed("speed-clamp-undo01", 3, "speed-clamp-down01")),
+    ).toMatchObject({ ok: true })
+    await game.expectSameState()
+    const log = await game.log("host")
+    expect(log.find((event) => event.operationId === "speed-clamp-undo01")?.delta).toBe(1)
   })
 })
 
