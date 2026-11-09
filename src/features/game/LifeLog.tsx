@@ -108,7 +108,7 @@ export function gameLog(
     for (const id of turnGroupOf(teams, change.playerId)) totals.set(id, life - change.delta)
     const key = `${change.playerId}\u0000${change.fromPlayerId ?? ""}`
     const burst = bursts.get(key)
-    if (burst && burst.oldestAt - event.clientCreatedAt <= LIFE_BURST_MS) {
+    if (burst && Math.abs(burst.oldestAt - event.clientCreatedAt) <= LIFE_BURST_MS) {
       burst.row.delta += change.delta
       burst.row.id = event.operationId
       burst.row.operationIds.push(event.operationId)
@@ -141,7 +141,7 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
   for (const { operationId, ...entry } of [...entries].reverse()) {
     const key = `${entry.playerId}\u0000${entry.counterId}`
     const burst = bursts.get(key)
-    if (burst && burst.oldestAt - entry.at <= LIFE_BURST_MS) {
+    if (burst && Math.abs(burst.oldestAt - entry.at) <= LIFE_BURST_MS) {
       burst.row.delta += entry.delta
       burst.row.operationIds.push(operationId)
       burst.oldestAt = entry.at
