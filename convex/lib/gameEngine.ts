@@ -216,6 +216,8 @@ export interface GameStore {
   readonly game: EngineGame
   seat(id: string): Read<EngineSeat | undefined>
   event(operationId: string): Read<GameEventRecord | undefined>
+  /** why: a change may be taken back once, so an undo checks no other undo already names it. */
+  undoneBy(operationId: string): Read<GameEventRecord | undefined>
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
@@ -398,8 +400,9 @@ export function changeLife(
   seat: EngineSeat,
   request: LifeChangeRequest & { operationId: string; undoOf?: string },
   now: number,
+  applying = request.delta,
 ) {
-  const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, request.delta)
+  const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, applying)
   const changes: GameChange[] = [
     {
       kind: "event.insert",
@@ -439,15 +442,20 @@ function* writeLife(
   if (retry === "duplicate")
     return acknowledged({ operationId, deduplicated: true, currentLife: seat.currentLife })
   if (retry !== "new") return failed(retry)
+  let applying = request.delta
   if (write.undoOf !== undefined) {
     const undone = yield* read(store.event(write.undoOf))
     if (!isOwnChange(undone, { ...request, kind: "life.changed" }))
       return failed(writeError("invalid_undo", "Only your own life change can be taken back"))
+    if (yield* read(store.undoneBy(write.undoOf)))
+      return failed(writeError("invalid_undo", "This change was already taken back"))
+    // why: a queued change can land clamped, so its undo reverses what the authority applied, not what the device asked for.
+    applying = -(undone?.delta ?? 0)
   }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
-  const { currentLife, changes } = changeLife(store.game, seat, request, now)
+  const { currentLife, changes } = changeLife(store.game, seat, request, now, applying)
   yield* read(store.apply(changes))
   return acknowledged({ operationId, deduplicated: false, currentLife })
 }
@@ -664,6 +672,8 @@ function* writeTable(
     const undone = yield* read(store.event(write.undoOf))
     if (!isOwnChange(undone, { kind: action.kind, playerId: seat.id, actorUserId: actor.userId }))
       return failed(writeError("invalid_undo", "Only your own change can be taken back"))
+    if (yield* read(store.undoneBy(write.undoOf)))
+      return failed(writeError("invalid_undo", "This change was already taken back"))
   }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)

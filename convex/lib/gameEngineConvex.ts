@@ -182,6 +182,13 @@ export async function writeCloudGame(
       return seat?.gameId === game._id ? { ...seat, id: seat._id } : undefined
     },
     event: async (operationId) => (await eventDoc(operationId)) ?? undefined,
+    undoneBy: async (operationId) =>
+      (await ctx.db
+        .query("gameEvents")
+        .withIndex("by_game_and_undo_of", (q) =>
+          q.eq("gameId", game._id).eq("undoOfOperationId", operationId),
+        )
+        .first()) ?? undefined,
     claim: async (operationId) => (await claimDoc(operationId)) ?? undefined,
     pendingClaims: () =>
       ctx.db

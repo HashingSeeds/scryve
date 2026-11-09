@@ -391,6 +391,49 @@ describe("engine parity: life undo", () => {
     expect(original).toMatchObject({ operationId: "life-undo-original-1", mine: true })
     expect((await game.log("joiner")).some((event) => event.mine)).toBe(false)
   })
+
+  it("reverses what the authority applied, not what the device asked for", async () => {
+    const game = await parityGame(makeConvexTest(), {
+      system: "ygo",
+      format: "advanced",
+      startingLife: 8000,
+    })
+    const life = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "life",
+        playerId: game.hostSeat,
+        delta,
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    expect(await game.write("host", life("life-clamp-change-1", -9000))).toMatchObject({
+      ack: { currentLife: 0 },
+    })
+    expect(
+      await game.write("host", life("life-clamp-undo-001", 9000, "life-clamp-change-1")),
+    ).toMatchObject({ ok: true, ack: { currentLife: 8000 } })
+    await game.expectSameState()
+  })
+
+  it("takes a change back only once", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const life = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "life",
+        playerId: game.hostSeat,
+        delta,
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", life("life-once-change-01", -3))
+    await game.write("host", life("life-once-undo-0001", 3, "life-once-change-01"))
+    expect(
+      await game.write("host", life("life-once-undo-0002", 3, "life-once-change-01")),
+    ).toMatchObject({ ok: false, error: { code: "invalid_undo" } })
+    await game.expectSameState()
+  })
 })
 
 describe("engine parity: tableAction", () => {
