@@ -517,7 +517,7 @@ export function CurrentGameScreen({
           turns={
             turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
           }
-          seam={modeSeamFor(boardModes, { dieOnChip, slotOf })}
+          seam={modeSeamFor(boardModes, { dieOnChip, slotOf, teamBinding })}
           toast={
             saved ? (
               <GameToast

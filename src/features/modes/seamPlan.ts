@@ -27,6 +27,14 @@ export interface SeamGeometry {
   width: number
   menuSize: number
   edge: number
+  /** why: a Two-Headed Giant team's link rivet can sit on this seam; `dy` is its center's offset from the seam. */
+  rivets?: readonly SeamRivet[]
+}
+
+export interface SeamRivet {
+  x: number
+  dy: number
+  size: number
 }
 
 const across = (facing: number | undefined) => facing === 0 || facing === 180
@@ -70,7 +78,12 @@ export function seamRoom(
   ): SeamRoom | undefined => {
     const run = (limit - start) * direction
     const inActiveCard = host !== undefined && busySlots.has(host.slot)
-    return run > 0 ? { width: run, shift, rotation, start, direction, inActiveCard } : undefined
+    return run > 0
+      ? clearOfRivets(
+          { width: run, shift, rotation, start, direction, inActiveCard },
+          geometry.rivets ?? [],
+        )
+      : undefined
   }
   const outer = (neighbor: SeamNeighbor) =>
     (side === "left" ? neighbor.leftFraction : neighbor.rightFraction) * width - direction * edge
@@ -99,6 +112,37 @@ export function seamRoom(
   // why: an across neighbor the plate can't use holds its chip at the seam, so the plate moves wholly into the sideways card.
   const shift = sideways.length === 2 ? 0 : sideways[0] === upper ? -inCard : inCard
   return room(limit, shift, 0)
+}
+
+/**
+ * why: a 2HG team's link rivet sits on the seam between a head's + and the pentagon, right where
+ * plates go. A plate inside one card moves further into it, past the rivet; a plate straddling
+ * the seam keeps the longer run on either side of it.
+ */
+function clearOfRivets(room: SeamRoom, rivets: readonly SeamRivet[]): SeamRoom | undefined {
+  let clear = room
+  for (const { x, dy, size } of rivets) {
+    const reach = size / 2 + GAP
+    const end = clear.start + clear.direction * clear.width
+    const touchesRun =
+      x + reach > Math.min(clear.start, end) && x - reach < Math.max(clear.start, end)
+    if (!touchesRun || Math.abs(clear.shift - dy) >= PLATE_HEIGHT / 2 + reach) continue
+    if (clear.shift !== 0) {
+      clear = {
+        ...clear,
+        shift:
+          dy + (Math.sign(clear.shift - dy) || Math.sign(clear.shift)) * (PLATE_HEIGHT / 2 + reach),
+      }
+      continue
+    }
+    const before = (x - clear.direction * reach - clear.start) * clear.direction
+    const after = clear.width - (x + clear.direction * reach - clear.start) * clear.direction
+    clear =
+      before >= after
+        ? { ...clear, width: before }
+        : { ...clear, start: x + clear.direction * reach, width: after }
+  }
+  return clear.width > 0 ? clear : undefined
 }
 
 // why: "Scheme due" has to be read, so it never shrinks to art the way a revealed scheme does.

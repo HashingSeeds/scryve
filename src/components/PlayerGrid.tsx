@@ -66,6 +66,7 @@ import {
   menuPlacementAt,
   panelBoxes,
   seamEdge,
+  teamPanelCompact,
   teamSeatRows,
   teamSplit,
 } from "./teamGridGeometry"
@@ -313,8 +314,7 @@ export function PlayerGrid({
     layout,
     gap: spacing.xxs,
   })
-  // why: a team panel's heads are as small as the cards of a game with that many seats.
-  const compact = layout.compact || (!!teams && players.length >= 5)
+  const compact = teams ? teamPanelCompact(layout, teams.length) : layout.compact
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const sidewaysGlyphReserve =
     2 * ((compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)

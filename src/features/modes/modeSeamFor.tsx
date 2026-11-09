@@ -1,4 +1,5 @@
 import { ModeSeam } from "@/components/modes/ModeSeam"
+import type { TeamBinding } from "@/components/TeamPanelLayer"
 import type { BoardSeamGeometry } from "@/features/game/GameBoardStage"
 
 import { chipCrowdedBySeam, planSeam, seamRoom, type SeamItem } from "./seamPlan"
@@ -10,7 +11,15 @@ const EDGE_WITH_TABS = 40
 
 export function modeSeamFor(
   modes: BoardModes,
-  { dieOnChip, slotOf }: { dieOnChip: boolean; slotOf: (playerId: string) => number | undefined },
+  {
+    dieOnChip,
+    slotOf,
+    teamBinding,
+  }: {
+    dieOnChip: boolean
+    slotOf: (playerId: string) => number | undefined
+    teamBinding?: TeamBinding
+  },
 ) {
   const { planar, scheme } = modes
   if (!planar && !scheme) return undefined
@@ -21,6 +30,7 @@ export function modeSeamFor(
     sides,
     width,
     menuSize,
+    rivets,
   }: BoardSeamGeometry) {
     const busySlots = new Set(
       modes.activeGroup.flatMap((playerId) => {
@@ -35,6 +45,8 @@ export function modeSeamFor(
       width,
       menuSize,
       edge: edgeTabs ? EDGE_WITH_TABS : EDGE,
+      // why: the frame binding on trial draws no rivet.
+      rivets: teamBinding === "frame" ? [] : rivets,
     }
     const crowded = chipCrowdedBySeam(geometry, busySlots)
     const items: SeamItem[] = [

@@ -6,7 +6,12 @@ import type {
   LifeCardMenuCorner,
   LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { getPlayerGridLayout } from "./playerGridGeometry"
+import {
+  getPlayerGridLayout,
+  getPlayerGridRowFlex,
+  getPlayerGridRows,
+  getPlayerSlotFacings,
+} from "./playerGridGeometry"
 
 type GridLayout = ReturnType<typeof getPlayerGridLayout>
 
@@ -131,4 +136,74 @@ export function teamSeatRows(
     }
   })
   return { rows: seated, flexes }
+}
+
+/** why: a team panel's heads are as small as the cards of a game with that many seats, so three teams or more draw compact. */
+export const teamPanelCompact = (layout: GridLayout, teamCount: number) =>
+  layout.compact || teamCount >= 3
+
+const MENU_CLEARANCE = 48
+const TOWARD_CENTER: Record<LifeCardContentRotation, { x: number; y: number }> = {
+  0: { x: 0, y: -1 },
+  180: { x: 0, y: 1 },
+  90: { x: 1, y: 0 },
+  [-90]: { x: -1, y: 0 },
+}
+
+export interface TeamRivet {
+  x: number
+  y: number
+  size: number
+}
+
+/**
+ * why: the seam's middle sits between one head's + and the other's −, so the link rivet moves
+ * toward the table's center, off their line, and further on a narrow head whose total fills the
+ * card; it stops short of the menu. Returns its center's offset from the panel's center.
+ */
+export function teamRivet(
+  panel: { width: number; height: number },
+  rotation: LifeCardContentRotation,
+  compact: boolean | undefined,
+  menuAtSeam: boolean,
+): TeamRivet {
+  const size = compact ? 24 : 28
+  const sideways = Math.abs(rotation) === 90
+  const depth = sideways ? panel.width : panel.height
+  const headRun = (sideways ? panel.height : panel.width) / 2
+  const wanted = depth * (headRun < depth ? 0.25 : 0.2)
+  const shift = Math.max(
+    0,
+    menuAtSeam ? Math.min(wanted, depth / 2 - MENU_CLEARANCE - size / 2) : wanted,
+  )
+  const toward = TOWARD_CENTER[rotation]
+  return { x: toward.x * shift, y: toward.y * shift, size }
+}
+
+/** why: Planechase and Archenemy plates on the menu's seam keep clear of each team's rivet, so they need it where the grid draws it, in board points. */
+export function teamRivets(
+  teamCount: number,
+  layout: GridLayout,
+  board: { width: number; height: number },
+  anchor: { x: number; y: number },
+): TeamRivet[] {
+  const rows = getPlayerGridRows(teamCount, layout)
+  const facings = getPlayerSlotFacings(teamCount, layout)
+  const boxes = panelBoxes(
+    rows,
+    rows.map((row) => getPlayerGridRowFlex(row, layout)),
+  )
+  return [...boxes].map(([slot, box]) => {
+    const offset = teamRivet(
+      { width: (box.x1 - box.x0) * board.width, height: (box.y1 - box.y0) * board.height },
+      facings[slot],
+      teamPanelCompact(layout, teamCount),
+      menuPlacementAt(box, anchor).edgeCenter !== undefined,
+    )
+    return {
+      x: ((box.x0 + box.x1) / 2) * board.width + offset.x,
+      y: ((box.y0 + box.y1) / 2) * board.height + offset.y,
+      size: offset.size,
+    }
+  })
 }

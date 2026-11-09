@@ -385,7 +385,7 @@ function dieWidth(slot: SeamSlot) {
 
 function slotPlacement(room: SeamSlot["room"]): ViewStyle {
   return {
-    top: room.shift - PLATE_HEIGHT / 2,
+    top: SEAM_BAND / 2 + room.shift - PLATE_HEIGHT / 2,
     width: room.width,
     left: room.direction === 1 ? room.start : room.start - room.width,
     justifyContent: (room.direction === 1) === (room.rotation === 0) ? "flex-start" : "flex-end",
@@ -393,11 +393,15 @@ function slotPlacement(room: SeamSlot["room"]): ViewStyle {
   }
 }
 
+/** why: iOS leaves a plate drawn outside its parent's frame out of the accessibility tree, so the seam is a band tall enough to hold every plate, not a line. */
+const SEAM_BAND = 4 * PLATE_HEIGHT
+
 const $seam: ViewStyle = {
   position: "absolute",
   left: 0,
   right: 0,
-  height: 0,
+  height: SEAM_BAND,
+  marginTop: -SEAM_BAND / 2,
   zIndex: 60,
   elevation: 60,
 }

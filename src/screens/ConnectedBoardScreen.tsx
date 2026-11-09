@@ -1187,6 +1187,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             const slot = players.findIndex(({ id }) => id === playerId)
             return slot < 0 ? undefined : slot
           },
+          teamBinding,
         })}
         toast={
           turnToast ? (
