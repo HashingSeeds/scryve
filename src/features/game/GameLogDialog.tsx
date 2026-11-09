@@ -10,6 +10,7 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { relativeTime } from "@/features/connected/connectedCopy"
 import { translate } from "@/i18n/translate"
@@ -133,7 +134,8 @@ export function GameLogDialog({
           data={rows}
           keyExtractor={({ id }) => id}
           renderItem={renderRow}
-          style={$list}
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed($sheetScrollContent)}
         />
       )}
       <View style={themed($dialogActions)}>
@@ -157,7 +159,6 @@ function signed(delta: number) {
 
 const MARK = 32
 const SOURCE_MARK = 18
-const $list: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

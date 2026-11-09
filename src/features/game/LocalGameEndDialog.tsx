@@ -7,6 +7,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, type DialogOrigin } from "@/components/DialogCard"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { lastPlayerStanding } from "@/features/game/domain"
 import { counterValueLabel } from "@/features/game/playSystems"
@@ -78,7 +79,10 @@ export function LocalGameEndDialog({
         <Text tx="board:endGame.title" preset="subheading" />
         <Text tx="board:endGame.subtitle" size="xs" tone="dim" />
       </View>
-      <ScrollView style={$resultScroll} contentContainerStyle={themed($resultChoices)}>
+      <ScrollView
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $resultChoices])}
+      >
         {game.players.map((player, seat) => {
           const selected = winnerPlayerIds.includes(player.id)
           return (
@@ -142,7 +146,6 @@ export function LocalGameEndDialog({
 }
 
 const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $resultScroll: ViewStyle = { flexGrow: 0, flexShrink: 1 }
 const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $wideAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   minHeight: 48,
