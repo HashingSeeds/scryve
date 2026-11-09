@@ -36,6 +36,7 @@ export function GameLogDialog({
   undoLabel = translate("board:log.undoLast"),
   origin,
   onMore,
+  positionOf,
   onUndo,
   onClose,
 }: {
@@ -51,6 +52,8 @@ export function GameLogDialog({
   origin?: DialogOrigin
   /** why: a connected game's log arrives a page at a time. */
   onMore?: () => void
+  /** why: a connected log places rows under turns by the authority's order, not device clocks. */
+  positionOf?: (operationId: string) => number | undefined
   onUndo: () => void
   onClose: () => void
 }) {
@@ -64,10 +67,12 @@ export function GameLogDialog({
         mergedLog(
           gameLog(players, events, sharedLife ? groups : undefined),
           counterLog(counters ?? []),
+          positionOf,
         ),
         turns ?? [],
+        positionOf,
       ),
-    [players, events, turns, groups, sharedLife, counters],
+    [players, events, turns, groups, sharedLife, counters, positionOf],
   )
   // why: a page can hold only changes the log hides, such as a change with its undo or passes with turns hidden, which leaves no new row to scroll to, so the log reads on by itself.
   const shownRows = useRef<number | undefined>(undefined)

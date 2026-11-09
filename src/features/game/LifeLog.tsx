@@ -161,11 +161,14 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
 
 type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
 
+/** why: newest first; a connected log passes `positionOf` so device clocks that drift apart don't reorder life and counter rows. */
 export function mergedLog(
   life: readonly GameLogRow[],
   counters: readonly GameCounterRow[],
+  positionOf?: (operationId: string) => number | undefined,
 ): GameLogChange[] {
-  return [...life, ...counters].sort((left, right) => right.at - left.at)
+  const placeOf = (row: GameLogChange) => (positionOf ? rowPosition(row, positionOf) : row.at)
+  return [...life, ...counters].sort((left, right) => placeOf(right) - placeOf(left))
 }
 
 type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & {
@@ -174,15 +177,31 @@ type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "a
 
 export type GameLogItem = GameLogChange | TurnDivider
 
+/** why: a connected log places a row by the newest change in it, where the authority recorded that change. */
+export const rowPosition = (
+  row: Pick<GameLogChange, "operationIds">,
+  positionOf: (operationId: string) => number | undefined,
+) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
+
+/**
+ * why: a local game has one clock, so rows go under a turn by time. A connected log passes
+ * `positionOf`, the authority's order, since device clocks drift apart; a turn whose start hasn't
+ * loaded yet heads every loaded row.
+ */
 export function withTurnDividers(
   rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],
+  positionOf?: (operationId: string) => number | undefined,
 ): GameLogItem[] {
+  const startOf = (turn: TurnLogEntry) =>
+    positionOf ? (positionOf(turn.operationId) ?? -Infinity) : turn.at
+  const placeOf = (row: GameLogChange) => (positionOf ? rowPosition(row, positionOf) : row.at)
   const items: GameLogItem[] = []
   let index = 0
   for (const turn of [...turns].reverse()) {
     const start = index
-    while (index < rows.length && rows[index].at >= turn.at) index += 1
+    const begins = startOf(turn)
+    while (index < rows.length && placeOf(rows[index]) >= begins) index += 1
     items.push({ kind: "turn", ...turn }, ...rows.slice(start, index))
   }
   return [...items, ...rows.slice(index)]
