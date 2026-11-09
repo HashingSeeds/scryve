@@ -665,6 +665,8 @@ describe("PlayerGrid", () => {
     [6, 951, 669, 2, 3],
     [5, 669, 951, 3, 2],
     [6, 669, 951, 3, 2],
+    [9, 951, 669, 6, 2],
+    [10, 951, 669, 6, 2],
   ])(
     "lays out %i players at %ix%i across a fold as %i columns by %i rows, an even count along the long side",
     (playerCount, width, height, columns, rows) => {
@@ -674,6 +676,19 @@ describe("PlayerGrid", () => {
       })
     },
   )
+
+  it("fills a big table's short last row with gaps across a fold so no card sits on the crease", () => {
+    const layout = getPlayerGridLayout({
+      playerCount: 9,
+      width: 951,
+      height: 669,
+      spansHinge: true,
+    })
+    expect(getPlayerGridRows(9, layout)).toEqual([
+      [0, 1, 2, 3, 4, 5],
+      [6, 7, 8, null, null, null],
+    ])
+  })
 
   it("supports featured and even arrangements without dropping a player", () => {
     const inputs = [
