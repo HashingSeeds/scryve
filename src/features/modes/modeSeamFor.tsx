@@ -13,10 +13,13 @@ export function modeSeamFor(
   modes: BoardModes,
   {
     dieOnChip,
+    turnChips,
     slotOf,
     teamBinding,
   }: {
     dieOnChip: boolean
+    /** why: with Turns off no chip carries "Scheme due", so the seam holds the archenemy's scheme control. */
+    turnChips: boolean
     slotOf: (playerId: string) => number | undefined
     teamBinding?: TeamBinding
   },
@@ -49,22 +52,32 @@ export function modeSeamFor(
       rivets: teamBinding === "frame" ? [] : rivets,
     }
     const crowded = chipCrowdedBySeam(geometry, busySlots)
+    const seamHoldsScheme = !turnChips && !!scheme?.mine
+    const schemeItem: SeamItem | undefined =
+      scheme?.due && scheme.mine && (crowded || !turnChips)
+        ? "schemeDue"
+        : scheme && (scheme.ongoing.length > 0 || scheme.shown || seamHoldsScheme)
+          ? "scheme"
+          : undefined
     const items: SeamItem[] = [
       ...(planar ? ["plane" as const] : []),
       ...(planar && (!dieOnChip || crowded) ? ["die" as const] : []),
-      ...(scheme?.due && scheme.mine && crowded
-        ? ["schemeDue" as const]
-        : scheme && (scheme.ongoing.length > 0 || scheme.shown)
-          ? ["scheme" as const]
-          : []),
+      ...(schemeItem ? [schemeItem] : []),
     ]
-    const plan = planSeam(
-      {
-        left: seamRoom(geometry, "left", busySlots),
-        right: seamRoom(geometry, "right", busySlots),
-      },
-      items,
-    )
+    const rooms = {
+      left: seamRoom(geometry, "left", busySlots),
+      right: seamRoom(geometry, "right", busySlots),
+    }
+    const planned = planSeam(rooms, items)
+    const placed = [planned.left, planned.right].some((slot) => slot?.items.includes("schemeDue"))
+    // why: a labeled "Scheme due" needs a full plate; where the seam can't fit one, the scheme icon opens the same reveal.
+    const plan =
+      schemeItem === "schemeDue" && !placed && seamHoldsScheme
+        ? planSeam(
+            rooms,
+            items.map((item) => (item === "schemeDue" ? "scheme" : item)),
+          )
+        : planned
     return (
       <ModeSeam
         anchorY={anchor.y}

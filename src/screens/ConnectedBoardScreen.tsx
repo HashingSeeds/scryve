@@ -1181,6 +1181,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         }
         seam={modeSeamFor(boardModes, {
           dieOnChip,
+          turnChips: turnsOn && !!turn,
           slotOf: (playerId) => {
             const slot = players.findIndex(({ id }) => id === playerId)
             return slot < 0 ? undefined : slot
