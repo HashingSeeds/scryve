@@ -28,6 +28,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
+import { concentricRadius, useBoardCornerRadii } from "./boardCorners"
 import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
@@ -72,6 +73,7 @@ import { TeamPanelLayer, type TeamBinding } from "./TeamPanelLayer"
 import { SeatSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
+import type { CornerRadii } from "../../modules/display-corners"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (playerId: PlayerId, commander?: CommanderSlot) => Record<PlayerId, number>
@@ -354,6 +356,7 @@ export function PlayerGrid({
     playerIndexOf.get(second) ?? 0,
   ])
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  const displayRadii = useBoardCornerRadii()
   const seated = teams
     ? teamSeatRows(rows, rowFlexes, rotationAt, (slot) => teamIndexes[slot])
     : {
@@ -618,7 +621,10 @@ export function PlayerGrid({
             menuCorner: menu.corner,
             menuEdgeCenter: menu.edgeCenter,
             lifeFontSizeFor: headLifeFontSizeFor(index, box),
-            style: headCornerStyle(screenEdges, seam, Platform.OS === "web" ? insets : undefined),
+            style: headCornerStyle(screenEdges, seam, Platform.OS === "web" ? insets : undefined, {
+              displayRadii,
+              topInset: topEdgeBand,
+            }),
           })}
         </View>
       )
@@ -653,6 +659,7 @@ export function PlayerGrid({
               },
               undefined,
               Platform.OS === "web" ? insets : undefined,
+              { displayRadii, topInset: topEdgeBand },
             )
           }
         />
@@ -721,6 +728,8 @@ export function PlayerGrid({
                 rowIndex,
                 columnIndex,
                 insets: Platform.OS === "web" ? insets : undefined,
+                displayRadii,
+                topInset: topEdgeBand,
               })
               return (
                 // why: keyed by seat, so a rematch's new player ids reuse the card; remounting every seat each game kept the old cards' native animation memory.
@@ -766,23 +775,35 @@ interface SeatPlace {
   style?: ViewStyle
 }
 
-/** why: the heads of a team panel meet with square corners so the panel reads as one card. */
-/** why: with no `seam`, this is the team panel's outer shape, so the turn frame around the team squares the same screen corners its heads do. */
+/**
+ * why: the heads of a team panel meet with square corners so the panel reads as one card. With no
+ * `seam`, this is the team panel's outer shape, so the turn frame around the team follows the
+ * same screen corners its heads do, at the display's radius where it reports one.
+ */
 function headCornerStyle(
   edges: Record<LifeCardEdge, boolean>,
   seam: LifeCardEdge | undefined,
   insets?: LifeCardContentInsets,
+  glass: { displayRadii?: CornerRadii | null; topInset?: number } = {},
 ): ViewStyle {
   const reaches = (edge: LifeCardEdge, side: LifeCardEdge) =>
     !insets || insets[edge] > 0 || insets[side] > 0
-  const square = (edge: "top" | "bottom", side: "left" | "right") =>
-    seam === edge || seam === side || (edges[edge] && edges[side] && reaches(edge, side))
-  return {
-    ...(square("top", "left") ? { borderTopLeftRadius: radius.none } : null),
-    ...(square("top", "right") ? { borderTopRightRadius: radius.none } : null),
-    ...(square("bottom", "left") ? { borderBottomLeftRadius: radius.none } : null),
-    ...(square("bottom", "right") ? { borderBottomRightRadius: radius.none } : null),
+  const corner = (edge: "top" | "bottom", side: "left" | "right", index: number) => {
+    if (seam === edge || seam === side) return radius.none
+    if (!(edges[edge] && edges[side] && reaches(edge, side))) return undefined
+    const inset = edge === "top" ? glass.topInset : 0
+    return concentricRadius(glass.displayRadii?.[index] ?? null, inset) ?? radius.none
   }
+  const radii = {
+    borderTopLeftRadius: corner("top", "left", 0),
+    borderTopRightRadius: corner("top", "right", 1),
+    borderBottomRightRadius: corner("bottom", "right", 2),
+    borderBottomLeftRadius: corner("bottom", "left", 3),
+  }
+  const style: ViewStyle = Object.fromEntries(
+    Object.entries(radii).filter(([, value]) => value !== undefined),
+  )
+  return glass.displayRadii ? { ...style, borderCurve: "continuous" } : style
 }
 
 export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
@@ -933,12 +954,19 @@ function seatTabCorners(
     )
 }
 
-/** why: on web, pass the insets. The page only reaches a rounded screen corner where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
+/**
+ * why: on web, pass the insets. The page only reaches a rounded screen corner where the browser
+ * reports an inset; a browser tab or a solid status bar strip reports none. A card corner that
+ * meets the screen's takes the display's radius from `displayRadii` (board corners, top left
+ * clockwise), so the card and its turn frame follow the glass; with no radius it stays square.
+ */
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
   columnIndex: number
   insets?: LifeCardContentInsets
+  displayRadii?: CornerRadii | null
+  topInset?: number
 }): ViewStyle | undefined {
   const reachesCorner = (edge: LifeCardEdge, side: LifeCardEdge) =>
     !input.insets || input.insets[edge] > 0 || input.insets[side] > 0
@@ -946,21 +974,25 @@ export function getScreenCornerSquaringStyle(input: {
   const touchesBottomEdge = input.rowIndex === input.rows.length - 1
   const touchesLeftEdge = input.columnIndex === 0
   const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
+  const glass = (corner: number, top: boolean) =>
+    concentricRadius(input.displayRadii?.[corner] ?? null, top ? input.topInset : 0) ?? radius.none
   const squared: ViewStyle = {
     ...(touchesTopEdge && touchesLeftEdge && reachesCorner("top", "left")
-      ? { borderTopLeftRadius: radius.none }
+      ? { borderTopLeftRadius: glass(0, true) }
       : null),
     ...(touchesTopEdge && touchesRightEdge && reachesCorner("top", "right")
-      ? { borderTopRightRadius: radius.none }
-      : null),
-    ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
-      ? { borderBottomLeftRadius: radius.none }
+      ? { borderTopRightRadius: glass(1, true) }
       : null),
     ...(touchesBottomEdge && touchesRightEdge && reachesCorner("bottom", "right")
-      ? { borderBottomRightRadius: radius.none }
+      ? { borderBottomRightRadius: glass(2, false) }
+      : null),
+    ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
+      ? { borderBottomLeftRadius: glass(3, false) }
       : null),
   }
-  return Object.keys(squared).length ? squared : undefined
+  if (!Object.keys(squared).length) return undefined
+  // why: Apple draws its displays with continuous corners, so a circular arc would lift off the glass.
+  return input.displayRadii ? { ...squared, borderCurve: "continuous" } : squared
 }
 
 const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
