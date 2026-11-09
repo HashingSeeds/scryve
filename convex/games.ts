@@ -1095,7 +1095,12 @@ export const claimSeat = mutation({
         candidate.userId === user._id &&
         (args.deviceId ? candidate.deviceId === args.deviceId : candidate.deviceId === undefined),
     )
-    if (duplicate) return { publicId: game.publicId, seat: duplicate.seat }
+    if (duplicate) {
+      // why: a player who updated Scryve reclaims their seat with the new limit, so the host can grow past six.
+      const { maxSeats }: { maxSeats?: number } = seatLimitOf(args.maxSeats)
+      if (duplicate.maxSeats !== maxSeats) await ctx.db.patch(duplicate._id, { maxSeats })
+      return { publicId: game.publicId, seat: duplicate.seat }
+    }
     const players = existingPlayers
     const occupied = new Set(players.map((player) => player.seat))
     let seat = 1

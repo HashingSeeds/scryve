@@ -164,6 +164,16 @@ describe("Convex connected-game authorization", () => {
     await expect(
       host.mutation(api.games.updateLobbySettings, { ...grow, playerCount: 6 }),
     ).resolves.toMatchObject({ playerCount: 6 })
+    // why: once that player updates Scryve and rejoins, their seat stops holding the table at six.
+    await old.mutation(api.games.claimSeat, {
+      token,
+      displayName: "Old",
+      color: "#2563EB",
+      maxSeats: 10,
+    })
+    await expect(host.mutation(api.games.updateLobbySettings, grow)).resolves.toMatchObject({
+      playerCount: 8,
+    })
   })
 
   it("claims separate seats for separate devices on the same signed-in account", async () => {
