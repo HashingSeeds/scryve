@@ -18,11 +18,14 @@ const NO_DEVICE = asDeviceId("")
 /**
  * why: this device's unsent changes show at once and give way to the authority's copy, matched by
  * operation id, so the log reads the same offline, on reconnect, and after a rejection drops one.
+ * Where anyone edits any seat, the authority confirms commander damage as it lands, so an unsent
+ * claim shows as that confirmation, under the id the authority gives it.
  */
 export function connectedLogEvents(
   confirmed: readonly ConnectedLogEvent[],
   pending: readonly PendingLifeAction[],
   gameId: string,
+  anyoneEdits = false,
 ): ConnectedLogEvent[] {
   const known = new Set(confirmed.map(({ operationId }) => operationId))
   const unsent = pending.flatMap(({ event }): ConnectedLogEvent[] => {
@@ -53,11 +56,26 @@ export function connectedLogEvents(
           mine: true,
         },
       ]
+    const confirmation = `${event.operationId}_confirmed`
+    if (event.type === "commanderDamage.submitted" && anyoneEdits && !known.has(confirmation))
+      return [
+        {
+          ...base,
+          operationId: confirmation,
+          kind: "commanderDamage.confirmed",
+          playerId: event.toPlayerId,
+          fromPlayerId: event.fromPlayerId,
+          delta: event.delta,
+          mine: true,
+        },
+      ]
     return []
   })
-  return [...confirmed, ...unsent].sort(
-    (left, right) => left.clientCreatedAt - right.clientCreatedAt,
-  )
+  // why: device clocks drift apart, so confirmed changes keep the authority's order and only this device's own unsent ones sort by when it made them.
+  return [
+    ...confirmed,
+    ...unsent.sort((left, right) => left.clientCreatedAt - right.clientCreatedAt),
+  ]
 }
 
 /** why: the local log's own builders draw the rows, so a connected game reads like a local one. */

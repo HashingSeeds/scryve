@@ -42,7 +42,7 @@ import {
   connectedStandingWinners,
   connectedLives,
   connectedOutState,
-  projectionOutState,
+  outPlayerIds,
   type ConnectedOutGame,
   type ConnectedBoardSeat,
   type ConnectedBoardView,
@@ -108,7 +108,6 @@ import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
 import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
-import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
 import { nextTurnSeat, sharesTurn, turnGroupOf } from "../../convex/lib/turns"
 
@@ -298,6 +297,7 @@ type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
 
 type ConnectedBoardReadyView = {
   game: ConnectedBoardView
+  out: readonly string[]
   syncSignal: BoardSyncSignal
   offlineSince?: number
   finishBlocker?: FinishBlocker
@@ -465,6 +465,7 @@ export function ConnectedBoardWithRuntime({
     runtime.status === "ready"
       ? {
           game: connectedBoardView(runtime.projection),
+          out: outPlayerIds(runtime.projection),
           syncSignal,
           offlineSince,
           finishBlocker:
@@ -1017,15 +1018,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const undoSeat =
     turn?.previous &&
     turnGroupOf(turnGroups, turn.previous.playerId).find((id) => controlled.has(id))
-  // why: lives stay out of this memoized board, so who is out is read from the runtime when asked.
   function nextPlayerId() {
-    const runtime = controls.current()
-    if (!turn || runtime.status !== "ready") return undefined
-    const outState = projectionOutState(runtime.projection)
+    if (!turn) return undefined
     return nextTurnSeat(
       turnSeats.map(({ playerId }) => playerId),
       turn.playerId,
-      (id) => outReason(outState, id) !== undefined,
+      (id) => view.out.includes(id),
       turnGroups,
     )
   }
@@ -1232,6 +1230,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           groups={turnGroups}
           counterTable={{ players: table?.table.players }}
           turnsShown={tabOn}
+          anyoneEdits={anySeat}
           origin={menuDialogOrigin}
           onUndoTurn={(playerId, operationId) => {
             table?.undoTurn(playerId, operationId)

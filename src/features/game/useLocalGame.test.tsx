@@ -9,7 +9,7 @@ import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { createLocalGame } from "./domain"
 import { LocalGameRepository } from "./localPersistence"
-import { pauseRoundClock, startRoundClock } from "./roundClock"
+import { callRoundTime, pauseRoundClock, startRoundClock } from "./roundClock"
 import type { LocalGame } from "./types"
 import { useLocalGame } from "./useLocalGame"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
@@ -31,6 +31,32 @@ function game() {
     ],
   })
 }
+
+describe("useLocalGame round clock", () => {
+  it("takes back the extra turn a pass counted when the log undoes that pass", () => {
+    const base = game()
+    const initial: LocalGame = {
+      ...base,
+      system: "mtg",
+      clock: callRoundTime(startRoundClock({ mode: "countdown", minutes: 50 }, 1), 2),
+    }
+    const { result } = renderHook(() =>
+      useLocalGame(initial, new LocalGameRepository(new MemoryStorage())),
+    )
+    const [ada, grace] = initial.players
+    act(() => {
+      result.current.setTurn(ada.id, ada.id)
+    })
+    act(() => {
+      result.current.passTurn(ada.id, grace.id)
+    })
+    expect(result.current.game.clock?.turn).toBe(1)
+
+    act(() => result.current.undo())
+    expect(result.current.game.turn?.playerId).toBe(ada.id)
+    expect(result.current.game.clock?.turn).toBe(0)
+  })
+})
 
 describe("useLocalGame persistence", () => {
   it("closes the first-player offer in the write that starts play, so clearing the change never reopens it", () => {
