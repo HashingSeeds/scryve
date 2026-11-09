@@ -21,6 +21,7 @@ import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
 import type { Turn, TurnGroups } from "../../../convex/lib/turns"
 
 export interface ConnectedLogFeedState {
+  /** why: oldest first, in the order the authority recorded them, which device clocks can't be trusted to give. */
   events: readonly ConnectedLogEvent[]
   more?: () => void
 }
@@ -57,8 +58,9 @@ const CloudLogPages: ConnectedLogFeed = ({ publicId, children }) => {
     { publicId },
     { initialNumItems: CONNECTED_EVENT_PAGE_MAX_ITEMS },
   )
+  const events = useMemo(() => [...results].reverse(), [results])
   return children({
-    events: results,
+    events,
     more: status === "CanLoadMore" ? () => loadMore(CONNECTED_EVENT_PAGE_MAX_ITEMS) : undefined,
   })
 }
@@ -74,6 +76,7 @@ export function ConnectedLogDialog({
   sharedLife,
   counterTable,
   turnsShown,
+  anyoneEdits,
   origin,
   onUndoTurn,
   onClose,
@@ -86,6 +89,7 @@ export function ConnectedLogDialog({
   sharedLife?: boolean
   counterTable?: CounterTable
   turnsShown: boolean
+  anyoneEdits?: boolean
   origin?: DialogOrigin
   onUndoTurn: (playerId: string, turnOperationId: string) => void
   onClose: () => void
@@ -102,6 +106,7 @@ export function ConnectedLogDialog({
           sharedLife={sharedLife}
           counterTable={counterTable}
           turnsShown={turnsShown}
+          anyoneEdits={anyoneEdits}
           origin={origin}
           onUndoTurn={onUndoTurn}
           onClose={onClose}
@@ -120,6 +125,7 @@ function ConnectedLog({
   sharedLife,
   counterTable,
   turnsShown,
+  anyoneEdits,
   origin,
   onUndoTurn,
   onClose,
@@ -132,8 +138,8 @@ function ConnectedLog({
     [lives, seats],
   )
   const events = useMemo(
-    () => connectedLogEvents(feed.events, pending, publicId),
-    [feed.events, pending, publicId],
+    () => connectedLogEvents(feed.events, pending, publicId, anyoneEdits),
+    [anyoneEdits, feed.events, pending, publicId],
   )
   const inputs = useMemo(
     () => connectedLogInputs(events, publicId, turn, counterTable),

@@ -5,7 +5,12 @@ import type {
   ConnectedPlayerProjection,
   ConnectedProjection,
 } from "./model"
-import { commanderOutState, standingWinners, type OutState } from "../../../convex/lib/outReason"
+import {
+  commanderOutState,
+  outReason,
+  standingWinners,
+  type OutState,
+} from "../../../convex/lib/outReason"
 import { teamTableRules, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
@@ -78,6 +83,14 @@ export function projectionOutState(projection: ConnectedProjection) {
   return connectedOutState(
     projection,
     projection.players.map(({ playerId, currentLife }) => ({ playerId, life: currentLife })),
+  )
+}
+
+/** why: who is out moves the next seat's frame, but lives stay out of the memoized board, so the board gets only this. */
+export function outPlayerIds(projection: ConnectedProjection): string[] {
+  const state = projectionOutState(projection)
+  return projection.players.flatMap(({ playerId }) =>
+    outReason(state, playerId) === undefined ? [] : [playerId],
   )
 }
 

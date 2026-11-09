@@ -27,7 +27,7 @@ import {
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import { newestLogUndo, undoLogRow } from "./logUndo"
 import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
-import type { RoundClock } from "./roundClock"
+import { roundClockAfterTurn, type RoundClock } from "./roundClock"
 import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
   CommanderSlot,
@@ -210,7 +210,14 @@ export function useLocalGame(
           const previous = gameRef.current
           const applied = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
           if (applied === previous) return false
-          const next = withFirstPlayerSettled(applied)
+          const next = withFirstPlayerSettled(
+            applied.clock
+              ? {
+                  ...applied,
+                  clock: roundClockAfterTurn(applied.clock, applied.system, action, operationId),
+                }
+              : applied,
+          )
           save(next)
           if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
             captureGame("game_started", { ...next, playerCount: next.players.length }, "local")

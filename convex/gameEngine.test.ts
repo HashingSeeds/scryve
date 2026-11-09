@@ -391,6 +391,49 @@ describe("engine parity: life undo", () => {
     expect(original).toMatchObject({ operationId: "life-undo-original-1", mine: true })
     expect((await game.log("joiner")).some((event) => event.mine)).toBe(false)
   })
+
+  it("reverses what the authority applied, not what the device asked for", async () => {
+    const game = await parityGame(makeConvexTest(), {
+      system: "ygo",
+      format: "advanced",
+      startingLife: 8000,
+    })
+    const life = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "life",
+        playerId: game.hostSeat,
+        delta,
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    expect(await game.write("host", life("life-clamp-change-1", -9000))).toMatchObject({
+      ack: { currentLife: 0 },
+    })
+    expect(
+      await game.write("host", life("life-clamp-undo-001", 9000, "life-clamp-change-1")),
+    ).toMatchObject({ ok: true, ack: { currentLife: 8000 } })
+    await game.expectSameState()
+  })
+
+  it("takes a change back only once", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const life = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "life",
+        playerId: game.hostSeat,
+        delta,
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", life("life-once-change-01", -3))
+    await game.write("host", life("life-once-undo-0001", 3, "life-once-change-01"))
+    expect(
+      await game.write("host", life("life-once-undo-0002", 3, "life-once-change-01")),
+    ).toMatchObject({ ok: false, error: { code: "invalid_undo" } })
+    await game.expectSameState()
+  })
 })
 
 describe("engine parity: tableAction", () => {
@@ -873,6 +916,74 @@ describe("memory engine: turn groups", () => {
       }),
     ).toMatchObject({ ok: true })
     expect(memory.turn).toMatchObject({ playerId: "ada", number: 1 })
+  })
+
+  it("lets no other seat claim, pass or take back a turn, even when anyone edits life", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      lifeEditing: "anyone",
+      seats: new Map(["ada", "bo"].map((id) => [id, seat(id)])),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const asBo = (operationId: string, action: TableAction) =>
+      writeMemoryGame(memory, actor("bo"), tableWrite("bo", operationId, action), CREATED_AT)
+
+    expect(
+      asBo("turn-claim-bo-0001", { kind: "turn.set", playerId: "ada", toPlayerId: "ada" }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+    memory.turn = { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-ada" }
+    expect(
+      asBo("turn-pass-bo-00001", { kind: "turn.passed", playerId: "ada", toPlayerId: "bo" }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+    memory.turn = {
+      playerId: "bo",
+      number: 2,
+      startedAt: CREATED_AT,
+      operationId: "turn-pass-ada",
+      previous: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-ada" },
+    }
+    expect(
+      asBo("turn-undo-bo-00001", {
+        kind: "turn.undone",
+        playerId: "ada",
+        turnOperationId: "turn-pass-ada",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+  })
+
+  it("passes past a seat that went out after the passer's board last drew it", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      turn: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-set-ada-0001" },
+      seats: new Map(
+        ["ada", "bo", "cy"].map((id) => [id, { ...seat(id), currentLife: id === "bo" ? 0 : 40 }]),
+      ),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    expect(
+      writeMemoryGame(
+        memory,
+        actor("ada"),
+        tableWrite("ada", "turn-pass-ada-0001", {
+          kind: "turn.passed",
+          playerId: "ada",
+          toPlayerId: "bo",
+        }),
+        CREATED_AT + 1_000,
+      ),
+    ).toMatchObject({ ok: true })
+    expect(memory.turn).toMatchObject({ playerId: "cy", number: 2 })
+    expect(memory.events.get("turn-pass-ada-0001")).toMatchObject({ toPlayerId: "cy" })
   })
 })
 

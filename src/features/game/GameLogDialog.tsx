@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, View } from "react-native"
 
@@ -69,6 +69,14 @@ export function GameLogDialog({
       ),
     [players, events, turns, groups, sharedLife, counters],
   )
+  // why: a page can hold only changes the log hides, such as a change with its undo or passes with turns hidden, which leaves no new row to scroll to, so the log reads on by itself.
+  const shownRows = useRef<number | undefined>(undefined)
+  const readOn = useEffectEvent(() => {
+    const before = shownRows.current
+    shownRows.current = rows.length
+    if (rows.length === 0 || rows.length === before) onMore?.()
+  })
+  useEffect(() => readOn(), [events, turns])
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
     () =>

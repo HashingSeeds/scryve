@@ -364,6 +364,7 @@ export type TableContext = {
   operationId: string
   lifeOf: (playerId: string) => number | undefined
   now?: number
+  nextTurnSeat?: (from: string) => string | undefined
 }
 
 export type TableChange = {
@@ -438,6 +439,7 @@ export function applyTableAction(
       now: context.now ?? Date.now(),
       isSeat: (playerId) => context.lifeOf(playerId) !== undefined,
       groups: table.turnGroups,
+      nextSeat: context.nextTurnSeat,
     })
     if (turn === null) return null
     if (turn === table.turn) return unchanged

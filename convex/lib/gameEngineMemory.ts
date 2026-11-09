@@ -62,9 +62,14 @@ const memoryStore = (game: MemoryGame): GameStore => ({
   game,
   seat: (id) => game.seats.get(id),
   event: (operationId) => game.events.get(operationId),
+  undoneBy: (operationId) =>
+    [...game.events.values()].find((event) => event.undoOfOperationId === operationId),
   claim: (operationId) => game.claims.get(operationId),
   pendingClaims: () => [...game.claims.values()].filter((claim) => claim.status === "pending"),
   pairTotal: (pair) => game.pairs.get(pairKey(pair))?.total ?? 0,
+  // why: a nearby host seats players in lobby order.
+  seats: () => [...game.seats.values()],
+  commanderTotals: () => commanderTotals(game),
   // why: a nearby host takes writes only from devices it seated.
   isMember: () => true,
   apply: (changes) => applyGameChanges(game, changes),
