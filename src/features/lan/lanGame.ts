@@ -894,8 +894,8 @@ export function mergeLanLog(
   const fresh = new Set(page.events.map(({ operationId }) => operationId))
   const kept = (current?.events ?? []).filter(({ operationId }) => !fresh.has(operationId))
   if (page.before !== undefined) return { events: [...page.events, ...kept], more: page.more }
-  return {
-    events: [...kept, ...page.events],
-    more: kept.length > 0 ? (current?.more ?? false) : page.more,
-  }
+  // why: a newest page that repeats nothing the guest holds left a gap behind it, so it starts the log over and pages back from itself.
+  const overlaps = kept.length < (current?.events.length ?? 0)
+  if (!overlaps || kept.length === 0) return { events: page.events, more: page.more }
+  return { events: [...kept, ...page.events], more: current?.more ?? false }
 }

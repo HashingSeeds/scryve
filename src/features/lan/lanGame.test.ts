@@ -23,6 +23,7 @@ import {
   type LanSetup,
 } from "./lanGame"
 import { encodeLine, MAX_LINE_BYTES } from "./lineReader"
+import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import type { ConnectedActionEvent } from "../connected/model"
 
 const NOW = 1_700_000_000_000
@@ -566,6 +567,26 @@ describe("nearby game log", () => {
       ],
     })
     expect(lanLog(next, "host").events.some((event) => event.mine)).toBe(false)
+  })
+
+  it("starts the log over from a newest page that repeats nothing the guest holds", () => {
+    const event = (index: number): ConnectedLogEvent => ({
+      operationId: `log-op-${String(index).padStart(4, "0")}`,
+      playerId: "guest",
+      kind: "life.changed",
+      delta: -1,
+      clientCreatedAt: index,
+    })
+    const range = (from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, offset) => event(from + offset))
+    const read = mergeLanLog(
+      { events: range(1, 200), more: false },
+      { events: range(401, 600), more: true },
+    )
+    expect(read.events.map(({ operationId }) => operationId)).toEqual(
+      range(401, 600).map(({ operationId }) => operationId),
+    )
+    expect(read.more).toBe(true)
   })
 
   it("sends the newest changes that fit one line, and older ones page in after", () => {
