@@ -832,6 +832,44 @@ describe("memory engine: turn groups", () => {
     expect(memory.turn).toMatchObject({ playerId: "ada", number: 1 })
   })
 
+  it("lets no other seat claim, pass or take back a turn, even when anyone edits life", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      lifeEditing: "anyone",
+      seats: new Map(["ada", "bo"].map((id) => [id, seat(id)])),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const asBo = (operationId: string, action: TableAction) =>
+      writeMemoryGame(memory, actor("bo"), tableWrite("bo", operationId, action), CREATED_AT)
+
+    expect(
+      asBo("turn-claim-bo-0001", { kind: "turn.set", playerId: "ada", toPlayerId: "ada" }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+    memory.turn = { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-ada" }
+    expect(
+      asBo("turn-pass-bo-00001", { kind: "turn.passed", playerId: "ada", toPlayerId: "bo" }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+    memory.turn = {
+      playerId: "bo",
+      number: 2,
+      startedAt: CREATED_AT,
+      operationId: "turn-pass-ada",
+      previous: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-ada" },
+    }
+    expect(
+      asBo("turn-undo-bo-00001", {
+        kind: "turn.undone",
+        playerId: "ada",
+        turnOperationId: "turn-pass-ada",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+  })
+
   it("passes past a seat that went out after the passer's board last drew it", () => {
     const memory: MemoryGame = {
       status: "active",

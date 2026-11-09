@@ -323,10 +323,12 @@ function* editableSeat(
   id: string,
   actor: SeatActor,
   message = "Seat-owner permission required",
+  anyoneMay = true,
 ) {
   const seat = yield* read(store.seat(id))
   if (seat && controlsSeat(seat, actor)) return seat
-  if (seat && store.game.lifeEditing === "anyone" && (yield* read(store.isMember()))) return seat
+  if (seat && anyoneMay && store.game.lifeEditing === "anyone" && (yield* read(store.isMember())))
+    return seat
   return writeError("seat_owner_required", message)
 }
 
@@ -606,7 +608,8 @@ function* writeTable(
   now: number,
 ): GameSteps<GameWriteResult> {
   const action = gatedTableAction(write.action)
-  const seat = yield* editableSeat(store, action.playerId, actor)
+  // why: "anyone edits" lets the table fix each other's counts, not claim, pass or take back another seat's turn.
+  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request = {
