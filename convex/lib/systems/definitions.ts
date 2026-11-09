@@ -108,6 +108,8 @@ export type TableCounterDefinition = {
   readonly max: number
   readonly losesAt?: number
   readonly commandZoneOnly?: boolean
+  /** why: a counter teammates share, such as Two-Headed Giant poison, moves on every seat of the team at once. */
+  readonly shared?: boolean
 }
 
 export type DesignationDefinition = { readonly id: string; readonly label: string }
@@ -118,6 +120,7 @@ export type TableDefinition = {
   readonly counters: readonly TableCounterDefinition[]
   readonly designations: readonly DesignationDefinition[]
   readonly pokemon?: PokemonBoardDefinition
+  readonly customCounters?: boolean
 }
 
 export type FirstPlayerDefinition = {
@@ -309,8 +312,9 @@ export const SYSTEMS = {
         { id: "monarch", label: "Monarch" },
         { id: "initiative", label: "Initiative" },
       ],
+      customCounters: true,
     },
-    variants: ["treachery", "archenemy"],
+    variants: ["treachery", "archenemy", "twoHeadedGiant"],
     planechase: true,
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },

@@ -46,6 +46,8 @@ export interface BoardChromeOptions {
     onChange: (layout: PlayerGridLayoutVariant) => void
     seats?: ReactNode
   }
+  /** why: a Two-Headed Giant board seats team panels, so the menu and tabs sit by the teams. */
+  teamCount?: number
   petals: readonly [BoardPetal, BoardPetal]
   attack: Pick<CommanderAttack, "dispatch">
   onDiceTool?: () => void
@@ -69,6 +71,7 @@ export function useBoardChrome({
   players,
   layout,
   petals: [third, end],
+  teamCount,
   attack: { dispatch },
   onDiceTool,
   onLog,
@@ -102,7 +105,7 @@ export function useBoardChrome({
     if (rules?.kind === "text") prefetchRules(rules)
   }, [rules])
   const hasRules = Boolean(rules && (rules.kind === "link" || onRules))
-  const playerCount = players.length
+  const playerCount = teamCount ?? players.length
   const canPickLayout = getPlayerGridLayoutOptions(playerCount).length > 1 || Boolean(layout.seats)
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
@@ -201,6 +204,7 @@ export function useBoardChrome({
     dialogOrigin,
     dice,
     playerCount,
+    teamBoard: teamCount !== undefined,
     layout,
     closeLayout,
     menu: {
@@ -233,7 +237,7 @@ function petal({ onPress: _onPress, ...shown }: BoardPetal) {
 
 export type GameBoardProps = Omit<
   GameBoardStageProps,
-  "playerCount" | "layoutVariant" | "menu" | "windowOverlay"
+  "playerCount" | "teamBoard" | "layoutVariant" | "menu" | "windowOverlay"
 > & { chrome: BoardChrome }
 
 export function GameBoard({ chrome, ...stage }: GameBoardProps) {
@@ -243,6 +247,7 @@ export function GameBoard({ chrome, ...stage }: GameBoardProps) {
       <GameBoardStage
         {...stage}
         playerCount={chrome.playerCount}
+        teamBoard={chrome.teamBoard}
         layoutVariant={layout.value}
         menu={chrome.menu}
         windowOverlay={navigation ? <FloatingAppNavigation {...navigation} /> : null}

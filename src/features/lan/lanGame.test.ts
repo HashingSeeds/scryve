@@ -5,6 +5,7 @@ import {
   endLanRound,
   LAN_PROTOCOL,
   lanLobbyOf,
+  lanLog,
   lanProjection,
   lanSeatsReady,
   parseGuestMessage,
@@ -16,6 +17,7 @@ import {
   setLanDeck,
   setLanPlayerCount,
   startLanRound,
+  swapLanSeats,
   type LanGame,
   type LanSeatPass,
   type LanSetup,
@@ -138,6 +140,43 @@ describe("nearby lobby", () => {
     expect(lanSeatsReady(full)).toBe(true)
     expect(lanSeatsReady(setLanConnected(full, "guest", false))).toBe(false)
     expect(releaseLanSeat(full, "guest").seats.map((seat) => seat.key)).toEqual(["host"])
+  })
+})
+
+describe("nearby Two-Headed Giant teams", () => {
+  const twoHeaded: LanSetup = { ...commander, playerCount: 4, variant: "twoHeadedGiant" }
+  const admit = (game: LanGame, key: string) => {
+    const admitted = admitLanGuest(
+      game,
+      tokens,
+      { ...join(key), variants: ["twoHeadedGiant"] },
+      { key, token: `token-${key}` },
+    )
+    if ("rejected" in admitted) throw new Error(admitted.rejected)
+    return admitted.game
+  }
+  const seatsOf = (game: LanGame) => game.seats.map(({ key, seat }) => [key, seat])
+
+  it("lets the host trade seats in the lobby, an open one too, and the next guest fills the gap", () => {
+    const traded = swapLanSeats(admit(lobby(twoHeaded), "bo"), 2, 3)
+    expect(seatsOf(traded)).toEqual([
+      ["host", 1],
+      ["bo", 3],
+    ])
+    const full = admit(admit(traded, "cy"), "dee")
+    expect(seatsOf(releaseLanSeat(full, "cy"))).toEqual([
+      ["host", 1],
+      ["bo", 3],
+      ["dee", 4],
+    ])
+    expect(startLanRound(full, NOW).memory?.turnGroups).toEqual([
+      ["host", "cy"],
+      ["bo", "dee"],
+    ])
+    expect(swapLanSeats(startLanRound(full, NOW), 1, 2).seats).toEqual(
+      startLanRound(full, NOW).seats,
+    )
+    expect(swapLanSeats(full, 1, 5)).toBe(full)
   })
 })
 
@@ -534,6 +573,37 @@ describe("nearby messages", () => {
       playerCount: 4,
     })
     expect(lanProjection(lobby(tabletop), "guest").layout).toBe("tabletop")
+  })
+})
+
+describe("nearby game log", () => {
+  it("sends each guest the log on request, marking only its own changes and undos", () => {
+    const tapped = write(started(), "guest", life("life-guest-tap-0001", "guest", -3)).next
+    const { next, result } = write(
+      tapped,
+      "guest",
+      op({
+        type: "life.changed",
+        operationId: "life-guest-undo-001",
+        playerId: "guest",
+        delta: 3,
+        compensatesOperationId: "life-guest-tap-0001",
+      }),
+    )
+    expect(result).toMatchObject({ ok: true })
+    expect(parseGuestMessage(JSON.stringify({ type: "log" }))).toEqual({ type: "log" })
+
+    const received = parseHostMessage(
+      JSON.stringify({ type: "log", events: lanLog(next, "guest") }),
+    )
+    expect(received).toMatchObject({
+      type: "log",
+      events: [
+        { operationId: "life-guest-tap-0001", delta: -3, mine: true },
+        { operationId: "life-guest-undo-001", undoOf: "life-guest-tap-0001", mine: true },
+      ],
+    })
+    expect(lanLog(next, "host").some((event) => event.mine)).toBe(false)
   })
 })
 

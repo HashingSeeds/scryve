@@ -2,6 +2,7 @@ import { createClientId } from "./domain"
 import type { TableRules } from "./playSystems"
 import {
   applyTableAction,
+  customCounterNameOf,
   pokemonBoardOf,
   type Coin,
   type PokemonCard,
@@ -104,7 +105,12 @@ export function createTableActions(
 
   return {
     adjustCounter: (playerId, counterId, delta) => {
-      run({ kind: "counter.changed", playerId, counterId, delta })
+      const name = customCounterNameOf(counterId)
+      run(
+        name === undefined
+          ? { kind: "counter.changed", playerId, counterId, delta }
+          : { kind: "customCounter.changed", playerId, name, delta },
+      )
     },
     takeDesignation: (playerId, designationId) => {
       run({ kind: "designation.taken", playerId, designationId })

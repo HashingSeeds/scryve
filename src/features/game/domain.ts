@@ -57,16 +57,20 @@ import {
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
 import {
   commanderOutState,
-  standingWinners,
   outReason,
+  standingWinners,
   type OutState,
 } from "../../../convex/lib/outReason"
 import { attachesDecks, flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
 import {
   applyTableAction,
+  customCounterId,
   EMPTY_TABLE,
+  findCustomCounter,
+  playerTableOf,
   tableHasState,
   type TableAction,
+  type TableState,
 } from "../../../convex/lib/table"
 import {
   applyModeAction,
@@ -83,9 +87,17 @@ import {
   applyTurnAction,
   isTurnAction,
   startedByChange,
+  turnGroupOf,
   turnLead,
   type Turn,
 } from "../../../convex/lib/turns"
+import {
+  isTwoHeadedGiantPlayerCount,
+  isValidTeams,
+  teamTableRules,
+  TWO_HEADED_GIANT,
+  TWO_HEADED_GIANT_SEATS_MESSAGE,
+} from "../../../convex/lib/twoHeadedGiant"
 
 export {
   isCommanderDamageDelta,
@@ -173,6 +185,7 @@ export function createLocalGame(input: {
   match?: { bestOf: MatchBestOf }
   clock?: RoundClockSetup
   modeSetup?: ModeSetup
+  teams?: readonly (readonly number[])[]
 }): LocalGame {
   const system = isPlaySystemId(input.system) ? input.system : undefined
   const format = system ? playSystemFormat(system, input.format) : undefined
@@ -195,6 +208,8 @@ export function createLocalGame(input: {
     throw new Error(validatedNames.errors.find(Boolean) ?? "Enter valid player names.")
   }
 
+  if (input.teams && !isTwoHeadedGiantPlayerCount(input.players.length))
+    throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
   const now = input.now ?? Date.now()
   const id = input.gameId ?? asGameId(createClientId("game", now))
   const created: GamePlayer[] = input.players.map((player, seat) => ({
@@ -230,7 +245,10 @@ export function createLocalGame(input: {
     id,
     status: "active",
     ...(system ? { system, format } : {}),
-    layout: playerGridLayoutForCount(input.players.length, input.layout),
+    layout: playerGridLayoutForCount(
+      input.teams ? input.teams.length : input.players.length,
+      input.layout,
+    ),
     ...(isSeatOrder(input.seatOrder, players.length) ? { seatOrder: input.seatOrder } : {}),
     lifeStep,
     startingLife: input.startingLife,
@@ -249,8 +267,24 @@ export function createLocalGame(input: {
     ...(started.archenemyId
       ? { firstPlayerId: asPlayerId(started.archenemyId), firstPlayerOffered: true as const }
       : {}),
+    ...teamsFor(players, input.teams),
   }
 }
+
+function teamsFor(players: readonly GamePlayer[], seats?: readonly (readonly number[])[]) {
+  if (!seats) return {}
+  const turnGroups = seats.map((team) => team.flatMap((seat) => players[seat]?.id ?? []))
+  if (!isValidTeams(turnGroups, new Set(players.map(({ id }) => id))))
+    throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
+  return { variant: TWO_HEADED_GIANT, turnGroups }
+}
+
+export const localTeams = (game: Pick<LocalGame, "variant" | "turnGroups">) =>
+  game.variant === TWO_HEADED_GIANT ? game.turnGroups : undefined
+
+/** why: CR 810.9, a team shares one life total, so a change to either head moves both. */
+const sharesLife = (game: LocalGame, playerId: PlayerId, other: PlayerId) =>
+  turnGroupOf(localTeams(game), playerId).includes(other)
 
 function newMatch(bestOf: MatchBestOf, seatCount: number, now: number): LocalGameMatch {
   return {
@@ -412,6 +446,7 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
     ...(game.match ? { match: { bestOf: game.match.bestOf } } : {}),
     ...(game.clock ? { clock: game.clock.setup } : {}),
     ...(game.modeSetup ? { modeSetup: rematchModeSetup(game, game.modeSetup) } : {}),
+    ...(localTeams(game) ? { teams: teamSeats(game) } : {}),
   })
 }
 
@@ -423,6 +458,11 @@ function rematchModeSetup(game: LocalGame, setup: ModeSetup): ModeSetup {
     ? { ...setup, archenemy: { ...setup.archenemy, seat: seat + 1 } }
     : setup
 }
+
+export const teamSeats = (game: Pick<LocalGame, "players" | "variant" | "turnGroups">) =>
+  (localTeams(game) ?? []).map((team) =>
+    team.map((playerId) => game.players.findIndex(({ id }) => id === playerId)),
+  )
 
 export const COMMANDER_SLOTS: readonly CommanderSlot[] = [undefined, PARTNER_COMMANDER]
 
@@ -461,6 +501,7 @@ export function incomingCommanderDamage(
 
 export function localOutState(game: LocalGame): OutState<PlayerId> {
   return {
+    ...(localTeams(game) ? { sharedFate: true as const } : {}),
     counter: playSystemRules(game.system).counter,
     tableRules: localTableRules(game),
     table: game.table,
@@ -472,6 +513,7 @@ export function localOutState(game: LocalGame): OutState<PlayerId> {
           COMMANDER_SLOTS.map((commander) => ({
             fromPlayerId: from.id,
             toPlayerId: to.id,
+            ...(commander ? { commander } : {}),
             total: commanderDamageBetween(game, from.id, to.id, commander),
           })),
         ),
@@ -485,8 +527,9 @@ export function localOutReason(game: LocalGame, playerId: PlayerId) {
   return outReason(localOutState(game), playerId)
 }
 
-export function localTableRules(game: Pick<LocalGame, "system" | "format">) {
-  return playTableRules(game.system, game.format)
+export function localTableRules(game: Pick<LocalGame, "system" | "format" | "variant">) {
+  const rules = playTableRules(game.system, game.format)
+  return game.variant === TWO_HEADED_GIANT ? teamTableRules(rules) : rules
 }
 
 const MAX_TURN_LOG = 400
@@ -595,12 +638,20 @@ function applyBoardTableAction(
   context: { operationId: string; now: number },
 ): LocalGame {
   const table = game.table ?? EMPTY_TABLE
-  const change = applyTableAction(table, action, {
+  // why: a shared counter reaches the teammate through the groups, which live on the game.
+  const teams = localTeams(game)
+  const change = applyTableAction(teams ? { ...table, turnGroups: teams } : table, action, {
     rules: localTableRules(game),
     operationId: context.operationId,
     lifeOf: (playerId) => game.players.find(({ id }) => id === playerId)?.life,
   })
-  if (!change || change.table === table) return game
+  if (
+    !change ||
+    (change.table.players === table.players && change.table.designations === table.designations)
+  )
+    return game
+  const counted = countedChange(table, change.table, action)
+  const { turnGroups: _groups, ...changed } = change.table
   const players = game.players.map((player) => {
     const delta = change.life
       .filter((life) => life.playerId === player.id)
@@ -609,10 +660,40 @@ function applyBoardTableAction(
   })
   return {
     ...game,
-    table: change.table,
+    table: changed,
     players,
+    ...(counted
+      ? {
+          counterLog: [
+            ...(game.counterLog ?? []),
+            {
+              ...counted,
+              operationId: context.operationId,
+              playerId: action.playerId as PlayerId,
+              at: context.now,
+            },
+          ].slice(-MAX_COUNTER_LOG),
+        }
+      : {}),
     updatedAt: Math.max(game.updatedAt, context.now),
   }
+}
+
+const MAX_COUNTER_LOG = 400
+
+function countedChange(before: TableState, after: TableState, action: TableAction) {
+  if (action.kind === "counter.changed") {
+    const was = playerTableOf(before, action.playerId).counters?.[action.counterId] ?? 0
+    const now = playerTableOf(after, action.playerId).counters?.[action.counterId] ?? 0
+    return { counterId: action.counterId, delta: now - was, value: now }
+  }
+  if (action.kind !== "customCounter.changed") return undefined
+  const was = findCustomCounter(playerTableOf(before, action.playerId), action.name)
+  const now = findCustomCounter(playerTableOf(after, action.playerId), action.name)
+  const name = now?.name ?? was?.name
+  if (!name) return undefined
+  const value = now?.value ?? 0
+  return { counterId: customCounterId(name), delta: value - (was?.value ?? 0), value }
 }
 
 export function localStandingWinners(game: LocalGame) {
@@ -662,8 +743,10 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
         return game
     }
 
-    const players = game.players.map((player, index) =>
-      index === playerIndex ? { ...player, life: player.life + event.delta } : player,
+    const players = game.players.map((player) =>
+      sharesLife(game, event.playerId, player.id)
+        ? { ...player, life: player.life + event.delta }
+        : player,
     )
     return {
       ...game,
@@ -701,8 +784,10 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
     const total = (game.commanderDamage?.[key] ?? 0) + event.delta
     if (total < 0 || total > MAX_COMMANDER_DAMAGE) return game
 
-    const players = game.players.map((player, index) =>
-      index === targetIndex ? { ...player, life: player.life - event.delta } : player,
+    const players = game.players.map((player) =>
+      sharesLife(game, event.toPlayerId, player.id)
+        ? { ...player, life: player.life - event.delta }
+        : player,
     )
     return {
       ...game,
@@ -790,7 +875,9 @@ export function commandToEvent(
       (event): event is CompensatableEvent =>
         isCompensatable(event) &&
         !event.compensatesOperationId &&
-        event.actorId === context.actorId &&
+        (command.operationId === undefined
+          ? event.actorId === context.actorId
+          : event.operationId === command.operationId) &&
         !compensated.has(event.operationId),
     )
     if (!target) return null

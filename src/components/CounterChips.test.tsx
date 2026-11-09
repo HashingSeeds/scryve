@@ -4,7 +4,7 @@ import { act, fireEvent, render, within } from "@testing-library/react-native"
 import { playTableRules } from "@/features/game/playSystems"
 import { ThemeProvider } from "@/theme/context"
 
-import { CounterChips, type CounterChipsProps, type SeatTable } from "./CounterChips"
+import { CounterChips, fitChips, type CounterChipsProps, type SeatTable } from "./CounterChips"
 import { LifeCard } from "./LifeCard"
 
 const commander = playTableRules("mtg", "commander")
@@ -249,19 +249,21 @@ describe("CounterChips", () => {
     expect(table.adjustCounter).not.toHaveBeenCalled()
   })
 
-  it("wraps a full row inside a narrow sideways six-player card instead of overflowing it", () => {
+  it("fits chips between the name and the bag, folding the rest into a +N that opens the bag", () => {
+    expect(fitChips([30, 30, 30], 94, 2, 24)).toEqual({ shown: 3, overflow: 0 })
+    expect(fitChips([30, 30, 30], 60, 2, 24)).toEqual({ shown: 1, overflow: 2 })
+    expect(fitChips([30], 20, 2, 24)).toEqual({ shown: 0, overflow: 0 })
+
     const view = chips(
       seat({ counters: { poison: 5, commanderTax: 4 }, held: ["monarch", "initiative"] }),
-      { compact: true, contentRotation: 90, cardSize: { width: 158, height: 154 } },
+      { compact: true, contentRotation: 90, cardSize: { width: 158, height: 154 }, nameEnd: 40 },
     )
-    const row = view.getByTestId("counter-chips-seat-1")
-    const rowStyle = StyleSheet.flatten(row.props.style)
-    const frameStyle = StyleSheet.flatten(
-      view.getByTestId("counter-chips-frame-seat-1").props.style,
-    )
-
-    expect(frameStyle.width).toBe(154)
-    expect(rowStyle).toMatchObject({ flexWrap: "wrap", left: 4, right: 4 })
+    const row = StyleSheet.flatten(view.getByTestId("counter-chips-seat-1").props.style)
+    expect(row).toMatchObject({ right: 16 + 32 + 2, bottom: 16, flexDirection: "row-reverse" })
+    expect(view.getByTestId("designation-chip-1-monarch")).toBeTruthy()
+    expect(view.queryByTestId("counter-chip-1-poison")).toBeNull()
+    fireEvent.press(view.getByLabelText("Seat 1, Ada, 3 more counters"))
+    expect(view.getByTestId("counter-sheet-seat-1")).toBeTruthy()
   })
 
   it("speaks every counter change and a newly taken designation, but not a lost one", () => {

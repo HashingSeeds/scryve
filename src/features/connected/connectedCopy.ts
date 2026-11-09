@@ -1,3 +1,4 @@
+import { gameTypeLabel } from "@/features/game/gameTypes"
 import { counterValueLabel, playFormatLabel, storedPlaySystem } from "@/features/game/playSystems"
 import { appLocale } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -73,6 +74,11 @@ export function lobbyDetail(
   variant?: string,
 ) {
   const resolvedSystem = storedPlaySystem(system)
+  if (variant === "twoHeadedGiant" && resolvedSystem)
+    return [
+      gameTypeLabel({ id: variant, system: resolvedSystem, format: format || ruleset, variant }),
+      counterValueLabel(resolvedSystem, startingLife),
+    ].join(" · ")
   return [
     counterValueLabel(resolvedSystem, startingLife),
     resolvedSystem ? playFormatLabel(resolvedSystem, format || ruleset) : undefined,

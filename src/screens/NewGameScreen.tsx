@@ -22,6 +22,7 @@ import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
 import { Sheet } from "@/components/Sheet"
 import { $sheetScroll } from "@/components/sheetStyles"
+import { TeamPicker } from "@/components/TeamPicker"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
@@ -41,6 +42,7 @@ import {
   matchContextLabel,
   MAX_PLAYER_NAME_LENGTH,
   meSeatOf,
+  teamSeats,
   PLAYER_COLORS,
   validatePlayerNames,
   validateStartingLife,
@@ -124,6 +126,13 @@ import {
 } from "../../convex/lib/systems"
 import { ARCHENEMY_MIN_SEATS, type ModeSetup } from "../../convex/lib/tableModes"
 import { isTreacheryPlayerCount, type GameVariant } from "../../convex/lib/treachery"
+import {
+  defaultTeamLife,
+  isTwoHeadedGiantPlayerCount,
+  isValidTeams,
+  pairedTeams,
+  teamLifePresets,
+} from "../../convex/lib/twoHeadedGiant"
 
 export type NewGameMode = "local" | "connected"
 
@@ -205,6 +214,8 @@ const NEW_GAME_FIELDS = [
   "playerCount",
   "layout",
   "treacheryChosen",
+  "teamsChosen",
+  "teams",
   "matchOn",
   "chosenBestOf",
   "clockMode",
@@ -330,10 +341,27 @@ function NewGameForm({
   const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
   const [archenemyChosen, setArchenemyChosen] = useState(lobby?.variant === "archenemy")
   const [modeChoices, setModeChoices] = useState(DEFAULT_MODE_CHOICES)
+  const [teamsChosen, setTeamsChosen] = useState(
+    lobby?.variant === "twoHeadedGiant" || seedGame?.variant === "twoHeadedGiant",
+  )
+  const [teamDraft, setTeamDraft] = useState<readonly (readonly number[])[]>(() =>
+    seedGame ? teamSeats(seedGame) : [],
+  )
   const [lifeStep, setLifeStep] = useState(
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
-  const lifeOptions = lifePresets(system, format)
+  const teamsAvailable = Boolean(systemDefinition(system)?.variants.includes("twoHeadedGiant"))
+  const twoHeadedGiant = teamsAvailable && teamsChosen
+  const seatIndexes = Array.from({ length: playerCount }, (_, index) => index)
+  const teams = !twoHeadedGiant
+    ? undefined
+    : isValidTeams(
+          teamDraft.map((team) => team.map(String)),
+          new Set(seatIndexes.map(String)),
+        )
+      ? teamDraft
+      : pairedTeams(seatIndexes)
+  const lifeOptions = twoHeadedGiant ? teamLifePresets(format) : lifePresets(system, format)
   const claimedGame = replaying ? undefined : initialGame
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
     claimedGame && (claimedGame.account || hasLocalGameStarted(claimedGame))
@@ -400,7 +428,9 @@ function NewGameForm({
     ? "treachery"
     : archenemy
       ? "archenemy"
-      : undefined
+      : twoHeadedGiant
+        ? "twoHeadedGiant"
+        : undefined
   const draft = {
     system,
     format,
@@ -410,6 +440,8 @@ function NewGameForm({
     chosenLayout,
     layout,
     treacheryChosen,
+    teamsChosen,
+    teams,
     deck,
     matchOn,
     chosenBestOf,
@@ -466,6 +498,7 @@ function NewGameForm({
     ...(system && format ? { system, format } : {}),
     ...(variant ? { variant } : {}),
     ...(modeSetup ? { modeSetup } : {}),
+    ...(teams && !connectedMode ? { teams } : {}),
   }
   const gameTabs = useMemo(
     () =>
@@ -742,18 +775,27 @@ function NewGameForm({
 
   function chooseGameType(type: GameType) {
     const nextTreachery = type.variant === "treachery"
+    const nextTeams = type.variant === "twoHeadedGiant"
     const nextCount =
-      nextTreachery && !isTreacheryPlayerCount(playerCount)
+      (nextTreachery && !isTreacheryPlayerCount(playerCount)) ||
+      (nextTeams && !isTwoHeadedGiantPlayerCount(playerCount))
         ? TREACHERY_MIN_SEATS
         : type.variant === "archenemy" && playerCount < ARCHENEMY_MIN_SEATS
           ? ARCHENEMY_MIN_SEATS
           : playerCount
+    const defaultLife = nextTeams
+      ? defaultTeamLife(type.format)
+      : defaultStartingLife(type.system, type.format, nextCount)
     if (type.system !== system) {
       setSystem(type.system)
-      setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
+      setStartingLife(defaultLife)
       setLifeStep(playSystemRules(type.system).counter.tapStep)
-    } else if (startingLife === defaultStartingLife(system, format, playerCount))
-      setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
+    } else if (
+      twoHeadedGiant !== nextTeams ||
+      startingLife === defaultStartingLife(system, format, playerCount) ||
+      (twoHeadedGiant && startingLife === defaultTeamLife(format))
+    )
+      setStartingLife(defaultLife)
     if (type.system !== system || type.format !== format) {
       pinningRef.current = undefined
       setPinning(false)
@@ -762,6 +804,7 @@ function NewGameForm({
     }
     setTreacheryChosen(nextTreachery)
     setArchenemyChosen(type.variant === "archenemy")
+    setTeamsChosen(nextTeams)
     setFormatPicked(true)
     if (nextCount !== playerCount) resizeSeats(nextCount)
   }
@@ -858,7 +901,7 @@ function NewGameForm({
 
   function choosePlayerCount(value: number) {
     if (!isTreacheryPlayerCount(value)) setTreacheryChosen(false)
-    if (startingLife === defaultStartingLife(system, format, playerCount))
+    if (!twoHeadedGiant && startingLife === defaultStartingLife(system, format, playerCount))
       setStartingLife(defaultStartingLife(system, format, value))
     resizeSeats(value)
   }
@@ -967,9 +1010,7 @@ function NewGameForm({
             detail={(type) =>
               gameTypeDetail(
                 type,
-                type.variant === "treachery"
-                  ? Math.max(playerCount, TREACHERY_MIN_SEATS)
-                  : playerCount,
+                type.variant ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount,
               )
             }
             onChoose={pickGameType}
@@ -993,7 +1034,9 @@ function NewGameForm({
                     ? (count) => !isTreacheryPlayerCount(count)
                     : archenemy
                       ? (count) => count < ARCHENEMY_MIN_SEATS
-                      : undefined
+                      : twoHeadedGiant
+                        ? (count) => !isTwoHeadedGiantPlayerCount(count)
+                        : undefined
                 }
                 onSelect={(value) => {
                   choosePlayerCount(value)
@@ -1003,7 +1046,9 @@ function NewGameForm({
               {lifeOptions.length > 0 ? (
                 <OptionGrid
                   testID="starting-counter"
-                  label={counterHeading(system)}
+                  label={
+                    twoHeadedGiant ? translate("play:newGame.teamLife") : counterHeading(system)
+                  }
                   options={lifeOptions}
                   value={startingLife}
                   custom={startingValueRange(system)}
@@ -1114,6 +1159,22 @@ function NewGameForm({
                   </View>
                 ))}
               </View>
+              {teams ? (
+                <TeamPicker
+                  players={players}
+                  teams={teams}
+                  onSwap={(first, second) => {
+                    setTeamDraft(
+                      teams.map((team) =>
+                        team.map((seat) =>
+                          seat === first ? second : seat === second ? first : seat,
+                        ),
+                      ),
+                    )
+                    setEdited(true)
+                  }}
+                />
+              ) : null}
               {account ? (
                 <View style={themed($accountSeat)}>
                   <SelectField

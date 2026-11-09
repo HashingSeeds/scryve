@@ -27,6 +27,8 @@ import { tableRules } from "./systems"
 import {
   applyTableAction,
   seatTable,
+  loggedCounterId,
+  loggedCounterValue,
   tableActionDelta,
   tableActionIdentity,
   tableRelatedSeatId,
@@ -35,7 +37,9 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
+import type { GameVariant } from "./treachery"
 import { isTurnAction, startedByChange, type Turn } from "./turns"
+import { teammatesOf, teamTableRules, TWO_HEADED_GIANT } from "./twoHeadedGiant"
 import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
@@ -73,6 +77,7 @@ export const engineGameOf = (
     | "turn"
     | "turnGroups"
     | "modes"
+    | "variant"
   >,
 ): EngineGame => ({
   status: game.status,
@@ -83,6 +88,7 @@ export const engineGameOf = (
   ...(game.turn ? { turn: game.turn } : {}),
   ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
   ...(game.modes ? { modes: game.modes } : {}),
+  ...(game.variant ? { variant: game.variant } : {}),
 })
 
 export interface EngineGame {
@@ -94,6 +100,7 @@ export interface EngineGame {
   turn?: Turn
   turnGroups?: TableState["turnGroups"]
   modes?: TableState["modes"]
+  variant?: GameVariant
 }
 
 export interface EngineSeat extends SeatOwner, PlayerTable {
@@ -147,6 +154,7 @@ export interface SeatPatch {
   lastEventAt?: number
   lastWrite?: SeatWrite
   counters?: PlayerTable["counters"]
+  customCounters?: PlayerTable["customCounters"]
   pokemon?: PlayerTable["pokemon"]
 }
 
@@ -180,8 +188,8 @@ export interface WriteRequest {
 export type ClaimDecision = "confirmed" | "declined"
 
 export type GameWrite =
-  | (WriteRequest & { kind: "life"; playerId: string; delta: number })
-  | (WriteRequest & { kind: "table"; action: TableAction })
+  | (WriteRequest & { kind: "life"; playerId: string; delta: number; undoOf?: string })
+  | (WriteRequest & { kind: "table"; action: TableAction; undoOf?: string })
   | (WriteRequest & {
       kind: "commander.claim"
       fromPlayerId: string
@@ -275,14 +283,17 @@ const checkActive = (game: Pick<EngineGame, "status">) =>
 export function rejectRequest(write: GameWrite): EngineError | null {
   if (write.kind === "life")
     return (
+      (write.undoOf === undefined ? null : checkOperationId(write.undoOf)) ??
       (isLifeDelta(write.delta)
         ? null
         : writeError(
             "invalid_life_delta",
             "Life delta must be a non-zero whole number from -999999 to 999999",
-          )) ?? checkWrite(write)
+          )) ??
+      checkWrite(write)
     )
-  if (write.kind === "table") return checkWrite(write)
+  if (write.kind === "table")
+    return (write.undoOf === undefined ? null : checkOperationId(write.undoOf)) ?? checkWrite(write)
   if (write.kind === "commander.claim")
     return (
       (isCommanderDamageDelta(write.delta)
@@ -347,10 +358,11 @@ export function* writeGame(
     deviceId: actor.deviceId,
     ...(isTapTime(write.tappedAt) ? { tappedAt: write.tappedAt } : {}),
   })
-  const stamped =
+  const turned =
     write.kind === "table" && isTurnAction(write.action)
       ? lastWrite
       : withTurnStarted(lastWrite, now)
+  const stamped = yield* withSharedTeam(turned)
   if (write.kind === "life") return yield* writeLife(stamped, actor, write, now)
   if (write.kind === "table") return yield* writeTable(stamped, actor, write, now)
   if (write.kind === "commander.claim") return yield* writeClaim(stamped, actor, write, now)
@@ -390,7 +402,7 @@ export function matchLifeRetry(
 export function changeLife(
   game: Pick<EngineGame, "system">,
   seat: EngineSeat,
-  request: LifeChangeRequest & { operationId: string },
+  request: LifeChangeRequest & { operationId: string; undoOf?: string },
   now: number,
 ) {
   const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, request.delta)
@@ -403,6 +415,7 @@ export function changeLife(
         kind: "life.changed",
         ...(delta === 0 ? {} : { delta }),
         ...(delta === request.delta ? {} : { actionIdentity: String(request.delta) }),
+        ...(request.undoOf === undefined ? {} : { undoOfOperationId: request.undoOf }),
         actorUserId: request.actorUserId,
         deviceId: request.deviceId,
         clientCreatedAt: request.clientCreatedAt,
@@ -432,12 +445,37 @@ function* writeLife(
   if (retry === "duplicate")
     return acknowledged({ operationId, deduplicated: true, currentLife: seat.currentLife })
   if (retry !== "new") return failed(retry)
+  if (write.undoOf !== undefined) {
+    const undone = yield* read(store.event(write.undoOf))
+    if (!isOwnChange(undone, { ...request, kind: "life.changed" }))
+      return failed(writeError("invalid_undo", "Only your own life change can be taken back"))
+  }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
   const { currentLife, changes } = changeLife(store.game, seat, request, now)
   yield* read(store.apply(changes))
   return acknowledged({ operationId, deduplicated: false, currentLife })
+}
+
+/** why: the game log hides a change and its undo together, so an undo may only name a standing change of the same kind the same account made on the same seat. */
+const isOwnChange = (
+  event: GameEventRecord | undefined,
+  request: { kind: string; playerId: string; actorUserId: string },
+) =>
+  event?.kind === request.kind &&
+  event.undoOfOperationId === undefined &&
+  event.playerId === request.playerId &&
+  event.actorUserId === request.actorUserId
+
+/** why: the log counts a counter back from its current value, so a tap the floor or cap absorbed records what it changed, not what was asked. */
+const appliedCounterDelta = (
+  before: PlayerTable | undefined,
+  after: PlayerTable | undefined,
+  counterId: string,
+) => {
+  const delta = loggedCounterValue(after, counterId) - loggedCounterValue(before, counterId)
+  return delta === 0 ? undefined : delta
 }
 
 function gatedCard<Card extends PokemonCard>(card: Card): Card {
@@ -479,6 +517,7 @@ export interface TableActionRequest extends WriteRequest {
   actorUserId: string
   action: TableAction
   actionIdentity: string
+  undoOf?: string
 }
 
 export function matchTableRetry(
@@ -535,7 +574,13 @@ export function changeTable(
       kind: "seat.patch",
       seatId: row.id,
       patch: {
-        ...(after === before ? {} : { counters: after?.counters, pokemon: after?.pokemon }),
+        ...(after === before
+          ? {}
+          : {
+              counters: after?.counters,
+              customCounters: after?.customCounters,
+              pokemon: after?.pokemon,
+            }),
         ...(lifeDelta === 0 ? {} : { currentLife: row.currentLife + lifeDelta }),
         ...(isActor ? { eventCount: (row.eventCount ?? 0) + 1 } : {}),
         lastEventAt: now,
@@ -549,7 +594,11 @@ export function changeTable(
     changes.push({ kind: "modes.set", modes: result.table.modes })
 
   const lifeChange = result.life[0]
-  const actionDelta = tableActionDelta(action)
+  const counterId = loggedCounterId(action)
+  const actionDelta =
+    counterId === undefined
+      ? tableActionDelta(action)
+      : appliedCounterDelta(table.players[actor.id], result.table.players[actor.id], counterId)
   changes.push({
     kind: "event.insert",
     event: {
@@ -566,7 +615,9 @@ export function changeTable(
             : { delta: actionDelta }),
       ...(action.kind === "pokemon.knockoutUndone"
         ? { undoOfOperationId: action.knockoutOperationId }
-        : {}),
+        : request.undoOf === undefined
+          ? {}
+          : { undoOfOperationId: request.undoOf }),
       actorUserId: request.actorUserId,
       deviceId: request.deviceId,
       clientCreatedAt: request.clientCreatedAt,
@@ -595,6 +646,11 @@ function* writeTable(
   const retry = matchTableRetry(yield* read(store.event(operationId)), seat.id, request)
   if (retry === "duplicate") return acknowledged({ operationId, deduplicated: true })
   if (retry !== "new") return failed(retry)
+  if (write.undoOf !== undefined) {
+    const undone = yield* read(store.event(write.undoOf))
+    if (!isOwnChange(undone, { kind: action.kind, playerId: seat.id, actorUserId: actor.userId }))
+      return failed(writeError("invalid_undo", "Only your own change can be taken back"))
+  }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
@@ -604,6 +660,73 @@ function* writeTable(
   if (isEngineError(outcome)) return failed(outcome)
   yield* read(store.apply(outcome.changes))
   return acknowledged({ operationId, deduplicated: false })
+}
+
+/**
+ * why: a Two-Headed Giant team shares one life total and its poison (CR 810.9, 810.10), so every
+ * seat patch that moves either one moves the teammate too. Each head keeps its own events, which
+ * is how the log says who made a change, and older projections still read a life per seat.
+ */
+function* withSharedTeam(store: GameStore): GameSteps<GameStore> {
+  const teams = store.game.variant === TWO_HEADED_GIANT ? store.game.turnGroups : undefined
+  if (!teams) return store
+  const seats = new Map<string, EngineSeat>()
+  for (const id of teams.flat()) {
+    const seat = yield* read(store.seat(id))
+    if (seat) seats.set(id, seat)
+  }
+  const shared = teamTableRules(tableRules(store.game.system, store.game.format))
+    .counters.filter((counter) => counter.shared)
+    .map(({ id }) => id)
+  return {
+    ...store,
+    apply: (changes) => store.apply(withTeammates(changes, teams, seats, shared)),
+  }
+}
+
+export function withTeammates(
+  changes: readonly GameChange[],
+  teams: readonly (readonly string[])[],
+  seats: ReadonlyMap<string, EngineSeat>,
+  shared: readonly string[],
+): GameChange[] {
+  const patches = new Map<string, SeatPatch>()
+  for (const change of changes)
+    if (change.kind === "seat.patch") patches.set(change.seatId, change.patch)
+  const mirrored = new Map<string, SeatPatch>()
+  for (const [seatId, patch] of patches) {
+    const counters = shared.filter((id) => patch.counters?.[id] !== undefined)
+    if (patch.currentLife === undefined && counters.length === 0) continue
+    for (const mateId of teammatesOf(teams, seatId)) {
+      const mate = seats.get(mateId)
+      if (!mate) continue
+      const own = patches.get(mateId)
+      const before = mirrored.get(mateId) ?? {}
+      const baseCounters = before.counters ?? own?.counters ?? mate.counters
+      mirrored.set(mateId, {
+        ...before,
+        ...(patch.currentLife === undefined ? {} : { currentLife: patch.currentLife }),
+        ...(counters.length === 0
+          ? {}
+          : {
+              counters: {
+                ...baseCounters,
+                ...Object.fromEntries(counters.map((id) => [id, patch.counters?.[id] ?? 0])),
+              },
+            }),
+        ...(patch.lastEventAt === undefined ? {} : { lastEventAt: patch.lastEventAt }),
+      })
+    }
+  }
+  if (mirrored.size === 0) return [...changes]
+  const merged = changes.map((change) =>
+    change.kind === "seat.patch" && mirrored.has(change.seatId)
+      ? { ...change, patch: { ...change.patch, ...mirrored.get(change.seatId) } }
+      : change,
+  )
+  for (const [seatId, patch] of mirrored)
+    if (!patches.has(seatId)) merged.push({ kind: "seat.patch", seatId, patch })
+  return merged
 }
 
 /** why: the first turn's clock starts on the table's first change from any seat or write, on the authority, so every device and every older client agrees. */

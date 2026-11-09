@@ -85,13 +85,19 @@ describe("Planechase and Archenemy games", () => {
     const authority = (await t.run((ctx) => ctx.db.query("games").first()))!.modes!
     expect(authority.archenemy?.order).toHaveLength(20)
     expect(authority.planechase?.order).toHaveLength(10)
-    const older = await host.query(api.games.lobbyProjection, { publicId, tableVersion: 3 })
-    expect(older.table?.modes).toBeUndefined()
+    for (const tableVersion of [3, 4]) {
+      const older = await host.query(api.games.lobbyProjection, { publicId, tableVersion })
+      expect(older.table?.modes).toBeUndefined()
+      expect(older.table?.turn).toBeDefined()
+    }
   })
 
   it("syncs scheme reveals and planar rolls through Convex", async () => {
     const { host, joiners } = await archenemyGame(3)
-    const view = await host.query(api.games.lobbyProjection, { publicId, tableVersion: 4 })
+    const view = await host.query(api.games.lobbyProjection, {
+      publicId,
+      tableVersion: TABLE_VERSION,
+    })
     const archenemyId = view.players[1].playerId
     const hostId = view.players[0].playerId
     const write = (operationId: string, deviceId: string) => ({
@@ -114,14 +120,20 @@ describe("Planechase and Archenemy games", () => {
       ...write("operation-roll-0000002", "device-joiner-2"),
       action: { kind: "planar.rolled", playerId: archenemyId, face: "chaos" },
     })
-    const after = await host.query(api.games.lobbyProjection, { publicId, tableVersion: 4 })
+    const after = await host.query(api.games.lobbyProjection, {
+      publicId,
+      tableVersion: TABLE_VERSION,
+    })
     expect(after.table?.modes?.log?.map((entry) => entry.kind)).toEqual(["revealed", "rolled"])
     expect(after.table?.turn?.waiting).toBeUndefined()
   })
 
   it("never sends a client a face-down plane or scheme", async () => {
     const { t, host, joiners } = await archenemyGame(4)
-    const view = await host.query(api.games.lobbyProjection, { publicId, tableVersion: 4 })
+    const view = await host.query(api.games.lobbyProjection, {
+      publicId,
+      tableVersion: TABLE_VERSION,
+    })
     const archenemyId = view.players[1].playerId
     for (const [index, kind] of (
       ["scheme.revealed", "scheme.revealed", "planar.walked"] as const
@@ -144,7 +156,10 @@ describe("Planechase and Archenemy games", () => {
     }
     expect(facedown.scheme.size).toBeGreaterThan(0)
     for (const client of [host, ...joiners]) {
-      const { table } = await client.query(api.games.lobbyProjection, { publicId, tableVersion: 4 })
+      const { table } = await client.query(api.games.lobbyProjection, {
+        publicId,
+        tableVersion: TABLE_VERSION,
+      })
       const modes = table!.modes!
       expect(JSON.stringify(modes)).not.toContain("order")
       const log = modes.log ?? []

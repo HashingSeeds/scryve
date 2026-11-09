@@ -70,6 +70,7 @@ import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
+  seatCardRadius,
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
   getLifeFontSizeThatFits,
@@ -255,7 +256,7 @@ export const LifeCard = memo(function LifeCard({
   const resolvedLifeFontSize = fontSizeFor(shownDigits)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
-  const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
+  const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number; width: number }>()
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -946,9 +947,9 @@ export const LifeCard = memo(function LifeCard({
             layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
-                current?.x === layout.x && current.y === layout.y
+                current?.x === layout.x && current.y === layout.y && current.width === layout.width
                   ? current
-                  : { x: layout.x, y: layout.y },
+                  : { x: layout.x, y: layout.y, width: layout.width },
               )
             }
             style={[
@@ -979,6 +980,12 @@ export const LifeCard = memo(function LifeCard({
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
                 commanderSeat && { maxWidth: identityCorner.position.maxWidth },
+                // why: the commander grid takes the mark's place and can outgrow it, so the row's chips start past the grid instead of under it.
+                commanderStripShown &&
+                  stripBounds &&
+                  !!diceChips?.length && {
+                    minWidth: sidewaysContent ? stripBounds.height : stripBounds.width,
+                  },
               ]}
             >
               {commanderDamage ? (
@@ -1113,6 +1120,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+          nameEnd={identityRowAt && identityRowAt.x + identityRowAt.width}
           onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}
@@ -1160,12 +1168,12 @@ export const LifeCard = memo(function LifeCard({
 const STACK_MS = 260
 const KNOCKBACK = 12
 
-const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   overflow: "hidden",
   padding: spacing.xs,
   borderWidth: 0,
-  borderRadius: radius.xxxl,
+  borderRadius: seatCardRadius(),
 })
 
 const $content: ThemedStyle<ViewStyle> = () => ({
@@ -1180,9 +1188,9 @@ const $readout: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $compactCard: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.xxs,
-  borderRadius: radius.xxl,
+  borderRadius: seatCardRadius(true),
 })
 
 const $life: ThemedStyle<TextStyle> = () => ({

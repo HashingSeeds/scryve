@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, View } from "react-native"
 
 import { Button } from "@/components/Button"
+import { TableGlyph } from "@/components/CounterChips"
 import {
   $dialogActions,
   $dialogButton,
@@ -17,14 +18,18 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import {
+  counterLog,
   gameLog,
+  mergedLog,
   withModeRows,
   withTurnDividers,
   type GameLogItem,
   type GameModeRow,
 } from "./LifeLog"
+import { tableItemLabel } from "./playSystems"
 import { teamName } from "./teams"
-import type { GameEvent, GamePlayer, TurnLogEntry } from "./types"
+import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "./types"
+import { customCounterNameOf } from "../../../convex/lib/table"
 import type { TurnGroups } from "../../../convex/lib/turns"
 
 export function GameLogDialog({
@@ -32,9 +37,13 @@ export function GameLogDialog({
   events,
   turns,
   groups,
+  counters,
+  sharedLife = false,
   modes,
   canUndo,
+  undoLabel = translate("board:log.undoLast"),
   origin,
+  onMore,
   onUndo,
   onClose,
 }: {
@@ -42,9 +51,15 @@ export function GameLogDialog({
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
+  counters?: readonly CounterLogEntry[]
+  /** why: Two-Headed Giant heads share one life, so a row names the team, says which head made it, and counts the team's total. */
+  sharedLife?: boolean
   modes?: readonly GameModeRow[]
   canUndo: boolean
+  undoLabel?: string
   origin?: DialogOrigin
+  /** why: a connected game's log arrives a page at a time. */
+  onMore?: () => void
   onUndo: () => void
   onClose: () => void
 }) {
@@ -53,8 +68,18 @@ export function GameLogDialog({
     theme: { colors },
   } = useAppTheme()
   const rows = useMemo(
-    () => withTurnDividers(withModeRows(gameLog(players, events), modes ?? []), turns ?? []),
-    [players, events, turns, modes],
+    () =>
+      withTurnDividers(
+        withModeRows(
+          mergedLog(
+            gameLog(players, events, sharedLife ? groups : undefined),
+            counterLog(counters ?? []),
+          ),
+          modes ?? [],
+        ),
+        turns ?? [],
+      ),
+    [players, events, turns, counters, groups, sharedLife, modes],
   )
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
@@ -119,9 +144,58 @@ export function GameLogDialog({
         </View>
       )
     }
+    if (item.kind === "counter") {
+      const seat = seats.get(item.playerId)
+      const name = seat?.name ?? ""
+      const custom = customCounterNameOf(item.counterId)
+      const counter = custom ?? tableItemLabel({ id: item.counterId, label: item.counterId })
+      const delta = signed(item.delta)
+      return (
+        <View
+          testID={`game-log-counter-${item.id}`}
+          accessible
+          accessibilityLabel={translate("board:log.counterRow", {
+            name,
+            counter,
+            delta,
+            value: item.value,
+          })}
+          style={themed($row)}
+        >
+          {seat ? (
+            <PlayerMark
+              seatNumber={seat.seatNumber}
+              color={seat.color}
+              shape={seat.shape}
+              size={MARK}
+            />
+          ) : null}
+          <View style={$lines}>
+            <View style={themed($headline)}>
+              <Text text={name} weight="medium" numberOfLines={1} style={$name} />
+              <Text text={delta} weight="semiBold" style={[$number, { color: colors.text }]} />
+              <Text text="→" style={{ color: colors.textDim }} />
+              <Text text={String(item.value)} weight="semiBold" style={$number} />
+            </View>
+            <View style={themed($detail)}>
+              {custom === undefined ? (
+                <TableGlyph id={item.counterId} size={COUNTER_GLYPH} color={colors.textDim} />
+              ) : null}
+              <Text
+                text={`${counter} · ${relativeTime(item.at, openedAt)}`}
+                size="xxs"
+                numberOfLines={1}
+                style={[$shrink, { color: colors.textDim }]}
+              />
+            </View>
+          </View>
+        </View>
+      )
+    }
     const seat = seats.get(item.playerId)
     const source = item.fromPlayerId ? seats.get(item.fromPlayerId) : undefined
-    const name = seat?.name ?? ""
+    const name = (sharedLife ? teamName(players, groups, item.playerId) : seat?.name) ?? ""
+    const head = sharedLife && !source ? seat : undefined
     const delta = signed(item.delta)
     const when = relativeTime(item.at, openedAt)
     return (
@@ -177,6 +251,13 @@ export function GameLogDialog({
                   style={[$shrink, { color: colors.textDim }]}
                 />
               </>
+            ) : head ? (
+              <Text
+                text={`${translate("board:log.by", { name: head.name })} ·`}
+                size="xxs"
+                numberOfLines={1}
+                style={[$shrink, { color: colors.textDim }]}
+              />
             ) : null}
             <Text text={when} size="xxs" numberOfLines={1} style={{ color: colors.textDim }} />
           </View>
@@ -206,11 +287,14 @@ export function GameLogDialog({
           keyExtractor={(item) =>
             item.kind === "turn"
               ? `turn:${item.operationId}`
-              : item.kind === "mode"
-                ? `mode:${item.id}`
-                : item.id
+              : item.kind === "counter"
+                ? `counter:${item.id}`
+                : item.kind === "mode"
+                  ? `mode:${item.id}`
+                  : item.id
           }
           renderItem={renderRow}
+          onEndReached={onMore}
           style={$list}
         />
       )}
@@ -218,7 +302,7 @@ export function GameLogDialog({
         <Button
           testID="game-log-undo"
           tx="common:undo"
-          accessibilityLabel={translate("board:log.undoLast")}
+          accessibilityLabel={undoLabel}
           disabled={!canUndo}
           style={themed($dialogButton)}
           onPress={onUndo}
@@ -234,6 +318,7 @@ function signed(delta: number) {
 }
 
 const MARK = 32
+const COUNTER_GLYPH = 12
 const TURN_MARK = 14
 const $turnRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

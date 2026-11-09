@@ -27,6 +27,7 @@ import {
   endLanRound,
   LAN_PROTOCOL,
   lanLobbyOf,
+  lanLog,
   lanProjection,
   lanRejectionMessage,
   lanRoundId,
@@ -38,6 +39,7 @@ import {
   setLanDeck,
   setLanPlayerCount,
   startLanRound,
+  swapLanSeats,
   type LanGame,
   type LanGuestMessage,
   type LanHostMessage,
@@ -56,6 +58,7 @@ import {
 import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
 import { nearbyCodeFor, nearbyServiceName } from "./nearbyCode"
 import type { MemoryGame } from "../../../convex/lib/gameEngineMemory"
+import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import { TABLE_VERSION } from "../../../convex/lib/table"
 import { CLIENT_VARIANTS } from "../../../convex/lib/tableModes"
 
@@ -82,6 +85,9 @@ export interface LanSessionState {
   partners?: boolean
   hostEditsAnySeat?: boolean
   turns?: boolean
+  /** why: only a host that answers log requests says so in its welcome. */
+  logs?: boolean
+  log?: { publicId: string; events: ConnectedLogEvent[] }
   error?: string
 }
 
@@ -396,10 +402,12 @@ export class LanSession {
             partners: true,
             editsAnySeat: true,
             turns: true,
+            log: true,
           })
           return this.publish(admitted.game)
         }
         if (!seatKey) return
+        if (message.type === "log") return peer.send({ type: "log", events: lanLog(game, seatKey) })
         if (message.type === "stats") return void this.guestLatency.set(seatKey, message.stats)
         const now = Date.now()
         if (now - windowStart >= 1_000) {
@@ -619,7 +627,12 @@ export class LanSession {
         partners: message.partners === true,
         hostEditsAnySeat: message.editsAnySeat === true,
         turns: message.turns === true,
+        logs: message.log === true,
       })
+    }
+    if (message.type === "log") {
+      const publicId = this.state.projection?.publicId
+      return publicId && this.set({ log: { publicId, events: message.events } })
     }
     if (message.type === "pong")
       return this.latency.clockSample(message.at, Date.now(), message.hostAt)
@@ -693,12 +706,28 @@ export class LanSession {
     if (next !== game) this.publish(next)
   }
 
+  swapSeats = (first: number, second: number) => {
+    const game = this.game
+    if (this.state.role !== "host" || !game) return
+    const next = swapLanSeats(game, first, second)
+    if (next !== game) this.publish(next)
+  }
+
   selectDeck = async (deck: LanSeatDeck | null) => {
     const { role, seatKey, status } = this.state
     const game = this.game
     if (role === "host" && game && seatKey) return this.publish(setLanDeck(game, seatKey, deck))
     if (!this.connection || status !== "connected") throw new Error("Not connected to the host")
     this.connection.send({ type: "deck", deck })
+  }
+
+  /** why: the log travels only while someone reads it, so a busy table never resends it on every change. */
+  requestLog = () => {
+    const { role, seatKey, status } = this.state
+    const game = this.game
+    if (role === "host" && game && seatKey)
+      return this.set({ log: { publicId: lanRoundId(game), events: lanLog(game, seatKey) } })
+    if (status === "connected") this.connection?.send({ type: "log" })
   }
 
   revealRole = async () => {

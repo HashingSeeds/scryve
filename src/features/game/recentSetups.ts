@@ -8,6 +8,7 @@ import { isMatchBestOf } from "../../../convex/lib/matchResults"
 import { systemDefinition } from "../../../convex/lib/systems"
 import type { ModeSetup } from "../../../convex/lib/tableModes"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
+import { isTwoHeadedGiantPlayerCount } from "../../../convex/lib/twoHeadedGiant"
 
 export const MAX_RECENT_SETUPS = 5
 
@@ -39,6 +40,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const isWholeNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value >= 0
 
+const isSeatTeams = (value: unknown): value is number[][] =>
+  Array.isArray(value) &&
+  value.every((team) => Array.isArray(team) && team.every((seat) => isWholeNumber(seat)))
+
 const isPositiveInteger = (value: unknown): value is number => isWholeNumber(value) && value > 0
 
 function parseLocalSetup(value: unknown): LocalSetup | undefined {
@@ -60,9 +65,15 @@ function parseLocalSetup(value: unknown): LocalSetup | undefined {
     ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
     ...(typeof value.format === "string" ? { format: value.format } : {}),
     ...(typeof value.layout === "string"
-      ? { layout: playerGridLayoutForCount(players.length, value.layout) }
+      ? {
+          layout: playerGridLayoutForCount(
+            isSeatTeams(value.teams) ? value.teams.length : players.length,
+            value.layout,
+          ),
+        }
       : {}),
     ...(isPositiveInteger(value.lifeStep) ? { lifeStep: value.lifeStep } : {}),
+    ...(isSeatTeams(value.teams) ? { teams: value.teams } : {}),
     ...(isRecord(value.match) && isMatchBestOf(value.match.bestOf)
       ? { match: { bestOf: value.match.bestOf } }
       : {}),
@@ -103,18 +114,26 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     return undefined
   if (
     value.variant !== undefined &&
-    (value.variant !== "treachery" ||
-      !systemDefinition(system)?.variants.includes(value.variant) ||
-      !isTreacheryPlayerCount(value.playerCount))
+    !(
+      (value.variant === "treachery" && isTreacheryPlayerCount(value.playerCount)) ||
+      (value.variant === "twoHeadedGiant" && isTwoHeadedGiantPlayerCount(value.playerCount))
+    )
   )
+    return undefined
+  if (value.variant !== undefined && !systemDefinition(system)?.variants.includes(value.variant))
     return undefined
   return {
     playerCount: value.playerCount,
     startingLife: value.startingLife,
     ruleset: value.ruleset,
     ...(system && typeof value.format === "string" ? { system, format: value.format } : {}),
-    ...(value.variant === "treachery" ? { variant: value.variant } : {}),
-    layout: playerGridLayoutForCount(value.playerCount, value.layout),
+    ...(value.variant === "treachery" || value.variant === "twoHeadedGiant"
+      ? { variant: value.variant }
+      : {}),
+    layout: playerGridLayoutForCount(
+      value.variant === "twoHeadedGiant" ? value.playerCount / 2 : value.playerCount,
+      value.layout,
+    ),
     lifeStep: value.lifeStep,
   }
 }

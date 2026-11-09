@@ -165,13 +165,17 @@ export function lifeInk(fontSize: number, digits: number): ReadoutInk {
   }
 }
 
+// why: the gap between a defender's life and its "34 − 4" line grows with the life, so a tablet's big total doesn't crowd the line.
+const STACK_GAP = 0.1
+
 /** why: once an attack lands, a defender's life shrinks and rises to make room for its "34 − 4" line, inside the disc already drawn around the life alone, so the disc never jumps. `scale` is the life's new size; `lifeShift` and `lineShift` place the life's ink and the line's ink from where the life's ink sat. */
 export function stackedReadout(fontSize: number, digits: number, lineChars: number) {
   const life = lifeInk(fontSize, digits)
   const lineHeight = DIGIT_INK_HEIGHT * OUT_CAUSE.fontSize
   const lineWidth = lineChars * DIGIT_INK_WIDTH * OUT_CAUSE.fontSize
+  const gap = Math.max(OUT_CAUSE_GAP, STACK_GAP * fontSize)
   const room = Math.hypot(life.width, life.height)
-  const height = (scale: number) => life.height * scale + OUT_CAUSE_GAP + lineHeight
+  const height = (scale: number) => life.height * scale + gap + lineHeight
   let scale = 1
   while (
     scale > MIN_FIT &&
@@ -180,8 +184,8 @@ export function stackedReadout(fontSize: number, digits: number, lineChars: numb
     scale -= 0.02
   return {
     scale,
-    lifeShift: -(OUT_CAUSE_GAP + lineHeight) / 2,
-    lineShift: (life.height * scale + OUT_CAUSE_GAP) / 2,
+    lifeShift: -(gap + lineHeight) / 2,
+    lineShift: (life.height * scale + gap) / 2,
   }
 }
 

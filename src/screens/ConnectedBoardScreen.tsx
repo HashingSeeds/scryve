@@ -39,6 +39,7 @@ import {
 import {
   connectedBoardView,
   connectedStandingWinners,
+  connectedTeams,
   connectedLives,
   connectedOutState,
   projectionOutState,
@@ -46,6 +47,12 @@ import {
   type ConnectedBoardSeat,
   type ConnectedBoardView,
 } from "@/features/connected/boardView"
+import {
+  CloudLogFeed,
+  ConnectedLogContext,
+  ConnectedLogDialog,
+  type ConnectedLogFeed,
+} from "@/features/connected/ConnectedLogDialog"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
 import { loadLayoutChoice, saveLayoutChoice } from "@/features/connected/layoutChoice"
@@ -90,6 +97,7 @@ import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
+import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { modeSeamFor } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
@@ -107,7 +115,8 @@ import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
-import { nextTurnSeat, sharesTurn, turnGroupOf } from "../../convex/lib/turns"
+import { nextTurnSeat, sharesTurn, turnGroupOf, turnLead } from "../../convex/lib/turns"
+import { TWO_HEADED_GIANT } from "../../convex/lib/twoHeadedGiant"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -288,6 +297,7 @@ type ConnectedBoardReadyProps = {
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline: boolean
   turns: boolean
+  logFeed?: ConnectedLogFeed
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -365,6 +375,8 @@ interface ConnectedBoardRuntimeProps {
   ownerId: string
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
+  /** why: a nearby host from before the game log can't send one, so its guests get no Log. */
+  logFeed?: ConnectedLogFeed
   partners?: boolean
   turns?: boolean
   awayPlayerIds?: readonly string[]
@@ -434,6 +446,7 @@ export function ConnectedBoardWithRuntime({
   accountEntry,
   ownerId,
   cloud = true,
+  logFeed = cloud ? CloudLogFeed : undefined,
   partners = cloud,
   turns = cloud,
   awayPlayerIds,
@@ -476,9 +489,20 @@ export function ConnectedBoardWithRuntime({
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
   )
   const { pending } = runtime
+  const lifeTeams = useStructurallyStable(
+    runtime.status === "ready" ? connectedTeams(runtime.projection) : undefined,
+  )
   const lifeLog = useMemo(
-    (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
-    [cloud, publicId, pending],
+    (): LifeLogSource | undefined =>
+      cloud
+        ? { kind: "connected", publicId, pending, ...(lifeTeams ? { teams: lifeTeams } : {}) }
+        : undefined,
+    [cloud, publicId, pending, lifeTeams],
+  )
+  const { undoLife, undoTable } = runtime
+  const logContext = useMemo(
+    () => ({ pending, lives, undoLife, undoTable }),
+    [pending, lives, undoLife, undoTable],
   )
   const tableState = useStructurallyStable(runtime.table)
   const {
@@ -599,31 +623,34 @@ export function ConnectedBoardWithRuntime({
       <ConnectedTableContext.Provider value={table}>
         <ConnectedUnsentContext.Provider value={runtime.pending.length}>
           <LifeLogContext.Provider value={lifeLog}>
-            <ConnectedBoardReady
-              publicId={publicId}
-              initialInviteOpen={initialInviteOpen}
-              onBack={onBack}
-              onHistory={onHistory}
-              onRules={onRules}
-              onDecks={onDecks}
-              onSettings={onSettings}
-              onSupport={onSupport}
-              onAccount={onAccount}
-              accountEntry={accountEntry}
-              onGameEnded={onGameEnded}
-              onRematch={onRematch}
-              onGameAbandoned={onGameAbandoned}
-              onLeave={onLeave}
-              view={view}
-              controls={controls}
-              ownerId={ownerId}
-              cloud={cloud}
-              partners={partners}
-              awayPlayerIds={awayPlayerIds}
-              onRevealRole={onRevealRole}
-              roleRevealOnline={roleRevealOnline}
-              turns={turns}
-            />
+            <ConnectedLogContext.Provider value={logContext}>
+              <ConnectedBoardReady
+                publicId={publicId}
+                initialInviteOpen={initialInviteOpen}
+                onBack={onBack}
+                onHistory={onHistory}
+                onRules={onRules}
+                onDecks={onDecks}
+                onSettings={onSettings}
+                onSupport={onSupport}
+                onAccount={onAccount}
+                accountEntry={accountEntry}
+                onGameEnded={onGameEnded}
+                onRematch={onRematch}
+                onGameAbandoned={onGameAbandoned}
+                onLeave={onLeave}
+                view={view}
+                controls={controls}
+                ownerId={ownerId}
+                cloud={cloud}
+                partners={partners}
+                awayPlayerIds={awayPlayerIds}
+                onRevealRole={onRevealRole}
+                roleRevealOnline={roleRevealOnline}
+                turns={turns}
+                logFeed={logFeed}
+              />
+            </ConnectedLogContext.Provider>
             <SyncStatsOverlay latency={runtime.latency} peers={peerLatency} />
           </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
@@ -656,6 +683,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onRevealRole,
   roleRevealOnline,
   turns,
+  logFeed,
 }: ConnectedBoardReadyProps) {
   const {
     themed,
@@ -687,6 +715,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const turnGroups = table?.table.turnGroups
   const [turnPrefs, setTurnPrefs] = useTurnPrefs(localGameRepository)
   const [turnOpen, setTurnOpen] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
+  const openLog = useCallback(() => setLogOpen(true), [])
   const [turnToast, setTurnToast] = useState<{
     operationId: string
     passerId: string
@@ -775,13 +805,29 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     ],
     [controlled, game.players],
   )
+  const teams = useMemo(() => {
+    const groups = connectedTeams({ variant: game.variant, table: table?.table })
+    // why: this device's team sits last, where its own seat would.
+    return (
+      groups &&
+      [...groups].sort(
+        (a, b) =>
+          Number(a.some((id) => controlled.has(id))) - Number(b.some((id) => controlled.has(id))),
+      )
+    )
+  }, [controlled, game.variant, table?.table])
+  const cellCount = teams?.length ?? players.length
+  const [teamBinding] = useState(() => localGameRepository.teamBinding())
+  /** why: a head's device changes its team's life from either half, writing as the head it holds, so the log knows who did it. */
+  const actingHead = (playerId: string) =>
+    turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
   const layoutVariant =
-    layoutChoice?.playerCount === players.length
+    layoutChoice?.playerCount === cellCount
       ? layoutChoice.layout
       : playerGridLayoutForCount(
-          players.length,
+          cellCount,
           game.layout,
-          defaultConnectedLayout(players.length),
+          teams ? "auto" : defaultConnectedLayout(players.length),
         )
   const commanderLethal = playCommanderLethal(system, game.format || game.ruleset)
   const commanderDamageEnabled = commanderLethal !== undefined && game.commanderDamage !== undefined
@@ -920,10 +966,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     gameId: publicId,
     system,
     players,
+    teamCount: teams?.length,
     layout: {
       value: layoutVariant,
       onChange: (layout) => {
-        const choice = { playerCount: players.length, layout }
+        const choice = { playerCount: cellCount, layout }
         setLayoutChoice(choice)
         saveLayoutChoice(publicId, choice)
       },
@@ -980,8 +1027,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     onSettings,
     onSupport,
     onAccount,
+    onLog: logFeed ? openLog : undefined,
   })
   const { menuOpen, dice, dialogOrigin: menuDialogOrigin } = chrome
+  const logSeats = useMemo(
+    () => [...game.players].sort((left, right) => left.seat - right.seat).map(toBoardSeat),
+    [game.players],
+  )
   const turnSeats = [...game.players]
     .sort((left, right) => left.seat - right.seat)
     .map((player) => ({
@@ -1165,8 +1217,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             {...(anySeat
               ? {}
               : {
-                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(player.id),
-                  isPlayerOwned: (player: GamePlayer) => controlled.has(player.id),
+                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(actingHead(player.id)),
+                  isPlayerOwned: (player: GamePlayer) => controlled.has(actingHead(player.id)),
                 })}
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
@@ -1197,7 +1249,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 : undefined
             }
             dice={seatGrid}
-            onChange={controls.changeLife}
+            teams={teams}
+            teamBinding={teamBinding}
+            onChange={(playerId, delta) =>
+              controls.changeLife(asPlayerId(actingHead(playerId)), delta)
+            }
           />
         )}
       />
@@ -1231,6 +1287,34 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       ) : null}
 
       {hideOffer ? <HideTurnsDialog onAnswer={answerHideOffer} /> : null}
+
+      {logOpen && logFeed ? (
+        <ConnectedLogDialog
+          publicId={publicId}
+          Feed={logFeed}
+          seats={logSeats}
+          turn={table?.table.turn}
+          groups={turnGroups}
+          sharedLife={game.variant === TWO_HEADED_GIANT}
+          modes={boardModes.log.map(modeLogRow)}
+          counterTable={{
+            players: table?.table.players,
+            // why: a Two-Headed Giant team shares poison, so both heads' taps count back from one value.
+            counterKey: (playerId, counterId) =>
+              game.variant === TWO_HEADED_GIANT &&
+              table?.tableRules.counters.some(({ id, shared }) => id === counterId && shared)
+                ? `${turnLead(turnGroups, playerId)}:${counterId}`
+                : `${playerId}:${counterId}`,
+          }}
+          turnsShown={tabOn}
+          origin={menuDialogOrigin}
+          onUndoTurn={(playerId, operationId) => {
+            table?.undoTurn(playerId, operationId)
+            setTurnToast(undefined)
+          }}
+          onClose={() => setLogOpen(false)}
+        />
+      ) : null}
 
       {inviteSheet.shown && shownInvitation ? (
         <Sheet

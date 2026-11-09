@@ -6,6 +6,7 @@ import type { PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
 import type { TableState } from "../../../convex/lib/table"
 import type { ModeSetup } from "../../../convex/lib/tableModes"
+import type { GameVariant } from "../../../convex/lib/treachery"
 import type { Turn } from "../../../convex/lib/turns"
 
 export type CommanderSlot = typeof PARTNER_COMMANDER | undefined
@@ -130,8 +131,20 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
+  counterLog?: CounterLogEntry[]
   /** why: kept so a rematch deals the same modes again; the game's own modes live in `table`. */
   modeSetup?: ModeSetup
+  /** why: Two-Headed Giant games share life and poison across each turn group. */
+  variant?: GameVariant
+}
+
+export interface CounterLogEntry {
+  operationId: string
+  playerId: PlayerId
+  counterId: string
+  delta: number
+  value: number
+  at: number
 }
 
 export interface TurnLogEntry {
@@ -157,7 +170,7 @@ export type GameCommand =
       commander?: typeof PARTNER_COMMANDER
       delta: number
     }
-  | { type: "life.undo" }
+  | { type: "life.undo"; operationId?: OperationId }
   | { type: "game.finish"; result?: LocalGameResult }
   | { type: "game.abandon" }
 

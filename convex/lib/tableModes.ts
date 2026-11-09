@@ -98,7 +98,12 @@ export const isModeAction = (action: { kind: string }): action is ModeAction =>
 
 /** why: clients list the modes they can play beside variants, so an app from before these modes is asked to update. */
 export const PLANECHASE_CAPABILITY = "planechase"
-export const CLIENT_VARIANTS: readonly string[] = ["treachery", "archenemy", PLANECHASE_CAPABILITY]
+export const CLIENT_VARIANTS: readonly string[] = [
+  "treachery",
+  "archenemy",
+  "twoHeadedGiant",
+  PLANECHASE_CAPABILITY,
+]
 export const ARCHENEMY_LIFE = 40
 export const ARCHENEMY_TEAM_LIFE = 20
 export const ARCHENEMY_MIN_SEATS = 3

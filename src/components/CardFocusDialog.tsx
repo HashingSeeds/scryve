@@ -269,7 +269,7 @@ export function CardFocusDialog({
             accessibilityLabel={imageAccessibilityLabel}
             source={displayImageUrl}
             placeholder={cachedThumbnailUrl}
-            style={themed($cardImage)}
+            style={$cardImage}
           />
           <View style={themed($details)}>
             {visibleDetails?.manaCost ? (
@@ -412,13 +412,12 @@ const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $cardImage: ThemedStyle<ImageStyle> = ({ radius }) => ({
+const $cardImage: ImageStyle = {
   width: "52%",
   maxWidth: 180,
   alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
-  borderRadius: radius.md,
-})
+}
 const $faceControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingVertical: spacing.xs })
 const $details: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })

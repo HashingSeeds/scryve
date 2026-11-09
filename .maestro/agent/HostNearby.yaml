@@ -1,0 +1,38 @@
+# flow: Host a nearby game
+# intent: open a nearby lobby on a development or preview build and leave its invite sheet open on the join code.
+#
+#   agent-device replay .maestro/agent/HostNearby.yaml --maestro -e PLAYERS=4 -e LIFE=40
+#   agent-device get text 'id="manual-code"'
+# A second device joins with scryve-dev://lan?join=<code>.
+appId: ${MAESTRO_APP_ID}
+env:
+  MAESTRO_APP_ID: com.sowinghope.count.dev
+  SCHEME: scryve-dev
+  PLAYERS: "2"
+  LIFE: "20"
+---
+- openLink: "${SCHEME}://lan?players=${PLAYERS}&life=${LIFE}"
+# iOS asks for local network access once hosting starts, which can be after the lobby opens.
+- repeat:
+    times: 20
+    while:
+      notVisible:
+        id: "open-invite-button"
+    commands:
+      - runFlow:
+          when:
+            visible: "Allow"
+          commands:
+            - tapOn: "Allow"
+      - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "open-invite-button"
+    timeout: 20000
+- waitForAnimationToEnd
+- tapOn:
+    id: "open-invite-button"
+- extendedWaitUntil:
+    visible:
+      id: "manual-code"
+    timeout: 5000

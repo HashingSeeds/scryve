@@ -2,13 +2,16 @@ import type { Href } from "expo-router"
 
 import {
   applyGameCommand,
+  applyLocalTableAction,
   commanderDamageBetween,
+  createClientId,
   createLocalGame,
   defaultCommandContext,
   MAX_COMMANDER_DAMAGE,
   MAX_PLAYERS,
   MIN_PLAYERS,
   PLAYER_COLORS,
+  withFirstTurn,
 } from "@/features/game/domain"
 import {
   DEFAULT_LOCAL_SETTINGS,
@@ -22,14 +25,17 @@ import {
   NO_PLAY_SYSTEM,
   PLAY_SYSTEM_IDS,
   playSystemFormats,
+  playTableRules,
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import type { TableAction } from "../../../convex/lib/table"
 import { isValidModeSetup } from "../../../convex/lib/tableModes"
 import { isValidTurnGroups } from "../../../convex/lib/turns"
+import { defaultTeamLife } from "../../../convex/lib/twoHeadedGiant"
 
 function integer(name: string, value: string): number {
   const parsed = Number(value)
@@ -80,22 +86,30 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   if (!layout)
     throw new SeedError(`layout for ${playerCount} players must be one of ${layouts.join(", ")}.`)
 
+  const names = list(params.names)
+  // why: teams=1+2,3+4 starts a Two-Headed Giant game with those seats as teams.
+  const teams = list(params.teams).map((entry) =>
+    entry.split("+").map((value) => integer("teams seat", value) - 1),
+  )
   let game: LocalGame
   try {
     game = createLocalGame({
       players: Array.from({ length: playerCount }, (_, index) => ({
-        name: `Player ${index + 1}`,
+        name: names[index] || `Player ${index + 1}`,
         color: PLAYER_COLORS[index],
         ...(marks[index] ? { shape: marks[index] } : {}),
       })),
       startingLife:
         params.start !== undefined
           ? integer("start", params.start)
-          : defaultStartingLife(system, format, playerCount),
+          : teams.length > 0
+            ? defaultTeamLife(format)
+            : defaultStartingLife(system, format, playerCount),
       system,
       format,
       layout,
       ...modeSetupOf(params, playerCount),
+      ...(teams.length > 0 ? { teams } : {}),
     })
   } catch (error) {
     throw new SeedError(error instanceof Error ? error.message : String(error))
@@ -130,6 +144,39 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       throw new SeedError(`cmd "${entry}" was rejected by the game rules.`)
   }
 
+  for (const entry of list(params.counters)) {
+    const match = /^(\d+):([^:]+):(\d+)$/.exec(entry)
+    if (!match) throw new SeedError(`counters entries look like 1:poison:3, got "${entry}".`)
+    const [, seatNumber, counter, amount] = match
+    const playerId = seat(seatNumber).id
+    const system = playTableRules(game.system, game.format).counters
+    const action: TableAction = system.some(({ id }) => id === counter)
+      ? {
+          kind: "counter.changed",
+          playerId,
+          counterId: counter,
+          delta: integer("counters", amount),
+        }
+      : {
+          kind: "customCounter.changed",
+          playerId,
+          name: counter,
+          delta: integer("counters", amount),
+        }
+    const next = applyLocalTableAction(game, action, {
+      operationId: createClientId("operation"),
+      now: Date.now(),
+    })
+    if (next === game) throw new SeedError(`counters "${entry}" was rejected by the game rules.`)
+    game = next
+  }
+
+  if (params.turn !== undefined)
+    game = withFirstTurn(game, seat(params.turn).id, {
+      operationId: createClientId("operation"),
+      now: Date.now(),
+    })
+
   life.forEach((target, index) => {
     const player = game.players[index]
     const delta = target - player.life
@@ -147,6 +194,21 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
     if (!isValidTurnGroups(groups, new Set(game.players.map(({ id }) => id))))
       throw new SeedError(`groups name each seat once, like 1+2,3+4, got "${params.groups}".`)
     game = { ...game, turnGroups: groups }
+  }
+
+  // why: poison=1:12 gives seat 1 twelve poison, through the same rules a tap uses.
+  for (const entry of list(params.poison)) {
+    const [seatValue, amount] = entry.split(":")
+    game = applyLocalTableAction(
+      game,
+      {
+        kind: "counter.changed",
+        playerId: seat(seatValue ?? "").id,
+        counterId: "poison",
+        delta: integer("poison", amount ?? ""),
+      },
+      { operationId: context.operationId(), now: context.now() },
+    )
   }
   return game
 }
@@ -178,6 +240,9 @@ function modeSetupOf(params: SeedParams, playerCount: number) {
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {
   const game = buildSeededGame(params, repository)
+  // why: binding=frame or binding=link picks the team binding on trial, until one is chosen.
+  if (params.binding === "frame" || params.binding === "link")
+    repository.saveTeamBinding(params.binding)
   repository.clearActiveGame()
   repository.saveActiveGame(game)
   return { pathname: "/", params: { destination: "play" } }

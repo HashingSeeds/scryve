@@ -49,6 +49,7 @@ import type {
   MatchSeatOutcome,
   NewPlayerInput,
   SeatPassHashes,
+  CounterLogEntry,
   TurnLogEntry,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
@@ -58,6 +59,7 @@ import { startingValueRange } from "../../../convex/lib/systems"
 import { matchesValidator, parseTableState, type TableState } from "../../../convex/lib/table"
 import { isValidModes, modeSetupValidator } from "../../../convex/lib/tableModes"
 import { isValidTurn, isValidTurnGroups } from "../../../convex/lib/turns"
+import { isValidTeams, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -99,6 +101,7 @@ export interface LocalSettings {
   syncStats?: boolean
   turnTab?: boolean
   turnTabHideOffered?: true
+  teamBinding?: "frame"
 }
 
 export const COMMANDER_SEATS = 4
@@ -467,13 +470,17 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const modeSetup = matchesValidator(modeSetupValidator, value.modeSetup)
     ? value.modeSetup
     : undefined
+  const counterLog = parseCounterLog(value.counterLog, playerIds)
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
     status: value.status,
     ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
     ...(typeof value.format === "string" ? { format: value.format } : {}),
-    layout: playerGridLayoutForCount(players.length, value.layout),
+    layout: playerGridLayoutForCount(
+      value.variant === TWO_HEADED_GIANT && turnGroups ? turnGroups.length : players.length,
+      value.layout,
+    ),
     ...(isSeatOrder(value.seatOrder, players.length) ? { seatOrder: value.seatOrder } : {}),
     lifeStep:
       isLifeDelta(value.lifeStep) && value.lifeStep > 0
@@ -505,6 +512,10 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
+    ...(value.variant === TWO_HEADED_GIANT && isValidTeams(turnGroups, playerIds)
+      ? { variant: TWO_HEADED_GIANT }
+      : {}),
+    ...(counterLog ? { counterLog } : {}),
     ...(modeSetup ? { modeSetup } : {}),
   }
 }
@@ -514,6 +525,36 @@ function withReadableModes(table: TableState | undefined, playerIds: ReadonlySet
   if (!table?.modes || isValidModes(table.modes, playerIds)) return table
   const { modes: _unreadable, ...rest } = table
   return rest
+}
+
+function parseCounterLog(
+  value: unknown,
+  playerIds: ReadonlySet<string>,
+): CounterLogEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const entries = value.flatMap((entry): CounterLogEntry[] =>
+    isRecord(entry) &&
+    typeof entry.operationId === "string" &&
+    typeof entry.playerId === "string" &&
+    playerIds.has(entry.playerId) &&
+    typeof entry.counterId === "string" &&
+    Number.isInteger(entry.delta) &&
+    Number.isInteger(entry.value) &&
+    typeof entry.at === "number" &&
+    Number.isFinite(entry.at)
+      ? [
+          {
+            operationId: entry.operationId,
+            playerId: asPlayerId(entry.playerId),
+            counterId: entry.counterId,
+            delta: Number(entry.delta),
+            value: Number(entry.value),
+            at: entry.at,
+          },
+        ]
+      : [],
+  )
+  return entries.length > 0 ? entries : undefined
 }
 
 function parseTurnLog(value: unknown, playerIds: ReadonlySet<string>): TurnLogEntry[] | undefined {
@@ -572,6 +613,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === false ? { turnTab: false } : {}),
     ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
+    ...(migrated.teamBinding === "frame" ? { teamBinding: "frame" } : {}),
   }
 }
 
@@ -799,6 +841,15 @@ export class LocalGameRepository {
       ...(next.hideOffered ? { turnTabHideOffered: true } : {}),
     })
     return next
+  }
+
+  teamBinding(): "link" | "frame" {
+    return this.loadSettings().teamBinding ?? "link"
+  }
+
+  saveTeamBinding(binding: "link" | "frame") {
+    const { teamBinding: _binding, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(binding === "frame" ? { teamBinding: "frame" } : {}) })
   }
 
   hapticsEnabled(): boolean {

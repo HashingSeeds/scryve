@@ -388,6 +388,25 @@ const board = {
     giveUp: "Give up {{label}}",
     take: "Take {{label}}",
     rule: "Rule {{rule}}",
+    // Opens a field where the player names their own counter, for a mechanic the app doesn't list (Speed, rad counters, the Ring).
+    custom: "Name a counter",
+    // Short form of "Name a counter" for a narrow button.
+    customShort: "Custom",
+    // Placeholder in the field for a counter's name.
+    customName: "Counter name",
+    // Adds the named counter to the player's seat.
+    customAdd: "Add",
+    // Screen reader label for a recently used counter name; tapping it adds that counter. {{label}} is the name.
+    customRecent: "Add {{label}}",
+    // Screen reader label for a "+2" button on a seat; it opens the seat's counters that didn't fit on the card.
+    // Suggested names for a player's own counter, before they've named any. Use the term printed on Magic cards in this language. Keep under 20 characters.
+    starter: {
+      speed: "Speed",
+      rad: "Rad",
+      storm: "Storm",
+    },
+    more_one: "{{identity}}, {{count}} more counter",
+    more_other: "{{identity}}, {{count}} more counters",
   },
   seat: {
     identity: "Seat {{seat}}, {{name}}",
@@ -619,11 +638,17 @@ const board = {
     empty: "No changes yet",
     // Under a commander damage row in the game log, naming whose commander dealt it, as in "From Grace's commander". Keep it short so the name fits.
     commanderFrom: "From {{name}}'s commander",
+    // Two-Headed Giant: under a team's life change in the game log, naming the teammate who made it, as in "By Ada". Keep it short.
+    by: "By {{name}}",
     // One row of the game log: a player's life change and the total it left them on, as in "Ada −3 to 17".
     row: "{{name}} {{delta}} to {{life}}",
     // A commander damage row, as in "Ada −5 from Grace's commander, to 12".
     commanderRow: "{{name}} {{delta}} from {{from}}'s commander, to {{life}}",
+    // A counter row in the game log, as in "Ada poison +1 to 3". {{counter}} is a counter such as poison, or a name the player gave their own counter.
+    counterRow: "{{name}} {{counter}} {{delta}} to {{value}}",
     undoLast: "Undo the last change",
+    // Connected games: Undo takes back the newest change this player made, not anyone else's.
+    undoMine: "Undo your last change",
   },
   calculator: {
     damage: "− Damage",

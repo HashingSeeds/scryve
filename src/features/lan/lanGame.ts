@@ -12,6 +12,11 @@ import {
   type MemoryGame,
 } from "../../../convex/lib/gameEngineMemory"
 import {
+  connectedLogEvent,
+  NEARBY_LOG_LIMIT,
+  type ConnectedLogEvent,
+} from "../../../convex/lib/gameLog"
+import {
   commanderField,
   commanderLethalDamage,
   isCommanderSlot,
@@ -23,6 +28,7 @@ import {
 } from "../../../convex/lib/layouts"
 import { outReason } from "../../../convex/lib/outReason"
 import {
+  hasTable,
   identitySection,
   startingValueRange,
   systemDefinition,
@@ -31,6 +37,7 @@ import {
 import {
   matchesValidator,
   TABLE_VERSION,
+  TURN_TABLE_VERSION,
   tableActionValidator,
   tableForVersion,
   type PlayerTable,
@@ -53,6 +60,11 @@ import {
   type GameVariant,
   type TreacheryRole,
 } from "../../../convex/lib/treachery"
+import {
+  isTwoHeadedGiantPlayerCount,
+  pairedTeams,
+  TWO_HEADED_GIANT,
+} from "../../../convex/lib/twoHeadedGiant"
 import { projectionOutState } from "../connected/boardView"
 import {
   CONNECTED_RECENT_OPERATION_LIMIT,
@@ -151,6 +163,7 @@ export type LanGuestMessage =
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
+  | { type: "log" }
   | { type: "deck"; deck: LanSeatDeck | null }
   | { type: "ping"; at: number }
   | { type: "stats"; stats: SyncLatencySummary }
@@ -164,6 +177,8 @@ export type LanHostMessage =
       partners?: boolean
       editsAnySeat?: boolean
       turns?: boolean
+      /** why: a host from before the game log ignores a guest's log request, so guests offer the log only when the welcome says so. */
+      log?: boolean
     }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
@@ -171,6 +186,7 @@ export type LanHostMessage =
   | { type: "ack"; operationId: string; status?: ClaimStatus }
   | { type: "nack"; operationId: string; code?: string; message: string }
   | { type: "pong"; at: number; hostAt: number }
+  | { type: "log"; events: ConnectedLogEvent[] }
 
 export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
 
@@ -271,19 +287,43 @@ export function admitLanGuest(
   if (game.seats.length >= game.setup.playerCount) return { rejected: LAN_REJECTIONS.full }
   const seat: LanSeat = {
     key: fresh.key,
-    seat: game.seats.length + 1,
+    seat: firstOpenSeat(game.seats),
     name: join.name,
     connected: true,
     ...editsAnySeat,
   }
-  return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
+  return {
+    game: { ...game, seats: [...game.seats, seat].sort((left, right) => left.seat - right.seat) },
+    pass: fresh,
+  }
+}
+
+const firstOpenSeat = (seats: readonly LanSeat[]) => {
+  let seat = 1
+  while (seats.some((taken) => taken.seat === seat)) seat += 1
+  return seat
+}
+
+/** why: the host trades two seats to change Two-Headed Giant teams. An open seat trades too, so a lobby may keep a gap, which the next guest fills. */
+export function swapLanSeats(game: LanGame, first: number, second: number): LanGame {
+  const inRange = (seat: number) =>
+    Number.isInteger(seat) && seat >= 1 && seat <= game.setup.playerCount
+  if (game.status !== "lobby" || first === second || !inRange(first) || !inRange(second))
+    return game
+  const traded = (seat: number) => (seat === first ? second : seat === second ? first : seat)
+  return {
+    ...game,
+    seats: game.seats
+      .map((seat) => ({ ...seat, seat: traded(seat.seat) }))
+      .sort((left, right) => left.seat - right.seat),
+  }
 }
 
 export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
   if (
     game.status !== "lobby" ||
     !Number.isInteger(playerCount) ||
-    playerCount < Math.max(LAN_MIN_PLAYERS, game.seats.length) ||
+    playerCount < Math.max(LAN_MIN_PLAYERS, ...game.seats.map(({ seat }) => seat)) ||
     playerCount > LAN_MAX_SEATS ||
     !fitsVariant(game.setup, playerCount)
   )
@@ -302,15 +342,10 @@ export function setLanDeck(game: LanGame, key: string, deck: LanSeatDeck | null)
 export const setLanConnected = (game: LanGame, key: string, connected: boolean) =>
   withSeat(game, key, (seat) => ({ ...seat, connected }))
 
-// why: only the lobby frees a seat; once a game has started, a departed guest keeps it to reconnect with its pass.
+// why: only the lobby frees a seat; once a game has started, a departed guest keeps it to reconnect with its pass. Everyone else keeps their seat, so teams the host traded stay put.
 export function releaseLanSeat(game: LanGame, key: string): LanGame {
   if (game.status !== "lobby") return setLanConnected(game, key, false)
-  return {
-    ...game,
-    seats: game.seats
-      .filter((seat) => seat.key !== key)
-      .map((seat, index) => ({ ...seat, seat: index + 1 })),
-  }
+  return { ...game, seats: game.seats.filter((seat) => seat.key !== key) }
 }
 
 function dealLanRoles(game: LanGame, random: () => number) {
@@ -356,6 +391,10 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
       status: "active",
       system: setup.system,
       format: setup.format,
+      // why: neighboring seats form the Two-Headed Giant teams, as on Convex.
+      ...(setup.variant === TWO_HEADED_GIANT
+        ? { variant: TWO_HEADED_GIANT, turnGroups: pairedTeams(game.seats.map(({ key }) => key)) }
+        : {}),
       ...(game.seats.every((seat) => seat.editsAnySeat) ? { lifeEditing: "anyone" as const } : {}),
       designations: {},
       ...modeGameFields(started, now, `archenemy_${lanRoundId(game)}`),
@@ -366,7 +405,11 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
             id: seat.key,
             userId: seat.key,
             currentLife:
-              started.archenemyId === seat.key ? ARCHENEMY_LIFE : startingLifeFor(setup, seat.deck),
+              started.archenemyId === seat.key
+                ? ARCHENEMY_LIFE
+                : setup.variant === TWO_HEADED_GIANT
+                  ? setup.startingLife
+                  : startingLifeFor(setup, seat.deck),
             eventCount: 0,
           },
         ]),
@@ -402,8 +445,20 @@ function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined
     ...tap,
   }
   if (event.type === "life.changed")
-    return { kind: "life", playerId: event.playerId, delta: event.delta, ...sent }
-  if (event.type === "table.action") return { kind: "table", action: event.action, ...sent }
+    return {
+      kind: "life",
+      playerId: event.playerId,
+      delta: event.delta,
+      ...(event.compensatesOperationId ? { undoOf: event.compensatesOperationId } : {}),
+      ...sent,
+    }
+  if (event.type === "table.action")
+    return {
+      kind: "table",
+      action: event.action,
+      ...(event.undoOf ? { undoOf: event.undoOf } : {}),
+      ...sent,
+    }
   if (event.type === "commanderDamage.submitted")
     return {
       kind: "commander.claim",
@@ -461,11 +516,9 @@ export const lanSeatAppearance = (seat: number) => ({
   shape: shapeForSeat(seat),
 })
 
-const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
-  rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
-
 const playerTableOf = (seat: PlayerTable): PlayerTable => ({
   ...(seat.counters ? { counters: seat.counters } : {}),
+  ...(seat.customCounters ? { customCounters: seat.customCounters } : {}),
   ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
 })
 
@@ -546,8 +599,8 @@ export function lanProjection(
     })),
     ...(commander ? { commanderDamage: commander } : {}),
     ...(memory &&
-    (tableRulesApply(rules) ||
-      ((memory.turn || memory.turnGroups) && tableVersion >= 3) ||
+    (hasTable(rules) ||
+      ((memory.turn || memory.turnGroups) && tableVersion >= TURN_TABLE_VERSION) ||
       (memory.modes && tableVersion >= TABLE_VERSION))
       ? {
           table: tableForVersion(
@@ -655,7 +708,9 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     ...setup,
     system,
     format,
-    ...((variant === "treachery" || variant === "archenemy") &&
+    ...((variant === "treachery" ||
+      variant === "archenemy" ||
+      (variant === TWO_HEADED_GIANT && isTwoHeadedGiantPlayerCount(setup.playerCount))) &&
     systemDefinition(system)?.variants.includes(variant)
       ? { variant }
       : {}),
@@ -700,9 +755,17 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
       ...base,
       playerId: asPlayerId(value.playerId),
       delta: value.delta,
+      ...(isId(value.compensatesOperationId)
+        ? { compensatesOperationId: asOperationId(value.compensatesOperationId) }
+        : {}),
     }
   if (value.type === "table.action" && matchesValidator(tableActionValidator, value.action))
-    return { type: "table.action", ...base, action: value.action }
+    return {
+      type: "table.action",
+      ...base,
+      action: value.action,
+      ...(isId(value.undoOf) ? { undoOf: asOperationId(value.undoOf) } : {}),
+    }
   if (
     value.type === "commanderDamage.submitted" &&
     isId(value.fromPlayerId) &&
@@ -757,6 +820,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(isCount(value.tableVersion) ? { tableVersion: value.tableVersion } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
+  if (value.type === "log") return { type: "log" }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }
   if (value.type === "stats") {
     const stats = parseLatencySummary(value.stats)
@@ -820,6 +884,7 @@ export function parseHostMessage(line: string): LanHostMessage | null {
       ...(value.partners === true ? { partners: true } : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(value.turns === true ? { turns: true } : {}),
+      ...(value.log === true ? { log: true } : {}),
     }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {
@@ -840,5 +905,34 @@ export function parseHostMessage(line: string): LanHostMessage | null {
     }
   if (value.type === "pong" && isCount(value.at) && isCount(value.hostAt))
     return { type: "pong", at: value.at, hostAt: value.hostAt }
+  if (value.type === "log" && Array.isArray(value.events))
+    return {
+      type: "log",
+      events: value.events.slice(-NEARBY_LOG_LIMIT).flatMap((event) => parseLogEvent(event) ?? []),
+    }
   return null
 }
+
+/** why: a newer host may send actions this build can't read, so a row keeps its change and drops only the action. */
+function parseLogEvent(value: unknown): ConnectedLogEvent | null {
+  if (!isRecord(value)) return null
+  const { operationId, playerId, kind, delta, fromPlayerId, clientCreatedAt, action, undoOf } =
+    value
+  if (!isId(operationId) || !isId(playerId) || !isId(kind) || !isCount(clientCreatedAt)) return null
+  return {
+    operationId,
+    playerId,
+    kind,
+    ...(isWhole(delta) ? { delta } : {}),
+    ...(isId(fromPlayerId) ? { fromPlayerId } : {}),
+    clientCreatedAt,
+    ...(matchesValidator(tableActionValidator, action) ? { action } : {}),
+    ...(isId(undoOf) ? { undoOf } : {}),
+    ...(value.mine === true ? { mine: true as const } : {}),
+  }
+}
+
+export const lanLog = (game: LanGame, viewerKey: string): ConnectedLogEvent[] =>
+  [...(game.memory?.events.values() ?? [])]
+    .slice(-NEARBY_LOG_LIMIT)
+    .map((event) => connectedLogEvent(event, viewerKey))

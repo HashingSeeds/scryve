@@ -101,9 +101,14 @@ async function parityGame(
               ...base,
               playerId: write.playerId as Id<"gamePlayers">,
               delta: write.delta,
+              ...(write.undoOf ? { undoOf: write.undoOf } : {}),
             })
           : write.kind === "table"
-            ? await client.mutation(api.games.tableAction, { ...base, action: write.action })
+            ? await client.mutation(api.games.tableAction, {
+                ...base,
+                action: write.action,
+                ...(write.undoOf ? { undoOf: write.undoOf } : {}),
+              })
             : write.kind === "commander.claim"
               ? await client.mutation(api.games.submitCommanderDamage, {
                   ...base,
@@ -262,7 +267,16 @@ async function parityGame(
       })
     ).table?.turn
 
+  const log = async (seat: Seat) =>
+    (
+      await clients[seat].query(api.games.connectedEvents, {
+        publicId,
+        paginationOpts: { numItems: 50, cursor: null },
+      })
+    ).page
+
   return {
+    log,
     hostSeat: hostRow._id as string,
     joinerSeat: joinerRow._id as string,
     write,
@@ -347,6 +361,35 @@ describe("engine parity: changeLife", () => {
       error: { code: "game_not_active" },
     })
     await game.expectSameState()
+  })
+})
+
+describe("engine parity: life undo", () => {
+  it("takes back only the writer's own standing life change", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const life = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "life",
+        playerId: game.hostSeat,
+        delta,
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", life("life-undo-original-1", -3))
+    await game.write("host", life("life-undo-missing-01", 3, "life-undo-nothing-01"))
+    expect(
+      await game.write("host", life("life-undo-takeback-1", 3, "life-undo-original-1")),
+    ).toMatchObject({ ok: true })
+    expect(
+      await game.write("host", life("life-undo-of-undo-01", -3, "life-undo-takeback-1")),
+    ).toMatchObject({ ok: false, error: { code: "invalid_undo" } })
+    await game.expectSameState()
+
+    const [undo, original] = await game.log("host")
+    expect(undo).toMatchObject({ undoOf: "life-undo-original-1", mine: true })
+    expect(original).toMatchObject({ operationId: "life-undo-original-1", mine: true })
+    expect((await game.log("joiner")).some((event) => event.mine)).toBe(false)
   })
 })
 
@@ -830,5 +873,80 @@ describe("memory engine: turn groups", () => {
       }),
     ).toMatchObject({ ok: true })
     expect(memory.turn).toMatchObject({ playerId: "ada", number: 1 })
+  })
+})
+
+describe("engine parity: counter undo", () => {
+  it("records what a counter tap changed, and takes back only the same kind of change", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const poison = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "table",
+        action: { kind: "counter.changed", playerId: game.hostSeat, counterId: "poison", delta },
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", poison("poison-floor-tap-01", -1))
+    await game.write("host", poison("poison-tap-000001", 2))
+    await game.write("host", {
+      kind: "life",
+      playerId: game.hostSeat,
+      delta: 1,
+      ...sent("life-wrong-undo-01"),
+      undoOf: "poison-tap-000001",
+    })
+    expect(
+      await game.write("host", poison("poison-undo-00001", -2, "poison-tap-000001")),
+    ).toMatchObject({
+      ok: true,
+    })
+    await game.expectSameState()
+    const log = await game.log("host")
+    expect(log.find((event) => event.operationId === "poison-floor-tap-01")?.delta).toBeUndefined()
+    expect(log.find((event) => event.operationId === "poison-tap-000001")?.delta).toBe(2)
+    expect(log.find((event) => event.operationId === "life-wrong-undo-01")).toBeUndefined()
+  })
+})
+
+describe("memory engine: life undo", () => {
+  it("refuses to take back another account's change on a table where anyone edits any seat", () => {
+    const seat = (id: string) => ({ id, userId: id, deviceId: `device-${id}`, currentLife: 40 })
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      lifeEditing: "anyone",
+      seats: new Map(["ada", "bo"].map((id) => [id, seat(id)])),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const life = (by: string, operationId: string, delta: number, undoOf?: string) =>
+      writeMemoryGame(
+        memory,
+        { userId: by, isHost: by === "ada" },
+        {
+          kind: "life",
+          playerId: "ada",
+          delta,
+          operationId,
+          deviceId: `device-${by}`,
+          clientCreatedAt: CREATED_AT,
+          ...(undoOf ? { undoOf } : {}),
+        },
+        CREATED_AT,
+      )
+
+    life("bo", "life-by-bo-on-ada-001", -5)
+    expect(life("ada", "life-ada-takes-back-1", 5, "life-by-bo-on-ada-001")).toMatchObject({
+      ok: false,
+      error: { code: "invalid_undo" },
+    })
+    expect(life("bo", "life-bo-takes-back-01", 5, "life-by-bo-on-ada-001")).toMatchObject({
+      ok: true,
+    })
+    expect(memory.seats.get("ada")?.currentLife).toBe(40)
   })
 })

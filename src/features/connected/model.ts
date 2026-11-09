@@ -117,6 +117,7 @@ export interface TableActionEvent {
   operationId: OperationId
   gameId: GameId
   action: TableAction
+  undoOf?: OperationId
   actorId: ActorId
   deviceId: DeviceId
   clientCreatedAt: number
@@ -349,7 +350,9 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
           format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
         }
       : {}),
-    ...(value.variant === "treachery" || value.variant === "archenemy"
+    ...(value.variant === "treachery" ||
+    value.variant === "archenemy" ||
+    value.variant === "twoHeadedGiant"
       ? { variant: value.variant }
       : {}),
     ...(matchesValidator(modeSetupValidator, value.modeSetup)

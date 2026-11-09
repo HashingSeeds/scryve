@@ -26,6 +26,7 @@ import {
   incomingCommanderDamage,
   isMatchInProgress,
   localOutState,
+  localTeams,
   matchContextLabel,
   matchScoreAfter,
 } from "@/features/game/domain"
@@ -181,22 +182,29 @@ export function CurrentGameScreen({
   const attack = useCommanderAttack(commanderPort, { seatDeck })
   const attackDispatch = attack.dispatch
   const layoutVariant = runtime.game.layout ?? "auto"
+  const teams = localTeams(runtime.game)
+  const [teamBinding] = useState(() => (repository ?? localGameRepository).teamBinding())
   const chrome = useBoardChrome({
     gameId: runtime.game.id,
     system,
     players: runtime.game.players,
+    teamCount: teams?.length,
     layout: {
       value: layoutVariant,
       onChange: runtime.changeLayout,
-      seats: (
-        <SeatArrangement
-          players={runtime.game.players}
-          layoutVariant={layoutVariant}
-          board={boardSize}
-          seatOrder={runtime.game.seatOrder}
-          onChange={runtime.changeSeatOrder}
-        />
-      ),
+      ...(teams
+        ? {}
+        : {
+            seats: (
+              <SeatArrangement
+                players={runtime.game.players}
+                layoutVariant={layoutVariant}
+                board={boardSize}
+                seatOrder={runtime.game.seatOrder}
+                onChange={runtime.changeSeatOrder}
+              />
+            ),
+          }),
     },
     petals: [
       {
@@ -259,7 +267,10 @@ export function CurrentGameScreen({
   const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
   const playerCount = runtime.game.players.length
   const { events } = runtime.game
-  const lifeLog = useMemo((): LifeLogSource => ({ kind: "local", events }), [events])
+  const lifeLog = useMemo(
+    (): LifeLogSource => ({ kind: "local", events, ...(teams ? { teams: teams } : {}) }),
+    [events, teams],
+  )
   const firstPlayer = useMemo<FirstPlayerOffer | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
     const offer = (run: () => void) => () => {
@@ -317,6 +328,7 @@ export function CurrentGameScreen({
     if (!turn) return undefined
     const { players, seatOrder } = runtime.game
     const order = clockwiseSlots.flatMap((slot) => {
+      if (teams) return teams[slot] ?? []
       const player = players[seatOrder?.[slot] ?? slot]
       return player ? [player.id] : []
     })
@@ -553,6 +565,8 @@ export function CurrentGameScreen({
               onPlayStart={markFirstPlayerUsed}
               layoutVariant={layoutVariant}
               seatOrder={runtime.game.seatOrder}
+              teams={teams}
+              teamBinding={teamBinding}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
               outState={outState}
@@ -652,10 +666,12 @@ export function CurrentGameScreen({
           events={events}
           turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
           groups={turnGroups}
+          counters={runtime.game.counterLog}
+          sharedLife={!!teams}
           modes={boardModes.log.map(modeLogRow)}
-          canUndo={runtime.canUndo}
+          canUndo={runtime.canUndo(turnPrefs.enabled)}
           origin={chrome.dialogOrigin}
-          onUndo={runtime.undo}
+          onUndo={() => runtime.undo(turnPrefs.enabled)}
           onClose={() => setLogOpen(false)}
         />
       ) : null}
