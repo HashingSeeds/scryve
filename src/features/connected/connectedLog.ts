@@ -2,7 +2,7 @@ import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "@/fe
 import { gameLog, rowPosition } from "@/features/game/LifeLog"
 import type { GameEvent, GamePlayer, TurnLogEntry } from "@/features/game/types"
 
-import type { PendingLifeAction } from "./model"
+import { compareQueued, type PendingLifeAction } from "./model"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import type { Turn } from "../../../convex/lib/turns"
 
@@ -22,7 +22,7 @@ export function connectedLogEvents(
   anyoneEdits = false,
 ): ConnectedLogEvent[] {
   const known = new Set(confirmed.map(({ operationId }) => operationId))
-  const unsent = pending.flatMap(({ event }): ConnectedLogEvent[] => {
+  const unsent = [...pending].sort(compareQueued).flatMap(({ event }): ConnectedLogEvent[] => {
     if (event.gameId !== gameId || known.has(event.operationId)) return []
     const base = { operationId: event.operationId, clientCreatedAt: event.clientCreatedAt }
     if (event.type === "life.changed")
@@ -61,11 +61,8 @@ export function connectedLogEvents(
       ]
     return []
   })
-  // why: device clocks drift apart, so confirmed changes keep the authority's order and only this device's own unsent ones sort by when it made them.
-  return [
-    ...confirmed,
-    ...unsent.sort((left, right) => left.clientCreatedAt - right.clientCreatedAt),
-  ]
+  // why: the log's order is a sequence, never a clock: the authority's order, then this device's unsent changes in the order it queued them.
+  return [...confirmed, ...unsent]
 }
 
 /** why: device clocks drift apart, so turn headings and Undo place a change by where the authority recorded it, and its own time stays for bursts and display. */

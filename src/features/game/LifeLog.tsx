@@ -126,18 +126,17 @@ export const rowPosition = (
 ) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
 
 /**
- * why: a local game has one clock, so rows go under a turn by time. A connected log passes
- * `positionOf`, the authority's order, since device clocks drift apart; a turn whose start hasn't
- * loaded yet heads every loaded row.
+ * why: the log's order is a sequence, never a clock: `positionOf` is the authority's order in a
+ * connected game and the apply order in a local one. A turn whose start hasn't loaded yet heads
+ * every loaded row.
  */
 export function withTurnDividers(
   rows: readonly GameLogRow[],
   turns: readonly TurnLogEntry[],
-  positionOf?: (operationId: string) => number | undefined,
+  positionOf: (operationId: string) => number | undefined,
 ): GameLogItem[] {
-  const startOf = (turn: TurnLogEntry) =>
-    positionOf ? (positionOf(turn.operationId) ?? -Infinity) : turn.at
-  const placeOf = (row: GameLogRow) => (positionOf ? rowPosition(row, positionOf) : row.at)
+  const startOf = (turn: TurnLogEntry) => positionOf(turn.operationId) ?? -Infinity
+  const placeOf = (row: GameLogRow) => rowPosition(row, positionOf)
   const items: GameLogItem[] = []
   let index = 0
   for (const turn of [...turns].reverse()) {

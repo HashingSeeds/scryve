@@ -502,6 +502,9 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
+    ...(Array.isArray(value.logOrder)
+      ? { logOrder: value.logOrder.filter((id): id is string => typeof id === "string") }
+      : {}),
   }
 }
 

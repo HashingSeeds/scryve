@@ -134,6 +134,7 @@ describe("local turns", () => {
         { operationId: "turn-1", playerId: ada.id, number: 1, at: 1_000 },
         { operationId: "turn-2", playerId: bo.id, number: 2, at: 5_000 },
       ],
+      (operationId) => ["turn-1", "early", "turn-2", "late"].indexOf(operationId),
     )
     expect(log.map((item) => (item.kind === "turn" ? `turn ${item.number}` : item.id))).toEqual([
       "turn 2",

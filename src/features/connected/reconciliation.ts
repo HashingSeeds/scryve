@@ -7,6 +7,7 @@ import type {
   ConnectedProjection,
   PendingLifeAction,
 } from "./model"
+import { compareQueued } from "./model"
 import { PERMANENT_GAME_WRITE_CODES } from "../../../convex/lib/gameWriteErrors"
 import { applyTableAction, EMPTY_TABLE } from "../../../convex/lib/table"
 
@@ -121,12 +122,7 @@ function withCommanderHits(
 }
 
 export function oldestFirst(actions: readonly PendingLifeAction[]): PendingLifeAction[] {
-  return [...actions].sort(
-    (left, right) =>
-      left.queuedAt - right.queuedAt ||
-      left.event.clientCreatedAt - right.event.clientCreatedAt ||
-      left.event.operationId.localeCompare(right.event.operationId),
-  )
+  return [...actions].sort(compareQueued)
 }
 
 export type WriteFailureKind = "retry" | "permanent"
