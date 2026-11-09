@@ -1,11 +1,8 @@
 import { Platform } from "react-native"
-import * as Application from "expo-application"
-import Constants from "expo-constants"
 import { router } from "expo-router"
 import { useQuery } from "convex/react"
 import Head from "expo-router/head"
 
-import { openAppleStandardEula } from "@/content/legalLinks"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { useFeedbackKey } from "@/features/feedback/feedbackKey"
@@ -38,30 +35,32 @@ function LiveSupport() {
   const key = useFeedbackKey({ create: false })
   const online = useConvexOnline()
   const mine = useQuery(api.feedback.mine, key ? { key } : {})
-  return <Support unread={mine?.filter((item) => item.unread).length ?? 0} offline={!online} />
+  return (
+    <Support
+      unread={mine?.filter((item) => item.unread).length ?? 0}
+      hasFeedback={Boolean(mine?.length)}
+      offline={!online}
+    />
+  )
 }
 
 function StaticSupport() {
-  return <Support unread={0} offline={false} />
+  return <Support unread={0} hasFeedback={false} offline={false} />
 }
 
-function Support(props: Pick<SupportScreenProps, "unread" | "offline">) {
+function Support(props: Pick<SupportScreenProps, "unread" | "hasFeedback" | "offline">) {
   return (
     <SupportScreen
       {...props}
       onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
       onYourFeedback={() => router.push("/feedback/mine")}
       onEmailSupport={() => void openUrl(SUPPORT_EMAIL)}
-      onSuggest={(message) =>
-        router.push(message ? { pathname: "/feedback/new", params: { message } } : "/feedback/new")
+      onSuggest={({ kind, message }) =>
+        router.push({
+          pathname: "/feedback/new",
+          params: { kind, ...(message ? { message } : {}) },
+        })
       }
-      onOpenPrivacy={() => router.push("/privacy")}
-      onOpenTerms={() => router.push("/terms")}
-      onOpenLicenseAgreement={
-        Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
-      }
-      onOpenCookiePolicy={() => router.push("/cookie-policy")}
-      appVersion={Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
     />
   )
 }

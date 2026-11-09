@@ -10,7 +10,8 @@ export default {
     newCount_other: "{{count}} nouveaux",
     email: "Écrire au support",
     emailDetail: "Questions sur le compte ou la facturation",
-    suggest: "Suggérer une fonctionnalité ou signaler un bug",
+    suggestFeature: "Suggérer une fonctionnalité",
+    reportBug: "Signaler un bug",
     noMatch: "Aucune réponse pour « {{query}} ».",
     ask: "Posez-nous une question sur « {{query}} »",
   },
@@ -20,24 +21,26 @@ export default {
     kind: "De quoi s'agit-il ?",
     feature: "Fonctionnalité",
     bug: "Bug",
+    prompt: {
+      feature: "Que souhaiteriez-vous voir ?",
+      bug: "Qu'est-ce qui ne s'est pas passé comme prévu ?",
+    },
     bodyPlaceholder: {
-      feature: "Que souhaiteriez-vous, et quand l'utiliseriez-vous ?",
-      bug: "Que s'est-il passé ? Qu'attendiez-vous ?",
+      feature: "Quand l'utiliseriez-vous ?",
+      bug: "Que s'est-il passé, et qu'attendiez-vous ?",
     },
     addScreenshot: "Ajouter une capture d'écran",
     removeScreenshot: "Retirer la capture d'écran",
     selectedScreenshot: "Capture d'écran sélectionnée",
     screenshotFailed: "Impossible d'ajouter cette capture d'écran. Essayez une autre image.",
-    sentryDisclosure:
-      "Les signalements de bugs et les captures d'écran envoient aussi les détails de votre appareil à Sentry.",
-    translationNotice:
-      "Écrivez dans la langue de votre choix. Nous pouvons utiliser des outils d'IA pour la traduire. Consultez notre <privacy>Politique de confidentialité</privacy>.",
+    notice: {
+      feature:
+        "Toutes les langues sont acceptées. Une IA peut nous aider à vous lire. <privacy>Confidentialité</privacy>",
+      bug: "Toutes les langues sont acceptées. Une IA peut nous aider à vous lire. Les rapports de bug incluent des infos sur l'appareil. <privacy>Confidentialité</privacy>",
+    },
     includeAccount: "Inclure mon compte",
     includeAccountHelper:
-      "Les réponses vous suivent sur chaque appareil où vous vous connectez, et nous voyons votre nom d'utilisateur.",
-    anonymous:
-      "Envoyé sans votre compte. Les réponses s'affichent sur cet appareil, et une réinstallation peut les faire perdre.",
-    signInToKeep: "Connectez-vous pour la conserver",
+      "Les réponses se synchronisent sur vos appareils, et nous voyons votre nom d'utilisateur.",
     sendFailed: "Envoi impossible. Réessayez.",
     rateLimited_one: "Trop d'envois. Réessayez dans {{count}} minute.",
     rateLimited_many: "Trop d'envois. Réessayez dans {{count}} de minutes.",
@@ -69,7 +72,7 @@ export default {
     linkedElsewhere: "Envoyé avec un autre compte",
     notLinked: "Envoyé sans votre compte.",
     includeAccount: "L'inclure",
-    signInToKeep: "Connectez-vous pour le conserver",
+    signInToSync: "Connectez-vous pour le synchroniser",
   },
   notifyPrompt: {
     title: "Recevoir une notification pour les réponses ?",

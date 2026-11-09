@@ -8,7 +8,8 @@ export default {
     newCount_other: "새 답변 {{count}}개",
     email: "이메일 문의",
     emailDetail: "계정 또는 결제 문의",
-    suggest: "기능 제안 또는 버그 신고",
+    suggestFeature: "기능 제안하기",
+    reportBug: "버그 신고하기",
     noMatch: "“{{query}}”에 대한 답변이 없습니다.",
     ask: "“{{query}}” 문의하기",
   },
@@ -18,23 +19,25 @@ export default {
     kind: "어떤 내용인가요?",
     feature: "기능",
     bug: "버그",
+    prompt: {
+      feature: "어떤 기능을 원하시나요?",
+      bug: "어떤 문제가 있었나요?",
+    },
     bodyPlaceholder: {
-      feature: "어떤 기능을 원하시나요? 언제 사용하시겠습니까?",
-      bug: "무슨 일이 있었나요? 어떻게 되길 기대하셨나요?",
+      feature: "언제 사용하실 건가요?",
+      bug: "어떤 일이 있었고, 어떻게 되길 기대하셨나요?",
     },
     addScreenshot: "스크린샷 추가",
     removeScreenshot: "스크린샷 삭제",
     selectedScreenshot: "선택한 스크린샷",
     screenshotFailed: "스크린샷을 추가하지 못했습니다. 다른 이미지를 선택하세요.",
-    sentryDisclosure: "버그 신고와 스크린샷을 보내면 기기 정보도 Sentry로 전송됩니다.",
-    translationNotice:
-      "어떤 언어로든 작성하세요. AI 도구로 번역할 수 있습니다. <privacy>개인정보 처리방침</privacy>을 확인하세요.",
+    notice: {
+      feature:
+        "어떤 언어든 괜찮습니다. AI가 내용을 읽는 데 도움을 줄 수 있습니다. <privacy>개인정보 처리방침</privacy>",
+      bug: "어떤 언어든 괜찮습니다. AI가 내용을 읽는 데 도움을 줄 수 있습니다. 버그 신고에는 기기 정보가 포함됩니다. <privacy>개인정보 처리방침</privacy>",
+    },
     includeAccount: "내 계정 포함",
-    includeAccountHelper:
-      "로그인한 모든 기기에서 답변을 확인할 수 있으며, 사용자 이름이 우리에게 표시됩니다.",
-    anonymous:
-      "계정 없이 전송되었습니다. 답변은 이 기기에 표시되며, 앱을 다시 설치하면 사라질 수 있습니다.",
-    signInToKeep: "로그인하여 보관",
+    includeAccountHelper: "답변이 내 기기에 동기화되며, 사용자 이름이 우리에게 표시됩니다.",
     sendFailed: "보내지 못했습니다. 다시 시도하세요.",
     rateLimited_other: "전송 횟수가 너무 많습니다. {{count}}분 후에 다시 시도하세요.",
   },
@@ -64,7 +67,7 @@ export default {
     linkedElsewhere: "다른 계정으로 전송됨",
     notLinked: "계정 없이 전송되었습니다.",
     includeAccount: "계정 포함하기",
-    signInToKeep: "로그인하여 보관하기",
+    signInToSync: "로그인하여 동기화하세요",
   },
   notifyPrompt: {
     title: "답변 알림을 받을까요?",
