@@ -619,6 +619,9 @@ describe("LifeCard", () => {
           />
         </ThemeProvider>,
       )
+      fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+        nativeEvent: { layout: { width: 200, height: 300 } },
+      })
 
       const layer = StyleSheet.flatten(view.getByTestId("life-corner-layer-seat-1").props.style)
       expect(layer.transform).toEqual([{ rotate: `${contentRotation}deg` }])

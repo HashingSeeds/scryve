@@ -259,6 +259,8 @@ export const LifeCard = memo(function LifeCard({
   const resolvedLifeFontSize = fontSizeFor(shownDigits)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
+  // why: a sideways corner layer is sized from the card, so laid out before the card measures, the row's corner slide carries the name across the seat into place.
+  const cornerMeasured = !sidewaysContent || cardSize.width > 0
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
 
@@ -933,7 +935,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {(!commanderCovers || attackerSide) && !tableSheetOpen && !dice?.view ? (
+      {cornerMeasured && (!commanderCovers || attackerSide) && !tableSheetOpen && !dice?.view ? (
         // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
         <Animated.View
           key={contentRotation}

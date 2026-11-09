@@ -130,6 +130,11 @@ function tableGrid(table: TableState) {
   return { view, submit }
 }
 
+function layoutCards(view: ReturnType<typeof render>) {
+  for (const card of view.queryAllByTestId(/^life-card-seat-\d+$/))
+    fireEvent(card, "layout", { nativeEvent: { layout: { width: 300, height: 400, x: 0, y: 0 } } })
+}
+
 describe("PlayerGrid", () => {
   it("draws a foil player's Pro mark in foil on a Pokémon seat, and leaves a free mark flat", () => {
     const rules = playTableRules("pokemon", "standard")
@@ -601,6 +606,7 @@ describe("PlayerGrid", () => {
       </ThemeProvider>
     )
     const view = render(grid(false))
+    layoutCards(view)
     const markFromSeam = () =>
       Number(StyleSheet.flatten(view.getByTestId("life-identity-row-seat-3").props.style).left)
     const resting = markFromSeam()
@@ -959,6 +965,7 @@ describe("PlayerGrid", () => {
         <PlayerGrid players={players(6)} onChange={jest.fn()} />
       </ThemeProvider>,
     )
+    layoutCards(view)
 
     expect(view.getByTestId("player-mark-seat-6", { includeHiddenElements: true })).toBeTruthy()
     expect(view.getAllByText("20")[5].props.maxFontSizeMultiplier).toBe(1.3)
