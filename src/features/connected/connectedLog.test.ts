@@ -66,6 +66,67 @@ const turnOf = (operationId: string, number: number, previous = true): Turn => (
 })
 
 describe("connected log", () => {
+  it("keeps a confirmed counter tap and a later unsent one apart when the device clock runs backward", () => {
+    const poison = {
+      kind: "counter.changed",
+      playerId: "ada",
+      counterId: "poison",
+      delta: 1,
+    } as const
+    const unsent = {
+      schemaVersion: 1,
+      event: {
+        type: "table.action",
+        operationId: "poison-unsent-11s",
+        gameId: GAME,
+        action: poison,
+        actorId: "me",
+        deviceId: "device-me",
+        clientCreatedAt: 11_000,
+      },
+      queuedAt: 11_000,
+      attempts: 0,
+    } as PendingLifeAction
+    const events = connectedLogEvents(
+      [
+        {
+          operationId: "poison-confirmed-60s",
+          playerId: "ada",
+          kind: "counter.changed",
+          delta: 1,
+          action: poison,
+          clientCreatedAt: 60_000,
+          mine: true,
+        },
+      ],
+      [unsent],
+      GAME,
+      true,
+    )
+    expect(
+      connectedLogUndo(events, players, GAME, undefined, {
+        turns: true,
+        table: { players: { ada: { counters: { poison: 2 } } } },
+      }),
+    ).toEqual({
+      kind: "counter",
+      changes: [{ operationId: "poison-unsent-11s", action: { ...poison, delta: -1 } }],
+    })
+  })
+
+  it("keeps a confirmed change and a later unsent one apart when the device clock runs backward", () => {
+    const events = connectedLogEvents(
+      [life("confirmed-at-60s", "ada", -2, 60_000, { mine: true })],
+      [queued("unsent-at-11s", "ada", -3, 11_000)],
+      GAME,
+      true,
+    )
+    expect(connectedLogUndo(events, players, GAME, undefined, { turns: true })).toEqual({
+      kind: "life",
+      changes: [{ operationId: "unsent-at-11s", playerId: "ada", delta: -3 }],
+    })
+  })
+
   it("keeps two of my changes ten seconds apart as two rows after another device's later-stamped change", () => {
     const confirmed = [
       life("other-device", "bo", -1, 60_000),
