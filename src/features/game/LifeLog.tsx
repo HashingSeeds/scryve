@@ -119,15 +119,31 @@ export type GameLogItem =
   | (GameLogRow & { kind?: undefined })
   | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
 
+/** why: a connected log places a row by the newest change in it, where the authority recorded that change. */
+export const rowPosition = (
+  row: Pick<GameLogRow, "operationIds">,
+  positionOf: (operationId: string) => number | undefined,
+) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
+
+/**
+ * why: a local game has one clock, so rows go under a turn by time. A connected log passes
+ * `positionOf`, the authority's order, since device clocks drift apart; a turn whose start hasn't
+ * loaded yet heads every loaded row.
+ */
 export function withTurnDividers(
   rows: readonly GameLogRow[],
   turns: readonly TurnLogEntry[],
+  positionOf?: (operationId: string) => number | undefined,
 ): GameLogItem[] {
+  const startOf = (turn: TurnLogEntry) =>
+    positionOf ? (positionOf(turn.operationId) ?? -Infinity) : turn.at
+  const placeOf = (row: GameLogRow) => (positionOf ? rowPosition(row, positionOf) : row.at)
   const items: GameLogItem[] = []
   let index = 0
   for (const turn of [...turns].reverse()) {
     const start = index
-    while (index < rows.length && rows[index].at >= turn.at) index += 1
+    const begins = startOf(turn)
+    while (index < rows.length && placeOf(rows[index]) >= begins) index += 1
     items.push({ kind: "turn", ...turn }, ...rows.slice(start, index))
   }
   return [...items, ...rows.slice(index)]

@@ -7,7 +7,12 @@ import { GameLogDialog } from "@/features/game/GameLogDialog"
 import type { GamePlayer } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 
-import { connectedLogEvents, connectedLogInputs, connectedLogUndo } from "./connectedLog"
+import {
+  connectedLogEvents,
+  connectedLogInputs,
+  connectedLogUndo,
+  logPositions,
+} from "./connectedLog"
 import type { PendingLifeAction } from "./model"
 import type { ConnectedGameRuntime } from "./useConnectedRuntime"
 import { api } from "../../../convex/_generated/api"
@@ -128,6 +133,7 @@ function ConnectedLog({
     [anyoneEdits, feed.events, pending, publicId],
   )
   const inputs = useMemo(() => connectedLogInputs(events, publicId, turn), [events, publicId, turn])
+  const positionOf = useMemo(() => logPositions(events), [events])
   const undo = connectedLogUndo(events, players, publicId, turn, { turns: turnsShown })
   return (
     <GameLogDialog
@@ -139,6 +145,7 @@ function ConnectedLog({
       undoLabel={translate("board:log.undoMine")}
       origin={origin}
       onMore={feed.more}
+      positionOf={positionOf}
       onUndo={() => {
         if (undo?.kind === "turn") onUndoTurn(undo.playerId, undo.turnOperationId)
         else if (undo) context?.undoLife(undo.changes)
