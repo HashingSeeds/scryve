@@ -442,6 +442,12 @@ export function PlayerGrid({
               const partnerIncoming =
                 commanderDamage?.incomingFor(player.id, PARTNER_COMMANDER) ?? NO_INCOMING
               const strike = attack && armedPlayer ? attack.against(player.id) : undefined
+              const corners = getScreenCornerSquaringStyle({
+                rows,
+                rowIndex,
+                columnIndex,
+                insets: Platform.OS === "web" ? insets : undefined,
+              })
               if (table?.tableRules.pokemon) {
                 return (
                   <View
@@ -476,14 +482,13 @@ export function PlayerGrid({
                         onChange(player.id, delta),
                       )}
                       onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
-                      style={getScreenCornerSquaringStyle({
-                        rows,
-                        rowIndex,
-                        columnIndex,
-                        insets: Platform.OS === "web" ? insets : undefined,
-                      })}
+                      style={corners}
                     />
-                    <SeatSpotlight playerId={player.id} />
+                    <SeatSpotlight
+                      playerId={player.id}
+                      compact={layout.compact}
+                      corners={corners}
+                    />
                   </View>
                 )
               }
@@ -623,14 +628,9 @@ export function PlayerGrid({
                     onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                       onChange(player.id, delta),
                     )}
-                    style={getScreenCornerSquaringStyle({
-                      rows,
-                      rowIndex,
-                      columnIndex,
-                      insets: Platform.OS === "web" ? insets : undefined,
-                    })}
+                    style={corners}
                   />
-                  <SeatSpotlight playerId={player.id} />
+                  <SeatSpotlight playerId={player.id} compact={layout.compact} corners={corners} />
                 </View>
               )
             })}

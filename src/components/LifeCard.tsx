@@ -70,6 +70,7 @@ import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
+  seatCardRadius,
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
   getLifeFontSizeThatFits,
@@ -1160,12 +1161,12 @@ export const LifeCard = memo(function LifeCard({
 const STACK_MS = 260
 const KNOCKBACK = 12
 
-const $card: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   overflow: "hidden",
   padding: spacing.xs,
   borderWidth: 0,
-  borderRadius: radius.xxxl,
+  borderRadius: seatCardRadius(),
 })
 
 const $content: ThemedStyle<ViewStyle> = () => ({
@@ -1180,9 +1181,9 @@ const $readout: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $compactCard: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.xxs,
-  borderRadius: radius.xxl,
+  borderRadius: seatCardRadius(true),
 })
 
 const $life: ThemedStyle<TextStyle> = () => ({
