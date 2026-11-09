@@ -19,7 +19,7 @@ import type {
   PendingLifeAction,
   TableActionEvent,
 } from "./model"
-import { compareQueued, toConnectedProjection } from "./model"
+import { compareQueued, nextQueuedSequence, toConnectedProjection } from "./model"
 import { matchesValidator, tableActionValidator } from "../../../convex/lib/table"
 import {
   asActorId,
@@ -427,6 +427,15 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   createFailure: (action, reason, failedAt) => ({ schemaVersion: 1, action, reason, failedAt }),
   operationId: (action) => action.event.operationId,
   compare: compareQueued,
+  // why: a build from before `sequence` queues without one; it was queued after whatever came before it in storage.
+  inStoredOrder: (pending) => {
+    let next = nextQueuedSequence(pending)
+    return pending.map((action) =>
+      action.sequence === undefined ? { ...action, sequence: next++ } : action,
+    )
+  },
+  // why: two tabs of one game share this storage, so the next sequence comes from what it holds now.
+  stamp: (action, stored) => ({ ...action, sequence: nextQueuedSequence(stored) }),
   operationTypes: [
     "life.changed",
     "table.action",
