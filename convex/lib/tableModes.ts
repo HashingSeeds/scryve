@@ -41,9 +41,10 @@ export type ModeLogEntry = Infer<typeof modeLogValidator>
 
 /**
  * why: one communal planar deck (CR 901.15). `order[0]` is face up, and a planeswalk moves it to
- * the bottom. `rolls` counts each player's rolls during turn `rollsTurn`, so a pass resets the
- * cost without a write, and an undone pass brings it back. No `decks` means the players use
- * their own cards and the app keeps only the die and its cost.
+ * the bottom. `rolls` counts each player's rolls during turn `rollsTurn` (the turn that began
+ * with `rollsTurnId`), so a pass resets the cost without a write. The first roll of a new turn
+ * keeps the turn before's counts in `previousRolls`, so an undone pass brings them back. No
+ * `decks` means the players use their own cards and the app keeps only the die and its cost.
  */
 export const planechaseValidator = v.object({
   decks: v.optional(v.array(v.string())),
@@ -52,6 +53,10 @@ export const planechaseValidator = v.object({
   faceUp: v.optional(v.number()),
   rolls: v.record(v.string(), v.number()),
   rollsTurn: v.optional(v.number()),
+  rollsTurnId: v.optional(v.string()),
+  previousRolls: v.optional(
+    v.object({ turnId: v.string(), rolls: v.record(v.string(), v.number()) }),
+  ),
 })
 
 /** why: `order[0]` is the top scheme. A plain scheme goes to the bottom once revealed and stays `shown` until the next. */
@@ -125,8 +130,22 @@ export function faceUpPlane(planechase: Planechase | undefined) {
   return index === undefined ? undefined : planarCards(planechase?.decks)[index]
 }
 
+const NO_ROLLS: Planechase["rolls"] = {}
+
+function turnRolls(planechase: Planechase, turn: Turn | undefined): Planechase["rolls"] {
+  if (!turn) return planechase.rollsTurn === undefined ? planechase.rolls : NO_ROLLS
+  if (
+    planechase.rollsTurn === turn.number &&
+    (planechase.rollsTurnId === undefined || planechase.rollsTurnId === turn.operationId)
+  )
+    return planechase.rolls
+  return planechase.previousRolls?.turnId === turn.operationId
+    ? planechase.previousRolls.rolls
+    : NO_ROLLS
+}
+
 export function rollCost(planechase: Planechase, turn: Turn | undefined, playerId: string) {
-  return planechase.rollsTurn === turn?.number ? (planechase.rolls[playerId] ?? 0) : 0
+  return turnRolls(planechase, turn)[playerId] ?? 0
 }
 
 /** why: the planar controller is the active player (CR 901.6), and every seat of a team that shares the turn may roll (CR 901.12d). */
@@ -321,11 +340,19 @@ export function applyModeAction(
   // why: a face-up phenomenon planeswalks before anyone gets priority again (CR 312.7), so nobody rolls under it.
   if (faceUpPlane(planechase)?.kind === "phenomenon") return null
   const cost = rollCost(planechase, context.turn, playerId)
-  const fresh = planechase.rollsTurn === context.turn?.number ? planechase.rolls : {}
+  const counted = turnRolls(planechase, context.turn)
+  // why: another turn's counts stay one step back, where an undone pass finds them.
+  const displaced =
+    counted !== planechase.rolls && planechase.rollsTurnId !== undefined
+      ? { previousRolls: { turnId: planechase.rollsTurnId, rolls: planechase.rolls } }
+      : {}
   const rolled: Planechase = {
     ...planechase,
-    rolls: { ...fresh, [playerId]: cost + 1 },
-    ...(context.turn ? { rollsTurn: context.turn.number } : {}),
+    ...displaced,
+    rolls: { ...counted, [playerId]: cost + 1 },
+    ...(context.turn
+      ? { rollsTurn: context.turn.number, rollsTurnId: context.turn.operationId }
+      : {}),
   }
   const afterRoll = logged(
     { ...modes, planechase: rolled },
@@ -346,7 +373,11 @@ function isValidPlanechase(planechase: Planechase, playerIds: ReadonlySet<string
   const size = planarCards(decks).length
   return (
     Object.keys(planechase.rolls).every((id) => playerIds.has(id)) &&
-    Object.values(planechase.rolls).every((count) => Number.isInteger(count) && count >= 0) &&
+    [planechase.rolls, planechase.previousRolls?.rolls ?? {}].every(
+      (rolls) =>
+        Object.keys(rolls).every((id) => playerIds.has(id)) &&
+        Object.values(rolls).every((count) => Number.isInteger(count) && count >= 0),
+    ) &&
     (planechase.order === undefined ||
       (planechase.order.length === size && isIndexOrder(planechase.order, size)))
   )
@@ -400,6 +431,9 @@ function withoutOrder<Deck extends { order?: number[] }>({ order: _hidden, ...sh
   return shown
 }
 
+const remapRolls = (rolls: Planechase["rolls"], idOf: (playerId: string) => string) =>
+  Object.fromEntries(Object.entries(rolls).map(([id, count]) => [idOf(id), count]))
+
 export function remapModes(modes: TableModes, idOf: (playerId: string) => string): TableModes {
   const { planechase, archenemy, log } = modes
   return {
@@ -407,9 +441,15 @@ export function remapModes(modes: TableModes, idOf: (playerId: string) => string
       ? {
           planechase: {
             ...planechase,
-            rolls: Object.fromEntries(
-              Object.entries(planechase.rolls).map(([id, count]) => [idOf(id), count]),
-            ),
+            rolls: remapRolls(planechase.rolls, idOf),
+            ...(planechase.previousRolls
+              ? {
+                  previousRolls: {
+                    ...planechase.previousRolls,
+                    rolls: remapRolls(planechase.previousRolls.rolls, idOf),
+                  },
+                }
+              : {}),
           },
         }
       : {}),

@@ -45,6 +45,23 @@ describe("Planechase", () => {
       ).toBe("plane")
   })
 
+  it("brings a player's roll count back when their pass is undone, after the next player rolled", () => {
+    const blank = (playerId: string) =>
+      ({ kind: "planar.rolled", playerId, face: "blank" }) as const
+    const adaTurn = turn("ada", 1)
+    const rolled = play(modes!, [
+      [blank("ada"), adaTurn],
+      [blank("ada"), adaTurn],
+      [blank("cy"), turn("cy", 2)],
+    ])!
+    expect(rollCost(rolled.planechase!, adaTurn, "ada")).toBe(2)
+
+    const afterUndo = play(rolled, [[blank("ada"), adaTurn]])!
+    expect(afterUndo.log?.at(-1)?.cost).toBe(2)
+    const passedAgain = { ...turn("cy", 2), operationId: "turn-2-again" }
+    expect(rollCost(afterUndo.planechase!, passedAgain, "cy")).toBe(0)
+  })
+
   it("charges one more for each roll this turn, and a pass resets it", () => {
     const blank = { kind: "planar.rolled", playerId: "ada", face: "blank" } as const
     const rolled = play(modes!, [
