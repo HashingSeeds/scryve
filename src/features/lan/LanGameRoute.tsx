@@ -3,6 +3,7 @@ import { Redirect, router } from "expo-router"
 
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { lanSession, useLanSession } from "@/features/lan/lanSession"
+import { NearbyLogFeed } from "@/features/lan/NearbyLogFeed"
 import { useLanGame } from "@/features/lan/useLanGame"
 import { ConnectedBoardWithRuntime } from "@/screens/ConnectedBoardScreen"
 
@@ -15,7 +16,7 @@ export default function LanGameRoute() {
   // why: resuming before useLanGame reads the session puts the saved game on the first render instead of leaving the route.
   useState(() => lanPlayAvailable() && lanSession.resumeHostedGame())
   const runtime = useLanGame()
-  const { projection, lobby, role, status, error, partners, turns } = useLanSession()
+  const { projection, lobby, role, status, error, partners, turns, logs } = useLanSession()
   // why: with no game and no error, the lobby has nothing to show and would say "Connecting…" forever.
   const gameGone = lanPlayAvailable() && !projection && !error
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function LanGameRoute() {
       cloud={false}
       partners={partners}
       turns={role === "host" || turns === true}
+      logFeed={role === "host" || logs === true ? NearbyLogFeed : undefined}
       awayPlayerIds={awayPlayerIds}
       onRevealRole={lanSession.revealRole}
       roleRevealOnline={role === "host" || status === "connected"}

@@ -12,6 +12,11 @@ import {
   type MemoryGame,
 } from "../../../convex/lib/gameEngineMemory"
 import {
+  connectedLogEvent,
+  NEARBY_LOG_LIMIT,
+  type ConnectedLogEvent,
+} from "../../../convex/lib/gameLog"
+import {
   commanderField,
   commanderLethalDamage,
   isCommanderSlot,
@@ -23,6 +28,7 @@ import {
 } from "../../../convex/lib/layouts"
 import { outReason } from "../../../convex/lib/outReason"
 import {
+  hasTable,
   identitySection,
   startingValueRange,
   systemDefinition,
@@ -31,6 +37,7 @@ import {
 import {
   matchesValidator,
   TABLE_VERSION,
+  TURN_TABLE_VERSION,
   tableActionValidator,
   tableForVersion,
   type PlayerTable,
@@ -144,6 +151,7 @@ export type LanGuestMessage =
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
+  | { type: "log" }
   | { type: "deck"; deck: LanSeatDeck | null }
   | { type: "ping"; at: number }
   | { type: "stats"; stats: SyncLatencySummary }
@@ -157,6 +165,8 @@ export type LanHostMessage =
       partners?: boolean
       editsAnySeat?: boolean
       turns?: boolean
+      /** why: a host from before the game log ignores a guest's log request, so guests offer the log only when the welcome says so. */
+      log?: boolean
     }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
@@ -164,6 +174,7 @@ export type LanHostMessage =
   | { type: "ack"; operationId: string; status?: ClaimStatus }
   | { type: "nack"; operationId: string; code?: string; message: string }
   | { type: "pong"; at: number; hostAt: number }
+  | { type: "log"; events: ConnectedLogEvent[] }
 
 export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
 
@@ -413,8 +424,20 @@ function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined
     ...tap,
   }
   if (event.type === "life.changed")
-    return { kind: "life", playerId: event.playerId, delta: event.delta, ...sent }
-  if (event.type === "table.action") return { kind: "table", action: event.action, ...sent }
+    return {
+      kind: "life",
+      playerId: event.playerId,
+      delta: event.delta,
+      ...(event.compensatesOperationId ? { undoOf: event.compensatesOperationId } : {}),
+      ...sent,
+    }
+  if (event.type === "table.action")
+    return {
+      kind: "table",
+      action: event.action,
+      ...(event.undoOf ? { undoOf: event.undoOf } : {}),
+      ...sent,
+    }
   if (event.type === "commanderDamage.submitted")
     return {
       kind: "commander.claim",
@@ -472,11 +495,9 @@ export const lanSeatAppearance = (seat: number) => ({
   shape: shapeForSeat(seat),
 })
 
-const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
-  rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
-
 const playerTableOf = (seat: PlayerTable): PlayerTable => ({
   ...(seat.counters ? { counters: seat.counters } : {}),
+  ...(seat.customCounters ? { customCounters: seat.customCounters } : {}),
   ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
 })
 
@@ -556,8 +577,7 @@ export function lanProjection(
     })),
     ...(commander ? { commanderDamage: commander } : {}),
     ...(memory &&
-    (tableRulesApply(rules) ||
-      ((memory.turn || memory.turnGroups) && tableVersion >= TABLE_VERSION))
+    (hasTable(rules) || ((memory.turn || memory.turnGroups) && tableVersion >= TURN_TABLE_VERSION))
       ? {
           table: tableForVersion(
             {
@@ -694,9 +714,17 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
       ...base,
       playerId: asPlayerId(value.playerId),
       delta: value.delta,
+      ...(isId(value.compensatesOperationId)
+        ? { compensatesOperationId: asOperationId(value.compensatesOperationId) }
+        : {}),
     }
   if (value.type === "table.action" && matchesValidator(tableActionValidator, value.action))
-    return { type: "table.action", ...base, action: value.action }
+    return {
+      type: "table.action",
+      ...base,
+      action: value.action,
+      ...(isId(value.undoOf) ? { undoOf: asOperationId(value.undoOf) } : {}),
+    }
   if (
     value.type === "commanderDamage.submitted" &&
     isId(value.fromPlayerId) &&
@@ -750,6 +778,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(isCount(value.tableVersion) ? { tableVersion: value.tableVersion } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
+  if (value.type === "log") return { type: "log" }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }
   if (value.type === "stats") {
     const stats = parseLatencySummary(value.stats)
@@ -813,6 +842,7 @@ export function parseHostMessage(line: string): LanHostMessage | null {
       ...(value.partners === true ? { partners: true } : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(value.turns === true ? { turns: true } : {}),
+      ...(value.log === true ? { log: true } : {}),
     }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {
@@ -833,5 +863,34 @@ export function parseHostMessage(line: string): LanHostMessage | null {
     }
   if (value.type === "pong" && isCount(value.at) && isCount(value.hostAt))
     return { type: "pong", at: value.at, hostAt: value.hostAt }
+  if (value.type === "log" && Array.isArray(value.events))
+    return {
+      type: "log",
+      events: value.events.slice(-NEARBY_LOG_LIMIT).flatMap((event) => parseLogEvent(event) ?? []),
+    }
   return null
 }
+
+/** why: a newer host may send actions this build can't read, so a row keeps its change and drops only the action. */
+function parseLogEvent(value: unknown): ConnectedLogEvent | null {
+  if (!isRecord(value)) return null
+  const { operationId, playerId, kind, delta, fromPlayerId, clientCreatedAt, action, undoOf } =
+    value
+  if (!isId(operationId) || !isId(playerId) || !isId(kind) || !isCount(clientCreatedAt)) return null
+  return {
+    operationId,
+    playerId,
+    kind,
+    ...(isWhole(delta) ? { delta } : {}),
+    ...(isId(fromPlayerId) ? { fromPlayerId } : {}),
+    clientCreatedAt,
+    ...(matchesValidator(tableActionValidator, action) ? { action } : {}),
+    ...(isId(undoOf) ? { undoOf } : {}),
+    ...(value.mine === true ? { mine: true as const } : {}),
+  }
+}
+
+export const lanLog = (game: LanGame, viewerKey: string): ConnectedLogEvent[] =>
+  [...(game.memory?.events.values() ?? [])]
+    .slice(-NEARBY_LOG_LIMIT)
+    .map((event) => connectedLogEvent(event, viewerKey))

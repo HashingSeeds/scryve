@@ -40,6 +40,7 @@ import {
   type GameWrite,
 } from "./lib/gameEngine"
 import { storedDesignations, throwIfRejected, writeCloudGame } from "./lib/gameEngineConvex"
+import { connectedLogEvent } from "./lib/gameLog"
 import { limitGameRate } from "./lib/gameRateLimits"
 import {
   commanderField,
@@ -93,13 +94,19 @@ import {
 } from "./lib/policy"
 import { recordGameResults, recordPlayerResult, refreshGameOpponents } from "./lib/results"
 import { hashSeatPassToken, isSeatPassHash, nearbyGamePublicId } from "./lib/seatPass"
-import { attachesDecks, startingValueRange, systemDefinition, tableRules } from "./lib/systems"
+import {
+  attachesDecks,
+  hasTable,
+  startingValueRange,
+  systemDefinition,
+  tableRules,
+} from "./lib/systems"
 import {
   canonicalJson,
   isValidTableSnapshot,
   remapTableState,
   seatTable,
-  TABLE_VERSION,
+  TURN_TABLE_VERSION,
   tableActionIdentity,
   tableForVersion,
   tableStateValidator,
@@ -2024,8 +2031,8 @@ export const lobbyProjection = query({
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
       ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
-      ...(tableRulesApply(gameTableRules(game)) ||
-      ((game.turn || game.turnGroups) && (args.tableVersion ?? 1) >= TABLE_VERSION)
+      ...(hasTable(gameTableRules(game)) ||
+      ((game.turn || game.turnGroups) && (args.tableVersion ?? 1) >= TURN_TABLE_VERSION)
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
     }
@@ -2072,10 +2079,6 @@ function decidedTreacheryOutcome(
         : [{ playerId: player._id, role: player.role, inGame: !outReason(outState, player._id) }],
     ),
   )
-}
-
-function tableRulesApply(rules: ReturnType<typeof gameTableRules>) {
-  return rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
 }
 
 function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): TableState {
@@ -2567,6 +2570,7 @@ export const changeLife = mutation({
     deviceId: v.string(),
     clientCreatedAt: v.number(),
     tappedAt: v.optional(v.number()),
+    undoOf: v.optional(v.string()),
   },
   handler: async (ctx, { publicId, ...sent }) => {
     const write: GameWrite = { kind: "life", ...sent }
@@ -2596,6 +2600,7 @@ export const tableAction = mutation({
     clientCreatedAt: v.number(),
     tappedAt: v.optional(v.number()),
     action: tableActionValidator,
+    undoOf: v.optional(v.string()),
   },
   handler: async (ctx, { publicId, ...sent }) => {
     const write: GameWrite = { kind: "table", ...sent }
@@ -3316,6 +3321,7 @@ export const connectedEvents = query({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     await requireSummaryAccess(ctx, game)
+    const viewer = await requireUser(ctx)
     const result = await ctx.db
       .query("gameEvents")
       .withIndex("by_game_server_time", (q) => q.eq("gameId", game._id))
@@ -3324,6 +3330,7 @@ export const connectedEvents = query({
     return {
       ...result,
       page: result.page.map((event) => ({
+        ...connectedLogEvent(event, viewer._id),
         operationId: event.operationId,
         playerId: event.playerId,
         kind: event.kind,

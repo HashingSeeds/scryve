@@ -6,6 +6,7 @@ import Svg, { Circle, Path } from "react-native-svg"
 
 import { toolLabel, type DiceTool } from "@/features/game/dice"
 import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features/game/playSystems"
+import { rememberCounterName, suggestedCounterNames } from "@/features/game/recentCounterNames"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
 import { translate } from "@/i18n/translate"
@@ -31,9 +32,19 @@ import {
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { Text } from "./Text"
+import { TextField } from "./TextField"
 import { targetSlop } from "./touchTarget"
 import { NO_TABLE } from "../../convex/lib/systems"
-import { playerTableOf } from "../../convex/lib/table"
+import {
+  customCounterId,
+  customCounterName,
+  customCounterNameOf,
+  MAX_CUSTOM_COUNTER,
+  MAX_CUSTOM_COUNTER_NAME_LENGTH,
+  MAX_CUSTOM_COUNTERS,
+  playerTableOf,
+  type CustomCounter,
+} from "../../convex/lib/table"
 
 /** why: what one seat shows and may change. The plain parts compare structurally in the memoized card; PlayerGrid keeps the callbacks stable. */
 export interface SeatTable {
@@ -67,13 +78,32 @@ export function seatTableState(
 ): Pick<SeatTable, "rules" | "counters" | "held"> | undefined {
   if (!runtime) return undefined
   const { table, tableRules: rules } = runtime
-  if (rules.counters.length === 0 && rules.designations.length === 0) return undefined
+  if (rules.counters.length === 0 && rules.designations.length === 0 && !rules.customCounters)
+    return undefined
+  const seat = playerTableOf(table, playerId)
+  const counters = seat.counters ?? NO_COUNTERS
+  const custom = rules.customCounters ? (seat.customCounters ?? []) : []
   return {
-    rules,
-    counters: playerTableOf(table, playerId).counters ?? NO_COUNTERS,
+    rules: custom.length
+      ? { ...rules, counters: [...rules.counters, ...custom.map(customCounterRule)] }
+      : rules,
+    counters: custom.length
+      ? {
+          ...counters,
+          ...Object.fromEntries(custom.map(({ name, value }) => [customCounterId(name), value])),
+        }
+      : counters,
     held: rules.designations.flatMap(({ id }) => (table.designations[id] === playerId ? [id] : [])),
   }
 }
+
+/** why: a seat's own counters ride with the system's, so chips, the edit sheet and announcements treat them alike. */
+const customCounterRule = ({ name }: CustomCounter) => ({
+  id: customCounterId(name),
+  label: name,
+  step: 1,
+  max: MAX_CUSTOM_COUNTER,
+})
 
 type OutReasonId = keyof typeof board.outReason
 
@@ -174,7 +204,7 @@ const RULE_LINK_WIDTH = 28
 /** why: a column narrower than this gives its label the room instead, and a long press on the option opens its rule. */
 const RULE_BUTTON_COLUMN = 132
 
-type Sheet = { kind: "edit"; counterId: string } | { kind: "add" }
+type Sheet = { kind: "edit"; counterId: string } | { kind: "add" } | { kind: "name" }
 
 const ADD_TRIGGER = "add"
 const LIVE_REGION_REISSUE_MS = 100
@@ -198,7 +228,39 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
+  nameEnd?: number
   onSheetOpenChange?: (open: boolean) => void
+}
+
+type ChipItem =
+  | { kind: "designation"; key: string; designation: { id: string; label: string } }
+  | {
+      kind: "counter"
+      key: string
+      counter: TableRules["counters"][number]
+      value: number
+      lethal: boolean
+    }
+
+const OVERFLOW_KEY = "\u0000overflow"
+
+export function fitChips(
+  widths: readonly number[],
+  room: number,
+  gap: number,
+  overflowWidth: number,
+): { shown: number; overflow: number } {
+  const all = widths.reduce((total, width, index) => total + width + (index ? gap : 0), 0)
+  if (all <= room) return { shown: widths.length, overflow: 0 }
+  if (overflowWidth > room) return { shown: 0, overflow: 0 }
+  let used = overflowWidth
+  let shown = 0
+  for (const width of widths) {
+    if (used + gap + width > room) break
+    used += gap + width
+    shown += 1
+  }
+  return { shown, overflow: widths.length - shown }
 }
 
 export function chipRowOrigin(input: {
@@ -233,6 +295,7 @@ export const CounterChips = memo(function CounterChips({
   contentInsets,
   menuEdgeCenter,
   cardSize,
+  nameEnd,
   dice,
   bagAt,
   onSheetOpenChange,
@@ -254,8 +317,30 @@ export const CounterChips = memo(function CounterChips({
     setSheet(next)
   }
   const { rules, counters, held, editable } = seat
-  const shown = rules.counters.filter(({ id }) => (counters[id] ?? 0) > 0)
-  const heldDesignations = rules.designations.filter(({ id }) => held.includes(id))
+  const items: ChipItem[] = [
+    ...rules.designations.flatMap((designation) =>
+      held.includes(designation.id)
+        ? [{ kind: "designation" as const, key: designation.id, designation }]
+        : [],
+    ),
+    ...rules.counters.flatMap((counter) => {
+      const value = counters[counter.id] ?? 0
+      return value > 0
+        ? [
+            {
+              kind: "counter" as const,
+              key: counter.id,
+              counter,
+              value,
+              lethal: counter.losesAt !== undefined && value >= counter.losesAt,
+            },
+          ]
+        : []
+    }),
+  ]
+  const [widths, setWidths] = useState<Readonly<Record<string, number>>>({})
+  const measure = (key: string, width: number) =>
+    setWidths((current) => (current[key] === width ? current : { ...current, [key]: width }))
   const webAnnouncement = useAnnouncements(seat, identity)
   const sheetOpen = sheet !== null
 
@@ -293,6 +378,66 @@ export const CounterChips = memo(function CounterChips({
   })
   const bagSlop = targetSlop({ width: bagSize, height: bagSize }, bagAt)
   const bagShown = editable || !!dice
+  const chipGap = compact ? spacing.xxxs : spacing.xxs
+  const rowRight = bagAt.right + (bagShown ? bagSize + chipGap : 0)
+  const menuOnRow = menuEdgeCenter === CONTENT_EDGES[contentRotation].bottom
+  const room = Math.max(
+    0,
+    Math.min(
+      frameWidth - rowRight - (nameEnd ?? frameWidth / 2) - chipGap,
+      menuOnRow
+        ? frameWidth / 2 - (compact ? COMPACT_MENU_CLEARANCE : MENU_CLEARANCE) - rowRight
+        : Infinity,
+    ),
+  )
+  // why: a chip counts at its smallest until it is measured, so the first frame is close to the settled row.
+  const unmeasured = compact ? COMPACT_CHIP_WIDTH : CHIP_SIZE
+  const fit = fitChips(
+    items.map((item) => widths[item.key] ?? unmeasured),
+    room,
+    chipGap,
+    widths[OVERFLOW_KEY] ?? unmeasured,
+  )
+  const chipBox = themed(compact ? $compactChip : $chip)
+  const chipStyleOf = (item: ChipItem) => [
+    chipBox,
+    item.kind === "counter" && item.lethal && { borderColor: foreground },
+  ]
+  const chipFace = (item: ChipItem) => {
+    if (item.kind === "designation")
+      return <TableGlyph id={item.designation.id} size={glyphSize} color={foreground} />
+    const customName = customCounterNameOf(item.counter.id)
+    return (
+      <>
+        {customName === undefined ? (
+          <TableGlyph id={item.counter.id} size={glyphSize} color={foreground} />
+        ) : (
+          <Text
+            text={customName}
+            size="xxs"
+            weight="bold"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
+            style={[compact ? $compactCustomChipName : $customChipName, { color: foreground }]}
+          />
+        )}
+        <Text
+          text={String(item.value)}
+          weight={item.lethal ? "bold" : "medium"}
+          maxFontSizeMultiplier={1.2}
+          style={[themed(compact ? $compactValue : $value), { color: foreground }]}
+        />
+      </>
+    )
+  }
+  const overflowFace = (count: number) => (
+    <Text
+      text={`+${count}`}
+      weight="bold"
+      maxFontSizeMultiplier={1.2}
+      style={[themed(compact ? $compactValue : $value), { color: foreground }]}
+    />
+  )
   return (
     <>
       {Platform.OS === "web" ? (
@@ -303,60 +448,83 @@ export const CounterChips = memo(function CounterChips({
           style={$visuallyHidden}
         />
       ) : null}
-      {!sheetOpen && (shown.length > 0 || heldDesignations.length > 0) ? (
+      {!sheetOpen && items.length > 0 ? (
         <View
           testID={`counter-chips-frame-seat-${seatNumber}`}
           pointerEvents="box-none"
           style={[frame, $layer]}
         >
           <View
+            pointerEvents="none"
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[$measureRow, { gap: chipGap }]}
+          >
+            {items.map((item) => (
+              <View
+                key={item.key}
+                onLayout={({ nativeEvent }) => measure(item.key, nativeEvent.layout.width)}
+                style={chipStyleOf(item)}
+              >
+                {chipFace(item)}
+              </View>
+            ))}
+            <View
+              onLayout={({ nativeEvent }) => measure(OVERFLOW_KEY, nativeEvent.layout.width)}
+              style={chipBox}
+            >
+              {overflowFace(items.length)}
+            </View>
+          </View>
+          <View
             testID={`counter-chips-seat-${seatNumber}`}
             pointerEvents="box-none"
-            style={[themed(compact ? $compactRow : $row), { top }]}
+            style={[
+              $bottomRow,
+              { gap: chipGap, right: rowRight, bottom: bagAt.bottom, height: bagSize },
+            ]}
           >
-            {shown.map((counter) => {
-              const value = counters[counter.id] ?? 0
-              const lethal = counter.losesAt !== undefined && value >= counter.losesAt
-              const content = (
-                <>
-                  <TableGlyph id={counter.id} size={glyphSize} color={foreground} />
-                  <Text
-                    text={String(value)}
-                    weight={lethal ? "bold" : "medium"}
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed(compact ? $compactValue : $value), { color: foreground }]}
-                  />
-                </>
-              )
+            {items.slice(0, fit.shown).map((item) => {
+              const style = chipStyleOf(item)
+              if (item.kind === "designation")
+                return (
+                  <View
+                    key={item.key}
+                    testID={`designation-chip-${seatNumber}-${item.designation.id}`}
+                    accessible
+                    accessibilityLabel={translate("board:counters.seatItem", {
+                      identity,
+                      label: tableItemLabel(item.designation),
+                    })}
+                    style={style}
+                  >
+                    {chipFace(item)}
+                  </View>
+                )
+              const { counter, value } = item
               const counterLabel = tableItemLabel(counter)
-              const label = translate("board:counters.seatItem", {
-                identity,
-                label: counterLabel,
-              })
+              const label = translate("board:counters.seatItem", { identity, label: counterLabel })
               const valueText =
                 counter.losesAt !== undefined
                   ? translate("board:counters.valueOutOf", { value, max: counter.losesAt })
                   : String(value)
-              const chipStyle = [
-                themed(compact ? $compactChip : $chip),
-                lethal && { borderColor: foreground },
-              ]
               if (!editable)
                 return (
                   <View
-                    key={counter.id}
+                    key={item.key}
                     testID={`counter-chip-${seatNumber}-${counter.id}`}
                     accessible
                     accessibilityLabel={label}
                     accessibilityValue={{ text: valueText }}
-                    style={chipStyle}
+                    style={style}
                   >
-                    {content}
+                    {chipFace(item)}
                   </View>
                 )
               return (
                 <BoardPressable
-                  key={counter.id}
+                  key={item.key}
                   ref={trigger(counter.id)}
                   testID={`counter-chip-${seatNumber}-${counter.id}`}
                   accessibilityRole="adjustable"
@@ -393,38 +561,46 @@ export const CounterChips = memo(function CounterChips({
                     seat.adjustCounter(counter.id, counter.step)
                   }}
                   style={({ pressed }) => [
-                    chipStyle,
+                    style,
                     pressed && { backgroundColor: overlayTint(foreground, 0.14) },
                   ]}
                 >
-                  {content}
+                  {chipFace(item)}
                 </BoardPressable>
               )
             })}
-            {heldDesignations.map((designation) => (
-              <View
-                key={designation.id}
-                testID={`designation-chip-${seatNumber}-${designation.id}`}
-                accessible
-                accessibilityLabel={translate("board:counters.seatItem", {
-                  identity,
-                  label: tableItemLabel(designation),
-                })}
-                style={themed(compact ? $compactChip : $chip)}
-              >
-                <TableGlyph id={designation.id} size={glyphSize} color={foreground} />
-                {compact ? null : (
-                  <Text
-                    text={tableItemLabel(designation)}
-                    weight="bold"
-                    size="xxs"
-                    maxFontSizeMultiplier={1.2}
-                    numberOfLines={1}
-                    style={{ color: foreground }}
-                  />
-                )}
-              </View>
-            ))}
+            {fit.overflow > 0 ? (
+              bagShown ? (
+                <BoardPressable
+                  testID={`counter-overflow-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("board:counters.more", {
+                    identity,
+                    count: fit.overflow,
+                  })}
+                  hitSlop={{ top: 6, bottom: 6 }}
+                  onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
+                  style={({ pressed }) => [
+                    chipBox,
+                    pressed && { backgroundColor: overlayTint(foreground, 0.14) },
+                  ]}
+                >
+                  {overflowFace(fit.overflow)}
+                </BoardPressable>
+              ) : (
+                <View
+                  testID={`counter-overflow-seat-${seatNumber}`}
+                  accessible
+                  accessibilityLabel={translate("board:counters.more", {
+                    identity,
+                    count: fit.overflow,
+                  })}
+                  style={chipBox}
+                >
+                  {overflowFace(fit.overflow)}
+                </View>
+              )
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -469,6 +645,7 @@ export const CounterChips = memo(function CounterChips({
           topClearance={top}
           dice={dice}
           onEdit={(counterId) => setSheet({ kind: "edit", counterId })}
+          onName={() => setSheet({ kind: "name" })}
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -530,6 +707,7 @@ function CounterSheet({
   topClearance,
   dice,
   onEdit,
+  onName,
   onClose,
 }: {
   sheet: Sheet
@@ -548,6 +726,7 @@ function CounterSheet({
   topClearance: number
   dice?: SeatDiceBag
   onEdit: (counterId: string) => void
+  onName: () => void
   onClose: () => void
 }) {
   const {
@@ -559,7 +738,8 @@ function CounterSheet({
   const slide = useCornerSlide()
   const ink = accessibleForeground(sheetColor)
   const gap = compact ? spacing.xxs : spacing.xs
-  const trackers = seat.rules.counters.length + seat.rules.designations.length > 0
+  const trackers =
+    seat.rules.counters.length + seat.rules.designations.length > 0 || !!seat.rules.customCounters
   // why: with both, dice take the bag's half of the card and trackers the other, so neither scrolls; only the dice half keeps clear of Close in its corner.
   const split = !!dice && trackers && sheet.kind === "add"
   const [allDice, setAllDice] = useState(false)
@@ -586,6 +766,8 @@ function CounterSheet({
   }
   const firstControl = useRef<View>(null)
   const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
+  const customCount = seat.rules.counters.filter(({ id }) => customCounterNameOf(id)).length
+  const offersCustom = seat.rules.customCounters === true && customCount < MAX_CUSTOM_COUNTERS
   useEffect(() => moveFocus(firstControl.current), [sheetKey])
 
   return (
@@ -677,6 +859,17 @@ function CounterSheet({
               />
             </View>
           </>
+        ) : sheet.kind === "name" ? (
+          <NameCounter
+            seatNumber={seatNumber}
+            ink={ink}
+            taken={seat.rules.counters.flatMap(({ id }) => customCounterNameOf(id) ?? [])}
+            onAdd={(name) => {
+              seat.adjustCounter(customCounterId(name), 1)
+              rememberCounterName(name)
+              onClose()
+            }}
+          />
         ) : (
           <>
             {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
@@ -765,6 +958,28 @@ function CounterSheet({
                         />
                       )
                     })}
+                    {offersCustom ? (
+                      <SheetOption
+                        testID={`counter-option-${seatNumber}-custom`}
+                        id="plus"
+                        label={translate(
+                          optionColumn < SHORT_LABEL_COLUMN
+                            ? "board:counters.customShort"
+                            : "board:counters.custom",
+                        )}
+                        accessibilityLabel={translate("board:counters.custom")}
+                        ink={ink}
+                        ruleButton={roomForRule}
+                        ruleTestID={`counter-rule-${seatNumber}-custom`}
+                        iconOnly={split && allDice}
+                        slide={slide}
+                        fade={fade}
+                        onPress={() => {
+                          if (split && allDice) return setAllDice(false)
+                          onName()
+                        }}
+                      />
+                    ) : null}
                   </ScrollView>
                 </Animated.View>
               ) : null}
@@ -825,6 +1040,84 @@ function CounterSheet({
         </BoardPressable>
       </View>
     </Animated.View>
+  )
+}
+
+function NameCounter({
+  seatNumber,
+  ink,
+  taken,
+  onAdd,
+}: {
+  seatNumber: number
+  ink: string
+  taken: readonly string[]
+  onAdd: (name: string) => void
+}) {
+  const { themed } = useAppTheme()
+  const [draft, setDraft] = useState("")
+  const [recent] = useState(() =>
+    suggestedCounterNames().filter(
+      (name) => !taken.some((held) => held.toLocaleLowerCase() === name.toLocaleLowerCase()),
+    ),
+  )
+  const name = customCounterName(draft)
+  return (
+    <View style={themed($nameCounter)}>
+      <TextField
+        testID={`counter-name-${seatNumber}`}
+        accessibilityLabel={translate("board:counters.customName")}
+        placeholder={translate("board:counters.customName")}
+        placeholderTextColor={overlayTint(ink, 0.6)}
+        autoFocus
+        autoCapitalize="words"
+        autoCorrect={false}
+        maxLength={MAX_CUSTOM_COUNTER_NAME_LENGTH}
+        returnKeyType="done"
+        value={draft}
+        onChangeText={setDraft}
+        onSubmitEditing={() => name && onAdd(name)}
+        inputWrapperStyle={[themed($nameInput), { borderColor: overlayTint(ink, 0.5) }]}
+        style={{ color: ink }}
+      />
+      {recent.length > 0 ? (
+        <View style={themed($recentNames)}>
+          {recent.map((recentName) => (
+            <BoardPressable
+              key={recentName}
+              testID={`counter-recent-${seatNumber}-${recentName}`}
+              accessibilityRole="button"
+              accessibilityLabel={translate("board:counters.customRecent", { label: recentName })}
+              hitSlop={4}
+              onPress={() => onAdd(recentName)}
+              style={({ pressed }) => [
+                themed($recentName),
+                { borderColor: overlayTint(ink, 0.4) },
+                pressed && { backgroundColor: overlayTint(ink, 0.14) },
+              ]}
+            >
+              <Text
+                text={recentName}
+                size="xs"
+                weight="medium"
+                numberOfLines={1}
+                style={{ color: ink }}
+              />
+            </BoardPressable>
+          ))}
+        </View>
+      ) : null}
+      {name ? (
+        <View style={themed($sheetFooter)}>
+          <SheetTextButton
+            testID={`counter-name-add-${seatNumber}`}
+            text={translate("board:counters.customAdd")}
+            ink={ink}
+            onPress={() => onAdd(name)}
+          />
+        </View>
+      ) : null}
+    </View>
   )
 }
 
@@ -1081,25 +1374,50 @@ function SheetOption({
 
 const $layer: ViewStyle = { zIndex: 10 }
 
-const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $customChipName: TextStyle = { maxWidth: 72 }
+const $compactCustomChipName: TextStyle = { maxWidth: 48 }
+
+const $measureRow: ViewStyle = {
   position: "absolute",
-  left: spacing.xs,
-  right: spacing.xs,
+  left: 0,
+  top: 0,
   flexDirection: "row",
-  flexWrap: "wrap",
-  justifyContent: "center",
+  opacity: 0,
+}
+
+const $bottomRow: ViewStyle = {
+  position: "absolute",
+  flexDirection: "row-reverse",
   alignItems: "center",
-  gap: spacing.xxxs,
+}
+
+const $nameCounter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  gap: spacing.xs,
+  paddingHorizontal: spacing.xs,
 })
 
-const $compactRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  left: spacing.xxs,
-  right: spacing.xxs,
+const $nameInput: ThemedStyle<ViewStyle> = () => ({
+  backgroundColor: "transparent",
+  borderBottomWidth: 1.5,
+  borderLeftWidth: 0,
+  borderRadius: 0,
+  borderRightWidth: 0,
+  borderTopWidth: 0,
+})
+
+const $recentNames: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
+  gap: spacing.xxs,
+})
+
+const $recentName: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+  borderRadius: radius.sm,
+  borderWidth: 1,
+  minHeight: 32,
   justifyContent: "center",
-  alignItems: "center",
+  paddingHorizontal: spacing.xs,
 })
 
 const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({

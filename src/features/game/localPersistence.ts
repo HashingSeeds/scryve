@@ -49,6 +49,7 @@ import type {
   MatchSeatOutcome,
   NewPlayerInput,
   SeatPassHashes,
+  CounterLogEntry,
   TurnLogEntry,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
@@ -465,6 +466,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const turn = isValidTurn(value.turn, playerIds) ? value.turn : undefined
   const turnLog = turn ? parseTurnLog(value.turnLog, playerIds) : undefined
   const turnGroups = isValidTurnGroups(value.turnGroups, playerIds) ? value.turnGroups : undefined
+  const counterLog = parseCounterLog(value.counterLog, playerIds)
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -509,7 +511,38 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(value.variant === TWO_HEADED_GIANT && isValidTeams(turnGroups, playerIds)
       ? { variant: TWO_HEADED_GIANT }
       : {}),
+    ...(counterLog ? { counterLog } : {}),
   }
+}
+
+function parseCounterLog(
+  value: unknown,
+  playerIds: ReadonlySet<string>,
+): CounterLogEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const entries = value.flatMap((entry): CounterLogEntry[] =>
+    isRecord(entry) &&
+    typeof entry.operationId === "string" &&
+    typeof entry.playerId === "string" &&
+    playerIds.has(entry.playerId) &&
+    typeof entry.counterId === "string" &&
+    Number.isInteger(entry.delta) &&
+    Number.isInteger(entry.value) &&
+    typeof entry.at === "number" &&
+    Number.isFinite(entry.at)
+      ? [
+          {
+            operationId: entry.operationId,
+            playerId: asPlayerId(entry.playerId),
+            counterId: entry.counterId,
+            delta: Number(entry.delta),
+            value: Number(entry.value),
+            at: entry.at,
+          },
+        ]
+      : [],
+  )
+  return entries.length > 0 ? entries : undefined
 }
 
 function parseTurnLog(value: unknown, playerIds: ReadonlySet<string>): TurnLogEntry[] | undefined {

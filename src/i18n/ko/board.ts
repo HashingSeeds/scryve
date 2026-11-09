@@ -383,6 +383,17 @@ export default {
     giveUp: "{{label}} 포기",
     take: "{{label}} 가져오기",
     rule: "규칙 {{rule}}",
+    custom: "카운터 이름 정하기",
+    customShort: "직접 입력",
+    customName: "카운터 이름",
+    customAdd: "추가",
+    customRecent: "{{label}} 추가",
+    starter: {
+      speed: "속도",
+      rad: "방사능",
+      storm: "폭풍",
+    },
+    more_other: "{{identity}}, 카운터 {{count}}개 더 있음",
   },
   seat: {
     identity: "자리 {{seat}}, {{name}}",
@@ -544,7 +555,9 @@ export default {
     by: "{{name}} 님",
     row: "{{name}} {{delta}}, 현재 {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}}의 커맨더에게서, 현재 {{life}}",
+    counterRow: "{{name}} {{counter}} {{delta}}, 현재 {{value}}",
     undoLast: "마지막 변경 취소",
+    undoMine: "내 마지막 변경 취소하기",
   },
   calculator: {
     damage: "− 데미지",

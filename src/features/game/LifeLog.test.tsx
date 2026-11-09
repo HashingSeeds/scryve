@@ -13,7 +13,15 @@ import {
   asPlayerId,
   createLocalGame,
 } from "./domain"
-import { gameLog, LifeLog, LifeLogContext, lifeLog, localLifeChanges } from "./LifeLog"
+import {
+  counterLog,
+  gameLog,
+  LifeLog,
+  LifeLogContext,
+  lifeLog,
+  localLifeChanges,
+  mergedLog,
+} from "./LifeLog"
 import type { CommandContext, GameCommand } from "./types"
 
 jest.mock("convex/react", () => ({ usePaginatedQuery: jest.fn() }))
@@ -175,5 +183,53 @@ describe("life log", () => {
     )
 
     expect(view.getByTestId("log")).toHaveProp("accessibilityLabel", "8000 6000 4800 5300")
+  })
+})
+
+describe("counter log rows", () => {
+  const ada = asPlayerId("ada")
+  const entry = (
+    operationId: string,
+    counterId: string,
+    delta: number,
+    value: number,
+    at: number,
+  ) => ({
+    operationId,
+    playerId: ada,
+    counterId,
+    delta,
+    value,
+    at,
+  })
+
+  it("folds quick taps on one counter, keeps other counters apart, and sorts in with life", () => {
+    const rows = counterLog([
+      entry("a", "poison", 1, 1, 1_000),
+      entry("b", "poison", 1, 2, 1_500),
+      entry("c", "custom:Speed", 1, 1, 1_600),
+      entry("d", "custom:Speed", -1, 0, 9_000),
+    ])
+    expect(rows.map(({ counterId, delta, value }) => [counterId, delta, value])).toEqual([
+      ["custom:Speed", -1, 0],
+      ["custom:Speed", 1, 1],
+      ["poison", 2, 2],
+    ])
+    const life = [
+      { id: "life", playerId: ada, delta: -3, life: 37, at: 1_550, operationIds: ["life"] },
+    ]
+    expect(mergedLog(life, rows).map(({ at }) => at)).toEqual([9_000, 1_600, 1_550, 1_500])
+  })
+
+  it("folds a counter's quick taps even when another counter changes in between", () => {
+    const rows = counterLog([
+      entry("a", "poison", 1, 1, 1_000),
+      entry("b", "custom:Speed", 1, 1, 1_200),
+      entry("c", "poison", 1, 2, 1_500),
+    ])
+    expect(rows.map(({ counterId, delta }) => [counterId, delta])).toEqual([
+      ["poison", 2],
+      ["custom:Speed", 1],
+    ])
   })
 })

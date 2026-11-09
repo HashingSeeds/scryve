@@ -111,6 +111,7 @@ export interface TableActionEvent {
   operationId: OperationId
   gameId: GameId
   action: TableAction
+  undoOf?: OperationId
   actorId: ActorId
   deviceId: DeviceId
   clientCreatedAt: number

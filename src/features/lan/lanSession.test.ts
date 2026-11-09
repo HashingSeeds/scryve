@@ -207,6 +207,7 @@ describe("nearby host", () => {
       partners: true,
       editsAnySeat: true,
       turns: true,
+      log: true,
     })
   })
 
@@ -415,6 +416,7 @@ describe("nearby host", () => {
       partners: true,
       editsAnySeat: true,
       turns: true,
+      log: true,
     })
     bob.send({ type: "op", event: claim("claim-operation-0001", attacker) })
     void session.writes.send({

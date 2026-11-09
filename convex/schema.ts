@@ -7,7 +7,7 @@ import { feedbackFix, feedbackKind } from "./lib/feedback"
 import { lifeEditingValidator } from "./lib/gameRules"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
-import { pokemonBoardValidator } from "./lib/table"
+import { customCounterValidator, pokemonBoardValidator } from "./lib/table"
 import { gameVariantValidator, treacheryRoleValidator } from "./lib/treachery"
 import { turnGroupsValidator, turnValidator } from "./lib/turns"
 
@@ -186,6 +186,7 @@ export default defineSchema({
     resumable: v.optional(v.boolean()),
     joinedAt: v.number(),
     counters: v.optional(v.record(v.string(), v.number())),
+    customCounters: v.optional(v.array(customCounterValidator)),
     pokemon: v.optional(pokemonBoardValidator),
     // why: other seats must not see a role until it is revealed or the game ends; only roleForViewer projects it.
     role: v.optional(treacheryRoleValidator),

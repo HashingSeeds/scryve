@@ -1,0 +1,16 @@
+# flow: Shared _DevClient
+# intent: get past the Expo development-client server chooser when a relaunch shows it.
+# The chooser can connect on its own while this runs, so its taps are optional.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      visible: "Development servers"
+    commands:
+      - tapOn:
+          text: "http://.*:.*"
+          optional: true
+      - waitForAnimationToEnd
+      - tapOn:
+          text: "Close"
+          optional: true

@@ -132,6 +132,16 @@ export interface LocalGame {
   turnGroups?: string[][]
   /** why: Two-Headed Giant games share life and poison across each turn group. */
   variant?: GameVariant
+  counterLog?: CounterLogEntry[]
+}
+
+export interface CounterLogEntry {
+  operationId: string
+  playerId: PlayerId
+  counterId: string
+  delta: number
+  value: number
+  at: number
 }
 
 export interface TurnLogEntry {
@@ -157,7 +167,7 @@ export type GameCommand =
       commander?: typeof PARTNER_COMMANDER
       delta: number
     }
-  | { type: "life.undo" }
+  | { type: "life.undo"; operationId?: OperationId }
   | { type: "game.finish"; result?: LocalGameResult }
   | { type: "game.abandon" }
 

@@ -4,12 +4,14 @@ import {
   applyGameCommand,
   applyLocalTableAction,
   commanderDamageBetween,
+  createClientId,
   createLocalGame,
   defaultCommandContext,
   MAX_COMMANDER_DAMAGE,
   MAX_PLAYERS,
   MIN_PLAYERS,
   PLAYER_COLORS,
+  withFirstTurn,
 } from "@/features/game/domain"
 import {
   DEFAULT_LOCAL_SETTINGS,
@@ -23,12 +25,14 @@ import {
   NO_PLAY_SYSTEM,
   PLAY_SYSTEM_IDS,
   playSystemFormats,
+  playTableRules,
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import type { TableAction } from "../../../convex/lib/table"
 import { isValidTurnGroups } from "../../../convex/lib/turns"
 import { defaultTeamLife } from "../../../convex/lib/twoHeadedGiant"
 
@@ -137,6 +141,39 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
     if (commanderDamageBetween(game, fromPlayerId, toPlayerId) !== before + delta)
       throw new SeedError(`cmd "${entry}" was rejected by the game rules.`)
   }
+
+  for (const entry of list(params.counters)) {
+    const match = /^(\d+):([^:]+):(\d+)$/.exec(entry)
+    if (!match) throw new SeedError(`counters entries look like 1:poison:3, got "${entry}".`)
+    const [, seatNumber, counter, amount] = match
+    const playerId = seat(seatNumber).id
+    const system = playTableRules(game.system, game.format).counters
+    const action: TableAction = system.some(({ id }) => id === counter)
+      ? {
+          kind: "counter.changed",
+          playerId,
+          counterId: counter,
+          delta: integer("counters", amount),
+        }
+      : {
+          kind: "customCounter.changed",
+          playerId,
+          name: counter,
+          delta: integer("counters", amount),
+        }
+    const next = applyLocalTableAction(game, action, {
+      operationId: createClientId("operation"),
+      now: Date.now(),
+    })
+    if (next === game) throw new SeedError(`counters "${entry}" was rejected by the game rules.`)
+    game = next
+  }
+
+  if (params.turn !== undefined)
+    game = withFirstTurn(game, seat(params.turn).id, {
+      operationId: createClientId("operation"),
+      now: Date.now(),
+    })
 
   life.forEach((target, index) => {
     const player = game.players[index]

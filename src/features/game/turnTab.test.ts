@@ -126,8 +126,8 @@ describe("local turns", () => {
     const [ada, bo] = game.players
     const log = withTurnDividers(
       [
-        { id: "late", playerId: bo.id, delta: -2, life: 18, at: 7_000 },
-        { id: "early", playerId: ada.id, delta: -1, life: 19, at: 2_000 },
+        { id: "late", playerId: bo.id, delta: -2, life: 18, at: 7_000, operationIds: ["late"] },
+        { id: "early", playerId: ada.id, delta: -1, life: 19, at: 2_000, operationIds: ["early"] },
         ...rows,
       ],
       [
