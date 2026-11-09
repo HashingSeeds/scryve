@@ -194,6 +194,8 @@ export default {
   },
   publish: {
     failed: "이 게임을 연결하지 못했습니다.",
+    twoHeadedGiant:
+      "투헤드 자이언트 게임은 아직 연결할 수 없습니다. 기기에서 플레이하려면 새 게임을 시작하세요.",
   },
   invite: {
     label: "초대",

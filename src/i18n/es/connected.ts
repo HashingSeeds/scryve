@@ -216,6 +216,8 @@ export default {
   },
   publish: {
     failed: "No se pudo conectar esta partida.",
+    twoHeadedGiant:
+      "Las partidas de Gigante de dos cabezas aún no se pueden conectar. Empieza una nueva para jugar en dispositivos.",
   },
   invite: {
     label: "Invitar",
