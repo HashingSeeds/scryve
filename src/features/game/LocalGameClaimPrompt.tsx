@@ -7,6 +7,7 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { appLocale } from "@/i18n"
@@ -178,7 +179,10 @@ function ClaimPicker({
           onSelect={chooseAllSeat}
         />
       ) : null}
-      <ScrollView style={$list} contentContainerStyle={themed($rows)}>
+      <ScrollView
+        style={themed($sheetScroll)}
+        contentContainerStyle={themed([$sheetScrollContent, $rows])}
+      >
         {candidates.map((unit) => {
           const selected = !excluded.includes(unit.id)
           const game = latestGame(unit)
@@ -340,7 +344,6 @@ export function LocalGameClaimPrompt({
 }
 
 const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $list: ViewStyle = { flexShrink: 1 }
 const $rows: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $game: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const CHECK_SIZE = 22
