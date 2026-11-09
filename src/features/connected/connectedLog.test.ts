@@ -61,6 +61,24 @@ const turnOf = (operationId: string, number: number, previous = true): Turn => (
 })
 
 describe("connected log", () => {
+  it("keeps passes in the authority's order when device clocks disagree", () => {
+    // why: Ada's clock runs ahead of Bo's, so Bo's later pass carries the earlier timestamp.
+    const confirmed = [pass("pass-ada", "ada", "bo", 100), pass("pass-bo", "bo", "ada", 50)]
+    const turn: Turn = {
+      playerId: "ada",
+      number: 3,
+      startedAt: 0,
+      operationId: "pass-bo",
+      previous: { playerId: "bo", number: 2, startedAt: 0, operationId: "pass-ada" },
+    }
+    const { turns } = connectedLogInputs(connectedLogEvents(confirmed, [], GAME), GAME, turn)
+    expect(turns.map(({ number, playerId }) => [number, playerId])).toEqual([
+      [1, "ada"],
+      [2, "bo"],
+      [3, "ada"],
+    ])
+  })
+
   it("shows an unsent commander damage claim where anyone edits, then the authority's confirmation in its place", () => {
     const claim = {
       schemaVersion: 1,

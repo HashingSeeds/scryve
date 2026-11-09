@@ -61,9 +61,11 @@ export function connectedLogEvents(
       ]
     return []
   })
-  return [...confirmed, ...unsent].sort(
-    (left, right) => left.clientCreatedAt - right.clientCreatedAt,
-  )
+  // why: device clocks drift apart, so confirmed changes keep the authority's order and only this device's own unsent ones sort by when it made them.
+  return [
+    ...confirmed,
+    ...unsent.sort((left, right) => left.clientCreatedAt - right.clientCreatedAt),
+  ]
 }
 
 /** why: the local log's own builders draw the rows, so a connected game reads like a local one. */
