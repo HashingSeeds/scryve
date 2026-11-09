@@ -12,6 +12,7 @@ import {
   connectedLogEvents,
   connectedLogInputs,
   connectedLogUndo,
+  logPositions,
   type CounterTable,
 } from "./connectedLog"
 import type { PendingLifeAction } from "./model"
@@ -150,6 +151,7 @@ function ConnectedLog({
     () => connectedLogInputs(events, publicId, turn, counterTable),
     [counterTable, events, publicId, turn],
   )
+  const positionOf = useMemo(() => logPositions(events), [events])
   const undo = connectedLogUndo(events, players, publicId, turn, {
     turns: turnsShown,
     table: counterTable,
@@ -167,6 +169,7 @@ function ConnectedLog({
       undoLabel={translate("board:log.undoMine")}
       origin={origin}
       onMore={feed.more}
+      positionOf={positionOf}
       onUndo={() => {
         if (undo?.kind === "turn") onUndoTurn(undo.playerId, undo.turnOperationId)
         else if (undo?.kind === "counter") context?.undoTable(undo.changes)

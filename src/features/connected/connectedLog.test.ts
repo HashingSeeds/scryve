@@ -1,7 +1,12 @@
 import { asPlayerId } from "@/features/game/domain"
 import { gameLog, withTurnDividers } from "@/features/game/LifeLog"
 
-import { connectedLogEvents, connectedLogInputs, connectedLogUndo } from "./connectedLog"
+import {
+  connectedLogEvents,
+  connectedLogInputs,
+  connectedLogUndo,
+  logPositions,
+} from "./connectedLog"
 import type { PendingLifeAction } from "./model"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import type { Turn } from "../../../convex/lib/turns"
@@ -61,6 +66,22 @@ const turnOf = (operationId: string, number: number, previous = true): Turn => (
 })
 
 describe("connected log", () => {
+  it("keeps two of my changes ten seconds apart as two rows after another device's later-stamped change", () => {
+    const confirmed = [
+      life("other-device", "bo", -1, 60_000),
+      life("mine-first", "ada", -2, 1_000, { mine: true }),
+      life("mine-second", "ada", -3, 11_000, { mine: true }),
+    ]
+    expect(
+      connectedLogUndo(connectedLogEvents(confirmed, [], GAME), players, GAME, undefined, {
+        turns: true,
+      }),
+    ).toEqual({
+      kind: "life",
+      changes: [{ operationId: "mine-second", playerId: "ada", delta: -3 }],
+    })
+  })
+
   it("puts a change under the turn the authority recorded it in, whatever the device clock said", () => {
     // why: Bo's clock runs behind Ada's, so Bo's hit after Ada's pass carries an earlier time.
     const confirmed = [
@@ -74,8 +95,13 @@ describe("connected log", () => {
       operationId: "pass-ada",
       previous: { playerId: "ada", number: 1, startedAt: 0, operationId: "older" },
     }
-    const inputs = connectedLogInputs(connectedLogEvents(confirmed, [], GAME), GAME, turn)
-    const items = withTurnDividers(gameLog(players, inputs.events), inputs.turns)
+    const events = connectedLogEvents(confirmed, [], GAME)
+    const inputs = connectedLogInputs(events, GAME, turn)
+    const items = withTurnDividers(
+      gameLog(players, inputs.events),
+      inputs.turns,
+      logPositions(events),
+    )
     expect(items.map((item) => (item.kind === "turn" ? `turn ${item.number}` : item.id))).toEqual([
       "turn 2",
       "hit-on-ada",
