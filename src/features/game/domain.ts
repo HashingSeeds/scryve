@@ -536,7 +536,7 @@ const withLogged = (game: LocalGame, operationId: string): LocalGame => ({
  * in its own order, and only between those lists does time decide.
  */
 export function localLogPositions(
-  game: Pick<LocalGame, "logOrder" | "events" | "turnLog">,
+  game: Pick<LocalGame, "logOrder" | "events" | "turnLog" | "counterLog">,
   extra: readonly { operationId: string; at: number }[] = [],
 ): (operationId: string) => number | undefined {
   const logged = game.logOrder ?? []
@@ -544,6 +544,7 @@ export function localLogPositions(
   const older = [
     game.events.map(({ operationId, clientCreatedAt }) => ({ operationId, at: clientCreatedAt })),
     (game.turnLog ?? []).map(({ operationId, at }) => ({ operationId, at })),
+    (game.counterLog ?? []).map(({ operationId, at }) => ({ operationId, at })),
     extra,
   ]
     .flatMap((list) => {

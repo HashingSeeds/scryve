@@ -9,21 +9,9 @@ import {
 } from "./connectedLog"
 import type { PendingLifeAction } from "./model"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
+import { seededRandom, type SeededRandom } from "../../../test/support/seededRandom"
 
 const GAME = "game-log-property"
-
-/** why: a seeded generator, so a failing run replays from its seed alone. */
-function generator(seed: number) {
-  let state = seed >>> 0
-  const next = () => {
-    state = (state + 0x6d2b79f5) >>> 0
-    let value = state
-    value = Math.imul(value ^ (value >>> 15), value | 1)
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
-  }
-  return { next, int: (min: number, max: number) => min + Math.floor(next() * (max - min + 1)) }
-}
 
 interface Operation {
   operationId: string
@@ -36,7 +24,7 @@ interface Operation {
 
 /** why: a confirmed prefix in the authority's order, then this device's unsent changes in the order it queued them, stamped by clocks that skew and jump back. */
 function randomOperations(seed: number) {
-  const random = generator(seed)
+  const random = seededRandom(seed)
   const seats = ["ada", "bo", "cy"].slice(0, random.int(2, 3))
   const count = random.int(4, 24)
   const unsentFrom = random.int(0, count)
@@ -71,7 +59,7 @@ function feed({
 }: {
   seats: readonly string[]
   operations: readonly Operation[]
-  shuffle: ReturnType<typeof generator>
+  shuffle: SeededRandom
 }) {
   const confirmed: ConnectedLogEvent[] = operations
     .filter(({ confirmed: isConfirmed }) => isConfirmed)
@@ -113,7 +101,7 @@ function feed({
 
 function expectLogLaws(operations: readonly Operation[], seed: number) {
   const generated = { seats: [...new Set(operations.map(({ playerId }) => playerId))], operations }
-  const { events, players } = feed({ ...generated, shuffle: generator(seed) })
+  const { events, players } = feed({ ...generated, shuffle: seededRandom(seed) })
   const sequence = new Map(operations.map(({ operationId }, index) => [operationId, index]))
   const byId = new Map(operations.map((operation) => [operation.operationId, operation]))
   const positionOf = logPositions(events)

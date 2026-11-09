@@ -148,13 +148,13 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
 
 type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
 
-/** why: newest first; a connected log passes `positionOf` so device clocks that drift apart don't reorder life and counter rows. */
+/** why: newest first, by sequence: `positionOf` is the authority's order or a local game's apply order, never a clock. */
 export function mergedLog(
   life: readonly GameLogRow[],
   counters: readonly GameCounterRow[],
-  positionOf?: (operationId: string) => number | undefined,
+  positionOf: (operationId: string) => number | undefined,
 ): GameLogChange[] {
-  const placeOf = (row: GameLogChange) => (positionOf ? rowPosition(row, positionOf) : row.at)
+  const placeOf = (row: GameLogChange) => rowPosition(row, positionOf)
   return [...life, ...counters].sort((left, right) => placeOf(right) - placeOf(left))
 }
 
