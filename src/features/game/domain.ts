@@ -617,28 +617,39 @@ const withLogged = (game: LocalGame, operationId: string): LocalGame => ({
 
 /**
  * why: the log's order is a sequence, never a clock, so a change sits where `logOrder` put it. A
- * game saved before `logOrder` has no sequence for its older changes: they come first, each list
- * in its own order, and only between those lists does time decide.
+ * change missing from it (saved before `logOrder`, or by an older build after a rollback, which
+ * drops it) goes right after the last logged change before it in its own list. Only unlogged
+ * changes from different lists that share that spot are ordered by time.
  */
 export function localLogPositions(
   game: Pick<LocalGame, "logOrder" | "events" | "turnLog" | "counterLog">,
   extra: readonly { operationId: string; at: number }[] = [],
 ): (operationId: string) => number | undefined {
-  const logged = game.logOrder ?? []
-  const positions = new Map(logged.map((operationId, index) => [operationId, index]))
-  const older = [
+  const positions = new Map((game.logOrder ?? []).map((id, index) => [id, index]))
+  const unlogged = [
     game.events.map(({ operationId, clientCreatedAt }) => ({ operationId, at: clientCreatedAt })),
     (game.turnLog ?? []).map(({ operationId, at }) => ({ operationId, at })),
     (game.counterLog ?? []).map(({ operationId, at }) => ({ operationId, at })),
     extra,
-  ]
-    .flatMap((list) => {
-      const unlogged = list.filter(({ operationId }) => !positions.has(operationId))
-      let at = -Infinity
-      return unlogged.map((entry) => ({ ...entry, at: (at = Math.max(at, entry.at)) }))
+  ].flatMap((list) => {
+    let after = -1
+    let at = -Infinity
+    return list.flatMap(({ operationId, at: stamped }) => {
+      const logged = positions.get(operationId)
+      if (logged !== undefined) {
+        after = logged
+        at = -Infinity
+        return []
+      }
+      // why: within one list the list's order holds, so a time that runs backward never reorders it.
+      at = Math.max(at, stamped)
+      return [{ operationId, after, at }]
     })
-    .sort((left, right) => left.at - right.at)
-  older.forEach(({ operationId }, index) => positions.set(operationId, index - older.length))
+  })
+  unlogged.sort((left, right) => left.after - right.after || left.at - right.at)
+  unlogged.forEach(({ operationId, after }, index) =>
+    positions.set(operationId, after + (index + 1) / (unlogged.length + 1)),
+  )
   return (operationId) => positions.get(operationId)
 }
 
