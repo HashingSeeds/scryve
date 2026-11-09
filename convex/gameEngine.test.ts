@@ -1018,6 +1018,26 @@ describe("engine parity: counter undo", () => {
     expect(log.find((event) => event.operationId === "poison-tap-000001")?.delta).toBe(2)
     expect(log.find((event) => event.operationId === "life-wrong-undo-01")).toBeUndefined()
   })
+
+  it("takes back what a clamped counter tap changed, not what the device asked for", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const poison = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "table",
+        action: { kind: "counter.changed", playerId: game.hostSeat, counterId: "poison", delta },
+        ...sent(operationId),
+        ...(undoOf ? { undoOf } : {}),
+      }) as const
+
+    await game.write("host", poison("poison-clamp-up-01", 1))
+    await game.write("host", poison("poison-clamp-down1", -3))
+    expect(
+      await game.write("host", poison("poison-clamp-undo1", 3, "poison-clamp-down1")),
+    ).toMatchObject({ ok: true })
+    await game.expectSameState()
+    const log = await game.log("host")
+    expect(log.find((event) => event.operationId === "poison-clamp-undo1")?.delta).toBe(1)
+  })
 })
 
 describe("memory engine: life undo", () => {

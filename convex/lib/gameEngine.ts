@@ -659,7 +659,7 @@ function* writeTable(
   const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
-  const request = {
+  const request: TableActionRequest = {
     ...write,
     action,
     actorUserId: actor.userId,
@@ -674,6 +674,11 @@ function* writeTable(
       return failed(writeError("invalid_undo", "Only your own change can be taken back"))
     if (yield* read(store.undoneBy(write.undoOf)))
       return failed(writeError("invalid_undo", "This change was already taken back"))
+    // why: a counter stops at 0 and at its max, so its undo reverses what the authority recorded, not what the device asked for.
+    if (action.kind === "counter.changed") {
+      if (!undone?.delta) return failed(writeError("invalid_undo", "This change moved nothing"))
+      request.action = { ...action, delta: -undone.delta }
+    }
   }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
