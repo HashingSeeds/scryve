@@ -2,7 +2,7 @@ import { Buffer } from "buffer"
 import TcpSocket from "react-native-tcp-socket"
 import Zeroconf, { type Service } from "react-native-zeroconf"
 
-import { createLineReader } from "./lineReader"
+import { createLineReader, encodeLine } from "./lineReader"
 
 // why: iOS only browses Bonjour types listed in NSBonjourServices, so renaming this needs app.config.ts too.
 export const LAN_SERVICE_TYPE = "scryve"
@@ -15,12 +15,6 @@ const HEARTBEAT_MS = 200
 const SILENCE_LIMIT_MS = 4_000
 
 type Socket = ReturnType<typeof TcpSocket.createConnection>
-
-const NON_ASCII = /[^\x00-\x7f]/g
-
-// why: btoa takes one byte per char, and peers on any version parse the \u escapes back to the same text.
-const asciiLine = (message: unknown) =>
-  `${JSON.stringify(message).replace(NON_ASCII, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)}\n`
 
 // why: tcp-socket base64-encodes each write with its JS Buffer polyfill, the host's biggest JS cost. It only reads byteLength and toString("base64") from a Buffer, so this one hands native Hermes' btoa output as-is.
 function wire(text: string) {
@@ -126,12 +120,12 @@ function wrapSocket<In, Out>(
   let ending = false
   return {
     send: (...messages) => {
-      if (!closed && !ending) socket.write(wire(messages.map(asciiLine).join("")))
+      if (!closed && !ending) socket.write(wire(messages.map(encodeLine).join("")))
     },
     sendAndClose: (message) => {
       if (closed || ending) return
       ending = true
-      socket.end(wire(asciiLine(message)))
+      socket.end(wire(encodeLine(message)))
       setTimeout(shutdown, SILENCE_LIMIT_MS)
     },
     close: shutdown,

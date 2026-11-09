@@ -28,6 +28,8 @@ import {
   LAN_PROTOCOL,
   lanLobbyOf,
   lanLog,
+  mergeLanLog,
+  type LanLogPage,
   lanProjection,
   lanRejectionMessage,
   lanRoundId,
@@ -85,7 +87,7 @@ export interface LanSessionState {
   turns?: boolean
   /** why: only a host that answers log requests says so in its welcome. */
   logs?: boolean
-  log?: { publicId: string; events: ConnectedLogEvent[] }
+  log?: { publicId: string; events: ConnectedLogEvent[]; more: boolean }
   error?: string
 }
 
@@ -405,7 +407,8 @@ export class LanSession {
           return this.publish(admitted.game)
         }
         if (!seatKey) return
-        if (message.type === "log") return peer.send({ type: "log", events: lanLog(game, seatKey) })
+        if (message.type === "log")
+          return peer.send({ type: "log", ...lanLog(game, seatKey, message.before) })
         if (message.type === "stats") return void this.guestLatency.set(seatKey, message.stats)
         const now = Date.now()
         if (now - windowStart >= 1_000) {
@@ -630,7 +633,7 @@ export class LanSession {
     }
     if (message.type === "log") {
       const publicId = this.state.projection?.publicId
-      return publicId && this.set({ log: { publicId, events: message.events } })
+      return publicId && this.set({ log: { publicId, ...this.mergedLog(publicId, message) } })
     }
     if (message.type === "pong")
       return this.latency.clockSample(message.at, Date.now(), message.hostAt)
@@ -712,13 +715,23 @@ export class LanSession {
     this.connection.send({ type: "deck", deck })
   }
 
-  /** why: the log travels only while someone reads it, so a busy table never resends it on every change. */
-  requestLog = () => {
+  /** why: the log travels only while someone reads it, so a busy table never resends it on every change. `before` asks for the page older than that change. */
+  requestLog = (before?: string) => {
     const { role, seatKey, status } = this.state
     const game = this.game
-    if (role === "host" && game && seatKey)
-      return this.set({ log: { publicId: lanRoundId(game), events: lanLog(game, seatKey) } })
-    if (status === "connected") this.connection?.send({ type: "log" })
+    if (role === "host" && game && seatKey) {
+      const publicId = lanRoundId(game)
+      return this.set({
+        log: { publicId, ...this.mergedLog(publicId, lanLog(game, seatKey, before)) },
+      })
+    }
+    if (status === "connected")
+      this.connection?.send({ type: "log", ...(before === undefined ? {} : { before }) })
+  }
+
+  private mergedLog(publicId: string, page: LanLogPage) {
+    const { log } = this.state
+    return mergeLanLog(log?.publicId === publicId ? log : undefined, page)
   }
 
   revealRole = async () => {
