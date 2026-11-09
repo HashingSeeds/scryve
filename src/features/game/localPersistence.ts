@@ -672,7 +672,9 @@ export class LocalGameRepository {
     const stored = this.storage.getString(LOCAL_KEYS.meSeat)
     if (stored === "none") return "none"
     const raw = Number(stored)
-    return stored !== undefined && Number.isInteger(raw) && raw >= 0 && raw < 6 ? raw : undefined
+    return stored !== undefined && Number.isInteger(raw) && raw >= 0 && raw < MAX_PLAYERS
+      ? raw
+      : undefined
   }
 
   saveMeSeat(seat: number | undefined): void {

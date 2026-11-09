@@ -744,6 +744,8 @@ describe("LocalGameRepository account ownership", () => {
     expect(repository.loadMeSeat()).toBeUndefined()
     repository.saveMeSeat(2)
     expect(repository.loadMeSeat()).toBe(2)
+    repository.saveMeSeat(9)
+    expect(repository.loadMeSeat()).toBe(9)
     repository.saveMeSeat(undefined)
     expect(repository.loadMeSeat()).toBe("none")
   })
