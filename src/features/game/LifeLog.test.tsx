@@ -187,23 +187,28 @@ describe("life log", () => {
     expect(view.getByTestId("log")).toHaveProp("accessibilityLabel", "8000 6000 4800 5300")
   })
 
-  it("places Planechase and Archenemy entries among life changes, under the turn they happened in", () => {
+  it("places Planechase and Archenemy entries among life changes by sequence, under the turn they happened in", () => {
     const ada = asPlayerId("ada")
     const life = { id: "hit", playerId: ada, delta: -2, life: 18, at: 3_000, operationIds: ["hit"] }
-    const roll = { kind: "mode" as const, id: "roll", playerId: ada, at: 5_000, text: "Ada rolled" }
-    const scheme = {
+    const mode = (id: string, at: number) => ({
       kind: "mode" as const,
-      id: "scheme",
+      id,
       playerId: ada,
-      at: 1_000,
-      text: "Ada set",
-    }
+      at,
+      text: id,
+      operationIds: [id],
+    })
     const turns = [{ operationId: "turn-2", playerId: ada, number: 2, at: 2_000 }]
+    // why: the roll's clock reads before the hit's, but it came after it.
+    const sequence = ["scheme", "turn-2", "hit", "roll"]
+    const positionOf = (id: string) => sequence.indexOf(id)
 
     expect(
-      withTurnDividers(withModeRows([life], [scheme, roll]), turns).map((item) =>
-        item.kind === "turn" ? `turn ${item.number}` : item.id,
-      ),
+      withTurnDividers(
+        withModeRows([life], [mode("scheme", 1_000), mode("roll", 2_500)], positionOf),
+        turns,
+        positionOf,
+      ).map((item) => (item.kind === "turn" ? `turn ${item.number}` : item.id)),
     ).toEqual(["turn 2", "roll", "hit", "scheme"])
   })
 })
@@ -240,6 +245,9 @@ describe("counter log rows", () => {
     const life = [
       { id: "life", playerId: ada, delta: -3, life: 37, at: 1_550, operationIds: ["life"] },
     ]
-    expect(mergedLog(life, rows).map(({ at }) => at)).toEqual([9_000, 1_600, 1_550, 1_500])
+    const sequence = ["a", "b", "life", "c", "d"]
+    expect(mergedLog(life, rows, (id) => sequence.indexOf(id)).map(({ at }) => at)).toEqual([
+      9_000, 1_600, 1_550, 1_500,
+    ])
   })
 })

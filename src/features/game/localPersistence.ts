@@ -518,6 +518,9 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
       : {}),
     ...(counterLog ? { counterLog } : {}),
     ...(modeSetup ? { modeSetup } : {}),
+    ...(Array.isArray(value.logOrder)
+      ? { logOrder: value.logOrder.filter((id): id is string => typeof id === "string") }
+      : {}),
   }
 }
 

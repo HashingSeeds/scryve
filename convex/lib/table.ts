@@ -470,6 +470,7 @@ export function applyTableAction(
       turn: table.turn,
       groups: table.turnGroups,
       now: context.now ?? Date.now(),
+      operationId: context.operationId,
     })
     if (modes === null) return null
     return modes === table.modes ? unchanged : { table: { ...table, modes }, life: [] }

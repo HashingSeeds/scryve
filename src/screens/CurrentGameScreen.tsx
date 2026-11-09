@@ -25,6 +25,7 @@ import {
   hasPlayBegun,
   incomingCommanderDamage,
   isMatchInProgress,
+  localLogPositions,
   localOutState,
   localTeams,
   matchContextLabel,
@@ -668,6 +669,7 @@ export function CurrentGameScreen({
           counters={runtime.game.counterLog}
           sharedLife={!!teams}
           modes={boardModes.log.map(modeLogRow)}
+          positionOf={localLogPositions(runtime.game)}
           canUndo={runtime.canUndo(turnPrefs.enabled)}
           origin={chrome.dialogOrigin}
           onUndo={() => runtime.undo(turnPrefs.enabled)}

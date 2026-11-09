@@ -62,6 +62,14 @@ describe("Planechase", () => {
     expect(rollCost(afterUndo.planechase!, passedAgain, "cy")).toBe(0)
   })
 
+  it("names the change behind each log entry, so the game log places it by sequence", () => {
+    const blank = { kind: "planar.rolled", playerId: "ada", face: "blank" } as const
+    const context = { turn: turn("ada", 1), groups, now: 1 }
+    const first = applyModeAction(modes!, blank, { ...context, operationId: "roll-1" })!
+    const second = applyModeAction(first, blank, { ...context, operationId: "roll-2" })!
+    expect(second.log?.map(({ operationId }) => operationId)).toEqual(["roll-1", "roll-2"])
+  })
+
   it("charges one more for each roll this turn, and a pass resets it", () => {
     const blank = { kind: "planar.rolled", playerId: "ada", face: "blank" } as const
     const rolled = play(modes!, [

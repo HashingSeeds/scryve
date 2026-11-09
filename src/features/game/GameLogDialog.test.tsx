@@ -28,6 +28,7 @@ describe("GameLogDialog", () => {
           players={[{ id: ada, name: "Ada", life: 40, color: "#000" }]}
           events={events}
           canUndo={false}
+          positionOf={() => undefined}
           onMore={onMore}
           onUndo={jest.fn()}
           onClose={jest.fn()}

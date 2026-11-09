@@ -167,33 +167,32 @@ export interface GameModeRow {
   playerId: PlayerId
   at: number
   text: string
+  /** why: the change that made the entry, which places it in the log; empty for an entry from before it was kept. */
+  operationIds: string[]
 }
 
 type GameTableChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
 type GameLogChange = GameTableChange | GameModeRow
 
-/** why: newest first; a connected log passes `positionOf` so device clocks that drift apart don't reorder life and counter rows. */
+/** why: newest first, by sequence: `positionOf` is the authority's order or a local game's apply order, never a clock. */
 export function mergedLog(
   life: readonly GameLogRow[],
   counters: readonly GameCounterRow[],
-  positionOf?: (operationId: string) => number | undefined,
+  positionOf: (operationId: string) => number | undefined,
 ): GameTableChange[] {
-  const placeOf = (row: GameTableChange) => (positionOf ? rowPosition(row, positionOf) : row.at)
+  const placeOf = (row: GameTableChange) => rowPosition(row, positionOf)
   return [...life, ...counters].sort((left, right) => placeOf(right) - placeOf(left))
 }
 
 /** why: mode entries carry the authority's time and no change of their own, so they slot in by time and leave the table rows in the order they came. */
+/** why: newest first, by sequence like every other row: a mode entry sits where the change that made it does. */
 export function withModeRows(
   rows: readonly GameLogChange[],
   modes: readonly GameModeRow[],
+  positionOf: (operationId: string) => number | undefined,
 ): GameLogChange[] {
-  const merged: GameLogChange[] = []
-  let index = 0
-  for (const mode of [...modes].sort((left, right) => right.at - left.at)) {
-    while (index < rows.length && rows[index].at >= mode.at) merged.push(rows[index++])
-    merged.push(mode)
-  }
-  return [...merged, ...rows.slice(index)]
+  const placeOf = (row: GameLogChange) => rowPosition(row, positionOf)
+  return [...rows, ...modes].sort((left, right) => placeOf(right) - placeOf(left))
 }
 
 type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & {
@@ -204,29 +203,22 @@ export type GameLogItem = GameLogChange | TurnDivider
 
 /** why: a connected log places a row by the newest change in it, where the authority recorded that change. */
 export const rowPosition = (
-  row: Pick<GameTableChange, "operationIds">,
+  row: Pick<GameLogChange, "operationIds">,
   positionOf: (operationId: string) => number | undefined,
 ) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
 
 /**
- * why: a local game has one clock, so rows go under a turn by time. A connected log passes
- * `positionOf`, the authority's order, since device clocks drift apart; a turn whose start hasn't
- * loaded yet heads every loaded row.
+ * why: the log's order is a sequence, never a clock: `positionOf` is the authority's order in a
+ * connected game and the apply order in a local one. A turn whose start hasn't loaded yet heads
+ * every loaded row.
  */
 export function withTurnDividers(
   rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],
-  positionOf?: (operationId: string) => number | undefined,
+  positionOf: (operationId: string) => number | undefined,
 ): GameLogItem[] {
-  const startOf = (turn: TurnLogEntry) =>
-    positionOf ? (positionOf(turn.operationId) ?? -Infinity) : turn.at
-  // why: a mode entry has no change of its own, so it goes under the same turn as the row listed above it.
-  let above = Infinity
-  const places = rows.map((row) => {
-    if (!positionOf) return row.at
-    above = row.kind === "mode" ? above : rowPosition(row, positionOf)
-    return above
-  })
+  const startOf = (turn: TurnLogEntry) => positionOf(turn.operationId) ?? -Infinity
+  const places = rows.map((row) => rowPosition(row, positionOf))
   const items: GameLogItem[] = []
   let index = 0
   for (const turn of [...turns].reverse()) {

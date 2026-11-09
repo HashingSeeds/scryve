@@ -36,6 +36,8 @@ const modeLogValidator = v.object({
   face: v.optional(planarFaceValidator),
   cost: v.optional(v.number()),
   card: v.optional(v.number()),
+  /** why: the game log places an entry by the change that made it, never by its time. */
+  operationId: v.optional(v.string()),
 })
 export type ModeLogEntry = Infer<typeof modeLogValidator>
 
@@ -252,6 +254,7 @@ export interface ModeContext {
   turn?: Turn
   groups?: TurnGroups
   now: number
+  operationId?: string
 }
 
 function logged(modes: TableModes, entry: ModeLogEntry): TableModes {
@@ -273,6 +276,21 @@ function walkedEntry(planechase: Planechase, playerId: string, at: number): Mode
  * the Pokémon coin, so every reducer agrees on a roll. Returns null for an action the modes refuse.
  */
 export function applyModeAction(
+  modes: TableModes | undefined,
+  action: ModeAction,
+  context: ModeContext,
+): TableModes | null {
+  const next = appliedModeAction(modes, action, context)
+  const { operationId } = context
+  if (!next?.log || !operationId || next.log === modes?.log) return next
+  const before = new Set(modes?.log)
+  return {
+    ...next,
+    log: next.log.map((entry) => (before.has(entry) ? entry : { ...entry, operationId })),
+  }
+}
+
+function appliedModeAction(
   modes: TableModes | undefined,
   action: ModeAction,
   context: ModeContext,

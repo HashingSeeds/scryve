@@ -9,4 +9,5 @@ export const modeLogRow = ({ key, text, at, entry }: ModeLogRow): GameModeRow =>
   playerId: asPlayerId(entry.playerId),
   at,
   text,
+  operationIds: entry.operationId ? [entry.operationId] : [],
 })
