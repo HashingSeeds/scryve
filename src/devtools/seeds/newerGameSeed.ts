@@ -1,7 +1,7 @@
 import type { Href } from "expo-router"
 
 import {
-  ACTIVE_SCHEMA_VERSION,
+  WIDE_ACTIVE_SCHEMA_VERSION,
   LOCAL_KEYS,
   LocalGameRepository,
   type StringStorage,
@@ -13,7 +13,7 @@ export function seedNewerGame(_params: unknown, storage: StringStorage = mmkvSto
   new LocalGameRepository(storage).clearActiveGame()
   storage.set(
     LOCAL_KEYS.active,
-    JSON.stringify({ schemaVersion: ACTIVE_SCHEMA_VERSION + 1, game: {}, eventChunkCount: 0 }),
+    JSON.stringify({ schemaVersion: WIDE_ACTIVE_SCHEMA_VERSION + 1, game: {}, eventChunkCount: 0 }),
   )
   return { pathname: "/", params: { destination: "play" } }
 }
