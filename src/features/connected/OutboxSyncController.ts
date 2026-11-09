@@ -32,7 +32,7 @@ import type {
   ConnectedOperationStatus,
   SentWrite,
 } from "./model"
-import { nextQueuedSequence, toConnectedProjection } from "./model"
+import { toConnectedProjection } from "./model"
 import type { ConnectedGameRepository, ConnectedOutbox } from "./persistence"
 import {
   classifyWriteFailure,
@@ -204,11 +204,6 @@ export class OutboxSyncController {
     return this.outbox.getState().pending
   }
 
-  /** why: every change takes the next queue position here, so the outbox and the log keep the order it was made in. */
-  private enqueue(action: PendingLifeAction) {
-    return this.outbox.enqueue({ ...action, sequence: nextQueuedSequence(this.pending) })
-  }
-
   setEnvironment(environment: OutboxSyncEnvironment): void {
     if (!this.environmentInitialized) {
       this.environmentInitialized = true
@@ -321,7 +316,7 @@ export class OutboxSyncController {
       queuedAt: now,
       attempts: 0,
     }
-    if (!this.enqueue(action)) {
+    if (!this.outbox.enqueue(action)) {
       this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return
@@ -336,7 +331,7 @@ export class OutboxSyncController {
     this.lastQueuedLifeChange = undefined
     for (const change of changes) {
       const now = this.now()
-      const queued = this.enqueue({
+      const queued = this.outbox.enqueue({
         schemaVersion: 1,
         event: {
           type: "life.changed",
@@ -407,7 +402,7 @@ export class OutboxSyncController {
         queuedAt: now,
         attempts: 0,
       }
-      if (!this.enqueue(action)) {
+      if (!this.outbox.enqueue(action)) {
         this.changeError = translate("connected:outbox.queueFull")
         this.publish()
         continue
@@ -448,7 +443,7 @@ export class OutboxSyncController {
       queuedAt: now,
       attempts: 0,
     }
-    if (!this.enqueue(action)) {
+    if (!this.outbox.enqueue(action)) {
       this.changeError = translate("connected:outbox.queueFull")
       this.publish()
       return
@@ -475,7 +470,7 @@ export class OutboxSyncController {
 
   private enqueueTableAction(action: TableAction, operationId: string): boolean {
     const now = this.now()
-    const accepted = this.enqueue({
+    const accepted = this.outbox.enqueue({
       schemaVersion: 1,
       event: {
         type: "table.action",
