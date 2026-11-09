@@ -1,5 +1,6 @@
 import { translate } from "@/i18n/translate"
 
+import { encodeLine, MAX_LINE_BYTES } from "./lineReader"
 import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
 import type {
   ClaimStatus,
@@ -151,7 +152,7 @@ export type LanGuestMessage =
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
-  | { type: "log" }
+  | { type: "log"; before?: string }
   | { type: "deck"; deck: LanSeatDeck | null }
   | { type: "ping"; at: number }
   | { type: "stats"; stats: SyncLatencySummary }
@@ -174,7 +175,7 @@ export type LanHostMessage =
   | { type: "ack"; operationId: string; status?: ClaimStatus }
   | { type: "nack"; operationId: string; code?: string; message: string }
   | { type: "pong"; at: number; hostAt: number }
-  | { type: "log"; events: ConnectedLogEvent[] }
+  | ({ type: "log" } & LanLogPage)
 
 export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
 
@@ -778,7 +779,8 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(isCount(value.tableVersion) ? { tableVersion: value.tableVersion } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
-  if (value.type === "log") return { type: "log" }
+  if (value.type === "log")
+    return { type: "log", ...(isId(value.before) ? { before: value.before } : {}) }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }
   if (value.type === "stats") {
     const stats = parseLatencySummary(value.stats)
@@ -867,6 +869,8 @@ export function parseHostMessage(line: string): LanHostMessage | null {
     return {
       type: "log",
       events: value.events.slice(-NEARBY_LOG_LIMIT).flatMap((event) => parseLogEvent(event) ?? []),
+      more: value.more === true,
+      ...(isId(value.before) ? { before: value.before } : {}),
     }
   return null
 }
@@ -890,7 +894,44 @@ function parseLogEvent(value: unknown): ConnectedLogEvent | null {
   }
 }
 
-export const lanLog = (game: LanGame, viewerKey: string): ConnectedLogEvent[] =>
-  [...(game.memory?.events.values() ?? [])]
-    .slice(-NEARBY_LOG_LIMIT)
-    .map((event) => connectedLogEvent(event, viewerKey))
+/** why: `more` says older changes wait before the first of `events`; `before` names the change a page was asked to end before. */
+export interface LanLogPage {
+  events: ConnectedLogEvent[]
+  more: boolean
+  before?: string
+}
+
+/** why: the log rides one line, and a peer drops a line past MAX_LINE_BYTES, so the host sends the newest changes that fit and older ones page in on request. */
+export function lanLog(game: LanGame, viewerKey: string, before?: string): LanLogPage {
+  const all = [...(game.memory?.events.values() ?? [])]
+  const cursor = before === undefined ? {} : { before }
+  const end = before === undefined ? all.length : all.findIndex((e) => e.operationId === before)
+  if (end < 0) return { events: [], more: false, ...cursor }
+  let bytes = encodeLine({ type: "log", events: [], more: true, ...cursor }).length
+  const events: ConnectedLogEvent[] = []
+  let start = end
+  while (start > 0 && events.length < NEARBY_LOG_LIMIT) {
+    const event = connectedLogEvent(all[start - 1], viewerKey)
+    // why: each event's own newline stands in for the comma that joins it to the next.
+    const size = encodeLine(event).length
+    if (bytes + size > MAX_LINE_BYTES) break
+    bytes += size
+    events.unshift(event)
+    start -= 1
+  }
+  return { events, more: start > 0, ...cursor }
+}
+
+/** why: the newest page replaces what it repeats and older pages go in front, so a guest keeps every change it has read, in the host's order. */
+export function mergeLanLog(
+  current: { events: readonly ConnectedLogEvent[]; more?: boolean } | undefined,
+  page: LanLogPage,
+): { events: ConnectedLogEvent[]; more: boolean } {
+  const fresh = new Set(page.events.map(({ operationId }) => operationId))
+  const kept = (current?.events ?? []).filter(({ operationId }) => !fresh.has(operationId))
+  if (page.before !== undefined) return { events: [...page.events, ...kept], more: page.more }
+  return {
+    events: [...kept, ...page.events],
+    more: kept.length > 0 ? (current?.more ?? false) : page.more,
+  }
+}

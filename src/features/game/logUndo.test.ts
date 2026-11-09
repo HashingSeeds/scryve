@@ -43,7 +43,7 @@ const table = (current: LocalGame, action: TableAction, now: number) =>
   applyLocalTableAction(current, action, at(now))
 
 function undoNewest(current: LocalGame, turns = true) {
-  const undo: LogUndo | undefined = newestLogUndo(current, actor, { turns })
+  const undo: LogUndo | undefined = newestLogUndo(current, { turns })
   if (!undo || undo.kind === "turn") throw new Error(`expected a row, got ${undo?.kind}`)
   return undoLogRow(current, undo, context)
 }
@@ -81,7 +81,7 @@ describe("the game log's Undo", () => {
     expect(current.counterLog).toBeUndefined()
     current = undoNewest(current)
     expect(current.players[1].life).toBe(40)
-    expect(newestLogUndo(current, actor, { turns: true })).toBeUndefined()
+    expect(newestLogUndo(current, { turns: true })).toBeUndefined()
   })
 
   it("takes back a pass only when it is the newest thing the log shows", () => {
@@ -96,13 +96,41 @@ describe("the game log's Undo", () => {
     }
 
     const passedLast = table(table(base, poison, 2_000), pass, 5_000)
-    expect(newestLogUndo(passedLast, actor, { turns: true })).toMatchObject({ kind: "turn" })
-    expect(newestLogUndo(passedLast, actor, { turns: false })).toMatchObject({ kind: "counter" })
+    expect(newestLogUndo(passedLast, { turns: true })).toMatchObject({ kind: "turn" })
+    expect(newestLogUndo(passedLast, { turns: false })).toMatchObject({ kind: "counter" })
 
     const counterLast = table(table(base, pass, 2_000), poison, 5_000)
-    expect(newestLogUndo(counterLast, actor, { turns: true })).toMatchObject({
+    expect(newestLogUndo(counterLast, { turns: true })).toMatchObject({
       kind: "counter",
       counterId: "poison",
+    })
+  })
+
+  it("takes back a pass when the only taps after it cancel out", () => {
+    const base = game()
+    const [ada, bo] = base.players
+    const counted = table(
+      base,
+      { kind: "counter.changed", playerId: bo.id, counterId: "poison", delta: 1 },
+      1_000,
+    )
+    let current = table(
+      counted,
+      { kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id },
+      2_000,
+    )
+    clock = 3_000
+    current = applyGameCommand(
+      current,
+      { type: "life.change", playerId: bo.id, delta: -1 },
+      context,
+    )
+    clock = 3_200
+    current = applyGameCommand(current, { type: "life.change", playerId: bo.id, delta: 1 }, context)
+
+    expect(newestLogUndo(current, { turns: true })).toMatchObject({
+      kind: "turn",
+      playerId: ada.id,
     })
   })
 })
@@ -128,7 +156,7 @@ describe("log undo in Two-Headed Giant", () => {
       delta: 2,
     }
     const poisoned = applyLocalTableAction(created, poison, at(1_000))
-    const undo = newestLogUndo(poisoned, actor, { turns: true })
+    const undo = newestLogUndo(poisoned, { turns: true })
     if (!undo || undo.kind === "turn") throw new Error("expected a counter row")
     const after = undoLogRow(poisoned, undo, context)
     expect(after.table?.players[ada.id]?.counters?.poison ?? 0).toBe(0)

@@ -1,12 +1,6 @@
-import {
-  applyGameCommand,
-  asOperationId,
-  localTableRules,
-  localTeams,
-  undoableTurn,
-} from "./domain"
+import { applyGameCommand, asOperationId, localTableRules, localTeams } from "./domain"
 import { counterLog, gameLog, mergedLog } from "./LifeLog"
-import type { ActorId, CommandContext, LocalGame } from "./types"
+import type { CommandContext, LocalGame } from "./types"
 import {
   applyTableAction,
   customCounterNameOf,
@@ -14,12 +8,20 @@ import {
   type TableAction,
 } from "../../../convex/lib/table"
 
-/** why: with turns hidden the log shows no passes, so Undo never rewinds a turn the player cannot see. */
-export function newestLogUndo(game: LocalGame, actorId: ActorId, { turns }: { turns: boolean }) {
+/**
+ * why: with turns hidden the log shows no passes, so Undo never rewinds a turn the player cannot
+ * see. A pass is weighed against the newest row the log shows, so taps that cancel out after it,
+ * which show no row, don't hide it.
+ */
+export function newestLogUndo(game: LocalGame, { turns }: { turns: boolean }) {
   const [row] = mergedLog(gameLog(game.players, game.events), counterLog(game.counterLog ?? []))
-  const turn = turns ? undoableTurn(game, actorId) : undefined
-  if (turn && game.turn && (!row || game.turn.startedAt >= row.at))
-    return { kind: "turn" as const, ...turn }
+  const turn = turns ? game.turn : undefined
+  if (turn?.previous && (!row || turn.startedAt >= row.at))
+    return {
+      kind: "turn" as const,
+      playerId: turn.previous.playerId,
+      turnOperationId: turn.operationId,
+    }
   if (!row) return undefined
   return row.kind === "counter"
     ? {

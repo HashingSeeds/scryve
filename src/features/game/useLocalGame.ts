@@ -334,7 +334,7 @@ export function useLocalGame(
     game,
     ...tableRuntime,
     tableRuntime,
-    canUndo: (turns: boolean) => newestLogUndo(game, context.actorId, { turns }) !== undefined,
+    canUndo: (turns: boolean) => newestLogUndo(game, { turns }) !== undefined,
     changeLife,
     assignCommanderDamage,
     changeLayout,
@@ -342,8 +342,7 @@ export function useLocalGame(
     changeClock,
     undo: (turns = true) => {
       const current = gameRef.current
-      const undo =
-        current.status === "active" ? newestLogUndo(current, context.actorId, { turns }) : undefined
+      const undo = current.status === "active" ? newestLogUndo(current, { turns }) : undefined
       if (!undo) return
       if (undo.kind === "turn") tableActions.undoTurn(undo.playerId, undo.turnOperationId)
       else {
