@@ -5,6 +5,7 @@ import {
   isRoundClockSetup,
   pauseRoundClock,
   resumeRoundClock,
+  roundClockAfterTurn,
   roundClockText,
   roundClockView,
   startRoundClock,
@@ -42,6 +43,16 @@ describe("round clock", () => {
     clock = addRoundBonusTurns(clock, SYSTEMS.mtg.roundClock.slowPlayTurns)
     expect(roundClockText(roundClockView(clock, "mtg", 21 * MINUTE))).toBe("Turn 2 of 7")
     for (let step = 0; step < 10; step++) clock = stepRoundTurn(clock, "mtg", 1)
+    expect(roundClockText(roundClockView(clock, "mtg", 22 * MINUTE))).toBe("Turns done")
+  })
+
+  it("leaves finished extra turns finished when a pass past them is taken back", () => {
+    let clock = callRoundTime(adjustRoundClock(fifty, MINUTE), 20 * MINUTE)
+    for (let step = 0; step < 6; step++) clock = stepRoundTurn(clock, "mtg", 1)
+    const passed = { kind: "turn.passed", playerId: "a", toPlayerId: "b" } as const
+    clock = roundClockAfterTurn(clock, "mtg", passed, "late-pass")
+    const undone = { kind: "turn.undone", playerId: "a", turnOperationId: "late-pass" } as const
+    clock = roundClockAfterTurn(clock, "mtg", undone, "undo")
     expect(roundClockText(roundClockView(clock, "mtg", 22 * MINUTE))).toBe("Turns done")
   })
 
