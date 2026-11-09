@@ -12,6 +12,7 @@ import {
   type GameWrite as MemoryWrite,
 } from "./lib/gameEngine"
 import { writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
+import { connectedLogEvent } from "./lib/gameLog"
 import { TABLE_VERSION, type TableAction } from "./lib/table"
 
 const token = "t".repeat(43)
@@ -984,6 +985,38 @@ describe("memory engine: turn groups", () => {
     ).toMatchObject({ ok: true })
     expect(memory.turn).toMatchObject({ playerId: "cy", number: 2 })
     expect(memory.events.get("turn-pass-ada-0001")).toMatchObject({ toPlayerId: "cy" })
+  })
+
+  it("names the seat the authority passed to in the log, not the one the device named", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      turn: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-set-ada-0001" },
+      seats: new Map(
+        ["ada", "bo", "cy"].map((id) => [id, { ...seat(id), currentLife: id === "bo" ? 0 : 40 }]),
+      ),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    writeMemoryGame(
+      memory,
+      actor("ada"),
+      tableWrite("ada", "turn-pass-ada-0002", {
+        kind: "turn.passed",
+        playerId: "ada",
+        toPlayerId: "bo",
+      }),
+      CREATED_AT + 1_000,
+    )
+    const pass = memory.events.get("turn-pass-ada-0002")
+    expect(pass && connectedLogEvent(pass, "ada").action).toEqual({
+      kind: "turn.passed",
+      playerId: "ada",
+      toPlayerId: "cy",
+    })
   })
 })
 
