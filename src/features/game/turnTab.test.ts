@@ -1,9 +1,13 @@
 import {
+  applyGameCommand,
   createLocalGame,
+  localLogPositions,
   undoableTurn,
   withFirstTurn,
   applyLocalTableAction,
   asActorId,
+  asDeviceId,
+  asOperationId,
   startTurnOnChange,
 } from "./domain"
 import { gameLog, withTurnDividers } from "./LifeLog"
@@ -142,5 +146,55 @@ describe("local turns", () => {
       "turn 1",
       "early",
     ])
+  })
+})
+
+describe("the local log without a full logOrder", () => {
+  it("places every change and loses no row when an older build dropped or never wrote logOrder", () => {
+    const created = createLocalGame({
+      startingLife: 40,
+      now: 0,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Bo", color: "#111" },
+      ],
+    })
+    const [ada, bo] = created.players
+    let game = withFirstTurn(created, ada.id, { operationId: "turn-1", now: 0 })
+    const tap = (operationId: string, playerId: typeof ada.id, at: number) => {
+      game = applyGameCommand(
+        game,
+        { type: "life.change", playerId, delta: -1 },
+        {
+          actorId: asActorId("local"),
+          deviceId: asDeviceId("device"),
+          now: () => at,
+          operationId: () => asOperationId(operationId),
+        },
+      )
+    }
+    tap("hit-1", ada.id, 5_000)
+    game = applyLocalTableAction(
+      game,
+      { kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id },
+      { operationId: "turn-2", now: 6_000 },
+    )
+    tap("hit-2", bo.id, 9_000)
+    // why: after a rollback the older build appends without logOrder, here with a clock that ran backward.
+    const rolledBack = { ...game, logOrder: game.logOrder }
+    tap("hit-3", bo.id, 1_000)
+    const partial = { ...game, logOrder: rolledBack.logOrder }
+    const missing = { ...game, logOrder: undefined }
+
+    for (const saved of [partial, missing]) {
+      const positionOf = localLogPositions(saved)
+      const ids = [...saved.events.map(({ operationId }) => operationId), "turn-2"]
+      expect(ids.every((id) => positionOf(id) !== undefined)).toBe(true)
+      const order = ["hit-1", "turn-2", "hit-2", "hit-3"].map((id) => positionOf(id)!)
+      expect(order).toEqual([...order].sort((left, right) => left - right))
+      const rows = gameLog(saved.players, saved.events)
+      const items = withTurnDividers(rows, saved.turnLog ?? [], positionOf)
+      expect(items.filter((item) => item.kind !== "turn")).toHaveLength(rows.length)
+    }
   })
 })
