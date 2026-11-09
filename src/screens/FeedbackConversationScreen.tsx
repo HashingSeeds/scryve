@@ -105,6 +105,23 @@ export function FeedbackConversationScreen({
                 />
               </View>
             ) : null}
+            {opened ? null : (
+              <Text size="xs" tone="dim" style={$centered}>
+                <Trans
+                  i18nKey={`feedback:suggest.notice.${kind}`}
+                  components={{
+                    privacy: (
+                      <Text
+                        size="xs"
+                        accessibilityRole="link"
+                        style={themed($link)}
+                        onPress={onOpenPrivacy}
+                      />
+                    ),
+                  }}
+                />
+              </Text>
+            )}
             <View style={themed($composer)}>
               {opened ? null : (
                 <ComposerButton
@@ -164,34 +181,10 @@ export function FeedbackConversationScreen({
               value={includeAccount}
               onValueChange={onIncludeAccount}
             />
-          ) : (
-            <Text size="xs" tone="dim">
-              {translate("feedback:suggest.anonymous")}{" "}
-              <Text
-                size="xs"
-                accessibilityRole="link"
-                style={themed($link)}
-                tx="feedback:suggest.signInToKeep"
-                onPress={onSignIn}
-              />
-            </Text>
-          )}
-          <Text size="xs" tone="dim">
-            <Trans
-              i18nKey="feedback:suggest.translationNotice"
-              components={{
-                privacy: (
-                  <Text
-                    size="xs"
-                    accessibilityRole="link"
-                    style={themed($link)}
-                    onPress={onOpenPrivacy}
-                  />
-                ),
-              }}
-            />
-          </Text>
-          <Text tx="feedback:suggest.sentryDisclosure" size="xs" tone="dim" />
+          ) : null}
+          <View style={$prompt}>
+            <Text tx={`feedback:suggest.prompt.${kind}`} preset="subheading" style={$centered} />
+          </View>
         </>
       )}
       {request || outgoing !== undefined ? (
@@ -294,7 +287,7 @@ function AccountStatus({
         size="xs"
         accessibilityRole="link"
         style={themed($link)}
-        tx={request.canLink ? "feedback:thread.includeAccount" : "feedback:thread.signInToKeep"}
+        tx={request.canLink ? "feedback:thread.includeAccount" : "feedback:thread.signInToSync"}
         onPress={request.canLink ? onLinkAccount : onSignIn}
       />
     </Text>
@@ -437,6 +430,8 @@ const $theirs: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $team: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $prompt: ViewStyle = { flex: 1, justifyContent: "center" }
+const $centered: TextStyle = { textAlign: "center" }
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.tint,
   textDecorationLine: "underline",

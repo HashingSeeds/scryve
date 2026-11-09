@@ -72,6 +72,7 @@ const $fill: ViewStyle = { flex: 1, justifyContent: "flex-start" }
 const $grow: ViewStyle = { flex: 1 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
+  flexGrow: 1,
   maxWidth: 680,
   alignSelf: "center",
   paddingHorizontal: spacing.md,
