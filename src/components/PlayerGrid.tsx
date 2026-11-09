@@ -28,6 +28,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
+import { concentricRadius, useBoardCornerRadii } from "./boardCorners"
 import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
@@ -61,6 +62,7 @@ import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import { SeatSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
+import type { CornerRadii } from "../../modules/display-corners"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (playerId: PlayerId, commander?: CommanderSlot) => Record<PlayerId, number>
@@ -323,6 +325,7 @@ export function PlayerGrid({
     row.map((slot) => (slot === null ? null : (seatOrder?.[slot] ?? slot))),
   )
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  const displayRadii = useBoardCornerRadii()
   const menuJunction = getFourCardMenuJunction(rows)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const tabRow = useContext(FirstPlayerTabsShownContext)
@@ -447,6 +450,8 @@ export function PlayerGrid({
                 rowIndex,
                 columnIndex,
                 insets: Platform.OS === "web" ? insets : undefined,
+                displayRadii,
+                topInset: topEdgeBand,
               })
               if (table?.tableRules.pokemon) {
                 return (
@@ -782,12 +787,19 @@ function seatTabCorners(
     )
 }
 
-/** why: on web, pass the insets. The page only reaches a rounded screen corner where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
+/**
+ * why: on web, pass the insets. The page only reaches a rounded screen corner where the browser
+ * reports an inset; a browser tab or a solid status bar strip reports none. A card corner that
+ * meets the screen's takes the display's radius from `displayRadii` (board corners, top left
+ * clockwise), so the card and its turn frame follow the glass; with no radius it stays square.
+ */
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
   columnIndex: number
   insets?: LifeCardContentInsets
+  displayRadii?: CornerRadii | null
+  topInset?: number
 }): ViewStyle | undefined {
   const reachesCorner = (edge: LifeCardEdge, side: LifeCardEdge) =>
     !input.insets || input.insets[edge] > 0 || input.insets[side] > 0
@@ -795,21 +807,25 @@ export function getScreenCornerSquaringStyle(input: {
   const touchesBottomEdge = input.rowIndex === input.rows.length - 1
   const touchesLeftEdge = input.columnIndex === 0
   const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
+  const glass = (corner: number, top: boolean) =>
+    concentricRadius(input.displayRadii?.[corner] ?? null, top ? input.topInset : 0) ?? radius.none
   const squared: ViewStyle = {
     ...(touchesTopEdge && touchesLeftEdge && reachesCorner("top", "left")
-      ? { borderTopLeftRadius: radius.none }
+      ? { borderTopLeftRadius: glass(0, true) }
       : null),
     ...(touchesTopEdge && touchesRightEdge && reachesCorner("top", "right")
-      ? { borderTopRightRadius: radius.none }
-      : null),
-    ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
-      ? { borderBottomLeftRadius: radius.none }
+      ? { borderTopRightRadius: glass(1, true) }
       : null),
     ...(touchesBottomEdge && touchesRightEdge && reachesCorner("bottom", "right")
-      ? { borderBottomRightRadius: radius.none }
+      ? { borderBottomRightRadius: glass(2, false) }
+      : null),
+    ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
+      ? { borderBottomLeftRadius: glass(3, false) }
       : null),
   }
-  return Object.keys(squared).length ? squared : undefined
+  if (!Object.keys(squared).length) return undefined
+  // why: Apple draws its displays with continuous corners, so a circular arc would lift off the glass.
+  return input.displayRadii ? { ...squared, borderCurve: "continuous" } : squared
 }
 
 const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
