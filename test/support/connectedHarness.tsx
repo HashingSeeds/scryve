@@ -72,6 +72,8 @@ type RuntimePlayer = Required<Pick<LobbyPlayer, "playerId" | "controlledByMe" | 
 type RuntimeActionEvent = {
   type?: "life.changed" | "commanderDamage.submitted" | "commanderDamage.resolved"
   operationId: string
+  gameId?: string
+  clientCreatedAt?: number
   playerId?: string
   fromPlayerId?: string
   toPlayerId?: string
@@ -106,6 +108,7 @@ export type MockConnectedRuntime = TableRuntime & {
   failed: Array<{ action: { event: RuntimeActionEvent }; reason: string }>
   connectionStatus: "connected" | "offline" | "syncing"
   changeLife: jest.Mock
+  undoLife: jest.Mock
   submitCommanderDamage: jest.Mock
   resolveCommanderDamageClaim: jest.Mock
   finish: jest.Mock
@@ -139,6 +142,7 @@ export const mockMigrate = jest.fn(async () => ({ isDone: true, continueCursor: 
 export const mockReportPlayer = jest.fn(async () => ({ blocked: true, held: false }))
 export const mockBlockPlayer = jest.fn(async () => ({ blocked: true }))
 export const mockChangeLife = jest.fn()
+export const mockUndoLife = jest.fn()
 export const mockSubmitCommanderDamage = jest.fn(async () => undefined)
 export const mockResolveCommanderDamageClaim = jest.fn(async () => undefined)
 export const mockDismissFailed = jest.fn()
@@ -198,6 +202,7 @@ function defaultRuntime(): MockConnectedRuntime {
     failed: [],
     connectionStatus: "connected",
     changeLife: mockChangeLife,
+    undoLife: mockUndoLife,
     submitCommanderDamage: mockSubmitCommanderDamage,
     resolveCommanderDamageClaim: mockResolveCommanderDamageClaim,
     finish: mockFinish,

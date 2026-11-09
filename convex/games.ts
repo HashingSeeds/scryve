@@ -40,6 +40,7 @@ import {
   type GameWrite,
 } from "./lib/gameEngine"
 import { storedDesignations, throwIfRejected, writeCloudGame } from "./lib/gameEngineConvex"
+import { connectedLogEvent } from "./lib/gameLog"
 import { limitGameRate } from "./lib/gameRateLimits"
 import {
   commanderField,
@@ -2506,6 +2507,7 @@ export const changeLife = mutation({
     deviceId: v.string(),
     clientCreatedAt: v.number(),
     tappedAt: v.optional(v.number()),
+    undoOf: v.optional(v.string()),
   },
   handler: async (ctx, { publicId, ...sent }) => {
     const write: GameWrite = { kind: "life", ...sent }
@@ -2535,6 +2537,7 @@ export const tableAction = mutation({
     clientCreatedAt: v.number(),
     tappedAt: v.optional(v.number()),
     action: tableActionValidator,
+    undoOf: v.optional(v.string()),
   },
   handler: async (ctx, { publicId, ...sent }) => {
     const write: GameWrite = { kind: "table", ...sent }
@@ -3238,6 +3241,7 @@ export const connectedEvents = query({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     await requireSummaryAccess(ctx, game)
+    const viewer = await requireUser(ctx)
     const result = await ctx.db
       .query("gameEvents")
       .withIndex("by_game_server_time", (q) => q.eq("gameId", game._id))
@@ -3246,6 +3250,7 @@ export const connectedEvents = query({
     return {
       ...result,
       page: result.page.map((event) => ({
+        ...connectedLogEvent(event, viewer._id),
         operationId: event.operationId,
         playerId: event.playerId,
         kind: event.kind,

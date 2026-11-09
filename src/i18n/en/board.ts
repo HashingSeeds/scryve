@@ -589,6 +589,8 @@ const board = {
     // A counter row in the game log, as in "Ada poison +1 to 3". {{counter}} is a counter such as poison, or a name the player gave their own counter.
     counterRow: "{{name}} {{counter}} {{delta}} to {{value}}",
     undoLast: "Undo the last change",
+    // Connected games: Undo takes back the newest change this player made, not anyone else's.
+    undoMine: "Undo your last change",
   },
   calculator: {
     damage: "− Damage",

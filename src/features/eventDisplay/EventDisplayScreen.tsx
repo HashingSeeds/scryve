@@ -29,7 +29,7 @@ import {
 } from "../../../convex/lib/events/commands"
 import { formatDefinition } from "../../../convex/lib/systems"
 
-type EventView = NonNullable<FunctionReturnType<typeof api.events.view>>
+type EventView = NonNullable<FunctionReturnType<typeof api.events.board>>
 type Table = EventView["tables"][number]
 type Player = EventView["players"][number]
 type Standing = NonNullable<FunctionReturnType<typeof api.events.standings>>[number]
@@ -117,7 +117,7 @@ function useSize() {
 }
 
 function EventBoard({ eventId, s }: { eventId: Id<"events">; s: Styles }) {
-  const event = useQuery(api.events.view, { eventId })
+  const event = useQuery(api.events.board, { eventId })
   const through = event ? standingsThroughRound(event) : 0
   const standings = useQuery(
     api.events.standings,

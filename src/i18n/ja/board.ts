@@ -553,6 +553,7 @@ export default {
     commanderRow: "{{name}} {{delta}}({{from}}の統率者から、ライフ{{life}})",
     counterRow: "{{name}} {{counter}} {{delta}} → {{value}}",
     undoLast: "直前の変更を取り消す",
+    undoMine: "自分の最後の変更を取り消す",
   },
   calculator: {
     damage: "− ダメージ",

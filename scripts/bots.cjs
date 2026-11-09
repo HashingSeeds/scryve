@@ -494,4 +494,14 @@ if (require.main === module) {
   })
 }
 
-module.exports = { assertPreviewTarget, botIdentity, lobbyIdentifiers, parseCli, parseDuration }
+module.exports = {
+  assertPreviewTarget,
+  botIdentity,
+  createReporter,
+  currentPreviewName,
+  lobbyIdentifiers,
+  parseCli,
+  parseCount,
+  parseDuration,
+  previewCredentials,
+}

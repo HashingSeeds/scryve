@@ -11,7 +11,12 @@ import { standingsThroughRound } from "../../../convex/lib/events/commands"
 
 export function useConvexEventSource(eventId: string): EventSource {
   const id = eventId as Id<"events">
-  const view: EventView | null | undefined = useQuery(api.events.view, { eventId: id })
+  const board = useQuery(api.events.board, { eventId: id })
+  const viewer = useQuery(api.events.viewer, { eventId: id })
+  const view = useMemo((): EventView | null | undefined => {
+    if (board === undefined || viewer === undefined) return undefined
+    return board && viewer && { ...board, ...viewer }
+  }, [board, viewer])
   const standings = useQuery(
     api.events.standings,
     view ? { eventId: id, throughRound: standingsThroughRound(view) } : "skip",

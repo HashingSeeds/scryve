@@ -26,16 +26,7 @@ appId: ${MAESTRO_APP_ID}
 
 - waitForAnimationToEnd
 
-# conditionally run the dev client flow if the words "Development servers" is present.
-# this uses the default maestro timeout and moves on if it doesn't see the text.
-- runFlow:
-    when:
-      visible: 'Development servers'
-    commands:
-      # this regex allows for different hosts and ports
-      - tapOn: "http://.*:.*" 
-      - waitForAnimationToEnd
-      - tapOn: "Close" # dismiss the bottom sheet
+- runFlow: _DevClient.yaml
 
 # a cleared install asks what the player plays, and "Play" accepts the legal
 # documents. "No system" keeps the 2 players at 20 life that flows assert against.
