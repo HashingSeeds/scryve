@@ -110,7 +110,8 @@ import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
-import { nextTurnSeat, sharesTurn, turnGroupOf } from "../../convex/lib/turns"
+import { nextTurnSeat, sharesTurn, turnGroupOf, turnLead } from "../../convex/lib/turns"
+import { TWO_HEADED_GIANT } from "../../convex/lib/twoHeadedGiant"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -1257,7 +1258,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           seats={logSeats}
           turn={table?.table.turn}
           groups={turnGroups}
-          counterTable={{ players: table?.table.players }}
+          sharedLife={game.variant === TWO_HEADED_GIANT}
+          counterTable={{
+            players: table?.table.players,
+            // why: a Two-Headed Giant team shares poison, so both heads' taps count back from one value.
+            counterKey: (playerId, counterId) =>
+              game.variant === TWO_HEADED_GIANT &&
+              table?.tableRules.counters.some(({ id, shared }) => id === counterId && shared)
+                ? `${turnLead(turnGroups, playerId)}:${counterId}`
+                : `${playerId}:${counterId}`,
+          }}
           turnsShown={tabOn}
           origin={menuDialogOrigin}
           onUndoTurn={(playerId, operationId) => {

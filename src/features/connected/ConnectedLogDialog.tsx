@@ -71,6 +71,7 @@ export function ConnectedLogDialog({
   seats,
   turn,
   groups,
+  sharedLife,
   counterTable,
   turnsShown,
   origin,
@@ -82,6 +83,7 @@ export function ConnectedLogDialog({
   seats: readonly Seat[]
   turn?: Turn
   groups?: TurnGroups
+  sharedLife?: boolean
   counterTable?: CounterTable
   turnsShown: boolean
   origin?: DialogOrigin
@@ -97,6 +99,7 @@ export function ConnectedLogDialog({
           seats={seats}
           turn={turn}
           groups={groups}
+          sharedLife={sharedLife}
           counterTable={counterTable}
           turnsShown={turnsShown}
           origin={origin}
@@ -114,6 +117,7 @@ function ConnectedLog({
   seats,
   turn,
   groups,
+  sharedLife,
   counterTable,
   turnsShown,
   origin,
@@ -145,6 +149,7 @@ function ConnectedLog({
       events={inputs.events}
       turns={turnsShown ? inputs.turns : undefined}
       groups={groups}
+      sharedLife={sharedLife}
       counters={inputs.counters}
       canUndo={undo !== undefined}
       undoLabel={translate("board:log.undoMine")}

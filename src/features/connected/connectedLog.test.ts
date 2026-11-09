@@ -204,4 +204,27 @@ describe("connected log", () => {
       ],
     })
   })
+
+  it("counts a team's shared poison back from one value when both heads add it", () => {
+    const poison = (operationId: string, playerId: string, at: number) =>
+      ({
+        operationId,
+        playerId,
+        kind: "counter.changed",
+        delta: 1,
+        clientCreatedAt: at,
+        action: { kind: "counter.changed", playerId, counterId: "poison", delta: 1 },
+      }) satisfies ConnectedLogEvent
+    const table = {
+      players: { ada: { counters: { poison: 2 } }, bo: { counters: { poison: 2 } } },
+      counterKey: (_playerId: string, counterId: string) => `team:${counterId}`,
+    }
+    const events = [
+      poison("op-ada-poison-01", "ada", 1_000),
+      poison("op-bo-poison-001", "bo", 9_000),
+    ]
+    expect(
+      connectedLogInputs(events, GAME, undefined, table).counters.map(({ value }) => value),
+    ).toEqual([1, 2])
+  })
 })
