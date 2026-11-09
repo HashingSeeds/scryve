@@ -196,7 +196,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       ) -
       insets.bottom -
       padding
-    : seatIdentityBottomGap(identityMetrics.edge, insets.bottom, edges.bottom) - padding
+    : seatIdentityBottomGap(identityMetrics.edge, insets.bottom) - padding
   // why: the board drops a corner camera hole's side inset, so the identity and prizes step along their row past whatever sits in their corner, as a life card's corners do. The bench sits deeper than a first-player tab reaches, so only the hole moves it.
   const cornerChromeStep = (side: "left" | "right") =>
     cornerStep(cornerObstacles(contentInsets), edges[side], edges.bottom)

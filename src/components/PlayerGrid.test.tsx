@@ -24,6 +24,7 @@ import {
 import {
   getCellSize,
   getLifeFontSize,
+  getPlayerContentRotation,
   getPlayerGridLayout,
   getPlayerGridLayoutOptions,
   getPlayerGridMenuAnchor,
@@ -699,6 +700,30 @@ describe("PlayerGrid", () => {
       expect(getPlayerGridRows(5, layout)).toEqual(expectedRows)
     }
   })
+
+  it.each([3, 5])(
+    "turns the last seat of a %i-player even grid to face its column's side",
+    (playerCount) => {
+      const layout = getPlayerGridLayout({
+        playerCount,
+        width: 390,
+        height: 844,
+        layoutVariant: "even-grid",
+      })
+      const rows = getPlayerGridRows(playerCount, layout)
+      const rowIndex = rows.length - 1
+      expect(
+        getPlayerContentRotation({
+          playerCount,
+          layout,
+          row: rows[rowIndex],
+          rowIndex,
+          columnIndex: 0,
+          slot: playerCount - 1,
+        }),
+      ).toBe(90)
+    },
+  )
 
   it("supports the four-player tabletop arrangement", () => {
     const layout = getPlayerGridLayout({

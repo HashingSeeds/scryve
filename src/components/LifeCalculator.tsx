@@ -67,7 +67,9 @@ type Props = {
 
 const GLYPH_KEYS = [8.6, 12, 15.4].flatMap((cx) => [13, 17].map((cy) => ({ cx, cy })))
 
-export function CalculatorGlyph({ color, size }: { color: string; size: number }) {
+/** why: the body's ink spans 20.9 of its 24-unit box, so the box grows until the ink is `inkHeight` tall. */
+export function CalculatorGlyph({ color, inkHeight }: { color: string; inkHeight: number }) {
+  const size = (inkHeight * 24) / 20.9
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect x={4.5} y={2.5} width={15} height={19} rx={3} stroke={color} strokeWidth={1.9} />
