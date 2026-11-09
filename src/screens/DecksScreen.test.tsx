@@ -651,6 +651,10 @@ describe("DecksScreen", () => {
       )
       expect(view.getByTestId("deck-filters-done")).toBeEnabled()
     }
+    expect(StyleSheet.flatten(view.getByTestId("deck-filters-scroll").props.style)).toMatchObject({
+      flexGrow: 1,
+      flexBasis: 0,
+    })
   })
 
   it("narrows the shelf by search and offers a way back", () => {

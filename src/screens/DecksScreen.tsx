@@ -846,6 +846,7 @@ export function DecksScreen({
       >
         <Text preset="subheading" tx="decks:filters.label" />
         <ScrollView
+          testID="deck-filters-scroll"
           style={themed([$sheetScroll, $filtersScroll])}
           contentContainerStyle={themed([$sheetScrollContent, $dialogBody])}
         >
@@ -938,7 +939,6 @@ const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $flex1: ViewStyle = { flex: 1 }
 const $filtersDialog: ViewStyle = { height: 560 }
-// why: the filters dialog has a fixed height, so the list fills it instead of fitting its content.
 const $filtersScroll: ViewStyle = { flexGrow: 1, flexBasis: 0 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
