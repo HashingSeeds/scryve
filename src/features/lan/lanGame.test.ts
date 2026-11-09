@@ -6,6 +6,7 @@ import {
   LAN_PROTOCOL,
   lanLobbyOf,
   lanLog,
+  mergeLanLog,
   lanProjection,
   lanSeatsReady,
   parseGuestMessage,
@@ -22,6 +23,7 @@ import {
   type LanSeatPass,
   type LanSetup,
 } from "./lanGame"
+import { encodeLine, MAX_LINE_BYTES } from "./lineReader"
 import type { ConnectedActionEvent } from "../connected/model"
 
 const NOW = 1_700_000_000_000
@@ -593,9 +595,7 @@ describe("nearby game log", () => {
     expect(result).toMatchObject({ ok: true })
     expect(parseGuestMessage(JSON.stringify({ type: "log" }))).toEqual({ type: "log" })
 
-    const received = parseHostMessage(
-      JSON.stringify({ type: "log", events: lanLog(next, "guest") }),
-    )
+    const received = parseHostMessage(JSON.stringify({ type: "log", ...lanLog(next, "guest") }))
     expect(received).toMatchObject({
       type: "log",
       events: [
@@ -603,7 +603,42 @@ describe("nearby game log", () => {
         { operationId: "life-guest-undo-001", undoOf: "life-guest-tap-0001", mine: true },
       ],
     })
-    expect(lanLog(next, "host").some((event) => event.mine)).toBe(false)
+    expect(lanLog(next, "host").events.some((event) => event.mine)).toBe(false)
+  })
+
+  it("sends the newest changes that fit one line, and older ones page in after", () => {
+    const game = started()
+    const counterId = "c".repeat(300)
+    for (let index = 0; index < 200; index += 1) {
+      const operationId = `counter-op-${String(index).padStart(4, "0")}`
+      game.memory?.events.set(operationId, {
+        playerId: "guest",
+        operationId,
+        kind: "counter.changed",
+        delta: 1,
+        actionIdentity: JSON.stringify({
+          kind: "counter.changed",
+          playerId: "guest",
+          counterId,
+          delta: 1,
+        }),
+        actorUserId: "guest",
+        clientCreatedAt: index + 1,
+        serverCreatedAt: index + 1,
+      })
+    }
+
+    const newest = lanLog(game, "guest")
+    expect(encodeLine({ type: "log", ...newest }).length).toBeLessThanOrEqual(MAX_LINE_BYTES)
+    expect(newest).toMatchObject({ more: true })
+    expect(newest.events.at(-1)?.operationId).toBe("counter-op-0199")
+
+    const older = lanLog(game, "guest", newest.events[0].operationId)
+    const read = mergeLanLog(newest, older)
+    expect(read.events.map(({ operationId }) => operationId)).toEqual(
+      Array.from({ length: 200 }, (_, index) => `counter-op-${String(index).padStart(4, "0")}`),
+    )
+    expect(read.more).toBe(false)
   })
 })
 

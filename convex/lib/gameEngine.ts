@@ -28,6 +28,7 @@ import { commanderOutState, outReason, type CommanderTotal, type OutState } from
 import { systemDefinition, tableRules } from "./systems"
 import {
   applyTableAction,
+  normalizedTableAction,
   seatTable,
   loggedCounterId,
   loggedCounterValue,
@@ -676,7 +677,8 @@ function* writeTable(
   write: WriteOf<"table">,
   now: number,
 ): GameSteps<GameWriteResult> {
-  const action = gatedTableAction(write.action)
+  const sent = normalizedTableAction(write.action)
+  const action = gatedTableAction(sent)
   // why: "anyone edits" lets the table fix each other's counts, not claim, pass or take back another seat's turn.
   const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
@@ -685,7 +687,7 @@ function* writeTable(
     ...write,
     action,
     actorUserId: actor.userId,
-    actionIdentity: tableActionIdentity(write.action),
+    actionIdentity: tableActionIdentity(sent),
   }
   const retry = matchTableRetry(yield* read(store.event(operationId)), seat.id, request)
   if (retry === "duplicate") return acknowledged({ operationId, deduplicated: true })
