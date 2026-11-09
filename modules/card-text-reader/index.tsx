@@ -37,6 +37,7 @@ type CardTextCameraProps = ViewProps & {
 type CardTextReaderModule = {
   haptic?: (kind: ScanHaptic) => Promise<void>
   prepareHaptics?: () => Promise<void>
+  readPhoto?: (uri: string, minimumTextHeight?: number) => Promise<CardPhotoText>
 }
 type ScanHaptic = "added" | "skipped"
 
@@ -44,6 +45,9 @@ const nativeModule = requireOptionalNativeModule<CardTextReaderModule>("CardText
 
 /** why: null on web, Jest, and binaries built before the module existed. */
 export const canReadCardText = nativeModule !== null
+
+/** why: undefined on binaries built before photos could be read. */
+export const readPhoto = nativeModule?.readPhoto
 
 /** why: binaries without the native haptic fall back to expo-haptics. */
 export function scanHaptic(kind: ScanHaptic) {

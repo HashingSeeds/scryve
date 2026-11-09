@@ -52,6 +52,7 @@ import {
 } from "./cardDetailsCache"
 import { searchCardNames } from "./cardNameMatch"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
+import { CardSpreadDebug } from "./CardSpreadDebug"
 import {
   COLOR_MATCHES,
   matchesColors,
@@ -202,8 +203,13 @@ export function CardSearch({
   )
   const [query, setQuery] = useState("")
   const [scanning, setScanning] = useState(false)
+  const [spreading, setSpreading] = useState(false)
   const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
-  const nameIndex = useCardNameIndex(game, deviceId, scanning || query.trim().length > 0)
+  const nameIndex = useCardNameIndex(
+    game,
+    deviceId,
+    scanning || spreading || query.trim().length > 0,
+  )
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
@@ -728,6 +734,7 @@ export function CardSearch({
                 tx="decks:cardSearch.scan"
                 accessibilityLabel={translate("decks:cardSearch.scanLabel")}
                 onPress={() => setScanning(true)}
+                onLongPress={__DEV__ ? () => setSpreading(true) : undefined}
               />
             ) : null}
             {filtersCards ? (
@@ -1054,6 +1061,9 @@ export function CardSearch({
             />
           </View>
         </DialogCard>
+      ) : null}
+      {spreading ? (
+        <CardSpreadDebug nameIndex={nameIndex} onClose={() => setSpreading(false)} />
       ) : null}
       {scanning ? (
         <CardScanner
