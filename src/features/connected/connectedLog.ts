@@ -1,5 +1,10 @@
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "@/features/game/domain"
-import { counterLog as localCounterLog, gameLog, mergedLog } from "@/features/game/LifeLog"
+import {
+  counterLog as localCounterLog,
+  gameLog,
+  mergedLog,
+  rowPosition,
+} from "@/features/game/LifeLog"
 import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "@/features/game/types"
 
 import type { PendingLifeAction } from "./model"
@@ -72,17 +77,18 @@ export function connectedLogEvents(
     return []
   })
   // why: device clocks drift apart, so confirmed changes keep the authority's order and only this device's own unsent ones sort by when it made them.
-  const ordered = [
+  return [
     ...confirmed,
     ...unsent.sort((left, right) => left.clientCreatedAt - right.clientCreatedAt),
   ]
-  // why: the log places rows under turn headings and folds bursts by time, so each change's time never runs behind the one before it; a skewed clock moves only by the gap.
-  let last = -Infinity
-  return ordered.map((event) => {
-    const at = Math.max(event.clientCreatedAt, last + 1)
-    last = at
-    return at === event.clientCreatedAt ? event : { ...event, clientCreatedAt: at }
-  })
+}
+
+/** why: device clocks drift apart, so turn headings and Undo place a change by where the authority recorded it, and its own time stays for bursts and display. */
+export function logPositions(
+  events: readonly ConnectedLogEvent[],
+): (operationId: string) => number | undefined {
+  const positions = new Map(events.map(({ operationId }, index) => [operationId, index]))
+  return (operationId) => positions.get(operationId)
 }
 
 /** why: the local log's own builders draw the rows, so a connected game reads like a local one. */
@@ -236,11 +242,18 @@ export function connectedLogUndo(
     events.flatMap((event) => (event.mine ? [[event.operationId, event] as const] : [])),
   )
   const inputs = connectedLogInputs(events, gameId, turn, table)
-  const rows = mergedLog(gameLog(players, inputs.events), localCounterLog(inputs.counters))
+  const positionOf = logPositions(events)
+  const rows = mergedLog(
+    gameLog(players, inputs.events),
+    localCounterLog(inputs.counters),
+    positionOf,
+  )
   const row = rows.find(({ operationIds }) => operationIds.some((id) => mine.has(id)))
   const pass = turn?.previous ? mine.get(turn.operationId) : undefined
   const ownPass =
-    turns && pass?.action?.kind === "turn.passed" && (!row || pass.clientCreatedAt >= row.at)
+    turns &&
+    pass?.action?.kind === "turn.passed" &&
+    (!row || (positionOf(pass.operationId) ?? -1) >= rowPosition(row, positionOf))
       ? pass
       : undefined
   if (ownPass)
