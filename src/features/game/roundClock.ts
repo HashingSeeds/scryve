@@ -159,7 +159,9 @@ export function roundClockAfterTurn(
 ): RoundClock {
   if (action.kind === "turn.passed") {
     const stepped = stepRoundTurn(clock, system, 1)
-    return stepped === clock ? clock : { ...stepped, steppedBy: operationId }
+    return (stepped.turn ?? 0) === (clock.turn ?? 0)
+      ? clock
+      : { ...stepped, steppedBy: operationId }
   }
   if (action.kind !== "turn.undone" || clock.steppedBy !== action.turnOperationId) return clock
   const { steppedBy: _counted, ...rest } = stepRoundTurn(clock, system, -1)
