@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react"
 import type { ViewStyle } from "react-native"
-import { ScrollView, StyleSheet, View } from "react-native"
+import { Platform, ScrollView, StyleSheet, View } from "react-native"
 import { LegendList } from "@legendapp/list/react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -22,6 +22,10 @@ export interface EventRows<Row> {
 
 // why: a 256-player event's lists took 1.2 s to mount on a Pixel 6a when switching tabs, and every result re-rendered all of them; the list builds only the rows near the screen.
 const ROW_HEIGHT = 52
+// why: LegendList's web build copies unknown props onto its <div>, so these native-only props made React warn on every event screen, and the dev warning toast covered the round button.
+const NATIVE_LIST_PROPS = Platform.select({
+  native: { testID: "event-rows", keyboardShouldPersistTaps: "handled" as const },
+})
 
 export function EventFrame<Row>({
   title,
@@ -75,10 +79,9 @@ export function EventFrame<Row>({
         <>
           {rows ? (
             <LegendList
-              testID="event-rows"
+              {...NATIVE_LIST_PROPS}
               style={$styles.flex1}
               contentContainerStyle={themed($listContent)}
-              keyboardShouldPersistTaps="handled"
               ListHeaderComponent={<View style={themed($listHeader)}>{children}</View>}
               data={rows.data}
               keyExtractor={rows.key}
