@@ -94,7 +94,7 @@ export function gameLog(
     totals.set(change.playerId, life - change.delta)
     const key = `${change.playerId}\u0000${change.fromPlayerId ?? ""}`
     const burst = bursts.get(key)
-    if (burst && burst.oldestAt - event.clientCreatedAt <= LIFE_BURST_MS) {
+    if (burst && Math.abs(burst.oldestAt - event.clientCreatedAt) <= LIFE_BURST_MS) {
       burst.row.delta += change.delta
       burst.row.id = event.operationId
       burst.row.operationIds.push(event.operationId)
