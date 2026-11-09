@@ -173,6 +173,12 @@ export function planSeam(
   const left = items.filter((item) => sideOf(item) === "left")
   const right = items.filter((item) => sideOf(item) === "right")
   if (!fits(rooms.left, left) || !fits(rooms.right, right)) {
+    // why: the planar dialog has the die too, and the plane opens it, so a crowded seam gives up the die before the plane and scheme lose their own sides.
+    if (items.includes("die"))
+      return planSeam(
+        rooms,
+        items.filter((item) => item !== "die"),
+      )
     const roomier = (rooms.left?.width ?? 0) >= (rooms.right?.width ?? 0) ? "left" : "right"
     const room = rooms[roomier]
     const kept = items.filter((_, index) => fits(room, items.slice(0, index + 1)))
