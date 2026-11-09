@@ -10,5 +10,10 @@ export const NearbyLogFeed: ConnectedLogFeed = ({ publicId, children }) => {
   // why: a log opened offline asks again on reconnect, even when no change landed meanwhile.
   const status = useLanSessionSlice((state) => state.status)
   useEffect(() => lanSession.requestLog(), [sequence, status])
-  return children({ events: log?.publicId === publicId ? log.events : [] })
+  const shown = log?.publicId === publicId ? log : undefined
+  const oldest = shown?.events[0]?.operationId
+  return children({
+    events: shown?.events ?? [],
+    more: shown?.more && oldest ? () => lanSession.requestLog(oldest) : undefined,
+  })
 }
