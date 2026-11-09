@@ -61,5 +61,5 @@ const $frame: ViewStyle = {
   right: 0,
   bottom: 0,
 }
-const $active: ViewStyle = { borderWidth: 4 }
+const $active: ViewStyle = { borderWidth: 4, borderStyle: "solid" }
 const $next: ViewStyle = { borderWidth: 3, borderStyle: "dashed", opacity: 0.8 }
