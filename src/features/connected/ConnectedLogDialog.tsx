@@ -66,6 +66,7 @@ export function ConnectedLogDialog({
   turn,
   groups,
   turnsShown,
+  anyoneEdits,
   origin,
   onUndoTurn,
   onClose,
@@ -76,6 +77,7 @@ export function ConnectedLogDialog({
   turn?: Turn
   groups?: TurnGroups
   turnsShown: boolean
+  anyoneEdits?: boolean
   origin?: DialogOrigin
   onUndoTurn: (playerId: string, turnOperationId: string) => void
   onClose: () => void
@@ -90,6 +92,7 @@ export function ConnectedLogDialog({
           turn={turn}
           groups={groups}
           turnsShown={turnsShown}
+          anyoneEdits={anyoneEdits}
           origin={origin}
           onUndoTurn={onUndoTurn}
           onClose={onClose}
@@ -106,6 +109,7 @@ function ConnectedLog({
   turn,
   groups,
   turnsShown,
+  anyoneEdits,
   origin,
   onUndoTurn,
   onClose,
@@ -118,8 +122,8 @@ function ConnectedLog({
     [lives, seats],
   )
   const events = useMemo(
-    () => connectedLogEvents(feed.events, pending, publicId),
-    [feed.events, pending, publicId],
+    () => connectedLogEvents(feed.events, pending, publicId, anyoneEdits),
+    [anyoneEdits, feed.events, pending, publicId],
   )
   const inputs = useMemo(() => connectedLogInputs(events, publicId, turn), [events, publicId, turn])
   const undo = connectedLogUndo(events, players, publicId, turn, { turns: turnsShown })

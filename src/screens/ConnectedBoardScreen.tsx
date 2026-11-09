@@ -1226,6 +1226,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turn={table?.table.turn}
           groups={turnGroups}
           turnsShown={tabOn}
+          anyoneEdits={anySeat}
           origin={menuDialogOrigin}
           onUndoTurn={(playerId, operationId) => {
             table?.undoTurn(playerId, operationId)

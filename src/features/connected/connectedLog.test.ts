@@ -61,6 +61,44 @@ const turnOf = (operationId: string, number: number, previous = true): Turn => (
 })
 
 describe("connected log", () => {
+  it("shows an unsent commander damage claim where anyone edits, then the authority's confirmation in its place", () => {
+    const claim = {
+      schemaVersion: 1,
+      event: {
+        type: "commanderDamage.submitted",
+        operationId: "op-claim-ada-bo-1",
+        gameId: GAME,
+        fromPlayerId: "ada",
+        toPlayerId: "bo",
+        delta: 5,
+        actorId: "me",
+        deviceId: "device-me",
+        clientCreatedAt: 10,
+      },
+      queuedAt: 10,
+      attempts: 0,
+    } as PendingLifeAction
+    expect(connectedLogEvents([], [claim], GAME)).toEqual([])
+    expect(connectedLogEvents([], [claim], GAME, true)).toEqual([
+      expect.objectContaining({
+        operationId: "op-claim-ada-bo-1_confirmed",
+        kind: "commanderDamage.confirmed",
+        playerId: "bo",
+        fromPlayerId: "ada",
+        delta: 5,
+      }),
+    ])
+    const confirmed: ConnectedLogEvent = {
+      operationId: "op-claim-ada-bo-1_confirmed",
+      kind: "commanderDamage.confirmed",
+      playerId: "bo",
+      fromPlayerId: "ada",
+      delta: 5,
+      clientCreatedAt: 10,
+    }
+    expect(connectedLogEvents([confirmed], [claim], GAME, true)).toEqual([confirmed])
+  })
+
   it("shows an unsent change at once and keeps one row once the authority has it", () => {
     const offline = connectedLogEvents([], [queued("op-unsent-ada-01", "ada", -6, 10)], GAME)
     expect(gameLog(players, connectedLogInputs(offline, GAME, undefined).events)).toMatchObject([

@@ -12,11 +12,14 @@ const NO_DEVICE = asDeviceId("")
 /**
  * why: this device's unsent changes show at once and give way to the authority's copy, matched by
  * operation id, so the log reads the same offline, on reconnect, and after a rejection drops one.
+ * Where anyone edits any seat, the authority confirms commander damage as it lands, so an unsent
+ * claim shows as that confirmation, under the id the authority gives it.
  */
 export function connectedLogEvents(
   confirmed: readonly ConnectedLogEvent[],
   pending: readonly PendingLifeAction[],
   gameId: string,
+  anyoneEdits = false,
 ): ConnectedLogEvent[] {
   const known = new Set(confirmed.map(({ operationId }) => operationId))
   const unsent = pending.flatMap(({ event }): ConnectedLogEvent[] => {
@@ -40,6 +43,19 @@ export function connectedLogEvents(
           kind: event.action.kind,
           playerId: event.action.playerId,
           action: event.action,
+          mine: true,
+        },
+      ]
+    const confirmation = `${event.operationId}_confirmed`
+    if (event.type === "commanderDamage.submitted" && anyoneEdits && !known.has(confirmation))
+      return [
+        {
+          ...base,
+          operationId: confirmation,
+          kind: "commanderDamage.confirmed",
+          playerId: event.toPlayerId,
+          fromPlayerId: event.fromPlayerId,
+          delta: event.delta,
           mine: true,
         },
       ]
