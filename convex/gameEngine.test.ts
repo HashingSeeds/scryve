@@ -12,7 +12,9 @@ import {
   type GameWrite as MemoryWrite,
 } from "./lib/gameEngine"
 import { writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
+import { PLANAR_DECKS, SCHEME_DECKS } from "./lib/modeDecks"
 import { TABLE_VERSION, type TableAction } from "./lib/table"
+import { startModes } from "./lib/tableModes"
 
 const token = "t".repeat(43)
 const HOST_DEVICE = "device-host-0001"
@@ -954,6 +956,38 @@ describe("memory engine: turn groups", () => {
         turnOperationId: "turn-pass-ada",
       }),
     ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+  })
+
+  it("lets no other seat roll the planar die or reveal a scheme, even when anyone edits life", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      lifeEditing: "anyone",
+      turn: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-ada" },
+      modes: startModes(
+        {
+          planechase: { decks: [PLANAR_DECKS[0].id] },
+          archenemy: { seat: 1, deck: SCHEME_DECKS[0].id },
+        },
+        ["ada", "bo"],
+      ).modes,
+      seats: new Map(["ada", "bo"].map((id) => [id, seat(id)])),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const asBo = (operationId: string, action: TableAction) =>
+      writeMemoryGame(memory, actor("bo"), tableWrite("bo", operationId, action), CREATED_AT)
+
+    expect(
+      asBo("planar-roll-bo-001", { kind: "planar.rolled", playerId: "ada", face: "blank" }),
+    ).toMatchObject({ ok: false, error: { code: "seat_owner_required" } })
+    expect(asBo("scheme-reveal-bo-1", { kind: "scheme.revealed", playerId: "ada" })).toMatchObject({
+      ok: false,
+      error: { code: "seat_owner_required" },
+    })
   })
 
   it("passes past a seat that went out after the passer's board last drew it", () => {

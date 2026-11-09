@@ -40,6 +40,7 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
+import { isModeAction } from "./tableModes"
 import type { GameVariant } from "./treachery"
 import { isTurnAction, nextTurnSeat, startedByChange, type Turn } from "./turns"
 import { teammatesOf, teamTableRules, TWO_HEADED_GIANT } from "./twoHeadedGiant"
@@ -679,8 +680,9 @@ function* writeTable(
 ): GameSteps<GameWriteResult> {
   const sent = normalizedTableAction(write.action)
   const action = gatedTableAction(sent)
-  // why: "anyone edits" lets the table fix each other's counts, not claim, pass or take back another seat's turn.
-  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
+  // why: "anyone edits" lets the table fix each other's counts, not act in another seat's turn: claim, pass or take one back, roll the planar die, or reveal a scheme.
+  const ownSeatOnly = isTurnAction(action) || isModeAction(action)
+  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !ownSeatOnly)
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request = {
