@@ -13,6 +13,7 @@ import {
 import { limitGameRate } from "./gameRateLimits"
 import { commanderField, MAX_PENDING_COMMANDER_CLAIMS } from "./gameRules"
 import { gameWriteError } from "./gameWriteErrors"
+import { MAX_PLAYERS } from "./policy"
 import type { TableState } from "./table"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
@@ -188,6 +189,22 @@ export async function writeCloudGame(
         .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
         .take(MAX_PENDING_COMMANDER_CLAIMS + 1),
     pairTotal: async (pair) => (await pairDoc(pair))?.total ?? 0,
+    seats: async () =>
+      (
+        await ctx.db
+          .query("gamePlayers")
+          .withIndex("by_game", (q) => q.eq("gameId", game._id))
+          .take(MAX_PLAYERS + 1)
+      )
+        .sort((left, right) => left.seat - right.seat)
+        .map((seat) => ({ ...seat, id: seat._id })),
+    commanderTotals: async () =>
+      (
+        await ctx.db
+          .query("gameCommanderDamage")
+          .withIndex("by_game", (q) => q.eq("gameId", game._id))
+          .take(MAX_PLAYERS * (MAX_PLAYERS - 1) * 2)
+      ).map(({ fromPlayerId, toPlayerId, total }) => ({ fromPlayerId, toPlayerId, total })),
     isMember: async () => {
       const seat =
         seatsRead.find((row) => row.userId === user._id) ??

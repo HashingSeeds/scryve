@@ -831,4 +831,34 @@ describe("memory engine: turn groups", () => {
     ).toMatchObject({ ok: true })
     expect(memory.turn).toMatchObject({ playerId: "ada", number: 1 })
   })
+
+  it("passes past a seat that went out after the passer's board last drew it", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      turn: { playerId: "ada", number: 1, startedAt: CREATED_AT, operationId: "turn-set-ada-0001" },
+      seats: new Map(
+        ["ada", "bo", "cy"].map((id) => [id, { ...seat(id), currentLife: id === "bo" ? 0 : 40 }]),
+      ),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    expect(
+      writeMemoryGame(
+        memory,
+        actor("ada"),
+        tableWrite("ada", "turn-pass-ada-0001", {
+          kind: "turn.passed",
+          playerId: "ada",
+          toPlayerId: "bo",
+        }),
+        CREATED_AT + 1_000,
+      ),
+    ).toMatchObject({ ok: true })
+    expect(memory.turn).toMatchObject({ playerId: "cy", number: 2 })
+    expect(memory.events.get("turn-pass-ada-0001")).toMatchObject({ toPlayerId: "cy" })
+  })
 })
