@@ -21,7 +21,7 @@ import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
 import { Sheet } from "@/components/Sheet"
-import { $sheetScroll } from "@/components/sheetStyles"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
@@ -1307,7 +1307,10 @@ function NewGameForm({
         }
         testID="setup-options-dialog"
       >
-        <ScrollView style={$sheetScroll} contentContainerStyle={themed($statusDetails)}>
+        <ScrollView
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed([$sheetScrollContent, $statusDetails])}
+        >
           {!connectedMode && !localGame ? (
             <View style={themed($section)}>
               <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />
@@ -1407,7 +1410,10 @@ function NewGameForm({
         dialogTestID="setup-status-dialog"
         accessibilityViewIsModal
       >
-        <ScrollView contentContainerStyle={themed($statusDetails)}>
+        <ScrollView
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed([$sheetScrollContent, $statusDetails])}
+        >
           {connectedMode && connected?.blockedReason ? (
             <Text accessibilityRole="alert" size="xs" text={connected.blockedReason} tone="dim" />
           ) : null}

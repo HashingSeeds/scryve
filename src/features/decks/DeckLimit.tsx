@@ -6,6 +6,7 @@ import type { FunctionReturnType } from "convex/server"
 
 import { Button } from "@/components/Button"
 import { DialogCard } from "@/components/DialogCard"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
@@ -266,7 +267,11 @@ function DeckChoices({
   const queuedEdits = useDecksWithQueuedEdits(access?.ownerId, access?.ready ?? false)
   if (!mine) return <Text size="sm" tone="dim" tx="decks:deckLimit.loading" />
   return (
-    <ScrollView style={$choices} testID="deck-limit-choices">
+    <ScrollView
+      style={themed([$sheetScroll, $choices])}
+      contentContainerStyle={themed($sheetScrollContent)}
+      testID="deck-limit-choices"
+    >
       {mine.decks
         .filter((deck) => !queuedEdits.has(deck._id))
         .map((deck) => (
