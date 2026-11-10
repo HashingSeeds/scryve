@@ -44,7 +44,7 @@ describe("game seed", () => {
     [{ players: "2", layout: "tabletop" }, /layout for 2 players/],
     [{ cmd: "1>2:5" }, /cmd needs system=mtg&format=commander/],
     [{ format: "commander", cmd: "1>1:5" }, /rejected by the game rules/],
-    [{ format: "commander", cmd: "1>2:60,1>2:60" }, /"1>2:60" was rejected/],
+    [{ format: "commander", cmd: "1>2:600,1>2:600" }, /"1>2:600" was rejected/],
     [{ format: "commander", players: "2", cmd: "1>3:5" }, /seat 3 is not in a 2 player game/],
     [{ life: "20,abc" }, /life must be a whole number/],
     [{ players: "" }, /players must be a whole number/],

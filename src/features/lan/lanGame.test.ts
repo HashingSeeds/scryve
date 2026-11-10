@@ -355,6 +355,45 @@ describe("nearby rounds on the shared engine", () => {
     ])
   })
 
+  it("declines a pre-999 guest's claim that would pull a total past 99 back down", () => {
+    const claim = (operationId: string, delta: number, marker = {}) =>
+      op({
+        type: "commanderDamage.submitted",
+        operationId,
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        delta,
+        ...marker,
+      })
+    const confirm = (operationId: string, claimOperationId: string) =>
+      op({
+        type: "commanderDamage.resolved",
+        operationId,
+        claimOperationId,
+        toPlayerId: "guest",
+        accepted: true,
+      })
+    const at120 = [
+      claim("claim-operation-001", 120),
+      confirm("resolve-operation-1", "claim-operation-001"),
+    ].reduce(
+      (game, event) =>
+        write(game, event.type === "commanderDamage.resolved" ? "guest" : "host", event).next,
+      started(),
+    )
+    const marked = claim("claim-operation-003", -21, { commanderLimit: 999 })
+
+    expect(marked).toMatchObject({ commanderLimit: 999 })
+    expect(write(at120, "host", claim("claim-operation-002", -21)).result).toMatchObject({
+      ok: true,
+      ack: { status: "declined" },
+    })
+    expect(write(at120, "host", marked).result).toMatchObject({
+      ok: true,
+      ack: { status: "pending" },
+    })
+  })
+
   it("keeps a partner's damage on its own total, apart from the first commander's", () => {
     const claim = (operationId: string, delta: number, partner = {}) =>
       op({

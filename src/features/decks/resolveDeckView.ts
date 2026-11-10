@@ -14,13 +14,19 @@ import {
   DECK_VERSION_QUEUE_CONFLICT_REASON,
   syncReasonMessage,
 } from "./deckSyncReasons"
-import type { DeckVersionCacheSnapshot, StoredVersion } from "./deckVersionsCache"
+import {
+  isProvisionalVersionId,
+  type DeckVersionCacheSnapshot,
+  type DeckVersionRef,
+  type ProvisionalVersionId,
+} from "./deckVersionsCache"
 import type { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { deckFormatLabel } from "../../../convex/lib/deckGames"
 
 type DeckDetail = FunctionReturnType<typeof api.decks.detail>
 type StoredCardRow = { _id?: unknown; _creationTime?: unknown; deckVersionId?: unknown }
+type MappedVersionId = (provisionalId: ProvisionalVersionId) => Id<"deckVersions"> | undefined
 
 export type DeckViewInput = {
   deckId: string
@@ -29,9 +35,12 @@ export type DeckViewInput = {
   sync: { enabled: boolean; ownerId?: string }
   syncedMetadata: readonly SyncedDeck[]
   metadataWrites: DeckSyncWriteSnapshot
-  versionWrites: DeckVersionWriteSnapshot & { mappedVersion: (versionId: string) => string }
+  versionWrites: DeckVersionWriteSnapshot & {
+    mappedVersion: (versionId: string) => string
+    mappedVersionId: MappedVersionId
+  }
   versionCache: DeckVersionCacheSnapshot
-  selectedVersionId: string | undefined
+  selectedVersionId: DeckVersionRef | undefined
   loadCardDetails: () => Record<string, CommanderSelectionDetails>
 }
 
@@ -62,18 +71,13 @@ export function isDeckKnownDeleted(
   return lists.some((list) => list.some((deck) => deck.deckId === deckId && deck.deleted))
 }
 
-export function deckQueryVersionId(
-  selectedVersionId: string | undefined,
-  mappedSelection: string | undefined,
-  cachedVersions: readonly StoredVersion[],
+export function serverVersionId(
+  versionId: DeckVersionRef | undefined,
+  mappedVersionId: MappedVersionId,
 ) {
-  const provisional =
-    selectedVersionId !== undefined &&
-    mappedSelection === selectedVersionId &&
-    cachedVersions.some((candidate) => candidate.versionId === selectedVersionId && candidate.local)
-  return mappedSelection === undefined || provisional
-    ? undefined
-    : (mappedSelection as Id<"deckVersions">)
+  return versionId !== undefined && isProvisionalVersionId(versionId)
+    ? mappedVersionId(versionId)
+    : versionId
 }
 
 export function resolveDeckView(input: DeckViewInput) {
@@ -81,7 +85,7 @@ export function resolveDeckView(input: DeckViewInput) {
   const { selectedVersionId } = input
   const knownDeleted = isDeckKnownDeleted(deckId, input.syncedMetadata, metadataWrites.metadata)
   const mappedSelection =
-    selectedVersionId !== undefined ? versionWrites.mappedVersion(selectedVersionId) : undefined
+    serverVersionId(selectedVersionId, versionWrites.mappedVersionId) ?? selectedVersionId
 
   const pendingMetadata = metadataWrites.pending.filter((write) => write.deckId === deckId)
   const pendingCards = versionWrites.pending.filter((write) => write.deckId === deckId)
@@ -115,14 +119,9 @@ export function resolveDeckView(input: DeckViewInput) {
   const staleSelection = selectedVersionId !== undefined && detail?.version?._id !== mappedSelection
   const version = staleSelection ? undefined : (detail?.version ?? undefined)
   const activeVersionId = version?._id ?? cachedVersion?.versionId
-  const mappedCachedVersionId =
-    cachedVersion && versionWrites.mappedVersion(cachedVersion.versionId)
-  // why: a version made offline has no server id until its create syncs, and the server rejects a match that names it.
   const cachedServerVersionId =
-    cachedVersion &&
-    !cachedVersion.deleted &&
-    !(cachedVersion.local && mappedCachedVersionId === cachedVersion.versionId)
-      ? (mappedCachedVersionId as Id<"deckVersions">)
+    cachedVersion && !cachedVersion.deleted
+      ? serverVersionId(cachedVersion.versionId, versionWrites.mappedVersionId)
       : undefined
   const matchVersionId = knownDeleted ? undefined : (version?._id ?? cachedServerVersionId)
   const storedCards = version ? deckCardsFromRows(detail?.cards ?? []) : []
@@ -134,7 +133,7 @@ export function resolveDeckView(input: DeckViewInput) {
     ? { versionId: version._id, expectedRevision: version.syncRevision ?? 0 }
     : cachedVersion && versionCache.cards !== undefined
       ? {
-          versionId: cachedVersion.versionId as Id<"deckVersions">,
+          versionId: cachedVersion.versionId,
           expectedRevision: cachedVersion.revision,
         }
       : undefined
@@ -167,7 +166,7 @@ export function resolveDeckView(input: DeckViewInput) {
     versionCache.versions.find((candidate) => candidate.versionId === activeVersionId)
   const liveCachedVersions = versionCache.versions.filter((candidate) => !candidate.deleted)
   const cachedVersionRows = liveCachedVersions.map((candidate) => ({
-    _id: candidate.versionId as Id<"deckVersions">,
+    _id: candidate.versionId,
     versionNumber: candidate.versionNumber,
     name: candidate.name,
     note: candidate.note,

@@ -192,9 +192,9 @@ describe("publishLocalGame", () => {
     await expect(
       host.mutation(
         api.games.publishLocalGame,
-        snapshotArgs({ commanderTotals: [{ fromSeat: 1, toSeat: 2, total: 120 }] }),
+        snapshotArgs({ commanderTotals: [{ fromSeat: 1, toSeat: 2, total: 1000 }] }),
       ),
-    ).rejects.toThrow("Commander damage total must be between 0 and 99")
+    ).rejects.toThrow("Commander damage total must be between 0 and 999")
     await expect(
       host.mutation(
         api.games.publishLocalGame,

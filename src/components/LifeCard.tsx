@@ -19,7 +19,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
-import type { AttackBox } from "@/features/game/commanderAttack"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { CommanderBoardPlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
@@ -35,7 +34,6 @@ import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanne
 import {
   ATTACK_SHADE,
   DAMAGE_INK,
-  OTHERS_INK,
   CommanderDamageCardControls,
   shadowReached,
   SWAP_MS,
@@ -129,17 +127,9 @@ export type LifeCardCommanderDamage = {
   reach?: CommanderReach
   dealt?: number
   takeBack?: number
-  othersStep?: number
-  othersTakeBack?: number
   /** why: how much of this attack's damage the defender's life already shows, so its readout can name the life it started from. */
   applied?: number
-  /** why: the attacker's Others box, damage from its other creatures that takes life but never counts toward commander lethal. */
-  others?: number
-  onOthers?: (power: number) => void
-  othersShown?: boolean
-  othersSitting?: boolean
-  onSit?: (box: AttackBox) => void
-  othersLanded?: number
+  onSit?: (slot: number) => void
   onHit?: () => void
   onUndo?: () => void
   acted?: boolean
@@ -306,26 +296,15 @@ export const LifeCard = memo(function LifeCard({
   const causeGlyphShown =
     out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
   const incoming = armedCommanders.reduce((sum, { landed = 0 }) => sum + landed, 0)
-  const othersIncoming = commanderDamage?.othersLanded ?? 0
   const attackParts =
-    defending && commanderDamage && (incoming || othersIncoming)
-      ? {
-          from: life + (commanderDamage.applied ?? 0),
-          commander: incoming,
-          others: othersIncoming,
-        }
+    defending && commanderDamage && incoming
+      ? { from: life + (commanderDamage.applied ?? 0), commander: incoming }
       : undefined
   // why: the line fades out with the last attack's numbers rather than going blank as it goes.
   const lastAttack = useRef(attackParts)
   if (attackParts) lastAttack.current = attackParts
   const shownAttack = attackParts ?? lastAttack.current
-  const attackLine = shownAttack
-    ? [
-        shownAttack.from,
-        ...(shownAttack.commander ? [shownAttack.commander] : []),
-        ...(shownAttack.others ? [shownAttack.others] : []),
-      ].join(" − ")
-    : ""
+  const attackLine = shownAttack ? `${shownAttack.from} − ${shownAttack.commander}` : ""
   const stacked = stackedReadout(resolvedLifeFontSize, shownDigits, attackLine.length)
   const lifeRise = lifeInk(resolvedLifeFontSize, shownDigits).y
   const stack = useSharedValue(0)
@@ -394,10 +373,6 @@ export const LifeCard = memo(function LifeCard({
           submit: commanderDamage.armBar?.stagedTargets ? "send" : "done",
           mark: { color, shape, seatNumber },
           commanders: armedCommanders,
-          others: commanderDamage.others ?? 0,
-          onOthers: commanderDamage.onOthers ?? (() => {}),
-          othersShown: commanderDamage.othersShown !== false,
-          othersSitting: !!commanderDamage.othersSitting,
           onSit: commanderDamage.onSit ?? (() => {}),
           acted: !!commanderDamage.acted,
           onPower: commanderDamage.onPower ?? (() => {}),
@@ -420,8 +395,6 @@ export const LifeCard = memo(function LifeCard({
             acted: !!commanderDamage.acted,
             dealt: commanderDamage.dealt ?? 0,
             takeBack: commanderDamage.takeBack ?? 0,
-            othersStep: commanderDamage.othersStep ?? 0,
-            othersTakeBack: commanderDamage.othersTakeBack ?? 0,
             onHit: commanderDamage.onHit ?? (() => {}),
             onUndo: commanderDamage.onUndo ?? (() => {}),
           }
@@ -477,7 +450,6 @@ export const LifeCard = memo(function LifeCard({
           attackerLayout({
             space: sidewaysContent ? { width: cardSize.height, height: cardSize.width } : cardSize,
             count: slotCommanders,
-            others: commanderDamage?.othersShown !== false,
             compact,
             grid,
           }),
@@ -796,22 +768,12 @@ export const LifeCard = memo(function LifeCard({
                     style={[$outAmount, { color: foreground }]}
                   >
                     {String(shownAttack.from)}
-                    {shownAttack.commander ? (
-                      <Text
-                        text={` − ${shownAttack.commander}`}
-                        weight="bold"
-                        maxFontSizeMultiplier={1}
-                        style={[$outAmount, $hurtInk, { color: DAMAGE_INK }]}
-                      />
-                    ) : null}
-                    {shownAttack.others ? (
-                      <Text
-                        text={` − ${shownAttack.others}`}
-                        weight="bold"
-                        maxFontSizeMultiplier={1}
-                        style={[$outAmount, $hurtInk, { color: OTHERS_INK }]}
-                      />
-                    ) : null}
+                    <Text
+                      text={` − ${shownAttack.commander}`}
+                      weight="bold"
+                      maxFontSizeMultiplier={1}
+                      style={[$outAmount, $hurtInk, { color: DAMAGE_INK }]}
+                    />
                   </Text>
                 </Animated.View>
               ) : null}

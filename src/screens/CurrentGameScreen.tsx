@@ -16,7 +16,7 @@ import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
-import type { AttackChange, OthersChange } from "@/features/game/commanderAttack"
+import type { AttackChange } from "@/features/game/commanderAttack"
 import { CLAIM_CHIP, systemDice, type DiceSeatChip } from "@/features/game/dice"
 import {
   canContinueMatch,
@@ -149,8 +149,6 @@ export function CurrentGameScreen({
       changes.forEach(({ toPlayerId, commander, delta }) =>
         runtime.assignCommanderDamage(from, toPlayerId, delta, commander),
       ),
-    loseLife: (changes: readonly OthersChange[]) =>
-      changes.forEach(({ toPlayerId, amount }) => runtime.changeLife(toPlayerId, -amount)),
   }
   const attack = useCommanderAttack(commanderPort, { seatDeck })
   const attackDispatch = attack.dispatch
