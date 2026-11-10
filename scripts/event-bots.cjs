@@ -1,8 +1,6 @@
 /**
- * why: stand-in players for events, so one person can fill an event with up to 128 players on
- * either authority. On Convex they act as made-up users through admin auth on a preview, like
- * scripts/bots.cjs. Nearby they join a real device's hosted event over Wi-Fi, which is the
- * authority no unit test runs.
+ * why: stand-in players for events, up to 128 on either authority. On Convex they act through admin auth on a preview;
+ * nearby they join a real device's event over Wi-Fi, which no unit test runs.
  */
 const { ConvexClient } = require("convex/browser")
 const { anyApi: api } = require("convex/server")
@@ -306,7 +304,7 @@ const connectionLost = (message) => Object.assign(new Error(message), { lost: tr
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const between = ([low, high]) => low + Math.random() * (high - low)
 
-// why: Wi-Fi delays packets unevenly but TCP never reorders them. Timers due together can fire in either order, so one chain delivers each message after the one before it.
+// why: Wi-Fi delays packets unevenly but TCP never reorders them, so one chain delivers each message after the one before it.
 function laggedQueue(lag) {
   let last = 0
   let chain = Promise.resolve()
@@ -467,7 +465,6 @@ class Bot {
     const { view, options } = this
     if (this.organizer) return organizerMove(view, options, this.ready)
     const table = view.tables.find((candidate) => candidate.playerIds.includes(this.playerId))
-    // why: rolling once per round keeps --drop a per-round chance however many views arrive.
     const last = view.round >= view.plannedRounds
     if (table?.status === "confirmed" && !last && !this.rolled.has(view.round)) {
       this.rolled.add(view.round)

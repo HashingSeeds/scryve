@@ -74,7 +74,7 @@ export function playSystemId(value: unknown): PlaySystemId {
   return isPlaySystemId(value) ? value : "mtg"
 }
 
-/** why: games saved before `system` existed are Magic, but a system this build doesn't know must show as No system rather than pass for Magic. */
+/** why: games saved before `system` existed are Magic, but an unknown system must show as No system. */
 export function storedPlaySystem(value: unknown): PlaySystemId | undefined {
   if (value === undefined) return "mtg"
   return isPlaySystemId(value) ? value : undefined
@@ -109,7 +109,7 @@ export function defaultStartingLife(system?: unknown, format?: string, playerCou
   )
 }
 
-// why: the system definitions hold one preset list per game, but setup offers what each format actually starts at. Empty means the game has one fixed start, so setup shows no life row.
+// why: setup offers what each format starts at. Empty means one fixed start, so setup shows no life row.
 const LIFE_PRESETS: Record<
   PlaySystemId,
   { formats?: Record<string, readonly number[]>; rest: readonly number[] }

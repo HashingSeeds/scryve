@@ -77,7 +77,6 @@ export interface GameRadialMenuProps {
   statusLine?: GameMenuStatusLine
 }
 
-/** why: the pentagon has five sides and the fan is laid out for exactly one action per side. */
 export type GameMenuActions = readonly [
   RadialMenuAction,
   RadialMenuAction,
@@ -779,7 +778,7 @@ const $cluster: ViewStyle = {
   marginTop: -CLUSTER_SIZE / 2,
 }
 const $clusterCenter: ViewStyle = { left: CLUSTER_SIZE / 2, top: CLUSTER_SIZE / 2 }
-// why: the row stays inside the cluster box (half the box is larger than the status line's reach), because Android drops touches outside it.
+// why: the row stays inside the cluster box because Android drops touches outside it.
 const $clusterStatusRow: ViewStyle = { left: 0, right: 0, top: CLUSTER_SIZE / 2 }
 const $backdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,

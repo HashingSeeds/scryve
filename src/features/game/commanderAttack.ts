@@ -6,7 +6,6 @@ export type AttackChange = { toPlayerId: PlayerId; commander?: CommanderSlot; de
 export type OthersChange = { toPlayerId: PlayerId; amount: number }
 
 type Hit = { steps: readonly number[]; others: number }
-/** why: a box on the attacker's card, a commander by slot or Others. */
 export type AttackBox = number | "others"
 
 export type AttackState = {
@@ -17,9 +16,8 @@ export type AttackState = {
   /** why: each defender's hits this attack, newest last, so undo takes back exactly the last hit rather than the current power. */
   hits: Partial<Record<PlayerId, readonly Hit[]>>
   staged: readonly AttackChange[]
-  /** why: what each tap deals from the attacker's other creatures. Every attack starts it at 1 and sat out, since those creatures change from turn to turn and most hits are the commander's alone. */
+  /** why: what each tap deals from the attacker's other creatures. Starts at 1 and sat out each attack, since those creatures change every turn. */
   others: number
-  /** why: a connected attack holds Others damage until Send, like its commander damage. */
   stagedOthers: Partial<Record<PlayerId, number>>
   /** why: boxes sat out of this attack by tapping their names. They keep their number, so tapping again brings them back at the same power. */
   sitting: readonly AttackBox[]
@@ -37,7 +35,7 @@ export type AttackAction =
 export type AttackBoard = {
   recorded: (from: PlayerId, to: PlayerId, commander: CommanderSlot) => number
   commanders: readonly { name?: string; power?: number }[]
-  /** why: only a connected game buffers, since assignment and confirmation live on separate devices there. Local play has nobody to confirm to, so each step commits as it is pressed and there is nothing to stage or send. */
+  /** why: only connected games buffer, since assignment and confirmation live on separate devices; local play commits each step as pressed. */
   buffered: boolean
   /** why: Others damage lowers another seat's life, which only a game where anyone edits any seat accepts; elsewhere the attack has no Others. */
   others: boolean
@@ -98,7 +96,7 @@ export function attackView(state: AttackState, board: AttackBoard, to: PlayerId)
       power: (armed ? state.powers[`${armed}:${slot}`] : undefined) ?? power ?? 1,
       sitting: state.sitting.includes(slot),
       total,
-      // why: the part of the total this attack's hits dealt, which the defender's ring shows apart until the attack ends.
+      // why: this attack's share of the total, shown apart on the defender's ring until the attack ends.
       landed: Math.min(total, sum(hits.map(({ steps }) => steps[slot] ?? 0))),
     }
   })
@@ -112,7 +110,7 @@ export function attackView(state: AttackState, board: AttackBoard, to: PlayerId)
   const takeBacks = commanders.map(({ total }, slot) => Math.min(lastSteps[slot] ?? 0, total))
   const othersTakeBack = lastHit?.others ?? 0
   const othersLanded = sum(hits.map(({ others }) => others))
-  // why: a local hit lowers the defender's life as it lands; a buffered one waits for Send, so none of it is on their life yet.
+  // why: a buffered hit waits for Send, so none of it is on their life yet.
   const applied = board.buffered ? 0 : sum(commanders.map(({ landed }) => landed)) + othersLanded
   return {
     commanders,

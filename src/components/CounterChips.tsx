@@ -51,7 +51,6 @@ export interface SeatTable {
 
 const NO_COUNTERS: Readonly<Record<string, number>> = {}
 
-/** why: a seat with no counters or designations still carries a bag for its dice. */
 export const DICE_ONLY_SEAT: SeatTable = {
   rules: NO_TABLE,
   counters: NO_COUNTERS,
@@ -138,7 +137,7 @@ export function contentFrame(
   }
 }
 
-/** why: the life − and + ignore a side's safe area and ink about 18 dp in, so the sheet's tracker icons and dice start there too, past a camera hole only where one sits: a corner hole, or the notch or Dynamic Island mid top edge. */
+/** why: the life − and + ink about 18 dp in from a side's safe area, so tracker icons and dice start there, past a camera hole only where one sits. */
 function sheetSideInset(
   rotation: LifeCardContentRotation,
   insets: LifeCardContentInsets | undefined,
@@ -164,14 +163,12 @@ const COMPACT_MENU_CLEARANCE = 37
 const CHIP_SIZE = 36
 const COMPACT_CHIP_SIZE = 32
 
-/** why: a seat's bag and calculator are buttons around an icon as tall as the seat mark. */
 export function seatBagSize(compact?: boolean) {
   return seatIdentityMetrics(compact).icon + 8
 }
 const COMPACT_CHIP_WIDTH = 28
-/** why: below this column width "0 Commander tax" no longer fits on one line, so items with a short label use it. */
+/** why: below this column width "0 Commander tax" no longer fits on one line. */
 const SHORT_LABEL_COLUMN = 180
-/** why: room the rule's info button takes beside its option, so the label shortens before it would truncate. */
 const RULE_LINK_WIDTH = 28
 /** why: a column narrower than this gives its label the room instead, and a long press on the option opens its rule. */
 const RULE_BUTTON_COLUMN = 132
@@ -479,7 +476,7 @@ export const CounterChips = memo(function CounterChips({
 }, structurallyEqual)
 
 /**
- * why: like life, every change to a seat's counters is spoken once, whether this device or another made it. A moved designation is spoken only for the seat that took it. Native platforms announce directly; react-native-web's announce is a no-op, so web gets the message back for a polite live region.
+ * why: every counter change is spoken once, from this device or another. react-native-web's announce is a no-op, so web gets the message back for a polite live region.
  */
 function useAnnouncements({ rules, counters, held }: SeatTable, identity: string) {
   const previous = useRef({ counters, held })
@@ -508,7 +505,7 @@ function useAnnouncements({ rules, counters, held }: SeatTable, identity: string
       changes: changes.join(", "),
     })
     if (Platform.OS !== "web") return AccessibilityInfo.announceForAccessibility(message)
-    // why: a live region only speaks when its text changes, so it clears first and the message lands a beat later; retaking Monarch is read again.
+    // why: a live region only speaks when its text changes, so clear first and set the message a beat later.
     clearTimeout(reissue.current)
     setWebMessage("")
     reissue.current = setTimeout(() => setWebMessage(message), LIVE_REGION_REISSUE_MS)
@@ -832,10 +829,9 @@ function CounterSheet({
 
 type SheetDice = SeatDiceBag
 
-/** why: the dice that earn a spot beside the trackers; the rest open from the more button. */
 const QUICK_DICE: readonly DiceTool[] = ["d20", "d6", "coin"]
 
-/** why: a die rolls for its own seat on a tap. Beside trackers the bag keeps three dice and a more button, which opens the rest over the trackers. */
+/** why: beside trackers the bag keeps three dice and a more button, which opens the rest over the trackers. */
 function DiceSection({
   seatNumber,
   dice,
@@ -1244,7 +1240,6 @@ const $diceHalf: ViewStyle = { flex: 1, justifyContent: "center" }
 
 const $narrowDice: ViewStyle = { justifyContent: "center" }
 
-/** why: beside trackers the dice keep to a two-by-two column, so the trackers take the rest of the card. */
 const NARROW_DICE_WIDTH = 84
 const DIVIDER_SPACE = 2 * 8 + 1.5
 // why: matches the life calculator, the card's other sheet, so both open and close alike.
@@ -1268,7 +1263,6 @@ const $option: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   borderRadius: radius.md,
 })
 
-// why: a column too narrow for the rule button also gives its padding and gaps to the label, so "Initiative" fits a landscape quarter-seat.
 const $tightOption: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
   paddingHorizontal: spacing.xxs,

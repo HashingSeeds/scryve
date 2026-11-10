@@ -1,8 +1,6 @@
 /**
- * why: stand-in players for connected games, so one person or agent can test lobbies, sync and
- * load without more devices. Bots act as made-up users through Convex admin auth, which only a
- * deploy key grants, so the key must be a preview key and the deployment it resolves to must be a
- * preview, never production.
+ * why: stand-in players for connected games. They act through Convex admin auth, which only a deploy key grants,
+ * so the key must be a preview key, never production.
  */
 const { ConvexClient } = require("convex/browser")
 const { anyApi: api, getFunctionName } = require("convex/server")

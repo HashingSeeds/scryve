@@ -34,7 +34,7 @@ export function initObservability() {
       Platform.OS === "web"
         ? undefined
         : () => (analyticsEnabled() ? NATIVE_TRACES_SAMPLE_RATE : 0),
-    // why: a transaction can outlive the opt-out that happens during it; breadcrumbs carry request URLs and transactions upload without an error, so they carry none.
+    // why: a transaction can outlive an opt-out; transactions upload without an error, so they carry no request URLs.
     beforeSendTransaction: (event) => (analyticsEnabled() ? { ...event, breadcrumbs: [] } : null),
     beforeSendMetric: (metric) => (analyticsEnabled() ? metric : null),
     integrations: [

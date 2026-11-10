@@ -28,7 +28,6 @@ const mockConvex = { action: mockSearchCards }
 const mockConnectionState = { isWebSocketConnected: true }
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvex,
-  // why: the deck capacity query is the only one called with empty args, and only recent results page.
   useQuery: (...args: unknown[]) =>
     JSON.stringify(args[1]) === "{}"
       ? { used: 1, limit: 2 }

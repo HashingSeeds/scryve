@@ -92,7 +92,7 @@ export function createOutbox<
     retryTimer = undefined
   }
 
-  // why: callers queue or dismiss several writes in one turn (a deck's sibling failures); a drain started after the first would send before the rest settle. A running pass already reads new writes.
+  // why: callers queue several writes in one turn; draining after the first would send before the rest settle.
   const requestDrain = () => {
     if (drainRequested) return
     drainRequested = true

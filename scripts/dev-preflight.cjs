@@ -130,7 +130,7 @@ function readLink(link) {
   }
 }
 
-/** why: on macOS ps joins argv with spaces, so a dev command whose path contains a space is not found there. Linux keeps exact argv boundaries. */
+/** why: macOS ps joins argv with spaces, so a dev command whose path contains a space is not found there. */
 function processTable() {
   if (process.platform !== "linux") {
     const ps = spawnSync("ps", ["-axww", "-o", "pid=,command="], { encoding: "utf8" }).stdout ?? ""
@@ -207,7 +207,7 @@ async function stopProcesses(procs, info = processInfo) {
   for (const proc of signaled) signalIfSame(proc, "SIGKILL")
 }
 
-/** why: two starts must not both see a free port or an unclaimed deployment. Binding a loopback port is atomic and the kernel frees it when the holder dies. A port is skipped only when the OS names a listener that is clearly not a dev starter, so every starter walks the same list and meets on the same port. */
+/** why: two starts must not both see a free port. Binding a loopback port is atomic and freed when the holder dies. Only an OS-named non-starter listener is skipped, so every starter walks the same list. */
 async function withLock(fn, { ports = LOCK_PORTS, waitMs = LOCK_WAIT_MS } = {}) {
   const deadline = Date.now() + waitMs
   for (;;) {
@@ -361,7 +361,7 @@ const recordFile = (worktree) =>
     `${path.basename(worktree)}-${createHash("sha256").update(worktree).digest("hex").slice(0, 8)}.json`,
   )
 
-/** why: a crashed run leaves its record behind. Only a caller holding the lock may prune, so a record mid-rename or a live claim is never deleted by a racing start. */
+/** why: only a lock holder may prune, so a record mid-rename or a live claim is never deleted by a racing start. */
 function liveRecords(dir = stateDir, { prune = false } = {}) {
   const names = fs.existsSync(dir) ? fs.readdirSync(dir) : []
   if (prune) removeOldTempRecords(dir, names)

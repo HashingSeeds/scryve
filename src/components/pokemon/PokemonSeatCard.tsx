@@ -177,10 +177,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchChip = benchChipMetrics(cramped, fontScale)
   const identityMetrics = seatIdentityMetrics(cramped)
-  // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
   const edges = CONTENT_EDGES[contentRotation]
-  // why: boards hide the status bar, and a camera cutout ends at least 11pt above its inset, so a full-width seat's row rises until its name line meets that line: the mark and prizes sit in the corners beside the cutout. Dice chips and the stale line are taller than the name, so the row stays put while they show.
+  // why: boards hide the status bar and a cutout ends at least 11pt above its inset, so a full-width row rises until its name line meets that line. Taller dice chips and the stale line keep it put.
   const besideCutout =
     edges.bottom !== "bottom" &&
     insets.bottom > 0 &&
@@ -197,7 +196,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.bottom -
       padding
     : seatIdentityBottomGap(identityMetrics.edge, insets.bottom) - padding
-  // why: the board drops a corner camera hole's side inset, so the identity and prizes step along their row past whatever sits in their corner, as a life card's corners do. The bench sits deeper than a first-player tab reaches, so only the hole moves it.
+  // why: the board drops a corner camera hole side inset, so identity and prizes step along their row past the hole. The bench sits deeper than a tab reaches.
   const cornerChromeStep = (side: "left" | "right") =>
     cornerStep(cornerObstacles(contentInsets), edges[side], edges.bottom)
   const cornerSlide = useCornerSlide()
@@ -233,7 +232,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const shown = focused ?? board.active
   const asking = takerAsk ? findPokemon(board, takerAsk.pokemonId)?.pokemon : undefined
   const controlsLive = canEdit && !sheetMode
-  // why: the bag sits in the bottom row just before the prizes, so it is placed from where the row and the prizes laid out in the layer.
   const [bottomRowAt, setBottomRowAt] = useState<LayoutRectangle>()
   const [prizesAt, setPrizesAt] = useState<LayoutRectangle>()
   const bagSize = seatBagSize(cramped)
@@ -662,7 +660,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           })}
         </View>
 
-        {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
         <View
           testID={`pokemon-bottom-row-seat-${seatNumber}`}
           onLayout={({ nativeEvent }) => setBottomRowAt(nativeEvent.layout)}

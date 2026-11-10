@@ -336,7 +336,6 @@ function DeckDetailContent({
     edit,
     subscribe: subscribeDraft,
   } = useAccountDeckDraft({ ownerId: access?.ownerId, deckId })
-  // why: an unsaved draft brought back from storage reopens where it can be finished.
   const [mode, setMode] = useState<DeckMode>(draft.editing ? "build" : "play")
   const building = mode === "build"
   const [dialog, setDialog] = useState<DeckDialog>("none")
@@ -848,7 +847,6 @@ function DeckDetailContent({
     }, translate("decks:detail.updateFailed"))
   }
 
-  // why: these rows fall back to server calls, so offline they say why instead of failing on press.
   const needsConnection =
     (access && !access.ready) || offline
       ? (access?.message ?? translate("account:cloud.reconnect"))

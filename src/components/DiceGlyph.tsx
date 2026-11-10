@@ -18,7 +18,7 @@ export function DiceBagGlyph({ inkHeight, color }: { inkHeight: number; color: s
 
 type Point = readonly [number, number]
 
-// why: these are the shapes the old one-and-a-half-unit round stroke drew, so the faces keep their weight and soft corners.
+// why: matches the old 1.5-unit round stroke, so faces keep their weight and soft corners.
 const SHAPE_GROWTH = 0.75
 const CORNER_RADIUS = 1.1
 
@@ -58,7 +58,7 @@ function roundedPolygon(points: readonly Point[]) {
 const circle = (r: number) =>
   `M${12 - r} 12a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`
 
-// why: SVG text snaps to whole pixels as it scales, so a die's number bobbed against its shape while the shape pulsed; these Rubik Bold outlines scale with it. Each is centered on its shape's visual middle, which for a triangle, kite, or pentagon is not the box's middle.
+// why: SVG text snaps to whole pixels as it scales, so a die's number bobbed against its shape; these outlines scale with it. Each is centered on its shape's visual middle, not the box's.
 const NUMBER_PATHS: Record<Exclude<DiceTool, "coin">, string> = {
   d4: "M12.49 18.2Q12.39 18.2 12.32 18.12Q12.24 18.05 12.24 17.95V16.82H9.13Q9.03 16.82 8.95 16.75Q8.88 16.68 8.88 16.57V15.62Q8.88 15.53 8.91 15.45Q8.95 15.38 8.99 15.31L11.9 11.37Q12.03 11.2 12.27 11.2H13.73Q13.83 11.2 13.91 11.27Q13.98 11.34 13.98 11.45V15.33H14.86Q14.98 15.33 15.05 15.4Q15.12 15.48 15.12 15.58V16.57Q15.12 16.68 15.04 16.75Q14.97 16.82 14.87 16.82H13.98V17.95Q13.98 18.05 13.91 18.12Q13.83 18.2 13.73 18.2ZM10.6 15.4H12.28V13.04Z",
   d6: "M12.04 15.55Q11.14 15.55 10.47 15.23Q9.8 14.91 9.43 14.34Q9.05 13.78 9.05 13.05Q9.05 12.74 9.15 12.43Q9.24 12.13 9.38 11.85Q9.53 11.58 9.66 11.36Q9.8 11.15 9.89 11.02L11.65 8.65Q11.71 8.6 11.79 8.52Q11.87 8.45 12.02 8.45H13.34Q13.43 8.45 13.49 8.51Q13.55 8.58 13.55 8.67Q13.55 8.71 13.54 8.74Q13.54 8.78 13.52 8.8L12.16 10.64Q12.22 10.62 12.31 10.61Q12.39 10.61 12.46 10.61Q12.91 10.63 13.36 10.81Q13.79 10.99 14.16 11.3Q14.52 11.61 14.73 12.04Q14.95 12.48 14.95 13.01Q14.95 13.71 14.59 14.29Q14.22 14.86 13.57 15.2Q12.91 15.55 12.04 15.55ZM12.02 14.11Q12.3 14.11 12.55 13.98Q12.8 13.86 12.96 13.62Q13.11 13.38 13.11 13.04Q13.11 12.69 12.96 12.45Q12.81 12.22 12.56 12.1Q12.31 11.98 12.02 11.98Q11.71 11.98 11.46 12.1Q11.21 12.22 11.05 12.45Q10.9 12.69 10.9 13.04Q10.9 13.38 11.06 13.62Q11.21 13.86 11.46 13.98Q11.71 14.11 12.02 14.11Z",
@@ -70,7 +70,6 @@ const NUMBER_PATHS: Record<Exclude<DiceTool, "coin">, string> = {
 }
 
 const REEDS = 28
-// why: a notched rim is what reads as a coin at icon size; a plain disc reads as a button.
 const REEDED_RIM = Array.from({ length: REEDS * 2 }, (_, index) => {
   const angle = (index / (REEDS * 2)) * 2 * Math.PI
   const radius = index % 2 === 0 ? 10.6 : 9.6

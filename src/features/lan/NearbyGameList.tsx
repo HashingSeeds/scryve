@@ -32,7 +32,7 @@ export function NearbyGameList({ code, onJoin }: NearbyGameListProps) {
     <Button testID="back-to-nearby-game" tx="connected:nearby.backToGame" onPress={onJoin} />
   )
   if (table === "playing") return backToGame
-  // why: a finished table only waits for a rematch, so it must not hide other games nearby.
+  // why: a finished table only waits for a rematch, so it must not hide other games.
   return (
     <>
       {table === "finished" ? backToGame : null}

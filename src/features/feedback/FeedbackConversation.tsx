@@ -22,7 +22,6 @@ import { FeedbackConversationScreen, type SuggestKind } from "@/screens/Feedback
 
 import { api } from "../../../convex/_generated/api"
 
-// why: new feedback and its thread are one screen, so the first send stays put instead of swapping screens.
 export function FeedbackConversation({
   requestId: openedId,
   initialKind = "feature",

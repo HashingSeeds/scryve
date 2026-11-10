@@ -376,7 +376,6 @@ describe("PlayerGrid", () => {
     expect(
       view.getByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
     ).toBeTruthy()
-    // why: a local hit already counts, so finishing stays an X rather than asking to confirm.
     expect(
       view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
     ).toBeTruthy()

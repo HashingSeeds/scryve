@@ -17,11 +17,7 @@ import { APP_ICON_VARIANTS, appIconAssets } from "./src/features/appIcon/appIcon
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
 
-/**
- * why: safe only because fingerprint.config.js skips ExpoConfigExtraSection; otherwise notes change
- * the runtime. RELEASE_NOTES is `release-train.cjs notes` output. The commit lets a later update's
- * notes skip what this build already has; EAS sets it for binaries, GitHub Actions for beta updates.
- */
+/** why: safe only because fingerprint.config.js skips ExpoConfigExtraSection; otherwise notes change the runtime. The commit lets later updates skip notes this build already has. */
 const RELEASE_NOTES: { notes: string[]; newSince: Record<string, number> } | null = process.env
   .RELEASE_NOTES
   ? JSON.parse(process.env.RELEASE_NOTES)
@@ -88,10 +84,7 @@ const getLegacyAppScheme = () => {
   return "count"
 }
 
-/**
- * why: expo-alternate-app-icons writes only PNG icon sets. Xcode uses an Icon Composer file named
- * like an alternate icon in place of its PNG set, and renders it for iOS releases before Liquid Glass.
- */
+/** why: Xcode swaps in an Icon Composer file named like an alternate icon for its PNG set; expo-alternate-app-icons writes only PNGs. */
 function withLiquidGlassAlternateIcons(config: ExpoConfig, projectRoot: string): ExpoConfig {
   const glassIcons = APP_ICON_VARIANTS.map(({ name }) => ({
     name,
@@ -279,7 +272,7 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     return config
   })
 
-  // why: expo-alternate-app-icons launches through activity aliases but copies only android.intentFilters, so with an alternate icon on, scheme links and Clerk's sign-in callback would reach no enabled activity.
+  // why: expo-alternate-app-icons copies only android.intentFilters to its aliases, so scheme links and Clerk's callback would reach no enabled activity.
   return withAndroidManifest(withGradleHeap, (config) => {
     const main = AndroidConfig.Manifest.getMainActivityOrThrow(config.modResults)
     const application = AndroidConfig.Manifest.getMainApplicationOrThrow(config.modResults)

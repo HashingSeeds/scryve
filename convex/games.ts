@@ -277,7 +277,7 @@ async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualC
   return game
 }
 
-/** why: clients from before the `systems` argument show any system they don't know as Magic. None of them knows a system beyond these three, so a newer system asks them to update. Builds older than Yu-Gi-Oh! and Pokémon still join those, as they did before this check. */
+/** why: older clients show unknown systems as Magic, so a newer system asks them to update. Builds older than Yu-Gi-Oh! and Pokémon still join those. */
 const SYSTEMS_BEFORE_CLIENT_LIST: readonly string[] = ["mtg", "ygo", "pokemon"]
 // why: hidden roles are shown per device, so a Treachery seat must belong to one.
 const TREACHERY_DEVICE_MESSAGE = "Treachery seats need a device"
@@ -1018,11 +1018,7 @@ export const claimSeat = mutation({
     if (args.deviceId) assertDeviceId(args.deviceId)
     const game = await joinableInviteGame(ctx, args)
     if (!game) {
-      /* why: installed clients claim right after claimableSeats rejected the same invite and
-         expect this throw; that lookup already counted the failure. The grace is timed from the
-         lookup, not the window, so a rollover between the two calls still throws, yet retries
-         stop being free a minute later. Any other wrong invite returns null so the attempt
-         counted above commits. */
+      /* why: installed clients claim right after claimableSeats rejected the same invite and expect this throw. Grace is timed from that lookup, so a window rollover still throws. Other wrong invites return null so the counted attempt commits. */
       const joins = await joinAttemptsFor(ctx, clerkUserId)
       if (
         joins?.failedInvite === inviteKey(args) &&
@@ -1671,11 +1667,7 @@ async function claimableDeck(
     : undefined
 }
 
-/**
- * why: a claim that names a stale or mismatched shared deck still takes the seat, just without a deck,
- * as claimableDeck does. The owner may have edited the deck since the game, so a list other than the
- * one played is not attributed.
- */
+/** why: a claim naming a stale or mismatched shared deck still takes the seat, just without a deck; the owner may have edited the list since. */
 async function claimableSharedDeck(
   ctx: QueryCtx,
   { deckShareToken, deckFingerprint }: { deckShareToken?: string; deckFingerprint?: string },
@@ -1824,8 +1816,7 @@ export const claimableSeats = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     const clerkUserId = String(user.clerkUserId)
-    /* why: a lookup reveals whether a code is live, so it stops once wrong codes or claims have
-       spent the join budget, even though repeat lookups of a good code never spend it. */
+    /* why: lookups reveal whether a code is live, so they stop once wrong codes or claims spent the join budget. */
     const joins = await joinAttemptsFor(ctx, clerkUserId)
     if (
       joins &&

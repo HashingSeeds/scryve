@@ -81,7 +81,7 @@ function sidewaysZoneEdge(pinsToTopEdge: boolean): LifeCardEdge {
   return pinsToTopEdge ? "top" : "bottom"
 }
 
-/** why: on a short seat the commander grid reaches the middle of its end, so the glyph there slides along its edge until it clears the grid, and never steps inward toward the total. */
+/** why: on a short seat the glyph slides along its edge until it clears the commander grid, never inward toward the total. */
 export function glyphSlide(
   { edge, bounds }: { edge: LifeCardEdge; bounds: LayoutRectangle },
   zones: { width: number; height: number },
@@ -317,7 +317,6 @@ export function LifeControls({
           const glyphScale = Math.min(fontScale, LIFE_MAX_FONT_SCALE)
           const lineHeight =
             (compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) * glyphScale
-          // why: the grid only has to clear what the glyph inks, a delta's digits at most, not its taller line box.
           const slide =
             obstacle?.edge === zoneEdge
               ? glyphSlide(

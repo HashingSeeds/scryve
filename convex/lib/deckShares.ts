@@ -21,7 +21,6 @@ export async function sharedDeckKey(token: string) {
   return `shared-${hex.join("").slice(0, 32)}`
 }
 
-/** why: a link shows the version its owner brings, or the latest one when none is chosen. */
 export async function sharedDeckVersion(ctx: QueryCtx, token: string) {
   if (!SHARE_TOKEN.test(token)) return null
   const link = await ctx.db
@@ -56,10 +55,7 @@ export type SharedSeatDeck =
       startingValue?: number
     }
 
-/**
- * why: a seat playing someone else's shared deck copies its key, list and label, so the owner's
- * ids, deck key and stats never reach the game. The owner opening their own link plays their deck.
- */
+/** why: a seat playing someone's shared deck copies only key, list and label, so owner ids and stats never reach the game. */
 export async function sharedSeatDeck(
   ctx: QueryCtx,
   token: string,

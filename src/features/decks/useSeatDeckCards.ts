@@ -9,7 +9,7 @@ import { loadSharedDeckByKey } from "./sharedDecks"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
-/** why: a synced deck is read by version, a device deck by the list pinned when the game started, and a shared deck from the copy kept on this device. */
+/** why: synced decks read by version, device decks by the list pinned at game start, shared decks from the local copy. */
 export type SeatDeck =
   | { ownerId: string; versionId: string }
   | { deckKey: string; fingerprint: string }

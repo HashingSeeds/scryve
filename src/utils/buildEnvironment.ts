@@ -1,7 +1,7 @@
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 
-// why: only EAS builds carry a channel, so channel-less local and perf builds stop posing as production, and store installs keep their channel even if an update ships without APP_VARIANT.
+// why: only EAS builds carry a channel, so local and perf builds don't pose as production.
 export function buildEnvironment() {
   const webBuildEnvironment = process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT
   if (webBuildEnvironment) return webBuildEnvironment

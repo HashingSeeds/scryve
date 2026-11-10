@@ -12,10 +12,7 @@ function isSafeInternalPath(path: string): boolean {
 const DEV_LINK =
   /^(?:(?:scryve|count)(?:-dev|-preview)?:\/\/\/?|\/)dev\/(seed\/[a-z]+|auth)(\?[^#\s\u0000-\u001F\u007F]*)?$/
 
-/**
- * why: preview builds open PR previews from `scryve-preview://preview/pr-123`, or from the QR code
- * in the pr-preview comment, which qr.expo.dev can only encode as a development-client link.
- */
+/** why: qr.expo.dev can only encode a development-client link, so preview builds also open `scryve-preview://preview/pr-123`. */
 const PR_PREVIEW_LINK =
   /^(?:(?:scryve|count)-preview:\/\/(?:\/?preview\/|expo-development-client\/\?url=https:\/\/u\.expo\.dev\/[0-9a-f-]+\?channel-name=)|\/preview\/)(pr-[0-9]+)$/
 

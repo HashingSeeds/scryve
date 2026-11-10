@@ -312,7 +312,7 @@ const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.md,
 })
 
-/** why: the closed iPhone Duo puts the status bar and system controls in a rail down one side and reports it as that side's safe-area inset; content stops at the rail like a native app's. It is the only portrait screen whose side inset beats its top, so landscape notches keep their layout. Screen content pads itself by at least `spacing.md`, so the gutter adds only what the rail needs beyond that, instead of stacking the two. */
+/** why: the closed iPhone Duo reports its side rail as a safe-area inset; it is the only portrait screen whose side inset beats its top. Screen content already pads by `spacing.md`, so add only the excess. */
 const NO_SIDE_GUTTER = { left: 0, right: 0 }
 
 function useSideSafeAreaGutter(enabled: boolean) {

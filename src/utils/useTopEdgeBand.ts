@@ -11,7 +11,7 @@ function subscribe(onChange: () => void) {
   return () => portrait?.removeEventListener("change", onChange)
 }
 
-/** why: iOS 26 blurs the top of a home screen web app unless a fixed, solid band over 10px tall covers the top edge. index.html paints that band with the same conditions, so top content starts below it. */
+/** why: iOS 26 blurs the top of a home screen web app unless a fixed solid band over 10px covers it. index.html paints the same band. */
 export function useTopEdgeBand() {
   const inPortrait = useSyncExternalStore(
     subscribe,
