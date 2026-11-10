@@ -116,11 +116,13 @@ export function TurnChip({
   seatNumber,
   foreground,
   compact,
+  tight,
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
+  tight?: boolean
 }) {
   const {
     themed,
@@ -135,7 +137,9 @@ export function TurnChip({
   const bank = bankLeft(turn, turn.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0
   const time = numbered
-    ? translate("board:turn.chipNumber", { number: turn.number })
+    ? tight
+      ? String(turn.number)
+      : translate("board:turn.chipNumber", { number: turn.number })
     : formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
   const ink = outOfTime ? colors.board.text : foreground
   const name = state.nameOf(turn.playerId) ?? ""
@@ -172,7 +176,7 @@ export function TurnChip({
       />
       {split && nextSeat ? (
         <View style={[$passSegment, { backgroundColor: nextSeat.color }]}>
-          {canPress && state.passLabelShown ? (
+          {canPress && state.passLabelShown && !tight ? (
             <Text
               tx="board:turn.pass"
               weight="semiBold"

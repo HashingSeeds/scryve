@@ -603,6 +603,28 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
   })
 
+  it("drops the turn chip to its number when even a bare mark leaves it too little room", () => {
+    const view = renderGame(game(), turnsOn())
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const widths = (identity: number, chip: number) => {
+      fireEvent(view.getByTestId("life-identity-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: identity, height: 30 } },
+      })
+      fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: chip, height: 36 } },
+      })
+    }
+
+    widths(2_000, 60)
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+    expect(view.getByTestId("turn-chip-time")).toHaveTextContent("Turn 1")
+
+    widths(2_000, 1_000)
+    expect(view.getByTestId("turn-chip-time")).toHaveTextContent(/^1$/)
+    expect(view.getByTestId("turn-chip-1").props.accessibilityLabel).toMatch(/^Turn 1/)
+  })
+
   it("forgets who went first when the result is cleared before play", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
