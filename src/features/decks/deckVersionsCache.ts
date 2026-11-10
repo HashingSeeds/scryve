@@ -69,7 +69,6 @@ export type DeckVersionRef = Id<"deckVersions"> | ProvisionalVersionId
 
 const PROVISIONAL_VERSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** why: offline creates name versions with randomUUID and Convex ids never contain a dash, so a stored or restored id that matches is one the server would reject. */
 export function isProvisionalVersionId(versionId: string): versionId is ProvisionalVersionId {
   return PROVISIONAL_VERSION_ID.test(versionId)
 }
@@ -700,7 +699,7 @@ export class DeckVersionCacheController {
       const versions = await this.pullVersions(deckId, epoch, ordinal)
       if (this.superseded(deckId, ordinal, epoch)) return
       const versionId = this.wantedAt(deckId) ?? this.latestActive(versions)?.versionId
-      if (!versionId) return
+      if (!versionId || isProvisionalVersionId(versionId)) return
       const metadata = versions.find((version) => version.versionId === versionId)
       const cached = this.repository.loadCards(versionId)
       if (!metadata) return

@@ -11,7 +11,7 @@ import {
   type VersionCardPayload,
   versionWriteOutbox,
 } from "./decksVersionWrites"
-import { DeckVersionCacheRepository } from "./deckVersionsCache"
+import { DeckVersionCacheRepository, isProvisionalVersionId } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
@@ -390,6 +390,7 @@ describe("deck version card writes", () => {
     stop()
 
     expect(cache.mappedVersionId(provisionalId)).toBe(serverVersionId)
+    expect(isProvisionalVersionId(provisionalId)).toBe(true)
     expect(cache.loadCards(provisionalId)).toBeUndefined()
     const confirmed = cache.loadCards(serverVersionId)
     expect(confirmed).toMatchObject({ revision: 2 })
@@ -485,6 +486,7 @@ describe("deck version card writes", () => {
     const actor = t.withIdentity({ subject: "owner" })
     await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
     const version = await seedVersion(actor, "Original")
+    expect(isProvisionalVersionId(version.versionId)).toBe(false)
     const local = new MemoryStorage()
     let lost = true
     const client = {
