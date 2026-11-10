@@ -7,12 +7,10 @@ import { useAppTheme } from "@/theme/context"
 
 import type { LifeCardContentRotation } from "./playerCardTypes"
 
-/** why: two treatments are on trial for showing that two touching cards are one team. `link` joins the totals with a rivet on the seam; `frame` outlines the pair as one card. */
 export type TeamBinding = "link" | "frame"
 
 const MENU_CLEARANCE = 48
 
-/** why: a Two-Headed Giant team's two cards touch, and this draws the mark that binds them above the pair. */
 export function TeamPanelLayer({
   binding,
   rotation,
@@ -35,7 +33,6 @@ export function TeamPanelLayer({
   const depth = sideways ? size.width : size.height
   const headRun = (sideways ? size.height : size.width) / 2
   const toward = UP[rotation]
-  // why: the seam's middle sits between one head's + and the other's −, so the rivet moves toward the table's center, off their line, and further on a narrow head whose total fills the card; it stops short of the menu.
   const wanted = depth * (headRun < depth ? 0.25 : 0.2)
   const shift = Math.max(
     0,

@@ -27,7 +27,6 @@ interface LifeLogChange {
   delta: number
 }
 
-/** why: a Two-Headed Giant head's life is its team's, so `teams` folds both heads' changes into one history. */
 export type LifeLogSource =
   | { kind: "local"; events: readonly GameEvent[]; teams?: TurnGroups }
   | {

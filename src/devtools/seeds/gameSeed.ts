@@ -86,7 +86,6 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
     throw new SeedError(`layout for ${playerCount} players must be one of ${layouts.join(", ")}.`)
 
   const names = list(params.names)
-  // why: teams=1+2,3+4 starts a Two-Headed Giant game with those seats as teams.
   const teams = list(params.teams).map((entry) =>
     entry.split("+").map((value) => integer("teams seat", value) - 1),
   )
@@ -193,7 +192,6 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
     game = { ...game, turnGroups: groups }
   }
 
-  // why: poison=1:12 gives seat 1 twelve poison, through the same rules a tap uses.
   for (const entry of list(params.poison)) {
     const [seatValue, amount] = entry.split(":")
     game = applyLocalTableAction(
@@ -212,7 +210,6 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {
   const game = buildSeededGame(params, repository)
-  // why: binding=frame or binding=link picks the team binding on trial, until one is chosen.
   if (params.binding === "frame" || params.binding === "link")
     repository.saveTeamBinding(params.binding)
   repository.clearActiveGame()

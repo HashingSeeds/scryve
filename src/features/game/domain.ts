@@ -248,7 +248,6 @@ function teamsFor(players: readonly GamePlayer[], seats?: readonly (readonly num
 export const localTeams = (game: Pick<LocalGame, "variant" | "turnGroups">) =>
   game.variant === TWO_HEADED_GIANT ? game.turnGroups : undefined
 
-/** why: CR 810.9, a team shares one life total, so a change to either head moves both. */
 const sharesLife = (game: LocalGame, playerId: PlayerId, other: PlayerId) =>
   turnGroupOf(localTeams(game), playerId).includes(other)
 
@@ -621,7 +620,6 @@ function applyBoardTableAction(
   context: { operationId: string; now: number },
 ): LocalGame {
   const table = game.table ?? EMPTY_TABLE
-  // why: a shared counter reaches the teammate through the groups, which live on the game.
   const teams = localTeams(game)
   const change = applyTableAction(teams ? { ...table, turnGroups: teams } : table, action, {
     rules: localTableRules(game),

@@ -24,7 +24,6 @@ export interface OutState<Id extends string = string> {
     readonly totals: readonly CommanderTotal<Id>[]
   }
   readonly groups?: TurnGroups
-  /** why: a Two-Headed Giant team has one life (CR 810.8a), so one head out puts out the team, and 21 from one commander counts across both heads. */
   readonly sharedFate?: true
 }
 

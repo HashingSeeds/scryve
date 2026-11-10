@@ -214,7 +214,6 @@ export async function writeCloudGame(
       ).map(({ fromPlayerId, toPlayerId, commander, total }) => ({
         fromPlayerId,
         toPlayerId,
-        // why: 21 from one commander puts a player out (CR 903.10a), so a partner's damage is counted on its own.
         ...commanderField(commander),
         total,
       })),

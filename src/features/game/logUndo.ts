@@ -69,7 +69,6 @@ export function undoLogRow(
         }
       : { kind: "customCounter.changed", playerId: undo.playerId, name, delta: -undo.delta }
   const table = game.table ?? EMPTY_TABLE
-  // why: a Two-Headed Giant team shares poison, so taking it back moves both heads, as adding it did.
   const teams = localTeams(game)
   const change = applyTableAction(teams ? { ...table, turnGroups: teams } : table, action, {
     rules: localTableRules(game),

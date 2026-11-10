@@ -2289,7 +2289,6 @@ export const updateLobbySettings = mutation({
   },
 })
 
-/** why: Two-Headed Giant teams are neighboring seats, so the host trades seats to change teams before the game starts. */
 export const swapLobbySeats = mutation({
   args: { publicId: v.string(), first: v.number(), second: v.number() },
   handler: async (ctx, args) => {
@@ -2366,7 +2365,6 @@ export const startGame = mutation({
       startedAt: now,
       updatedAt: now,
       ...lifeEditingFor(players),
-      // why: teammates sit together, so neighboring seats form the Two-Headed Giant teams.
       ...(game.variant === TWO_HEADED_GIANT
         ? {
             turnGroups: pairedTeams(
@@ -2382,7 +2380,6 @@ export const startGame = mutation({
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
-      // why: a Two-Headed Giant team starts at the team life, whatever a deck would start at.
       const deckLife =
         game.variant === TWO_HEADED_GIANT
           ? undefined

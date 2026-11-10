@@ -130,7 +130,6 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
-  /** why: Two-Headed Giant games share life and poison across each turn group. */
   variant?: GameVariant
   counterLog?: CounterLogEntry[]
   logOrder?: string[]

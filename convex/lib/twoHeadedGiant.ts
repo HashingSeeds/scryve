@@ -21,7 +21,6 @@ export const defaultTeamLife = (format: string | undefined) =>
 export const teamLifePresets = (format: string | undefined): readonly number[] =>
   format === "commander" ? [40, 50, COMMANDER_TEAM_LIFE] : [TEAM_LIFE, 40]
 
-/** why: teammates sit together, so each pair of neighboring seats is a team until setup says otherwise. */
 export function pairedTeams<Id>(playerIds: readonly Id[]): Id[][] {
   const teams: Id[][] = []
   for (let index = 0; index + 1 < playerIds.length; index += 2)
@@ -29,7 +28,6 @@ export function pairedTeams<Id>(playerIds: readonly Id[]): Id[][] {
   return teams
 }
 
-/** why: every seat is on exactly one team of two, so a life change always has one teammate to share it with. */
 export function isValidTeams(value: unknown, playerIds: ReadonlySet<string>): value is string[][] {
   return (
     isValidTurnGroups(value, playerIds) &&
@@ -42,7 +40,6 @@ export function isValidTeams(value: unknown, playerIds: ReadonlySet<string>): va
 export const teammatesOf = (teams: TurnGroups | undefined, playerId: string) =>
   teams ? turnGroupOf(teams, playerId).filter((id) => id !== playerId) : []
 
-/** why: CR 810.5 shares only life and poison. Poison counts for the whole team and a team loses at 15. */
 export function teamTableRules(rules: TableDefinition): TableDefinition {
   return {
     ...rules,

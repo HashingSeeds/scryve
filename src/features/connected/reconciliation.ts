@@ -42,7 +42,6 @@ export function overlayPendingDeltas(
   const deltas = new Map<string, number>()
   let table = confirmed.table ?? EMPTY_TABLE
   const teams = confirmed.variant === TWO_HEADED_GIANT ? table.turnGroups : undefined
-  // why: a queued change to one Two-Headed Giant head shows on the teammate at once, as the authority will.
   const addDelta = (playerId: string, delta: number) => {
     for (const id of turnGroupOf(teams, playerId)) deltas.set(id, (deltas.get(id) ?? 0) + delta)
   }

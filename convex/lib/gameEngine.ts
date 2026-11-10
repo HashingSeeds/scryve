@@ -703,11 +703,7 @@ function* writeTable(
   return acknowledged({ operationId, deduplicated: false })
 }
 
-/**
- * why: a Two-Headed Giant team shares one life total and its poison (CR 810.9, 810.10), so every
- * seat patch that moves either one moves the teammate too. Each head keeps its own events, which
- * is how the log says who made a change, and older projections still read a life per seat.
- */
+/** why: older projections read a life per seat, so a team's shared life and poison are written to both heads. */
 function* withSharedTeam(store: GameStore): GameSteps<GameStore> {
   const teams = store.game.variant === TWO_HEADED_GIANT ? store.game.turnGroups : undefined
   if (!teams) return store

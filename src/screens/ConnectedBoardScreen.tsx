@@ -777,7 +777,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   )
   const teams = useMemo(() => {
     const groups = connectedTeams({ variant: game.variant, table: table?.table })
-    // why: this device's team sits last, where its own seat would.
     return (
       groups &&
       [...groups].sort(
@@ -788,7 +787,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }, [controlled, game.variant, table?.table])
   const cellCount = teams?.length ?? players.length
   const [teamBinding] = useState(() => localGameRepository.teamBinding())
-  /** why: a head's device changes its team's life from either half, writing as the head it holds, so the log knows who did it. */
   const actingHead = (playerId: string) =>
     turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
   const layoutVariant =
@@ -1232,7 +1230,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           sharedLife={game.variant === TWO_HEADED_GIANT}
           counterTable={{
             players: table?.table.players,
-            // why: a Two-Headed Giant team shares poison, so both heads' taps count back from one value.
             counterKey: (playerId, counterId) =>
               game.variant === TWO_HEADED_GIANT &&
               table?.tableRules.counters.some(({ id, shared }) => id === counterId && shared)

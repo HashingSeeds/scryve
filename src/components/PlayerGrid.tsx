@@ -219,7 +219,6 @@ export interface PlayerGridProps {
   onPlayStart?: () => void
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
-  /** why: a Two-Headed Giant team's heads share one panel, so the grid seats teams in place of players. */
   teams?: readonly (readonly string[])[]
   teamBinding?: TeamBinding
 }
@@ -313,7 +312,6 @@ export function PlayerGrid({
     layout,
     gap: spacing.xxs,
   })
-  // why: a team panel's heads are as small as the cards of a game with that many seats.
   const compact = layout.compact || (!!teams && players.length >= 5)
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const sidewaysGlyphReserve =
@@ -775,11 +773,6 @@ interface SeatPlace {
   style?: ViewStyle
 }
 
-/**
- * why: the heads of a team panel meet with square corners so the panel reads as one card. With no
- * `seam`, this is the team panel's outer shape, so the turn frame around the team follows the
- * same screen corners its heads do, at the display's radius where it reports one.
- */
 function headCornerStyle(
   edges: Record<LifeCardEdge, boolean>,
   seam: LifeCardEdge | undefined,
@@ -928,7 +921,6 @@ function seatCutout(
 /** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. */
 type TabSeam = "top" | "bottom" | null
 
-/** why: a first-player tab straddles the seam at `at`, so corner chrome on either side of it steps clear. */
 function tabSeamOf(at: number | null, top: number, bottom: number): TabSeam {
   if (at === null) return null
   if (Math.abs(top - at) < 0.01) return "top"

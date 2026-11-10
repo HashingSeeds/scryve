@@ -44,7 +44,6 @@ export function GameLogDialog({
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
-  /** why: Two-Headed Giant heads share one life, so a row names the team, says which head made it, and counts the team's total. */
   sharedLife?: boolean
   counters?: readonly CounterLogEntry[]
   canUndo: boolean
