@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Path } from "react-native-svg"
 
 import type { TurnChipState } from "@/features/game/dice"
@@ -247,6 +248,58 @@ export function TurnChip({
     >
       {content}
     </BoardPressable>
+  )
+}
+
+export function UndoPassChip({
+  seatNumber,
+  foreground,
+  compact,
+  onUndo,
+}: {
+  seatNumber: number
+  foreground: string
+  compact?: boolean
+  onUndo: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(220)}>
+      <BoardPressable
+        testID={`turn-undo-pass-${seatNumber}`}
+        accessibilityRole="button"
+        accessibilityLabel={translate("board:turn.undoPass")}
+        hitSlop={{ top: 6, bottom: 6 }}
+        onPress={onUndo}
+        style={({ pressed }) => [
+          themed(compact ? $compactChip : $chip),
+          $filled,
+          pressed && $pressed,
+        ]}
+      >
+        <UndoGlyph color={foreground} />
+        <Text
+          tx="common:undo"
+          weight="semiBold"
+          style={[compact ? $compactWord : $word, { color: foreground }]}
+        />
+      </BoardPressable>
+    </Animated.View>
+  )
+}
+
+function UndoGlyph({ color }: { color: string }) {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24">
+      <Path
+        d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
   )
 }
 

@@ -68,6 +68,7 @@ export type DiceSeatChip =
   | { kind: "first" }
   | { kind: "claim" }
   | { kind: "turn"; state: TurnChipState }
+  | { kind: "undoPass"; onUndo: () => void }
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
 

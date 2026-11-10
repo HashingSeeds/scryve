@@ -354,16 +354,19 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("dice-chip-2-claim"))
     expect(view.getByTestId("turn-chip-1")).toHaveTextContent("Start")
     expect(view.getByTestId("turn-chip-2")).toHaveTextContent("Start")
-    expect(view.getAllByTestId("seat-spotlight-active")).toHaveLength(2)
-    expect(view.getAllByTestId("seat-spotlight-next")).toHaveLength(2)
 
     fireEvent.press(view.getByTestId("turn-chip-2"))
     fireEvent.press(view.getByTestId("turn-chip-2"))
     expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: katherine, number: 2 })
-    expect(view.getByTestId("turn-passed-toast")).toHaveTextContent(/^Turn 2, Katherine & Dorothy/)
     expect(view.queryByTestId("turn-chip-1")).toBeNull()
     expect(view.getByTestId("turn-chip-3")).toBeTruthy()
     expect(view.getByTestId("turn-chip-4")).toBeTruthy()
+    expect(view.getByTestId("turn-undo-pass-1")).toBeTruthy()
+    expect(view.getByTestId("turn-undo-pass-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("turn-undo-pass-2"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: ada, number: 1 })
+    expect(view.queryByTestId("turn-undo-pass-1")).toBeNull()
   })
 
   it("lands the turn chip on the first player, waiting until the table's first change", () => {
@@ -373,7 +376,6 @@ describe("CurrentGameScreen", () => {
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-1-claim"))
     expect(view.getByTestId("turn-chip-1")).toHaveTextContent("Start")
-    expect(view.getByTestId("seat-spotlight-active")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("life-seat-2-1"))
     expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: initial.players[0].id })

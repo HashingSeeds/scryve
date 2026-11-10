@@ -289,7 +289,11 @@ export function CurrentGameScreen({
   const turn = runtime.game.turn
   const active = runtime.game.status === "active"
   const turnsOn = turnsEnabled && active
-  const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
+  useEffect(() => {
+    if (!turnToast) return
+    const expire = setTimeout(() => setTurnToast(undefined), PASS_UNDO_MS)
+    return () => clearTimeout(expire)
+  }, [turnToast])
   const casual = clock?.setup.mode !== "countdown"
   const turnSeats: TurnSeat[] = runtime.game.players.map((player, index) => ({
     playerId: player.id,
@@ -353,6 +357,8 @@ export function CurrentGameScreen({
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
         return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+      if (turnToast && sharesTurn(turnGroups, turnToast.passerId, player.id))
+        return [...chips, { kind: "undoPass", onUndo: undoToastPass }]
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -472,18 +478,6 @@ export function CurrentGameScreen({
                 actionTestID="game-abandoned-undo-button"
                 persistent
                 onAction={runtime.undoAbandon}
-              />
-            ) : turnToast ? (
-              <GameToast
-                key={turnToast.operationId}
-                inline
-                message={turnToast.message}
-                actionTx="common:undo"
-                testID="turn-passed-toast"
-                actionTestID="turn-passed-undo"
-                onAction={undoToastPass}
-                visibleMs={PASS_UNDO_MS}
-                onDismiss={dismissTurnToast}
               />
             ) : null
           }

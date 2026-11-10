@@ -108,7 +108,7 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
-import { TurnChip, TurnChipLayer } from "./TurnChip"
+import { TurnChip, TurnChipLayer, UndoPassChip } from "./TurnChip"
 import { useSeatDimmed } from "./TurnSpotlight"
 import { useTurnStyle } from "./turnStyle"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
@@ -230,6 +230,7 @@ export const LifeCard = memo(function LifeCard({
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
   const turnChip = diceChips?.flatMap((chip) => (chip.kind === "turn" ? [chip.state] : []))[0]
+  const undoPass = diceChips?.flatMap((chip) => (chip.kind === "undoPass" ? [chip.onUndo] : []))[0]
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const cornerSlide = useCornerSlide()
@@ -1056,6 +1057,14 @@ export const LifeCard = memo(function LifeCard({
                 foreground={foreground}
                 compact={compact}
                 filled
+              />
+            ) : null}
+            {undoPass && turnChipShown ? (
+              <UndoPassChip
+                seatNumber={seatNumber}
+                foreground={foreground}
+                compact={compact}
+                onUndo={undoPass}
               />
             ) : null}
           </Animated.View>

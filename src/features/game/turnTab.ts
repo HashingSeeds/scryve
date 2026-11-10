@@ -1,7 +1,7 @@
 import type { Turn } from "../../../convex/lib/turns"
 
 export const CHESS_BANK_MINUTES = [10, 20, 30] as const
-export const PASS_UNDO_MS = 15_000
+export const PASS_UNDO_MS = 5_000
 
 export function clockwiseSlots(rows: readonly (readonly (number | null)[])[]): number[] {
   const seated = rows.map((row) => row.filter((slot): slot is number => slot !== null))
