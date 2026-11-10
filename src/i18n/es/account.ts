@@ -122,8 +122,7 @@ export default {
     copyFailed: "No se pudo copiar. Inténtalo de nuevo.",
     turns: {
       label: "Turnos",
-      helper:
-        "Muestra de quién es el turno con un temporizador de turno. Toca el temporizador para pasar.",
+      helper: "Muestra de quién es el turno. Toca la ficha de turno para pasar.",
     },
     syncStats: {
       label: "Estadísticas para nerds",
