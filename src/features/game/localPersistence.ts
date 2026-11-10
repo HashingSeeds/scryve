@@ -16,6 +16,7 @@ import {
   isLifeDelta,
   localGameAccount,
   MAX_COMMANDER_DAMAGE,
+  retainedLogOrder,
   validatePlayerNames,
 } from "./domain"
 import { gameShape } from "./gameShape"
@@ -903,7 +904,10 @@ export class LocalGameRepository {
     }
     const metadata: ActiveMetadata = {
       schemaVersion: ACTIVE_SCHEMA_VERSION,
-      game: gameWithoutEvents,
+      game: {
+        ...gameWithoutEvents,
+        ...(game.logOrder ? { logOrder: retainedLogOrder({ ...game, events: kept }) } : {}),
+      },
       eventChunkCount: chunkCount,
       eventCount: kept.length,
       ...(kept.length > 0 ? { lastOperationId: kept[kept.length - 1].operationId } : {}),

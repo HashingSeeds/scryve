@@ -65,6 +65,8 @@ export default {
   outbox: {
     queueFull:
       "保留中の変更のオフラインキューがいっぱいです。再接続して同期してから、変更を続けてください。",
+    undoPartial:
+      "この取り消しの途中でオフラインのキューがいっぱいになったため、一部しか保存されませんでした。再接続して同期してから、残りを取り消してください。",
     commanderDamageRange: "統率者ダメージの変更は1～{{max}}の範囲にしてください。",
     commanderSelfDamage: "統率者は自分自身にダメージを与えられません",
     commanderClaimDeclined:
