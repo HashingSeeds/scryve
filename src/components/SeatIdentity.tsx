@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react"
+import { useState, type ComponentProps } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from "react-native-reanimated"
@@ -88,6 +88,7 @@ export function SeatIdentity({
   style,
 }: SeatIdentityProps) {
   const metrics = seatIdentityMetrics(compact)
+  const [nameHeight, setNameHeight] = useState(0)
   const art = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
   return (
     <View testID={`seat-identity-seat-${seatNumber}`} style={[$row, { gap: metrics.gap }, style]}>
@@ -100,10 +101,18 @@ export function SeatIdentity({
         size={art.size}
         style={[$mark, art.trim, markHidden && $hidden]}
       />
-      <Animated.View testID={`life-status-seat-${seatNumber}`} style={[$text, nameStyle]}>
+      <Animated.View
+        testID={`life-status-seat-${seatNumber}`}
+        // why: a retracted name's fading copy is pinned to this box; letting it collapse re-centers the box and drops the copy half a line.
+        style={[$text, nameStyle, nameRetracted && { minHeight: nameHeight }]}
+      >
         <LayoutAnimationConfig skipEntering>
           {markOnly || nameRetracted ? null : (
-            <Animated.View entering={NAME_IN} exiting={NAME_OUT}>
+            <Animated.View
+              entering={NAME_IN}
+              exiting={NAME_OUT}
+              onLayout={({ nativeEvent: { layout } }) => setNameHeight(layout.height)}
+            >
               <Text
                 testID={`player-name-seat-${seatNumber}`}
                 text={playerName}
