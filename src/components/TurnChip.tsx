@@ -333,15 +333,18 @@ export function RowChipSlot({
   }))
   return (
     <Animated.View
-      testID={testID}
       exiting={reducedMotion ? undefined : FadeOut.duration(NAME_OUT_MS)}
-      onLayout={({ nativeEvent: { layout } }) => {
-        onWidth(layout.width)
-        setMeasured(true)
-      }}
-      style={[$growFromMark, style]}
+      style={[$growFromMark, style, !measured && $measuringAside]}
     >
-      {children}
+      <View
+        testID={testID}
+        onLayout={({ nativeEvent: { layout } }) => {
+          onWidth(layout.width)
+          setMeasured(true)
+        }}
+      >
+        {children}
+      </View>
     </Animated.View>
   )
 }
@@ -389,6 +392,14 @@ function ChevronGlyph({ color }: { color: string }) {
 }
 
 const $growFromMark: ViewStyle = { transformOrigin: "left center" }
+// why: measured in the flow, the hidden chip squeezes the name to "Playe…" for a frame before it retracts, which reads as the name jumping.
+const $measuringAside: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  width: 1_000,
+  flexDirection: "row",
+  alignItems: "center",
+}
 const $layer: ViewStyle = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }
 const $slot: ViewStyle = { position: "absolute" }
 const $measuring: ViewStyle = { opacity: 0 }
