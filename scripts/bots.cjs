@@ -135,6 +135,7 @@ function parseCli(argv) {
   const players = parseCount(values.players ?? (variant ? "4" : "2"), "players", 2, 6)
   if (values.variant === "treachery" && players < 4)
     throw new Error("--variant treachery needs --players 4 to 6")
+  if (variant === "archenemy" && players < 3) throw new Error("--archenemy needs --players 3 to 6")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
   const none = values.format === "none"
   return {

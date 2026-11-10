@@ -74,6 +74,11 @@ test("cli takes --archenemy as the variant and checks its seat", () => {
   )
   assert.throws(() => parseCli(["host", "--archenemy", "first"]), /--archenemy must be/)
   assert.throws(() => parseCli(["host", "--archenemy", "5"]), /--archenemy must be/)
+  assert.throws(
+    () => parseCli(["host", "--players", "2", "--archenemy", "1"]),
+    /--archenemy needs --players 3/,
+  )
+  assert.equal(parseCli(["host", "--players", "3", "--archenemy", "1"]).players, 3)
 })
 
 test("a host bot abandons its leftover game of any variant before hosting again", async () => {
