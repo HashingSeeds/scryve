@@ -9,6 +9,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import { DieFace } from "./DiceGlyph"
+import { FIRST_PLAYER_TAB } from "./playerGridGeometry"
 import { PlayerMark } from "./PlayerMark"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -26,9 +27,7 @@ export interface FirstPlayerTab {
   facing: number
 }
 
-const TAB_LENGTH = 56
-const TAB_DEPTH = 40
-export const FIRST_PLAYER_TAB = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
+const { length: TAB_LENGTH, depth: TAB_DEPTH } = FIRST_PLAYER_TAB
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
 export const FirstPlayerTabsShownContext = createContext(false)
 const TAB_BORDER = 4
