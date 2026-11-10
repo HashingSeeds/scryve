@@ -292,17 +292,19 @@ export function RowChipSlot({
   return (
     <Animated.View
       exiting={reducedMotion ? undefined : FadeOut.duration(NAME_OUT_MS)}
-      style={[$growFromMark, style, !measured && $measuringAside]}
+      style={!measured && $measuringAside}
     >
-      <View
-        testID={testID}
-        onLayout={({ nativeEvent: { layout } }) => {
-          onWidth(layout.width)
-          setMeasured(true)
-        }}
-      >
-        {children}
-      </View>
+      <Animated.View style={[$growFromMark, style]}>
+        <View
+          testID={testID}
+          onLayout={({ nativeEvent: { layout } }) => {
+            onWidth(layout.width)
+            setMeasured(true)
+          }}
+        >
+          {children}
+        </View>
+      </Animated.View>
     </Animated.View>
   )
 }
