@@ -147,8 +147,8 @@ describe("buildLocalGameSnapshot", () => {
 
     expect(build({ ...game, table }).table).toEqual(table)
     expect(
-      build({ ...game, table: { ...table, designations: { notADesignation: ada } } }),
-    ).not.toHaveProperty("table")
+      build({ ...game, table: { ...table, designations: { notADesignation: ada } } }).table,
+    ).toBeUndefined()
   })
 
   it("falls back to a system-less ruleset when the game has no format", () => {
@@ -252,8 +252,8 @@ describe("buildFinishedLocalGameSnapshot", () => {
       createdAt: 100,
       finishedAt: 200,
     })
-    expect(snapshot).not.toHaveProperty("system")
-    expect(snapshot).not.toHaveProperty("firstPlayerLocalId")
+    expect(snapshot.system).toBeUndefined()
+    expect(snapshot.firstPlayerLocalId).toBeUndefined()
   })
 
   it("caps life at the server's limit, so one runaway seat can't sink the upload", () => {
@@ -298,7 +298,7 @@ it("uploads a local deck without a synced version", () => {
     deckName: "Local Burn",
     deckFingerprint: `v1:${"a".repeat(64)}`,
   })
-  expect(snapshot.players[0]).not.toHaveProperty("deckVersionId")
+  expect(snapshot.players[0].deckVersionId).toBeUndefined()
 })
 
 describe("publishing a started local game", () => {

@@ -7,13 +7,13 @@ import type {
   LifeCardMenuEdge,
 } from "./playerCardTypes"
 import {
+  CONTENT_EDGES,
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
   getPlayerSlotFacings,
 } from "./playerGridGeometry"
-import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
 
 type GridLayout = ReturnType<typeof getPlayerGridLayout>
 

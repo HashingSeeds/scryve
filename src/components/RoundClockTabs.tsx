@@ -12,7 +12,8 @@ import { useAppTheme } from "@/theme/context"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { EDGE_SLIDES, edgeStyle, FIRST_PLAYER_TAB, type FirstPlayerTab } from "./FirstPlayerTabs"
+import { EDGE_SLIDES, edgeStyle, type FirstPlayerTab } from "./FirstPlayerTabs"
+import { FIRST_PLAYER_TAB } from "./playerGridGeometry"
 import { Text } from "./Text"
 
 const BORDER = 4

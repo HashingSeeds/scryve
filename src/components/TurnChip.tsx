@@ -16,7 +16,8 @@ import type {
   LifeCardMenuCorner,
   LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { CONTENT_EDGES, contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
+import { CONTENT_EDGES } from "./playerGridGeometry"
+import { contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
 import { Text } from "./Text"
 import { useTurnSpotlight } from "./TurnSpotlight"
 import { bankLeft, turnElapsed } from "../../convex/lib/turns"

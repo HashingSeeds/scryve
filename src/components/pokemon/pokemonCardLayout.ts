@@ -13,17 +13,10 @@ import {
   getLifeFontSizeThatFits,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
-  type LifeCardEdge,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "../playerCardTypes"
-
-export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
-  0: { top: "top", right: "right", bottom: "bottom", left: "left" },
-  90: { top: "right", right: "bottom", bottom: "left", left: "top" },
-  [-90]: { top: "left", right: "top", bottom: "right", left: "bottom" },
-  180: { top: "bottom", right: "left", bottom: "top", left: "right" },
-}
+import { CONTENT_EDGES } from "../playerGridGeometry"
 
 export function contentInsetsFor(
   rotation: LifeCardContentRotation,
