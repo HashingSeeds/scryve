@@ -144,7 +144,7 @@ describe("outbox sync controller", () => {
     expect(seatsOf(stored(repository).pending)).toEqual(["player-1", "player-2", "player-1"])
   })
 
-  it("keeps a change an older build queued after A after A, though it carries no sequence", () => {
+  it("keeps a change an older build queued after A between A and what is queued next, across reloads", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
     repository
@@ -165,6 +165,14 @@ describe("outbox sync controller", () => {
     expect(stored(repository).pending.map(({ event }) => event.operationId)).toEqual([
       "operation-queued-first",
       "operation-older-build",
+    ])
+
+    repository.outbox("game-public").enqueue(action("operation-queued-after", 1, 3_000))
+    const reloaded = new ConnectedGameRepository(storage, "user-1")
+    expect(stored(reloaded).pending.map(({ event }) => event.operationId)).toEqual([
+      "operation-queued-first",
+      "operation-older-build",
+      "operation-queued-after",
     ])
   })
 
