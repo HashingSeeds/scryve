@@ -20,6 +20,7 @@ import { deckFingerprint } from "@/features/stats/deckFingerprint"
 import { ThemeProvider } from "@/theme/context"
 
 import { NewGameScreen, type ConnectedHostFeed, type NewGameScreenProps } from "./NewGameScreen"
+import { PLANAR_DECKS, SCHEME_DECKS } from "../../convex/lib/modeDecks"
 import { NO_SYSTEM_SETTINGS } from "../../test/fixtures/localSettings"
 import {
   connectedHarness,
@@ -1754,6 +1755,66 @@ describe("NewGameScreen", () => {
     expectSetup(screen, 5, 40)
     fireEvent.press(screen.getByTestId("host-connected-button"))
     expect(host).toHaveBeenCalledWith(lobby)
+  })
+
+  it("restores a recent setup's Planechase and Archenemy choices and starts with them", async () => {
+    const planar = PLANAR_DECKS[0]!
+    const schemes = SCHEME_DECKS[1]!
+    const onStartLocal = jest.fn()
+    setup({
+      onStartLocal,
+      recentSetups: [
+        {
+          savedAt: 1,
+          mode: "local",
+          game: {
+            players: [
+              { name: "Ada", color: "#B85636" },
+              { name: "Grace", color: "#41476E" },
+            ],
+            startingLife: 20,
+            system: "mtg",
+            format: "constructed",
+            modeSetup: { planechase: { decks: [planar.id] } },
+          },
+        },
+      ],
+    })
+    openOptions()
+    expect(screen.getByTestId("planechase").props.accessibilityLabel).toContain(planar.name)
+    closeOptions()
+    await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      20,
+      expect.objectContaining({ modeSetup: { planechase: { decks: [planar.id] } } }),
+    )
+
+    const host = jest.fn()
+    const lobby = {
+      playerCount: 4,
+      startingLife: 20,
+      ruleset: "constructed",
+      system: "mtg" as const,
+      format: "constructed",
+      variant: "archenemy" as const,
+      modeSetup: { archenemy: { seat: 3, deck: schemes.id } },
+      layout: "auto" as const,
+      lifeStep: 1,
+    }
+    setup({
+      mode: "connected",
+      connected: { ...readyHost, host },
+      recentSetups: [{ savedAt: 1, mode: "connected", lobby }],
+    })
+    openOptions()
+    expect(screen.getByTestId("archenemy-seat").props.accessibilityLabel).not.toContain(
+      "Roll at start",
+    )
+    expect(screen.getByTestId("scheme-deck").props.accessibilityLabel).toContain(schemes.name)
+    closeOptions()
+    fireEvent.press(screen.getByTestId("host-connected-button"))
+    expect(host).toHaveBeenCalledWith(expect.objectContaining({ modeSetup: lobby.modeSetup }))
   })
 
   it("keeps an ended game's format selected in the list, not a different recent setup", () => {

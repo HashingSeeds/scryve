@@ -52,6 +52,26 @@ export function modeSetupOf(
   return setup.planechase || setup.archenemy ? setup : undefined
 }
 
+function planarChoiceOf(decks: readonly string[] | undefined) {
+  if (!decks) return "own"
+  if (decks.length === 1) return decks[0]!
+  const product = PRODUCTS.find(
+    (candidate) => planarDecksOf(`${ALL}${candidate}`).join() === decks.join(),
+  )
+  return product ? `${ALL}${product}` : DEFAULT_MODE_CHOICES.planar
+}
+
+export function modeChoicesOf(setup: ModeSetup | undefined): ModeChoices {
+  const archenemy = setup?.archenemy
+  return {
+    planar: setup?.planechase
+      ? planarChoiceOf(setup.planechase.decks)
+      : DEFAULT_MODE_CHOICES.planar,
+    archenemy: archenemy?.seat === undefined ? "roll" : String(archenemy.seat),
+    schemes: archenemy ? (archenemy.deck ?? "own") : DEFAULT_MODE_CHOICES.schemes,
+  }
+}
+
 const planarOptions = (): SelectOption[] => [
   { id: "off", label: translate("play:newGame.planechaseOff") },
   { id: "own", label: translate("play:newGame.ownPlanarDeck") },

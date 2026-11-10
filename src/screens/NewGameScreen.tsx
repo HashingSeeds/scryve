@@ -88,11 +88,7 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 import type { LanSetup } from "@/features/lan/lanGame"
-import {
-  DEFAULT_MODE_CHOICES,
-  modeSetupOf,
-  ModeSetupFields,
-} from "@/features/modes/ModeSetupFields"
+import { modeChoicesOf, modeSetupOf, ModeSetupFields } from "@/features/modes/ModeSetupFields"
 import {
   deckChoiceId,
   localDeckChoices,
@@ -340,8 +336,11 @@ function NewGameForm({
     seed?.startingLife ?? defaults.defaultStartingLife,
   )
   const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
-  const [archenemyChosen, setArchenemyChosen] = useState(lobby?.variant === "archenemy")
-  const [modeChoices, setModeChoices] = useState(DEFAULT_MODE_CHOICES)
+  const seedModes = lobby ? lobby.modeSetup : seedGame?.modeSetup
+  const [archenemyChosen, setArchenemyChosen] = useState(
+    lobby ? lobby.variant === "archenemy" : seedModes?.archenemy !== undefined,
+  )
+  const [modeChoices, setModeChoices] = useState(() => modeChoicesOf(seedModes))
   const [teamsChosen, setTeamsChosen] = useState(
     lobby?.variant === "twoHeadedGiant" || seedGame?.variant === "twoHeadedGiant",
   )
