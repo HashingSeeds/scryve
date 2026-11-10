@@ -243,6 +243,7 @@ class Bot {
       hostDisplayName: this.name,
       hostColor: COLORS[0],
       deviceId: this.deviceId,
+      editsAnySeat: true,
     })
     this.publicId = lobby.publicId
     this.watch()
@@ -258,6 +259,7 @@ class Bot {
       deviceId: this.deviceId,
       systems: SYSTEM_IDS,
       variants: ["treachery"],
+      editsAnySeat: true,
     })
     this.publicId = seat.publicId
     this.report(this, "joined", { seat: seat.seat })
@@ -533,6 +535,7 @@ if (require.main === module) {
 
 module.exports = {
   assertPreviewTarget,
+  Bot,
   botIdentity,
   createReporter,
   currentPreviewName,
