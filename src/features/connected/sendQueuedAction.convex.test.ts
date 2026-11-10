@@ -120,6 +120,7 @@ describe("sendQueuedAction against the real game mutations", () => {
       fromPlayerId: asPlayerId(from),
       toPlayerId: asPlayerId(to),
       delta,
+      commanderLimit: 999,
     })
     const resolve = (claimOperationId: string, to: string, accepted: boolean) => ({
       type: "commanderDamage.resolved" as const,

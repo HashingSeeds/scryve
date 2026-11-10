@@ -85,6 +85,7 @@ export interface CommanderDamageSubmittedEvent {
   toPlayerId: PlayerId
   commander?: typeof PARTNER_COMMANDER
   delta: number
+  commanderLimit?: number
   actorId: ActorId
   deviceId: DeviceId
   clientCreatedAt: number

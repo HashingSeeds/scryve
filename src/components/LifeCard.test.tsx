@@ -1160,6 +1160,7 @@ describe("LifeCard", () => {
       [2, 0],
       [1, 0],
       [12, 0],
+      [123, 0],
       [4, 0],
     ])
     fireEvent.press(view.getByTestId("commander-exit-seat-1"))

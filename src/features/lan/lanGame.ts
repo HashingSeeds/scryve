@@ -382,6 +382,7 @@ function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined
       toPlayerId: event.toPlayerId,
       ...commanderField(event.commander),
       delta: event.delta,
+      ...(event.commanderLimit === undefined ? {} : { commanderLimit: event.commanderLimit }),
       ...sent,
     }
   return {
@@ -660,6 +661,7 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
       toPlayerId: asPlayerId(value.toPlayerId),
       ...commanderField(value.commander),
       delta: value.delta,
+      ...(isCount(value.commanderLimit) ? { commanderLimit: value.commanderLimit } : {}),
     }
   if (
     value.type === "commanderDamage.resolved" &&
