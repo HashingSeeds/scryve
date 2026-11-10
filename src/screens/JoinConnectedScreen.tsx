@@ -17,7 +17,7 @@ import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
 import { connectedProfileName } from "@/features/connected/useConnectedProfile"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
-import { hasLocalGameStarted } from "@/features/game/domain"
+import { hasLocalGameStarted, MAX_PLAYERS } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -141,6 +141,7 @@ export function JoinConnectedScreen({
         manualCode: manualCode ?? undefined,
         systems: PLAYABLE_SYSTEMS,
         variants: PLAYABLE_VARIANTS,
+        maxSeats: MAX_PLAYERS,
       })
       if ("invalid" in lookup) throw new Error(translate("connected:join.invalidInvite"))
       const seats = lookup.seats
@@ -163,6 +164,7 @@ export function JoinConnectedScreen({
         systems: PLAYABLE_SYSTEMS,
         variants: PLAYABLE_VARIANTS,
         editsAnySeat: true,
+        maxSeats: MAX_PLAYERS,
       })
       if (!result) throw new Error(translate("connected:join.invalidInvite"))
       requestSucceeded = true
