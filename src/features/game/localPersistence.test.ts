@@ -277,7 +277,7 @@ describe("LocalGameRepository", () => {
 
   it("keeps a game saved by a newer version until the player replaces it", () => {
     const storage = new MemoryStorage()
-    const newer = JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 })
+    const newer = JSON.stringify({ schemaVersion: 3, game: {}, eventChunkCount: 0 })
     storage.set(LOCAL_KEYS.active, newer)
     const repository = new LocalGameRepository(storage)
 
@@ -565,6 +565,38 @@ describe("LocalGameRepository", () => {
     expect(repository.loadHistoryDetail(finished.id)?.game.status).toBe("finished")
   })
 
+  it("keeps seven-plus-seat games where a six-seat build can neither replace nor drop them", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const context = defaultCommandContext(asDeviceId("device"))
+    const wide = createLocalGame({
+      now: 1,
+      startingLife: 40,
+      players: Array.from({ length: 8 }, (_, seat) => ({
+        name: `P${seat}`,
+        color: "#000",
+        shape: "circle" as const,
+      })),
+    })
+    repository.saveActiveGame(wide)
+    // why: a six-seat build only keeps an active game it reads as newer.
+    expect(JSON.parse(storage.getString(LOCAL_KEYS.active) ?? "{}").schemaVersion).toBe(2)
+    expect(repository.loadActiveGame()?.players).toHaveLength(8)
+
+    repository.archiveGame(applyGameCommand(wide, { type: "game.finish" }, context))
+    repository.archiveGame(applyGameCommand(makeGame(2), { type: "game.finish" }, context))
+    // why: a six-seat build rewrites the main index with only the games it can parse.
+    storage.set(
+      LOCAL_KEYS.historyIndex,
+      JSON.stringify(
+        JSON.parse(storage.getString(LOCAL_KEYS.historyIndex) ?? "[]").filter(
+          (game: { players: unknown[] }) => game.players.length <= 6,
+        ),
+      ),
+    )
+    expect(repository.loadHistory().map(({ id }) => id)).toContain(wide.id)
+  })
+
   it("archives a No system game without a system so History does not file it as Magic", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const finished = applyGameCommand(
@@ -744,6 +776,8 @@ describe("LocalGameRepository account ownership", () => {
     expect(repository.loadMeSeat()).toBeUndefined()
     repository.saveMeSeat(2)
     expect(repository.loadMeSeat()).toBe(2)
+    repository.saveMeSeat(9)
+    expect(repository.loadMeSeat()).toBe(9)
     repository.saveMeSeat(undefined)
     expect(repository.loadMeSeat()).toBe("none")
   })

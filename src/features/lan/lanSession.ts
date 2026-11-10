@@ -25,6 +25,7 @@ import {
   applyLanWrite,
   createLanGame,
   endLanRound,
+  LAN_MAX_SEATS,
   LAN_PROTOCOL,
   lanLobbyOf,
   lanProjection,
@@ -574,6 +575,7 @@ export class LanSession {
       systems: PLAY_SYSTEM_IDS,
       variants: ["treachery"],
       editsAnySeat: true,
+      maxSeats: LAN_MAX_SEATS,
       ...(this.pass ? { pass: this.pass } : {}),
     })
     const ping = () => {

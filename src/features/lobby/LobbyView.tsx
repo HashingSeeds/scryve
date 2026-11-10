@@ -44,11 +44,13 @@ import type { ThemedStyle } from "@/theme/types"
 import {
   CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
+  PLAYER_MARK_SHAPES,
   PRO_MARK_SHAPES,
   shapeForSeat,
   shownMarkShape,
   type PlayerAppearance,
 } from "../../../convex/lib/appearance"
+import { clientSeesSeats, MAX_PLAYERS, MIN_PLAYERS } from "../../../convex/lib/policy"
 import { attachesDecks } from "../../../convex/lib/systems"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
 
@@ -101,6 +103,11 @@ export interface LobbyViewProps {
   onReport?: (seat: LobbySeat) => void
   children?: ReactNode
 }
+
+const LOBBY_SEAT_COUNTS = Array.from(
+  { length: MAX_PLAYERS - MIN_PLAYERS + 1 },
+  (_, index) => MIN_PLAYERS + index,
+)
 
 const originOf = (event?: GestureResponderEvent): DialogOrigin | undefined =>
   event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined
@@ -275,7 +282,7 @@ export function LobbyView({
                 testID="lobby-player-count"
                 accessibilityLabel={translate("connected:lobby.playerCount")}
                 selectedId={String(lobby.playerCount)}
-                chips={[2, 3, 4, 5, 6].map((count) => ({
+                chips={LOBBY_SEAT_COUNTS.map((count) => ({
                   id: String(count),
                   label: String(count),
                   disabled:
@@ -446,7 +453,9 @@ export function LobbyView({
           <AppearancePicker
             value={appearanceDraft}
             taken={takenAppearances}
-            shapes={CONNECTED_PLAYER_MARK_SHAPES}
+            shapes={
+              clientSeesSeats(lobby.playerCount) ? CONNECTED_PLAYER_MARK_SHAPES : PLAYER_MARK_SHAPES
+            }
             proShapes={PRO_MARK_SHAPES}
             proLocked={appearance.proLocked}
             foil={appearance.foil}

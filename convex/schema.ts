@@ -172,6 +172,8 @@ export default defineSchema({
     lastEventAt: v.optional(v.number()),
     // why: a seat's app that predates editing any seat leaves this unset, so its game stays owner-only.
     editsAnySeat: v.optional(v.boolean()),
+    // why: a seat's app that predates 7–10 seats leaves this unset, so its lobby can't grow past six.
+    maxSeats: v.optional(v.number()),
     lastWrite: v.optional(
       v.object({
         actorUserId: v.id("users"),

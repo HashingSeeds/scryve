@@ -150,8 +150,8 @@ describe("local game domain", () => {
   })
 
   it("rejects invalid player counts and starting life", () => {
-    expect(() => makeGame(1)).toThrow("2–6")
-    expect(() => makeGame(7)).toThrow("2–6")
+    expect(() => makeGame(1)).toThrow("2–10")
+    expect(() => makeGame(11)).toThrow("2–10")
     expect(() => makeGame(2, 0)).toThrow("1 to 999")
   })
 

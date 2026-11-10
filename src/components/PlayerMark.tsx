@@ -26,6 +26,8 @@ export const MARK_ART_BOUNDS: Record<
   hexagon: { top: 8.39, bottom: 35.61, left: 9.88, right: 34.12 },
   plus: { top: 8, bottom: 36, left: 8, right: 36 },
   shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
+  moon: { top: 9.05, bottom: 35, left: 9, right: 34.33 },
+  ring: { top: 9.5, bottom: 34.5, left: 9.5, right: 34.5 },
   heart: { top: 7.5, bottom: 37.4, left: 11.12, right: 32.88 },
   crown: { top: 10.25, bottom: 35, left: 8.25, right: 35.75 },
   flame: { top: 8, bottom: 36, left: 11, right: 33 },
@@ -175,6 +177,8 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<PlayerMarkShape, Inset> = {
   star: { centerX: 22, centerY: 23, size: 12 },
   plus: { centerX: 22, centerY: 22, size: 12 },
   shield: { centerX: 22, centerY: 21.5, size: 15 },
+  moon: { centerX: 17, centerY: 25, size: 10 },
+  ring: { centerX: 22, centerY: 22, size: 14 },
   heart: { centerX: 22, centerY: 21.5, size: 14 },
   crown: { centerX: 22, centerY: 22.5, size: 11 },
   flame: { centerX: 22, centerY: 27, size: 12 },
@@ -321,6 +325,16 @@ function MarkShape({
         <Path
           {...common}
           d="M21.04 8.4a2.5 2.5 0 0 1 1.92 0l9.5 3.96A2.5 2.5 0 0 1 34 14.67V23c0 6-5 10-12 14-7-4-12-8-12-14v-8.33a2.5 2.5 0 0 1 1.54-2.31Z"
+        />
+      )
+    case "moon":
+      return <Path {...common} d="M20.91 9.05A13 13 0 1 0 34.33 26.12 11 11 0 0 1 20.91 9.05Z" />
+    case "ring":
+      return (
+        <Path
+          {...common}
+          fillRule="evenodd"
+          d={`M34.5 22A12.5 12.5 0 1 1 9.5 22 12.5 12.5 0 1 1 34.5 22Z${solid ? "" : "M27.5 22A5.5 5.5 0 1 0 16.5 22 5.5 5.5 0 1 0 27.5 22Z"}`}
         />
       )
     case "heart":

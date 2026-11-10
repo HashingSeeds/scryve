@@ -22,6 +22,7 @@ export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge,
 }
 
 const SINGLE_PLAYER_ROW_FLEX = 0.8
+const BIG_TABLE_FROM = 7
 
 export function getPlayerGridRows(
   playerCount: number,
@@ -35,7 +36,7 @@ export function getPlayerGridRows(
     return [...chunkSeats(seats.slice(0, -1), 2), [playerCount - 1]]
   if (layout.variant === "even-grid") return chunkSeats(seats, 2, true)
   if (layout.layout === "three-featured") return [[0], [1, 2]]
-  return chunkSeats(seats, layout.columnCount)
+  return chunkSeats(seats, layout.columnCount, layout.padLastRow)
 }
 
 export function getPlayerGridMenuAnchor(
@@ -119,6 +120,8 @@ export function getPlayerContentRotation(input: {
   // why: an even grid's last odd seat keeps its column's side, so it faces the same way as the seats above it.
   if (input.row.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
   const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
+  if (input.playerCount >= BIG_TABLE_FROM && occupiedColumns.length > 2)
+    return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
   if (input.columnIndex === occupiedColumns[0]) return 90
   if (input.columnIndex === occupiedColumns[occupiedColumns.length - 1]) return -90
   return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
@@ -173,16 +176,24 @@ export function getPlayerGridLayout(input: {
   const tablet = Math.min(input.width, input.height) >= 600
   const largeText = (input.fontScale ?? 1) >= 1.4
   const denseColumnCount = input.spansHinge ? (landscape ? 2 : 3) : landscape ? 3 : 2
+  const halfTable = Math.ceil(input.playerCount / 2)
+  const bigTableColumns = input.spansHinge ? halfTable + (halfTable % 2) : halfTable
+  // why: across a fold, a short last row of a big table keeps full-width cells, so it fills with gaps to stay off the crease.
+  const padLastRow = input.spansHinge === true && input.playerCount >= BIG_TABLE_FROM
   const automaticColumnCount =
-    input.playerCount === 2
+    input.playerCount > BIG_TABLE_FROM - 1
       ? landscape
-        ? 2
-        : 1
-      : input.playerCount === 3 && landscape
-        ? 3
-        : input.playerCount >= 5
-          ? denseColumnCount
-          : 2
+        ? bigTableColumns
+        : 2
+      : input.playerCount === 2
+        ? landscape
+          ? 2
+          : 1
+        : input.playerCount === 3 && landscape
+          ? 3
+          : input.playerCount >= 5
+            ? denseColumnCount
+            : 2
   const variant = playerGridLayoutForCount(input.playerCount, input.layoutVariant)
   const columnCount =
     variant === "featured-first" ||
@@ -223,6 +234,7 @@ export function getPlayerGridLayout(input: {
     columnCount,
     rowCount,
     layout,
+    padLastRow,
     minCellHeight,
     compact: input.playerCount >= 5 || baseCellHeight < 280,
     landscape,
