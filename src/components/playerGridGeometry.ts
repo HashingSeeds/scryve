@@ -3,7 +3,23 @@ import {
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
 
-import type { LifeCardContentRotation } from "./playerCardTypes"
+import type {
+  LifeCardContentInsets,
+  LifeCardContentRotation,
+  LifeCardCorner,
+  LifeCardEdge,
+  LifeCardMenuCorner,
+  LifeCardMenuEdge,
+} from "./playerCardTypes"
+
+export const FIRST_PLAYER_TAB = { length: 52, depth: 40 } as const
+
+export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
+  0: { top: "top", right: "right", bottom: "bottom", left: "left" },
+  90: { top: "right", right: "bottom", bottom: "left", left: "top" },
+  [-90]: { top: "left", right: "top", bottom: "right", left: "bottom" },
+  180: { top: "bottom", right: "left", bottom: "top", left: "right" },
+}
 
 const SINGLE_PLAYER_ROW_FLEX = 0.8
 
@@ -213,4 +229,177 @@ export function getPlayerGridLayout(input: {
     tablet,
     largeText,
   }
+}
+
+type PlayerGridLayout = ReturnType<typeof getPlayerGridLayout>
+
+export type SeatFrame = ReturnType<typeof seatFrames>["rows"][number][number]
+
+/** why: the safe area reports the screen's own edges, so a board turned a quarter takes each inset from the edge that now sits on that side. */
+export function boardInsetsFor(
+  screenInsets: Record<LifeCardEdge, number>,
+  boardRotation: number,
+): Record<LifeCardEdge, number> {
+  const { top, right, bottom, left } = screenInsets
+  if (boardRotation === 90) return { top: right, right: bottom, bottom: left, left: top }
+  if (boardRotation === -90) return { top: left, right: top, bottom: right, left: bottom }
+  return screenInsets
+}
+
+export function seatFrames(input: {
+  playerCount: number
+  layout: PlayerGridLayout
+  boardSize: { width: number; height: number }
+  measuredGrid: { width: number; height: number }
+  topEdgeBand: number
+  gap: number
+  insets: Record<LifeCardEdge, number>
+  tabsShown: boolean
+}) {
+  const { playerCount, layout, measuredGrid: board, gap } = input
+  const cutout = getCornerCutout(input.insets, input.boardSize)
+  const insets = cutout ? { ...input.insets, [cutout.edge]: 0 } : input.insets
+  const rows = getPlayerGridRows(playerCount, layout)
+  const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  const totalFlex = rowFlexes.reduce((sum, flex) => sum + flex, 0)
+  const rowSpace = Math.max(board.height - input.topEdgeBand - gap * (rows.length - 1), 0)
+  const menuJunction = getFourCardMenuJunction(rows)
+  const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
+  const tabRow = input.tabsShown ? (menuJunction?.boundary ?? fallbackMenuBoundary) : null
+  const rowHeights = rowFlexes.map((flex) => (rowSpace * flex) / totalFlex)
+  return {
+    insets,
+    cutout,
+    rows: rows.map((row, rowIndex) =>
+      row.map((slot, columnIndex) => {
+        if (slot === null) return null
+        const width = Math.max((board.width - gap * (row.length - 1)) / row.length, 0)
+        const rotation = getPlayerContentRotation({
+          playerCount,
+          layout,
+          row,
+          rowIndex,
+          columnIndex,
+          slot,
+        })
+        const screenEdges = {
+          top: rowIndex === 0,
+          bottom: rowIndex === rows.length - 1,
+          left: columnIndex === 0,
+          right: columnIndex === row.length - 1,
+        }
+        const fallbackMenu =
+          fallbackMenuBoundary === null
+            ? undefined
+            : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+        return {
+          slot,
+          rowIndex,
+          columnIndex,
+          rotation,
+          card: {
+            x: columnIndex * (width + gap),
+            y:
+              input.topEdgeBand +
+              rowHeights.slice(0, rowIndex).reduce((sum, height) => sum + height + gap, 0),
+            width,
+            height: rowHeights[rowIndex],
+          },
+          screenEdges,
+          contentInsets: {
+            top: screenEdges.top ? insets.top : 0,
+            bottom: screenEdges.bottom ? insets.bottom : 0,
+            left: screenEdges.left ? insets.left : 0,
+            right: screenEdges.right ? insets.right : 0,
+            cutout: seatCutout(cutout, rotation, screenEdges),
+            tabCorners: seatTabCorners(tabRow, rowIndex, rotation, screenEdges),
+          } satisfies LifeCardContentInsets,
+          menuCorner: menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner,
+          menuEdgeCenter: fallbackMenu?.edgeCenter,
+        }
+      }),
+    ),
+  }
+}
+
+/** why: the iPhone Duo outer display reports its top-corner camera hole as safe area down that side, the only upright screen with a side inset. Seats keep full width; only that corner's chrome moves. */
+export function getCornerCutout(
+  insets: Record<LifeCardEdge, number>,
+  board: { width: number; height: number },
+) {
+  if (board.height <= board.width) return undefined
+  const edge =
+    insets.right > insets.top
+      ? ("right" as const)
+      : insets.left > insets.top
+        ? ("left" as const)
+        : undefined
+  return edge && { edge, size: insets[edge] }
+}
+
+export function seatCutout(
+  cutout: ReturnType<typeof getCornerCutout>,
+  rotation: LifeCardContentRotation,
+  screenEdges: Record<LifeCardEdge, boolean>,
+): LifeCardContentInsets["cutout"] {
+  if (!cutout || !screenEdges.top || !screenEdges[cutout.edge]) return undefined
+  // why: corner chrome slides along its own row, so it stays against the seat's outer edge.
+  const facesCutoutSide = rotation === (cutout.edge === "right" ? -90 : 90)
+  return facesCutoutSide
+    ? { edge: "top", side: cutout.edge, size: cutout.size }
+    : { edge: cutout.edge, side: "top", size: cutout.size }
+}
+
+/** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. */
+function seatTabCorners(
+  tabRow: number | null,
+  rowIndex: number,
+  rotation: LifeCardContentRotation,
+  screenEdges: Record<LifeCardEdge, boolean>,
+): LifeCardCorner[] | undefined {
+  if (tabRow === null) return undefined
+  const seam = rowIndex === tabRow ? "top" : rowIndex === tabRow - 1 ? "bottom" : null
+  if (!seam) return undefined
+  const rowEdge = CONTENT_EDGES[rotation].bottom
+  return (["left", "right"] as const)
+    .filter((side) => screenEdges[side])
+    .flatMap((side): LifeCardCorner[] =>
+      rowEdge === seam
+        ? [{ edge: side, side: seam, size: FIRST_PLAYER_TAB.depth }]
+        : rowEdge === side
+          ? [{ edge: seam, side, size: FIRST_PLAYER_TAB.length / 2 }]
+          : [],
+    )
+}
+
+function menuCornerAt(
+  junction: ReturnType<typeof getFourCardMenuJunction>,
+  row: number,
+  column: number,
+): LifeCardMenuCorner | undefined {
+  if (!junction) return undefined
+  if (row === junction.boundary - 1 && column === junction.column - 1) return "bottomRight"
+  if (row === junction.boundary - 1 && column === junction.column) return "bottomLeft"
+  if (row === junction.boundary && column === junction.column - 1) return "topRight"
+  if (row === junction.boundary && column === junction.column) return "topLeft"
+  return undefined
+}
+
+function fallbackMenuAt(
+  rows: (number | null)[][],
+  boundary: number,
+  row: number,
+  column: number,
+): { corner?: LifeCardMenuCorner; edgeCenter?: LifeCardMenuEdge } | undefined {
+  if (rows.length === 1 && rows[0].length === 2)
+    return row === 0 ? { edgeCenter: column === 0 ? "right" : "left" } : undefined
+  if (rows.length === 1) return undefined
+  if (row !== boundary - 1 && row !== boundary) return undefined
+  const upper = row === boundary - 1
+  const count = rows[row].length
+  const middle = Math.floor(count / 2)
+  if (count % 2) return column === middle ? { edgeCenter: upper ? "bottom" : "top" } : undefined
+  if (column === middle - 1) return { corner: upper ? "bottomRight" : "topRight" }
+  if (column === middle) return { corner: upper ? "bottomLeft" : "topLeft" }
+  return undefined
 }
