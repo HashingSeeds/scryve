@@ -65,6 +65,41 @@ function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat")
 }
 
 describe("CurrentGameScreen", () => {
+  it("adds two teammates' held changes on both cards, each clearing only its own", () => {
+    const initial = createLocalGame({
+      players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 30,
+      system: "mtg",
+      format: "constructed",
+      teams: [
+        [0, 1],
+        [2, 3],
+      ],
+      now: 1,
+    })
+    const view = renderGame(initial, turnsOff())
+    layoutSeats(view)
+    fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 160 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 124, pageY: 124 } })
+    const held = Number(textOf(view.getByTestId("life-editor-value-seat-1"))) - 30
+    expect(held).not.toBe(0)
+
+    const minus = view.getByTestId("life-seat-2--1")
+    fireEvent(minus, "pressIn")
+    expect(view.getByTestId("life-total-seat-2")).toHaveTextContent(String(30 + held - 1))
+    fireEvent.press(minus)
+    fireEvent(minus, "pressOut")
+    expect(view.getByTestId("life-total-seat-2")).toHaveTextContent(String(29 + held))
+
+    fireEvent(slider, "responderRelease")
+    fireEvent(view.getByTestId("life-editor-seat-1"), "responderRelease")
+    expect(view.getByTestId("life-total-seat-1")).toHaveTextContent(String(29 + held))
+    expect(view.getByTestId("life-total-seat-2")).toHaveTextContent(String(29 + held))
+  })
+
   it("mirrors a teammate's held life change on the partner's card before it commits", () => {
     const initial = createLocalGame({
       players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
