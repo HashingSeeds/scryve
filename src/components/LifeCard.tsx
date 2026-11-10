@@ -272,8 +272,6 @@ export const LifeCard = memo(function LifeCard({
   // why: a sideways corner layer is sized from the card, so laid out before the card measures, the row's corner slide carries the name across the seat into place.
   const cornerMeasured = !sidewaysContent || cardSize.width > 0
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
-  const [identityWidth, setIdentityWidth] = useState(0)
-  const [turnChipWidth, setTurnChipWidth] = useState(0)
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -625,15 +623,6 @@ export const LifeCard = memo(function LifeCard({
   })
   // why: a seat someone else holds keeps its own bag on its own device.
   const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
-  const rowCap =
-    calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
-      ? Math.max(identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap, 0)
-      : identityCorner.rowMaxWidth
-  const bagReserve = seatBag ? trailingButtonSize + identityMetrics.gap : 0
-  const chipInRow =
-    turnStyle === "row" &&
-    (typeof rowCap !== "number" ||
-      identityWidth + identityMetrics.gap + turnChipWidth <= rowCap - bagReserve)
   const markAnchor =
     cardSize.width > 0
       ? identityMarkCenter({
@@ -988,13 +977,18 @@ export const LifeCard = memo(function LifeCard({
                 gap: identityMetrics.gap,
                 left: identityCorner.position.left,
                 bottom: identityCorner.position.bottom,
-                maxWidth: rowCap,
+                maxWidth:
+                  calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
+                    ? Math.max(
+                        identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap,
+                        0,
+                      )
+                    : identityCorner.rowMaxWidth,
               },
             ]}
           >
             <View
               testID={`life-identity-seat-${seatNumber}`}
-              onLayout={({ nativeEvent: { layout } }) => setIdentityWidth(layout.width)}
               // why: the corner layer draws above the grid, so the hidden mark and name would swallow touches meant for the grid's lower chips.
               pointerEvents={commanderStripShown ? "none" : cornerTouches}
               accessibilityElementsHidden={diceCovers}
@@ -1056,16 +1050,14 @@ export const LifeCard = memo(function LifeCard({
                 }
               />
             ) : null}
-            {turnChip && chipInRow && turnChipShown ? (
-              <View onLayout={({ nativeEvent: { layout } }) => setTurnChipWidth(layout.width)}>
-                <TurnChip
-                  state={turnChip}
-                  seatNumber={seatNumber}
-                  foreground={foreground}
-                  compact={compact}
-                  filled
-                />
-              </View>
+            {turnChip && turnStyle === "row" && turnChipShown ? (
+              <TurnChip
+                state={turnChip}
+                seatNumber={seatNumber}
+                foreground={foreground}
+                compact={compact}
+                filled
+              />
             ) : null}
             {undoPass && turnChipShown ? (
               <UndoPassChip
@@ -1099,9 +1091,8 @@ export const LifeCard = memo(function LifeCard({
           ) : null}
         </Animated.View>
       ) : null}
-      {turnChip && !chipInRow && turnChipShown ? (
+      {turnChip && turnStyle !== "row" && turnChipShown ? (
         <TurnChipLayer
-          onWidth={setTurnChipWidth}
           state={turnChip}
           seatNumber={seatNumber}
           foreground={foreground}
@@ -1111,7 +1102,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuCorner={menuCorner}
           menuEdgeCenter={menuEdgeCenter}
-          filled={turnStyle !== "frames"}
+          filled={turnStyle === "dim"}
         />
       ) : null}
       {claims?.length ? (
