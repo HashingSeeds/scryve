@@ -6,9 +6,7 @@ const BUNDLES = { ios: "iOS", android: "Android", web: "Web" }
 const { maxGrowthPercent } = require("./bundle-size-budget.json")
 
 /**
- * why: export:check exports each platform on its own, into exportDir/<platform>. One
- * export of several platforms numbers modules in whatever order the builds race, which
- * moved iOS and Android by about 25 KB between runs of the same commit.
+ * why: export:check exports each platform alone. One multi-platform export numbers modules in race order, moving iOS and Android by about 25 KB per run.
  */
 function measure(exportDir) {
   return Object.fromEntries(

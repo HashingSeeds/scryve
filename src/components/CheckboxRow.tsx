@@ -8,7 +8,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { Icon } from "./Icon"
 import { Text } from "./Text"
 
-/** why: only the box takes the accent; full peach rows for every pick competed with the screen's one primary button. */
+/** why: only the box takes the accent; full accent rows competed with the screen's primary button. */
 export function CheckboxRow({
   label,
   detail,

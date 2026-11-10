@@ -199,9 +199,9 @@ function storedWindow(
 }
 
 /**
- * why: chunks are written before the metadata that commits them, so a killed save can leave an
- * event past the committed one, or a half-done rewrite that repeats a chunk. Keeping each operation
- * once, up to the committed one, matches the life totals the metadata stored.
+ * why: chunks are written before the metadata that commits them, so a killed save can leave an extra
+ * event or a repeated chunk. Keeping each operation once, up to the committed one, matches the
+ * life totals the metadata stored.
  */
 function committedEvents(events: readonly GameEvent[], tail: ActiveEventLayout["tail"]) {
   const seen = new Set<string>()
@@ -925,7 +925,7 @@ export class LocalGameRepository {
     })
   }
 
-  /** why: clearActiveGame also runs when a game moves elsewhere (published, match ended), so only a player throwing a started game away says how far it got. */
+  /** why: clearActiveGame also runs when a game moves elsewhere, so only a discard says how far the game got. */
   discardActiveGame(
     endSource: GameEndSource,
     { undoable = false }: { undoable?: boolean } = {},
@@ -938,7 +938,7 @@ export class LocalGameRepository {
     this.clearActiveGame()
   }
 
-  /** why: Abandon asks nothing first, so the next board offers a started game back until that board's first action. Held in memory only, because that board may sit on another route. Its abandoned report waits for the offer to end, so a game taken back never counts as abandoned. */
+  /** why: Abandon asks nothing first, so the next board offers a started game back until its first action. Memory only, as that board may sit on another route. The report waits for the offer to end, so a game taken back never counts as abandoned. */
   rememberAbandoned(game: LocalGame, endSource: GameEndSource): void {
     this.forgetAbandoned()
     if (hasLocalGameStarted(game)) this.abandoned = { game, endSource }
@@ -984,7 +984,7 @@ export class LocalGameRepository {
     }
   }
 
-  // why: a game claimed at setup keeps that owner even if another account is signed in when it ends, so one account's seat and deck never move to another.
+  // why: a game claimed at setup keeps its owner even if another account is signed in at the end, so one account's seat and deck never move to another.
   archiveGame(
     game: LocalGame,
     endSource: GameEndSource = "game_menu",
@@ -1041,14 +1041,14 @@ export class LocalGameRepository {
     return summary
   }
 
-  /** why: the uploader runs through this list on sign-in, reconnect, and every finish, oldest first so a match's games land in order. */
+  /** why: oldest first, so a match's games land in order. */
   pendingPublishes(ownerId: string): LocalGameSummary[] {
     return this.loadHistory()
       .filter((game) => game.publish === "pending" && game.account?.ownerId === ownerId)
       .sort((left, right) => left.finishedAt - right.finishedAt)
   }
 
-  /** why: the sign-in picker files claimed games under the account and remembers who declined the rest. The index is the authority: once it is written, a failed detail write is repaired by the next call or launch, and the error reaches the picker so the user can retry. */
+  /** why: the index is the authority: a failed detail write is repaired by the next call or launch, and the error reaches the picker for retry. */
   resolveClaims(ownerId: string, decisions: readonly ClaimDecision[]): void {
     const history = this.loadHistory()
     const next = applyClaimDecisions(history, ownerId, decisions)
@@ -1248,7 +1248,7 @@ export class LocalGameRepository {
       : this.repairNoSystemHistory(games)
   }
 
-  /** why: older index entries say "mtg" for No system games and only the detail knows otherwise. Games from before No system existed have system-less details too, and those are Magic. */
+  /** why: older index entries say "mtg" for No system games; only the detail knows. System-less details from before No system are Magic. */
   private repairNoSystemHistory(games: LocalGameSummary[]): LocalGameSummary[] {
     const repaired = games.map((game) => {
       if (game.system !== "mtg" || game.createdAt < NO_SYSTEM_RELEASED_AT) return game

@@ -129,7 +129,7 @@ export function remainingMs(clock: EventClock, now: number) {
   return Math.max(0, clockRemainingMs(clock, now))
 }
 
-/** why: a local countdown starts from the minutes left on the event clock, rounded up so it never ends before the round does. */
+/** why: round the countdown up so it never ends before the round does. */
 export function localClockFor(clock: EventClock | null, now: number): RoundClockSetup | undefined {
   const left = clock ? remainingMs(clock, now) : 0
   if (left === 0) return undefined

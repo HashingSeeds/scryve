@@ -1,7 +1,5 @@
 /**
- * why: Expo only renders the QR code and keyboard shortcuts when it owns a real TTY,
- * so it inherits this process's stdio. Convex runs beside it with its output
- * piped and prefixed.
+ * why: Expo renders the QR code and shortcuts only on a real TTY, so it inherits stdio. Convex output is piped and prefixed.
  */
 const { spawn, spawnSync } = require("node:child_process")
 const fs = require("node:fs")

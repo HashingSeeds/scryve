@@ -14,5 +14,5 @@ const spansHinge = () => {
   return status === "fullyOpen" || status === "partiallyOpen"
 }
 
-// why: hinge angles stream in while a device folds, and the whole board would re-render for each one; this snapshot only changes when the window starts or stops spanning the fold.
+// why: hinge angles stream in while folding and would rerender the whole board; this changes only when spanning starts or stops.
 export const useWindowSpansHinge = () => useSyncExternalStore(subscribe, spansHinge, spansHinge)

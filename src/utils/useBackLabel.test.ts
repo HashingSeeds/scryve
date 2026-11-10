@@ -9,7 +9,6 @@ import { useBackLabel, type BackRoute } from "./useBackLabel"
 
 type Routes = { key: string; name: string }[]
 
-// why: a stand-in for the screen's stack: the state it reads and the "state" event it listens for.
 function stack(routes: Routes) {
   const listeners = new Set<() => void>()
   const navigation = {

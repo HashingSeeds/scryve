@@ -3,10 +3,7 @@ import { v } from "convex/values"
 import { internalMutation } from "./_generated/server"
 import { refreshDeckIdentity } from "./lib/deckIdentity"
 
-/**
- * why: each deck is recomputed from its cards and patched only when the result differs, so a
- * rerun, a restart from a null cursor, or a later pass after the card catalog fills in is safe.
- */
+/** why: patches only on change, so reruns and restarts are safe. */
 export const backfillDeckIdentity = internalMutation({
   args: { cursor: v.union(v.string(), v.null()), batchSize: v.number() },
   handler: async (ctx, args) => {

@@ -211,7 +211,6 @@ export function CurrentGameScreen({
           },
     ],
     attack,
-    // why: rolling by hand means the players skipped the first-player offer.
     onDiceTool: markFirstPlayerUsed,
     onLog: openLog,
     statusLine: match

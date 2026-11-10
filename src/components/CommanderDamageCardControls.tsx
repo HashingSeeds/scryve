@@ -54,7 +54,7 @@ export type ArmedCommander = {
   power: number
   total: number
   landed?: number
-  /** why: sat out of this attack by tapping its name; it keeps its power for when it comes back. */
+  /** why: sat out of this attack; it keeps its power for when it returns. */
   sitting?: boolean
 }
 
@@ -90,9 +90,8 @@ type AssignmentSource = {
   onOthers: (power: number) => void
   othersShown: boolean
   othersSitting: boolean
-  /** why: how far the commander grid in the card's lower corner reaches in from the seat's side and up from its foot, in the seat's own upright space, so the boxes stay clear of it. */
+  /** why: how far the commander grid reaches in from the seat's side and up from its foot, in upright space, so the boxes stay clear of it. */
   grid?: { width: number; height: number }
-  /** why: a box's name toggles whether it takes part in this attack. */
   onSit: (box: AttackBox) => void
   acted: boolean
   onPower: (power: number, index: number) => void
@@ -112,19 +111,19 @@ export interface CommanderDamageCardControlsProps {
   menuCorner?: LifeCardMenuCorner
   compact?: boolean
   mode: CommanderDamageCardMode
-  // why: a defender's last attack, kept on screen while the shadow drains so its ring fades out as the shadow's edge passes the disc. It takes no touches.
+  // why: a defender's last attack, kept up while the shadow drains so its ring fades as the shadow's edge passes it. Takes no touches.
   draining?: boolean
 }
 
-// why: the shadow eases off the attacker's card and travels at a pace the eye can follow, so neighbours darken first and the far seats after.
+// why: the shadow travels at a pace the eye can follow, so neighbours darken first and far seats after.
 export const TAKEOVER_MS = 950
 const TAKEOVER_EASING = Easing.bezier(0.45, 0.05, 0.25, 1)
-// why: closing is quicker than opening. The drain pulls the shadow back slowly at first and then fast into the attacker's card.
+// why: closing is quicker than opening; the shadow pulls back slowly, then fast into the card.
 const DRAIN_MS = 620
 const DRAIN_EASING = Easing.bezier(0.7, 0, 0.7, 0.4)
-// why: the shadow's blur and spread. Spreading by the blur puts the blur's solid core at the card's grown edge, so the shadow fades smoothly from there over twice this distance.
+// why: spreading by the blur puts its solid core at the card's grown edge, so it fades smoothly over twice this distance.
 const FLOOD_BLUR = 24
-// why: the attacker's card is where the shadow starts, so it swaps its life total for power boxes quickly as the shadow leaves it; everything else changes when the shadow reaches it.
+// why: the shadow starts at the attacker's card, so it swaps its life for power boxes quickly as the shadow leaves; everything else changes when the shadow arrives.
 export const SWAP_MS = 240
 const SWAP_FROM = 0.85
 
@@ -151,7 +150,7 @@ export function CommanderDamageCardControls({
     if (source) progress.value = withTiming(1, { duration: swap, easing: Easing.out(Easing.cubic) })
   }, [progress, source, swap])
 
-  // why: a defender's ring and badges show as the shadow's edge passes its disc, the same moment the disc's gutter ring draws in.
+  // why: a defender's ring and badges show as the shadow's edge passes its disc, when the disc's gutter ring draws in.
   const entranceStyle = useAnimatedStyle(() => {
     if (!wave)
       return {
@@ -200,13 +199,13 @@ export function CommanderDamageCardControls({
 
 export type CommanderFlood = NonNullable<CommanderTakeover["flood"]>
 
-// why: the shadow is the attacker's card grown on every side, from just inside its own edges until it covers the farthest seat. Its blur fades over twice FLOOD_BLUR past those edges, so it arrives with a soft edge.
+// why: the shadow is the attacker's card grown on every side, from just inside its edges until it covers the farthest seat; its blur fades over twice FLOOD_BLUR past them, so it arrives soft.
 function shadowGrown(flood: CommanderFlood, wave: number) {
   "worklet"
   return -FLOOD_BLUR * 2 + wave * (flood.distance + FLOOD_BLUR * 2)
 }
 
-/** why: 0 until the shadow's soft edge reaches a point `gap` away, 1 once its solid core covers it, or once the shadow has grown `span` past that, if it still has that far to go. */
+/** why: 0 until the shadow's soft edge reaches a point `gap` away, 1 once its solid core covers it, or once it grows `span` past that if it still can. */
 export function shadowReached(flood: CommanderFlood, wave: number, gap: number, span?: number) {
   "worklet"
   // why: a worklet captures only what its body uses, so the default lives here rather than in the signature.
@@ -289,15 +288,15 @@ export function useCommanderTakeover<Attacker>(
   }
 }
 
-// why: the attacker's power box inks its number in a deep shade of the attacker's own color. 0.87 in linear light keeps about 40% of each sRGB channel.
+// why: deep shade of the attacker's color; 0.87 in linear light keeps about 40% of each sRGB channel.
 export function deepShade(color: string) {
   return mixColorsInLinearLight(color, "#000000", 0.87)
 }
 
-// why: every defender floods the same dark oxblood, so being targeted reads as danger and never as the grey dimming of a seat that is out, while staying dark enough not to fight the life discs' colors.
+// why: one dark oxblood for every defender reads as danger, never as the grey dimming of an out seat, and stays dark enough not to fight the life discs.
 export const ATTACK_SHADE = "#26080D"
 
-// why: every shadow is dark enough for white ink, so a defender's controls and commander strip read in white over it whatever the attacker's color.
+// why: every shadow is dark enough for white ink whatever the attacker's color.
 export const SHADOW_INK = "#FFFFFF"
 
 export function CommanderTakeoverBackdrop({
@@ -322,7 +321,7 @@ export function CommanderTakeoverBackdrop({
   const discX = cardSize.width / 2 + takeover.cardDiscOffset.x
   const discY = cardSize.height / 2 + takeover.cardDiscOffset.y
   const ringSize = (disc + DISC_RING) * 2
-  // why: the ring is the board's own gutter around the life disc, so a red-leaning player color still stands off the flood as a cut-out of its card.
+  // why: the ring is the board's gutter around the disc, so a red-leaning color still stands off the flood.
   const ring: ViewStyle = {
     position: "absolute",
     width: ringSize,
@@ -451,7 +450,7 @@ function DefenderControls({
   const discY = content.height / 2 + (takeover?.discOffset.y ?? 0)
   const ring = (disc + DISC_RING) * 2
   const lead = Math.max(...totals)
-  // why: damage from before this attack fills the arc bright; this attack's hits grow a faint stretch past it until the attack ends.
+  // why: earlier damage fills the arc bright; this attack's hits grow a faint stretch past it.
   const before = Math.max(...commanders.map(({ total, landed = 0 }) => total - landed))
 
   return (
@@ -558,7 +557,6 @@ function AttackerControls({
     grid: mode.grid,
   })
   const testSeats = partnerTestSeats(seatNumber)
-  // why: the box is a pale card of the attacker's own color with its number inked in a deep shade, like the power box printed on a creature card.
   const cardColor = mode.mark?.color
   const paper = cardColor
     ? mixColorsInLinearLight(cardColor, "#FFFFFF", 0.7)
@@ -653,7 +651,6 @@ function AttackerControls({
   const keypad = space ? keypadPlacement(space, layout, compact) : undefined
 
   return (
-    // why: a tap anywhere else on the card closes the keypad, like tapping away from a field.
     <BoardPressable
       testID={`commander-attacker-seat-${seatNumber}`}
       accessible={false}
@@ -670,7 +667,6 @@ function AttackerControls({
         ]}
       >
         {edited && keypad ? (
-          // why: the box being typed into stays and the rest step aside for the keypad: above it when the card is tall enough, beside it on a short seat.
           <View style={[keypad.stacked ? $editStacked : $editBeside, { gap: UNIT_GAP }]}>
             {edited}
             <Animated.View
@@ -746,7 +742,6 @@ export function keypadPlacement(
       width: beside,
       height: Math.max(0, Math.min(rowsHeight(COMPACT_KEY_HEIGHT), space.height - UNIT_GAP * 2)),
     }
-  // why: a seat too narrow for the keypad beside the box stacks it under the box, its compact rows giving up height to fit.
   return {
     stacked: true,
     compact: true,
@@ -764,7 +759,7 @@ const BOX_RATIO = 2
 // why: the commander's name runs along the box's foot, under the number. It toggles the box in and out of the attack, so with its slop below it reaches about a 40pt touch target.
 const NAME_SHARE = 0.5
 const MIN_NAME = 32
-// why: the attacker's life sits under its power boxes at about half a number row, small enough to read as secondary.
+// why: the attacker's life sits at about half a number row, small enough to read as secondary.
 const LIFE_SHARE = 0.5
 const MIN_LIFE = 18
 
@@ -778,10 +773,9 @@ export function attackerLayout({
 }: {
   space: { width: number; height: number } | null
   count: number
-  /** why: whether the Others box joins the commanders. */
   others?: boolean
   compact?: boolean
-  /** why: how far the commander grid reaches in from the seat's side, and up from its foot. */
+  /** why: how far the commander grid reaches in from the seat's side and up from its foot. */
   grid?: { width: number; height: number }
 }) {
   const largest = compact ? 52 : 64
@@ -824,7 +818,7 @@ export function attackerLayout({
       lifeY: beside
         ? (boxesHeight + spacing[ATTACKER_COLUMN_GAP]) / 2
         : (space?.height ?? 0) / 2 - band / 2,
-      // why: above the grid, the life is centered in the band beside it, so it shrinks to the room the grid leaves on both sides.
+      // why: above the grid, the life is centered beside it, so it shrinks to the room the grid leaves on both sides.
       lifeFont: beside
         ? life * 0.8
         : Math.min(
@@ -833,7 +827,6 @@ export function attackerLayout({
             ((space?.width ?? 0) - ((grid?.width ?? 0) + UNIT_GAP / 2) * 2) /
               (LIFE_DIGITS * DIGIT_ADVANCE),
           ),
-      // why: the column's full height, the life line included when it sits under the boxes.
       columnHeight: beside ? boxesHeight + spacing[ATTACKER_COLUMN_GAP] + life : boxesHeight,
     }
   }
@@ -860,11 +853,9 @@ export function attackerLayout({
         return undefined
       })
       .filter((layout) => layout !== undefined)
-      // why: a short, wide box reads and taps better than a tall, narrow one, so the arrangement with the most box face wins.
       .sort((a, b) => b.height * b.width - a.height * a.width)[0]
     if (best) return best
   }
-  // why: a seat too small for any margin still gets the roomiest boxes rather than ones squeezed to nothing.
   return arrangements
     .flatMap((arrangement) =>
       placements.map((placement) => size(TIGHT_BOX, TIGHT_NAME, arrangement, placement)),
@@ -876,14 +867,14 @@ type Arrangement = { rows: number; perRow: number }
 type Placement = "beside" | "above"
 // why: a box narrower than this leaves its − and + no room beside the number.
 const MIN_BOX_RATIO = 1.4
-// why: above the grid, a short row has the seat's whole width, so its boxes stretch further than BOX_RATIO to use it.
+// why: above the grid, a short row has the seat's full width, so boxes stretch past BOX_RATIO.
 const WIDE_BOX_RATIO = 2.8
 const SMALLEST_BOX = 28
-// why: the name bar gives up its 32pt, and the number row shrinks past SMALLEST_BOX, only when a seat is too small for the boxes otherwise.
+// why: the name bar drops from 32pt, and the number row below SMALLEST_BOX, only when a seat is too small for the boxes otherwise.
 const TIGHT_NAME = 24
 const TIGHT_BOX = 20
 const BOX_GAP = "md"
-// why: in the band beside the grid, the life reads larger than under the boxes, up to a size that still reads as secondary to the boxes.
+// why: in the band beside the grid the life reads larger, capped to stay secondary to the boxes.
 const BAND_LIFE_SHARE = 0.5
 const MAX_BAND_LIFE = 34
 const LIFE_DIGITS = 3
@@ -891,7 +882,7 @@ const LIFE_DIGITS = 3
 const ATTACKER_COLUMN_GAP = "xxs"
 const BOX_ROW_GAP = "sm"
 
-/** why: the attacker's own life stays in view while it attacks, regular weight, so it never reads as the attack's target: under its boxes, or larger in the band beside the commander grid when the boxes sit above it. */
+/** why: the attacker's life stays in view in regular weight so it never reads as the attack's target. */
 export function attackerLifeSlot(layout: ReturnType<typeof attackerLayout>) {
   return { belowCardCenter: layout.lifeY, fontSize: layout.lifeFont }
 }
@@ -901,13 +892,12 @@ const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber
 const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, left, top })
 
 const AnimatedPath = Animated.createAnimatedComponent(Path)
-// why: the ink of a hit, bright enough to read on the gutter ring over any shade.
+// why: bright enough to read on the gutter ring over any shade.
 export const DAMAGE_INK = "#FF4D5A"
 // why: Others damage hurts too, so it reads warm like a hit, but orange so it never passes for commander damage.
 export const OTHERS_INK = "#FF8A1F"
 const TRACK_OPACITY = 0.18
 const GHOST_OPACITY = 0.4
-// why: a hit eases the arc forward rather than snapping, so the defender sees how much it just took.
 const FILL_MS = 520
 // why: the arc's stroke runs a pixel past the ring's outer edge, so its canvas bleeds past the ring's box to keep that edge unclipped.
 const ARC_BLEED = 1
@@ -917,7 +907,7 @@ const ARC_WIDTH = DISC_RING - ARC_SEAM + ARC_BLEED
 // why: a single SVG arc cannot close on itself; stopping a hair short leaves a gap the round caps cover.
 const FULL_SWEEP = 0.9999
 
-/** why: an open arc clockwise from twelve o'clock, so both ends are real path ends and every renderer draws their round caps. A dashed circle leaves the cap at its seam to the renderer, and iOS draws it square. */
+/** why: an open arc, not a dashed circle: the renderer owns the cap at a dash seam, and iOS draws it square. */
 function arcPath(center: number, radius: number, fraction: number) {
   "worklet"
   const angle = 2 * Math.PI * Math.min(fraction, FULL_SWEEP)
@@ -927,7 +917,7 @@ function arcPath(center: number, radius: number, fraction: number) {
   return `M ${center} ${center - radius} A ${radius} ${radius} 0 ${large} 1 ${x} ${y}`
 }
 
-/** why: damage toward lethal reads as a red arc filling a faint full ring, clockwise from the top of the seat's own upright view. `fraction` is the damage from before this attack; `ghost` reaches as far as this attack has dealt. */
+/** why: damage toward lethal is a red arc filling a faint ring, clockwise from the top of the seat's upright view. `fraction` is damage from before this attack; `ghost` reaches as far as this attack dealt. */
 function DamageArc({
   seatNumber,
   size,
@@ -1007,7 +997,6 @@ const PULSE_MS = 1600
 const PULSES = 3
 const PEAK_OPACITY = 0.65
 
-/** why: one beat of a pulse at `t` from 0 to 1. The ring grows from `from` of its size to its full size and is invisible at both ends, so between and after pulses nothing rests on screen. */
 export function pulseFrame(t: number, from: number) {
   "worklet"
   return { opacity: PEAK_OPACITY * Math.sin(Math.PI * t), scale: from + (1 - from) * t }
@@ -1064,14 +1053,13 @@ export function PulseRing({
   )
 }
 
-// why: the ring may be larger than its parent, so it centers on it and overflows evenly.
 const $pulseCenter: ViewStyle = {
   ...StyleSheet.absoluteFill,
   alignItems: "center",
   justifyContent: "center",
 }
 
-/** why: the attacker's power reads as a creature's power box, and its left and right ends lower and raise it, as a card's halves do for life. Tapping the number types a power in, for a pump or a seat with no deck. The commander's name sits under the number; a partner at 0 sits the hit out and dims. */
+/** why: a creature-style power box; its left and right ends lower and raise power, and tapping the number types one in. A partner at 0 sits the hit out and dims. */
 function PowerBox({
   suffix,
   name,
@@ -1093,17 +1081,14 @@ function PowerBox({
 }: {
   suffix: string
   name?: string
-  /** why: the Others box, damage from the attacker's other creatures rather than a commander. */
   others?: boolean
   partner: boolean
   power: number
   sitting: boolean
-  /** why: what has been typed while this box's keypad is open; undefined while it is closed. */
   draft?: string
   color: string
   ink: string
   ring: string
-  /** why: an included box's name bar takes the seat's own color with the card's light ink, so it reads like the card around it rather than a dark slab. */
   bar: string
   width: number
   height: number
@@ -1115,7 +1100,7 @@ function PowerBox({
   const editing = draft !== undefined
   const pressedTint = { backgroundColor: overlayTint(ink, 0.14) }
   const lowest = lowestPower(partner)
-  // why: a box narrowed to its lane still fits two digits, so the number shrinks to the middle of its row rather than wrapping out of sight; the platform shrinks it further if the font runs wider than this estimate.
+  // why: shrink the number to its row's middle so two digits fit a narrowed box instead of wrapping out of sight; the platform shrinks it further if the font runs wider than this estimate.
   const valueWidth = (width * VALUE_FLEX) / (VALUE_FLEX + HALF_FLEX * 2)
   const digits = Math.max(1, String(power).length)
   const fontSize = Math.min(height * 0.62, valueWidth / (digits * DIGIT_ADVANCE))
@@ -1206,7 +1191,6 @@ function PowerBox({
         </BoardPressable>
         {half(1)}
       </View>
-      {/* why: the name strip is a toggle button: a bar in the seat's color while the box is in the attack, hollow with its name struck through once it sits out. A seat with no deck names its box "Commander". */}
       <BoardPressable
         testID={`commander-sit-seat-${suffix}`}
         accessibilityRole="switch"

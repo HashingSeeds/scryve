@@ -210,7 +210,6 @@ describe("Clerk webhook user sync", () => {
       ],
     ]
     for (const [id, data, expected] of cases) {
-      // why: Svix redelivers, so the replay must also succeed without adding a row.
       expect((await created(id, data)).status).toBe(200)
       expect((await created(id, data)).status).toBe(200)
       const row = (await users(t)).find((user) => user.clerkUserId === id)

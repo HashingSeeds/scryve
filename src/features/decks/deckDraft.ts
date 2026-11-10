@@ -138,7 +138,6 @@ function moveCopy<T extends DeckCard>(
       ? { ...entry, quantity: 1, board }
       : { ...entry, quantity: 1, section, ...(entry.board ? { board } : {}) }
   const merges = cards.some((card) => printingKey(card) === printingKey(copy))
-  // why: a lone copy keeps its place in the list, so moving it back leaves the draft clean.
   if (!merges && entry.quantity === 1)
     return { cards: cards.map((card) => (card === entry ? copy : card)) }
   const added = addCopy(cards, copy)

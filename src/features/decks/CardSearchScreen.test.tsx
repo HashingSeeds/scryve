@@ -61,7 +61,6 @@ function chooser(cards = deck, onAdd = jest.fn()) {
   )
 }
 
-// why: colors live in the Filters sheet, so a pick opens it, presses each color and closes it.
 async function pickColors(view: ReturnType<typeof render>, ...colors: string[]) {
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})

@@ -646,10 +646,7 @@ async function viewerOf(ctx: QueryCtx, event: Doc<"events">) {
   return { isOrganizer: event.ownerUserId === user._id, myPlayerId: player?._id ?? null }
 }
 
-/**
- * why: Convex caches a query per account once it reads the caller, so a board that read them reran for
- * every phone on every change. The handler takes only `db`, so reading the caller here fails to compile.
- */
+/** why: reading the caller makes Convex cache per account, rerunning for every phone on each change. Taking only `db` makes that a compile error. */
 export const board = query({
   args: { eventId: v.id("events") },
   handler: async ({ db }, args) => {
