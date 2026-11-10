@@ -81,6 +81,8 @@ export default {
   outbox: {
     queueFull:
       "La file hors ligne des modifications en attente est pleine. Reconnectez-vous et synchronisez avant de faire d’autres modifications.",
+    undoPartial:
+      "La file d'attente hors ligne s'est remplie en cours d'annulation, donc seule une partie a été enregistrée. Reconnectez-vous et synchronisez, puis annulez le reste.",
     commanderDamageRange:
       "Les modifications de blessures de commandant doivent être comprises entre 1 et {{max}}.",
     commanderSelfDamage: "Un commandant ne peut pas se blesser lui-même",
