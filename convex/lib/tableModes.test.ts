@@ -105,6 +105,16 @@ describe("Planechase", () => {
     expect(rollCost(reset.planechase!, undefined, "cy")).toBe(0)
   })
 
+  it("counts again when turns go off after a turn roll", () => {
+    const blank = { kind: "planar.rolled", playerId: "ada", face: "blank" } as const
+    const rolled = play(modes!, [
+      [blank, turn("ada", 1)],
+      [blank, undefined],
+      [blank, undefined],
+    ])!
+    expect(rolled.log?.map((entry) => entry.cost)).toEqual([0, 0, 1])
+  })
+
   it("planeswalks on the Planeswalker face, and chaos leaves the plane in place", () => {
     const at = turn("ada", 1)
     const before = faceUpPlane(modes!.planechase)

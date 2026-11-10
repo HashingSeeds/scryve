@@ -339,8 +339,9 @@ function appliedModeAction(
     counted !== planechase.rolls && planechase.rollsTurnId !== undefined
       ? { previousRolls: { turnId: planechase.rollsTurnId, rolls: planechase.rolls } }
       : {}
+  const { rollsTurn: _turn, rollsTurnId: _turnId, ...untimed } = planechase
   const rolled: Planechase = {
-    ...planechase,
+    ...untimed,
     ...displaced,
     rolls: { ...counted, [playerId]: cost + 1 },
     ...(context.turn
