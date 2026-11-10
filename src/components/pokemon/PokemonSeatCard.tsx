@@ -33,7 +33,6 @@ import {
   menuClearance,
   CHIP_BAR_HEIGHT,
   CARDLESS_POKEMON,
-  CONTENT_EDGES,
   contentInsetsFor,
   heroFontSize,
   isCardless,
@@ -43,6 +42,7 @@ import {
   pokemonReadout,
   rotatedLayerStyle,
 } from "./pokemonCardLayout"
+import { CONTENT_EDGES } from "../playerGridGeometry"
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
 import {
