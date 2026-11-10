@@ -60,7 +60,18 @@ interface StoredCapacity {
 
 interface StoredVersionIdMap {
   schemaVersion: 1
-  versionId: string
+  versionId: Id<"deckVersions">
+}
+
+declare const provisionalVersion: unique symbol
+export type ProvisionalVersionId = string & { readonly [provisionalVersion]: true }
+export type DeckVersionRef = Id<"deckVersions"> | ProvisionalVersionId
+
+const PROVISIONAL_VERSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** why: offline creates name versions with randomUUID and Convex ids never contain a dash, so a stored or restored id that matches is one the server would reject. */
+export function isProvisionalVersionId(versionId: string): versionId is ProvisionalVersionId {
+  return PROVISIONAL_VERSION_ID.test(versionId)
 }
 
 function versionsKey(ownerId: string, deploymentUrl: string | undefined, deckId: string) {
@@ -564,17 +575,18 @@ export class DeckVersionCacheRepository {
   }
 
   /** Durable identity map from a local provisional version id to its real server id. */
-  recordMapping(provisionalId: string, versionId: string): void {
+  recordMapping(provisionalId: string, versionId: Id<"deckVersions">): void {
     versionIdMapNode(this.context(), provisionalId).set({
       schemaVersion: 1,
       versionId,
     } satisfies StoredVersionIdMap)
   }
 
-  /** Raw local id a provisional id was acknowledged as, without needing the deck row. */
-  mappedVersionId(provisionalId: string): string | undefined {
+  mappedVersionId(provisionalId: string): Id<"deckVersions"> | undefined {
     const value = versionIdMapNode(this.context(), provisionalId).get() as unknown
-    return isRecord(value) && typeof value.versionId === "string" ? value.versionId : undefined
+    return isRecord(value) && typeof value.versionId === "string"
+      ? (value.versionId as Id<"deckVersions">)
+      : undefined
   }
 
   /** Row for a provisional id once the server has acknowledged the create. */

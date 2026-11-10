@@ -24,7 +24,7 @@ import {
   DECK_VERSION_QUEUE_CONFLICT_REASON,
   DECK_VERSION_REJECTED_REASON,
 } from "./deckSyncReasons"
-import { DeckVersionCacheRepository } from "./deckVersionsCache"
+import { DeckVersionCacheRepository, type ProvisionalVersionId } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import { MAX_DECK_NOTE_LENGTH, assertVersionName } from "../../../convex/lib/policy"
 
@@ -393,7 +393,7 @@ export class DeckVersionWriteController {
     name: string,
     note: string,
     cards: readonly VersionCardPayload[],
-  ): string {
+  ): ProvisionalVersionId {
     this.assertWritable()
     // Local policy parity keeps permanently invalid payloads out of the retry loop.
     const versionName = assertVersionName(name)
@@ -424,7 +424,7 @@ export class DeckVersionWriteController {
       local: true,
     })
     this.cache.saveCards(provisionalId, 0, cards)
-    return provisionalId
+    return provisionalId as ProvisionalVersionId
   }
 
   renameVersion(
@@ -617,6 +617,10 @@ export class DeckVersionWriteController {
   mappedVersion(versionId: string): string {
     return this.cache.mappedVersionId(versionId) ?? versionId
   }
+
+  mappedVersionId(provisionalId: ProvisionalVersionId) {
+    return this.cache.mappedVersionId(provisionalId)
+  }
 }
 
 const controllers = new WeakMap<object, Map<string, DeckVersionWriteController>>()
@@ -680,5 +684,7 @@ export function useDeckVersionWrites(
     deleteVersion: (deckId: string, versionId: string, expectedRevision: number) =>
       controller?.deleteVersion(deckId, versionId, expectedRevision),
     mappedVersion: (versionId: string) => controller?.mappedVersion(versionId) ?? versionId,
+    mappedVersionId: (provisionalId: ProvisionalVersionId) =>
+      controller?.mappedVersionId(provisionalId),
   }
 }
