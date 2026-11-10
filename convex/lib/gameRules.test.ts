@@ -72,7 +72,8 @@ describe("game rules", () => {
     const open = { total: 10, delta: 5, pendingClaims: 0, pairHasPendingClaim: false }
 
     expect(commanderClaimOutcome(open)).toBe("pending")
-    expect(commanderClaimOutcome({ ...open, delta: 90 })).toBe("declined")
+    expect(commanderClaimOutcome({ ...open, delta: 90 })).toBe("pending")
+    expect(commanderClaimOutcome({ ...open, total: 995, delta: 5 })).toBe("declined")
     expect(commanderClaimOutcome({ ...open, delta: -11 })).toBe("declined")
     expect(commanderClaimOutcome({ ...open, pairHasPendingClaim: true })).toBe("declined")
     expect(commanderClaimOutcome({ ...open, pendingClaims: MAX_PENDING_COMMANDER_CLAIMS })).toBe(
@@ -80,12 +81,16 @@ describe("game rules", () => {
     )
   })
 
-  it("moves life one for one when a claim is confirmed, and refuses totals outside 0 to 99", () => {
+  it("moves life one for one when a claim is confirmed, and refuses totals outside 0 to 999", () => {
     expect(confirmCommanderClaim({ total: 18, life: 4, delta: 7 })).toEqual({
       total: 25,
       currentLife: -3,
     })
-    expect(confirmCommanderClaim({ total: 95, life: 40, delta: 5 })).toBeNull()
+    expect(confirmCommanderClaim({ total: 97, life: 40, delta: 5 })).toEqual({
+      total: 102,
+      currentLife: 35,
+    })
+    expect(confirmCommanderClaim({ total: 995, life: 40, delta: 5 })).toBeNull()
   })
 })
 

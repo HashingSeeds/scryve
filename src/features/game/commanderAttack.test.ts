@@ -179,7 +179,7 @@ describe("commander attack", () => {
   })
 
   it("never deals past the storage cap, whether it commits or stages", () => {
-    const recorded = { [commanderDamageKey(ada, grace)]: 97 }
+    const recorded = { [commanderDamageKey(ada, grace)]: MAX_COMMANDER_DAMAGE - 2 }
     const local = attack({ recorded, commanders: [{ power: 5 }] })
     local.run(press(ada), hit(grace), hit(grace))
     expect(local.commits).toEqual([[{ toPlayerId: grace, delta: 2 }]])
@@ -245,7 +245,10 @@ describe("commander attack", () => {
     const lone = attack({ commanders: [{}] })
     lone.run(press(ada))
     expect(lone.view(grace).commanders[0].power).toBe(1)
-    lone.run({ type: "power", slot: 0, power: 0 }, { type: "power", slot: 0, power: 500 })
+    lone.run(
+      { type: "power", slot: 0, power: 0 },
+      { type: "power", slot: 0, power: MAX_COMMANDER_DAMAGE + 1 },
+    )
     expect(lone.view(grace).commanders[0].power).toBe(MAX_COMMANDER_DAMAGE)
   })
 })

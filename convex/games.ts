@@ -1217,7 +1217,7 @@ export const publishLocalGame = mutation({
       if (totalPairs.has(pair)) throw new Error("Duplicate commander damage pair")
       totalPairs.add(pair)
       if (!Number.isInteger(total.total) || total.total < 0 || total.total > MAX_COMMANDER_DAMAGE)
-        throw new Error("Commander damage total must be between 0 and 99")
+        throw new Error(`Commander damage total must be between 0 and ${MAX_COMMANDER_DAMAGE}`)
       return { ...total, commander: total.commander }
     })
     if (totalPairs.size > MAX_COMMANDER_DAMAGE_ROWS)

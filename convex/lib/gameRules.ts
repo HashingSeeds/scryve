@@ -4,7 +4,7 @@ import { flooredLifeDelta, formatDefinition } from "./systems"
 
 export const MAX_LIFE_DELTA = 999_999
 export const MAX_SNAPSHOT_LIFE = 1_000_000
-export const MAX_COMMANDER_DAMAGE = 99
+export const MAX_COMMANDER_DAMAGE = 999
 
 export const isLifeDelta = (value: unknown): value is number =>
   typeof value === "number" &&

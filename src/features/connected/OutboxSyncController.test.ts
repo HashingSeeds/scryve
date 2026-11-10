@@ -353,12 +353,12 @@ describe("outbox sync controller", () => {
 
     controller.submitCommanderDamage("player-1", [
       { toPlayerId: "player-2", delta: 4 },
-      { toPlayerId: "player-3", delta: 120 },
+      { toPlayerId: "player-3", delta: 1000 },
     ])
 
     expect(controller.getSnapshot().pending).toEqual([])
     expect(stored(repository).pending).toEqual([])
-    expect(controller.getSnapshot().changeError).toMatch(/between 1 and 99/i)
+    expect(controller.getSnapshot().changeError).toMatch(/between 1 and 999\b/i)
   })
 
   it("queues each partner's damage with its own commander slot", () => {
