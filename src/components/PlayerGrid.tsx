@@ -34,6 +34,7 @@ import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
 import { FIRST_PLAYER_TAB, FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
 import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
+import { PendingLifeProvider } from "./pendingLife"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   COMPACT_LIFE_TARGET_SIZE,
@@ -666,100 +667,102 @@ export function PlayerGrid({
   }
 
   return (
-    <View testID="player-grid-frame" style={$frame}>
-      <Animated.View
-        testID="player-grid"
-        accessibilityLabel={translate(`board:grid.label.${systemId}`, { count: players.length })}
-        onLayout={measureBoard}
-        style={[
-          themed($grid),
-          topEdgeBand ? { paddingTop: topEdgeBand } : null,
-          style,
-          boardOrientation && $fixedGrid,
-          boardOrientation && {
-            width,
-            height,
-            transform: [
-              { translateX: -width / 2 },
-              { translateY: -height / 2 },
-              { rotate: `${boardRotation}deg` },
-            ],
-          },
-          nativeBoardStyle,
-          (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
-        ]}
-      >
-        {rows.map((row, rowIndex) => (
-          <View
-            key={rowIndex}
-            testID={`player-grid-row-${rowIndex}`}
-            style={[themed($row), { flex: rowFlexes[rowIndex] }]}
-          >
-            {row.map((slot, columnIndex) => {
-              if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex)
-              const index = seatedRows[rowIndex]?.[columnIndex]
-              if (slot === null || index === null || index === undefined) {
+    <PendingLifeProvider teams={teams}>
+      <View testID="player-grid-frame" style={$frame}>
+        <Animated.View
+          testID="player-grid"
+          accessibilityLabel={translate(`board:grid.label.${systemId}`, { count: players.length })}
+          onLayout={measureBoard}
+          style={[
+            themed($grid),
+            topEdgeBand ? { paddingTop: topEdgeBand } : null,
+            style,
+            boardOrientation && $fixedGrid,
+            boardOrientation && {
+              width,
+              height,
+              transform: [
+                { translateX: -width / 2 },
+                { translateY: -height / 2 },
+                { rotate: `${boardRotation}deg` },
+              ],
+            },
+            nativeBoardStyle,
+            (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
+          ]}
+        >
+          {rows.map((row, rowIndex) => (
+            <View
+              key={rowIndex}
+              testID={`player-grid-row-${rowIndex}`}
+              style={[themed($row), { flex: rowFlexes[rowIndex] }]}
+            >
+              {row.map((slot, columnIndex) => {
+                if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex)
+                const index = seatedRows[rowIndex]?.[columnIndex]
+                if (slot === null || index === null || index === undefined) {
+                  return (
+                    <View
+                      key={`empty-${rowIndex}-${columnIndex}`}
+                      testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                      style={themed($cell)}
+                    />
+                  )
+                }
+                const player = players[index]
+                const seatNumber = index + 1
+                const contentRotation = rotationAt(rowIndex, columnIndex)
+                const screenEdges = {
+                  top: rowIndex === 0,
+                  bottom: rowIndex === rows.length - 1,
+                  left: columnIndex === 0,
+                  right: columnIndex === row.length - 1,
+                }
+                const fallbackMenu =
+                  fallbackMenuBoundary === null
+                    ? undefined
+                    : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+                const rowSeam = tabSeamOf(tabRow, rowIndex, rowIndex + 1)
+                const corners = getScreenCornerSquaringStyle({
+                  rows,
+                  rowIndex,
+                  columnIndex,
+                  insets: Platform.OS === "web" ? insets : undefined,
+                  displayRadii,
+                  topInset: topEdgeBand,
+                })
                 return (
+                  // why: keyed by seat, not player id, so a rematch reuses cards; remounting every seat kept old native animation memory.
                   <View
-                    key={`empty-${rowIndex}-${columnIndex}`}
-                    testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                    key={table?.tableRules.pokemon ? player.id : `seat-${index}`}
+                    testID={`player-cell-seat-${seatNumber}`}
                     style={themed($cell)}
-                  />
+                  >
+                    {seatCard(index, {
+                      contentRotation,
+                      screenEdges,
+                      contentInsets: {
+                        top: screenEdges.top ? insets.top : 0,
+                        bottom: screenEdges.bottom ? insets.bottom : 0,
+                        left: screenEdges.left ? insets.left : 0,
+                        right: screenEdges.right ? insets.right : 0,
+                        cutout: seatCutout(cutout, contentRotation, screenEdges),
+                        tabCorners: seatTabCorners(rowSeam, contentRotation, screenEdges),
+                      },
+                      menuCorner:
+                        menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner,
+                      menuEdgeCenter: fallbackMenu?.edgeCenter,
+                      style: corners,
+                    })}
+                    <SeatSpotlight playerId={player.id} compact={compact} corners={corners} />
+                  </View>
                 )
-              }
-              const player = players[index]
-              const seatNumber = index + 1
-              const contentRotation = rotationAt(rowIndex, columnIndex)
-              const screenEdges = {
-                top: rowIndex === 0,
-                bottom: rowIndex === rows.length - 1,
-                left: columnIndex === 0,
-                right: columnIndex === row.length - 1,
-              }
-              const fallbackMenu =
-                fallbackMenuBoundary === null
-                  ? undefined
-                  : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
-              const rowSeam = tabSeamOf(tabRow, rowIndex, rowIndex + 1)
-              const corners = getScreenCornerSquaringStyle({
-                rows,
-                rowIndex,
-                columnIndex,
-                insets: Platform.OS === "web" ? insets : undefined,
-                displayRadii,
-                topInset: topEdgeBand,
-              })
-              return (
-                // why: keyed by seat, not player id, so a rematch reuses cards; remounting every seat kept old native animation memory.
-                <View
-                  key={table?.tableRules.pokemon ? player.id : `seat-${index}`}
-                  testID={`player-cell-seat-${seatNumber}`}
-                  style={themed($cell)}
-                >
-                  {seatCard(index, {
-                    contentRotation,
-                    screenEdges,
-                    contentInsets: {
-                      top: screenEdges.top ? insets.top : 0,
-                      bottom: screenEdges.bottom ? insets.bottom : 0,
-                      left: screenEdges.left ? insets.left : 0,
-                      right: screenEdges.right ? insets.right : 0,
-                      cutout: seatCutout(cutout, contentRotation, screenEdges),
-                      tabCorners: seatTabCorners(rowSeam, contentRotation, screenEdges),
-                    },
-                    menuCorner:
-                      menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner,
-                    menuEdgeCenter: fallbackMenu?.edgeCenter,
-                    style: corners,
-                  })}
-                  <SeatSpotlight playerId={player.id} compact={compact} corners={corners} />
-                </View>
-              )
-            })}
-          </View>
-        ))}
-      </Animated.View>
-    </View>
+              })}
+            </View>
+          ))}
+        </Animated.View>
+      </View>
+    </PendingLifeProvider>
   )
 }
 

@@ -3,6 +3,7 @@ import { Alert, StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
+import type { ReactTestInstance } from "react-test-renderer"
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -45,6 +46,9 @@ function renderGame(
   )
 }
 
+const textOf = (node: ReactTestInstance | string): string =>
+  typeof node === "string" ? node : node.children.map(textOf).join("")
+
 function turnsOff() {
   return new LocalGameRepository(new MemoryStorage())
 }
@@ -61,6 +65,44 @@ function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat")
 }
 
 describe("CurrentGameScreen", () => {
+  it("mirrors a teammate's held life change on the partner's card before it commits", () => {
+    const initial = createLocalGame({
+      players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 30,
+      system: "mtg",
+      format: "constructed",
+      teams: [
+        [0, 1],
+        [2, 3],
+      ],
+      now: 1,
+    })
+    const view = renderGame(initial, turnsOff())
+    layoutSeats(view)
+    const minus = view.getByTestId("life-seat-1--1")
+    fireEvent(minus, "pressIn")
+    expect(view.getByTestId("life-total-seat-1")).toHaveTextContent("29")
+    expect(view.getByTestId("life-total-seat-2")).toHaveTextContent("29")
+    expect(view.getByTestId("life-total-seat-3")).toHaveTextContent("30")
+    fireEvent.press(minus)
+    fireEvent(minus, "pressOut")
+    expect(view.getByTestId("life-total-seat-1")).toHaveTextContent("29")
+    expect(view.getByTestId("life-total-seat-2")).toHaveTextContent("29")
+
+    fireEvent(minus, "longPress")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 160 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 124, pageY: 124 } })
+    const draft = Number(textOf(view.getByTestId("life-editor-value-seat-1")))
+    expect(draft).not.toBe(29)
+    expect(view.getByTestId("life-total-seat-2")).toHaveTextContent(String(draft))
+    fireEvent(slider, "responderRelease")
+    fireEvent(view.getByTestId("life-editor-seat-1"), "responderRelease")
+    expect(view.getByTestId("life-total-seat-1")).toHaveTextContent(String(draft))
+    expect(view.getByTestId("life-total-seat-2")).toHaveTextContent(String(draft))
+  })
+
   beforeEach(() => jest.mocked(Haptics.impactAsync).mockClear())
   afterEach(() => jest.restoreAllMocks())
 

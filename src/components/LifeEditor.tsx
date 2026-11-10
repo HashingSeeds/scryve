@@ -121,6 +121,7 @@ type Props = {
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   onChange: (delta: number) => void
+  onPreview?: (pendingDelta: number) => void
   onClose: () => void
 }
 
@@ -139,6 +140,7 @@ export function LifeEditor({
   menuCorner,
   menuEdgeCenter,
   onChange,
+  onPreview,
   onClose,
 }: Props) {
   const { theme } = useAppTheme()
@@ -260,6 +262,7 @@ export function LifeEditor({
   }, [closing, overlayOpacity, reducedMotion])
 
   useEffect(() => () => stopEdge(), [])
+  useEffect(() => () => onPreview?.(0), [onPreview])
 
   function stopEdge() {
     if (edgeDelay.current) clearTimeout(edgeDelay.current)
@@ -288,6 +291,7 @@ export function LifeEditor({
     if (next === draft.current) return
     draft.current = next
     setPreview(next)
+    onPreview?.(next - start.current.life)
     if (reducedMotion === false && localGameRepository.hapticsEnabled()) {
       void Haptics.selectionAsync().catch(() => undefined)
     }
@@ -492,6 +496,7 @@ export function LifeEditor({
             const delta = draft.current - start.current.life
             draft.current = life
             setPreview(life)
+            onPreview?.(0)
             if (delta && Math.abs(delta) <= MAX_LIFE_DELTA) {
               onChange(delta)
             }
@@ -501,6 +506,7 @@ export function LifeEditor({
             setDragging(false)
             draft.current = start.current.life
             setPreview(draft.current)
+            onPreview?.(0)
           }}
           style={[styles.trackTouch, { height: metrics.track }]}
         >
