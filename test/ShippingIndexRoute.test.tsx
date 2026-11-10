@@ -246,7 +246,7 @@ describe("shipping index route", () => {
   it("keeps a game saved by a newer version until the player confirms deleting it", async () => {
     storage.set(
       LOCAL_KEYS.active,
-      JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
+      JSON.stringify({ schemaVersion: 3, game: {}, eventChunkCount: 0 }),
     )
 
     const view = render(
@@ -278,7 +278,7 @@ describe("shipping index route", () => {
   it("sends a game saved by a newer version to the store once the store has a newer build", async () => {
     storage.set(
       LOCAL_KEYS.active,
-      JSON.stringify({ schemaVersion: 2, game: {}, eventChunkCount: 0 }),
+      JSON.stringify({ schemaVersion: 3, game: {}, eventChunkCount: 0 }),
     )
     const screen = () => (
       <ThemeProvider initialContext="dark">

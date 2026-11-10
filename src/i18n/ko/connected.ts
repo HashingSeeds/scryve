@@ -151,6 +151,8 @@ export default {
       hexagon: "육각형",
       plus: "플러스",
       shield: "방패",
+      moon: "달",
+      ring: "고리",
       circle: "원",
       crown: "왕관",
       flame: "불꽃",

@@ -12,6 +12,7 @@ import {
   type ConnectedProfileState,
 } from "@/features/connected/useConnectedProfile"
 import { useResumeGames } from "@/features/connected/useResumeGames"
+import { MAX_PLAYERS } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
@@ -95,7 +96,7 @@ function ConnectedHostQuerySource({
   const ready = connectedProfile.status === "ready"
   const activeGames = usePaginatedQuery(
     api.games.activeConnectedGames,
-    ready ? { variants: PLAYABLE_VARIANTS } : "skip",
+    ready ? { variants: PLAYABLE_VARIANTS, maxSeats: MAX_PLAYERS } : "skip",
     {
       initialNumItems: 10,
     },
@@ -182,6 +183,7 @@ function ConnectedHostQuerySource({
         hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
         editsAnySeat: true,
+        maxSeats: MAX_PLAYERS,
       })
       requestSucceeded = true
       captureAnalytics("connection_attempt", { action: "create", stage: "succeeded" })

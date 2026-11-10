@@ -41,6 +41,7 @@ import {
   hasLocalGameStarted,
   matchContextLabel,
   MAX_PLAYER_NAME_LENGTH,
+  MAX_PLAYERS,
   meSeatOf,
   teamSeats,
   PLAYER_COLORS,
@@ -203,6 +204,7 @@ export interface LocalConnectFeed {
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
+const MORE_PLAYER_COUNTS = [7, 8, 9, 10]
 const NEW_GAME_FIELDS = [
   "system",
   "format",
@@ -219,7 +221,6 @@ const NEW_GAME_FIELDS = [
   "chosenClockMinutes",
 ] as const
 const VARIANT_MIN_SEATS = 4
-const MAX_SEATS = 6
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 const CLOCK_MODES = [
   { id: "off", labelTx: "play:newGame.clockOff" },
@@ -300,10 +301,10 @@ function NewGameForm({
     lobby?.layout ?? seedGame?.layout,
   )
   const [names, setNames] = useState<string[]>(() =>
-    Array.from({ length: MAX_SEATS }, (_, index) => seedGame?.players[index]?.name ?? ""),
+    Array.from({ length: MAX_PLAYERS }, (_, index) => seedGame?.players[index]?.name ?? ""),
   )
   const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
-    Array.from({ length: MAX_SEATS }, (_, index) => ({
+    Array.from({ length: MAX_PLAYERS }, (_, index) => ({
       color: seedGame?.players[index]?.color ?? PLAYER_COLORS[index],
       shape:
         seedGame?.players[index]?.shape ??
@@ -1031,6 +1032,7 @@ function NewGameForm({
                     : translate("play:newGame.players")
                 }
                 options={PLAYER_COUNTS}
+                more={treachery || twoHeadedGiant ? undefined : MORE_PLAYER_COUNTS}
                 value={playerCount}
                 isDisabled={
                   treachery

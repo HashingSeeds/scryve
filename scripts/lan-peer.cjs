@@ -18,13 +18,14 @@ let active = false
 
 const socket = net.connect(Number(port), host, () => {
   log(`connected to ${host}:${port}`)
-  // why: the host turns away a guest that doesn't list a table's variant, and sends the table this guest says it reads.
+  // why: the host turns away a guest that doesn't list a table's variant or say it draws 7 or more seats, and sends the table this guest says it reads.
   send({
     type: "join",
     protocol: 2,
     name,
     variants: ["treachery", "archenemy", "twoHeadedGiant", "planechase"],
     tableVersion: Number.MAX_SAFE_INTEGER,
+    maxSeats: 10,
   })
 })
 const send = (message) => socket.write(`${JSON.stringify(message)}\n`)

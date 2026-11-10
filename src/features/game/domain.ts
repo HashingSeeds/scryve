@@ -61,6 +61,7 @@ import {
   standingWinners,
   type OutState,
 } from "../../../convex/lib/outReason"
+import { MAX_PLAYERS, MIN_PLAYERS } from "../../../convex/lib/policy"
 import { attachesDecks, flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
 import {
   applyTableAction,
@@ -109,8 +110,7 @@ export {
 }
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
-export const MIN_PLAYERS = 2
-export const MAX_PLAYERS = 6
+export { MAX_PLAYERS, MIN_PLAYERS }
 export const MAX_PLAYER_NAME_LENGTH = 24
 
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g
@@ -192,7 +192,7 @@ export function createLocalGame(input: {
   const counter = playSystemRules(system).counter
   const lifeStep = input.lifeStep ?? counter.tapStep
   if (!validatePlayerCount(input.players.length)) {
-    throw new Error("A local game requires 2–6 players.")
+    throw new Error(`A local game requires ${MIN_PLAYERS}–${MAX_PLAYERS} players.`)
   }
   if (
     [input.startingLife, ...input.players.map((player) => player.startingLife)].some(

@@ -25,6 +25,7 @@ import {
   applyLanWrite,
   createLanGame,
   endLanRound,
+  LAN_MAX_SEATS,
   LAN_PROTOCOL,
   lanLobbyOf,
   lanLog,
@@ -596,6 +597,7 @@ export class LanSession {
       variants: CLIENT_VARIANTS,
       editsAnySeat: true,
       tableVersion: TABLE_VERSION,
+      maxSeats: LAN_MAX_SEATS,
       ...(this.pass ? { pass: this.pass } : {}),
     })
     const ping = () => {

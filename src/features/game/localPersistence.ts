@@ -55,6 +55,7 @@ import type {
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
+import { MAX_PLAYERS, MIN_PLAYERS, SEATS_BEFORE_CLIENT_LIMIT } from "../../../convex/lib/policy"
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { matchesValidator, parseTableState, type TableState } from "../../../convex/lib/table"
@@ -68,6 +69,8 @@ export const MAX_HISTORY_EVENTS = 250
 const EVENT_CHUNK_SIZE = 100
 const PASS_LABEL_PASSES = 3
 export const ACTIVE_SCHEMA_VERSION = 1
+/** why: a build from before seven-plus seats rejects those games, so they save as a newer schema it keeps instead of replacing. */
+export const WIDE_ACTIVE_SCHEMA_VERSION = 2
 
 export const LOCAL_KEYS = {
   device: "count.local.device.v1",
@@ -76,6 +79,8 @@ export const LOCAL_KEYS = {
   legacySettings: "count.local.settings",
   active: "count.local.active.v1",
   historyIndex: "count.local.history.index.v1",
+  // why: a build from before seven-plus seats rewrites the main index without the games it cannot parse, so those games live where it never writes.
+  wideHistoryIndex: "count.local.history.index.wide.v1",
   noSystemHistoryRepaired: "count.local.history.noSystemRepaired.v1",
   meSeat: "count.local.meSeat.v1",
   pendingMatchEnd: "count.local.matchEnd.v1",
@@ -139,7 +144,7 @@ export interface StringStorage {
  * must keep this key and raise `schemaVersion`, so this build keeps that game instead of replacing it.
  */
 interface ActiveMetadata {
-  schemaVersion: typeof ACTIVE_SCHEMA_VERSION
+  schemaVersion: typeof ACTIVE_SCHEMA_VERSION | typeof WIDE_ACTIVE_SCHEMA_VERSION
   game: Omit<LocalGame, "events">
   eventChunkCount: number
   eventCount: number
@@ -170,7 +175,12 @@ function parseJson(value: string | undefined): unknown {
 }
 
 function readActiveLayout(raw: unknown): ActiveEventLayout | null {
-  if (!isRecord(raw) || raw.schemaVersion !== ACTIVE_SCHEMA_VERSION) return null
+  if (
+    !isRecord(raw) ||
+    (raw.schemaVersion !== ACTIVE_SCHEMA_VERSION &&
+      raw.schemaVersion !== WIDE_ACTIVE_SCHEMA_VERSION)
+  )
+    return null
   const { eventChunkCount: chunkCount, eventCount, lastOperationId } = raw
   if (!isCount(chunkCount) || chunkCount > MAX_ACTIVE_EVENTS / EVENT_CHUNK_SIZE) return null
   return {
@@ -187,7 +197,7 @@ function isNewerActiveGame(raw: unknown) {
   return (
     isRecord(raw) &&
     typeof raw.schemaVersion === "number" &&
-    raw.schemaVersion > ACTIVE_SCHEMA_VERSION
+    raw.schemaVersion > WIDE_ACTIVE_SCHEMA_VERSION
   )
 }
 
@@ -230,7 +240,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parsePlayers(value: unknown): GamePlayer[] | null {
-  if (!Array.isArray(value) || value.length < 2 || value.length > 6) return null
+  if (!Array.isArray(value) || value.length < MIN_PLAYERS || value.length > MAX_PLAYERS) return null
   const players: GamePlayer[] = []
   for (const candidate of value) {
     if (
@@ -594,8 +604,8 @@ function parseSettings(value: unknown): LocalSettings | null {
   if (
     migrated.schemaVersion !== 1 ||
     typeof migrated.defaultPlayerCount !== "number" ||
-    migrated.defaultPlayerCount < 2 ||
-    migrated.defaultPlayerCount > 6 ||
+    migrated.defaultPlayerCount < MIN_PLAYERS ||
+    migrated.defaultPlayerCount > MAX_PLAYERS ||
     typeof migrated.defaultStartingLife !== "number" ||
     migrated.defaultStartingLife < startingValue.min ||
     migrated.defaultStartingLife > startingValue.max ||
@@ -728,6 +738,9 @@ function parseSeatPassHashes(value: unknown, players: GamePlayer[]): SeatPassHas
   return Object.keys(hashes).length > 0 ? hashes : undefined
 }
 
+const isWide = (game: { players: readonly unknown[] }) =>
+  game.players.length > SEATS_BEFORE_CLIENT_LIMIT
+
 function withinHistoryCap(games: readonly LocalGameSummary[]): LocalGameSummary[] {
   return games.filter(
     (game, index) =>
@@ -776,7 +789,9 @@ export class LocalGameRepository {
     const stored = this.storage.getString(LOCAL_KEYS.meSeat)
     if (stored === "none") return "none"
     const raw = Number(stored)
-    return stored !== undefined && Number.isInteger(raw) && raw >= 0 && raw < 6 ? raw : undefined
+    return stored !== undefined && Number.isInteger(raw) && raw >= 0 && raw < MAX_PLAYERS
+      ? raw
+      : undefined
   }
 
   saveMeSeat(seat: number | undefined): void {
@@ -940,7 +955,7 @@ export class LocalGameRepository {
       )
     }
     const metadata: ActiveMetadata = {
-      schemaVersion: ACTIVE_SCHEMA_VERSION,
+      schemaVersion: isWide(game) ? WIDE_ACTIVE_SCHEMA_VERSION : ACTIVE_SCHEMA_VERSION,
       game: {
         ...gameWithoutEvents,
         ...(game.logOrder ? { logOrder: retainedLogOrder({ ...game, events: kept }) } : {}),
@@ -1144,7 +1159,7 @@ export class LocalGameRepository {
     const history = this.loadHistory()
     const next = applyClaimDecisions(history, ownerId, decisions)
     const changed = next.some((game, index) => game !== history[index])
-    if (changed) this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    if (changed) this.writeHistoryIndex(next)
     // why: a match claimed between games continues under the same account and seat, or its next game would not link.
     const active = this.loadActiveGame()
     const claimed = active?.match
@@ -1322,17 +1337,33 @@ export class LocalGameRepository {
     previous: readonly LocalGameSummary[],
   ): void {
     const next = withinHistoryCap(games)
-    this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    this.writeHistoryIndex(next)
     previous
       .filter(({ id }) => !next.some((game) => game.id === id))
       .forEach(({ id }) => this.storage.delete(LOCAL_KEYS.historyDetail(id)))
   }
 
+  private writeHistoryIndex(games: readonly LocalGameSummary[]): void {
+    this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(games.filter((game) => !isWide(game))))
+    const wide = games.filter(isWide)
+    if (wide.length > 0) this.storage.set(LOCAL_KEYS.wideHistoryIndex, JSON.stringify(wide))
+    else this.storage.delete(LOCAL_KEYS.wideHistoryIndex)
+  }
+
+  private readHistoryIndex(key: string): LocalGameSummary[] {
+    const raw = parseJson(this.storage.getString(key))
+    return Array.isArray(raw)
+      ? raw.map(parseSummary).filter((value): value is LocalGameSummary => value !== null)
+      : []
+  }
+
   loadHistory(): LocalGameSummary[] {
-    const raw = parseJson(this.storage.getString(LOCAL_KEYS.historyIndex))
-    if (!Array.isArray(raw)) return []
+    const wide = this.readHistoryIndex(LOCAL_KEYS.wideHistoryIndex)
+    const main = this.readHistoryIndex(LOCAL_KEYS.historyIndex)
     const games = withinHistoryCap(
-      raw.map(parseSummary).filter((value): value is LocalGameSummary => value !== null),
+      wide.length === 0
+        ? main
+        : [...main, ...wide].sort((left, right) => right.finishedAt - left.finishedAt),
     )
     return this.storage.getString(LOCAL_KEYS.noSystemHistoryRepaired)
       ? games
@@ -1349,8 +1380,7 @@ export class LocalGameRepository {
       const { system: _system, ...noSystem } = game
       return noSystem
     })
-    if (repaired.some((game, index) => game !== games[index]))
-      this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(repaired))
+    if (repaired.some((game, index) => game !== games[index])) this.writeHistoryIndex(repaired)
     this.storage.set(LOCAL_KEYS.noSystemHistoryRepaired, "1")
     return repaired
   }

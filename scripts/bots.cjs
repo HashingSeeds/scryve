@@ -47,7 +47,19 @@ Target
 
 const PRODUCTION_DEPLOYMENT = "dashing-curlew-34"
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-const COLORS = ["#B85636", "#41476E", "#39755C", "#94632D", "#77558A", "#A33A52", "#117B9C"]
+const COLORS = [
+  "#B85636",
+  "#41476E",
+  "#39755C",
+  "#94632D",
+  "#77558A",
+  "#A33A52",
+  "#117B9C",
+  "#857200",
+  "#507C24",
+  "#A8458F",
+]
+const MAX_SEATS = 10
 const FINISHED = new Set(["finished", "abandoned"])
 
 function parseDuration(value, name) {
@@ -130,10 +142,10 @@ function parseCli(argv) {
   if (!["stay", "leave", "finish"].includes(values.end))
     throw new Error("--end must be stay, leave or finish")
   const variant = values.archenemy !== undefined ? "archenemy" : values.variant
-  const players = parseCount(values.players ?? (variant ? "4" : "2"), "players", 2, 6)
-  if (values.variant === "treachery" && players < 4)
+  const players = parseCount(values.players ?? (variant ? "4" : "2"), "players", 2, MAX_SEATS)
+  if (values.variant === "treachery" && (players < 4 || players > 6))
     throw new Error("--variant treachery needs --players 4 to 6")
-  if (variant === "archenemy" && players < 3) throw new Error("--archenemy needs --players 3 to 6")
+  if (variant === "archenemy" && players < 3) throw new Error("--archenemy needs --players 3 or more")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
   const none = values.format === "none"
   return {
@@ -152,7 +164,7 @@ function parseCli(argv) {
       : values.format === "commander"
         ? 40
         : 20,
-    count: parseCount(values.count, "count", 1, 5),
+    count: parseCount(values.count, "count", 1, MAX_SEATS - 1),
     first: parseCount(values.first, "first", 1, 50),
     start: values.start,
     lifeEvery: parseDuration(values["life-every"], "life-every"),
@@ -260,6 +272,7 @@ class Bot {
     const { page } = await this.client.query(api.games.activeConnectedGames, {
       paginationOpts: { numItems: 10, cursor: null },
       variants: VARIANTS,
+      maxSeats: MAX_SEATS,
     })
     for (const game of page.filter((game) => game.isHost)) {
       await this.client.mutation(api.games.abandonGame, { publicId: game.publicId })
@@ -278,6 +291,7 @@ class Bot {
       hostDisplayName: this.name,
       hostColor: COLORS[0],
       deviceId: this.deviceId,
+      maxSeats: MAX_SEATS,
       editsAnySeat: true,
     })
     this.publicId = lobby.publicId
@@ -294,6 +308,7 @@ class Bot {
       deviceId: this.deviceId,
       systems: SYSTEM_IDS,
       variants: VARIANTS,
+      maxSeats: MAX_SEATS,
       editsAnySeat: true,
     })
     this.publicId = seat.publicId
