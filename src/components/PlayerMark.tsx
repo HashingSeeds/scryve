@@ -113,17 +113,26 @@ export function MarkArt({
   shape,
   color,
   size,
+  outline,
 }: {
   shape: PlayerMarkShape
   color: string
   size: number
+  outline?: string
 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 44 44">
+      {outline ? (
+        <G stroke={outline} strokeWidth={MARK_OUTLINE_WIDTH} strokeLinejoin="round">
+          <MarkShape shape={shape} color={outline} solid />
+        </G>
+      ) : null}
       <MarkShape shape={shape} color={color} />
     </Svg>
   )
 }
+
+const MARK_OUTLINE_WIDTH = 7
 
 // why: foil must contrast with what's behind the mark. Cards draw black marks only on light seats, so without a backdrop a black mark gets the dark foil; pickers pass the app background.
 const FOIL_STOPS = {
