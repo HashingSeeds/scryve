@@ -1,3 +1,5 @@
+import type { ConvexReactClient } from "convex/react"
+import type { FunctionArgs, FunctionReference } from "convex/server"
 import { convexTest } from "convex-test"
 import { readdirSync } from "node:fs"
 import { basename, join } from "node:path"
@@ -35,4 +37,17 @@ export async function signedIn(t: ConvexTestHarness, subject: string, displayNam
   const actor = t.withIdentity({ subject })
   const userId = await actor.mutation(api.users.syncCurrent, { displayName })
   return Object.assign(actor, { userId })
+}
+
+type Mutation = FunctionReference<"mutation", "public", Record<string, unknown>, unknown>
+
+export function convexClientFor<Reference extends Mutation = Mutation>(
+  actor: ReturnType<ConvexTestHarness["withIdentity"]>,
+  around: (send: () => Promise<unknown>, args: FunctionArgs<Reference>) => Promise<unknown> = (
+    send,
+  ) => send(),
+) {
+  const mutation = (reference: Reference, args: FunctionArgs<Reference>) =>
+    around(() => actor.mutation<Mutation>(reference, args), args)
+  return { mutation } as unknown as ConvexReactClient
 }
