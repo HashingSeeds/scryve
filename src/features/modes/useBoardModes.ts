@@ -25,6 +25,7 @@ export interface BoardModesInput {
   players: readonly { id: string; name: string }[]
   controls: (playerId: string) => boolean
   act: (action: ModeAction) => boolean
+  turnsOn: boolean
 }
 
 export interface PlanarDie {
@@ -64,7 +65,15 @@ export interface ModeLogRow {
 
 export type ModeDialog = "planar" | "scheme"
 
-export function useBoardModes({ modes, turn, groups, players, controls, act }: BoardModesInput) {
+export function useBoardModes({
+  modes,
+  turn,
+  groups,
+  players,
+  controls,
+  act,
+  turnsOn,
+}: BoardModesInput) {
   const [dialog, setDialog] = useState<ModeDialog>()
   const [opener, setOpener] = useState<string>()
   const planechase = modes?.planechase
@@ -107,7 +116,7 @@ export function useBoardModes({ modes, turn, groups, players, controls, act }: B
         reset: () => {
           if (actor) act({ kind: "planar.reset", playerId: actor })
         },
-        manualReset: !turn,
+        manualReset: !turn || !turnsOn,
       }
     : undefined
 

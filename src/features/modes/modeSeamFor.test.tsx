@@ -39,6 +39,7 @@ describe("modeSeamFor", () => {
         players: seats.map((id) => ({ id, name: id })),
         controls: () => true,
         act: () => true,
+        turnsOn: true,
       }),
     )
     const [width, height] = [390, 844]
@@ -81,6 +82,7 @@ describe("modeSeamFor", () => {
         players: players.map((id) => ({ id, name: id })),
         controls: () => true,
         act: () => true,
+        turnsOn: true,
       }),
     )
     const [width, height] = [320, 568]
@@ -130,6 +132,7 @@ describe("modeSeamFor", () => {
             players: players.map((id) => ({ id, name: id })),
             controls: () => true,
             act: () => true,
+            turnsOn: true,
           }),
         )
         const seam = modeSeamFor(result.current, {
@@ -186,6 +189,7 @@ describe("modeSeamFor", () => {
             players: players.map((id) => ({ id, name: id })),
             controls: () => true,
             act: () => true,
+            turnsOn,
           }),
         )
         const seam = modeSeamFor(result.current, {

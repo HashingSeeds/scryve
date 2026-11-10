@@ -1068,6 +1068,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     players: turnSeats.map(({ playerId, name }) => ({ id: playerId, name })),
     controls: (playerId) => controlled.has(playerId),
     act: (action) => table?.modeAction(action) ?? false,
+    turnsOn,
   })
   const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =

@@ -20,6 +20,7 @@ const boardModes = (input: Partial<BoardModesInput> = {}) =>
       players,
       controls: () => true,
       act: () => true,
+      turnsOn: true,
       ...input,
     }),
   )
@@ -37,5 +38,11 @@ describe("useBoardModes", () => {
     const connected = boardModes({ controls: (id) => id === "bo" || id === "cy" })
     act(() => connected.result.current.openDialog("planar", "ada"))
     expect(connected.result.current.dialogSeat).toBe("bo")
+  })
+
+  it("offers Reset cost whenever Turns are off, even in a game that holds a turn", () => {
+    expect(boardModes().result.current.planar?.manualReset).toBe(false)
+    expect(boardModes({ turnsOn: false }).result.current.planar?.manualReset).toBe(true)
+    expect(boardModes({ turn: undefined }).result.current.planar?.manualReset).toBe(true)
   })
 })

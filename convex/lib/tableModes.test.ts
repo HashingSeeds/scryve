@@ -103,6 +103,12 @@ describe("Planechase", () => {
       [{ kind: "planar.reset", playerId: "ada" }, undefined],
     ])!
     expect(rollCost(reset.planechase!, undefined, "cy")).toBe(0)
+    const held = turn("ada", 1)
+    const heldReset = play(modes!, [
+      [{ kind: "planar.rolled", playerId: "ada", face: "blank" }, held],
+      [{ kind: "planar.reset", playerId: "ada" }, held],
+    ])!
+    expect(rollCost(heldReset.planechase!, held, "ada")).toBe(0)
   })
 
   it("counts again when turns go off after a turn roll", () => {

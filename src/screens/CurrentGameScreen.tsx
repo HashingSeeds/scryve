@@ -359,6 +359,7 @@ export function CurrentGameScreen({
     players: runtime.game.players,
     controls: () => true,
     act: runtime.tableRuntime.modeAction,
+    turnsOn,
   })
   const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
