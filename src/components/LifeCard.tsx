@@ -612,6 +612,11 @@ export const LifeCard = memo(function LifeCard({
     rowChip &&
     typeof rowCap === "number" &&
     fullIdentityWidth + identityMetrics.gap + rowChipWidth > rowCap - bagReserve
+  // why: at 8 to 10 seats the row is too short for the full chip even beside a bare mark, so it drops its "Pass" label and "Turn" word instead of running over the mark and under the bag.
+  const chipTight =
+    nameRetracted &&
+    typeof rowCap === "number" &&
+    markArt.width + identityMetrics.gap * 2 + rowChipWidth > rowCap - bagReserve
   const markAnchor =
     cardSize.width > 0
       ? identityMarkCenter({
@@ -1046,6 +1051,7 @@ export const LifeCard = memo(function LifeCard({
                         seatNumber={seatNumber}
                         foreground={foreground}
                         compact={compact}
+                        tight={chipTight}
                       />
                       {modeBeside}
                     </View>

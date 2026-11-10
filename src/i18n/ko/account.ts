@@ -122,8 +122,7 @@ export default {
     copyFailed: "복사할 수 없습니다. 다시 시도해 주세요.",
     turns: {
       label: "턴",
-      helper:
-        "현재 차례인 플레이어를 턴 타이머와 함께 표시합니다. 타이머를 누르면 차례를 넘기세요.",
+      helper: "현재 누구의 차례인지 표시합니다. 턴 칩을 탭하면 넘어갑니다.",
     },
     syncStats: {
       label: "괴짜용 통계",
