@@ -66,7 +66,6 @@ export function Sheet({
       <ModalBottomSheet
         ref={sheet}
         onDismissRequest={onClose}
-        skipPartiallyExpanded
         sheetGesturesEnabled={dismissible}
         properties={{
           shouldDismissOnBackPress: dismissible,
