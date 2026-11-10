@@ -61,7 +61,6 @@ export interface GameBoardStageProps {
   firstPlayer?: FirstPlayerOffer
   roundClock?: BoardRoundClock
   turns?: BoardTurns
-  /** why: Planechase and Archenemy sit on the menu's seam; the screen picks each plate's facing from the grid's slot facings. */
   seam?: (geometry: BoardSeamGeometry) => ReactNode
   windowOverlay?: ReactNode
   toast?: ReactNode
@@ -88,11 +87,9 @@ export interface BoardSeamGeometry {
   sides: ReturnType<typeof getMenuSeamNeighbors>
   width: number
   menuSize: number
-  /** why: `dy` is a link rivet's offset from the seam. */
   rivets: readonly SeamRivet[]
 }
 
-/** why: a team board's link rivets can sit on the menu's seam, so its plates need them measured from the seam. */
 function seamRivets(
   teamBoard: boolean | undefined,
   playerCount: number,

@@ -373,7 +373,6 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
   const { setup } = game
   const { roles: _lastRound, ...rest } = game
   const roles = dealLanRoles(game, random)
-  // why: the same seat stays the archenemy in a rematch, as in cloud and local games, and the decks shuffle again.
   const archenemySeat = game.seats.findIndex(
     ({ key }) => key === game.memory?.modes?.archenemy?.playerId,
   )

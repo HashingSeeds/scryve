@@ -1056,7 +1056,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     controls: (playerId) => controlled.has(playerId),
     act: (action) => table?.modeAction(action) ?? false,
   })
-  // why: the turn chip's spot is kept clear of every seat's marks and controls, so the die rides there whenever turns show.
   const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn

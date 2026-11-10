@@ -13,7 +13,6 @@ export const planarFaceValidator = v.union(
 )
 export type PlanarFace = Infer<typeof planarFaceValidator>
 
-/** why: CR 901.3a, one Planeswalker face, one chaos face, four blank faces. */
 export const PLANAR_DIE: readonly PlanarFace[] = [
   "planeswalk",
   "chaos",
@@ -36,22 +35,13 @@ const modeLogValidator = v.object({
   face: v.optional(planarFaceValidator),
   cost: v.optional(v.number()),
   card: v.optional(v.number()),
-  /** why: the game log places an entry by the change that made it, never by its time. */
   operationId: v.optional(v.string()),
 })
 export type ModeLogEntry = Infer<typeof modeLogValidator>
 
-/**
- * why: one communal planar deck (CR 901.15). `order[0]` is face up, and a planeswalk moves it to
- * the bottom. `rolls` counts each player's rolls during turn `rollsTurn` (the turn that began
- * with `rollsTurnId`), so a pass resets the cost without a write. The first roll of a new turn
- * keeps the turn before's counts in `previousRolls`, so an undone pass brings them back. No
- * `decks` means the players use their own cards and the app keeps only the die and its cost.
- */
 export const planechaseValidator = v.object({
   decks: v.optional(v.array(v.string())),
   order: v.optional(v.array(v.number())),
-  /** why: clients get the face-up plane instead of `order`, which only the authority holds. */
   faceUp: v.optional(v.number()),
   rolls: v.record(v.string(), v.number()),
   rollsTurn: v.optional(v.number()),
@@ -61,7 +51,6 @@ export const planechaseValidator = v.object({
   ),
 })
 
-/** why: `order[0]` is the top scheme. A plain scheme goes to the bottom once revealed and stays `shown` until the next. */
 export const archenemyValidator = v.object({
   playerId: v.string(),
   deck: v.optional(v.string()),
@@ -77,7 +66,6 @@ export const tableModesValidator = v.object({
   log: v.optional(v.array(modeLogValidator)),
 })
 
-/** why: picked before seats exist, so the archenemy is a seat number, or rolled at the start when absent. */
 export const modeSetupValidator = v.object({
   planechase: v.optional(v.object({ decks: v.optional(v.array(v.string())) })),
   archenemy: v.optional(v.object({ seat: v.optional(v.number()), deck: v.optional(v.string()) })),
@@ -150,7 +138,6 @@ export function rollCost(planechase: Planechase, turn: Turn | undefined, playerI
   return turnRolls(planechase, turn)[playerId] ?? 0
 }
 
-/** why: the planar controller is the active player (CR 901.6), and every seat of a team that shares the turn may roll (CR 901.12d). */
 export const mayRoll = (turn: Turn | undefined, groups: TurnGroups | undefined, playerId: string) =>
   !turn || sharesTurn(groups, turn.playerId, playerId)
 
@@ -163,7 +150,6 @@ export function shuffled<T>(items: readonly T[], random: () => number): T[] {
   return result
 }
 
-/** why: CR 901.5, phenomena turned up for the starting plane go to the bottom until a plane is face up. */
 function startingPlanarOrder(cards: readonly ModeCard[], random: () => number) {
   const order = shuffled(
     cards.map((_, index) => index),
@@ -179,11 +165,7 @@ export interface StartedModes {
   archenemyId?: string
 }
 
-/**
- * why: every authority starts a game's modes here, so a local game, Convex, and a nearby host
- * shuffle and pick the archenemy the same way. The archenemy's seat is its own turn group and
- * every other seat shares one (CR 904.4), and the archenemy takes the first turn (CR 904.6).
- */
+/** why: every authority starts a game's modes here, so a local game, Convex, and a nearby host shuffle and pick the archenemy the same way. */
 export function startModes(
   setup: ModeSetup | undefined,
   playerIds: readonly string[],
@@ -230,7 +212,6 @@ export function startModes(
   }
 }
 
-/** why: the archenemy's group waits on the first turn, so its clock starts with the table's first change like any first player's. */
 export function modeGameFields(started: StartedModes, now: number, operationId: string) {
   const { modes, turnGroups, archenemyId } = started
   return {
@@ -271,10 +252,7 @@ function walkedEntry(planechase: Planechase, playerId: string, at: number): Mode
   return { kind: "walked", playerId, at, ...(card === undefined ? {} : { card }) }
 }
 
-/**
- * why: one reducer for every authority and the optimistic overlay. The die face is an input, like
- * the Pokémon coin, so every reducer agrees on a roll. Returns null for an action the modes refuse.
- */
+/** why: one reducer for every authority and the optimistic overlay, with the die face as an input, so every reducer agrees on a roll. */
 export function applyModeAction(
   modes: TableModes | undefined,
   action: ModeAction,
@@ -316,7 +294,6 @@ function appliedModeAction(
     }
     const revealedTurn = context.turn ? { revealedTurn: context.turn.number } : {}
     const [top, ...rest] = archenemy.order ?? []
-    // why: a client's projection has no order, so it logs the reveal and the authority's answer names the scheme.
     if (top === undefined)
       return archenemy.order?.length === 0
         ? null
@@ -355,11 +332,9 @@ function appliedModeAction(
     return logged({ ...modes, planechase: walked }, walkedEntry(walked, playerId, at))
   }
   if (!mayRoll(context.turn, context.groups, playerId)) return null
-  // why: a face-up phenomenon planeswalks before anyone gets priority again (CR 312.7), so nobody rolls under it.
   if (faceUpPlane(planechase)?.kind === "phenomenon") return null
   const cost = rollCost(planechase, context.turn, playerId)
   const counted = turnRolls(planechase, context.turn)
-  // why: another turn's counts stay one step back, where an undone pass finds them.
   const displaced =
     counted !== planechase.rolls && planechase.rollsTurnId !== undefined
       ? { previousRolls: { turnId: planechase.rollsTurnId, rolls: planechase.rolls } }
@@ -423,11 +398,7 @@ export function isValidModes(modes: TableModes, playerIds: ReadonlySet<string>) 
   )
 }
 
-/**
- * why: every device but the authority gets this, so no client can read an unrevealed plane or
- * scheme off the wire. It keeps the face-up plane, the revealed and ongoing schemes, and the log,
- * whose cards were all revealed when logged; deck sizes come from the catalog.
- */
+/** why: every device but the authority gets this, so no client can read an unrevealed plane or scheme off the wire. */
 export function revealedModes(modes: TableModes): TableModes {
   const { planechase, archenemy } = modes
   const faceUp = planechase?.order?.[0]

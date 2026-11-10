@@ -449,7 +449,6 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
   })
 }
 
-// why: the same seat stays the archenemy in a rematch, and the decks shuffle again.
 function rematchModeSetup(game: LocalGame, setup: ModeSetup): ModeSetup {
   const archenemyId = game.table?.modes?.archenemy?.playerId
   const seat = game.players.findIndex(({ id }) => id === archenemyId)

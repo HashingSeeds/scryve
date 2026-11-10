@@ -59,7 +59,6 @@ describe("modeSeamFor", () => {
     const sides = [left?.items ?? [], right?.items ?? []]
     const schemeSide = sides.findIndex((items) => items.some((item) => item.startsWith("scheme")))
     expect(schemeSide).toBeGreaterThanOrEqual(0)
-    // why: with Planechase on too, the plane keeps the other side of the menu and opens the die.
     if (setup.planechase) expect(sides[1 - schemeSide]).toContain("plane")
   })
 })

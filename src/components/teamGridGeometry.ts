@@ -128,7 +128,6 @@ export function teamSeatRows(
   return { rows: seated, flexes }
 }
 
-/** why: a team panel's heads are as small as the cards of a game with that many seats, so three teams or more draw compact. */
 export const teamPanelCompact = (layout: GridLayout, teamCount: number) =>
   layout.compact || teamCount >= 3
 
@@ -146,11 +145,6 @@ export interface TeamRivet {
   size: number
 }
 
-/**
- * why: the seam's middle sits between one head's + and the other's −, so the link rivet moves
- * toward the table's center, off their line, and further on a narrow head whose total fills the
- * card; it stops short of the menu. Returns its center's offset from the panel's center.
- */
 export function teamRivet(
   panel: { width: number; height: number },
   rotation: LifeCardContentRotation,
@@ -170,7 +164,6 @@ export function teamRivet(
   return { x: toward.x * shift, y: toward.y * shift, size }
 }
 
-/** why: Planechase and Archenemy plates on the menu's seam keep clear of each team's rivet, so they need it where the grid draws it, in board points. */
 export function teamRivets(
   teamCount: number,
   layout: GridLayout,

@@ -3,7 +3,6 @@ import type { SeamNeighbor, SeamSide } from "@/components/playerGridGeometry"
 export type SeamItem = "plane" | "scheme" | "schemeDue" | "die"
 type Side = "left" | "right"
 
-/** why: a sideways card centers its + and − across its width, at both ends, so a plate straddling the seam stops short of them. */
 const GLYPH_HALF = 25
 const GAP = 2
 export const PLATE_HEIGHT = 34
@@ -27,7 +26,6 @@ export interface SeamGeometry {
   width: number
   menuSize: number
   edge: number
-  /** why: a Two-Headed Giant team's link rivet can sit on this seam; `dy` is its center's offset from the seam. */
   rivets?: readonly SeamRivet[]
 }
 
@@ -39,17 +37,11 @@ export interface SeamRivet {
 
 const across = (facing: number | undefined) => facing === 0 || facing === 180
 
-/** why: an active across card's turn chip slides beside the pentagon on its holder's right, which is the board's left for a seat across the table. */
 const chipSideOf = (facing: number): Side => (facing === 180 ? "left" : "right")
 
 const inCard = PLATE_HEIGHT / 2 + SEAM_GUTTER / 2 + GAP
 
-/**
- * why: plates may only sit where #953's turn chip, the + and − glyphs, the life total, and the
- * name row (with #955's counter chips) never are: a card facing across the seam leaves its top
- * band free except where its active chip slides, and a sideways card leaves the run between its
- * glyphs and the pentagon free.
- */
+/** why: plates may only sit where the turn chip, the + and − glyphs, the life total, and the name row with its counter chips never are, so moving any of those moves these bounds. */
 export function seamRoom(
   geometry: SeamGeometry,
   side: Side,
@@ -109,16 +101,10 @@ export function seamRoom(
       direction * (GLYPH_HALF + GAP),
   )
   const limit = side === "left" ? Math.max(...glyphs) : Math.min(...glyphs)
-  // why: an across neighbor the plate can't use holds its chip at the seam, so the plate moves wholly into the sideways card.
   const shift = sideways.length === 2 ? 0 : sideways[0] === upper ? -inCard : inCard
   return room(limit, shift, 0)
 }
 
-/**
- * why: a 2HG team's link rivet sits on the seam between a head's + and the pentagon, right where
- * plates go. A plate inside one card moves further into it, past the rivet; a plate straddling
- * the seam keeps the longer run on either side of it.
- */
 function clearOfRivets(room: SeamRoom, rivets: readonly SeamRivet[]): SeamRoom | undefined {
   let clear = room
   for (const { x, dy, size } of rivets) {
@@ -145,7 +131,6 @@ function clearOfRivets(room: SeamRoom, rivets: readonly SeamRivet[]): SeamRoom |
   return clear.width > 0 ? clear : undefined
 }
 
-// why: "Scheme due" has to be read, so it never shrinks to art the way a revealed scheme does.
 export const minWidth = (item: SeamItem) => (item === "schemeDue" ? FULL_PLATE_WIDTH : ICON_WIDTH)
 
 export interface SeamSlot {
@@ -153,7 +138,6 @@ export interface SeamSlot {
   items: SeamItem[]
 }
 
-/** why: the die sits in the active seat's card so it reads their way, the plane takes the other side, and the schemes the right; a side with no room hands its plates to the other. */
 export function planSeam(
   rooms: { left?: SeamRoom; right?: SeamRoom },
   items: readonly SeamItem[],
@@ -173,7 +157,6 @@ export function planSeam(
   const left = items.filter((item) => sideOf(item) === "left")
   const right = items.filter((item) => sideOf(item) === "right")
   if (!fits(rooms.left, left) || !fits(rooms.right, right)) {
-    // why: the planar dialog has the die too, and the plane opens it, so a crowded seam gives up the die before the plane and scheme lose their own sides.
     if (items.includes("die"))
       return planSeam(
         rooms,

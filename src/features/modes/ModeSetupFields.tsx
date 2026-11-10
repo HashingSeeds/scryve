@@ -4,7 +4,6 @@ import { translate } from "@/i18n/translate"
 import { PLANAR_DECKS, SCHEME_DECKS } from "../../../convex/lib/modeDecks"
 import type { ModeSetup } from "../../../convex/lib/tableModes"
 
-/** why: the pickers' ids, so "off", "own", "all:<product>", or a deck id for planes, and "roll" or a seat number for the archenemy. */
 export interface ModeChoices {
   planar: string
   archenemy: string
@@ -73,7 +72,6 @@ const schemeOptions = (): SelectOption[] => [
   { id: "own", label: translate("play:newGame.ownSchemeDeck") },
 ]
 
-/** why: Planechase joins any Magic game, so its picker shows for every Magic type; the archenemy pickers show only for Archenemy. */
 export function ModeSetupFields({
   choices,
   archenemy,

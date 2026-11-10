@@ -360,7 +360,6 @@ export function CurrentGameScreen({
     controls: () => true,
     act: runtime.tableRuntime.modeAction,
   })
-  // why: the turn chip's spot is kept clear of every seat's marks and controls, so the die rides there whenever turns show.
   const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn

@@ -135,7 +135,6 @@ export interface SeamNeighbor {
 
 export type SeamSide = { upper?: SeamNeighbor; lower?: SeamNeighbor }
 
-/** why: the menu's seam is where Planechase and Archenemy plates sit, and what may sit there depends on the cards that touch it on each side of the pentagon. */
 export function getMenuSeamNeighbors(
   playerCount: number,
   layout: ReturnType<typeof getPlayerGridLayout>,
@@ -160,7 +159,6 @@ export function getMenuSeamNeighbors(
   return { left: sideOf("left"), right: sideOf("right") }
 }
 
-/** why: the seam's plates turn toward one seat, so they need each slot's own facing, indexed by slot. */
 export function getPlayerSlotFacings(
   playerCount: number,
   layout: ReturnType<typeof getPlayerGridLayout>,

@@ -64,7 +64,6 @@ export interface ModeLogRow {
 
 export type ModeDialog = "planar" | "scheme"
 
-/** why: local and connected boards read the same modes, so seat control is the only thing that differs between them. */
 export function useBoardModes({ modes, turn, groups, players, controls, act }: BoardModesInput) {
   const [dialog, setDialog] = useState<ModeDialog>()
   const planechase = modes?.planechase

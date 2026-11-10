@@ -21,7 +21,6 @@ import { BoardPressable } from "../BoardPressable"
 import { Text } from "../Text"
 
 const GAP = 4
-/** why: a fresh roll shows its face long enough to read across the table, then the die goes back to showing its cost. */
 const RESULT_MS = 4_000
 
 export function PlanarGlyph({
@@ -84,7 +83,6 @@ function useFresh(at: number | undefined) {
   return at !== undefined && Math.max(now, Date.now()) - at < RESULT_MS
 }
 
-/** why: the die shows the next roll's cost at rest, so the active player knows the mana before tapping. A seat's die rolls as that seat, since each teammate of a shared turn pays their own cost (CR 901.12d). */
 export function PlanarDieButton({
   planar,
   seat,
@@ -287,7 +285,6 @@ function SchemePlate({
   )
 }
 
-/** why: the archenemy's prompt rides beside their turn chip, labeled, since an icon can't say what's due. */
 export function SchemeDueButton({ onPress }: { onPress: () => void }) {
   const {
     theme: { colors },
@@ -314,11 +311,6 @@ export function SchemeDueButton({ onPress }: { onPress: () => void }) {
   )
 }
 
-/**
- * why: the plates sit on the menu's seam where seamPlan found room, so they never cover a mark,
- * name, life total, + or −, counter chip, or turn chip. A full plate turns to read right for the
- * seat whose card holds it.
- */
 export function ModeSeam({
   anchorY,
   plan,
@@ -376,7 +368,6 @@ export function ModeSeam({
   )
 }
 
-/** why: the die takes its full width only where the room spares it next to the plates, and drops the face's word below that. */
 function dieWidth(slot: SeamSlot) {
   const plates = slot.items.filter((item) => item !== "die").length
   const spare = slot.room.width - plates * (FULL_PLATE_WIDTH + GAP)

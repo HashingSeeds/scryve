@@ -210,7 +210,6 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   return game
 }
 
-/** why: planechase=<deck id>|own, archenemy=<seat>|roll, schemes=<deck id>|own. Decks are in convex/lib/modeDecks.ts. */
 function modeSetupOf(params: SeedParams, playerCount: number) {
   const planechase =
     params.planechase === undefined

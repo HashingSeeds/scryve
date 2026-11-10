@@ -159,14 +159,12 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
   return rows.filter(({ delta }) => delta !== 0)
 }
 
-/** why: a Planechase or Archenemy log entry, already worded with its player's name and card. */
 export interface GameModeRow {
   kind: "mode"
   id: string
   playerId: PlayerId
   at: number
   text: string
-  /** why: the change that made the entry, which places it in the log; empty for an entry from before it was kept. */
   operationIds: string[]
 }
 
@@ -182,8 +180,6 @@ export function mergedLog(
   return [...life, ...counters].sort((left, right) => placeOf(right) - placeOf(left))
 }
 
-/** why: mode entries carry the authority's time and no change of their own, so they slot in by time and leave the table rows in the order they came. */
-/** why: newest first, by sequence like every other row: a mode entry sits where the change that made it does. */
 export function withModeRows(
   rows: readonly GameLogChange[],
   modes: readonly GameModeRow[],

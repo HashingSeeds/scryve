@@ -199,7 +199,6 @@ describe("life log", () => {
       operationIds: [id],
     })
     const turns = [{ operationId: "turn-2", playerId: ada, number: 2, at: 2_000 }]
-    // why: the roll's clock reads before the hit's, but it came after it.
     const sequence = ["scheme", "turn-2", "hit", "roll"]
     const positionOf = (id: string) => sequence.indexOf(id)
 

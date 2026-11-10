@@ -6,7 +6,6 @@ import { chipCrowdedBySeam, planSeam, seamRoom, type SeamItem } from "./seamPlan
 import type { BoardModes } from "./useBoardModes"
 
 const EDGE = 8
-/** why: clears the first-player and round clock tabs at the board's edges while they show. */
 const EDGE_WITH_TABS = 40
 
 export function modeSeamFor(
@@ -18,7 +17,6 @@ export function modeSeamFor(
     teamBinding,
   }: {
     dieOnChip: boolean
-    /** why: with Turns off no chip carries "Scheme due", so the seam holds the archenemy's scheme control. */
     turnChips: boolean
     slotOf: (playerId: string) => number | undefined
     teamBinding?: TeamBinding
@@ -48,7 +46,6 @@ export function modeSeamFor(
       width,
       menuSize,
       edge: edgeTabs ? EDGE_WITH_TABS : EDGE,
-      // why: the frame binding on trial draws no rivet.
       rivets: teamBinding === "frame" ? [] : rivets,
     }
     const crowded = chipCrowdedBySeam(geometry, busySlots)
@@ -70,7 +67,6 @@ export function modeSeamFor(
     }
     const planned = planSeam(rooms, items)
     const placed = [planned.left, planned.right].some((slot) => slot?.items.includes("schemeDue"))
-    // why: a labeled "Scheme due" needs a full plate; where the seam can't fit one, the scheme icon opens the same reveal.
     const plan =
       schemeItem === "schemeDue" && !placed && seamHoldsScheme
         ? planSeam(
