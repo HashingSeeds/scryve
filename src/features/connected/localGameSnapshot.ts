@@ -116,9 +116,7 @@ function commanderTotalsFor(
     seats.flatMap(([toPlayerId, toSeat]) =>
       COMMANDER_SLOTS.flatMap((commander): NonNullable<LocalGameSnapshot["commanderTotals"]> => {
         const total = commanderDamageBetween(game, fromPlayerId, toPlayerId, commander)
-        return fromSeat === toSeat || total <= 0
-          ? []
-          : [{ fromSeat, toSeat, ...(commander ? { commander } : {}), total }]
+        return fromSeat === toSeat || total <= 0 ? [] : [{ fromSeat, toSeat, commander, total }]
       }),
     ),
   )
