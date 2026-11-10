@@ -1,3 +1,6 @@
+import type { FunctionArgs } from "convex/server"
+
+import type { api } from "../../../../convex/_generated/api"
 import {
   assertCanAddPlayer,
   assertPlannedRounds,
@@ -349,7 +352,9 @@ export function hubStandings(event: HubEvent, throughRound: number): readonly Pl
   })
 }
 
-export function nearbyImport(event: HubEvent, codeCandidates: string[]) {
+type NearbyImportArgs = FunctionArgs<typeof api.events.importNearby>
+
+export function nearbyImport(event: HubEvent, codeCandidates: string[]): NearbyImportArgs {
   return {
     nearbyId: event.id,
     name: event.name,
@@ -362,19 +367,28 @@ export function nearbyImport(event: HubEvent, codeCandidates: string[]) {
     round: event.round,
     createdAt: event.createdAt,
     finishedAt: event.finishedAt ?? Date.now(),
-    players: event.players.map(({ id, name, droppedAt }) => ({
+    players: event.players.map(({ id, name, droppedAt }): NearbyImportArgs["players"][number] => ({
       id,
       name,
-      ...(droppedAt === undefined ? {} : { droppedAt }),
+      droppedAt,
     })),
-    tables: event.tables.map(({ round, table, playerIds, status, result, reportedBy }) => ({
-      round,
-      table,
-      playerIds: [...playerIds],
-      status,
-      ...(result ? { result } : {}),
-      ...(reportedBy ? { reportedBy } : {}),
-    })),
+    tables: event.tables.map(
+      ({
+        round,
+        table,
+        playerIds,
+        status,
+        result,
+        reportedBy,
+      }): NearbyImportArgs["tables"][number] => ({
+        round,
+        table,
+        playerIds: [...playerIds],
+        status,
+        result: result || undefined,
+        reportedBy: reportedBy || undefined,
+      }),
+    ),
     codeCandidates,
   }
 }
