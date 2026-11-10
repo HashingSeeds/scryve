@@ -215,7 +215,7 @@ const NEW_GAME_FIELDS = [
   "clockMode",
   "chosenClockMinutes",
 ] as const
-const TREACHERY_MIN_SEATS = 4
+const VARIANT_MIN_SEATS = 4
 const MAX_SEATS = 6
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 const CLOCK_MODES = [
@@ -762,7 +762,7 @@ function NewGameForm({
     const nextCount =
       (nextTreachery && !isTreacheryPlayerCount(playerCount)) ||
       (nextTeams && !isTwoHeadedGiantPlayerCount(playerCount))
-        ? TREACHERY_MIN_SEATS
+        ? VARIANT_MIN_SEATS
         : playerCount
     const defaultLife = nextTeams
       ? defaultTeamLife(type.format)
@@ -990,7 +990,7 @@ function NewGameForm({
             detail={(type) =>
               gameTypeDetail(
                 type,
-                type.variant ? Math.max(playerCount, TREACHERY_MIN_SEATS) : playerCount,
+                type.variant ? Math.max(playerCount, VARIANT_MIN_SEATS) : playerCount,
               )
             }
             onChoose={pickGameType}
