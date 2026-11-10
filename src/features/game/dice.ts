@@ -1,6 +1,6 @@
 import { translate } from "@/i18n/translate"
 
-import type { TurnSeat } from "./TurnDialog"
+import type { TurnSeat } from "./turnTab"
 import type { GamePlayer, PlayerId } from "./types"
 import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/lib/systems"
 import type { Turn } from "../../../convex/lib/turns"
