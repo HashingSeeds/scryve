@@ -171,6 +171,7 @@ export type GameWrite =
       toPlayerId: string
       commander?: number
       delta: number
+      commanderLimit?: number
     })
   | (WriteRequest & {
       kind: "commander.resolve"
@@ -681,6 +682,7 @@ function* writeClaim(
   const status = commanderClaimOutcome({
     total,
     delta: write.delta,
+    commanderLimit: write.commanderLimit,
     pendingClaims: pending.length,
     pairHasPendingClaim: pending.some((claim) => isSamePair(claim, pair)),
   })

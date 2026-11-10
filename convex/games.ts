@@ -2541,6 +2541,7 @@ export const submitCommanderDamage = mutation({
     commander: v.optional(v.number()),
     operationId: v.string(),
     delta: v.number(),
+    commanderLimit: v.optional(v.number()),
     deviceId: v.string(),
     clientCreatedAt: v.number(),
     tappedAt: v.optional(v.number()),

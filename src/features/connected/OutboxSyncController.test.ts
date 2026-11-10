@@ -361,7 +361,7 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toMatch(/between 1 and 999\b/i)
   })
 
-  it("queues each partner's damage with its own commander slot", () => {
+  it("queues each partner's damage with its own commander slot, marked with the 999 limit", () => {
     const { controller, repository } = harness()
     controller.submitCommanderDamage("player-1", [
       { toPlayerId: "player-2", delta: 4 },
@@ -372,6 +372,7 @@ describe("outbox sync controller", () => {
     )
     expect(queued.find((event) => event.delta === 4)).not.toHaveProperty("commander")
     expect(queued.find((event) => event.delta === 2)).toMatchObject({ commander: 1 })
+    expect(queued.map((event) => event.commanderLimit)).toEqual([999, 999])
   })
 
   it("rejects commander damage against the attacking player before enqueueing", () => {

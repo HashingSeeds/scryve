@@ -102,22 +102,24 @@ export const commanderLethalDamage = (system: unknown, format: unknown) =>
 export const isCommanderFormat = (system: unknown, format: unknown) =>
   commanderLethalDamage(system, format) !== undefined
 
-// why: a claim that can never land is declined when it arrives instead of rejected, so every installed outbox sees a success and stops retrying it.
-/** why: builds from before the 999 limit clamp every commander slot to 99 on each hit, so a hit from one of them on a defender already past 99 also claims that slot back down to exactly 99. Drop this once those builds age out. */
-const OLD_BUILD_COMMANDER_CAP = 99
-const isOldBuildClampBack = (total: number, nextTotal: number) =>
-  total > OLD_BUILD_COMMANDER_CAP && nextTotal === OLD_BUILD_COMMANDER_CAP
+/** why: builds from before the 999 limit send no `commanderLimit` and clamp every commander slot to 99 on each hit, undo or Send, so past 99 their negative claims pull damage back and hand back life. Drop this once those builds age out. */
+const LEGACY_COMMANDER_LIMIT = 99
+const isClampedBack = (claim: { total: number; delta: number; commanderLimit?: number }) =>
+  claim.delta < 0 && claim.total > (claim.commanderLimit ?? LEGACY_COMMANDER_LIMIT)
 
+// why: a claim that can never land is declined when it arrives instead of rejected, so every installed outbox sees a success and stops retrying it.
+// why: a pair's total moves only when its claim is confirmed, and a pair holds one pending claim at a time, so the total checked here is still the total when that claim is confirmed.
 export function commanderClaimOutcome(claim: {
   total: number
   delta: number
+  commanderLimit?: number
   pendingClaims: number
   pairHasPendingClaim: boolean
 }): "pending" | "declined" {
   const nextTotal = claim.total + claim.delta
   return nextTotal < 0 ||
     nextTotal > MAX_COMMANDER_DAMAGE ||
-    isOldBuildClampBack(claim.total, nextTotal) ||
+    isClampedBack(claim) ||
     claim.pendingClaims >= MAX_PENDING_COMMANDER_CLAIMS ||
     claim.pairHasPendingClaim
     ? "declined"

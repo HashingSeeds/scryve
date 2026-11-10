@@ -75,9 +75,14 @@ describe("game rules", () => {
     expect(commanderClaimOutcome({ ...open, delta: 90 })).toBe("pending")
     expect(commanderClaimOutcome({ ...open, total: 995, delta: 5 })).toBe("declined")
     expect(commanderClaimOutcome({ ...open, delta: -11 })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, total: 120, delta: -21 })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, total: 120, delta: -20 })).toBe("pending")
     expect(commanderClaimOutcome({ ...open, total: 99, delta: -9 })).toBe("pending")
+    expect(commanderClaimOutcome({ ...open, total: 120, delta: -21 })).toBe("declined")
+    expect(commanderClaimOutcome({ ...open, total: 120, delta: -22 })).toBe("declined")
+    expect(commanderClaimOutcome({ ...open, total: 100, delta: -1 })).toBe("declined")
+    expect(commanderClaimOutcome({ ...open, total: 120, delta: 3 })).toBe("pending")
+    const marked = { ...open, commanderLimit: 999 }
+    expect(commanderClaimOutcome({ ...marked, total: 100, delta: -1 })).toBe("pending")
+    expect(commanderClaimOutcome({ ...marked, total: 120, delta: -21 })).toBe("pending")
     expect(commanderClaimOutcome({ ...open, pairHasPendingClaim: true })).toBe("declined")
     expect(commanderClaimOutcome({ ...open, pendingClaims: MAX_PENDING_COMMANDER_CLAIMS })).toBe(
       "declined",
