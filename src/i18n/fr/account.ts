@@ -123,7 +123,7 @@ export default {
     copyFailed: "Copie impossible. Réessayez.",
     turns: {
       label: "Tours",
-      helper: "Indique à qui est le tour. Touchez la pastille du tour pour passer.",
+      helper: "Indique à qui c'est le tour. Touchez la pastille du tour pour passer.",
     },
     syncStats: {
       label: "Stats pour les geeks",
