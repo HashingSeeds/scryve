@@ -126,6 +126,9 @@ async function parityGame(
                   toPlayerId: write.toPlayerId as Id<"gamePlayers">,
                   ...(write.commander === undefined ? {} : { commander: write.commander }),
                   delta: write.delta,
+                  ...(write.commanderLimit === undefined
+                    ? {}
+                    : { commanderLimit: write.commanderLimit }),
                 })
               : await client.mutation(
                   write.decision === "confirmed"
@@ -694,6 +697,62 @@ describe("engine parity: submitCommanderDamage", () => {
       ...sent("shared-operation-01"),
     })
     await game.write("host", claim("shared-operation-01", 2))
+    await game.expectSameState()
+  })
+
+  it("lets totals pass 99 and declines one past 999", async () => {
+    const game = await parityGame(makeConvexTest(), { ...commander, lifeEditing: "anyone" })
+    const claim = (operationId: string, delta: number) =>
+      ({
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        delta,
+        ...sent(operationId),
+      }) as const
+
+    await game.write("host", claim("claim-past-99-0001", 97))
+    expect(await game.write("host", claim("claim-past-99-0002", 5))).toMatchObject({
+      ok: true,
+      ack: { status: "confirmed", total: 102 },
+    })
+    await game.write("host", claim("claim-past-99-0003", 897))
+    expect(await game.write("host", claim("claim-past-99-0004", 1))).toMatchObject({
+      ok: true,
+      ack: { status: "declined" },
+    })
+    await game.expectSameState()
+  })
+
+  it("declines a pre-999 build's claim that would pull a total past 99 back down", async () => {
+    const game = await parityGame(makeConvexTest(), { ...commander, lifeEditing: "anyone" })
+    const claim = (operationId: string, delta: number, commanderLimit?: number) =>
+      ({
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        delta,
+        ...(commanderLimit === undefined ? {} : { commanderLimit }),
+        ...sent(operationId),
+      }) as const
+
+    await game.write("host", claim("clamp-back-to-99-01", 120))
+    for (const [operationId, delta] of [
+      ["clamp-back-to-99-02", -21],
+      ["clamp-back-to-99-03", -22],
+    ] as const)
+      expect(await game.write("host", claim(operationId, delta))).toMatchObject({
+        ok: true,
+        ack: { status: "declined" },
+      })
+    expect(await game.write("host", claim("clamp-back-to-99-04", -20, 999))).toMatchObject({
+      ok: true,
+      ack: { status: "confirmed", total: 100 },
+    })
+    expect(await game.write("host", claim("clamp-back-to-99-05", -1, 999))).toMatchObject({
+      ok: true,
+      ack: { status: "confirmed", total: 99 },
+    })
     await game.expectSameState()
   })
 

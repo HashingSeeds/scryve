@@ -1,11 +1,12 @@
-import type { ComponentProps } from "react"
+import { useState, type ComponentProps } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated from "react-native-reanimated"
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from "react-native-reanimated"
 
 import { translate } from "@/i18n/translate"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 
+import { HANDOFF_MS, NAME_OUT_MS } from "./playerCardTypes"
 import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "./PlayerMark"
 import { Text, type TextProps } from "./Text"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
@@ -64,6 +65,7 @@ export interface SeatIdentityProps {
   foil?: boolean
   staleSince?: number
   markOnly?: boolean
+  nameRetracted?: boolean
   markHidden?: boolean
   nameStyle?: ComponentProps<typeof Animated.View>["style"]
   style?: StyleProp<ViewStyle>
@@ -80,11 +82,13 @@ export function SeatIdentity({
   foil,
   staleSince,
   markOnly,
+  nameRetracted,
   markHidden,
   nameStyle,
   style,
 }: SeatIdentityProps) {
   const metrics = seatIdentityMetrics(compact)
+  const [nameHeight, setNameHeight] = useState(0)
   const art = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
   return (
     <View testID={`seat-identity-seat-${seatNumber}`} style={[$row, { gap: metrics.gap }, style]}>
@@ -97,24 +101,39 @@ export function SeatIdentity({
         size={art.size}
         style={[$mark, art.trim, markHidden && $hidden]}
       />
-      <Animated.View testID={`life-status-seat-${seatNumber}`} style={[$text, nameStyle]}>
-        {markOnly ? null : (
-          <Text
-            testID={`player-name-seat-${seatNumber}`}
-            text={playerName}
-            accessible={false}
-            size={metrics.name}
-            weight="medium"
-            maxFontSizeMultiplier={1.3}
-            numberOfLines={1}
-            style={{ color }}
-          />
-        )}
+      <Animated.View
+        testID={`life-status-seat-${seatNumber}`}
+        // why: a retracted name's fading copy is pinned to this box; letting it collapse re-centers the box and drops the copy half a line.
+        style={[$text, nameStyle, nameRetracted && { minHeight: nameHeight }]}
+      >
+        <LayoutAnimationConfig skipEntering>
+          {markOnly || nameRetracted ? null : (
+            <Animated.View
+              entering={NAME_IN}
+              exiting={NAME_OUT}
+              onLayout={({ nativeEvent: { layout } }) => setNameHeight(layout.height)}
+            >
+              <Text
+                testID={`player-name-seat-${seatNumber}`}
+                text={playerName}
+                accessible={false}
+                size={metrics.name}
+                weight="medium"
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={{ color }}
+              />
+            </Animated.View>
+          )}
+        </LayoutAnimationConfig>
         {staleSince !== undefined ? <UpdatedAgo since={staleSince} color={color} /> : null}
       </Animated.View>
     </View>
   )
 }
+
+const NAME_IN = FadeIn.duration(HANDOFF_MS).delay(NAME_OUT_MS)
+const NAME_OUT = FadeOut.duration(NAME_OUT_MS)
 
 function UpdatedAgo({ since, color }: { since: number; color: string }) {
   const elapsed = useElapsedSince(since)

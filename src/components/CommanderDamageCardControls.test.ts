@@ -1,8 +1,8 @@
 import { attackerLayout, keypadPlacement, pulseFrame } from "./CommanderDamageCardControls"
 
 describe("attackerLayout", () => {
-  const rowWidth = (layout: ReturnType<typeof attackerLayout>) =>
-    layout.perRow * layout.width + (layout.perRow - 1) * 16
+  const rowWidth = (layout: ReturnType<typeof attackerLayout>, count: number) =>
+    count * layout.width + (count - 1) * 16
   const boxesTop = (space: { height: number }, layout: ReturnType<typeof attackerLayout>) =>
     space.height / 2 + layout.boxesY - layout.boxesHeight / 2
 
@@ -25,7 +25,7 @@ describe("attackerLayout", () => {
         space.height - (layout.placement === "above" ? (grid?.height ?? 0) : 0) - 16 + 0.5,
       )
       const clear = layout.placement === "beside" ? (grid?.width ?? 0) : 0
-      expect(rowWidth(layout)).toBeLessThanOrEqual(space.width - 32 - clear * 2)
+      expect(rowWidth(layout, count)).toBeLessThanOrEqual(space.width - 32 - clear * 2)
       expect(layout.name).toBeGreaterThanOrEqual(name)
       expect(layout.width).toBeGreaterThanOrEqual(layout.height * 1.4)
     },
@@ -33,10 +33,10 @@ describe("attackerLayout", () => {
 
   it("sets partners in one full-width row above a short seat's grid, with the life larger beside the grid", () => {
     const space = { width: 455, height: 193 }
-    const layout = attackerLayout({ space, count: 2, grid: { width: 86, height: 80 } })
-    expect(layout).toMatchObject({ placement: "above", rows: 1, perRow: 3 })
+    const layout = attackerLayout({ space, count: 2, grid: { width: 120, height: 80 } })
+    expect(layout.placement).toBe("above")
     expect(layout.lifeFont).toBeGreaterThan(
-      attackerLayout({ space, count: 1, grid: { width: 86, height: 80 } }).lifeFont,
+      attackerLayout({ space, count: 1, grid: { width: 120, height: 80 } }).lifeFont,
     )
   })
 })
@@ -44,7 +44,7 @@ describe("attackerLayout", () => {
 describe("keypadPlacement", () => {
   it("stacks the keypad under the box when a narrow seat leaves no room beside it", () => {
     const space = { width: 150, height: 220 }
-    const keypad = keypadPlacement(space, attackerLayout({ space, count: 1, others: false }), true)
+    const keypad = keypadPlacement(space, attackerLayout({ space, count: 1 }), true)
     expect(keypad).toMatchObject({ stacked: true, compact: true })
     expect(keypad.width).toBeGreaterThanOrEqual(100)
     expect(keypad.height).toBeGreaterThan(0)

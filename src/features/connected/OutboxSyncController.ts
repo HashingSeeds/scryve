@@ -397,6 +397,7 @@ export class OutboxSyncController {
           toPlayerId: asPlayerId(toPlayerId),
           ...(commander ? { commander } : {}),
           delta,
+          commanderLimit: MAX_COMMANDER_DAMAGE,
           actorId: asActorId(this.options.ownerId),
           deviceId: this.options.deviceId,
           clientCreatedAt: now,

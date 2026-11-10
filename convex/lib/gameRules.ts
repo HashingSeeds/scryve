@@ -4,7 +4,7 @@ import { flooredLifeDelta, formatDefinition } from "./systems"
 
 export const MAX_LIFE_DELTA = 999_999
 export const MAX_SNAPSHOT_LIFE = 1_000_000
-export const MAX_COMMANDER_DAMAGE = 99
+export const MAX_COMMANDER_DAMAGE = 999
 
 export const isLifeDelta = (value: unknown): value is number =>
   typeof value === "number" &&
@@ -102,16 +102,24 @@ export const commanderLethalDamage = (system: unknown, format: unknown) =>
 export const isCommanderFormat = (system: unknown, format: unknown) =>
   commanderLethalDamage(system, format) !== undefined
 
+/** why: builds from before the 999 limit send no `commanderLimit` and clamp every commander slot to 99 on each hit, undo or Send, so past 99 their negative claims pull damage back and hand back life. Drop this once those builds age out. */
+const LEGACY_COMMANDER_LIMIT = 99
+const isClampedBack = (claim: { total: number; delta: number; commanderLimit?: number }) =>
+  claim.delta < 0 && claim.total > (claim.commanderLimit ?? LEGACY_COMMANDER_LIMIT)
+
 // why: a claim that can never land is declined when it arrives instead of rejected, so every installed outbox sees a success and stops retrying it.
+// why: a pair's total moves only when its claim is confirmed, and a pair holds one pending claim at a time, so the total checked here is still the total when that claim is confirmed.
 export function commanderClaimOutcome(claim: {
   total: number
   delta: number
+  commanderLimit?: number
   pendingClaims: number
   pairHasPendingClaim: boolean
 }): "pending" | "declined" {
   const nextTotal = claim.total + claim.delta
   return nextTotal < 0 ||
     nextTotal > MAX_COMMANDER_DAMAGE ||
+    isClampedBack(claim) ||
     claim.pendingClaims >= MAX_PENDING_COMMANDER_CLAIMS ||
     claim.pairHasPendingClaim
     ? "declined"

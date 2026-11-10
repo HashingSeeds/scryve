@@ -47,7 +47,7 @@ const { localGameRepository } = jest.requireMock<{ localGameRepository: LocalGam
 )
 
 describe("first launch", () => {
-  it("keeps 'Life and turns' when Play finishes onboarding", () => {
+  it("keeps Turns when Play finishes onboarding", () => {
     const view = render(
       <ThemeProvider>
         <Index />

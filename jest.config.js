@@ -1,9 +1,21 @@
+const os = require("node:os")
+
 const modulePathIgnorePatterns = ["<rootDir>/\\.delta/", "<rootDir>/\\.agents-work/"]
 
 const nodeTestDirectories = ["<rootDir>/convex/", "<rootDir>/src/features/sync/"]
 
 // why: test:ygo-worker runs the worker tests by path; the full suite skips them so CI runs them once.
 const workerTestsRequested = process.argv.some((arg) => arg.includes("workers/ygo-image-mirror"))
+
+// why: Jest's default of one worker per core (~700 MB each) OOM-killed agents on a 16 GB machine.
+const workerMemoryBytes = 1.5 * 2 ** 30
+const maxWorkers = Math.max(
+  1,
+  Math.min(
+    os.availableParallelism() - 1,
+    Math.floor(process.availableMemory() / workerMemoryBytes),
+  ),
+)
 
 /**
  * Tests under test/config/ assert repo invariants by reading JSON and shelling out
@@ -13,6 +25,7 @@ const workerTestsRequested = process.argv.some((arg) => arg.includes("workers/yg
  * @type {import('@jest/types').Config.InitialOptions}
  */
 module.exports = {
+  maxWorkers,
   projects: [
     {
       displayName: "app",

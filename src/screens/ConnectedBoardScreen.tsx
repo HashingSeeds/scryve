@@ -68,11 +68,9 @@ import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/Tr
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
-import type { OthersChange } from "@/features/game/commanderAttack"
 import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import { asPlayerId } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
-import { GameToast } from "@/features/game/GameToast"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { defaultConnectedLayout, playerGridLayoutForCount } from "@/features/game/playerLayouts"
@@ -86,7 +84,12 @@ import {
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import { teamChoices, teamMembers, teamName, teamValueLabel } from "@/features/game/teams"
-import { reportTurnsGame, TurnDialog, useTurnsEnabled } from "@/features/game/TurnDialog"
+import {
+  reportTurnsGame,
+  TurnDialog,
+  useChessMinutes,
+  useTurnsEnabled,
+} from "@/features/game/TurnDialog"
 import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
@@ -692,15 +695,17 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const turn = turns ? table?.table.turn : undefined
   const turnGroups = table?.table.turnGroups
   const [turnsEnabled] = useTurnsEnabled(localGameRepository)
+  const [chessMinutes] = useChessMinutes(localGameRepository)
+  const chessAppliedTo = useRef<string>(undefined)
   const [turnOpen, setTurnOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const openLog = useCallback(() => setLogOpen(true), [])
-  const [turnToast, setTurnToast] = useState<{
-    operationId: string
-    passerId: string
-    message: string
-  }>()
-  const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
+  const [passUndo, setPassUndo] = useState<{ operationId: string; passerId: string }>()
+  useEffect(() => {
+    if (!passUndo) return
+    const expire = setTimeout(() => setPassUndo(undefined), PASS_UNDO_MS)
+    return () => clearTimeout(expire)
+  }, [passUndo])
   const endedTurn = useRef(turn)
   useLayoutEffect(() => {
     endedTurn.current = turn
@@ -820,11 +825,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           ]),
       ) as Record<PlayerId, number>,
     commit: controls.submitCommanderDamage,
-    // why: Others lowers the defender's own seat, which the server takes only where anyone edits any seat.
-    loseLife: anySeat
-      ? (changes: readonly OthersChange[]) =>
-          changes.forEach(({ toPlayerId, amount }) => controls.changeLife(toPlayerId, -amount))
-      : undefined,
   }
   const attack = useCommanderAttack(commanderPort, {
     seatDeck,
@@ -976,6 +976,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     () => [...game.players].sort((left, right) => left.seat - right.seat).map(toBoardSeat),
     [game.players],
   )
+  useEffect(() => {
+    if (!chessMinutes || !table || !turn || turn.number !== 1 || turn.bank) return
+    if (!controlled.has(turn.playerId) || chessAppliedTo.current === turn.operationId) return
+    chessAppliedTo.current = turn.operationId
+    table.setBank(turn.playerId, chessMinutes * 60_000)
+  }, [chessMinutes, table, turn, controlled])
   const turnSeats = [...game.players]
     .sort((left, right) => left.seat - right.seat)
     .map((player) => ({
@@ -1004,14 +1010,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     if (!turn || !actingSeat || !table) return
     const operationId = table.passTurn(actingSeat, next)
     if (!operationId) return
-    setTurnToast({
-      operationId,
-      passerId: actingSeat,
-      message: translate("board:turn.passed", {
-        number: turn.number + 1,
-        name: teamName(named, turnGroups, next) ?? "",
-      }),
-    })
+    setPassUndo({ operationId, passerId: actingSeat })
   }
   const turnsOn = tabOn && active && table !== undefined
   const turnChip: TurnChipState | undefined =
@@ -1020,8 +1019,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turn,
           canPress: myTurn,
           nameOf: (playerId) => teamName(named, turnGroups, playerId),
+          seatOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId),
+          passLabelShown: localGameRepository.passLabelShown(),
           onStart: () => actingSeat && table?.startTurn(actingSeat),
-          onPass: passTo,
+          onPass: (next) => {
+            localGameRepository.notePass()
+            passTo(next)
+          },
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
@@ -1031,6 +1035,17 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
         return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+      if (passUndo && sharesTurn(turnGroups, passUndo.passerId, player.id))
+        return [
+          ...chips,
+          {
+            kind: "undoPass",
+            onUndo: () => {
+              table?.undoTurn(passUndo.passerId, passUndo.operationId)
+              setPassUndo(undefined)
+            },
+          },
+        ]
       return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -1094,24 +1109,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turnChip
             ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf: nextPlayerId }
             : undefined
-        }
-        toast={
-          turnToast ? (
-            <GameToast
-              key={turnToast.operationId}
-              inline
-              message={turnToast.message}
-              actionTx="common:undo"
-              testID="turn-passed-toast"
-              actionTestID="turn-passed-undo"
-              onAction={() => {
-                table?.undoTurn(turnToast.passerId, turnToast.operationId)
-                setTurnToast(undefined)
-              }}
-              visibleMs={PASS_UNDO_MS}
-              onDismiss={dismissTurnToast}
-            />
-          ) : null
         }
         renderGrid={(boardOrientation) => (
           <ConnectedLifeGrid
@@ -1177,7 +1174,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             turn && undoSeat
               ? () => {
                   table.undoTurn(undoSeat, turn.operationId)
-                  setTurnToast(undefined)
+                  setPassUndo(undefined)
                   setTurnOpen(false)
                 }
               : undefined
@@ -1202,7 +1199,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           origin={menuDialogOrigin}
           onUndoTurn={(playerId, operationId) => {
             table?.undoTurn(playerId, operationId)
-            setTurnToast(undefined)
+            setPassUndo(undefined)
           }}
           onClose={() => setLogOpen(false)}
         />

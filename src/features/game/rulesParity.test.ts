@@ -132,6 +132,15 @@ describe("local rules match the nearby engine", () => {
       ],
     },
     {
+      name: "commander damage keeps adding up past 99",
+      ...commander,
+      hits: [
+        { commander: 97, from: 0, to: 1 },
+        { commander: 5, from: 0, to: 1 },
+      ],
+      out: 1,
+    },
+    {
       name: "a negative correction gives the life back",
       ...commander,
       hits: [

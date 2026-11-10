@@ -1,5 +1,6 @@
 import { translate } from "@/i18n/translate"
 
+import type { TurnSeat } from "./TurnDialog"
 import type { GamePlayer, PlayerId } from "./types"
 import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/lib/systems"
 import type { Turn } from "../../../convex/lib/turns"
@@ -56,6 +57,9 @@ export interface TurnChipState {
   turn: Turn
   canPress: boolean
   nameOf: (playerId: string) => string | undefined
+  seatOf?: (playerId: string) => TurnSeat | undefined
+  /** why: the pass segment says "Pass" until this device has passed a few times, then the chevron alone carries it. */
+  passLabelShown: boolean
   onStart: () => void
   onPass: (nextPlayerId: string) => void
   onLongPress: () => void
@@ -66,6 +70,7 @@ export type DiceSeatChip =
   | { kind: "first" }
   | { kind: "claim" }
   | { kind: "turn"; state: TurnChipState }
+  | { kind: "undoPass"; onUndo: () => void }
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
 

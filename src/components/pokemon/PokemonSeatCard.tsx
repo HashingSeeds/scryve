@@ -80,7 +80,8 @@ import {
   seatMarkArt,
 } from "../SeatIdentity"
 import { Text } from "../Text"
-import { TurnChipLayer } from "../TurnChip"
+import { TurnChip, TurnChipLayer, UndoPassChip } from "../TurnChip"
+import { useSeatFill } from "../TurnSpotlight"
 
 export interface PokemonSeatCardProps {
   playerId: string
@@ -172,6 +173,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
   const turnChip = diceChips?.flatMap((chip) => (chip.kind === "turn" ? [chip.state] : []))[0]
+  const undoPass = diceChips?.flatMap((chip) => (chip.kind === "undoPass" ? [chip.onUndo] : []))[0]
+  const fillStyle = useSeatFill(color, playerId)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const layer = sideways
     ? { width: cardSize.height, height: cardSize.width }
@@ -452,7 +455,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const readyToLayout = !sideways || (cardSize.width > 0 && cardSize.height > 0)
 
   return (
-    <View
+    <Animated.View
       testID={`pokemon-card-seat-${seatNumber}`}
       accessibilityLabel={
         ownershipLabel
@@ -465,7 +468,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         compact && themed($compactCard),
         ownership === "disabled" && themed($disabledCard),
         staleSince !== undefined && themed($staleCard),
-        { backgroundColor: color },
+        fillStyle,
         style,
       ]}
     >
@@ -860,18 +863,26 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           cardSize={cardSize}
         />
       ) : null}
-      {turnChip && !dice?.view && !sheetMode && !diceCovers ? (
+      {(turnChip || undoPass) && !dice?.view && !sheetMode && !diceCovers ? (
         <TurnChipLayer
-          state={turnChip}
           seatNumber={seatNumber}
-          foreground={ink}
-          compact={cramped}
           rotation={contentRotation}
           cardSize={cardSize}
           contentInsets={contentInsets}
           menuCorner={menuCorner}
           menuEdgeCenter={menuEdgeCenter}
-        />
+        >
+          {turnChip ? (
+            <TurnChip state={turnChip} seatNumber={seatNumber} foreground={ink} compact={cramped} />
+          ) : undoPass ? (
+            <UndoPassChip
+              seatNumber={seatNumber}
+              foreground={ink}
+              compact={cramped}
+              onUndo={undoPass}
+            />
+          ) : null}
+        </TurnChipLayer>
       ) : null}
       {dice && diceCovers ? (
         <DiceSeatOverlay
@@ -920,7 +931,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           onClose={() => setSheet(null)}
         />
       ) : null}
-    </View>
+    </Animated.View>
   )
 }, structurallyEqual)
 

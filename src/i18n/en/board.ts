@@ -339,12 +339,6 @@ const board = {
     // {{name}} is the player who takes the damage.
     dealTo: "Deal {{damage}} commander damage to {{name}}",
     undoHit: "Take back {{damage}} commander damage",
-    // {{others}} is damage from the attacking player's other creatures, besides the commander. It takes life but is not commander damage.
-    dealWithOthersTo:
-      "Deal {{damage}} commander damage and {{others}} from other attackers to {{name}}",
-    undoHitWithOthers: "Take back {{damage}} commander damage and {{others}} from other attackers",
-    // Read by screen readers on the box for the attacking player's other creatures.
-    othersPower: "Damage from other attackers {{power}}",
     // The attacking commander's power: how much one hit deals.
     power: "Commander power {{power}}",
     raisePower: "Raise commander power",
@@ -354,11 +348,6 @@ const board = {
     lowerPowerOf: "Lower {{name}}'s power",
     // Shown dimmed in place of the commander's name when the seat has no deck.
     unnamed: "Commander",
-    // Short label on a small box beside the attacking player's commander. It stands for all the other creatures that player is attacking ("swinging") with this turn, besides the commander. Their combat damage takes life but is not commander damage. Keep it to one short word if the language allows; it is a plural noun for those creatures, not "other players".
-    others: "Others",
-    // Buttons on that box: they change how much damage the attacking player's other creatures deal.
-    raiseOthers: "Raise damage from other attackers",
-    lowerOthers: "Lower damage from other attackers",
     totalFrom: "{{damage}} commander damage from {{name}}",
     amountFrom: "{{amount}} from {{name}}",
     unknownAttacker: "Commander",
@@ -527,6 +516,8 @@ const board = {
     startHint: "Tap to start the turn clock",
     // Very short tap target on the turn chip that ends this player's turn and starts the next player's. Never "End turn".
     pass: "Pass",
+    // On the turn chip when there is no clock, as in "Turn 3". Very short.
+    chipNumber: "Turn {{number}}",
     // Screen reader label for the turn chip, as in "Turn 4, Ada".
     label: "Turn {{number}}, {{name}}",
     passHintTo: "Tap to pass to {{name}}",
@@ -542,8 +533,6 @@ const board = {
     // Shown instead of the player list in event play, where only passing changes the turn.
     eventPlay: "Event play: only passing changes the turn",
     undoPass: "Take back the pass",
-    // A toast after a pass, as in "Turn 5, Grace".
-    passed: "Turn {{number}}, {{name}}",
     // A chess clock: each player's own time bank counts down only on their turn.
     chessBank: "Time per player",
     chessMinutes: "{{minutes}} min",

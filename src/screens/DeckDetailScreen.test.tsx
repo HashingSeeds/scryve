@@ -61,6 +61,8 @@ const mockVersionCacheState = {
   knownCards: {} as Record<string, unknown>,
 }
 jest.mock("@/features/decks/deckVersionsCache", () => ({
+  isProvisionalVersionId: jest.requireActual("@/features/decks/deckVersionsCache")
+    .isProvisionalVersionId,
   cachedCardIdentity: (card: { printingId?: string; name: string }) => card.printingId ?? card.name,
   useDeckVersionCache: () => ({
     ...mockVersionCacheState,
@@ -103,6 +105,10 @@ jest.mock("@/features/decks/decksVersionWrites", () => ({
     renameVersion: mockVersionRename,
     deleteVersion: mockVersionDelete,
     mappedVersion: mockMappedVersion,
+    mappedVersionId: (versionId: string) => {
+      const mapped = mockMappedVersion(versionId)
+      return mapped === versionId ? undefined : mapped
+    },
   }),
 }))
 

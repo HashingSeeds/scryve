@@ -6,6 +6,7 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
@@ -352,37 +353,86 @@ describe("CurrentGameScreen", () => {
     const view = renderGame(initial, repository)
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-2-claim"))
-    expect(view.getByTestId("turn-chip-1")).toHaveTextContent("Start")
-    expect(view.getByTestId("turn-chip-2")).toHaveTextContent("Start")
-    expect(view.getAllByTestId("seat-spotlight-active")).toHaveLength(2)
-    expect(view.getAllByTestId("seat-spotlight-next")).toHaveLength(2)
+    expect(view.getByTestId("turn-chip-1")).toHaveTextContent(/^Turn 1/)
+    expect(view.getByTestId("turn-chip-2")).toHaveTextContent(/^Turn 1/)
 
     fireEvent.press(view.getByTestId("turn-chip-2"))
-    fireEvent.press(view.getByTestId("turn-chip-2"))
     expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: katherine, number: 2 })
-    expect(view.getByTestId("turn-passed-toast")).toHaveTextContent(/^Turn 2, Katherine & Dorothy/)
     expect(view.queryByTestId("turn-chip-1")).toBeNull()
     expect(view.getByTestId("turn-chip-3")).toBeTruthy()
     expect(view.getByTestId("turn-chip-4")).toBeTruthy()
+    expect(view.getByTestId("turn-undo-pass-1")).toBeTruthy()
+    expect(view.getByTestId("turn-undo-pass-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("turn-undo-pass-2"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: ada, number: 1 })
+    expect(view.queryByTestId("turn-undo-pass-1")).toBeNull()
   })
 
-  it("lands the turn chip on the first player, waiting until the table's first change", () => {
+  it("starts a chess clock picked in setup on the first player, waiting until the table's first change", () => {
     const initial = game()
     const repository = turnsOn()
+    repository.saveChessMinutes(20)
     const view = renderGame(initial, repository)
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-1-claim"))
     expect(view.getByTestId("turn-chip-1")).toHaveTextContent("Start")
-    expect(view.getByTestId("seat-spotlight-active")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("life-seat-2-1"))
     expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: initial.players[0].id })
     expect(repository.loadActiveGame()?.turn?.waiting).toBeUndefined()
+    expect(repository.loadActiveGame()?.turn?.bank?.ms).toBe(20 * 60_000)
     expect(view.getByTestId("turn-chip-time")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("turn-chip-1"))
     expect(repository.loadActiveGame()?.turn?.playerId).toBe(initial.players[1].id)
     expect(view.getByTestId("turn-chip-2")).toBeTruthy()
+  })
+
+  it("says Pass on the turn chip until this device has passed three times", () => {
+    const repository = turnsOn()
+    const view = renderGame(game(), repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const passFrom = (seat: number) => {
+      expect(view.getByTestId(`turn-chip-${seat}`)).toHaveTextContent(/Pass/)
+      fireEvent.press(view.getByTestId(`turn-chip-${seat}`))
+    }
+    passFrom(1)
+    passFrom(2)
+    passFrom(1)
+    expect(view.getByTestId("turn-chip-2")).not.toHaveTextContent(/Pass/)
+    expect(repository.passLabelShown()).toBe(false)
+  })
+
+  it("retracts the active player's name while the turn chip would not fit, until the undo window ends", () => {
+    jest.useFakeTimers()
+    const view = renderGame(game(), turnsOn())
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const widths = (identity: number, chip: number) => {
+      fireEvent(view.getByTestId("life-identity-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: identity, height: 30 } },
+      })
+      fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: chip, height: 36 } },
+      })
+    }
+
+    widths(80, 60)
+    expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
+
+    widths(80, 1_000)
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+    expect(view.getByTestId("player-name-seat-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("turn-chip-1"))
+    expect(view.getByTestId("turn-undo-pass-1")).toBeTruthy()
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+
+    act(() => jest.advanceTimersByTime(PASS_UNDO_MS))
+    expect(view.queryByTestId("turn-undo-pass-1")).toBeNull()
+    expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
   })
 
   it("forgets who went first when the result is cleared before play", () => {
