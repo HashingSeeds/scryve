@@ -86,7 +86,6 @@ export function projectionOutState(projection: ConnectedProjection) {
   )
 }
 
-/** why: who is out moves the next seat's frame, but lives stay out of the memoized board, so the board gets only this. */
 export function outPlayerIds(projection: ConnectedProjection): string[] {
   const state = projectionOutState(projection)
   return projection.players.flatMap(({ playerId }) =>

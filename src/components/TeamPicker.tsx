@@ -10,7 +10,6 @@ import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
-/** why: a seat with no player yet is still a place on a team, so an open seat can be traded too. Without `onSwap` the teams only show. */
 export function TeamPicker({
   players,
   teams,

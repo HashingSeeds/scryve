@@ -54,15 +54,12 @@ export function GameLogDialog({
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
   counters?: readonly CounterLogEntry[]
-  /** why: Two-Headed Giant heads share one life, so a row names the team, says which head made it, and counts the team's total. */
   sharedLife?: boolean
   modes?: readonly GameModeRow[]
   canUndo: boolean
   undoLabel?: string
   origin?: DialogOrigin
-  /** why: a connected game's log arrives a page at a time. */
   onMore?: () => void
-  /** why: rows go under turns by sequence, never a clock: the authority's order, or a local game's apply order. */
   positionOf: (operationId: string) => number | undefined
   onUndo: () => void
   onClose: () => void
@@ -88,7 +85,6 @@ export function GameLogDialog({
       ),
     [players, events, turns, counters, groups, sharedLife, modes, positionOf],
   )
-  // why: a page can hold only changes the log hides, such as a change with its undo or passes with turns hidden, which leaves no new row to scroll to, so the log reads on by itself.
   const shownRows = useRef<number | undefined>(undefined)
   const readOn = useEffectEvent(() => {
     const before = shownRows.current

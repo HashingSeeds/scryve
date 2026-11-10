@@ -35,7 +35,7 @@ export function LocalGamePublishSource({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
-  // why: a published game would lose its teams and shared life, since connected 2HG starts from the lobby.
+  // why: publishing carries no variant, so a published game would lose its shared life; connected 2HG starts from the lobby.
   const blocked =
     game.variant === TWO_HEADED_GIANT ? translate("connected:publish.twoHeadedGiant") : undefined
 

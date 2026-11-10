@@ -15,11 +15,6 @@ import {
 
 type GridLayout = ReturnType<typeof getPlayerGridLayout>
 
-/**
- * why: a Two-Headed Giant board seats teams the way a smaller game seats players, one panel per
- * team. Two teams face each other across the long sides, so both heads of a team share the
- * edge they sit along instead of crowding a short end.
- */
 export function teamGridLayout(input: Parameters<typeof getPlayerGridLayout>[0]): GridLayout {
   const layout = getPlayerGridLayout(input)
   if (input.playerCount !== 2 || layout.layout !== "two-stacked") return layout
@@ -89,7 +84,6 @@ export function panelBoxes(
 const NEAR = 0.01
 const near = (a: number, b: number) => Math.abs(a - b) < NEAR
 
-/** why: the menu sits where panels meet, which lands on a head's corner or the middle of one of its edges. */
 export function menuPlacementAt(
   box: Box,
   anchor: { x: number; y: number },
@@ -103,10 +97,6 @@ export function menuPlacementAt(
   return {}
 }
 
-/**
- * why: commander damage draws a small map of the board, one cell per seat. Heads stacked down a
- * panel take a row each and heads side by side share one, so the map matches where people sit.
- */
 export function teamSeatRows(
   rows: readonly (readonly (number | null)[])[],
   rowFlexes: readonly number[],

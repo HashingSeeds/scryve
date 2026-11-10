@@ -169,16 +169,12 @@ export interface PendingConnectedAction {
   schemaVersion: 1
   event: ConnectedActionEvent
   queuedAt: number
-  /** why: the order this device queued its changes in, which a clock that jumps can't give. */
   sequence?: number
   attempts: number
   lastAttemptAt?: number
 }
 
-/**
- * why: the outbox sends, overlays and logs changes in the order this device queued them. A
- * change queued before `sequence` existed goes first, in the order it always had.
- */
+/** why: a change queued before `sequence` existed goes first, in the order it always had. */
 export function compareQueued(left: PendingConnectedAction, right: PendingConnectedAction) {
   if (left.sequence !== undefined && right.sequence !== undefined)
     return left.sequence - right.sequence
@@ -191,7 +187,6 @@ export function compareQueued(left: PendingConnectedAction, right: PendingConnec
   )
 }
 
-/** why: one past the newest change still queued, so a new change always sorts after them. */
 export const nextQueuedSequence = (pending: readonly PendingConnectedAction[]) =>
   pending.reduce((next, { sequence }) => Math.max(next, (sequence ?? -1) + 1), 0)
 

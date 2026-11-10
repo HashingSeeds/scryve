@@ -75,7 +75,6 @@ export interface BoardRoundClock {
   onPress: () => void
 }
 
-/** why: only the grid knows where seats sit, so the stage hands its slots in clockwise order and the screen names the seat after the active one. */
 export interface BoardTurns {
   active?: string
   groups?: TurnGroups

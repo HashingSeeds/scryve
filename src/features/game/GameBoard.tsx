@@ -47,7 +47,6 @@ export interface BoardChromeOptions {
     onChange: (layout: PlayerGridLayoutVariant) => void
     seats?: ReactNode
   }
-  /** why: a Two-Headed Giant board seats team panels, so the menu and tabs sit by the teams. */
   teamCount?: number
   petals: readonly [BoardPetal, BoardPetal]
   attack: Pick<CommanderAttack, "dispatch">

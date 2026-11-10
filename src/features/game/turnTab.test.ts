@@ -169,7 +169,6 @@ describe("the local log without a full logOrder", () => {
       { operationId: "turn-2", now: 6_000 },
     )
     tap("hit-2", bo.id, 9_000)
-    // why: after a rollback the older build appends without logOrder, here with a clock that ran backward.
     const rolledBack = { ...game, logOrder: game.logOrder }
     tap("hit-3", bo.id, 1_000)
     const partial = { ...game, logOrder: rolledBack.logOrder }

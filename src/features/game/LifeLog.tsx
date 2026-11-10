@@ -28,7 +28,6 @@ interface LifeLogChange {
   delta: number
 }
 
-/** why: a Two-Headed Giant head's life is its team's, so `teams` folds both heads' changes into one history. */
 export type LifeLogSource =
   | { kind: "local"; events: readonly GameEvent[]; teams?: TurnGroups }
   | {
@@ -174,7 +173,6 @@ export interface GameModeRow {
 type GameTableChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
 type GameLogChange = GameTableChange | GameModeRow
 
-/** why: newest first, by sequence: `positionOf` is the authority's order or a local game's apply order, never a clock. */
 export function mergedLog(
   life: readonly GameLogRow[],
   counters: readonly GameCounterRow[],
@@ -201,17 +199,11 @@ type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "a
 
 export type GameLogItem = GameLogChange | TurnDivider
 
-/** why: a connected log places a row by the newest change in it, where the authority recorded that change. */
 export const rowPosition = (
   row: Pick<GameLogChange, "operationIds">,
   positionOf: (operationId: string) => number | undefined,
 ) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
 
-/**
- * why: the log's order is a sequence, never a clock: `positionOf` is the authority's order in a
- * connected game and the apply order in a local one. A turn whose start hasn't loaded yet heads
- * every loaded row.
- */
 export function withTurnDividers(
   rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],

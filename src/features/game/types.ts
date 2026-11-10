@@ -132,11 +132,8 @@ export interface LocalGame {
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
   counterLog?: CounterLogEntry[]
-  /** why: kept so a rematch deals the same modes again; the game's own modes live in `table`. */
   modeSetup?: ModeSetup
-  /** why: Two-Headed Giant games share life and poison across each turn group. */
   variant?: GameVariant
-  /** why: life events, the turn log and table changes live in separate lists, and a device clock can jump, so the log reads their order from here: every operation, in the order it was applied. */
   logOrder?: string[]
 }
 
@@ -202,6 +199,5 @@ export interface LocalGameSummary {
   match?: LocalGameMatch
   matchPublish?: "pending" | "published" | "failed"
   seatPassHashes?: SeatPassHashes
-  /** why: History names a winning team, so the summary keeps who shared a turn. */
   turnGroups?: string[][]
 }

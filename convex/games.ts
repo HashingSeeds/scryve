@@ -1381,6 +1381,11 @@ export const publishLocalGame = mutation({
       }
       if (Object.keys(table.designations).length > 0)
         await ctx.db.patch(gameId, { designations: storedDesignations(ctx, table.designations) })
+      if (table.turn || table.turnGroups)
+        await ctx.db.patch(gameId, {
+          ...(table.turn ? { turn: table.turn } : {}),
+          ...(table.turnGroups ? { turnGroups: table.turnGroups } : {}),
+        })
     }
     for (const total of totals) {
       await ctx.db.insert("gameCommanderDamage", {
@@ -2314,7 +2319,6 @@ export const updateLobbySettings = mutation({
   },
 })
 
-/** why: Two-Headed Giant teams are neighboring seats, so the host trades seats to change teams before the game starts. */
 export const swapLobbySeats = mutation({
   args: { publicId: v.string(), first: v.number(), second: v.number() },
   handler: async (ctx, args) => {
@@ -2398,7 +2402,6 @@ export const startGame = mutation({
       updatedAt: now,
       ...lifeEditingFor(players),
       ...modeGameFields(started, now, `archenemy_${game.publicId}`),
-      // why: teammates sit together, so neighboring seats form the Two-Headed Giant teams.
       ...(game.variant === TWO_HEADED_GIANT
         ? {
             turnGroups: pairedTeams(
@@ -2414,7 +2417,6 @@ export const startGame = mutation({
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
-      // why: a Two-Headed Giant team starts at the team life, whatever a deck would start at.
       const deckLife =
         game.variant === TWO_HEADED_GIANT
           ? undefined

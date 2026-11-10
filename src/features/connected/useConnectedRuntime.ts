@@ -200,7 +200,6 @@ export function useConnectedRuntime(
     const runtime = {
       ...controller.table,
       table: projection?.table ?? EMPTY_TABLE,
-      // why: a Two-Headed Giant team shares poison and loses at 15, in cloud and nearby games alike.
       tableRules: projection?.variant === TWO_HEADED_GIANT ? teamTableRules(seatRules) : seatRules,
       pending: snapshot.pending,
       failed: snapshot.failed,

@@ -2,7 +2,6 @@ import { boardCornerRadii, concentricRadius } from "./boardCorners"
 import { getScreenCornerSquaringStyle } from "./PlayerGrid"
 import type { CornerRadii } from "../../modules/display-corners"
 
-// why: distinct radii show which window corner each board corner took: 1 top left, then clockwise.
 const window: CornerRadii = [1, 2, 3, 4]
 
 describe("boardCornerRadii", () => {
@@ -10,7 +9,6 @@ describe("boardCornerRadii", () => {
     const corners = (holderAngle: number) =>
       boardCornerRadii({ radii: window, frame: "window" }, { pinned: true, holderAngle })
     expect(corners(0)).toEqual([1, 2, 3, 4])
-    // why: the window turned 90° one way, so the upright board's top left sits at the window's bottom left.
     expect(corners(90)).toEqual([4, 1, 2, 3])
     expect(corners(-90)).toEqual([2, 3, 4, 1])
     expect(corners(180)).toEqual([3, 4, 1, 2])

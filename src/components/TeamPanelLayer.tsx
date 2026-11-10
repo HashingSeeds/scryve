@@ -8,10 +8,8 @@ import { useAppTheme } from "@/theme/context"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { teamRivet } from "./teamGridGeometry"
 
-/** why: two treatments are on trial for showing that two touching cards are one team. `link` joins the totals with a rivet on the seam; `frame` outlines the pair as one card. */
 export type TeamBinding = "link" | "frame"
 
-/** why: a Two-Headed Giant team's two cards touch, and this draws the mark that binds them above the pair. */
 export function TeamPanelLayer({
   binding,
   rotation,

@@ -108,7 +108,6 @@ export type TableCounterDefinition = {
   readonly max: number
   readonly losesAt?: number
   readonly commandZoneOnly?: boolean
-  /** why: a counter teammates share, such as Two-Headed Giant poison, moves on every seat of the team at once. */
   readonly shared?: boolean
 }
 

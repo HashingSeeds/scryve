@@ -26,7 +26,6 @@ const TICK_MS = 1_000
 const MENU_HALF_RUN = 48
 const EDGE_GAP = 8
 
-/** why: only the chip's text ticks, so the card around it never re-renders with the clock. */
 function useNow(ticking: boolean) {
   const [, tick] = useReducer((count: number) => count + 1, 0)
   useEffect(() => {
@@ -37,11 +36,6 @@ function useNow(ticking: boolean) {
   return Date.now()
 }
 
-/**
- * why: the chip sits centered on the card's far edge from its player. Where the menu pentagon
- * shares that edge, it slides along the edge just clear of the pentagon, toward the side with more
- * room, so it never moves down toward the life total.
- */
 export function turnChipLeft(input: {
   run: number
   width: number
@@ -123,7 +117,6 @@ export function TurnChipLayer({
   )
 }
 
-/** why: the chip passes to the seat the board frames as next, so the frame and the pass can never disagree about who comes after. */
 export function TurnChip({
   state,
   seatNumber,

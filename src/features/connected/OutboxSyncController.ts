@@ -326,7 +326,6 @@ export class OutboxSyncController {
     this.publish()
   }
 
-  /** why: one compensating write per change it takes back, each naming its change, so the log hides both and a quick tap after it starts fresh. */
   undoLife = (changes: readonly { operationId: string; playerId: string; delta: number }[]) => {
     this.lastQueuedLifeChange = undefined
     this.changeError = undefined
@@ -471,7 +470,6 @@ export class OutboxSyncController {
     }
   }
 
-  /** why: one compensating write per change it takes back, each naming its change, so the log hides both. */
   undoTable = (changes: readonly { operationId: string; action: TableAction }[]) => {
     for (const { operationId, action } of changes)
       if (!this.enqueueTableAction(action, createClientId("operation", this.now()), operationId))

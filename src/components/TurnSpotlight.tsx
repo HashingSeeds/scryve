@@ -6,23 +6,16 @@ import { useAppTheme } from "@/theme/context"
 
 import { seatCardRadius } from "./playerCardTypes"
 
-/** why: `passTo` is the next group's first seat, the seat a pass names; `active` and `next` are every seat in those groups, so a shared turn frames each of its seats. */
 export interface TurnSpotlight {
   active: readonly string[]
   next: readonly string[]
   passTo?: string
 }
 
-/** why: the board knows the seats' order around the table, so it names the active and next seats for every card and for the chip that passes between them. */
 export const TurnSpotlightContext = createContext<TurnSpotlight | undefined>(undefined)
 
 export const useTurnSpotlight = () => useContext(TurnSpotlightContext)
 
-/**
- * why: the frame sits on its card's own rounded rect, with the card's radius and any corner the
- * card squares against the screen, so no card color shows outside it at a corner. `corners` is the
- * same corner style the card gets.
- */
 export function SeatSpotlight({
   playerId,
   compact,

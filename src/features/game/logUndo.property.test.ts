@@ -32,7 +32,6 @@ function randomSteps(seed: number) {
   const steps: Step[] = []
   for (let index = random.int(4, 28); index > 0; index -= 1) {
     const seat = random.int(0, seats - 1)
-    // why: often near the seat's last change, so bursts form, and often anywhere, including before it.
     const at =
       lastAt[seat] !== undefined && random.next() < 0.6
         ? lastAt[seat] + random.int(-2_500, 2_500)
@@ -56,7 +55,6 @@ function randomSteps(seed: number) {
   return { seats, steps }
 }
 
-/** why: each step goes through the local game's own reducers, and the test keeps its own record of what applied, in order. */
 function play(seats: number, steps: readonly Step[]) {
   let sequence = 0
   const nextId = () => `op-${String(sequence++).padStart(3, "0")}`

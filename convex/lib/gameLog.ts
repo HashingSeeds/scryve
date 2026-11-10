@@ -10,11 +10,9 @@ export interface ConnectedLogEvent {
   clientCreatedAt: number
   action?: TableAction
   undoOf?: string
-  /** why: a device may take back only its own changes, and only the authority knows who made each. */
   mine?: true
 }
 
-/** why: a nearby host sends its log in one message, so a guest gets the newest changes only. */
 export const NEARBY_LOG_LIMIT = 200
 
 // why: Pokémon actions carry card names the name gate may hide, and the log draws none of them.

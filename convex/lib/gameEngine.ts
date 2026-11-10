@@ -230,12 +230,10 @@ export interface GameStore {
   readonly game: EngineGame
   seat(id: string): Read<EngineSeat | undefined>
   event(operationId: string): Read<GameEventRecord | undefined>
-  /** why: a change may be taken back once, so an undo checks no other undo already names it. */
   undoneBy(operationId: string): Read<GameEventRecord | undefined>
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
-  /** why: in seat order; a pass reads every seat to skip those that are out. */
   seats(): Read<readonly EngineSeat[]>
   commanderTotals(): Read<readonly CommanderTotal[]>
   isMember(): Read<boolean>
@@ -475,7 +473,6 @@ function* writeLife(
   return acknowledged({ operationId, deduplicated: false, currentLife })
 }
 
-/** why: the game log hides a change and its undo together, so an undo may only name a standing change of the same kind the same account made on the same seat. */
 const isOwnChange = (
   event: GameEventRecord | undefined,
   request: { kind: string; playerId: string; actorUserId: string },
@@ -485,7 +482,6 @@ const isOwnChange = (
   event.playerId === request.playerId &&
   event.actorUserId === request.actorUserId
 
-/** why: the log counts a counter back from its current value, so a tap the floor or cap absorbed records what it changed, not what was asked. */
 const appliedCounterDelta = (
   before: PlayerTable | undefined,
   after: PlayerTable | undefined,
@@ -680,7 +676,6 @@ function* writeTable(
 ): GameSteps<GameWriteResult> {
   const sent = normalizedTableAction(write.action)
   const action = gatedTableAction(sent)
-  // why: "anyone edits" lets the table fix each other's counts, not act in another seat's turn: claim, pass or take one back, roll the planar die, or reveal a scheme.
   const ownSeatOnly = isTurnAction(action) || isModeAction(action)
   const seat = yield* editableSeat(store, action.playerId, actor, undefined, !ownSeatOnly)
   if (isEngineError(seat)) return failed(seat)
@@ -700,7 +695,6 @@ function* writeTable(
       return failed(writeError("invalid_undo", "Only your own change can be taken back"))
     if (yield* read(store.undoneBy(write.undoOf)))
       return failed(writeError("invalid_undo", "This change was already taken back"))
-    // why: a counter stops at 0 and at its max, so its undo reverses what the authority recorded, not what the device asked for.
     if (action.kind === "counter.changed" || action.kind === "customCounter.changed") {
       if (!undone?.delta) return failed(writeError("invalid_undo", "This change moved nothing"))
       request.action = { ...action, delta: -undone.delta }
@@ -718,11 +712,7 @@ function* writeTable(
   return acknowledged({ operationId, deduplicated: false })
 }
 
-/**
- * why: a Two-Headed Giant team shares one life total and its poison (CR 810.9, 810.10), so every
- * seat patch that moves either one moves the teammate too. Each head keeps its own events, which
- * is how the log says who made a change, and older projections still read a life per seat.
- */
+/** why: older projections read a life per seat, so a team's shared life and poison are written to both heads. */
 function* withSharedTeam(store: GameStore): GameSteps<GameStore> {
   const teams = store.game.variant === TWO_HEADED_GIANT ? store.game.turnGroups : undefined
   if (!teams) return store

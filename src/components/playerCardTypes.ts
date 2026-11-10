@@ -24,7 +24,6 @@ export interface LifeCardContentInsets extends Record<LifeCardEdge, number> {
 
 export type LifeCardScreenEdges = Record<LifeCardEdge, boolean>
 
-/** why: every seat card and the turn frame drawn over it share these radii, so the frame can never round differently from its card. */
 export const seatCardRadius = (compact?: boolean) => (compact ? radius.xxl : radius.xxxl)
 
 /** why: a full-seat overlay lays out whole rows and grids, so instead of stepping one row around a corner camera hole it stops at the hole's side, as screens stop at the iPhone Duo's rail. */

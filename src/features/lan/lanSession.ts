@@ -87,7 +87,6 @@ export interface LanSessionState {
   partners?: boolean
   hostEditsAnySeat?: boolean
   turns?: boolean
-  /** why: only a host that answers log requests says so in its welcome. */
   logs?: boolean
   log?: { publicId: string; events: ConnectedLogEvent[]; more: boolean }
   error?: string
@@ -724,7 +723,6 @@ export class LanSession {
     this.connection.send({ type: "deck", deck })
   }
 
-  /** why: the log travels only while someone reads it, so a busy table never resends it on every change. `before` asks for the page older than that change. */
   requestLog = (before?: string) => {
     const { role, seatKey, status } = this.state
     const game = this.game

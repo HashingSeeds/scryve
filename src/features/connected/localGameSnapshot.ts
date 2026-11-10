@@ -201,8 +201,14 @@ export function buildLocalGameSnapshot({
 
 // why: the server rejects a table its own reducer could not have produced, so a table that would fail the whole publish is left behind instead.
 function tableFor(game: LocalGame) {
-  const table = game.table
-  if (!table) return undefined
+  const turns = {
+    ...(game.turn ? { turn: game.turn } : {}),
+    ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+  }
   const playerIds = new Set<string>(game.players.map(({ id }) => id))
-  return isValidTableSnapshot(table, localTableRules(game), playerIds) ? table : undefined
+  const valid = (table: TableState) =>
+    isValidTableSnapshot(table, localTableRules(game), playerIds) ? table : undefined
+  const turnsOnly =
+    game.turn || game.turnGroups ? { designations: {}, players: {}, ...turns } : undefined
+  return (game.table && valid({ ...game.table, ...turns })) ?? (turnsOnly && valid(turnsOnly))
 }

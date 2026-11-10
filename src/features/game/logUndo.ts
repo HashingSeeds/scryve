@@ -14,11 +14,6 @@ import {
   type TableAction,
 } from "../../../convex/lib/table"
 
-/**
- * why: with turns hidden the log shows no passes, so Undo never rewinds a turn the player cannot
- * see. A pass is weighed against the newest row the log shows, so taps that cancel out after it,
- * which show no row, don't hide it.
- */
 export function newestLogUndo(game: LocalGame, { turns }: { turns: boolean }) {
   const positionOf = localLogPositions(game)
   const [row] = mergedLog(
@@ -74,7 +69,6 @@ export function undoLogRow(
         }
       : { kind: "customCounter.changed", playerId: undo.playerId, name, delta: -undo.delta }
   const table = game.table ?? EMPTY_TABLE
-  // why: a Two-Headed Giant team shares poison, so taking it back moves both heads, as adding it did.
   const teams = localTeams(game)
   const change = applyTableAction(teams ? { ...table, turnGroups: teams } : table, action, {
     rules: localTableRules(game),

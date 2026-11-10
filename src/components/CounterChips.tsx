@@ -97,7 +97,6 @@ export function seatTableState(
   }
 }
 
-/** why: a seat's own counters ride with the system's, so chips, the edit sheet and announcements treat them alike. */
 const customCounterRule = ({ name }: CustomCounter) => ({
   id: customCounterId(name),
   label: name,
@@ -390,7 +389,6 @@ export const CounterChips = memo(function CounterChips({
         : Infinity,
     ),
   )
-  // why: a chip counts at its smallest until it is measured, so the first frame is close to the settled row.
   const unmeasured = compact ? COMPACT_CHIP_WIDTH : CHIP_SIZE
   const fit = fitChips(
     items.map((item) => widths[item.key] ?? unmeasured),

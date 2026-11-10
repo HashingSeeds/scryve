@@ -220,7 +220,6 @@ export interface PlayerGridProps {
   onPlayStart?: () => void
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
-  /** why: a Two-Headed Giant team's heads share one panel, so the grid seats teams in place of players. */
   teams?: readonly (readonly string[])[]
   teamBinding?: TeamBinding
 }
@@ -775,11 +774,6 @@ interface SeatPlace {
   style?: ViewStyle
 }
 
-/**
- * why: the heads of a team panel meet with square corners so the panel reads as one card. With no
- * `seam`, this is the team panel's outer shape, so the turn frame around the team follows the
- * same screen corners its heads do, at the display's radius where it reports one.
- */
 function headCornerStyle(
   edges: Record<LifeCardEdge, boolean>,
   seam: LifeCardEdge | undefined,
@@ -928,7 +922,6 @@ function seatCutout(
 /** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. */
 type TabSeam = "top" | "bottom" | null
 
-/** why: a first-player tab straddles the seam at `at`, so corner chrome on either side of it steps clear. */
 function tabSeamOf(at: number | null, top: number, bottom: number): TabSeam {
   if (at === null) return null
   if (Math.abs(top - at) < 0.01) return "top"
@@ -954,12 +947,7 @@ function seatTabCorners(
     )
 }
 
-/**
- * why: on web, pass the insets. The page only reaches a rounded screen corner where the browser
- * reports an inset; a browser tab or a solid status bar strip reports none. A card corner that
- * meets the screen's takes the display's radius from `displayRadii` (board corners, top left
- * clockwise), so the card and its turn frame follow the glass; with no radius it stays square.
- */
+/** why: on web the page reaches a rounded screen corner only where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
