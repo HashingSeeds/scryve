@@ -16,7 +16,7 @@ import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
-import type { AttackChange, OthersChange } from "@/features/game/commanderAttack"
+import type { AttackChange } from "@/features/game/commanderAttack"
 import { CLAIM_CHIP, systemDice, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import {
   canContinueMatch,
@@ -45,6 +45,7 @@ import { teamName } from "@/features/game/teams"
 import {
   reportTurnsGame,
   TurnDialog,
+  useChessMinutes,
   useTurnsEnabled,
   type TurnSeat,
 } from "@/features/game/TurnDialog"
@@ -131,13 +132,12 @@ export function CurrentGameScreen({
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
-  const [turnsEnabled] = useTurnsEnabled(repository ?? localGameRepository)
+  const turnsStore = repository ?? localGameRepository
+  const [turnsEnabled] = useTurnsEnabled(turnsStore)
+  const [chessMinutes] = useChessMinutes(turnsStore)
+  const chessAppliedTo = useRef<string>(undefined)
   const [turnOpen, setTurnOpen] = useState(false)
-  const [turnToast, setTurnToast] = useState<{
-    operationId: string
-    passerId: string
-    message: string
-  }>()
+  const [passUndo, setPassUndo] = useState<{ operationId: string; passerId: string }>()
   const [logOpen, setLogOpen] = useState(false)
   const openLog = useCallback(() => setLogOpen(true), [])
   const clock = runtime.game.clock
@@ -168,8 +168,6 @@ export function CurrentGameScreen({
       changes.forEach(({ toPlayerId, commander, delta }) =>
         runtime.assignCommanderDamage(from, toPlayerId, delta, commander),
       ),
-    loseLife: (changes: readonly OthersChange[]) =>
-      changes.forEach(({ toPlayerId, amount }) => runtime.changeLife(toPlayerId, -amount)),
   }
   const attack = useCommanderAttack(commanderPort, { seatDeck })
   const attackDispatch = attack.dispatch
@@ -301,7 +299,11 @@ export function CurrentGameScreen({
   const turn = runtime.game.turn
   const active = runtime.game.status === "active"
   const turnsOn = turnsEnabled && active
-  const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
+  useEffect(() => {
+    if (!passUndo) return
+    const expire = setTimeout(() => setPassUndo(undefined), PASS_UNDO_MS)
+    return () => clearTimeout(expire)
+  }, [passUndo])
   const casual = clock?.setup.mode !== "countdown"
   const turnSeats: TurnSeat[] = runtime.game.players.map((player, index) => ({
     playerId: player.id,
@@ -311,6 +313,12 @@ export function CurrentGameScreen({
     shape: player.shape,
   }))
   const { passTurn, setTurn, undoTurn, setBank, startTurn } = runtime
+  useEffect(() => {
+    if (!chessMinutes || !turn || turn.number !== 1 || turn.bank) return
+    if (chessAppliedTo.current === turn.operationId) return
+    chessAppliedTo.current = turn.operationId
+    setBank(turn.playerId, chessMinutes * 60_000)
+  }, [chessMinutes, turn, setBank])
   const { turnGroups } = runtime.game
   const nameOf = (playerId: string) => teamName(runtime.game.players, turnGroups, playerId)
   function nextOf(clockwiseSlots: number[]) {
@@ -332,19 +340,12 @@ export function CurrentGameScreen({
     if (!turn) return
     const operationId = passTurn(turn.playerId, next)
     if (!operationId) return
-    setTurnToast({
-      operationId,
-      passerId: turn.playerId,
-      message: translate("board:turn.passed", {
-        number: turn.number + 1,
-        name: nameOf(next) ?? "",
-      }),
-    })
+    setPassUndo({ operationId, passerId: turn.playerId })
   }
-  function undoToastPass() {
-    if (!turnToast) return
-    undoTurn(turnToast.passerId, turnToast.operationId)
-    setTurnToast(undefined)
+  function undoPass() {
+    if (!passUndo) return
+    undoTurn(passUndo.passerId, passUndo.operationId)
+    setPassUndo(undefined)
   }
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
@@ -352,8 +353,13 @@ export function CurrentGameScreen({
           turn,
           canPress: true,
           nameOf,
+          seatOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId),
+          passLabelShown: turnsStore.passLabelShown(),
           onStart: () => startTurn(turn.playerId),
-          onPass: passTo,
+          onPass: (next) => {
+            turnsStore.notePass()
+            passTo(next)
+          },
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
@@ -365,6 +371,8 @@ export function CurrentGameScreen({
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
         return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+      if (passUndo && sharesTurn(turnGroups, passUndo.passerId, player.id))
+        return [...chips, { kind: "undoPass", onUndo: undoPass }]
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -401,7 +409,7 @@ export function CurrentGameScreen({
       playerCount: ended.players.length,
       mode: "local",
     })
-    setTurnToast(undefined)
+    setPassUndo(undefined)
     runtime.rematch()
     setEndSource(undefined)
     setSaved({
@@ -484,18 +492,6 @@ export function CurrentGameScreen({
                 actionTestID="game-abandoned-undo-button"
                 persistent
                 onAction={runtime.undoAbandon}
-              />
-            ) : turnToast ? (
-              <GameToast
-                key={turnToast.operationId}
-                inline
-                message={turnToast.message}
-                actionTx="common:undo"
-                testID="turn-passed-toast"
-                actionTestID="turn-passed-undo"
-                onAction={undoToastPass}
-                visibleMs={PASS_UNDO_MS}
-                onDismiss={dismissTurnToast}
               />
             ) : null
           }
@@ -583,7 +579,7 @@ export function CurrentGameScreen({
             turn?.previous
               ? () => {
                   undoTurn(turn.previous!.playerId, turn.operationId)
-                  setTurnToast(undefined)
+                  setPassUndo(undefined)
                   setTurnOpen(false)
                 }
               : undefined

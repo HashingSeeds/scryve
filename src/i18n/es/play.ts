@@ -40,7 +40,8 @@ export default {
   turnsChoice: {
     label: "Turnos",
     lifeOnly: "Solo vidas",
-    lifeAndTurns: "Vidas y turnos",
+    lifeAndTurns: "Turnos",
+    chessClock: "Reloj de ajedrez",
   },
   whatYouPlay: {
     heading: "¿A qué juegas?",

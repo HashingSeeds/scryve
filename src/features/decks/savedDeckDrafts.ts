@@ -1,6 +1,7 @@
 import { load, remove, save } from "@/utils/storage"
 
 import type { DeckDraft } from "./deckDraft"
+import type { DeckVersionRef } from "./deckVersionsCache"
 import { isGuestDeckPayload, type GuestDeckPayload } from "./guestDeck"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -8,7 +9,7 @@ type VersionTarget = { versionId: Id<"deckVersions">; expectedRevision: number }
 
 export type SavedAccountDraft = {
   draft: DeckDraft
-  versionId?: Id<"deckVersions">
+  versionId?: DeckVersionRef
   pinned?: VersionTarget
 }
 

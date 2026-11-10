@@ -1,14 +1,14 @@
-import { createContext, useContext } from "react"
-import type { StyleProp, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { createContext, useContext, useEffect } from "react"
+import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
 
 import { useAppTheme } from "@/theme/context"
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
-import { seatCardRadius } from "./playerCardTypes"
+import { mixColorsInLinearLight } from "./GameMenuButtonShape"
+import { HANDOFF_MS } from "./playerCardTypes"
 
 export interface TurnSpotlight {
   active: readonly string[]
-  next: readonly string[]
   passTo?: string
 }
 
@@ -16,43 +16,25 @@ export const TurnSpotlightContext = createContext<TurnSpotlight | undefined>(und
 
 export const useTurnSpotlight = () => useContext(TurnSpotlightContext)
 
-export function SeatSpotlight({
-  playerId,
-  compact,
-  corners,
-}: {
-  playerId: string
-  compact?: boolean
-  corners?: StyleProp<ViewStyle>
-}) {
+export function useSeatDimmed(playerId: string | undefined) {
   const spotlight = useTurnSpotlight()
+  return !!playerId && !!spotlight?.active.length && !spotlight.active.includes(playerId)
+}
+
+/** why: a seat out of the turn dims only its fill, so its life total stays full white; the fill hands off with the turn chip. */
+export function useSeatFill(color: string, playerId: string | undefined) {
   const {
     theme: { colors },
   } = useAppTheme()
-  const active = !!spotlight?.active.includes(playerId)
-  const next = !!spotlight?.next.includes(playerId)
-  if (!active && !next) return null
-  return (
-    <View
-      pointerEvents="none"
-      testID={active ? "seat-spotlight-active" : "seat-spotlight-next"}
-      style={[
-        $frame,
-        { borderRadius: seatCardRadius(compact) },
-        corners,
-        active ? $active : $next,
-        { borderColor: colors.gameMenu.anchorGlyph },
-      ]}
-    />
-  )
+  const reducedMotion = useReducedMotion()
+  const fill = useSeatDimmed(playerId)
+    ? mixColorsInLinearLight(color, colors.board.background, 0.55)
+    : color
+  const shown = useSharedValue(fill)
+  useEffect(() => {
+    shown.value = reducedMotion
+      ? fill
+      : withTiming(fill, { duration: HANDOFF_MS, easing: Easing.out(Easing.cubic) })
+  }, [shown, fill, reducedMotion])
+  return useAnimatedStyle(() => ({ backgroundColor: shown.value }))
 }
-
-const $frame: ViewStyle = {
-  position: "absolute",
-  left: 0,
-  top: 0,
-  right: 0,
-  bottom: 0,
-}
-const $active: ViewStyle = { borderWidth: 4, borderStyle: "solid" }
-const $next: ViewStyle = { borderWidth: 3, borderStyle: "dashed", opacity: 0.8 }
