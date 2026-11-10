@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- each system's card provider still branches here until it moves to convex/lib/games. */
 import { ConvexError, v, type Infer } from "convex/values"
 
 import { internal } from "./_generated/api"
@@ -17,7 +16,7 @@ import {
 } from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { pokemonCardByReference } from "./lib/games/pokemon"
-import { GAME_PROVIDERS } from "./lib/games/providers"
+import { GAME_PROVIDERS, isProviderGame } from "./lib/games/providers"
 import {
   assertGameSystem,
   integrationFor,
@@ -229,7 +228,7 @@ export const search = action({
   handler: async (ctx, args): Promise<CardReference[] | CatalogCard[]> => {
     const query = args.query.trim()
     const game = assertGameSystem(args.game ?? "mtg")
-    if (game === "mtg") return await searchScryfall(ctx, query, args.deviceId)
+    if (!isProviderGame(game)) return await searchScryfall(ctx, query, args.deviceId)
     if (query.length < 2 || query.length > MAX_CATALOG_QUERY_LENGTH) return []
     await requireActionCapability(ctx, game, "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")
@@ -495,7 +494,7 @@ export const byCatalogId = action({
       game,
       cardId,
     })
-    const catalog = game === "mtg" ? undefined : GAME_PROVIDERS[game].catalog
+    const catalog = isProviderGame(game) ? GAME_PROVIDERS[game].catalog : undefined
     if (
       cached &&
       (!catalog || catalog.bulk || cachedCardUsable(catalog, cached, cardId, includeImages))
