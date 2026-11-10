@@ -60,16 +60,23 @@ const DEVICES = [
     upright: safeArea(24, 0, 20, 0),
     sideways: safeArea(24, 0, 20, 0),
   },
-  // why: measured on the Pixel 6a emulator profile, whose board hides the status bar and keeps the gesture bar.
+  // why: measured on the Pixel 6a emulator profile (Android 16): the board hides both system bars, yet its top edge still reads the status bar's 132px at 2.625x, upright and turned.
   {
     name: "Pixel 6a",
     width: 411,
     height: 914,
-    upright: safeArea(0, 0, 24, 0),
-    sideways: safeArea(0, 0, 24, 0),
+    upright: safeArea(132 / 2.625, 0, 0, 0),
+    sideways: safeArea(0, 132 / 2.625, 0, 0),
   },
   { name: "iPhone Duo closed", width: 466, height: 678, upright: safeArea(0, 84, 34, 0) },
-  { name: "book fold", width: 829, height: 690, spansHinge: true, upright: safeArea(0, 0, 24, 0) },
+  // why: no fold was measured; this takes the Pixel 6a's board inset on a book fold's open screen.
+  {
+    name: "book fold",
+    width: 829,
+    height: 690,
+    spansHinge: true,
+    upright: safeArea(132 / 2.625, 0, 0, 0),
+  },
 ] as const satisfies readonly {
   name: string
   width: number
