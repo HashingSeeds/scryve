@@ -62,7 +62,6 @@ import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/Tr
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
-import type { OthersChange } from "@/features/game/commanderAttack"
 import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import { asPlayerId } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
@@ -808,11 +807,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           ]),
       ) as Record<PlayerId, number>,
     commit: controls.submitCommanderDamage,
-    // why: Others lowers the defender's own seat, which the server takes only where anyone edits any seat.
-    loseLife: anySeat
-      ? (changes: readonly OthersChange[]) =>
-          changes.forEach(({ toPlayerId, amount }) => controls.changeLife(toPlayerId, -amount))
-      : undefined,
   }
   const attack = useCommanderAttack(commanderPort, {
     seatDeck,

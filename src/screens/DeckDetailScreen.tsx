@@ -51,6 +51,7 @@ import { useDeckVersionWrites } from "@/features/decks/decksVersionWrites"
 import {
   cachedCardIdentity,
   useDeckVersionCache,
+  type DeckVersionRef,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
 import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
@@ -58,9 +59,9 @@ import { DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
 import {
-  deckQueryVersionId,
   isDeckKnownDeleted,
   resolveDeckView,
+  serverVersionId,
 } from "@/features/decks/resolveDeckView"
 import {
   forgetAccountDraft,
@@ -278,18 +279,12 @@ function DeckDetailContent({
   const pinnedVersionTarget = useRef<
     { versionId: Id<"deckVersions">; expectedRevision: number } | undefined
   >(restored?.pinned)
-  const mappedSelection =
-    selectedVersionId !== undefined ? versionWrites.mappedVersion(selectedVersionId) : undefined
+  const queryVersionId = serverVersionId(selectedVersionId, versionWrites.mappedVersionId)
   const versionCache = useDeckVersionCache(
     syncEnabled && !knownDeleted,
     access?.ownerId,
     deckId,
-    mappedSelection,
-  )
-  const queryVersionId = deckQueryVersionId(
-    selectedVersionId,
-    mappedSelection,
-    versionCache.versions,
+    queryVersionId ?? selectedVersionId,
   )
   const detailQueryActive = (access?.ready ?? true) && !knownDeleted
   const detail = useQuery(
@@ -717,9 +712,9 @@ function DeckDetailContent({
     setBringingPending(undefined)
   }
 
-  function chooseVersion(versionId: string) {
+  function chooseVersion(versionId: DeckVersionRef) {
     setNewListNotice(false)
-    setSelectedVersionId(versionId as Id<"deckVersions">)
+    setSelectedVersionId(versionId)
   }
 
   function startNewVersion() {
@@ -748,7 +743,7 @@ function DeckDetailContent({
           note.trim(),
           captured ?? [],
         )
-        setSelectedVersionId(provisionalId as Id<"deckVersions">)
+        setSelectedVersionId(provisionalId)
         setDialog("none")
       } catch (cause) {
         fail(cause, translate("decks:detail.createVersionFailed"))
@@ -776,7 +771,7 @@ function DeckDetailContent({
       try {
         versionWrites.renameVersion(
           deckId,
-          activeVersionId as Id<"deckVersions">,
+          activeVersionId,
           { name, note },
           pinnedRevisionFor(activeVersionId) ?? versionTarget?.expectedRevision ?? 0,
         )
@@ -800,8 +795,7 @@ function DeckDetailContent({
   }
 
   async function confirmDeleteVersion() {
-    const versionId =
-      version?._id ?? (activeVersionSummary ? (activeVersionId as Id<"deckVersions">) : undefined)
+    const versionId = version?._id ?? (activeVersionSummary ? activeVersionId : undefined)
     if (!versionId) return
     const expectedRevision = pinnedRevisionFor(versionId) ?? versionTarget?.expectedRevision ?? 0
     if (view.canQueueVersions) {

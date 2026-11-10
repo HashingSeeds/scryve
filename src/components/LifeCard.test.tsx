@@ -460,21 +460,6 @@ describe("LifeCard", () => {
     }
   })
 
-  it("names Others damage apart from commander damage on the hit and undo", () => {
-    const view = render(defendingCard({ dealt: 4, othersStep: 1, takeBack: 3, othersTakeBack: 2 }))
-    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
-      nativeEvent: { layout: { width: 193, height: 420 } },
-    })
-    expect(view.getByTestId("commander-hit-seat-2")).toHaveProp(
-      "accessibilityLabel",
-      "Deal 3 commander damage and 1 from other attackers to Grace",
-    )
-    expect(view.getByTestId("commander-undo-seat-2")).toHaveProp(
-      "accessibilityLabel",
-      "Take back 1 commander damage and 2 from other attackers",
-    )
-  })
-
   it("fills the ring at lethal damage, not at the storage cap", () => {
     const view = render(defendingCard())
     fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
@@ -511,20 +496,6 @@ describe("LifeCard", () => {
     // why: a connected attack holds its hits until Send, so the life shown is still the starting life.
     view.rerender(defendingCard({ commanders: [{ power: 2, total: 10, landed: 4 }], applied: 0 }))
     expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("30 − 4")
-
-    view.rerender(
-      defendingCard({ commanders: [{ power: 2, total: 6 }], othersLanded: 3, applied: 3 }),
-    )
-    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("33 − 3")
-
-    view.rerender(
-      defendingCard({
-        commanders: [{ power: 2, total: 10, landed: 4 }],
-        othersLanded: 3,
-        applied: 7,
-      }),
-    )
-    expect(view.getByTestId("life-incoming-seat-2")).toHaveTextContent("37 − 4 − 3")
   })
 
   it("inks a defender's controls white over its shade, even when the attacker's color is light", () => {
@@ -1039,32 +1010,6 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Krenko")
   })
 
-  it("offers Others beside the commander only where the game takes it", () => {
-    const attacker = (othersShown?: boolean) => (
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={20}
-          color="#41476E"
-          commanderDamage={commanderDamage({
-            armedPlayerId: commanderIds[0],
-            commanders: [{ name: "Krenko", power: 1, total: 0 }],
-            othersShown,
-            onPressSword: jest.fn(),
-          })}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>
-    )
-    const view = render(attacker())
-    expect(view.getByTestId("commander-name-seat-1-others")).toHaveTextContent("Others")
-
-    view.rerender(attacker(false))
-    expect(view.queryByTestId("commander-name-seat-1-others")).toBeNull()
-    expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Krenko")
-  })
-
   it("names each partner on a compact attacking card", () => {
     const view = render(
       <ThemeProvider initialContext="light">
@@ -1160,6 +1105,7 @@ describe("LifeCard", () => {
       [2, 0],
       [1, 0],
       [12, 0],
+      [123, 0],
       [4, 0],
     ])
     fireEvent.press(view.getByTestId("commander-exit-seat-1"))
