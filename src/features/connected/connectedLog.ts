@@ -10,8 +10,10 @@ import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "@/fea
 import { compareQueued, type PendingLifeAction } from "./model"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import {
+  customCounterId,
   loggedCounterId,
   loggedCounterValue,
+  sameLoggedCounters,
   type TableAction,
   type TableState,
 } from "../../../convex/lib/table"
@@ -134,8 +136,12 @@ function counterLog(events: readonly ConnectedLogEvent[], table: CounterTable): 
   )
   const values = new Map<string, number>()
   const entries: CounterLogEntry[] = []
+  const counterIdOf = sameLoggedCounters()
+  for (const player of Object.values(table.players ?? {}))
+    for (const { name } of player.customCounters ?? []) counterIdOf(customCounterId(name))
   for (const event of [...events].reverse()) {
-    const counterId = event.action && loggedCounterId(event.action)
+    const loggedId = event.action && loggedCounterId(event.action)
+    const counterId = loggedId && counterIdOf(loggedId)
     if (!counterId || !event.delta || event.undoOf || undone.has(event.operationId)) continue
     const key = table.counterKey?.(event.playerId, counterId) ?? `${event.playerId}:${counterId}`
     const value = values.get(key) ?? loggedCounterValue(table.players?.[event.playerId], counterId)
