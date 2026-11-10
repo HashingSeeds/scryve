@@ -1,9 +1,7 @@
-import type { ConvexReactClient } from "convex/react"
-
 import { buildManualMatchArgs, defaultManualMatchDraft } from "./manualMatchForm"
 import { ManualMatchController } from "./matchOutbox"
 import { api } from "../../../convex/_generated/api"
-import { makeConvexTest, signedIn } from "../../../test/convexTest"
+import { convexClientFor, makeConvexTest, signedIn } from "../../../test/convexTest"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const flush = () => new Promise(setImmediate)
@@ -23,17 +21,18 @@ async function setup() {
   const actor = await signedIn(t, "owner")
   const sent: string[] = []
   let loseNextAcknowledgement = false
-  const client = {
-    mutation: async (reference: typeof api.matches.recordManualMatch, args: unknown) => {
-      const result = await actor.mutation(reference, args as Parameters<typeof actor.mutation>[1])
-      sent.push((args as { publicId: string }).publicId)
+  const client = convexClientFor<typeof api.matches.recordManualMatch>(
+    actor,
+    async (send, args) => {
+      const result = await send()
+      sent.push(args.publicId)
       if (loseNextAcknowledgement) {
         loseNextAcknowledgement = false
         throw new Error("acknowledgement lost")
       }
       return result
     },
-  } as unknown as ConvexReactClient
+  )
   const local = new MemoryStorage()
   const relaunch = () => new ManualMatchController(client, "owner", { storage: local })
   const matches = () => t.run((ctx) => ctx.db.query("matches").collect())
