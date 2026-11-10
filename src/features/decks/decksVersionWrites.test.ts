@@ -15,7 +15,7 @@ import { DeckVersionCacheRepository } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
-import { makeConvexTest, type ConvexTestHarness } from "../../../test/convexTest"
+import { convexClientFor, makeConvexTest, type ConvexTestHarness } from "../../../test/convexTest"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const deckId = "deck-1" as Id<"decks">
@@ -87,15 +87,6 @@ async function seedVersion(actor: ReturnType<ConvexTestHarness["withIdentity"]>,
     paginationOpts: { numItems: 100, cursor: null },
   })
   return page.page[0]
-}
-
-function convexTestClient(actor: ReturnType<ConvexTestHarness["withIdentity"]>) {
-  return {
-    mutation: (
-      reference: typeof api.decks.syncVersionWrite,
-      args: Parameters<typeof actor.mutation>[1],
-    ) => actor.mutation(reference, args),
-  } as unknown as ConvexReactClient
 }
 
 describe("deck version card writes", () => {
@@ -549,24 +540,17 @@ describe("deck version card writes", () => {
     await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
     const version = await seedVersion(actor, "Original")
     const local = new MemoryStorage()
-    const sent: Array<Parameters<typeof actor.mutation>[1]> = []
+    const sent: unknown[] = []
     let releaseFirst: (() => void) | undefined
     const firstGate = new Promise((release) => {
       releaseFirst = release as () => void
     })
-    const calls: Array<{ reference: typeof api.decks.syncVersionWrite }> = []
-    const clientTyped = {
-      mutation: async (
-        reference: typeof api.decks.syncVersionWrite,
-        args: Parameters<typeof actor.mutation>[1],
-      ) => {
-        if (calls.length === 0) await firstGate
-        calls.push({ reference })
-        sent.push(args)
-        return await actor.mutation(reference, args)
-      },
-    } as unknown as ConvexReactClient
-    const controller = new DeckVersionWriteController(clientTyped, "owner", { storage: local })
+    const client = convexClientFor(actor, async (send, args) => {
+      if (sent.length === 0) await firstGate
+      sent.push(args)
+      return send()
+    })
+    const controller = new DeckVersionWriteController(client, "owner", { storage: local })
     const stop = controller.start()
     controller.update(version.deckId, version.versionId, [solRing], version.revision)
     await flush()
@@ -642,7 +626,7 @@ describe("deck version card writes", () => {
     const version = await seedVersion(actor, "Original")
     const local = new MemoryStorage()
     const cardFromAnotherBuild = { ...solRing, quantity: 4, foil: true }
-    const controller = new DeckVersionWriteController(convexTestClient(actor), "owner", {
+    const controller = new DeckVersionWriteController(convexClientFor(actor), "owner", {
       storage: local,
     })
     const stop = controller.start()
@@ -672,7 +656,7 @@ describe("deck version card writes", () => {
     const later = await seedVersion(actor, "Later")
     const local = new MemoryStorage()
     const boardFromNewerBuild = { ...solRing, board: "maybeboard" } as unknown as VersionCardPayload
-    const controller = new DeckVersionWriteController(convexTestClient(actor), "owner", {
+    const controller = new DeckVersionWriteController(convexClientFor(actor), "owner", {
       storage: local,
     })
     const stop = controller.start()

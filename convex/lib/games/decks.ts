@@ -67,4 +67,5 @@ export type DeckFeed = {
     format: string,
   ) => Promise<{ count: number; status: number }>
   readonly refreshMayCacheNothing?: true
+  readonly searchesDefaultFormatOnly?: true
 }
