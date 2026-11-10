@@ -603,7 +603,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
   })
 
-  it("drops the turn chip to its number when even a bare mark leaves it too little room", () => {
+  it("steps the turn chip down to its number, then to just the pass, while a bare mark leaves too little room", () => {
     const view = renderGame(game(), turnsOn())
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-1-claim"))
@@ -622,6 +622,12 @@ describe("CurrentGameScreen", () => {
 
     widths(2_000, 1_000)
     expect(view.getByTestId("turn-chip-time")).toHaveTextContent(/^1$/)
+    expect(view.getByTestId("turn-chip-1").props.accessibilityLabel).toMatch(/^Turn 1/)
+
+    fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 900, height: 36 } },
+    })
+    expect(view.queryByTestId("turn-chip-time")).toBeNull()
     expect(view.getByTestId("turn-chip-1").props.accessibilityLabel).toMatch(/^Turn 1/)
   })
 
