@@ -1374,10 +1374,13 @@ function SheetOption({
               />
             ) : null}
             <Text
+              testID={`${testID}-label`}
               text={label}
               weight={selected ? "bold" : "medium"}
               size={ruleButton ? "xs" : "xxs"}
-              numberOfLines={1}
+              numberOfLines={oneColumn ? ONE_COLUMN_LABEL_LINES : 1}
+              adjustsFontSizeToFit={oneColumn}
+              minimumFontScale={ONE_COLUMN_MIN_FONT_SCALE}
               style={[themed($optionLabel), { color: ink }, !selected && $muted]}
             />
             {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
@@ -1578,6 +1581,10 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
 
 const $oneColumnCell: ViewStyle = { width: "100%" }
+
+// why: a one-column bag on a crowded corner seat leaves about 42pt for a name, so a 20-character custom name needs three lines at 9pt to read in full.
+const ONE_COLUMN_LABEL_LINES = 3
+const ONE_COLUMN_MIN_FONT_SCALE = 0.75
 
 // why: a narrower two-up column leaves no room for a name beside the glyph and value, so a crowded seat's trackers show bare values.
 const TWO_COLUMN_MIN = 88
