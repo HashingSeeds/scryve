@@ -18,6 +18,7 @@ import {
   MAX_HISTORY_GAMES,
 } from "./localPersistence"
 import type { LocalGame } from "./types"
+import { TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 import { NO_SYSTEM_SETTINGS } from "../../../test/fixtures/localSettings"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
@@ -309,6 +310,25 @@ describe("LocalGameRepository", () => {
         (id) => kept.has(id) || id === turn.operationId || id === counter.operationId,
       ),
     )
+  })
+
+  it("loads a Two-Headed Giant game whose groups aren't teams as a plain game, layout included", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = createLocalGame({
+      startingLife: 30,
+      layout: "tabletop",
+      players: ["Ada", "Grace", "Alan", "Kim"].map((name) => ({ name, color: "#000" })),
+    })
+    const [ada, grace, alan, kim] = game.players.map(({ id }) => id)
+    repository.saveActiveGame({
+      ...game,
+      variant: TWO_HEADED_GIANT,
+      turnGroups: [[ada, grace, alan], [kim]],
+    })
+
+    const loaded = repository.loadActiveGame()
+    expect(loaded?.variant).toBeUndefined()
+    expect(loaded?.layout).toBe("tabletop")
   })
 
   it("keeps a game saved by a newer version until the player replaces it", () => {
