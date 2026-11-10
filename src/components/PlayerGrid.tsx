@@ -48,13 +48,14 @@ import {
 } from "./playerCardTypes"
 import {
   boardInsetsFor,
+  contentDirectionToward,
   getPlayerGridLayout,
   getPlayerGridRowFlex,
   getPlayerGridRows,
   seatFrames,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
-import { SeatSpotlight } from "./TurnSpotlight"
+import { SeatSpotlight, useTurnSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 import type { CornerRadii } from "../../modules/display-corners"
@@ -322,6 +323,13 @@ export function PlayerGrid({
   const attack = commanderDamage?.attack
   const armedPlayer = players.find(({ id }) => id === attack?.armedPlayerId)
   const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
+  const passTo = useTurnSpotlight()?.passTo
+  const passFrame = frames
+    .flat()
+    .find(
+      (frame) =>
+        frame && players[seatedRows[frame.rowIndex][frame.columnIndex] ?? -1]?.id === passTo,
+    )
   const seatRotations = new Map<number, LifeCardContentRotation>()
   for (const frame of frames.flat()) {
     const index = frame && seatedRows[frame.rowIndex][frame.columnIndex]
@@ -577,6 +585,11 @@ export function PlayerGrid({
                         : undefined
                     }
                     dice={seatDice}
+                    passDirection={
+                      passFrame && passTo !== player.id
+                        ? contentDirectionToward(frame, passFrame)
+                        : undefined
+                    }
                     onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
                     onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                       onChange(player.id, delta),
