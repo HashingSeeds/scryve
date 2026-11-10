@@ -22,7 +22,6 @@ export interface OutState<Id extends string = string> {
     readonly lethal: number
     readonly totals: readonly CommanderTotal<Id>[]
   }
-  /** why: seats that share a turn also win and lose together, such as a Two-Headed Giant team or Archenemy's opponents. */
   readonly groups?: TurnGroups
 }
 
@@ -60,14 +59,12 @@ export function outReason<Id extends string>(
   return isCounterOut(state.counter, life, others) ? { cause: "life" } : undefined
 }
 
-/** why: a group is out only once every seat in it is; a teammate who is out still shares the group's win. */
 export function isGroupOut<Id extends string>(state: OutState<Id>, playerId: Id): boolean {
   return turnGroupOf(state.groups, playerId).every(
     (seat) => outReason(state, seat as Id) !== undefined,
   )
 }
 
-/** why: the game is decided once one group is left standing: one player, or a whole team with any of its fallen seats. */
 export function standingWinners<Id extends string>(state: OutState<Id>): Id[] | undefined {
   const standing = state.lives.filter(({ playerId }) => !outReason(state, playerId))
   if (standing.length === 0) return undefined

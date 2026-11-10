@@ -227,6 +227,16 @@ describe("publishLocalGame", () => {
         }),
       ),
     ).rejects.toThrow("Commander damage totals are only supported in Commander games")
+    await expect(
+      host.mutation(api.games.publishLocalGame, {
+        ...snapshotArgs(),
+        table: {
+          designations: {},
+          players: {},
+          turnGroups: [["local-host-player", "local-stranger"]],
+        },
+      }),
+    ).rejects.toThrow("Table state does not fit this game")
     const games = await t.run((ctx) => ctx.db.query("games").collect())
     expect(games).toHaveLength(0)
   })

@@ -221,7 +221,6 @@ export interface GameStore {
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
-  /** why: in seat order; a pass reads every seat to skip those that are out. */
   seats(): Read<readonly EngineSeat[]>
   commanderTotals(): Read<readonly CommanderTotal[]>
   isMember(): Read<boolean>
@@ -655,7 +654,6 @@ function* writeTable(
   now: number,
 ): GameSteps<GameWriteResult> {
   const action = gatedTableAction(write.action)
-  // why: "anyone edits" lets the table fix each other's counts, not claim, pass or take back another seat's turn.
   const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write

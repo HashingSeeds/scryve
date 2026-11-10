@@ -11,10 +11,9 @@ declare class DisplayCornersModule {
   pointScale?: number
 }
 
-/** why: null on web, Jest, and binaries built before the module existed, which keep square corners. */
+/** why: binaries built before this module existed have no native side, so they keep square corners. */
 const native = requireOptionalNativeModule<DisplayCornersModule>("DisplayCorners")
 
-/** why: Android measures the window's corners as it stands now, while iOS knows only the upright hardware's, so `frame` says which the radii (top left, clockwise) are in. */
 export type DisplayCorners = { radii: CornerRadii; frame: "window" | "upright" }
 
 export function displayCorners(): DisplayCorners | null {

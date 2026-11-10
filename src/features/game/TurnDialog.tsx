@@ -168,7 +168,6 @@ const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $choice: ViewStyle = { flexGrow: 1 }
 
-/** why: the board, game setup and Settings stay mounted together, so each reads the saved choice as it changes. */
 export function useTurnsEnabled(repository: LocalGameRepository) {
   const subscribe = useCallback(
     (listener: () => void) => repository.onSettingsChanged(listener),

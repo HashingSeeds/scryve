@@ -53,7 +53,6 @@ export function LocalGameEndDialog({
   )
   const [drawSelected, setDrawSelected] = useState(false)
   const endResultSelected = winnerPlayerIds.length > 0 || drawSelected
-  // why: a team wins together, so choosing it chooses every seat in it.
   function toggleWinner(playerId: PlayerId) {
     setDrawSelected(false)
     const team = teamMembers(game.players, groups, playerId).map(({ id }) => id)
