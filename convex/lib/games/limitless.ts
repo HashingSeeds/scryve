@@ -351,4 +351,5 @@ export const LIMITLESS_FEED = {
   operation: (format) => `deck-feed-refresh:${format}`,
   refresh: refreshPokemonTopDecks,
   refreshMayCacheNothing: true,
+  searchesDefaultFormatOnly: true,
 } satisfies DeckFeed

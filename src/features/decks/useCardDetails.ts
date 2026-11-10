@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- each system's card details still have their own lookup here. */
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAction, useConvexConnectionState } from "convex/react"
 
@@ -15,6 +14,7 @@ import {
 } from "./cardDetailsCache"
 import { catalogCardDetails } from "./cardFocus"
 import { api } from "../../../convex/_generated/api"
+import { systemDefinition } from "../../../convex/lib/systems"
 
 type CardLookup = {
   detailKey: string
@@ -52,9 +52,10 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
     providerCardId,
     legacyDetailKey,
   } = card ?? {}
+  const catalogProvider = systemDefinition(game)?.integration.capabilities.cardCatalog.provider
   const magicId =
     scryfallId ??
-    (game === "mtg"
+    (catalogProvider === "scryfall"
       ? [printingId, providerCardId].find((id) => id && /^[0-9a-f-]{36}$/i.test(id))
       : undefined)
 
@@ -75,7 +76,7 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
           ? (detailsByKey[legacyDetailKey] ?? readCardDetail(legacyDetailKey))
           : undefined)
       const enrichmentKey = `${detailKey}:${attempt}`
-      const needsFaces = game === "mtg" && name.includes(" // ")
+      const needsFaces = catalogProvider === "scryfall" && name.includes(" // ")
       const stale = warmed !== undefined && staleCardDetails(game, warmed)
       if (
         warmed &&
@@ -104,7 +105,7 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
           ? await byId({ scryfallId: magicId, deviceId })
           : catalogCardId
             ? catalogCardDetails(await byCatalogId({ game, cardId: catalogCardId, deviceId }))
-            : game === "pokemon" && originalReference
+            : catalogProvider === "tcgdex" && originalReference
               ? catalogCardDetails(await byPokemonReference({ name, originalReference, deviceId }))
               : undefined
         if (!active) return
@@ -146,6 +147,7 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
     detailKey,
     name,
     game,
+    catalogProvider,
     offline,
     magicId,
     catalogCardId,
