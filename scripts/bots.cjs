@@ -14,6 +14,8 @@ const { parseArgs } = require("node:util")
 const { previewKey, previewName } = require("./preview.cjs")
 const { SYSTEM_IDS } = require("../convex/lib/systems/definitions.ts")
 
+const VARIANTS = ["treachery", "archenemy", "twoHeadedGiant", "planechase"]
+
 const USAGE = `Stand-in players for connected games on a Convex preview.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
@@ -248,6 +250,7 @@ class Bot {
     await this.client.mutation(api.users.syncCurrent, { displayName: this.name })
     const { page } = await this.client.query(api.games.activeConnectedGames, {
       paginationOpts: { numItems: 10, cursor: null },
+      variants: VARIANTS,
     })
     for (const game of page.filter((game) => game.isHost)) {
       await this.client.mutation(api.games.abandonGame, { publicId: game.publicId })
@@ -280,7 +283,7 @@ class Bot {
       color: COLORS[this.slot % COLORS.length],
       deviceId: this.deviceId,
       systems: SYSTEM_IDS,
-      variants: ["treachery", "archenemy", "twoHeadedGiant", "planechase"],
+      variants: VARIANTS,
     })
     this.publicId = seat.publicId
     this.report(this, "joined", { seat: seat.seat })
@@ -556,6 +559,7 @@ if (require.main === module) {
 
 module.exports = {
   assertPreviewTarget,
+  Bot,
   botIdentity,
   createReporter,
   currentPreviewName,

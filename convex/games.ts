@@ -852,7 +852,7 @@ export const createLobby = mutation({
     assertPlayerCount(args.playerCount)
     if (args.variant !== undefined) {
       if (!systemDefinition(gameSystem)?.variants.includes(args.variant))
-        throw new Error("Treachery and Archenemy are Magic variants")
+        throw new Error("This game doesn't offer that variant")
       assertVariantSeats(args.variant, args.playerCount)
       if (args.variant === "treachery" && !args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     }

@@ -470,6 +470,10 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const modeSetup = matchesValidator(modeSetupValidator, value.modeSetup)
     ? value.modeSetup
     : undefined
+  const teams =
+    value.variant === TWO_HEADED_GIANT && isValidTeams(turnGroups, playerIds)
+      ? turnGroups
+      : undefined
   const counterLog = parseCounterLog(value.counterLog, playerIds)
   return {
     schemaVersion: 1,
@@ -477,10 +481,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     status: value.status,
     ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
     ...(typeof value.format === "string" ? { format: value.format } : {}),
-    layout: playerGridLayoutForCount(
-      value.variant === TWO_HEADED_GIANT && turnGroups ? turnGroups.length : players.length,
-      value.layout,
-    ),
+    layout: playerGridLayoutForCount(teams ? teams.length : players.length, value.layout),
     ...(isSeatOrder(value.seatOrder, players.length) ? { seatOrder: value.seatOrder } : {}),
     lifeStep:
       isLifeDelta(value.lifeStep) && value.lifeStep > 0
@@ -512,9 +513,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
-    ...(value.variant === TWO_HEADED_GIANT && isValidTeams(turnGroups, playerIds)
-      ? { variant: TWO_HEADED_GIANT }
-      : {}),
+    ...(teams ? { variant: TWO_HEADED_GIANT } : {}),
     ...(counterLog ? { counterLog } : {}),
     ...(modeSetup ? { modeSetup } : {}),
     ...(Array.isArray(value.logOrder)

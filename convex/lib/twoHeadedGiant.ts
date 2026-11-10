@@ -1,10 +1,8 @@
 import type { TableDefinition } from "./systems"
 import { isValidTurnGroups, turnGroupOf, type TurnGroups } from "./turns"
 
-// why: these follow Comprehensive Rules 810, so changes start there.
 export const TWO_HEADED_GIANT = "twoHeadedGiant" as const
 
-/** why: CR 810.4 sets 30. 2HG Commander has no official rules, and Wizards' events play 60. */
 export const TEAM_LIFE = 30
 export const COMMANDER_TEAM_LIFE = 60
 export const TEAM_POISON = 15
