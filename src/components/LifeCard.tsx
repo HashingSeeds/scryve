@@ -75,6 +75,7 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOv
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
+import { usePendingLife } from "./pendingLife"
 import {
   seatCardRadius,
   COMPACT_LIFE_FONT_SIZE,
@@ -232,12 +233,15 @@ export const LifeCard = memo(function LifeCard({
   const displayName = playerName.trim() || translate("board:seat.unnamedPlayer")
   const identity = seatIdentityLabel(seatNumber, playerName)
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
-  const [preview, setPreview] = useState(0)
+  const [preview, setPreview] = usePendingLife(playerId)
   const stopTapTiming = useRef<() => void>(undefined)
-  const showPreview = useCallback((delta: number) => {
-    stopTapTiming.current = delta === 0 ? undefined : startTapTiming()
-    setPreview(delta)
-  }, [])
+  const showPreview = useCallback(
+    (delta: number) => {
+      stopTapTiming.current = delta === 0 ? undefined : startTapTiming()
+      setPreview(delta)
+    },
+    [setPreview],
+  )
   useLayoutEffect(() => {
     stopTapTiming.current?.()
     stopTapTiming.current = undefined
@@ -270,7 +274,6 @@ export const LifeCard = memo(function LifeCard({
   const [seatedPlayerId, setSeatedPlayerId] = useState(playerId)
   if (seatedPlayerId !== playerId) {
     setSeatedPlayerId(playerId)
-    setPreview(0)
     setEditorOpen(false)
     setTableSheetOpen(false)
   }
@@ -1157,6 +1160,7 @@ export const LifeCard = memo(function LifeCard({
           menuCorner={menuCorner}
           menuEdgeCenter={menuEdgeCenter}
           onChange={onChange}
+          onPreview={setPreview}
           onClose={() => setEditorOpen(false)}
         />
       ) : null}

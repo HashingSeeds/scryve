@@ -15,6 +15,7 @@ function editor(
 ) {
   const onChange = jest.fn()
   const onClose = jest.fn()
+  const onPreview = jest.fn()
   const view = render(
     <ThemeProvider initialContext="dark">
       <LifeEditor
@@ -29,11 +30,12 @@ function editor(
         cardHeight={320}
         {...size}
         onChange={onChange}
+        onPreview={onPreview}
         onClose={onClose}
       />
     </ThemeProvider>,
   )
-  return { view, onChange, onClose }
+  return { view, onChange, onClose, onPreview }
 }
 
 describe("LifeEditor", () => {
@@ -123,6 +125,19 @@ describe("LifeEditor", () => {
     localGameRepository.saveSettings(settings)
     jest.restoreAllMocks()
     resetReducedMotionCacheForTests()
+  })
+
+  it("shares the running change while the finger is down, and clears it on release", () => {
+    const { view, onChange, onPreview } = editor()
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 160 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 124, pageY: 100 } })
+    expect(onPreview).toHaveBeenLastCalledWith(3)
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent(slider, "responderRelease")
+    expect(onPreview).toHaveBeenLastCalledWith(0)
+    expect(onChange).toHaveBeenCalledWith(3)
   })
 
   it("spaces steps a finger apart on a short track", () => {
