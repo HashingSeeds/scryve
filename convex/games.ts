@@ -1339,6 +1339,11 @@ export const publishLocalGame = mutation({
       }
       if (Object.keys(table.designations).length > 0)
         await ctx.db.patch(gameId, { designations: storedDesignations(ctx, table.designations) })
+      if (table.turn || table.turnGroups)
+        await ctx.db.patch(gameId, {
+          ...(table.turn ? { turn: table.turn } : {}),
+          ...(table.turnGroups ? { turnGroups: table.turnGroups } : {}),
+        })
     }
     for (const total of totals) {
       await ctx.db.insert("gameCommanderDamage", {
