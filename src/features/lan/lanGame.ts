@@ -1,6 +1,10 @@
 import { translate } from "@/i18n/translate"
 
-import { PLAYER_COLOR_CHOICES, shapeForSeat } from "../../../convex/lib/appearance"
+import {
+  MANY_SEAT_MARK_SHAPES,
+  PLAYER_COLOR_CHOICES,
+  shapeForSeat,
+} from "../../../convex/lib/appearance"
 import type {
   ClaimStatus,
   GameWrite as MemoryWrite,
@@ -22,6 +26,7 @@ import {
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
 import { outReason } from "../../../convex/lib/outReason"
+import { clientSeesSeats } from "../../../convex/lib/policy"
 import {
   identitySection,
   startingValueRange,
@@ -113,6 +118,7 @@ export interface LanDealtRole {
 
 export interface LanGame extends LanLobby {
   hostKey: string
+  seatLimits?: Readonly<Record<string, number>>
   roles?: Readonly<Record<string, LanDealtRole>>
   memory?: MemoryGame
   recentOperationIds: string[]
@@ -136,6 +142,7 @@ export type LanGuestMessage =
       editsAnySeat?: boolean
       /** why: a guest sends the table it can parse, so a host leaves out a turn an older guest's strict parser would drop the whole table over. */
       tableVersion?: number
+      maxSeats?: number
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
@@ -236,7 +243,8 @@ export function admitLanGuest(
   if (
     join.protocol !== LAN_PROTOCOL ||
     (system && !systems.includes(system)) ||
-    (variant && !join.variants?.includes(variant))
+    (variant && !join.variants?.includes(variant)) ||
+    !clientSeesSeats(game.setup.playerCount, join.maxSeats)
   )
     return { rejected: LAN_REJECTIONS.update }
   const { pass } = join
@@ -263,7 +271,14 @@ export function admitLanGuest(
     connected: true,
     ...editsAnySeat,
   }
-  return { game: { ...game, seats: [...game.seats, seat] }, pass: fresh }
+  return {
+    game: {
+      ...game,
+      seats: [...game.seats, seat],
+      ...(join.maxSeats ? { seatLimits: { ...game.seatLimits, [fresh.key]: join.maxSeats } } : {}),
+    },
+    pass: fresh,
+  }
 }
 
 export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
@@ -272,7 +287,10 @@ export function setLanPlayerCount(game: LanGame, playerCount: number): LanGame {
     !Number.isInteger(playerCount) ||
     playerCount < Math.max(LAN_MIN_PLAYERS, game.seats.length) ||
     playerCount > LAN_MAX_SEATS ||
-    !fitsVariant(game.setup, playerCount)
+    !fitsVariant(game.setup, playerCount) ||
+    game.seats.some(
+      ({ key }) => key !== game.hostKey && !clientSeesSeats(playerCount, game.seatLimits?.[key]),
+    )
   )
     return game
   return { ...game, setup: { ...game.setup, playerCount } }
@@ -437,9 +455,10 @@ export function applyLanWrite(
   }
 }
 
-export const lanSeatAppearance = (seat: number) => ({
+/** why: only apps that draw 7 or more seats join a game that big, so its seats can use every free mark, as Convex's do. */
+export const lanSeatAppearance = (seat: number, playerCount: number) => ({
   color: PLAYER_COLOR_CHOICES[(seat - 1) % PLAYER_COLOR_CHOICES.length],
-  shape: shapeForSeat(seat),
+  shape: shapeForSeat(seat, clientSeesSeats(playerCount) ? undefined : MANY_SEAT_MARK_SHAPES),
 })
 
 const tableRulesApply = (rules: ReturnType<typeof tableRules>) =>
@@ -515,7 +534,7 @@ export function lanProjection(
       playerId: seat.key,
       seat: seat.seat,
       displayName: seat.name,
-      ...lanSeatAppearance(seat.seat),
+      ...lanSeatAppearance(seat.seat, setup.playerCount),
       currentLife: memory?.seats.get(seat.key)?.currentLife ?? setup.startingLife,
       ...(commander ? { eliminatedByCommanderDamage: eliminated.has(seat.key) } : {}),
       controlledByMe: seat.key === viewerKey,
@@ -712,6 +731,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
         : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(isCount(value.tableVersion) ? { tableVersion: value.tableVersion } : {}),
+      ...(isCount(value.maxSeats) ? { maxSeats: value.maxSeats } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }

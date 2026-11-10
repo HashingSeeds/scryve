@@ -19,6 +19,7 @@ export interface OptionGridProps {
   testID: string
   isDisabled?: (option: number) => boolean
   custom?: { min: number; max: number }
+  more?: readonly number[]
 }
 
 export function OptionGrid({
@@ -29,12 +30,16 @@ export function OptionGrid({
   testID,
   isDisabled,
   custom,
+  more,
 }: OptionGridProps) {
   const {
     themed,
     theme: { colors },
   } = useAppTheme()
   const [draft, setDraft] = useState<string>()
+  const [expanded, setExpanded] = useState(false)
+  const showMore = more !== undefined && (expanded || more.includes(value))
+  const shown = more && showMore ? [...options, ...more] : options
   const customValue = custom && !options.includes(value) ? value : undefined
 
   function pick(next: number) {
@@ -59,7 +64,7 @@ export function OptionGrid({
     <View style={themed($section)}>
       <Text text={label} preset="subheading" accessibilityRole="header" />
       <View testID={testID} accessibilityLabel={label} style={themed($grid)}>
-        {options.map((option) => (
+        {shown.map((option) => (
           <ChoiceButton
             key={option}
             compact
@@ -67,7 +72,11 @@ export function OptionGrid({
             text={String(option)}
             selected={draft === undefined && option === value}
             disabled={isDisabled?.(option)}
-            style={[themed($cell), isDisabled?.(option) && $disabled]}
+            style={[
+              themed($cell),
+              more && !showMore && $moreRowCell,
+              isDisabled?.(option) && $disabled,
+            ]}
             onPress={() => pick(option)}
           />
         ))}
@@ -105,6 +114,17 @@ export function OptionGrid({
             onPress={() => setDraft(customValue === undefined ? "" : String(customValue))}
           />
         ) : null}
+        {more?.length && !showMore ? (
+          <ChoiceButton
+            compact
+            testID={`${testID}-more`}
+            text={`${more[0]}+`}
+            selected={false}
+            accessibilityLabel={translate("common:optionGrid.more", { label, from: more[0] })}
+            style={[themed($cell), $moreRowCell]}
+            onPress={() => setExpanded(true)}
+          />
+        ) : null}
       </View>
     </View>
   )
@@ -118,6 +138,8 @@ const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 // why: equal growth from one basis keeps chips in a row the same width and wraps big text instead of clipping.
 const $cell: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, flexBasis: 56 })
+// why: six chips must share a phone-width row so "7+" stays beside 2–6 instead of wrapping alone.
+const $moreRowCell: ViewStyle = { flexBasis: 44, minWidth: 44 }
 const $input: ThemedStyle<ViewStyle> = ({ radius }) => ({
   minHeight: 48,
   borderWidth: 2,

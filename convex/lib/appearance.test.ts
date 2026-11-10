@@ -2,6 +2,7 @@ import {
   ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
   appearanceIsTaken,
   CONNECTED_PLAYER_MARK_SHAPES,
+  MANY_SEAT_MARK_SHAPES,
   isPlayerMarkShape,
   isProMarkShape,
   PLAYER_COLOR_CHOICES,
@@ -13,7 +14,7 @@ import {
   withoutProMarks,
   type PlayerAppearance,
 } from "./appearance"
-import { MAX_PLAYERS } from "./policy"
+import { MAX_PLAYERS, SEATS_BEFORE_CLIENT_LIMIT } from "./policy"
 
 const RED = PLAYER_COLOR_CHOICES[0]
 const BLUE = PLAYER_COLOR_CHOICES[1]
@@ -24,7 +25,7 @@ describe("player appearance", () => {
     expect(shapeForSeat(2)).toBe("triangle")
     expect(shapeForSeat(7)).toBe(shapeForSeat(1))
     expect(shapeForSeat(1, PLAYER_MARK_SHAPES)).toBe("heart")
-    expect(PLAYER_MARK_SHAPES).toHaveLength(8)
+    expect(PLAYER_MARK_SHAPES).toHaveLength(10)
     expect(PLAYER_MARK_SHAPES).not.toContain("circle")
     expect(CONNECTED_PLAYER_MARK_SHAPES).not.toContain("circle")
     expect(ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES).toContain("circle")
@@ -35,7 +36,9 @@ describe("player appearance", () => {
     expect(isPlayerMarkShape("octagon")).toBe(false)
     expect(isPlayerMarkShape(undefined)).toBe(false)
     expect(PLAYER_COLOR_CHOICES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
-    expect(CONNECTED_PLAYER_MARK_SHAPES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
+    expect(PLAYER_MARK_SHAPES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
+    expect(MANY_SEAT_MARK_SHAPES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
+    expect(CONNECTED_PLAYER_MARK_SHAPES.length).toBeGreaterThanOrEqual(SEATS_BEFORE_CLIENT_LIMIT)
   })
 
   it("reads Pro marks without offering them to seat defaults or connected lobbies", () => {
@@ -98,7 +101,7 @@ describe("player appearance", () => {
         preferred: { color: RED.toLowerCase(), shape: "circle" },
         taken,
         seat,
-        shapes: CONNECTED_PLAYER_MARK_SHAPES,
+        shapes: MANY_SEAT_MARK_SHAPES,
       })
       expect(appearanceIsTaken(taken, appearance)).toBe(false)
       taken.push(appearance)

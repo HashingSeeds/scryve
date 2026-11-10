@@ -1,7 +1,9 @@
 import { isPlayerMarkShape, type PlayerMarkShape } from "./appearance"
 
 export const MIN_PLAYERS = 2
-export const MAX_PLAYERS = 6
+export const MAX_PLAYERS = 10
+/** why: builds from before 7–10 seats draw at most six and don't say how many they can, so a game with more seats asks them to update. */
+export const SEATS_BEFORE_CLIENT_LIMIT = 6
 export const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000
 export const MAX_MANUAL_CODE_CANDIDATES = 8
 export const MAX_RULESET_LENGTH = 32
@@ -26,8 +28,12 @@ export const MATCH_FINISHED_AT_GRACE_MS = 24 * 60 * 60 * 1000
 
 export function assertPlayerCount(count: number) {
   if (!Number.isInteger(count) || count < MIN_PLAYERS || count > MAX_PLAYERS) {
-    throw new Error("A connected lobby must have 2–6 seats")
+    throw new Error(`A connected lobby must have ${MIN_PLAYERS}–${MAX_PLAYERS} seats`)
   }
+}
+
+export function clientSeesSeats(playerCount: number, maxSeats = SEATS_BEFORE_CLIENT_LIMIT) {
+  return playerCount <= maxSeats
 }
 
 export function assertStartingLife(life: number, { min, max }: { min: number; max: number }) {

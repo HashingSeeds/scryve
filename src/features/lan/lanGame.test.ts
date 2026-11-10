@@ -6,6 +6,7 @@ import {
   LAN_PROTOCOL,
   lanLobbyOf,
   lanProjection,
+  lanSeatAppearance,
   lanSeatsReady,
   parseGuestMessage,
   parseLanSetup,
@@ -129,6 +130,21 @@ describe("nearby lobby", () => {
     expect(setLanPlayerCount(seated, 7)).toBe(seated)
     const playing = startLanRound(setLanPlayerCount(seated, 3), NOW)
     expect(setLanPlayerCount(playing, 4)).toBe(playing)
+  })
+
+  it("keeps guests that draw at most six seats out of bigger tables", () => {
+    const big = lobby({ ...commander, playerCount: 8 })
+    const current = { ...join("new"), maxSeats: 10 }
+
+    expect(admitLanGuest(big, tokens, join("old"), unused)).toEqual({
+      rejected: "Update Scryve to join this game.",
+    })
+    const seated = admitLanGuest(big, tokens, current, { key: "new", token: "t" })
+    expect(seated).toHaveProperty("game.seats.1.key", "new")
+    if ("rejected" in seated) return
+    expect(setLanPlayerCount(seated.game, 10).setup.playerCount).toBe(10)
+    const withOld = seatGuest(setLanPlayerCount(seated.game, 4), "old")
+    expect(setLanPlayerCount(withOld, 7)).toBe(withOld)
   })
 
   it("is ready to start only when every chosen seat is filled and present", () => {
@@ -507,6 +523,15 @@ describe("nearby rounds on the shared engine", () => {
     expect(lanProjection(again, "host").publicId).not.toBe(lanProjection(first, "host").publicId)
     expect(lifeOf(again, "host", "guest")).toBe(40)
     expect(lanProjection(again, "host").recentOperationIds).toEqual([])
+  })
+})
+
+describe("nearby seat marks", () => {
+  it("gives every seat of a 7 to 10 seat game its own mark, and a 6 seat game the marks older apps draw", () => {
+    const marks = (count: number) =>
+      Array.from({ length: count }, (_, index) => lanSeatAppearance(index + 1, count).shape)
+    expect(new Set(marks(10)).size).toBe(10)
+    expect(marks(6)).toEqual(marks(10).slice(0, 6))
   })
 })
 
