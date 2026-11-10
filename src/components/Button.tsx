@@ -43,7 +43,6 @@ export interface ButtonProps extends PressableProps {
   disabledStyle?: StyleProp<ViewStyle>
 }
 
-/** why: actions that start something are outline buttons led by a plus, so every screen draws the same one. */
 export function PlusAccessory({ style, disabled }: ButtonAccessoryProps) {
   const { theme } = useAppTheme()
   return (

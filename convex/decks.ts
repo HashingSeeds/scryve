@@ -1882,7 +1882,6 @@ async function endShares(ctx: MutationCtx, deckId: Id<"decks">) {
     await ctx.db.delete(link._id)
 }
 
-/** why: one link per deck, so sharing again hands back the link already sent. */
 export const share = mutation({
   args: { deckId: v.id("decks") },
   handler: async (ctx, args) => {
@@ -1899,7 +1898,6 @@ export const share = mutation({
   },
 })
 
-/** why: the old link stops working, and sharing again makes a new one. */
 export const unshare = mutation({
   args: { deckId: v.id("decks") },
   handler: async (ctx, args) => {

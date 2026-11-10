@@ -377,7 +377,6 @@ function mtgJsonBoards(deck: Record<string, unknown>): Array<[PastedDeckBoard, u
   ]
 }
 
-/** why: MTGJSON cards carry their own color identity, so a precon's colors need no Scryfall lookup. */
 export function mtgJsonIdentity(format: string, payload: unknown) {
   const deck = objectRecord(objectRecord(payload)?.data)
   if (!deck) return undefined
@@ -762,10 +761,7 @@ export const storePreconIdentity = internalMutation({
   },
 })
 
-/**
- * why: MTGJSON's deck list carries no colors, so each command-zone precon's own file is read once.
- * Rows that already have colors are skipped, and a failed fetch is retried on the next scheduled refresh.
- */
+/** why: MTGJSON's deck list has no colors, so each command-zone precon's file is read once; failed fetches retry on the next refresh. */
 export const fillPreconIdentity = internalAction({
   args: { cursor: v.union(v.string(), v.null()) },
   handler: async (ctx, { cursor }): Promise<null> => {

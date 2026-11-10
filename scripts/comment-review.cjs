@@ -208,6 +208,14 @@ function removeBlock(source, block, filename) {
     }
   }
   let { start, end } = matches[0]
+  if (
+    /\.[jt]sx$/u.test(filename) &&
+    /(?:^|\n)[\t ]*\{[\t ]*$/u.test(source.slice(0, start)) &&
+    /^[\t ]*\}[\t ]*\r?(?:\n|$)/u.test(source.slice(end))
+  ) {
+    start = source.lastIndexOf("{", start)
+    end = source.indexOf("}", end) + 1
+  }
   const lineStart = source.lastIndexOf("\n", start - 1) + 1
   const nextNewline = source.indexOf("\n", end)
   const lineEnd = nextNewline === -1 ? source.length : nextNewline

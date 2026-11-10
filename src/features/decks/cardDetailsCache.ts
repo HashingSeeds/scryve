@@ -184,7 +184,6 @@ export async function fetchCardDetails(
   }
 }
 
-/** why: a deck screen loads details for its analysis and its rule warnings at once, and each would ask for the same cards. */
 type DetailBatch = FunctionReturnType<typeof api.cards.detailsBatch>
 
 const inFlight = new Map<string, Promise<unknown>>()

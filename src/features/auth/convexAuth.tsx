@@ -20,7 +20,7 @@ export function createConvexAuthHook(
   return function useConvexAuthFromClerk() {
     const { isLoaded, isSignedIn, getToken, orgId, orgRole, sessionId } = useAuthFromClerk()
     const currentGetToken = useRef(getToken)
-    // why: Convex keeps the previous session's "not authenticated" answer until the new token is checked, so a fresh sign-in briefly reads as a rejected session. One loading render resets Convex to pending.
+    // why: Convex keeps the previous session's "not authenticated" until the new token is checked, so a fresh sign-in reads as rejected; one loading render resets it to pending.
     const signedInSession = isSignedIn ? sessionId : undefined
     const [settledSession, setSettledSession] = useState(signedInSession)
     if (settledSession !== signedInSession) setSettledSession(signedInSession)

@@ -459,7 +459,6 @@ async function translate({ onlyNamespace, retranslate }) {
     const units = namespaceUnits(english, namespace)
     const lock = readJson(lockPath(namespace), {})
 
-    // why: one namespace per call keeps requests small and parallel by locale.
     await Promise.all(
       Object.keys(LOCALES).map(async (locale) => {
         const file = namespacePath(locale, namespace)

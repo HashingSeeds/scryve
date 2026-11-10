@@ -110,7 +110,7 @@ export function getPlayerContentRotation(input: {
 
 const acrossBoard = (facing: LifeCardContentRotation) => facing === 0 || facing === 180
 
-// why: one copy per seat direction stacked three or four chips around the menu button, so the board keeps a single axis: the one more seats face along, or on a tie the one that runs along the board's longer side, where a chip has room.
+// why: one chip copy per seat direction crowded the menu button, so use a single axis: the one more seats face, or the board's longer side on a tie.
 export function getPlayerGridFacings(
   playerCount: number,
   layout: ReturnType<typeof getPlayerGridLayout>,

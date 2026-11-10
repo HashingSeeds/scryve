@@ -36,7 +36,7 @@ const GLYPH_SIZE = 22
 const TAB_ENTER_DELAY_MS = 260
 const TAB_SLIDE_MS = 200
 
-/** why: a tab slides out of its edge when it appears and back into it when it goes, while the marks beside it slide into the room it leaves. Reanimated reads the system setting only at startup, so the live preference gates these instead. */
+/** why: Reanimated reads reduced motion only at startup, so the live preference gates these animations instead. */
 function edgeSlides(edge: BoardEdge) {
   const tuckedBy = (share: number) => ({
     transform: [
@@ -63,7 +63,7 @@ const EDGE_SLIDES = {
   bottom: edgeSlides("bottom"),
 } satisfies Record<BoardEdge, ReturnType<typeof edgeSlides>>
 
-/** why: the tool needs no words, so each copy can sit at an edge and turn toward whoever is nearest. Every copy runs the same action, so screen readers and keyboards get only the first. */
+/** why: every copy runs the same action, so screen readers and keyboards get only the first. */
 export const FirstPlayerTabs = memo(function FirstPlayerTabs({
   offer,
   tabs,

@@ -613,7 +613,7 @@ export const searchTopDecks = action({
   },
 })
 
-/** why: previews set CARD_CATALOG_SYNC=off to skip these writes; Top Decks still refresh on demand. */
+/** why: previews set CARD_CATALOG_SYNC=off; Top Decks still refresh on demand. */
 export const refreshScheduled = internalAction({
   args: {},
   handler: async (ctx) => {

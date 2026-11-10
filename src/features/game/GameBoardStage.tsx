@@ -228,7 +228,7 @@ export function firstPlayerTabs(
   })
 }
 
-// why: seats keep their name and mark at the outer edges, so a toast just past the menu, kept out of the side bands where sideways seats print theirs, never covers one. It stays mounted while the menu is open so a timed toast keeps its clock.
+// why: seats print their name and mark at the outer edges, so the toast sits just past the menu and out of the side bands sideways seats use. It stays mounted while the menu is open so a timed toast keeps its clock.
 const SEAT_IDENTITY_BAND = seatIdentityMetrics().edge + seatBagSize()
 const TOAST_MENU_CLEARANCE = MENU_BUTTON_SIZE / 2 + 8
 

@@ -89,7 +89,6 @@ export function GameLogDialog({
             <Text text={String(item.life)} weight="semiBold" style={$number} />
           </View>
           <View style={themed($detail)}>
-            {/* why: the attacker's mark with a sword is how a card shows commander damage. */}
             {source ? (
               <>
                 <PlayerMark
