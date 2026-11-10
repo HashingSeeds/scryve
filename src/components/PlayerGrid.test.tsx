@@ -12,7 +12,7 @@ import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
-import { FIRST_PLAYER_TAB, FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
+import { FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
 import { LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import {
@@ -35,6 +35,7 @@ import {
   PlayerGrid,
   type PlayerGridProps,
 } from "./PlayerGrid"
+import { FIRST_PLAYER_TAB } from "./playerGridGeometry"
 import type { OutState } from "../../convex/lib/outReason"
 import { EMPTY_TABLE, type TableState } from "../../convex/lib/table"
 

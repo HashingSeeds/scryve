@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Share } from "react-native"
 import { useConvex, useMutation, useQuery } from "convex/react"
+import type { FunctionArgs } from "convex/server"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remoteValue } from "@/features/async/remoteState"
@@ -187,7 +188,7 @@ function ConnectedLobbyContent({
 
   async function selectSeatDeck(
     seat: number,
-    choice: { deckVersionId?: Id<"deckVersions">; shareToken?: string; deckFingerprint?: string },
+    choice: Omit<FunctionArgs<typeof api.decks.selectForSeat>, "publicId" | "seat">,
   ) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) {
@@ -209,7 +210,9 @@ function ConnectedLobbyContent({
     }
   }
 
-  async function changeSettings(settings: { playerCount?: number; deckRequired?: boolean }) {
+  async function changeSettings(
+    settings: Omit<FunctionArgs<typeof api.games.updateLobbySettings>, "publicId">,
+  ) {
     if (settingsInFlight.current || startInFlight.current || !isWebSocketConnected) return
     settingsInFlight.current = true
     setSavingSettings(true)

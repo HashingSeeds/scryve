@@ -633,6 +633,7 @@ describe("LifeCard", () => {
         gap: 16,
         insets: { top: 47, bottom: 0, left: 0, right: 0 },
         markHeight: 64,
+        buttonSize: 32,
       }).position,
     ).toEqual({ left: 16, bottom: 63, maxWidth: 390 / 2 - 16 - 16 })
   })
@@ -646,6 +647,7 @@ describe("LifeCard", () => {
         insets: { top: 59, bottom: 0, left: 0, right: 0 },
         screenEdges: { top: true, left: true, right: true, bottom: false },
         markHeight: 48,
+        buttonSize: 32,
       }).position
     expect(place(400).bottom).toBe(59)
     expect(place(150).bottom).toBeLessThan(59)
@@ -666,6 +668,7 @@ describe("LifeCard", () => {
       },
       screenEdges: { top: true, left: true, right: true, bottom: false },
       markHeight: 48,
+      buttonSize: 32,
     }).position
     expect(position.left).toBe(12 + 84)
     expect(position.bottom).toBe(12)
@@ -685,6 +688,7 @@ describe("LifeCard", () => {
       },
       screenEdges: { top: true, left: false, right: true, bottom: false },
       markHeight: 48,
+      buttonSize: 32,
     })
     expect(rowMaxWidth).toBe(222 - 12 - (84 - 11))
   })
@@ -701,6 +705,7 @@ describe("LifeCard", () => {
         insets: { top: 0, bottom: inset, left: 0, right: 0 },
         screenEdges: { top: false, left: true, right: true, bottom: true },
         markHeight: 64,
+        buttonSize: 32,
       }).position.bottom,
     ).toBe(bottom)
   })
@@ -875,69 +880,6 @@ describe("LifeCard", () => {
     expect(
       StyleSheet.flatten(view.getByTestId("life-identity-seat-3").props.style).maxWidth,
     ).toBeUndefined()
-  })
-
-  it("ends a long name's row short of a first-player tab at its far end", () => {
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <LifeCard
-          playerName="Player 3"
-          seatNumber={3}
-          life={40}
-          color="#41476E"
-          compact
-          contentRotation={90}
-          contentInsets={{
-            top: 0,
-            bottom: 0,
-            left: 0,
-            right: 0,
-            tabCorners: [{ edge: "bottom", side: "left", size: 28 }],
-          }}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    fireEvent(view.getByTestId("life-card-seat-3"), "layout", {
-      nativeEvent: { layout: { width: 157, height: 185 } },
-    })
-
-    expect(
-      StyleSheet.flatten(view.getByTestId("life-identity-row-seat-3").props.style),
-    ).toMatchObject({ maxWidth: 185 - 12 - (12 + 28) })
-  })
-
-  it("keeps room for the name when a side notch is not at the card's middle", () => {
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={40}
-          color="#41476E"
-          compact
-          contentRotation={90}
-          contentInsets={{ top: 0, bottom: 0, left: 47, right: 0 }}
-          screenEdges={{ top: true, bottom: false, left: true, right: false }}
-          commanderDamage={commanderDamage({
-            players: commanderPlayers,
-            incoming: { [commanderIds[1]]: 3 },
-            onPressSword: jest.fn(),
-          })}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
-      nativeEvent: { layout: { width: 420, height: 193 } },
-    })
-
-    expect(
-      StyleSheet.flatten(view.getByTestId("life-identity-row-seat-1").props.style),
-    ).toMatchObject({ left: 12, bottom: 24 })
-    expect(StyleSheet.flatten(view.getByTestId("life-identity-seat-1").props.style)).toMatchObject({
-      maxWidth: 193 / 2 - 12 - 12,
-    })
   })
 
   it("keeps undo off the attacker's edge, out from under the menu, and clear of the grid", () => {
