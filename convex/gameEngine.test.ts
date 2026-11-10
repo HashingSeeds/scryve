@@ -11,8 +11,14 @@ import {
   type GameAck as MemoryAck,
   type GameWrite as MemoryWrite,
 } from "./lib/gameEngine"
-import { writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
+import { commanderTotals, writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
 import { connectedLogEvent } from "./lib/gameLog"
+import {
+  commanderField,
+  PARTNER_COMMANDER,
+  type CommanderSlot,
+  type LifeEditing,
+} from "./lib/gameRules"
 import { TABLE_VERSION, type TableAction } from "./lib/table"
 
 const token = "t".repeat(43)
@@ -25,8 +31,9 @@ type Outcome = { ok: true; ack: MemoryAck } | { ok: false; error: EngineError }
 
 async function parityGame(
   t: ConvexTestHarness,
-  setup: { system: string; format: string; startingLife: number },
+  setup: { system: string; format: string; startingLife: number; lifeEditing?: LifeEditing },
 ) {
+  const editsAnySeat = setup.lifeEditing === "anyone" ? { editsAnySeat: true } : {}
   const host = await signedIn(t, "parity-host", "Host")
   const created = await host.mutation(api.games.createLobby, {
     publicId: "parity-game-public-01",
@@ -40,6 +47,7 @@ async function parityGame(
     hostDisplayName: "Host",
     hostColor: "#7C3AED",
     deviceId: HOST_DEVICE,
+    ...editsAnySeat,
   })
   const joiner = await signedIn(t, "parity-joiner", "Joiner")
   await joiner.mutation(api.games.claimSeat, {
@@ -47,6 +55,7 @@ async function parityGame(
     displayName: "Joiner",
     color: "#2563EB",
     deviceId: JOINER_DEVICE,
+    ...editsAnySeat,
   })
   await host.mutation(api.games.startGame, { publicId: created.publicId })
   const { game, players } = await t.run(async (ctx) => {
@@ -115,6 +124,7 @@ async function parityGame(
                   ...base,
                   fromPlayerId: write.fromPlayerId as Id<"gamePlayers">,
                   toPlayerId: write.toPlayerId as Id<"gamePlayers">,
+                  ...(write.commander === undefined ? {} : { commander: write.commander }),
                   delta: write.delta,
                 })
               : await client.mutation(
@@ -153,7 +163,12 @@ async function parityGame(
   async function write(seat: Seat, request: MemoryWrite) {
     const convex = await convexWrite(seat, request)
     const engine = writeMemoryGame(memory, actors[seat], request, CREATED_AT)
-    if (convex.ok || engine.ok) expect(engine).toEqual(convex)
+    // why: submitCommanderDamage returns only the claim's status, even when the claim lands at once.
+    const comparable =
+      engine.ok && request.kind === "commander.claim"
+        ? { ok: true, ack: { ...engine.ack, total: undefined, currentLife: undefined } }
+        : engine
+    if (convex.ok || engine.ok) expect(comparable).toEqual(convex)
     else {
       expect(engine.error.code).toBe(convex.error.code)
       expect(convex.error.message).toContain(engine.error.message)
@@ -242,9 +257,23 @@ async function parityGame(
         ),
       ),
     )
-    expect(
-      [...memory.pairs.entries()].map(([key, pair]) => [key.replace("\u0000", ">"), pair.total]),
-    ).toEqual(stored.pairs.map((pair) => [`${pair.fromPlayerId}>${pair.toPlayerId}`, pair.total]))
+    const byPair = (
+      pairs: {
+        fromPlayerId: string
+        toPlayerId: string
+        commander?: CommanderSlot
+        total: number
+      }[],
+    ) =>
+      pairs
+        .map(({ fromPlayerId, toPlayerId, commander, total }) => ({
+          fromPlayerId,
+          toPlayerId,
+          ...commanderField(commander),
+          total,
+        }))
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+    expect(byPair(commanderTotals(memory))).toEqual(byPair(stored.pairs))
   }
 
   async function expectSameTurn() {
@@ -797,56 +826,76 @@ describe("engine parity: confirm and decline commander damage", () => {
   })
 })
 
-describe("memory engine: partner commanders", () => {
-  it("keeps a partner's claims and totals apart from the first commander's", () => {
-    const seat = (id: string) => ({ id, userId: id, deviceId: `device-${id}`, currentLife: 40 })
-    const memory: MemoryGame = {
-      status: "active",
-      system: "mtg",
-      format: "commander",
-      designations: {},
-      seats: new Map([
-        ["attacker", seat("attacker")],
-        ["defender", seat("defender")],
-      ]),
-      events: new Map(),
-      claims: new Map(),
-      pairs: new Map(),
-    }
-    const claim = (operationId: string, delta: number, commander?: number) =>
-      writeMemoryGame(
-        memory,
-        { userId: "attacker", isHost: true },
-        {
-          kind: "commander.claim",
-          fromPlayerId: "attacker",
-          toPlayerId: "defender",
-          ...(commander === undefined ? {} : { commander }),
-          delta,
-          operationId,
-          deviceId: "device-attacker",
-          clientCreatedAt: CREATED_AT,
-        },
-        CREATED_AT,
-      )
+describe("engine parity: partner commanders", () => {
+  it("keeps a partner's claims and totals apart from the first commander's", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const claim = (operationId: string, delta: number, slot?: CommanderSlot) =>
+      game.write("host", {
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        ...commanderField(slot),
+        delta,
+        ...sent(operationId),
+      })
     const confirm = (operationId: string) =>
-      writeMemoryGame(
-        memory,
-        { userId: "defender", isHost: false },
-        {
-          kind: "commander.resolve",
-          decision: "confirmed",
-          operationId,
-          deviceId: "device-defender",
-          clientCreatedAt: CREATED_AT,
-        },
-        CREATED_AT,
-      )
+      game.write("joiner", {
+        kind: "commander.resolve",
+        decision: "confirmed",
+        ...sent(operationId, JOINER_DEVICE),
+      })
 
-    expect(claim("claim-first-commander", 5)).toMatchObject({ ack: { status: "pending" } })
-    expect(claim("claim-partner-commander", 6, 1)).toMatchObject({ ack: { status: "pending" } })
-    expect(confirm("claim-first-commander")).toMatchObject({ ack: { total: 5, currentLife: 35 } })
-    expect(confirm("claim-partner-commander")).toMatchObject({ ack: { total: 6, currentLife: 29 } })
+    expect(await claim("claim-first-commander", 5)).toMatchObject({ ack: { status: "pending" } })
+    expect(await claim("claim-partner-commander", 6, PARTNER_COMMANDER)).toMatchObject({
+      ack: { status: "pending" },
+    })
+    expect(await confirm("claim-first-commander")).toMatchObject({
+      ack: { total: 5, currentLife: 35 },
+    })
+    expect(await confirm("claim-partner-commander")).toMatchObject({
+      ack: { total: 6, currentLife: 29 },
+    })
+    await game.write("host", {
+      kind: "commander.claim",
+      fromPlayerId: game.hostSeat,
+      toPlayerId: game.joinerSeat,
+      commander: 2,
+      delta: 1,
+      ...sent("claim-unknown-commander"),
+    })
+    await game.expectSameState()
+  })
+})
+
+describe("engine parity: anyone edits any seat", () => {
+  it("lands commander damage the moment the claim arrives", async () => {
+    const game = await parityGame(makeConvexTest(), { ...commander, lifeEditing: "anyone" })
+    const claim = (operationId: string, delta: number, slot?: CommanderSlot) =>
+      game.write("host", {
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        ...commanderField(slot),
+        delta,
+        ...sent(operationId),
+      })
+
+    expect(await claim("claim-instant-000001", 7)).toEqual({
+      ok: true,
+      ack: {
+        operationId: "claim-instant-000001",
+        deduplicated: false,
+        status: "confirmed",
+        total: 7,
+        currentLife: 33,
+      },
+    })
+    expect(await claim("claim-instant-000001", 7)).toMatchObject({
+      ack: { deduplicated: true, status: "confirmed" },
+    })
+    await claim("claim-instant-000002", 4, PARTNER_COMMANDER)
+    await claim("claim-instant-000003", -2)
+    await game.expectSameState()
   })
 })
 
