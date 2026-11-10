@@ -702,6 +702,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const table = useContext(ConnectedTableContext)
   const turn = turns ? table?.table.turn : undefined
   const turnGroups = table?.table.turnGroups
+  const tablePlayers = table?.table.players
+  const tableCounters = table?.tableRules.counters
+  const sharesCounters = game.variant === TWO_HEADED_GIANT
+  const counterTable = useMemo(
+    () => ({
+      players: tablePlayers,
+      counterKey: (playerId: string, counterId: string) =>
+        sharesCounters && tableCounters?.some(({ id, shared }) => id === counterId && shared)
+          ? `${turnLead(turnGroups, playerId)}:${counterId}`
+          : `${playerId}:${counterId}`,
+    }),
+    [tablePlayers, tableCounters, sharesCounters, turnGroups],
+  )
   const [turnsEnabled] = useTurnsEnabled(localGameRepository)
   const [turnOpen, setTurnOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
@@ -1228,14 +1241,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turn={table?.table.turn}
           groups={turnGroups}
           sharedLife={game.variant === TWO_HEADED_GIANT}
-          counterTable={{
-            players: table?.table.players,
-            counterKey: (playerId, counterId) =>
-              game.variant === TWO_HEADED_GIANT &&
-              table?.tableRules.counters.some(({ id, shared }) => id === counterId && shared)
-                ? `${turnLead(turnGroups, playerId)}:${counterId}`
-                : `${playerId}:${counterId}`,
-          }}
+          counterTable={counterTable}
           turnsShown={tabOn}
           anyoneEdits={anySeat}
           origin={menuDialogOrigin}

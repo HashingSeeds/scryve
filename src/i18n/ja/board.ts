@@ -393,7 +393,7 @@ export default {
       rad: "放射能",
       storm: "ストーム",
     },
-    more_other: "{{identity}}、ほかにカウンター{{count}}個",
+    more_other: "{{identity}}、ほかにカウンターが{{count}}個あります",
   },
   seat: {
     identity: "席{{seat}}、{{name}}",

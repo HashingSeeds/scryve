@@ -418,7 +418,7 @@ export default {
     customRecent: "Añadir {{label}}",
     starter: {
       speed: "Velocidad",
-      rad: "Radiación",
+      rad: "Rad",
       storm: "Tormenta",
     },
     more_one: "{{identity}}, {{count}} contador más",

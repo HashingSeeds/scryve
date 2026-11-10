@@ -958,6 +958,11 @@ function CounterSheet({
                     })}
                     {offersCustom ? (
                       <SheetOption
+                        ref={
+                          seat.rules.counters.length === 0 && seat.rules.designations.length === 0
+                            ? firstControl
+                            : undefined
+                        }
                         testID={`counter-option-${seatNumber}-custom`}
                         id="plus"
                         label={translate(
