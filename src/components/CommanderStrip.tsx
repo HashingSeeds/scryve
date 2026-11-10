@@ -360,6 +360,7 @@ export const CommanderStrip = memo(function CommanderStrip({
                         style={[
                           themed(compact ? $compactCount : $count),
                           { color: ink },
+                          total > 99 && (compact ? $compactThreeDigits : $threeDigits),
                           glyphRotation,
                         ]}
                       />
@@ -639,6 +640,9 @@ const $compactCount: ThemedStyle<TextStyle> = () => ({
   lineHeight: 16,
   fontVariant: ["tabular-nums"],
 })
+
+const $threeDigits: TextStyle = { fontSize: 11 }
+const $compactThreeDigits: TextStyle = { fontSize: 9 }
 
 const $ownSeat: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
