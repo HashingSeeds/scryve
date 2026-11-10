@@ -28,6 +28,5 @@ export function boardCornerRadii(
   return [at(0), at(1), at(2), at(3)]
 }
 
-/** why: a card corner set in from the glass by `inset` follows the display's curve one inset in, so it stays parallel to the glass. */
 export const concentricRadius = (radius: number | null, inset = 0) =>
   radius === null ? null : Math.max(0, radius - inset)

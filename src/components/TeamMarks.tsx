@@ -14,11 +14,6 @@ export interface TeamMark {
 const MARK = 28
 const TEAM_MARK = 22
 
-/**
- * why: a team's winner choice shows every teammate's mark, so the team reads at a glance. Each
- * keeps its own color until the row is chosen; then all take the row's ink to stay legible on its
- * fill. A single seat draws as it always has.
- */
 export function TeamMarks({
   marks,
   color,

@@ -216,7 +216,6 @@ describe("outboxes stored by v0.2.1", () => {
           clientCreatedAt: 120,
         },
         queuedAt: 120,
-        // why: v0.2.1 queued without a sequence; the outbox fills it in stored order and saves it.
         sequence: 0,
         attempts: 1,
         lastAttemptAt: expect.any(Number),

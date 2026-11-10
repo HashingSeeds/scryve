@@ -490,7 +490,6 @@ export function localTableRules(game: Pick<LocalGame, "system" | "format" | "var
 
 const MAX_TURN_LOG = 400
 
-/** why: an undo lands on a turn the log already holds, so it drops the start it took back instead of adding one. */
 export function withTurn(game: LocalGame, turn: Turn | undefined, now: number): LocalGame {
   if (turn === game.turn) return game
   const { turn: _turn, turnLog: log = [], ...rest } = game
@@ -519,7 +518,6 @@ export function withTurn(game: LocalGame, turn: Turn | undefined, now: number): 
   }
 }
 
-/** why: the first turn begins when the first player is known, so its clock starts as the game does. A first player chosen again before anyone passes replaces it. */
 export function withFirstTurn(
   game: LocalGame,
   playerId: PlayerId | undefined,
@@ -569,7 +567,6 @@ const withLogged = (game: LocalGame, operationId: string): LocalGame => ({
   logOrder: [...(game.logOrder ?? []), operationId],
 })
 
-/** why: `logOrder` gains an id per operation, so a save keeps only the ids of changes still in a list the log reads, in the same order. */
 export function retainedLogOrder(
   game: Pick<LocalGame, "logOrder" | "events" | "turnLog" | "counterLog">,
 ) {
@@ -581,12 +578,7 @@ export function retainedLogOrder(
   return (game.logOrder ?? []).filter((id) => retained.has(id))
 }
 
-/**
- * why: the log's order is a sequence, never a clock, so a change sits where `logOrder` put it. A
- * change missing from it (saved before `logOrder`, or by an older build after a rollback, which
- * drops it) goes right after the last logged change before it in its own list. Only unlogged
- * changes from different lists that share that spot are ordered by time.
- */
+/** why: a game saved before `logOrder`, or by an older build after a rollback, has changes missing from it, which go right after the last logged change before them in their own list. */
 export function localLogPositions(
   game: Pick<LocalGame, "logOrder" | "events" | "turnLog" | "counterLog">,
   extra: readonly { operationId: string; at: number }[] = [],
@@ -607,7 +599,6 @@ export function localLogPositions(
         at = -Infinity
         return []
       }
-      // why: within one list the list's order holds, so a time that runs backward never reorders it.
       at = Math.max(at, stamped)
       return [{ operationId, after, at }]
     })
@@ -948,7 +939,6 @@ export function canUndo(game: LocalGame, actorId: ActorId): boolean {
   )
 }
 
-/** why: the log's Undo takes back whatever happened last, so a pass is undone only when it is newer than this device's newest life change. */
 export function undoableTurn(game: LocalGame, actorId: ActorId) {
   const turn = game.turn
   if (!turn?.previous) return undefined

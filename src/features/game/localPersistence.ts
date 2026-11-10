@@ -98,7 +98,6 @@ export interface LocalSettings {
   defaultFormat?: string
   askWhatYouPlay?: true
   syncStats?: boolean
-  /** why: turns are opt-in, so only a player who chose them has this; a missing field means off. */
   turnTab?: true
   teamBinding?: "frame"
 }
@@ -722,7 +721,6 @@ function withinHistoryCap(games: readonly LocalGameSummary[]): LocalGameSummary[
 
 export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
 
-// why: shared by every repository on this device, since they read and write the same settings.
 const settingsListeners = new Set<() => void>()
 
 export class LocalGameRepository {
@@ -826,7 +824,6 @@ export class LocalGameRepository {
     this.saveSettings({ ...rest, ...(enabled ? { turnTab: true } : {}) })
   }
 
-  /** why: Settings, game setup and a board stay mounted together, so each hears a change the others save. */
   onSettingsChanged(listener: () => void): () => void {
     settingsListeners.add(listener)
     return () => {

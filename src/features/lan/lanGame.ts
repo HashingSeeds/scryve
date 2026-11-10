@@ -894,7 +894,6 @@ function parseLogEvent(value: unknown): ConnectedLogEvent | null {
   }
 }
 
-/** why: `more` says older changes wait before the first of `events`; `before` names the change a page was asked to end before. */
 export interface LanLogPage {
   events: ConnectedLogEvent[]
   more: boolean
@@ -912,7 +911,6 @@ export function lanLog(game: LanGame, viewerKey: string, before?: string): LanLo
   let start = end
   while (start > 0 && events.length < NEARBY_LOG_LIMIT) {
     const event = connectedLogEvent(all[start - 1], viewerKey)
-    // why: each event's own newline stands in for the comma that joins it to the next.
     const size = encodeLine(event).length
     if (bytes + size > MAX_LINE_BYTES) break
     bytes += size
@@ -922,7 +920,6 @@ export function lanLog(game: LanGame, viewerKey: string, before?: string): LanLo
   return { events, more: start > 0, ...cursor }
 }
 
-/** why: the newest page replaces what it repeats and older pages go in front, so a guest keeps every change it has read, in the host's order. */
 export function mergeLanLog(
   current: { events: readonly ConnectedLogEvent[]; more?: boolean } | undefined,
   page: LanLogPage,
@@ -930,7 +927,6 @@ export function mergeLanLog(
   const fresh = new Set(page.events.map(({ operationId }) => operationId))
   const kept = (current?.events ?? []).filter(({ operationId }) => !fresh.has(operationId))
   if (page.before !== undefined) return { events: [...page.events, ...kept], more: page.more }
-  // why: a newest page that repeats nothing the guest holds left a gap behind it, so it starts the log over and pages back from itself.
   const overlaps = kept.length < (current?.events.length ?? 0)
   if (!overlaps || kept.length === 0) return { events: page.events, more: page.more }
   return { events: [...kept, ...page.events], more: current?.more ?? false }

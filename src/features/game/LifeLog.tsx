@@ -161,7 +161,6 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
 
 type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
 
-/** why: newest first, by sequence: `positionOf` is the authority's order or a local game's apply order, never a clock. */
 export function mergedLog(
   life: readonly GameLogRow[],
   counters: readonly GameCounterRow[],
@@ -177,17 +176,11 @@ type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "a
 
 export type GameLogItem = GameLogChange | TurnDivider
 
-/** why: a connected log places a row by the newest change in it, where the authority recorded that change. */
 export const rowPosition = (
   row: Pick<GameLogChange, "operationIds">,
   positionOf: (operationId: string) => number | undefined,
 ) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
 
-/**
- * why: the log's order is a sequence, never a clock: `positionOf` is the authority's order in a
- * connected game and the apply order in a local one. A turn whose start hasn't loaded yet heads
- * every loaded row.
- */
 export function withTurnDividers(
   rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],

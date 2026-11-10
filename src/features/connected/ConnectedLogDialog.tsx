@@ -22,18 +22,15 @@ import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
 import type { Turn, TurnGroups } from "../../../convex/lib/turns"
 
 export interface ConnectedLogFeedState {
-  /** why: oldest first, in the order the authority recorded them, which device clocks can't be trusted to give. */
   events: readonly ConnectedLogEvent[]
   more?: () => void
 }
 
-/** why: Convex pages the log and a nearby host sends it on request, so each authority brings its own feed. */
 export type ConnectedLogFeed = (props: {
   publicId: string
   children: (feed: ConnectedLogFeedState) => ReactElement
 }) => ReactElement | null
 
-/** why: unsent changes and lives move on every tap, so only the open log reads them, not the memoized board. */
 export const ConnectedLogContext = createContext<
   | {
       pending: readonly PendingLifeAction[]

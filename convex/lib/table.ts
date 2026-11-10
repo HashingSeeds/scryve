@@ -5,6 +5,7 @@ import {
   applyTurnAction,
   isTurnAction,
   isValidTurn,
+  isValidTurnGroups,
   remapTurn,
   turnActionValidators,
   turnGroupOf,
@@ -247,7 +248,6 @@ export function customCounterName(raw: string): string | undefined {
   return name.length > 0 && name.length <= MAX_CUSTOM_COUNTER_NAME_LENGTH ? name : undefined
 }
 
-/** why: a named counter's change is stored with its name, in its identity and the log, so the authority keeps only the name it would show, whatever padding was sent. */
 export function normalizedTableAction(action: TableAction): TableAction {
   if (action.kind !== "customCounter.changed") return action
   const name = customCounterName(action.name)
@@ -701,6 +701,7 @@ export function isValidTableSnapshot(
 ): boolean {
   return (
     (table.turn === undefined || isValidTurn(table.turn, playerIds)) &&
+    (table.turnGroups === undefined || isValidTurnGroups(table.turnGroups, playerIds)) &&
     Object.entries(table.designations).every(
       ([designationId, holder]) =>
         rules.designations.some(({ id }) => id === designationId) && playerIds.has(holder),
@@ -740,6 +741,7 @@ function isValidCustomCounters(
 export function remapTableState(table: TableState, idOf: (playerId: string) => string): TableState {
   return {
     ...(table.turn ? { turn: remapTurn(table.turn, idOf) } : {}),
+    ...(table.turnGroups ? { turnGroups: table.turnGroups.map((group) => group.map(idOf)) } : {}),
     designations: Object.fromEntries(
       Object.entries(table.designations).map(([designationId, holder]) => [
         designationId,
