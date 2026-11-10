@@ -107,7 +107,7 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
-import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip } from "./TurnChip"
+import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
 import { useSeatFill } from "./TurnSpotlight"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -261,6 +261,8 @@ export const LifeCard = memo(function LifeCard({
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number; width: number }>()
   const [fullIdentityWidth, setFullIdentityWidth] = useState(0)
   const [rowChipWidth, setRowChipWidth] = useState(0)
+  const [shownChipWidth, setShownChipWidth] = useState(0)
+  const [chipSize, setChipSize] = useState<TurnChipSize>("full")
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -605,18 +607,25 @@ export const LifeCard = memo(function LifeCard({
   // why: with the pentagon centered on the card's top edge the seam carries a mode's control instead (seamPlan's chipCrowdedBySeam), so it never shows twice or not at all.
   const modeBeside =
     menuEdgeCenter === CONTENT_EDGES[contentRotation].top ? undefined : turnChip?.beside
-  useEffect(() => {
-    if (!rowChip) setRowChipWidth(0)
-  }, [rowChip])
   const nameRetracted =
     rowChip &&
     typeof rowCap === "number" &&
     fullIdentityWidth + identityMetrics.gap + rowChipWidth > rowCap - bagReserve
-  // why: at 8 to 10 seats the row is too short for the full chip even beside a bare mark, so it drops its "Pass" label and "Turn" word instead of running over the mark and under the bag.
-  const chipTight =
-    nameRetracted &&
-    typeof rowCap === "number" &&
-    markArt.width + identityMetrics.gap * 2 + rowChipWidth > rowCap - bagReserve
+  const bareMarkRoom =
+    typeof rowCap === "number"
+      ? rowCap - bagReserve - markArt.width - identityMetrics.gap * 2
+      : Number.POSITIVE_INFINITY
+  // why: at 8 to 10 seats even a bare mark leaves too little room, so the chip steps down from "Turn 3 | Pass › mark" to "3 › mark" to "› mark" instead of running over the mark and under the bag.
+  useEffect(() => {
+    if (!rowChip) {
+      setRowChipWidth(0)
+      setShownChipWidth(0)
+      setChipSize("full")
+      return
+    }
+    if (nameRetracted && shownChipWidth > bareMarkRoom)
+      setChipSize((size) => (size === "full" ? "number" : "pass"))
+  }, [rowChip, nameRetracted, shownChipWidth, bareMarkRoom])
   const markAnchor =
     cardSize.width > 0
       ? identityMarkCenter({
@@ -1041,7 +1050,10 @@ export const LifeCard = memo(function LifeCard({
               <RowChipSlot
                 testID={`turn-row-chip-seat-${seatNumber}`}
                 retracting={nameRetracted}
-                onWidth={(width) => setRowChipWidth((widest) => Math.max(widest, width))}
+                onWidth={(width) => {
+                  setRowChipWidth((widest) => Math.max(widest, width))
+                  setShownChipWidth(width)
+                }}
               >
                 {turnChip && rowTurnChip ? (
                   <FadeOutSlot>
@@ -1051,7 +1063,7 @@ export const LifeCard = memo(function LifeCard({
                         seatNumber={seatNumber}
                         foreground={foreground}
                         compact={compact}
-                        tight={chipTight}
+                        size={chipSize}
                       />
                       {modeBeside}
                     </View>

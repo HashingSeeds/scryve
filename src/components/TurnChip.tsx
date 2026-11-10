@@ -111,18 +111,20 @@ export function TurnChipLayer({
   )
 }
 
+export type TurnChipSize = "full" | "number" | "pass"
+
 export function TurnChip({
   state,
   seatNumber,
   foreground,
   compact,
-  tight,
+  size = "full",
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
-  tight?: boolean
+  size?: TurnChipSize
 }) {
   const {
     themed,
@@ -137,7 +139,7 @@ export function TurnChip({
   const bank = bankLeft(turn, turn.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0
   const time = numbered
-    ? tight
+    ? size !== "full"
       ? String(turn.number)
       : translate("board:turn.chipNumber", { number: turn.number })
     : formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
@@ -146,6 +148,7 @@ export function TurnChip({
   const nextName = next ? state.nameOf(next) : undefined
   const nextSeat = next ? state.seatOf?.(next) : undefined
   const split = !waiting && !outOfTime && !!nextSeat
+  const passOnly = split && numbered && size === "pass"
   const nextInk = nextSeat ? accessibleForeground(nextSeat.color) : ink
   const label = [
     translate("board:turn.label", { number: turn.number, name }),
@@ -168,15 +171,19 @@ export function TurnChip({
     </>
   ) : (
     <>
-      <Text
-        text={time}
-        testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
-        weight="bold"
-        style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
-      />
+      {passOnly ? null : (
+        <Text
+          text={time}
+          testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
+          weight="bold"
+          style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
+        />
+      )}
       {split && nextSeat ? (
-        <View style={[$passSegment, { backgroundColor: nextSeat.color }]}>
-          {canPress && state.passLabelShown && !tight ? (
+        <View
+          style={[$passSegment, passOnly && $passSegmentAlone, { backgroundColor: nextSeat.color }]}
+        >
+          {canPress && state.passLabelShown && size === "full" ? (
             <Text
               tx="board:turn.pass"
               weight="semiBold"
@@ -197,6 +204,7 @@ export function TurnChip({
   const shape: ViewStyle[] = [
     compact ? $compactChip : $chip,
     ...(split ? [$split] : []),
+    ...(passOnly ? [$passOnly] : []),
     ...(outOfTime ? [{ backgroundColor: colors.error }] : []),
     ...(canPress ? [] : [$passive]),
   ]
@@ -389,5 +397,7 @@ const $passSegment: ViewStyle = {
   paddingRight: 12,
   marginLeft: 4,
 }
+const $passOnly: ViewStyle = { paddingLeft: 0 }
+const $passSegmentAlone: ViewStyle = { marginLeft: 0, paddingLeft: 12 }
 const $passive: ViewStyle = { opacity: 0.7 }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }
