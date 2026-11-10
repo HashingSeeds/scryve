@@ -118,6 +118,8 @@ describe("shipping index route", () => {
           <Index />
         </ThemeProvider>,
       )
+      for (const card of view.getAllByTestId(/^life-card-seat-\d+$/))
+        fireEvent(card, "layout", { nativeEvent: { layout: { width: 300, height: 400 } } })
       expect(view.getAllByText("Jugador 1").length).toBeGreaterThan(0)
     } finally {
       await i18n.changeLanguage(language)

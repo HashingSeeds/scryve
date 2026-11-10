@@ -63,7 +63,13 @@ import {
   type CommanderReach,
 } from "./commanderDamageLayout"
 import { CommanderStrip, commanderGridShown, commanderStripCorner } from "./CommanderStrip"
-import { CounterChips, DICE_ONLY_SEAT, TableGlyph, type SeatTable } from "./CounterChips"
+import {
+  CounterChips,
+  DICE_ONLY_SEAT,
+  seatBagSize,
+  TableGlyph,
+  type SeatTable,
+} from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
@@ -253,6 +259,8 @@ export const LifeCard = memo(function LifeCard({
   const resolvedLifeFontSize = fontSizeFor(shownDigits)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const sidewaysContent = Math.abs(contentRotation) === 90
+  // why: a sideways corner layer is sized from the card, so laid out before the card measures, the row's corner slide carries the name across the seat into place.
+  const cornerMeasured = !sidewaysContent || cardSize.width > 0
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
 
@@ -565,7 +573,7 @@ export const LifeCard = memo(function LifeCard({
     !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
-  const calculatorButtonSize = compact ? 30 : 40
+  const calculatorButtonSize = seatBagSize(compact)
   const claimShown = !!claims?.length
   const sourceShown = attackerSide || sourceLanding
   // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card.
@@ -598,8 +606,12 @@ export const LifeCard = memo(function LifeCard({
     gap: identityMetrics.edge,
     insets: contentInsets,
     screenEdges,
-    markHeight: identityMetrics.mark,
+    markHeight: markArt.height,
   })
+  // why: the bag and calculator center on the identity row across the edge from them; when their own corner sits deeper, they center on a row placed there instead.
+  const trailingBottom = (size: number) =>
+    Math.max(Number(identityCorner.position.bottom ?? 0), identityCorner.trailing.bottom) +
+    (markArt.height - size) / 2
   // why: a seat someone else holds keeps its own bag on its own device.
   const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
   const markAnchor =
@@ -610,7 +622,7 @@ export const LifeCard = memo(function LifeCard({
           left: Number(identityCorner.position.left ?? 0),
           bottom: Number(identityCorner.position.bottom ?? 0),
           art: markArt,
-          size: identityMetrics.mark,
+          size: markArt.size,
         })
       : undefined
   const nameFadeStyle = useAnimatedStyle(() => ({
@@ -621,7 +633,7 @@ export const LifeCard = memo(function LifeCard({
   const markOnly =
     commanderSeat &&
     seatRun > 0 &&
-    seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.mark - identityMetrics.gap <
+    seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.icon - identityMetrics.gap <
       MIN_NAME_ROOM
   const seatIdentity = (
     <SeatIdentity
@@ -923,7 +935,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {(!commanderCovers || attackerSide) && !tableSheetOpen && !dice?.view ? (
+      {cornerMeasured && (!commanderCovers || attackerSide) && !tableSheetOpen && !dice?.view ? (
         // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
         <Animated.View
           key={contentRotation}
@@ -1043,14 +1055,14 @@ export const LifeCard = memo(function LifeCard({
                 $cornerButton,
                 {
                   right: identityCorner.trailing.right,
-                  bottom: identityCorner.trailing.bottom,
+                  bottom: trailingBottom(calculatorButtonSize),
                   width: calculatorButtonSize,
                   height: calculatorButtonSize,
                 },
                 pressed && { opacity: 0.72 },
               ]}
             >
-              <CalculatorGlyph color={foreground} size={calculatorButtonSize} />
+              <CalculatorGlyph color={foreground} inkHeight={identityMetrics.icon} />
             </BoardPressable>
           ) : null}
         </Animated.View>
@@ -1081,7 +1093,7 @@ export const LifeCard = memo(function LifeCard({
             right:
               identityCorner.trailing.right +
               (calculatorButtonShown ? calculatorButtonSize + identityMetrics.gap : 0),
-            bottom: identityCorner.trailing.bottom,
+            bottom: trailingBottom(seatBagSize(compact)),
           }}
           seatNumber={seatNumber}
           identity={identity}
@@ -1283,7 +1295,7 @@ export function seatIdentityPlacement({
   const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
   const inset = insets?.[bottomEdge] ?? 0
   const contentHeight = sideways ? width : height
-  const raised = seatIdentityBottomGap(gap, inset, bottomEdge) + inset
+  const raised = seatIdentityBottomGap(gap, inset) + inset
   // why: a mid-edge notch or home indicator truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
   const roomAboveCutout = raised + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
   const underCutout = spansScreenEdge && inset > 0

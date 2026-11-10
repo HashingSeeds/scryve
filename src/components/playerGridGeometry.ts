@@ -101,10 +101,11 @@ export function getPlayerContentRotation(input: {
   if (input.playerCount === 2 && input.layout.layout === "two-stacked")
     return input.slot === 0 ? 180 : 0
 
+  // why: an even grid's last odd seat keeps its column's side, so it faces the same way as the seats above it.
+  if (input.row.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
   const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
   if (input.playerCount >= BIG_TABLE_FROM && occupiedColumns.length > 2)
     return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
-  if (occupiedColumns.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
   if (input.columnIndex === occupiedColumns[0]) return 90
   if (input.columnIndex === occupiedColumns[occupiedColumns.length - 1]) return -90
   return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0

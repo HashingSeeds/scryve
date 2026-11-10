@@ -130,23 +130,8 @@ export default {
   support: {
     pageTitle: "Assistance Scryve",
     pageDescription:
-      "Prenez Scryve en main, trouvez des réponses aux questions courantes, suggérez des fonctionnalités ou contactez l'assistance.",
+      "Trouvez des réponses aux questions courantes, suggérez une fonctionnalité, signalez un bug ou contactez le support.",
     title: "Assistance",
-    gettingStarted: {
-      heading: "Pour commencer",
-      startGame: {
-        title: "Lancer une partie",
-        body: "Ouvrez Jouer. Votre nouveau plateau utilise les paramètres par défaut enregistrés dans Réglages.",
-      },
-      choosePlay: {
-        title: "Choisir comment jouer",
-        body: "Jouez ensemble sur un seul appareil, ou choisissez Connecté pour jouer sur des appareils séparés.",
-      },
-      setUpTable: {
-        title: "Préparer la table",
-        body: "Sélectionnez le nombre de joueurs et les points de vie de départ, puis lancez la partie.",
-      },
-    },
     faq: {
       heading: "Questions fréquentes",
       restorePro: {
@@ -170,7 +155,6 @@ export default {
           "Vous pouvez gérer votre compte depuis l’écran de compte de Scryve. Écrivez au support si vous avez besoin d’aide pour accéder à votre compte ou le supprimer.",
       },
     },
-    appVersion: "Scryve {{version}}",
   },
   profile: {
     title: "Compte",

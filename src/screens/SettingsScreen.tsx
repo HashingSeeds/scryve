@@ -127,6 +127,7 @@ export function SettingsScreen({
   const counter = playSystemRules(settings.defaultSystem).counter
   return (
     <SettingsPage titleTx="account:settings.title" onBack={onBack} scrollTestID="settings-scroll">
+      <AppUpdateStatus />
       <Text tx="account:settings.localDefaults" preset="subheading" accessibilityRole="header" />
       <SettingsRow
         testID="default-game"
@@ -255,7 +256,6 @@ export function SettingsScreen({
         />
       ) : null}
       <Text tx="account:settings.about" preset="subheading" accessibilityRole="header" />
-      <AppUpdateStatus />
       <View>
         <SettingsRow
           testID="settings-about"
