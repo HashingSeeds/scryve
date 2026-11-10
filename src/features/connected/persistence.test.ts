@@ -64,7 +64,7 @@ function action(operationId: string, queuedAt = 1, actorId = "user-1"): PendingL
 }
 
 describe("connected MMKV repository", () => {
-  it("drops stored commander claims against their own player and keeps valid claims", () => {
+  it("drops stored commander claims against their own player and keeps valid claims across a restart", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
     for (const toPlayerId of ["player-1", "player-2"]) {
@@ -77,12 +77,13 @@ describe("connected MMKV repository", () => {
           fromPlayerId: asPlayerId("player-1"),
           toPlayerId: asPlayerId(toPlayerId),
           delta: 5,
+          commanderLimit: 999,
           deviceId: asDeviceId("device-valid-001"),
         },
       })
     }
-    expect(stored(repository).pending.map((pending) => pending.event.operationId)).toEqual([
-      "commander-claim-player-2",
+    expect(stored(new ConnectedGameRepository(storage, "user-1")).pending).toMatchObject([
+      { event: { operationId: "commander-claim-player-2", commanderLimit: 999 } },
     ])
   })
 

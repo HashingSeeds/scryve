@@ -1758,7 +1758,7 @@ describe("connected commander damage claims", () => {
     ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
   })
 
-  it("declines totals above 99 and refuses a decline id another event already uses", async () => {
+  it("declines totals above 999 and refuses a decline id another event already uses", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)
     const claim = (operationId: string, delta: number) =>
@@ -1766,7 +1766,7 @@ describe("connected commander damage claims", () => {
         api.games.submitCommanderDamage,
         commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta),
       )
-    await claim("commander-ceiling-0001", 99)
+    await claim("commander-ceiling-0001", 999)
     await game.joiner.mutation(api.games.confirmCommanderDamage, {
       publicId: game.publicId,
       operationId: "commander-ceiling-0001",

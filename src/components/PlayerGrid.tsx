@@ -5,7 +5,6 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
-import type { AttackBox } from "@/features/game/commanderAttack"
 import type { DiceSeatChip, DiceTool } from "@/features/game/dice"
 import { PARTNER_COMMANDER } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
@@ -28,7 +27,6 @@ import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
-import { concentricRadius, useBoardCornerRadii } from "./boardCorners"
 import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
@@ -54,10 +52,8 @@ import {
   seatFrames,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
-import { SeatSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
-import type { CornerRadii } from "../../modules/display-corners"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (playerId: PlayerId, commander?: CommanderSlot) => Record<PlayerId, number>
@@ -312,7 +308,6 @@ export function PlayerGrid({
     row.map((slot) => (slot === null ? null : (seatOrder?.[slot] ?? slot))),
   )
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
-  const displayRadii = useBoardCornerRadii()
   const boardSeats = commanderDamage
     ? commanderBoardSeats(
         seatedRows,
@@ -393,14 +388,6 @@ export function PlayerGrid({
               const partnerIncoming =
                 commanderDamage?.incomingFor(player.id, PARTNER_COMMANDER) ?? NO_INCOMING
               const strike = attack && armedPlayer ? attack.against(player.id) : undefined
-              const corners = getScreenCornerSquaringStyle({
-                rows,
-                rowIndex,
-                columnIndex,
-                insets: Platform.OS === "web" ? insets : undefined,
-                displayRadii,
-                topInset: topEdgeBand,
-              })
               if (table?.tableRules.pokemon) {
                 return (
                   <View
@@ -435,12 +422,12 @@ export function PlayerGrid({
                         onChange(player.id, delta),
                       )}
                       onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
-                      style={corners}
-                    />
-                    <SeatSpotlight
-                      playerId={player.id}
-                      compact={layout.compact}
-                      corners={corners}
+                      style={getScreenCornerSquaringStyle({
+                        rows,
+                        rowIndex,
+                        columnIndex,
+                        insets: Platform.OS === "web" ? insets : undefined,
+                      })}
                     />
                   </View>
                 )
@@ -494,21 +481,12 @@ export function PlayerGrid({
                             commanders: strike?.commanders,
                             dealt: strike?.dealt,
                             takeBack: strike?.takeBack,
-                            othersStep: strike?.othersStep,
-                            othersTakeBack: strike?.othersTakeBack,
                             applied: strike?.applied,
-                            others: strike?.others,
-                            othersLanded: strike?.othersLanded,
                             onPower: stable(`power:${player.id}`, (power: number, slot: number) =>
                               attack.dispatch({ type: "power", slot, power }),
                             ),
-                            onOthers: stable(`others:${player.id}`, (power: number) =>
-                              attack.dispatch({ type: "others", power }),
-                            ),
-                            othersShown: strike?.othersShown,
-                            othersSitting: strike?.othersSitting,
-                            onSit: stable(`sit:${player.id}`, (box: AttackBox) =>
-                              attack.dispatch({ type: "sit", box }),
+                            onSit: stable(`sit:${player.id}`, (slot: number) =>
+                              attack.dispatch({ type: "sit", slot }),
                             ),
                             facing:
                               armedIndex >= 0
@@ -581,9 +559,13 @@ export function PlayerGrid({
                     onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                       onChange(player.id, delta),
                     )}
-                    style={corners}
+                    style={getScreenCornerSquaringStyle({
+                      rows,
+                      rowIndex,
+                      columnIndex,
+                      insets: Platform.OS === "web" ? insets : undefined,
+                    })}
                   />
-                  <SeatSpotlight playerId={player.id} compact={layout.compact} corners={corners} />
                 </View>
               )
             })}
@@ -660,8 +642,6 @@ export function getScreenCornerSquaringStyle(input: {
   rowIndex: number
   columnIndex: number
   insets?: LifeCardContentInsets
-  displayRadii?: CornerRadii | null
-  topInset?: number
 }): ViewStyle | undefined {
   const reachesCorner = (edge: LifeCardEdge, side: LifeCardEdge) =>
     !input.insets || input.insets[edge] > 0 || input.insets[side] > 0
@@ -669,25 +649,21 @@ export function getScreenCornerSquaringStyle(input: {
   const touchesBottomEdge = input.rowIndex === input.rows.length - 1
   const touchesLeftEdge = input.columnIndex === 0
   const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
-  const glass = (corner: number, top: boolean) =>
-    concentricRadius(input.displayRadii?.[corner] ?? null, top ? input.topInset : 0) ?? radius.none
   const squared: ViewStyle = {
     ...(touchesTopEdge && touchesLeftEdge && reachesCorner("top", "left")
-      ? { borderTopLeftRadius: glass(0, true) }
+      ? { borderTopLeftRadius: radius.none }
       : null),
     ...(touchesTopEdge && touchesRightEdge && reachesCorner("top", "right")
-      ? { borderTopRightRadius: glass(1, true) }
-      : null),
-    ...(touchesBottomEdge && touchesRightEdge && reachesCorner("bottom", "right")
-      ? { borderBottomRightRadius: glass(2, false) }
+      ? { borderTopRightRadius: radius.none }
       : null),
     ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
-      ? { borderBottomLeftRadius: glass(3, false) }
+      ? { borderBottomLeftRadius: radius.none }
+      : null),
+    ...(touchesBottomEdge && touchesRightEdge && reachesCorner("bottom", "right")
+      ? { borderBottomRightRadius: radius.none }
       : null),
   }
-  if (!Object.keys(squared).length) return undefined
-  // why: Apple draws its displays with continuous corners, so a circular arc would lift off the glass.
-  return input.displayRadii ? { ...squared, borderCurve: "continuous" } : squared
+  return Object.keys(squared).length ? squared : undefined
 }
 
 const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({

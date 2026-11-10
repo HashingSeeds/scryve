@@ -13,7 +13,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
 import type { LocalGameRepository } from "./localPersistence"
-import { CHESS_BANK_MINUTES, turnsPassed } from "./turnTab"
+import { CHESS_BANK_MINUTES, turnsPassed, type ChessBankMinutes } from "./turnTab"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { Turn } from "../../../convex/lib/turns"
 
@@ -167,6 +167,19 @@ const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 const $choice: ViewStyle = { flexGrow: 1 }
+
+export function useChessMinutes(repository: LocalGameRepository) {
+  const subscribe = useCallback(
+    (listener: () => void) => repository.onSettingsChanged(listener),
+    [repository],
+  )
+  const minutes = useSyncExternalStore(subscribe, () => repository.chessMinutes())
+  const setMinutes = useCallback(
+    (next: ChessBankMinutes | undefined) => repository.saveChessMinutes(next),
+    [repository],
+  )
+  return [minutes, setMinutes] as const
+}
 
 export function useTurnsEnabled(repository: LocalGameRepository) {
   const subscribe = useCallback(
