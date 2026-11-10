@@ -212,7 +212,7 @@ describe("modeSeamFor", () => {
         const { left, right } = element.props.plan
         expect([...(left?.items ?? []), ...(right?.items ?? [])]).not.toContain("plane")
         const bag = bagWithPlane({ tools: [], rollFor: () => {} }, result.current)
-        act(() => bag?.openPlane?.())
+        act(() => bag?.openPlane?.({ id: "p0" }))
         expect(result.current.dialog).toBe("planar")
       }
     },

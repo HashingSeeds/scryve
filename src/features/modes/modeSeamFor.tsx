@@ -23,9 +23,9 @@ export function teamSeat(
 export function bagWithPlane<Bag extends object>(
   bag: Bag | undefined,
   modes: BoardModes,
-): (Bag & { openPlane?: () => void }) | undefined {
+): (Bag & { openPlane?: (seat: { id: string }) => void }) | undefined {
   const { planar, openDialog } = modes
-  return bag && planar ? { ...bag, openPlane: () => openDialog("planar") } : bag
+  return bag && planar ? { ...bag, openPlane: ({ id }) => openDialog("planar", id) } : bag
 }
 
 const EDGE = 8

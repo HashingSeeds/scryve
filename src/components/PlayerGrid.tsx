@@ -111,7 +111,7 @@ export interface DiceGridBinding {
   bag?: {
     tools: readonly DiceTool[]
     rollFor: (player: GamePlayer, tool: DiceTool) => void
-    openPlane?: () => void
+    openPlane?: (player: GamePlayer) => void
   }
 }
 
@@ -185,7 +185,9 @@ function seatDiceFor(
     bag: bag && {
       tools: bag.tools,
       rollFor: stable(`dice-roll:${player.id}`, (tool: DiceTool) => bag.rollFor(player, tool)),
-      ...(bag.openPlane ? { openPlane: stable("open-plane", bag.openPlane) } : {}),
+      ...(bag.openPlane
+        ? { openPlane: stable(`open-plane:${player.id}`, () => bag.openPlane?.(player)) }
+        : {}),
     },
     onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
       dice.onChoose(player, order),

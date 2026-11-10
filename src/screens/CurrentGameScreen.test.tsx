@@ -338,6 +338,40 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("planar-walk")).toBeTruthy()
   })
 
+  it("rolls the planar die for the teammate whose bag opened the plane", () => {
+    const created = createLocalGame({
+      players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 30,
+      system: "mtg",
+      format: "constructed",
+      modeSetup: { planechase: {} },
+      teams: [
+        [0, 1],
+        [2, 3],
+      ],
+      now: 1,
+    })
+    const [, , katherine, dorothy] = created.players.map(({ id }) => id)
+    const initial = {
+      ...created,
+      turn: {
+        playerId: katherine!,
+        number: 1,
+        startedAt: 1,
+        operationId: "turn-1",
+        waiting: true as const,
+      },
+    }
+    const repository = turnsOn()
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("seat-bag-seat-4"))
+    fireEvent.press(view.getByTestId("bag-plane-seat-4"))
+    fireEvent.press(view.getByTestId("planar-dialog-die"))
+    const rolled = repository.loadActiveGame()?.table?.modes?.log?.at(-1)
+    expect(rolled).toMatchObject({ kind: "rolled", playerId: dorothy })
+  })
+
   it("lets a seat claim first from its empty 1st, which closes the offer everywhere", () => {
     const initial = game()
     const repository = turnsOff()

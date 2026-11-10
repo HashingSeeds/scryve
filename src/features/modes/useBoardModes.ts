@@ -66,6 +66,7 @@ export type ModeDialog = "planar" | "scheme"
 
 export function useBoardModes({ modes, turn, groups, players, controls, act }: BoardModesInput) {
   const [dialog, setDialog] = useState<ModeDialog>()
+  const [opener, setOpener] = useState<string>()
   const planechase = modes?.planechase
   const archenemy = modes?.archenemy
   const nameOf = useMemo(() => {
@@ -79,6 +80,8 @@ export function useBoardModes({ modes, turn, groups, players, controls, act }: B
 
   const roller = players.find(({ id }) => controls(id) && mayRoll(turn, groups, id))?.id
   const actor = roller ?? players.find(({ id }) => controls(id))?.id
+  const dialogSeat =
+    opener !== undefined && controls(opener) && mayRoll(turn, groups, opener) ? opener : roller
   const log = modes?.log ?? []
   const lastRolled = [...log].reverse().find((entry) => entry.kind === "rolled")
 
@@ -141,7 +144,11 @@ export function useBoardModes({ modes, turn, groups, players, controls, act }: B
     log: rows,
     nameOf,
     dialog,
-    openDialog: setDialog,
+    dialogSeat,
+    openDialog: (next: ModeDialog | undefined, seat?: string) => {
+      setDialog(next)
+      setOpener(seat)
+    },
   }
 }
 

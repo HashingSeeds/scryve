@@ -73,7 +73,8 @@ function ModeLog({ rows }: { rows: readonly ModeLogRow[] }) {
 
 export function ModesDialog({ modes }: { modes: BoardModes }) {
   const { themed } = useAppTheme()
-  const { dialog, planar, scheme, openDialog } = modes
+  const { dialog, planar, scheme, openDialog, dialogSeat } = modes
+  const die = planar && dialogSeat ? planar.dieFor(dialogSeat) : planar
   if (!dialog) return null
   const close = () => openDialog(undefined)
   const planarRows = modes.log.filter(({ entry }) =>
@@ -99,13 +100,13 @@ export function ModesDialog({ modes }: { modes: BoardModes }) {
             />
             {planar.card ? <PlaneImage card={planar.card} /> : null}
             <View style={themed($row)}>
-              <PlanarDieButton planar={planar} testID="planar-dialog-die" />
+              <PlanarDieButton planar={planar} seat={dialogSeat} testID="planar-dialog-die" />
               <View style={$grow}>
                 <Text
                   size="sm"
                   weight="bold"
                   text={translate("board:planar.nextCost", {
-                    cost: planar.cost || translate("board:planar.free"),
+                    cost: die?.cost || translate("board:planar.free"),
                   })}
                 />
                 {!planar.roller ? (
