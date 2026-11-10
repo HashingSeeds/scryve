@@ -2,7 +2,6 @@ import { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
 import { spacing } from "@/theme/spacing"
 
 import { seatBagSize } from "./CounterChips"
-import { FIRST_PLAYER_TAB } from "./FirstPlayerTabs"
 import { MENU_BUTTON_SIZE } from "./GameRadialMenu"
 import { CUTOUT_HALF_WIDTH, seatIdentityPlacement } from "./LifeCard"
 import {
@@ -15,11 +14,13 @@ import {
 } from "./playerCardTypes"
 import {
   boardInsetsFor,
+  CONTENT_EDGES,
+  FIRST_PLAYER_TAB,
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   seatFrames,
 } from "./playerGridGeometry"
-import { CONTENT_EDGES, contentInsetsFor, menuClearance } from "./pokemon/pokemonCardLayout"
+import { contentInsetsFor, menuClearance } from "./pokemon/pokemonCardLayout"
 import { tallestKeypadHeight } from "./pokemon/PokemonKeypad"
 import { keypadBesideForm } from "./pokemon/PokemonSheet"
 import { seatIdentityMetrics, seatMarkArt } from "./SeatIdentity"

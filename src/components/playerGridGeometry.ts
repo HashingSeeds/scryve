@@ -3,7 +3,6 @@ import {
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
 
-import { FIRST_PLAYER_TAB } from "./FirstPlayerTabs"
 import type {
   LifeCardContentInsets,
   LifeCardContentRotation,
@@ -12,7 +11,15 @@ import type {
   LifeCardMenuCorner,
   LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
+
+export const FIRST_PLAYER_TAB = { length: 56, depth: 40 } as const
+
+export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
+  0: { top: "top", right: "right", bottom: "bottom", left: "left" },
+  90: { top: "right", right: "bottom", bottom: "left", left: "top" },
+  [-90]: { top: "left", right: "top", bottom: "right", left: "bottom" },
+  180: { top: "bottom", right: "left", bottom: "top", left: "right" },
+}
 
 const SINGLE_PLAYER_ROW_FLEX = 0.8
 
