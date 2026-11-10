@@ -549,12 +549,6 @@ export default {
     chessOff: "बंद",
     roundClock: "राउंड घड़ी",
     divider: "टर्न {{number}} · {{name}}",
-    hideOffer: {
-      title: "टर्न ट्रैक करना बंद करें?",
-      body: "आप इसे सेटिंग में फिर से चालू कर सकते हैं।",
-      hide: "बंद करें",
-      keep: "रखें",
-    },
   },
   log: {
     close: "लॉग बंद करें",

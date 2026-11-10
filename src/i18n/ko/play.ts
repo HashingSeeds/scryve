@@ -36,6 +36,11 @@ export default {
     continue: "계속",
     endGame: "게임 종료",
   },
+  turnsChoice: {
+    label: "턴",
+    lifeOnly: "생명점만",
+    lifeAndTurns: "생명점과 턴",
+  },
   whatYouPlay: {
     heading: "어떤 게임을 하시나요?",
     changeLater: "설정에서 변경할 수 있습니다.",

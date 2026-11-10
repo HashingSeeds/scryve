@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 import type { ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 
@@ -13,7 +13,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
 import type { LocalGameRepository } from "./localPersistence"
-import { CHESS_BANK_MINUTES, turnsPassed, type TurnPrefs } from "./turnTab"
+import { CHESS_BANK_MINUTES, turnsPassed } from "./turnTab"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { Turn } from "../../../convex/lib/turns"
 
@@ -168,60 +168,27 @@ const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $choice: ViewStyle = { flexGrow: 1 }
 
-export function useTurnPrefs(repository: LocalGameRepository) {
-  const [prefs, setPrefs] = useState(() => repository.turnPrefs())
-  const update = useCallback(
-    (changes: Partial<TurnPrefs>) => setPrefs(repository.saveTurnPrefs(changes)),
+/** why: the board, game setup and Settings stay mounted together, so each reads the saved choice as it changes. */
+export function useTurnsEnabled(repository: LocalGameRepository) {
+  const subscribe = useCallback(
+    (listener: () => void) => repository.onSettingsChanged(listener),
     [repository],
   )
-  return [prefs, update] as const
+  const enabled = useSyncExternalStore(subscribe, () => repository.turnsEnabled())
+  const setEnabled = useCallback((next: boolean) => repository.saveTurnsEnabled(next), [repository])
+  return [enabled, setEnabled] as const
 }
 
-/** why: the game-end analytics event waits for the hide offer's answer, so one event carries it. */
 export function reportTurnsGame(input: {
-  prefs: Pick<TurnPrefs, "enabled">
+  turnsEnabled: boolean
   turn: Pick<Turn, "number"> | undefined
   playerCount: number
   mode: "local" | "connected"
-  hideOffer: "none" | "shown" | "accepted"
 }) {
   captureAnalytics("turns_game_ended", {
-    turns_enabled: input.prefs.enabled,
+    turns_enabled: input.turnsEnabled,
     pass_count: turnsPassed(input.turn),
     player_count: input.playerCount,
     mode: input.mode,
-    hide_offer: input.hideOffer,
   })
-}
-
-export function HideTurnsDialog({ onAnswer }: { onAnswer: (hide: boolean) => void }) {
-  const { themed } = useAppTheme()
-  return (
-    <DialogCard
-      visible
-      onClose={() => onAnswer(false)}
-      backdropTestID="hide-turns-backdrop"
-      backdropAccessibilityLabel={translate("board:turn.hideOffer.keep")}
-      dialogTestID="hide-turns-dialog"
-      dialogAccessibilityRole="alert"
-    >
-      <Text preset="subheading" tx="board:turn.hideOffer.title" />
-      <Text tx="board:turn.hideOffer.body" />
-      <View style={themed($dialogActions)}>
-        <Button
-          testID="hide-turns-keep"
-          tx="board:turn.hideOffer.keep"
-          style={themed($dialogButton)}
-          onPress={() => onAnswer(false)}
-        />
-        <Button
-          testID="hide-turns-hide"
-          tx="board:turn.hideOffer.hide"
-          preset="primary"
-          style={themed($dialogButton)}
-          onPress={() => onAnswer(true)}
-        />
-      </View>
-    </DialogCard>
-  )
 }

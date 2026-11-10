@@ -551,12 +551,6 @@ const board = {
     roundClock: "Round clock",
     // The log divider at the start of each turn, as in "Turn 4 · Ada".
     divider: "Turn {{number}} · {{name}}",
-    hideOffer: {
-      title: "Stop tracking turns?",
-      body: "You can turn it back on in Settings.",
-      hide: "Stop",
-      keep: "Keep",
-    },
   },
   log: {
     close: "Close log",
