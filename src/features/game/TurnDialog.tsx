@@ -13,17 +13,8 @@ import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
 import type { LocalGameRepository } from "./localPersistence"
-import { CHESS_BANK_MINUTES, turnsPassed, type ChessBankMinutes } from "./turnTab"
-import type { PlayerMarkShape } from "../../../convex/lib/appearance"
+import { CHESS_BANK_MINUTES, turnsPassed, type ChessBankMinutes, type TurnSeat } from "./turnTab"
 import type { Turn } from "../../../convex/lib/turns"
-
-export interface TurnSeat {
-  playerId: string
-  seatNumber: number
-  name: string
-  color: string
-  shape?: PlayerMarkShape
-}
 
 export interface TurnDialogProps {
   turn: Turn | undefined

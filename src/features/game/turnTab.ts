@@ -1,4 +1,13 @@
+import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { Turn } from "../../../convex/lib/turns"
+
+export interface TurnSeat {
+  playerId: string
+  seatNumber: number
+  name: string
+  color: string
+  shape?: PlayerMarkShape
+}
 
 export const CHESS_BANK_MINUTES = [10, 20, 30] as const
 export type ChessBankMinutes = (typeof CHESS_BANK_MINUTES)[number]

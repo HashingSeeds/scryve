@@ -953,12 +953,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     onAccount,
   })
   const { menuOpen, dice, dialogOrigin: menuDialogOrigin } = chrome
+  // why: the chess clock is the host's setup choice, so only the host's device sets the bank, through any seat it holds; whoever goes first may be on a device that chose otherwise.
+  const hostSeat = game.isHost ? [...controlled][0] : undefined
   useEffect(() => {
     if (!chessMinutes || !table || !turn || turn.number !== 1 || turn.bank) return
-    if (!controlled.has(turn.playerId) || chessAppliedTo.current === turn.operationId) return
+    if (!hostSeat || chessAppliedTo.current === turn.operationId) return
     chessAppliedTo.current = turn.operationId
-    table.setBank(turn.playerId, chessMinutes * 60_000)
-  }, [chessMinutes, table, turn, controlled])
+    table.setBank(hostSeat, chessMinutes * 60_000)
+  }, [chessMinutes, table, turn, hostSeat])
   const turnSeats = [...game.players]
     .sort((left, right) => left.seat - right.seat)
     .map((player) => ({

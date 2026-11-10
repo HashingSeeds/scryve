@@ -45,9 +45,8 @@ import {
   TurnDialog,
   useChessMinutes,
   useTurnsEnabled,
-  type TurnSeat,
 } from "@/features/game/TurnDialog"
-import { PASS_UNDO_MS } from "@/features/game/turnTab"
+import { PASS_UNDO_MS, type TurnSeat } from "@/features/game/turnTab"
 import type {
   CommanderSlot,
   GamePlayer,
