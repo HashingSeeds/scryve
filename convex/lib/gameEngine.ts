@@ -3,6 +3,7 @@ import {
   applyLifeChange,
   commanderClaimOutcome,
   commanderField,
+  commanderLethalDamage,
   confirmCommanderClaim,
   controlsSeat,
   isCommanderDamageDelta,
@@ -24,7 +25,8 @@ import {
 } from "./gameRules"
 import type { GameWriteErrorCode } from "./gameWriteErrors"
 import { nameFailsGate } from "./nameFilter"
-import { tableRules } from "./systems"
+import { commanderOutState, outReason, type CommanderTotal, type OutState } from "./outReason"
+import { systemDefinition, tableRules } from "./systems"
 import {
   applyTableAction,
   seatTable,
@@ -36,6 +38,7 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
+import { isTurnAction, nextTurnSeat, startedByChange, type Turn } from "./turns"
 import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
@@ -63,7 +66,15 @@ const MISMATCH = writeError(
 export const engineGameOf = (
   game: Pick<
     Doc<"games">,
-    "status" | "system" | "game" | "format" | "ruleset" | "designations" | "lifeEditing"
+    | "status"
+    | "system"
+    | "game"
+    | "format"
+    | "ruleset"
+    | "designations"
+    | "lifeEditing"
+    | "turn"
+    | "turnGroups"
   >,
 ): EngineGame => ({
   status: game.status,
@@ -71,6 +82,8 @@ export const engineGameOf = (
   format: game.format ?? game.ruleset,
   designations: game.designations ?? {},
   ...(game.lifeEditing ? { lifeEditing: game.lifeEditing } : {}),
+  ...(game.turn ? { turn: game.turn } : {}),
+  ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
 })
 
 export interface EngineGame {
@@ -79,6 +92,8 @@ export interface EngineGame {
   format: string | undefined
   designations: TableState["designations"]
   lifeEditing?: LifeEditing
+  turn?: Turn
+  turnGroups?: TableState["turnGroups"]
 }
 
 export interface EngineSeat extends SeatOwner, PlayerTable {
@@ -152,6 +167,7 @@ export type GameChange =
     }
   | (CommanderPair & { kind: "pair.put"; total: number; updatedAt: number })
   | { kind: "designations.set"; designations: TableState["designations"] }
+  | { kind: "turn.set"; turn: Turn | undefined }
 
 export interface WriteRequest {
   operationId: string
@@ -205,6 +221,8 @@ export interface GameStore {
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
+  seats(): Read<readonly EngineSeat[]>
+  commanderTotals(): Read<readonly CommanderTotal[]>
   isMember(): Read<boolean>
   beforeNewWrite?(): Read<void>
   apply(changes: readonly GameChange[]): Read<void>
@@ -308,10 +326,12 @@ function* editableSeat(
   id: string,
   actor: SeatActor,
   message = "Seat-owner permission required",
+  anyoneMay = true,
 ) {
   const seat = yield* read(store.seat(id))
   if (seat && controlsSeat(seat, actor)) return seat
-  if (seat && store.game.lifeEditing === "anyone" && (yield* read(store.isMember()))) return seat
+  if (seat && anyoneMay && store.game.lifeEditing === "anyone" && (yield* read(store.isMember())))
+    return seat
   return writeError("seat_owner_required", message)
 }
 
@@ -328,11 +348,15 @@ export function* writeGame(
   const invalid = rejectRequest(write) ?? rejectForGame(store.game, write)
   if (invalid) return failed(invalid)
   const actor = { ...identity, deviceId: write.deviceId }
-  const stamped = withLastWrite(store, {
+  const lastWrite = withLastWrite(store, {
     actorUserId: actor.userId,
     deviceId: actor.deviceId,
     ...(isTapTime(write.tappedAt) ? { tappedAt: write.tappedAt } : {}),
   })
+  const stamped =
+    write.kind === "table" && isTurnAction(write.action)
+      ? lastWrite
+      : withTurnStarted(lastWrite, now)
   if (write.kind === "life") return yield* writeLife(stamped, actor, write, now)
   if (write.kind === "table") return yield* writeTable(stamped, actor, write, now)
   if (write.kind === "commander.claim") return yield* writeClaim(stamped, actor, write, now)
@@ -485,6 +509,7 @@ export function changeTable(
   related: EngineSeat | undefined,
   request: TableActionRequest,
   now: number,
+  nextTurnSeat?: (from: string) => string | undefined,
 ): { changes: GameChange[] } | EngineError {
   const { action } = request
   const rows = new Map<string, EngineSeat>([[actor.id, actor]])
@@ -492,11 +517,15 @@ export function changeTable(
   const table: TableState = {
     designations: game.designations,
     players: Object.fromEntries([...rows.values()].map((row) => [row.id, seatTable(row)])),
+    ...(game.turn ? { turn: game.turn } : {}),
+    ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
   }
   const result = applyTableAction(table, action, {
     rules: tableRules(game.system, game.format),
     operationId: request.operationId,
     lifeOf: (playerId) => rows.get(playerId)?.currentLife,
+    now,
+    nextTurnSeat,
   })
   if (!result) return writeError("invalid_table_action", "This table change no longer applies")
 
@@ -522,6 +551,7 @@ export function changeTable(
   }
   if (result.table.designations !== table.designations)
     changes.push({ kind: "designations.set", designations: result.table.designations })
+  if (result.table.turn !== table.turn) changes.push({ kind: "turn.set", turn: result.table.turn })
 
   const lifeChange = result.life[0]
   const actionDelta = tableActionDelta(action)
@@ -534,9 +564,13 @@ export function changeTable(
       actionIdentity: request.actionIdentity,
       ...(lifeChange
         ? { toPlayerId: lifeChange.playerId, delta: lifeChange.delta }
-        : actionDelta === undefined
-          ? {}
-          : { delta: actionDelta }),
+        : action.kind === "turn.passed" && result.table.turn
+          ? { toPlayerId: result.table.turn.playerId }
+          : "toPlayerId" in action
+            ? { toPlayerId: action.toPlayerId }
+            : actionDelta === undefined
+              ? {}
+              : { delta: actionDelta }),
       ...(action.kind === "pokemon.knockoutUndone"
         ? { undoOfOperationId: action.knockoutOperationId }
         : {}),
@@ -549,6 +583,27 @@ export function changeTable(
   return { changes }
 }
 
+/** why: a device names the next seat from the board it last drew, which can lag a seat going out, so the authority picks the next group still in, in seat order. */
+function* passOrder(store: GameStore): GameSteps<(from: string) => string | undefined> {
+  const seats = yield* read(store.seats())
+  const totals = yield* read(store.commanderTotals())
+  const { game } = store
+  const state: OutState = {
+    counter: systemDefinition(game.system)?.counter,
+    tableRules: tableRules(game.system, game.format),
+    table: {
+      designations: game.designations,
+      players: Object.fromEntries(seats.map((seat) => [seat.id, seatTable(seat)])),
+    },
+    lives: seats.map(({ id, currentLife }) => ({ playerId: id, life: currentLife })),
+    commanderDamage: commanderOutState(commanderLethalDamage(game.system, game.format), totals),
+    ...(game.turnGroups ? { groups: game.turnGroups } : {}),
+  }
+  const order = seats.map(({ id }) => id)
+  return (from) =>
+    nextTurnSeat(order, from, (id) => outReason(state, id) !== undefined, game.turnGroups)
+}
+
 function* writeTable(
   store: GameStore,
   actor: SeatActor,
@@ -556,7 +611,7 @@ function* writeTable(
   now: number,
 ): GameSteps<GameWriteResult> {
   const action = gatedTableAction(write.action)
-  const seat = yield* editableSeat(store, action.playerId, actor)
+  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request = {
@@ -573,10 +628,22 @@ function* writeTable(
   if (inactive) return failed(inactive)
   const relatedId = tableRelatedSeatId(action, seat)
   const related = relatedId === undefined ? undefined : yield* read(store.seat(relatedId))
-  const outcome = changeTable(store.game, seat, related, request, now)
+  const nextSeat = action.kind === "turn.passed" ? yield* passOrder(store) : undefined
+  const outcome = changeTable(store.game, seat, related, request, now, nextSeat)
   if (isEngineError(outcome)) return failed(outcome)
   yield* read(store.apply(outcome.changes))
   return acknowledged({ operationId, deduplicated: false })
+}
+
+/** why: the first turn's clock starts on the table's first change from any seat or write, on the authority, so every device and every older client agrees. */
+function withTurnStarted(store: GameStore, now: number): GameStore {
+  return {
+    ...store,
+    apply: (changes) => {
+      const turn = startedByChange(store.game.turn, now)
+      return store.apply(turn ? [...changes, { kind: "turn.set", turn }] : changes)
+    },
+  }
 }
 
 export const declinedClaimOperationId = (operationId: string) => `${operationId}_declined`

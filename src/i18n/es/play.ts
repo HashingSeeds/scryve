@@ -37,6 +37,12 @@ export default {
     continue: "Continuar",
     endGame: "Terminar partida",
   },
+  turnsChoice: {
+    label: "Turnos",
+    lifeOnly: "Solo vidas",
+    lifeAndTurns: "Turnos",
+    chessClock: "Reloj de ajedrez",
+  },
   whatYouPlay: {
     heading: "¿A qué juegas?",
     changeLater: "Puedes cambiarlo en Ajustes.",

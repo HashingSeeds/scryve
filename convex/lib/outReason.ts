@@ -1,5 +1,6 @@
 import { isCounterOut, type CounterDefinition, type TableDefinition } from "./systems"
 import { counterValue, type TableState } from "./table"
+import { turnGroupOf, type TurnGroups } from "./turns"
 
 export type OutReason<Id extends string = string> =
   | { readonly cause: "commanderDamage"; readonly fromPlayerId: Id; readonly total: number }
@@ -21,6 +22,7 @@ export interface OutState<Id extends string = string> {
     readonly lethal: number
     readonly totals: readonly CommanderTotal<Id>[]
   }
+  readonly groups?: TurnGroups
 }
 
 export function commanderOutState<Id extends string>(
@@ -57,7 +59,16 @@ export function outReason<Id extends string>(
   return isCounterOut(state.counter, life, others) ? { cause: "life" } : undefined
 }
 
-export function lastStanding<Id extends string>(state: OutState<Id>): Id | undefined {
+export function isGroupOut<Id extends string>(state: OutState<Id>, playerId: Id): boolean {
+  return turnGroupOf(state.groups, playerId).every(
+    (seat) => outReason(state, seat as Id) !== undefined,
+  )
+}
+
+export function standingWinners<Id extends string>(state: OutState<Id>): Id[] | undefined {
   const standing = state.lives.filter(({ playerId }) => !outReason(state, playerId))
-  return standing.length === 1 ? standing[0].playerId : undefined
+  if (standing.length === 0) return undefined
+  const group = turnGroupOf(state.groups, standing[0].playerId)
+  if (!standing.every(({ playerId }) => group.includes(playerId))) return undefined
+  return state.lives.flatMap(({ playerId }) => (group.includes(playerId) ? [playerId] : []))
 }

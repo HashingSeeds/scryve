@@ -185,6 +185,13 @@ export function SettingsScreen({
           onValueChange={(value) => update({ hapticsEnabled: value })}
         />
       )}
+      <Switch
+        testID="turns-switch"
+        labelTx="account:settings.turns.label"
+        helperTx="account:settings.turns.helper"
+        value={settings.turnTab === true}
+        onValueChange={(value) => update({ turnTab: value || undefined })}
+      />
       <Text tx="account:settings.appearance" preset="subheading" accessibilityRole="header" />
       <Text tx="account:settings.theme.heading" style={themed($label)} />
       <View style={themed($row)}>

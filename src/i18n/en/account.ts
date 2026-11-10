@@ -121,6 +121,10 @@ const account = {
     copyDebugInfo: "Copy debug info",
     copied: "Copied",
     copyFailed: "Could not copy. Try again.",
+    turns: {
+      label: "Turns",
+      helper: "Shows whose turn it is with a turn timer. Tap the timer to pass.",
+    },
     syncStats: {
       // Playful name for a hidden switch that shows technical timing numbers on the game board.
       label: "Stats for nerds",

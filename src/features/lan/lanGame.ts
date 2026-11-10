@@ -140,6 +140,8 @@ export type LanGuestMessage =
       systems?: readonly PlaySystemId[]
       variants?: readonly GameVariant[]
       editsAnySeat?: boolean
+      /** why: a guest sends the table it can parse, so a host leaves out a turn an older guest's strict parser would drop the whole table over. */
+      tableVersion?: number
       maxSeats?: number
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
@@ -150,7 +152,14 @@ export type LanGuestMessage =
 
 export type LanHostMessage =
   // why: a host from before partners lands a partner's damage on the first commander, so guests offer partners only when the welcome says so. A flag, not a LAN_PROTOCOL bump, keeps mixed tables playing.
-  | { type: "welcome"; pass: LanSeatPass; partners?: boolean; editsAnySeat?: boolean }
+  // why: a host from before turns rejects turn writes, so guests show the turn tab only when the welcome says so.
+  | {
+      type: "welcome"
+      pass: LanSeatPass
+      partners?: boolean
+      editsAnySeat?: boolean
+      turns?: boolean
+    }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
   | { type: "state"; lobby: LanLobby; projection: ConnectedProjection }
@@ -482,7 +491,11 @@ function commanderProjection(memory: MemoryGame, viewerKey: string, lethal: numb
   }
 }
 
-export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjection {
+export function lanProjection(
+  game: LanGame,
+  viewerKey: string,
+  tableVersion = TABLE_VERSION,
+): ConnectedProjection {
   const { setup, memory } = game
   const rules = tableRules(setup.system, setup.format)
   const lethal = commanderLethalDamage(setup.system, setup.format)
@@ -530,14 +543,18 @@ export function lanProjection(game: LanGame, viewerKey: string): ConnectedProjec
       ...roleFor(seat.key),
     })),
     ...(commander ? { commanderDamage: commander } : {}),
-    ...(memory && tableRulesApply(rules)
+    ...(memory &&
+    (tableRulesApply(rules) ||
+      ((memory.turn || memory.turnGroups) && tableVersion >= TABLE_VERSION))
       ? {
           table: tableForVersion(
             {
               designations: memory.designations,
               players: Object.fromEntries(seatsOf.map((seat) => [seat.id, playerTableOf(seat)])),
+              ...(memory.turn ? { turn: memory.turn } : {}),
+              ...(memory.turnGroups ? { turnGroups: memory.turnGroups } : {}),
             },
-            TABLE_VERSION,
+            tableVersion,
           ),
         }
       : {}),
@@ -713,6 +730,7 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
         ? { variants: value.variants.filter((variant) => variant === "treachery") }
         : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
+      ...(isCount(value.tableVersion) ? { tableVersion: value.tableVersion } : {}),
       ...(isCount(value.maxSeats) ? { maxSeats: value.maxSeats } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
@@ -778,6 +796,7 @@ export function parseHostMessage(line: string): LanHostMessage | null {
       pass: { key: value.pass.key, token: value.pass.token },
       ...(value.partners === true ? { partners: true } : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
+      ...(value.turns === true ? { turns: true } : {}),
     }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {

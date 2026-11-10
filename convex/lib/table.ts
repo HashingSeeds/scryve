@@ -1,14 +1,24 @@
 import { v, type GenericValidator, type Infer } from "convex/values"
 
 import type { PokemonBoardDefinition, TableDefinition } from "./systems"
+import {
+  applyTurnAction,
+  isTurnAction,
+  isValidTurn,
+  isValidTurnGroups,
+  remapTurn,
+  turnActionValidators,
+  turnGroupsValidator,
+  turnValidator,
+} from "./turns"
 
 export const MAX_POKEMON_HP = 999
 export const MAX_POKEMON_DAMAGE = 999
 export const POKEMON_HP_FACET = "hp"
 export const POISON_CHECKUP_DAMAGE = 10
 export const BURN_CHECKUP_DAMAGE = 20
-/** why: clients that send this to lobbyProjection get Pokémon conditions; older installs get the table without them, since their strict parser drops a table with fields it does not know. */
-export const TABLE_VERSION = 2
+/** why: clients that send this to lobbyProjection get Pokémon conditions (2) and the turn (3); older installs get the table without them, since their strict parser drops a table with fields it does not know. */
+export const TABLE_VERSION = 3
 const MAX_POKEMON_CARD_ID_LENGTH = 200
 const MAX_POKEMON_NAME_LENGTH = 100
 const POKEMON_ID = /^[A-Za-z0-9_-]{8,64}$/
@@ -56,6 +66,8 @@ export const playerTableValidator = v.object({
 export const tableStateValidator = v.object({
   designations: v.record(v.string(), v.string()),
   players: v.record(v.string(), playerTableValidator),
+  turn: v.optional(turnValidator),
+  turnGroups: v.optional(turnGroupsValidator),
 })
 
 export const tableActionValidator = v.union(
@@ -126,6 +138,7 @@ export const tableActionValidator = v.union(
     coin: v.optional(coinValidator),
     takerPlayerId: v.optional(v.string()),
   }),
+  ...turnActionValidators,
 )
 
 export type PokemonSlot = Infer<typeof pokemonSlotValidator>
@@ -294,6 +307,8 @@ export type TableContext = {
   rules: TableDefinition
   operationId: string
   lifeOf: (playerId: string) => number | undefined
+  now?: number
+  nextTurnSeat?: (from: string) => string | undefined
 }
 
 export type TableChange = {
@@ -346,6 +361,7 @@ export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
   )
     return action.takerPlayerId
   if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
+  if (action.kind === "turn.passed" || action.kind === "turn.set") return action.toPlayerId
   return undefined
 }
 
@@ -358,6 +374,20 @@ export function applyTableAction(
   const { rules } = context
   const unchanged = { table, life: [] }
   if (context.lifeOf(action.playerId) === undefined) return null
+
+  if (isTurnAction(action)) {
+    const turn = applyTurnAction(table.turn, action, {
+      operationId: context.operationId,
+      now: context.now ?? Date.now(),
+      isSeat: (playerId) => context.lifeOf(playerId) !== undefined,
+      groups: table.turnGroups,
+      nextSeat: context.nextTurnSeat,
+    })
+    if (turn === null) return null
+    if (turn === table.turn) return unchanged
+    const { turn: _before, ...rest } = table
+    return { table: turn ? { ...rest, turn } : rest, life: [] }
+  }
 
   if (action.kind === "counter.changed") {
     const counter = rules.counters.find(({ id }) => id === action.counterId)
@@ -573,6 +603,8 @@ export function isValidTableSnapshot(
   playerIds: ReadonlySet<string>,
 ): boolean {
   return (
+    (table.turn === undefined || isValidTurn(table.turn, playerIds)) &&
+    (table.turnGroups === undefined || isValidTurnGroups(table.turnGroups, playerIds)) &&
     Object.entries(table.designations).every(
       ([designationId, holder]) =>
         rules.designations.some(({ id }) => id === designationId) && playerIds.has(holder),
@@ -593,6 +625,8 @@ export function isValidTableSnapshot(
 
 export function remapTableState(table: TableState, idOf: (playerId: string) => string): TableState {
   return {
+    ...(table.turn ? { turn: remapTurn(table.turn, idOf) } : {}),
+    ...(table.turnGroups ? { turnGroups: table.turnGroups.map((group) => group.map(idOf)) } : {}),
     designations: Object.fromEntries(
       Object.entries(table.designations).map(([designationId, holder]) => [
         designationId,
@@ -621,8 +655,10 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
 
 export function tableForVersion(table: TableState, tableVersion = 1): TableState {
   if (tableVersion >= TABLE_VERSION) return table
+  const { turn: _newer, turnGroups: _groups, ...beforeTurns } = table
+  if (tableVersion >= 2) return beforeTurns
   return {
-    ...table,
+    ...beforeTurns,
     players: Object.fromEntries(
       Object.entries(table.players).map(([playerId, player]) => {
         const board = player.pokemon

@@ -5,7 +5,12 @@ import type {
   ConnectedPlayerProjection,
   ConnectedProjection,
 } from "./model"
-import { commanderOutState, lastStanding, type OutState } from "../../../convex/lib/outReason"
+import {
+  commanderOutState,
+  outReason,
+  standingWinners,
+  type OutState,
+} from "../../../convex/lib/outReason"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
 
@@ -55,6 +60,7 @@ export function connectedOutState(
       playCommanderLethal(system, format),
       commanderDamage?.totals,
     ),
+    ...(table?.turnGroups ? { groups: table.turnGroups } : {}),
   }
 }
 
@@ -70,6 +76,15 @@ export function projectionOutState(projection: ConnectedProjection) {
   )
 }
 
-export function connectedLastStanding(projection: ConnectedDisplayProjection): string | undefined {
-  return lastStanding(projectionOutState(projection))
+export function outPlayerIds(projection: ConnectedProjection): string[] {
+  const state = projectionOutState(projection)
+  return projection.players.flatMap(({ playerId }) =>
+    outReason(state, playerId) === undefined ? [] : [playerId],
+  )
+}
+
+export function connectedStandingWinners(
+  projection: ConnectedDisplayProjection,
+): string[] | undefined {
+  return standingWinners(projectionOutState(projection))
 }

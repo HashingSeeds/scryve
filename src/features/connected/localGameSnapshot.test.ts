@@ -10,6 +10,9 @@ import {
 } from "@/features/game/domain"
 import type { LocalGame } from "@/features/game/types"
 
+import { api } from "../../../convex/_generated/api"
+import { makeConvexTest, signedIn } from "../../../test/convexTest"
+
 const identifiers = {
   operationId: "publish_operation_0000001",
   publicId: "published-game-id-00001",
@@ -296,4 +299,59 @@ it("uploads a local deck without a synced version", () => {
     deckFingerprint: `v1:${"a".repeat(64)}`,
   })
   expect(snapshot.players[0].deckVersionId).toBeUndefined()
+})
+
+describe("publishing a started local game", () => {
+  it("keeps the running turn, its clock and the turn groups", async () => {
+    const local = createLocalGame({
+      players: ["Ada", "Grace", "Alan", "Kim"].map((name, index) => ({
+        name,
+        color: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00"][index],
+      })),
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+    })
+    const [ada, grace, alan, kim] = local.players.map(({ id }) => id)
+    const game: LocalGame = {
+      ...local,
+      turn: {
+        playerId: alan,
+        number: 3,
+        startedAt: 50_000,
+        operationId: "turn-operation-00000003",
+        spent: { [ada]: 30_000, [alan]: 12_000 },
+      },
+      turnGroups: [
+        [ada, grace],
+        [alan, kim],
+      ],
+    }
+    const t = makeConvexTest()
+    const host = await signedIn(t, "host-subject", "Host")
+
+    const created = await host.mutation(
+      api.games.publishLocalGame,
+      buildLocalGameSnapshot({ game, hostPlayerId: ada, ...identifiers }),
+    )
+
+    const idOf = new Map(created.players.map(({ localId, playerId }) => [localId, playerId]))
+    const stored = await t.run(async (ctx) =>
+      ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", created.publicId))
+        .unique(),
+    )
+    expect(stored?.turn).toEqual({
+      playerId: idOf.get(alan),
+      number: 3,
+      startedAt: 50_000,
+      operationId: "turn-operation-00000003",
+      spent: { [idOf.get(ada)!]: 30_000, [idOf.get(alan)!]: 12_000 },
+    })
+    expect(stored?.turnGroups).toEqual([
+      [idOf.get(ada), idOf.get(grace)],
+      [idOf.get(alan), idOf.get(kim)],
+    ])
+  })
 })

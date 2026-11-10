@@ -5,6 +5,7 @@ import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
 import type { TableState } from "../../../convex/lib/table"
+import type { Turn } from "../../../convex/lib/turns"
 
 export type CommanderSlot = typeof PARTNER_COMMANDER | undefined
 
@@ -124,6 +125,17 @@ export interface LocalGame {
   firstPlayerOffered?: true
   firstPlayerId?: PlayerId
   seatPassHashes?: SeatPassHashes
+  /** why: kept beside the events rather than in them, so an older build a rollback falls back to still opens the game. */
+  turn?: Turn
+  turnLog?: TurnLogEntry[]
+  turnGroups?: string[][]
+}
+
+export interface TurnLogEntry {
+  operationId: string
+  playerId: PlayerId
+  number: number
+  at: number
 }
 
 export interface NewPlayerInput {
@@ -172,4 +184,5 @@ export interface LocalGameSummary {
   match?: LocalGameMatch
   matchPublish?: "pending" | "published" | "failed"
   seatPassHashes?: SeatPassHashes
+  turnGroups?: string[][]
 }

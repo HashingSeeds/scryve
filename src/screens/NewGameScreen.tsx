@@ -78,6 +78,7 @@ import {
   ROUND_CLOCK_MINUTES,
   type RoundClockSetup,
 } from "@/features/game/roundClock"
+import { TurnsChoice } from "@/features/game/TurnsChoice"
 import type {
   LocalGame,
   LocalGameResult,
@@ -983,6 +984,7 @@ function NewGameForm({
                   }}
                 />
               ) : null}
+              <TurnsChoice />
               <View style={themed($summaryRow)}>
                 <Text size="xs" text={optionsSummary} style={themed($summaryText)} />
                 <Button

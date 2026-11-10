@@ -138,7 +138,7 @@ export default function Index() {
     return (
       <WhatYouPlayScreen
         onChoose={(type) => {
-          const next = settingsForWhatYouPlay(settings, type)
+          const next = settingsForWhatYouPlay(localGameRepository.loadSettings(), type)
           localGameRepository.saveSettings(next)
           setSettings(next)
           setFreshGame(createFreshGame(prepared, next))

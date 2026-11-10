@@ -4,7 +4,13 @@ import { usePaginatedQuery } from "convex/react"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { PendingLifeAction } from "@/features/connected/model"
 
-import type { CommanderDamageAssignedEvent, GameEvent, GamePlayer, LifeChangedEvent } from "./types"
+import type {
+  CommanderDamageAssignedEvent,
+  GameEvent,
+  GamePlayer,
+  LifeChangedEvent,
+  TurnLogEntry,
+} from "./types"
 import { api } from "../../../convex/_generated/api"
 import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
 
@@ -92,6 +98,24 @@ export function gameLog(
     newerAt = event.clientCreatedAt
   }
   return rows.filter(({ delta }) => delta !== 0)
+}
+
+export type GameLogItem =
+  | (GameLogRow & { kind?: undefined })
+  | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
+
+export function withTurnDividers(
+  rows: readonly GameLogRow[],
+  turns: readonly TurnLogEntry[],
+): GameLogItem[] {
+  const items: GameLogItem[] = []
+  let index = 0
+  for (const turn of [...turns].reverse()) {
+    const start = index
+    while (index < rows.length && rows[index].at >= turn.at) index += 1
+    items.push({ kind: "turn", ...turn }, ...rows.slice(start, index))
+  }
+  return [...items, ...rows.slice(index)]
 }
 
 type LifeLogProps = {

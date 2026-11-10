@@ -57,6 +57,7 @@ import {
 import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
 import { nearbyCodeFor, nearbyServiceName } from "./nearbyCode"
 import type { MemoryGame } from "../../../convex/lib/gameEngineMemory"
+import { TABLE_VERSION } from "../../../convex/lib/table"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -80,6 +81,7 @@ export interface LanSessionState {
   serviceName?: string
   partners?: boolean
   hostEditsAnySeat?: boolean
+  turns?: boolean
   error?: string
 }
 
@@ -160,6 +162,7 @@ export class LanSession {
   private tokens = new Map<string, string>()
   private passHashes = new Map<string, Promise<string | undefined>>()
   private peers = new Map<string, LanConnection<LanHostMessage>>()
+  private tableVersions = new Map<string, number>()
   // why: a socket that hasn't sent its join yet isn't in peers, but still has to close when the host leaves.
   private accepted = new Set<LanConnection<LanHostMessage>>()
   private replies = new Map<string, LanHostMessage[]>()
@@ -386,7 +389,14 @@ export class LanSession {
           const previous = this.peers.get(seatKey)
           this.peers.set(seatKey, peer)
           previous?.close()
-          peer.send({ type: "welcome", pass: admitted.pass, partners: true, editsAnySeat: true })
+          this.tableVersions.set(seatKey, message.tableVersion ?? 2)
+          peer.send({
+            type: "welcome",
+            pass: admitted.pass,
+            partners: true,
+            editsAnySeat: true,
+            turns: true,
+          })
           return this.publish(admitted.game)
         }
         if (!seatKey) return
@@ -478,7 +488,7 @@ export class LanSession {
     }
     for (const [key, peer] of this.peers) {
       peer.send(
-        { type: "state", lobby, projection: lanProjection(game, key) },
+        { type: "state", lobby, projection: lanProjection(game, key, this.tableVersions.get(key)) },
         ...(this.replies.get(key) ?? []),
       )
     }
@@ -575,6 +585,7 @@ export class LanSession {
       systems: PLAY_SYSTEM_IDS,
       variants: ["treachery"],
       editsAnySeat: true,
+      tableVersion: TABLE_VERSION,
       maxSeats: LAN_MAX_SEATS,
       ...(this.pass ? { pass: this.pass } : {}),
     })
@@ -607,6 +618,7 @@ export class LanSession {
         seatKey: message.pass.key,
         partners: message.partners === true,
         hostEditsAnySeat: message.editsAnySeat === true,
+        turns: message.turns === true,
       })
     }
     if (message.type === "pong")
@@ -753,7 +765,7 @@ export class LanSession {
         peer.sendAndClose({
           type: "state",
           lobby: endedLobby,
-          projection: lanProjection(ended, key),
+          projection: lanProjection(ended, key, this.tableVersions.get(key)),
         })
       for (const peer of this.accepted) if (![...this.peers.values()].includes(peer)) peer.close()
     }

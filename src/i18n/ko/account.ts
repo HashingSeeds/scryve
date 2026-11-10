@@ -120,6 +120,11 @@ export default {
     copyDebugInfo: "디버그 정보 복사",
     copied: "복사됨",
     copyFailed: "복사할 수 없습니다. 다시 시도해 주세요.",
+    turns: {
+      label: "턴",
+      helper:
+        "현재 차례인 플레이어를 턴 타이머와 함께 표시합니다. 타이머를 누르면 차례를 넘기세요.",
+    },
     syncStats: {
       label: "괴짜용 통계",
       helper:

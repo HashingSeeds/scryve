@@ -3,6 +3,7 @@ import { formatElapsed } from "@/utils/useElapsedSince"
 
 import type { PlaySystemId } from "./playSystems"
 import { systemDefinition } from "../../../convex/lib/systems"
+import type { TableAction } from "../../../convex/lib/table"
 
 /** why: a judge keeps the official time, so a countdown starts from the minutes left on the venue clock. */
 export type RoundClockSetup = { mode: "stopwatch" } | { mode: "countdown"; minutes: number }
@@ -18,6 +19,7 @@ export interface RoundClock {
   /** why: 0 is the turn in progress when time was called, which does not count toward the extra turns. */
   turn?: number
   bonusTurns?: number
+  steppedBy?: string
 }
 
 export type RoundClockView =
@@ -145,6 +147,23 @@ export function stepRoundTurn(
   const view = roundClockView(clock, system)
   if (view.kind !== "time") return clock
   return { ...clock, turn: Math.min(view.turns + 1, Math.max(0, view.turn + step)) }
+}
+
+export function roundClockAfterTurn(
+  clock: RoundClock,
+  system: PlaySystemId | undefined,
+  action: TableAction,
+  operationId: string,
+): RoundClock {
+  if (action.kind === "turn.passed") {
+    const stepped = stepRoundTurn(clock, system, 1)
+    return (stepped.turn ?? 0) === (clock.turn ?? 0)
+      ? clock
+      : { ...stepped, steppedBy: operationId }
+  }
+  if (action.kind !== "turn.undone" || clock.steppedBy !== action.turnOperationId) return clock
+  const { steppedBy: _counted, ...rest } = stepRoundTurn(clock, system, -1)
+  return rest
 }
 
 export function addRoundBonusTurns(clock: RoundClock, turns: number): RoundClock {

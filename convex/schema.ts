@@ -9,6 +9,7 @@ import { playerGridLayoutValidator } from "./lib/layouts"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { pokemonBoardValidator } from "./lib/table"
 import { gameVariantValidator, treacheryRoleValidator } from "./lib/treachery"
+import { turnGroupsValidator, turnValidator } from "./lib/turns"
 
 const genericDeckCardFields = {
   game: v.optional(v.string()),
@@ -142,6 +143,8 @@ export default defineSchema({
     // Legacy event-count base. New life writes never patch this shared row.
     eventSequence: v.optional(v.number()),
     designations: v.optional(v.record(v.string(), v.id("gamePlayers"))),
+    turn: v.optional(turnValidator),
+    turnGroups: v.optional(turnGroupsValidator),
   })
     .index("by_public_id", ["publicId"])
     .index("by_host_status", ["hostUserId", "status"])
@@ -338,6 +341,7 @@ export default defineSchema({
     resultKind: v.optional(v.union(v.literal("win"), v.literal("draw"), v.literal("unknown"))),
     winnerPlayerIds: v.optional(v.array(v.id("gamePlayers"))),
     matchId: v.optional(v.id("matches")),
+    turnGroups: v.optional(turnGroupsValidator),
   })
     .index("by_game", ["gameId"])
     .index("by_public_id", ["publicId"]),

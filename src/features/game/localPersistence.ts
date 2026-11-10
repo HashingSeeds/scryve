@@ -36,6 +36,7 @@ import {
   type RecentSetup,
 } from "./recentSetups"
 import { isRoundClockSetup, type RoundClock } from "./roundClock"
+import { isChessBankMinutes, type ChessBankMinutes } from "./turnTab"
 import type {
   CommanderDamageTotals,
   GameEvent,
@@ -48,6 +49,7 @@ import type {
   MatchSeatOutcome,
   NewPlayerInput,
   SeatPassHashes,
+  TurnLogEntry,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
@@ -55,11 +57,13 @@ import { MAX_PLAYERS, MIN_PLAYERS, SEATS_BEFORE_CLIENT_LIMIT } from "../../../co
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { parseTableState } from "../../../convex/lib/table"
+import { isValidTurn, isValidTurnGroups } from "../../../convex/lib/turns"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
 export const MAX_HISTORY_EVENTS = 250
 const EVENT_CHUNK_SIZE = 100
+const PASS_LABEL_PASSES = 3
 export const ACTIVE_SCHEMA_VERSION = 1
 /** why: a build from before seven-plus seats rejects those games, so they save as a newer schema it keeps instead of replacing. */
 export const WIDE_ACTIVE_SCHEMA_VERSION = 2
@@ -78,6 +82,7 @@ export const LOCAL_KEYS = {
   pendingMatchEnd: "count.local.matchEnd.v1",
   recentSetups: "count.local.recentSetups.v1",
   deferredClaims: "count.local.claims.deferred.v1",
+  turnPasses: "count.local.turnPasses.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
@@ -98,6 +103,8 @@ export interface LocalSettings {
   defaultFormat?: string
   askWhatYouPlay?: true
   syncStats?: boolean
+  turnTab?: true
+  chessMinutes?: ChessBankMinutes
 }
 
 export const COMMANDER_SEATS = 4
@@ -419,6 +426,7 @@ function parseRoundClock(value: unknown): RoundClock | undefined {
     if (!isFiniteNumber(field)) return undefined
     clock[key] = field
   }
+  if (typeof value.steppedBy === "string") clock.steppedBy = value.steppedBy
   return clock
 }
 
@@ -464,6 +472,10 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const account = parseAccount(value.account, value.system)
   const match = parseMatch(value.match, players.length)
   const clock = parseRoundClock(value.clock)
+  const playerIds = new Set<string>(players.map(({ id }) => id))
+  const turn = isValidTurn(value.turn, playerIds) ? value.turn : undefined
+  const turnLog = turn ? parseTurnLog(value.turnLog, playerIds) : undefined
+  const turnGroups = isValidTurnGroups(value.turnGroups, playerIds) ? value.turnGroups : undefined
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -499,7 +511,34 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     players.some(({ id }) => id === value.firstPlayerId)
       ? { firstPlayerId: asPlayerId(value.firstPlayerId) }
       : {}),
+    ...(turn ? { turn } : {}),
+    ...(turnLog ? { turnLog } : {}),
+    ...(turnGroups ? { turnGroups } : {}),
   }
+}
+
+function parseTurnLog(value: unknown, playerIds: ReadonlySet<string>): TurnLogEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const entries = value.flatMap((entry): TurnLogEntry[] =>
+    isRecord(entry) &&
+    typeof entry.operationId === "string" &&
+    typeof entry.playerId === "string" &&
+    playerIds.has(entry.playerId) &&
+    typeof entry.number === "number" &&
+    Number.isInteger(entry.number) &&
+    typeof entry.at === "number" &&
+    Number.isFinite(entry.at)
+      ? [
+          {
+            operationId: entry.operationId,
+            playerId: asPlayerId(entry.playerId),
+            number: entry.number,
+            at: entry.at,
+          },
+        ]
+      : [],
+  )
+  return entries.length > 0 ? entries : undefined
 }
 
 function parseSettings(value: unknown): LocalSettings | null {
@@ -532,6 +571,8 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...systemPreference,
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
+    ...(migrated.turnTab === true ? { turnTab: true } : {}),
+    ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
   }
 }
 
@@ -589,6 +630,10 @@ function parseSummary(value: unknown): LocalGameSummary | null {
   const skippedBy = parseSkippedBy(value.skippedBy)
   const match = players ? parseMatch(value.match, players.length) : undefined
   const seatPassHashes = players ? parseSeatPassHashes(value.seatPassHashes, players) : undefined
+  const turnGroups =
+    players && isValidTurnGroups(value.turnGroups, new Set(players.map(({ id }) => id)))
+      ? value.turnGroups
+      : undefined
   return players
     ? {
         schemaVersion: 1,
@@ -621,6 +666,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
           ? { matchPublish: value.matchPublish }
           : {}),
         ...(seatPassHashes ? { seatPassHashes } : {}),
+        ...(turnGroups ? { turnGroups } : {}),
       }
     : null
 }
@@ -646,6 +692,8 @@ function withinHistoryCap(games: readonly LocalGameSummary[]): LocalGameSummary[
 }
 
 export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
+
+const settingsListeners = new Set<() => void>()
 
 export class LocalGameRepository {
   private readonly finishListeners = new Set<() => void>()
@@ -741,6 +789,46 @@ export class LocalGameRepository {
     return settings
   }
 
+  turnsEnabled(): boolean {
+    return this.loadSettings().turnTab === true
+  }
+
+  saveTurnsEnabled(enabled: boolean): void {
+    const { turnTab: _turnTab, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(enabled ? { turnTab: true } : {}) })
+  }
+
+  chessMinutes(): ChessBankMinutes | undefined {
+    const settings = this.loadSettings()
+    return settings.turnTab === true ? settings.chessMinutes : undefined
+  }
+
+  saveChessMinutes(minutes: ChessBankMinutes | undefined): void {
+    const { chessMinutes: _chessMinutes, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(minutes ? { chessMinutes: minutes } : {}) })
+  }
+
+  passLabelShown(): boolean {
+    return this.turnPasses() < PASS_LABEL_PASSES
+  }
+
+  notePass(): void {
+    const passes = this.turnPasses()
+    if (passes < PASS_LABEL_PASSES) this.storage.set(LOCAL_KEYS.turnPasses, String(passes + 1))
+  }
+
+  private turnPasses(): number {
+    const passes = Number(this.storage.getString(LOCAL_KEYS.turnPasses))
+    return Number.isInteger(passes) && passes > 0 ? passes : 0
+  }
+
+  onSettingsChanged(listener: () => void): () => void {
+    settingsListeners.add(listener)
+    return () => {
+      settingsListeners.delete(listener)
+    }
+  }
+
   hapticsEnabled(): boolean {
     const stored = parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.settings)))
     return (stored ?? DEFAULT_LOCAL_SETTINGS).hapticsEnabled
@@ -753,6 +841,7 @@ export class LocalGameRepository {
       LOCAL_KEYS.settings,
       JSON.stringify({ ...valid, brawlLifeMigrated: true, podDefaultMigrated: true }),
     )
+    settingsListeners.forEach((listener) => listener())
   }
 
   saveDefaultsFrom(game: Pick<LocalGame, "players" | "startingLife" | "system" | "format">): void {
@@ -958,6 +1047,7 @@ export class LocalGameRepository {
       ...(account && game.status === "finished" ? { publish: "pending" as const } : {}),
       ...(game.match ? { match: game.match } : {}),
       ...(game.seatPassHashes ? { seatPassHashes: game.seatPassHashes } : {}),
+      ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
       ...(account && game.status === "finished" && game.match?.result
         ? { matchPublish: "pending" as const }
         : {}),

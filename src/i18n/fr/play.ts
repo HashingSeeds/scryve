@@ -37,6 +37,12 @@ export default {
     continue: "Continuer",
     endGame: "Terminer la partie",
   },
+  turnsChoice: {
+    label: "Tours",
+    lifeOnly: "Points de vie seuls",
+    lifeAndTurns: "Tours",
+    chessClock: "Horloge d'échecs",
+  },
   whatYouPlay: {
     heading: "À quoi jouez-vous ?",
     changeLater: "Vous pouvez modifier cela dans les Réglages.",

@@ -7,7 +7,7 @@ import {
   commandToEvent,
   incomingCommanderDamage,
   localOutReason,
-  lastPlayerStanding,
+  localStandingWinners,
   MAX_COMMANDER_DAMAGE,
   PARTNER_COMMANDER,
   asDeviceId,
@@ -321,7 +321,7 @@ describe("local game domain", () => {
     expect(
       commandToEvent(game, { type: "life.change", playerId: alice, delta: -1000 }, context),
     ).toBeNull()
-    expect(lastPlayerStanding(game)).toBe(bob)
+    expect(localStandingWinners(game)).toEqual([bob])
     game = applyGameCommand(game, { type: "life.undo" }, context)
     expect(game.players[0].life).toBe(8000)
   })
@@ -520,13 +520,13 @@ describe("commander damage", () => {
 
   it("names the last player standing once life and commander damage knock out the rest", () => {
     let game = assign(commanderGame(3, 40), 0, 1, 21)
-    expect(lastPlayerStanding(game)).toBeUndefined()
+    expect(localStandingWinners(game)).toBeUndefined()
     game = applyGameCommand(
       game,
       { type: "life.change", playerId: game.players[0].id, delta: -40 },
       sharedContext,
     )
-    expect(lastPlayerStanding(game)).toBe(game.players[2].id)
+    expect(localStandingWinners(game)).toEqual([game.players[2].id])
   })
 })
 

@@ -6,6 +6,7 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
@@ -43,6 +44,16 @@ function renderGame(
       />
     </ThemeProvider>,
   )
+}
+
+function turnsOff() {
+  return new LocalGameRepository(new MemoryStorage())
+}
+
+function turnsOn() {
+  const repository = new LocalGameRepository(new MemoryStorage())
+  repository.saveTurnsEnabled(true)
+  return repository
 }
 
 function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat") {
@@ -196,7 +207,7 @@ describe("CurrentGameScreen", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
     const initial = game()
-    const repository = new LocalGameRepository(new MemoryStorage())
+    const repository = turnsOff()
     const view = renderGame(initial, repository)
     layoutSeats(view)
     expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
@@ -314,7 +325,7 @@ describe("CurrentGameScreen", () => {
 
   it("lets a seat claim first from its empty 1st, which closes the offer everywhere", () => {
     const initial = game()
-    const repository = new LocalGameRepository(new MemoryStorage())
+    const repository = turnsOff()
     const view = renderGame(initial, repository)
     layoutSeats(view)
     expect(view.getByTestId("dice-chip-1-claim").props.accessibilityLabel).toBe(
@@ -328,11 +339,107 @@ describe("CurrentGameScreen", () => {
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[1].id)
   })
 
+  it("frames and chips every seat of a shared turn, and passes group to group", () => {
+    const four = game(4)
+    const [ada, grace, katherine, dorothy] = four.players.map(({ id }) => id)
+    const initial = {
+      ...four,
+      turnGroups: [
+        [ada, grace],
+        [katherine, dorothy],
+      ],
+    }
+    const repository = turnsOn()
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-2-claim"))
+    expect(view.getByTestId("turn-chip-1")).toHaveTextContent(/^Turn 1/)
+    expect(view.getByTestId("turn-chip-2")).toHaveTextContent(/^Turn 1/)
+
+    fireEvent.press(view.getByTestId("turn-chip-2"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: katherine, number: 2 })
+    expect(view.queryByTestId("turn-chip-1")).toBeNull()
+    expect(view.getByTestId("turn-chip-3")).toBeTruthy()
+    expect(view.getByTestId("turn-chip-4")).toBeTruthy()
+    expect(view.getByTestId("turn-undo-pass-1")).toBeTruthy()
+    expect(view.getByTestId("turn-undo-pass-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("turn-undo-pass-2"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: ada, number: 1 })
+    expect(view.queryByTestId("turn-undo-pass-1")).toBeNull()
+  })
+
+  it("starts a chess clock picked in setup on the first player, waiting until the table's first change", () => {
+    const initial = game()
+    const repository = turnsOn()
+    repository.saveChessMinutes(20)
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    expect(view.getByTestId("turn-chip-1")).toHaveTextContent("Start")
+
+    fireEvent.press(view.getByTestId("life-seat-2-1"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: initial.players[0].id })
+    expect(repository.loadActiveGame()?.turn?.waiting).toBeUndefined()
+    expect(repository.loadActiveGame()?.turn?.bank?.ms).toBe(20 * 60_000)
+    expect(view.getByTestId("turn-chip-time")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("turn-chip-1"))
+    expect(repository.loadActiveGame()?.turn?.playerId).toBe(initial.players[1].id)
+    expect(view.getByTestId("turn-chip-2")).toBeTruthy()
+  })
+
+  it("says Pass on the turn chip until this device has passed three times", () => {
+    const repository = turnsOn()
+    const view = renderGame(game(), repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const passFrom = (seat: number) => {
+      expect(view.getByTestId(`turn-chip-${seat}`)).toHaveTextContent(/Pass/)
+      fireEvent.press(view.getByTestId(`turn-chip-${seat}`))
+    }
+    passFrom(1)
+    passFrom(2)
+    passFrom(1)
+    expect(view.getByTestId("turn-chip-2")).not.toHaveTextContent(/Pass/)
+    expect(repository.passLabelShown()).toBe(false)
+  })
+
+  it("retracts the active player's name while the turn chip would not fit, until the undo window ends", () => {
+    jest.useFakeTimers()
+    const view = renderGame(game(), turnsOn())
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const widths = (identity: number, chip: number) => {
+      fireEvent(view.getByTestId("life-identity-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: identity, height: 30 } },
+      })
+      fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: chip, height: 36 } },
+      })
+    }
+
+    widths(80, 60)
+    expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
+
+    widths(80, 1_000)
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+    expect(view.getByTestId("player-name-seat-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("turn-chip-1"))
+    expect(view.getByTestId("turn-undo-pass-1")).toBeTruthy()
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+
+    act(() => jest.advanceTimersByTime(PASS_UNDO_MS))
+    expect(view.queryByTestId("turn-undo-pass-1")).toBeNull()
+    expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
+  })
+
   it("forgets who went first when the result is cleared before play", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
     const initial = game()
-    const repository = new LocalGameRepository(new MemoryStorage())
+    const repository = turnsOff()
     const view = renderGame(initial, repository)
     layoutSeats(view)
     fireEvent.press(view.getByTestId("first-player-tab"))
@@ -344,7 +451,7 @@ describe("CurrentGameScreen", () => {
   it("flips a coin for Pokémon and lets the winner choose first or second", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const initial = game(2, "pokemon")
-    const repository = new LocalGameRepository(new MemoryStorage())
+    const repository = turnsOff()
     const view = renderGame(initial, repository)
     layoutSeats(view, "pokemon-card-seat")
     expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
@@ -371,7 +478,7 @@ describe("CurrentGameScreen", () => {
   })
 
   it("hands a rematch's first choice to the player who lost", () => {
-    const view = renderGame()
+    const view = renderGame(game(), turnsOff())
     fireEvent.press(view.getByTestId("life-seat-1-1"))
     expect(view.queryByTestId("first-player-tab")).toBeNull()
     fireEvent.press(view.getByTestId("game-menu-button"))
@@ -689,6 +796,37 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     expect(repository.loadHistory()).toEqual([])
+  })
+
+  it("offers a team as one winner choice and records every seat in it", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const four = game(4)
+    const [ada, grace, katherine, dorothy] = four.players.map(({ id }) => id)
+    const initial = {
+      ...four,
+      turnGroups: [
+        [ada, grace],
+        [katherine, dorothy],
+      ],
+    }
+    repository.saveActiveGame(initial)
+    const view = renderGame(initial, repository)
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    expect(view.queryByTestId("end-game-winner-1")).toBeNull()
+    expect(view.queryByTestId("end-game-winner-3")).toBeNull()
+    expect(view.getAllByTestId("team-marks")).toHaveLength(2)
+    fireEvent.press(view.getByTestId("end-game-winner-2"))
+    expect(view.getByLabelText("Katherine & Dorothy, 2 life, winner")).toBeTruthy()
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    await waitFor(() => {
+      expect(repository.loadHistory()[0]).toMatchObject({
+        result: { kind: "win", winnerPlayerIds: [katherine, dorothy] },
+        turnGroups: initial.turnGroups,
+      })
+    })
   })
 
   it("records the winner the host picks before ending the game", async () => {

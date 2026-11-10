@@ -27,7 +27,7 @@ export interface FirstPlayerTab {
   facing: number
 }
 
-const { length: TAB_LENGTH, depth: TAB_DEPTH } = FIRST_PLAYER_TAB
+const { depth: TAB_DEPTH } = FIRST_PLAYER_TAB
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
 export const FirstPlayerTabsShownContext = createContext(false)
 const TAB_BORDER = 4
@@ -55,7 +55,7 @@ function edgeSlides(edge: BoardEdge) {
   }
 }
 
-const EDGE_SLIDES = {
+export const EDGE_SLIDES = {
   left: edgeSlides("left"),
   right: edgeSlides("right"),
   top: edgeSlides("top"),
@@ -90,7 +90,7 @@ export const FirstPlayerTabs = memo(function FirstPlayerTabs({
             importantForAccessibility={primary ? "auto" : "no-hide-descendants"}
             style={[
               $tab,
-              edgeStyle(tab),
+              edgeStyle(tab, FIRST_PLAYER_TAB),
               {
                 backgroundColor: colors.gameMenu.anchor,
                 borderColor: "color" in glyph ? glyph.color : colors.gameMenu.anchorBorder,
@@ -129,9 +129,11 @@ export const FirstPlayerTabs = memo(function FirstPlayerTabs({
   )
 })
 
-const RADIUS = TAB_DEPTH / 2
-
-function edgeStyle({ edge, at }: FirstPlayerTab): ViewStyle {
+export function edgeStyle(
+  { edge, at }: FirstPlayerTab,
+  { length: TAB_LENGTH, depth: TAB_DEPTH }: { length: number; depth: number },
+): ViewStyle {
+  const RADIUS = TAB_DEPTH / 2
   const along = `${at * 100}%` as const
   switch (edge) {
     case "left":

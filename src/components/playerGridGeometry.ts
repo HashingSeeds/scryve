@@ -12,7 +12,7 @@ import type {
   LifeCardMenuEdge,
 } from "./playerCardTypes"
 
-export const FIRST_PLAYER_TAB = { length: 56, depth: 40 } as const
+export const FIRST_PLAYER_TAB = { length: 52, depth: 40 } as const
 
 export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
   0: { top: "top", right: "right", bottom: "bottom", left: "left" },
