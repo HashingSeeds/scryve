@@ -191,6 +191,8 @@ describe("a long-lived local board", () => {
   it("keeps logOrder to the changes its lists still hold, and Undo still picks the newest", () => {
     const created = createLocalGame({
       startingLife: 40,
+      system: "mtg",
+      format: "commander",
       now: 0,
       players: [
         { name: "Ada", color: "#000" },
@@ -222,6 +224,15 @@ describe("a long-lived local board", () => {
     for (let round = 0; round < 300; round += 1) {
       tap(ada.id)
       tap(bo.id)
+      table(
+        {
+          kind: "counter.changed",
+          playerId: bo.id,
+          counterId: "commanderTax",
+          delta: round % 2 ? -2 : 2,
+        },
+        `counter-${round}`,
+      )
       table({ kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id }, `turn-pass-${round}`)
       table(
         { kind: "turn.undone", playerId: ada.id, turnOperationId: `turn-pass-${round}` },
@@ -232,10 +243,12 @@ describe("a long-lived local board", () => {
     const held = new Set<string>([
       ...game.events.map(({ operationId }) => operationId),
       ...(game.turnLog ?? []).map(({ operationId }) => operationId),
+      ...(game.counterLog ?? []).map(({ operationId }) => operationId),
     ])
     expect(game.events.length).toBeGreaterThan(500)
     expect(game.logOrder?.every((id) => held.has(id))).toBe(true)
     expect(game.logOrder?.length).toBeLessThanOrEqual(held.size)
+    expect(game.logOrder).toContain("counter-299")
 
     table({ kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id }, "turn-pass-last")
     expect(undoableTurn(game, actor)).toEqual({

@@ -284,7 +284,20 @@ describe("LocalGameRepository", () => {
       number: 1,
       at: 2,
     }
-    game = { ...game, turnLog: [turn], logOrder: [...(game.logOrder ?? []), turn.operationId] }
+    const counter = {
+      operationId: "counter-operation-0001",
+      playerId: game.players[0].id,
+      counterId: "poison",
+      delta: 1,
+      value: 1,
+      at: 3,
+    }
+    game = {
+      ...game,
+      turnLog: [turn],
+      counterLog: [counter],
+      logOrder: [...(game.logOrder ?? []), turn.operationId, counter.operationId],
+    }
     for (let index = 0; index < MAX_ACTIVE_EVENTS; index += 1) game = tap(game)
     repository.saveActiveGame(game)
 
@@ -292,7 +305,9 @@ describe("LocalGameRepository", () => {
     const kept = new Set<string>(reopened?.events.map(({ operationId }) => operationId))
     expect(reopened?.events.length).toBeLessThan(game.events.length)
     expect(reopened?.logOrder).toEqual(
-      game.logOrder?.filter((id) => kept.has(id) || id === turn.operationId),
+      game.logOrder?.filter(
+        (id) => kept.has(id) || id === turn.operationId || id === counter.operationId,
+      ),
     )
   })
 

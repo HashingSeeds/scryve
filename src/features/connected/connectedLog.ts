@@ -1,9 +1,22 @@
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "@/features/game/domain"
-import { gameLog, rowPosition } from "@/features/game/LifeLog"
-import type { GameEvent, GamePlayer, TurnLogEntry } from "@/features/game/types"
+import {
+  counterLog as localCounterLog,
+  gameLog,
+  mergedLog,
+  rowPosition,
+} from "@/features/game/LifeLog"
+import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "@/features/game/types"
 
 import { compareQueued, type PendingLifeAction } from "./model"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
+import {
+  customCounterId,
+  loggedCounterId,
+  loggedCounterValue,
+  sameLoggedCounters,
+  type TableAction,
+  type TableState,
+} from "../../../convex/lib/table"
 import type { Turn } from "../../../convex/lib/turns"
 
 const NO_ACTOR = asActorId("")
@@ -37,6 +50,10 @@ export function connectedLogEvents(
           kind: event.action.kind,
           playerId: event.action.playerId,
           action: event.action,
+          ...(loggedCounterId(event.action) && "delta" in event.action
+            ? { delta: event.action.delta }
+            : {}),
+          ...(event.undoOf ? { undoOf: event.undoOf } : {}),
           mine: true,
         },
       ]
@@ -69,6 +86,7 @@ export function connectedLogInputs(
   events: readonly ConnectedLogEvent[],
   gameId: string,
   turn: Turn | undefined,
+  table: CounterTable = {},
 ) {
   const game = asGameId(gameId)
   const lifeEvents = events.flatMap((event): GameEvent[] => {
@@ -102,7 +120,42 @@ export function connectedLogInputs(
       ]
     return []
   })
-  return { events: lifeEvents, turns: turnLog(events, turn) }
+  return { events: lifeEvents, turns: turnLog(events, turn), counters: counterLog(events, table) }
+}
+
+export interface CounterTable {
+  players?: TableState["players"]
+  counterKey?: (playerId: string, counterId: string) => string
+}
+
+function counterLog(events: readonly ConnectedLogEvent[], table: CounterTable): CounterLogEntry[] {
+  const undone = new Set(
+    events.flatMap(({ undoOf, action }) =>
+      undoOf && action && loggedCounterId(action) ? [undoOf] : [],
+    ),
+  )
+  const values = new Map<string, number>()
+  const entries: CounterLogEntry[] = []
+  const counterIdOf = sameLoggedCounters()
+  for (const player of Object.values(table.players ?? {}))
+    for (const { name } of player.customCounters ?? []) counterIdOf(customCounterId(name))
+  for (const event of [...events].reverse()) {
+    const loggedId = event.action && loggedCounterId(event.action)
+    const counterId = loggedId && counterIdOf(loggedId)
+    if (!counterId || !event.delta || event.undoOf || undone.has(event.operationId)) continue
+    const key = table.counterKey?.(event.playerId, counterId) ?? `${event.playerId}:${counterId}`
+    const value = values.get(key) ?? loggedCounterValue(table.players?.[event.playerId], counterId)
+    values.set(key, value - event.delta)
+    entries.push({
+      operationId: event.operationId,
+      playerId: asPlayerId(event.playerId),
+      counterId,
+      delta: event.delta,
+      value,
+      at: event.clientCreatedAt,
+    })
+  }
+  return entries.reverse()
 }
 
 function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): TurnLogEntry[] {
@@ -155,6 +208,7 @@ function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): 
 
 export type ConnectedLogUndo =
   | { kind: "life"; changes: { operationId: string; playerId: string; delta: number }[] }
+  | { kind: "counter"; changes: { operationId: string; action: TableAction }[] }
   | { kind: "turn"; playerId: string; turnOperationId: string }
 
 export function connectedLogUndo(
@@ -162,15 +216,20 @@ export function connectedLogUndo(
   players: readonly Pick<GamePlayer, "id" | "life">[],
   gameId: string,
   turn: Turn | undefined,
-  { turns }: { turns: boolean },
+  { turns, table }: { turns: boolean; table?: CounterTable },
 ): ConnectedLogUndo | undefined {
   const mine = new Map(
     events.flatMap((event) => (event.mine ? [[event.operationId, event] as const] : [])),
   )
-  const rows = gameLog(players, connectedLogInputs(events, gameId, turn).events)
+  const inputs = connectedLogInputs(events, gameId, turn, table)
+  const positionOf = logPositions(events)
+  const rows = mergedLog(
+    gameLog(players, inputs.events),
+    localCounterLog(inputs.counters),
+    positionOf,
+  )
   const row = rows.find(({ operationIds }) => operationIds.some((id) => mine.has(id)))
   const pass = turn?.previous ? mine.get(turn.operationId) : undefined
-  const positionOf = logPositions(events)
   const ownPass =
     turns &&
     pass?.action?.kind === "turn.passed" &&
@@ -179,7 +238,22 @@ export function connectedLogUndo(
       : undefined
   if (ownPass)
     return { kind: "turn", playerId: ownPass.playerId, turnOperationId: ownPass.operationId }
-  if (!row || row.fromPlayerId || !row.operationIds.every((id) => mine.has(id))) return undefined
+  if (!row || !row.operationIds.every((id) => mine.has(id))) return undefined
+  if (row.kind === "counter")
+    return {
+      kind: "counter",
+      changes: row.operationIds.flatMap((operationId) => {
+        const action = mine.get(operationId)?.action
+        const delta = mine.get(operationId)?.delta
+        if (
+          !delta ||
+          (action?.kind !== "counter.changed" && action?.kind !== "customCounter.changed")
+        )
+          return []
+        return [{ operationId, action: { ...action, delta: -delta } }]
+      }),
+    }
+  if (row.fromPlayerId) return undefined
   return {
     kind: "life",
     changes: row.operationIds.flatMap((operationId) => {

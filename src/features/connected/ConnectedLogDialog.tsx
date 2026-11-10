@@ -12,6 +12,7 @@ import {
   connectedLogInputs,
   connectedLogUndo,
   logPositions,
+  type CounterTable,
 } from "./connectedLog"
 import type { PendingLifeAction } from "./model"
 import type { ConnectedGameRuntime } from "./useConnectedRuntime"
@@ -35,6 +36,7 @@ export const ConnectedLogContext = createContext<
       pending: readonly PendingLifeAction[]
       lives: Readonly<Record<string, number>>
       undoLife: ConnectedGameRuntime["undoLife"]
+      undoTable: ConnectedGameRuntime["undoTable"]
     }
   | undefined
 >(undefined)
@@ -69,6 +71,7 @@ export function ConnectedLogDialog({
   seats,
   turn,
   groups,
+  counterTable,
   turnsShown,
   anyoneEdits,
   origin,
@@ -80,6 +83,7 @@ export function ConnectedLogDialog({
   seats: readonly Seat[]
   turn?: Turn
   groups?: TurnGroups
+  counterTable?: CounterTable
   turnsShown: boolean
   anyoneEdits?: boolean
   origin?: DialogOrigin
@@ -95,6 +99,7 @@ export function ConnectedLogDialog({
           seats={seats}
           turn={turn}
           groups={groups}
+          counterTable={counterTable}
           turnsShown={turnsShown}
           anyoneEdits={anyoneEdits}
           origin={origin}
@@ -112,6 +117,7 @@ function ConnectedLog({
   seats,
   turn,
   groups,
+  counterTable,
   turnsShown,
   anyoneEdits,
   origin,
@@ -129,15 +135,22 @@ function ConnectedLog({
     () => connectedLogEvents(feed.events, pending, publicId, anyoneEdits),
     [anyoneEdits, feed.events, pending, publicId],
   )
-  const inputs = useMemo(() => connectedLogInputs(events, publicId, turn), [events, publicId, turn])
+  const inputs = useMemo(
+    () => connectedLogInputs(events, publicId, turn, counterTable),
+    [counterTable, events, publicId, turn],
+  )
   const positionOf = useMemo(() => logPositions(events), [events])
-  const undo = connectedLogUndo(events, players, publicId, turn, { turns: turnsShown })
+  const undo = connectedLogUndo(events, players, publicId, turn, {
+    turns: turnsShown,
+    table: counterTable,
+  })
   return (
     <GameLogDialog
       players={players}
       events={inputs.events}
       turns={turnsShown ? inputs.turns : undefined}
       groups={groups}
+      counters={inputs.counters}
       canUndo={undo !== undefined}
       undoLabel={translate("board:log.undoMine")}
       origin={origin}
@@ -145,6 +158,7 @@ function ConnectedLog({
       positionOf={positionOf}
       onUndo={() => {
         if (undo?.kind === "turn") onUndoTurn(undo.playerId, undo.turnOperationId)
+        else if (undo?.kind === "counter") context?.undoTable(undo.changes)
         else if (undo) context?.undoLife(undo.changes)
       }}
       onClose={onClose}

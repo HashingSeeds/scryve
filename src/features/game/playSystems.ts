@@ -138,6 +138,7 @@ export function supportsCommanderDamage(value: unknown, format?: string): boolea
 }
 
 export function playTableRules(value: unknown, format?: string): TableRules {
+  if (value === undefined || value === NO_PLAY_SYSTEM) return tableRules(undefined, undefined)
   return isPlaySystemId(value) ? tableRules(value, playSystemFormat(value, format)) : NO_TABLE
 }
 

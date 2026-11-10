@@ -29,7 +29,10 @@ import { commanderOutState, outReason, type CommanderTotal, type OutState } from
 import { systemDefinition, tableRules } from "./systems"
 import {
   applyTableAction,
+  normalizedTableAction,
   seatTable,
+  loggedCounterId,
+  loggedCounterValue,
   tableActionDelta,
   tableActionIdentity,
   tableRelatedSeatId,
@@ -147,6 +150,7 @@ export interface SeatPatch {
   lastEventAt?: number
   lastWrite?: SeatWrite
   counters?: PlayerTable["counters"]
+  customCounters?: PlayerTable["customCounters"]
   pokemon?: PlayerTable["pokemon"]
 }
 
@@ -476,7 +480,7 @@ const appliedCounterDelta = (
   after: PlayerTable | undefined,
   counterId: string,
 ) => {
-  const delta = (after?.counters?.[counterId] ?? 0) - (before?.counters?.[counterId] ?? 0)
+  const delta = loggedCounterValue(after, counterId) - loggedCounterValue(before, counterId)
   return delta === 0 ? undefined : delta
 }
 
@@ -577,7 +581,13 @@ export function changeTable(
       kind: "seat.patch",
       seatId: row.id,
       patch: {
-        ...(after === before ? {} : { counters: after?.counters, pokemon: after?.pokemon }),
+        ...(after === before
+          ? {}
+          : {
+              counters: after?.counters,
+              customCounters: after?.customCounters,
+              pokemon: after?.pokemon,
+            }),
         ...(lifeDelta === 0 ? {} : { currentLife: row.currentLife + lifeDelta }),
         ...(isActor ? { eventCount: (row.eventCount ?? 0) + 1 } : {}),
         lastEventAt: now,
@@ -589,14 +599,11 @@ export function changeTable(
   if (result.table.turn !== table.turn) changes.push({ kind: "turn.set", turn: result.table.turn })
 
   const lifeChange = result.life[0]
+  const counterId = loggedCounterId(action)
   const actionDelta =
-    action.kind === "counter.changed"
-      ? appliedCounterDelta(
-          table.players[actor.id],
-          result.table.players[actor.id],
-          action.counterId,
-        )
-      : tableActionDelta(action)
+    counterId === undefined
+      ? tableActionDelta(action)
+      : appliedCounterDelta(table.players[actor.id], result.table.players[actor.id], counterId)
   changes.push({
     kind: "event.insert",
     event: {
@@ -654,7 +661,8 @@ function* writeTable(
   write: WriteOf<"table">,
   now: number,
 ): GameSteps<GameWriteResult> {
-  const action = gatedTableAction(write.action)
+  const sent = normalizedTableAction(write.action)
+  const action = gatedTableAction(sent)
   const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
@@ -662,7 +670,7 @@ function* writeTable(
     ...write,
     action,
     actorUserId: actor.userId,
-    actionIdentity: tableActionIdentity(write.action),
+    actionIdentity: tableActionIdentity(sent),
   }
   const retry = matchTableRetry(yield* read(store.event(operationId)), seat.id, request)
   if (retry === "duplicate") return acknowledged({ operationId, deduplicated: true })
@@ -673,7 +681,7 @@ function* writeTable(
       return failed(writeError("invalid_undo", "Only your own change can be taken back"))
     if (yield* read(store.undoneBy(write.undoOf)))
       return failed(writeError("invalid_undo", "This change was already taken back"))
-    if (action.kind === "counter.changed") {
+    if (action.kind === "counter.changed" || action.kind === "customCounter.changed") {
       if (!undone?.delta) return failed(writeError("invalid_undo", "This change moved nothing"))
       request.action = { ...action, delta: -undone.delta }
     }

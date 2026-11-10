@@ -129,7 +129,17 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
+  counterLog?: CounterLogEntry[]
   logOrder?: string[]
+}
+
+export interface CounterLogEntry {
+  operationId: string
+  playerId: PlayerId
+  counterId: string
+  delta: number
+  value: number
+  at: number
 }
 
 export interface TurnLogEntry {
@@ -155,7 +165,7 @@ export type GameCommand =
       commander?: typeof PARTNER_COMMANDER
       delta: number
     }
-  | { type: "life.undo" }
+  | { type: "life.undo"; operationId?: OperationId }
   | { type: "game.finish"; result?: LocalGameResult }
   | { type: "game.abandon" }
 

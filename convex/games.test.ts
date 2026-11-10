@@ -2763,6 +2763,88 @@ describe("Convex game write rate limits", () => {
     ).rejects.toMatchObject({ data: { code: "rate_limited" } })
   })
 
+  it("syncs a custom counter to current clients and leaves it out for older ones", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    await game.host.mutation(api.games.tableAction, {
+      publicId: game.publicId,
+      operationId: "custom-counter-op-0001",
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      action: {
+        kind: "customCounter.changed",
+        playerId: game.hostPlayerId,
+        name: "Speed",
+        delta: 2,
+      },
+    })
+    const seat = async (tableVersion?: number) =>
+      (
+        await game.joiner.query(api.games.lobbyProjection, {
+          publicId: game.publicId,
+          ...(tableVersion === undefined ? {} : { tableVersion }),
+        })
+      ).table?.players[game.hostPlayerId]
+    expect(await seat(TABLE_VERSION)).toEqual({ customCounters: [{ name: "Speed", value: 2 }] })
+    expect(await seat(3)).toEqual({})
+  })
+
+  it("stores a padded counter name as the name it shows, never the padding", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    await game.host.mutation(api.games.tableAction, {
+      publicId: game.publicId,
+      operationId: "custom-counter-padded-01",
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      action: {
+        kind: "customCounter.changed",
+        playerId: game.hostPlayerId,
+        name: `Rad${" ".repeat(100_000)}`,
+        delta: 1,
+      },
+    })
+    const stored = await t.run((ctx) =>
+      ctx.db
+        .query("gameEvents")
+        .filter((q) => q.eq(q.field("operationId"), "custom-counter-padded-01"))
+        .unique(),
+    )
+    expect(stored?.actionIdentity).toContain('"name":"Rad"')
+    expect(stored?.actionIdentity?.length).toBeLessThan(200)
+    const { page } = await game.host.query(api.games.connectedEvents, {
+      publicId: game.publicId,
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(
+      page.find(({ operationId }) => operationId === "custom-counter-padded-01")?.action,
+    ).toEqual({ kind: "customCounter.changed", playerId: game.hostPlayerId, name: "Rad", delta: 1 })
+  })
+
+  it("keeps a counter a player names in a game with no system", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, { system: "none", ruleset: "none", startingLife: 20 })
+    await game.joiner.mutation(api.games.tableAction, {
+      publicId: game.publicId,
+      operationId: "custom-counter-none-0001",
+      deviceId: "device-joiner-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      action: {
+        kind: "customCounter.changed",
+        playerId: game.joinerPlayerId,
+        name: "Rad",
+        delta: 3,
+      },
+    })
+    const projection = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+      tableVersion: TABLE_VERSION,
+    })
+    expect(projection.table?.players[game.joinerPlayerId]).toEqual({
+      customCounters: [{ name: "Rad", value: 3 }],
+    })
+  })
+
   it("rate-limits table actions the same way and still acknowledges a replay", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)

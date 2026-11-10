@@ -253,7 +253,7 @@ export const LifeCard = memo(function LifeCard({
   const sidewaysContent = Math.abs(contentRotation) === 90
   // why: a sideways corner layer is sized from the card, so laid out before the card measures, the row's corner slide carries the name across the seat into place.
   const cornerMeasured = !sidewaysContent || cardSize.width > 0
-  const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
+  const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number; width: number }>()
   const [fullIdentityWidth, setFullIdentityWidth] = useState(0)
   const [rowChipWidth, setRowChipWidth] = useState(0)
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
@@ -937,9 +937,9 @@ export const LifeCard = memo(function LifeCard({
             layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
-                current?.x === layout.x && current.y === layout.y
+                current?.x === layout.x && current.y === layout.y && current.width === layout.width
                   ? current
-                  : { x: layout.x, y: layout.y },
+                  : { x: layout.x, y: layout.y, width: layout.width },
               )
             }
             style={[
@@ -1107,6 +1107,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+          nameEnd={identityRowAt && identityRowAt.x + identityRowAt.width}
           onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}

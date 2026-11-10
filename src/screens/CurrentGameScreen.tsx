@@ -588,10 +588,11 @@ export function CurrentGameScreen({
           events={events}
           turns={turnsEnabled ? runtime.game.turnLog : undefined}
           groups={turnGroups}
+          counters={runtime.game.counterLog}
           positionOf={localLogPositions(runtime.game)}
-          canUndo={runtime.canUndo}
+          canUndo={runtime.canUndo(turnsEnabled)}
           origin={chrome.dialogOrigin}
-          onUndo={runtime.undo}
+          onUndo={() => runtime.undo(turnsEnabled)}
           onClose={() => setLogOpen(false)}
         />
       ) : null}

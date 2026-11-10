@@ -6,6 +6,7 @@ import type { PendingLifeAction } from "@/features/connected/model"
 
 import type {
   CommanderDamageAssignedEvent,
+  CounterLogEntry,
   GameEvent,
   GamePlayer,
   LifeChangedEvent,
@@ -13,6 +14,7 @@ import type {
 } from "./types"
 import { api } from "../../../convex/_generated/api"
 import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
+import { sameLoggedCounters } from "../../../convex/lib/table"
 
 export interface LifeLogStep {
   id: string
@@ -113,22 +115,66 @@ export function gameLog(
   return rows.filter(({ delta }) => delta !== 0)
 }
 
-export type GameLogItem =
-  | (GameLogRow & { kind?: undefined })
-  | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
+export type GameCounterRow = Omit<CounterLogEntry, "operationId"> & {
+  kind: "counter"
+  id: string
+  operationIds: string[]
+}
+
+export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[] {
+  const rows: GameCounterRow[] = []
+  const bursts = new Map<string, { row: GameCounterRow; oldestAt: number }>()
+  const counterIdOf = sameLoggedCounters()
+  for (const { operationId, ...entry } of [...entries].reverse()) {
+    const key = `${entry.playerId}\u0000${counterIdOf(entry.counterId)}`
+    const burst = bursts.get(key)
+    if (burst && Math.abs(burst.oldestAt - entry.at) <= LIFE_BURST_MS) {
+      burst.row.delta += entry.delta
+      burst.row.operationIds.push(operationId)
+      burst.oldestAt = entry.at
+    } else {
+      const row: GameCounterRow = {
+        kind: "counter",
+        id: operationId,
+        operationIds: [operationId],
+        ...entry,
+      }
+      rows.push(row)
+      bursts.set(key, { row, oldestAt: entry.at })
+    }
+  }
+  return rows.filter(({ delta }) => delta !== 0)
+}
+
+type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
+
+export function mergedLog(
+  life: readonly GameLogRow[],
+  counters: readonly GameCounterRow[],
+  positionOf: (operationId: string) => number | undefined,
+): GameLogChange[] {
+  const placeOf = (row: GameLogChange) => rowPosition(row, positionOf)
+  return [...life, ...counters].sort((left, right) => placeOf(right) - placeOf(left))
+}
+
+type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & {
+  kind: "turn"
+}
+
+export type GameLogItem = GameLogChange | TurnDivider
 
 export const rowPosition = (
-  row: Pick<GameLogRow, "operationIds">,
+  row: Pick<GameLogChange, "operationIds">,
   positionOf: (operationId: string) => number | undefined,
 ) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
 
 export function withTurnDividers(
-  rows: readonly GameLogRow[],
+  rows: readonly GameLogChange[],
   turns: readonly TurnLogEntry[],
   positionOf: (operationId: string) => number | undefined,
 ): GameLogItem[] {
   const startOf = (turn: TurnLogEntry) => positionOf(turn.operationId) ?? -Infinity
-  const placeOf = (row: GameLogRow) => rowPosition(row, positionOf)
+  const placeOf = (row: GameLogChange) => rowPosition(row, positionOf)
   const items: GameLogItem[] = []
   let index = 0
   for (const turn of [...turns].reverse()) {

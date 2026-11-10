@@ -17,8 +17,13 @@ export const MAX_POKEMON_DAMAGE = 999
 export const POKEMON_HP_FACET = "hp"
 export const POISON_CHECKUP_DAMAGE = 10
 export const BURN_CHECKUP_DAMAGE = 20
-/** why: clients that send this to lobbyProjection get Pokémon conditions (2) and the turn (3); older installs get the table without them, since their strict parser drops a table with fields it does not know. */
-export const TABLE_VERSION = 3
+/** why: an older install's strict parser drops a table with any field it does not know, so each client gets only the fields of the version it sends. */
+export const TABLE_VERSION = 4
+export const TURN_TABLE_VERSION = 3
+export const CUSTOM_COUNTER_PREFIX = "custom:"
+export const MAX_CUSTOM_COUNTERS = 4
+export const MAX_CUSTOM_COUNTER_NAME_LENGTH = 20
+export const MAX_CUSTOM_COUNTER = 999
 const MAX_POKEMON_CARD_ID_LENGTH = 200
 const MAX_POKEMON_NAME_LENGTH = 100
 const POKEMON_ID = /^[A-Za-z0-9_-]{8,64}$/
@@ -58,8 +63,11 @@ export const pokemonBoardValidator = v.object({
   lastKnockout: v.optional(pokemonKnockoutValidator),
 })
 
+export const customCounterValidator = v.object({ name: v.string(), value: v.number() })
+
 export const playerTableValidator = v.object({
   counters: v.optional(v.record(v.string(), v.number())),
+  customCounters: v.optional(v.array(customCounterValidator)),
   pokemon: v.optional(pokemonBoardValidator),
 })
 
@@ -75,6 +83,12 @@ export const tableActionValidator = v.union(
     kind: v.literal("counter.changed"),
     playerId: v.string(),
     counterId: v.string(),
+    delta: v.number(),
+  }),
+  v.object({
+    kind: v.literal("customCounter.changed"),
+    playerId: v.string(),
+    name: v.string(),
     delta: v.number(),
   }),
   v.object({
@@ -149,6 +163,7 @@ export type PokemonInPlay = Infer<typeof pokemonValidator>
 export type PokemonKnockout = Infer<typeof pokemonKnockoutValidator>
 export type PokemonBoard = Infer<typeof pokemonBoardValidator>
 export type PlayerTable = Infer<typeof playerTableValidator>
+export type CustomCounter = Infer<typeof customCounterValidator>
 export type TableState = Infer<typeof tableStateValidator>
 export type TableAction = Infer<typeof tableActionValidator>
 export type TableActionKind = TableAction["kind"]
@@ -220,8 +235,62 @@ export function playerTableOf(table: TableState, playerId: string): PlayerTable 
 export function seatTable(seat: PlayerTable): PlayerTable {
   return {
     ...(seat.counters ? { counters: seat.counters } : {}),
+    ...(seat.customCounters?.length ? { customCounters: seat.customCounters } : {}),
     ...(seat.pokemon ? { pokemon: seat.pokemon } : {}),
   }
+}
+
+const CONTROL_CHARACTERS = /\p{Cc}/gu
+
+export function customCounterName(raw: string): string | undefined {
+  const name = raw.replace(CONTROL_CHARACTERS, "").replace(/\s+/g, " ").trim()
+  return name.length > 0 && name.length <= MAX_CUSTOM_COUNTER_NAME_LENGTH ? name : undefined
+}
+
+/** why: a named counter's name is part of its stored change's identity, so padding a client sent must not reach it. */
+export function normalizedTableAction(action: TableAction): TableAction {
+  if (action.kind !== "customCounter.changed") return action
+  const name = customCounterName(action.name)
+  return name === undefined || name === action.name ? action : { ...action, name }
+}
+
+const sameName = (left: string, right: string) =>
+  left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0
+
+export function customCounterId(name: string) {
+  return `${CUSTOM_COUNTER_PREFIX}${name}`
+}
+
+export function findCustomCounter(player: PlayerTable, name: string): CustomCounter | undefined {
+  return player.customCounters?.find((counter) => sameName(counter.name, name))
+}
+
+export function customCounterNameOf(counterId: string): string | undefined {
+  return counterId.startsWith(CUSTOM_COUNTER_PREFIX)
+    ? counterId.slice(CUSTOM_COUNTER_PREFIX.length)
+    : undefined
+}
+
+export function loggedCounterId(action: TableAction): string | undefined {
+  if (action.kind === "counter.changed") return action.counterId
+  return action.kind === "customCounter.changed" ? customCounterId(action.name) : undefined
+}
+
+export function sameLoggedCounters() {
+  const names: string[] = []
+  return (counterId: string) => {
+    const name = customCounterNameOf(counterId)
+    if (name === undefined) return counterId
+    const known = names.find((seen) => sameName(seen, name))
+    if (known === undefined) names.push(name)
+    return customCounterId(known ?? name)
+  }
+}
+
+export function loggedCounterValue(player: PlayerTable | undefined, counterId: string): number {
+  const name = customCounterNameOf(counterId)
+  if (name === undefined) return player?.counters?.[counterId] ?? 0
+  return (player && findCustomCounter(player, name)?.value) ?? 0
 }
 
 export function counterValue(table: TableState, playerId: string, counterId: string): number {
@@ -252,6 +321,7 @@ export function tableHasState(table: TableState | undefined): boolean {
     Object.values(table.players).some(
       (player) =>
         Object.values(player.counters ?? {}).some((value) => value !== 0) ||
+        (player.customCounters?.length ?? 0) > 0 ||
         player.pokemon?.active !== undefined ||
         (player.pokemon?.bench.length ?? 0) > 0,
     )
@@ -400,6 +470,33 @@ export function applyTableAction(
       table: withPlayer(table, action.playerId, {
         ...player,
         counters: { ...player.counters, [counter.id]: next },
+      }),
+      life: [],
+    }
+  }
+
+  if (action.kind === "customCounter.changed") {
+    const name = customCounterName(action.name)
+    if (!rules.customCounters || !name || !isNonZeroStep(action.delta, MAX_CUSTOM_COUNTER))
+      return null
+    const player = playerTableOf(table, action.playerId)
+    const existing = player.customCounters ?? []
+    const index = existing.findIndex((counter) => sameName(counter.name, name))
+    const current = existing[index]?.value ?? 0
+    const next = Math.max(0, Math.min(MAX_CUSTOM_COUNTER, current + action.delta))
+    if (next === current) return unchanged
+    if (index < 0 && existing.length >= MAX_CUSTOM_COUNTERS) return null
+    const customCounters =
+      index < 0
+        ? [...existing, { name, value: next }]
+        : next === 0
+          ? existing.filter((_, at) => at !== index)
+          : existing.map((counter, at) => (at === index ? { ...counter, value: next } : counter))
+    const { customCounters: _before, ...rest } = player
+    return {
+      table: withPlayer(table, action.playerId, {
+        ...rest,
+        ...(customCounters.length ? { customCounters } : {}),
       }),
       life: [],
     }
@@ -616,9 +713,27 @@ export function isValidTableSnapshot(
           const counter = rules.counters.find(({ id }) => id === counterId)
           return counter !== undefined && isWholeNumber(value, 0, counter.max)
         }) &&
+        isValidCustomCounters(player.customCounters, rules) &&
         (player.pokemon === undefined ||
           (rules.pokemon !== undefined &&
             isValidBoard(player.pokemon, playerId, rules.pokemon, playerIds))),
+    )
+  )
+}
+
+function isValidCustomCounters(
+  counters: readonly CustomCounter[] | undefined,
+  rules: TableDefinition,
+) {
+  if (counters === undefined) return true
+  return (
+    rules.customCounters === true &&
+    counters.length <= MAX_CUSTOM_COUNTERS &&
+    counters.every(
+      ({ name, value }, index) =>
+        customCounterName(name) === name &&
+        isWholeNumber(value, 1, MAX_CUSTOM_COUNTER) &&
+        !counters.slice(0, index).some((earlier) => sameName(earlier.name, name)),
     )
   )
 }
@@ -655,14 +770,16 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
 
 export function tableForVersion(table: TableState, tableVersion = 1): TableState {
   if (tableVersion >= TABLE_VERSION) return table
-  const { turn: _newer, turnGroups: _groups, ...beforeTurns } = table
-  if (tableVersion >= 2) return beforeTurns
+  const { turn, turnGroups, ...beforeTurns } = table
+  const turns = tableVersion >= TURN_TABLE_VERSION
   return {
+    ...(turn && turns ? { turn } : {}),
+    ...(turnGroups && turns ? { turnGroups } : {}),
     ...beforeTurns,
     players: Object.fromEntries(
-      Object.entries(table.players).map(([playerId, player]) => {
+      Object.entries(table.players).map(([playerId, { customCounters: _custom, ...player }]) => {
         const board = player.pokemon
-        if (!board) return [playerId, player]
+        if (!board || tableVersion >= 2) return [playerId, player]
         const { active, lastKnockout, ...rest } = board
         const pokemon: PokemonBoard = {
           ...rest,
@@ -699,7 +816,9 @@ export function tableActionIdentity(action: TableAction): string {
 }
 
 export function tableActionDelta(action: TableAction): number | undefined {
-  return action.kind === "counter.changed" || action.kind === "pokemon.damaged"
+  return action.kind === "counter.changed" ||
+    action.kind === "customCounter.changed" ||
+    action.kind === "pokemon.damaged"
     ? action.delta
     : undefined
 }

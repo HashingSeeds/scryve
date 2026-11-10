@@ -28,7 +28,7 @@ import {
 } from "./OutboxSyncController"
 import { ConnectedGameRepository } from "./persistence"
 import { SyncLatency } from "./syncLatency"
-import { EMPTY_TABLE } from "../../../convex/lib/table"
+import { EMPTY_TABLE, type TableAction } from "../../../convex/lib/table"
 
 interface ConnectedGameRuntimeBase extends TableRuntime {
   pending: PendingLifeAction[]
@@ -36,6 +36,7 @@ interface ConnectedGameRuntimeBase extends TableRuntime {
   connectionStatus: ConnectionStatus
   changeLife: (playerId: string, delta: LifeDelta) => void
   undoLife: (changes: readonly { operationId: string; playerId: string; delta: number }[]) => void
+  undoTable: (changes: readonly { operationId: string; action: TableAction }[]) => void
   submitCommanderDamage: (
     fromPlayerId: string,
     changes: readonly ConnectedCommanderDamageChange[],
@@ -206,6 +207,7 @@ export function useConnectedRuntime(
       finishing: snapshot.finishing,
       changeLife: controller.changeLife,
       undoLife: controller.undoLife,
+      undoTable: controller.undoTable,
       submitCommanderDamage: controller.submitCommanderDamage,
       resolveCommanderDamageClaim: controller.resolveCommanderDamage,
       finish: controller.finish,

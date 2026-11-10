@@ -1,5 +1,5 @@
 import { asPlayerId } from "@/features/game/domain"
-import { gameLog, withTurnDividers } from "@/features/game/LifeLog"
+import { counterLog, gameLog, withTurnDividers } from "@/features/game/LifeLog"
 
 import {
   connectedLogEvents,
@@ -66,6 +66,54 @@ const turnOf = (operationId: string, number: number, previous = true): Turn => (
 })
 
 describe("connected log", () => {
+  it("keeps a confirmed counter tap and a later unsent one apart when the device clock runs backward", () => {
+    const poison = {
+      kind: "counter.changed",
+      playerId: "ada",
+      counterId: "poison",
+      delta: 1,
+    } as const
+    const unsent = {
+      schemaVersion: 1,
+      event: {
+        type: "table.action",
+        operationId: "poison-unsent-11s",
+        gameId: GAME,
+        action: poison,
+        actorId: "me",
+        deviceId: "device-me",
+        clientCreatedAt: 11_000,
+      },
+      queuedAt: 11_000,
+      attempts: 0,
+    } as PendingLifeAction
+    const events = connectedLogEvents(
+      [
+        {
+          operationId: "poison-confirmed-60s",
+          playerId: "ada",
+          kind: "counter.changed",
+          delta: 1,
+          action: poison,
+          clientCreatedAt: 60_000,
+          mine: true,
+        },
+      ],
+      [unsent],
+      GAME,
+      true,
+    )
+    expect(
+      connectedLogUndo(events, players, GAME, undefined, {
+        turns: true,
+        table: { players: { ada: { counters: { poison: 2 } } } },
+      }),
+    ).toEqual({
+      kind: "counter",
+      changes: [{ operationId: "poison-unsent-11s", action: { ...poison, delta: -1 } }],
+    })
+  })
+
   it("keeps a confirmed change and a later unsent one apart when the device clock runs backward", () => {
     const events = connectedLogEvents(
       [life("confirmed-at-60s", "ada", -2, 60_000, { mine: true })],
@@ -282,6 +330,66 @@ describe("connected log", () => {
     ).toEqual([
       [1, "ada"],
       [2, "bo"],
+    ])
+  })
+
+  it("counts counter rows back from the table, hides an undone tap, and takes back this account's own", () => {
+    const poison = (operationId: string, delta: number, at: number, undoOf?: string) =>
+      ({
+        operationId,
+        playerId: "ada",
+        kind: "counter.changed",
+        delta,
+        clientCreatedAt: at,
+        action: { kind: "counter.changed", playerId: "ada", counterId: "poison", delta },
+        mine: true,
+        ...(undoOf ? { undoOf } : {}),
+      }) satisfies ConnectedLogEvent
+    const events = [
+      poison("op-poison-00001", 2, 1_000),
+      poison("op-poison-00002", 1, 10_000),
+      poison("op-poison-undo-1", -1, 11_000, "op-poison-00002"),
+    ]
+    const table = {
+      players: { ada: { counters: { poison: 2 } } },
+      counterKey: (playerId: string, counterId: string) => `${playerId}:${counterId}`,
+    }
+    expect(connectedLogInputs(events, GAME, undefined, table).counters).toMatchObject([
+      { operationId: "op-poison-00001", delta: 2, value: 2 },
+    ])
+    expect(connectedLogUndo(events, players, GAME, undefined, { turns: true, table })).toEqual({
+      kind: "counter",
+      changes: [
+        {
+          operationId: "op-poison-00001",
+          action: { kind: "counter.changed", playerId: "ada", counterId: "poison", delta: -2 },
+        },
+      ],
+    })
+  })
+
+  it("reads Speed and speed as one named counter, in a burst and in running values", () => {
+    const speed = (operationId: string, name: string, at: number) =>
+      ({
+        operationId,
+        playerId: "ada",
+        kind: "customCounter.changed",
+        delta: 1,
+        clientCreatedAt: at,
+        action: { kind: "customCounter.changed", playerId: "ada", name, delta: 1 },
+      }) satisfies ConnectedLogEvent
+    const events = [
+      speed("op-speed-000001", "speed", 1_000),
+      speed("op-speed-000002", "Speed", 2_000),
+      speed("op-speed-000003", "speed", 60_000),
+    ]
+    const table = { players: { ada: { customCounters: [{ name: "Speed", value: 3 }] } } }
+
+    const rows = counterLog(connectedLogInputs(events, GAME, undefined, table).counters)
+
+    expect(rows.map(({ delta, value, operationIds }) => ({ delta, value, operationIds }))).toEqual([
+      { delta: 1, value: 3, operationIds: ["op-speed-000003"] },
+      { delta: 2, value: 2, operationIds: ["op-speed-000002", "op-speed-000001"] },
     ])
   })
 })

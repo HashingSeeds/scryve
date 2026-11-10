@@ -1,5 +1,6 @@
 import {
   applyGameCommand,
+  applyLocalTableAction,
   asActorId,
   canUndo,
   hasLocalGameStarted,
@@ -637,5 +638,56 @@ describe("first chooser on a rematch", () => {
     expect(restarted.firstPlayerOffered).toBeUndefined()
     expect(restarted.firstPlayerId).toBeUndefined()
     expect(restarted.match).toEqual(next.match)
+  })
+})
+
+describe("counter log", () => {
+  const at = { operationId: "operation-counter-0001", now: 500 }
+
+  it("records each counter change a local game accepts, including ones a player named", () => {
+    const base = createLocalGame({
+      gameId: asGameId("game"),
+      now: 1,
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+    })
+    const [ada] = base.players
+    const poisoned = applyLocalTableAction(
+      base,
+      { kind: "counter.changed", playerId: ada.id, counterId: "poison", delta: 2 },
+      at,
+    )
+    const sped = applyLocalTableAction(
+      poisoned,
+      { kind: "customCounter.changed", playerId: ada.id, name: "speed", delta: 1 },
+      { ...at, operationId: "operation-counter-0002", now: 600 },
+    )
+    const capped = applyLocalTableAction(
+      sped,
+      { kind: "counter.changed", playerId: ada.id, counterId: "poison", delta: -5 },
+      { ...at, operationId: "operation-counter-0003", now: 700 },
+    )
+    expect(capped.counterLog).toEqual([
+      expect.objectContaining({ counterId: "poison", delta: 2, value: 2, at: 500 }),
+      expect.objectContaining({ counterId: "custom:speed", delta: 1, value: 1, at: 600 }),
+      expect.objectContaining({ counterId: "poison", delta: -2, value: 0, at: 700 }),
+    ])
+  })
+
+  it("lets a game with no system keep counters a player names", () => {
+    const game = makeGame()
+    const named = applyLocalTableAction(
+      game,
+      { kind: "customCounter.changed", playerId: game.players[0].id, name: "Rad", delta: 3 },
+      at,
+    )
+    expect(named.table?.players[game.players[0].id].customCounters).toEqual([
+      { name: "Rad", value: 3 },
+    ])
   })
 })
