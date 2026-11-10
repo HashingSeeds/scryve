@@ -64,6 +64,36 @@ test("cli defaults follow the format and reject seats that cannot exist", () => 
   assert.throws(() => parseCli(["host", "--life-every", "fast"]), /duration/)
 })
 
+test("a host bot abandons its leftover game of any variant before hosting again", async () => {
+  const calls = []
+  const bot = Object.create(Bot.prototype)
+  Object.assign(bot, {
+    name: "Bot 1",
+    deviceId: "device-bot-0001",
+    options: { players: 4, system: "mtg", format: "limited", variant: "twoHeadedGiant", life: 30 },
+    report: () => {},
+    watch: () => {},
+    client: {
+      query: async (fn, args) => ({
+        page: args.variants?.includes("twoHeadedGiant")
+          ? [{ isHost: true, publicId: "leftover-2hg-game" }]
+          : [],
+      }),
+      mutation: async (fn, args) => {
+        calls.push([getFunctionName(fn), args])
+        return { publicId: "new-game" }
+      },
+    },
+  })
+
+  await bot.host()
+
+  assert.deepEqual(
+    calls.filter(([name]) => name === "games:abandonGame").map(([, args]) => args),
+    [{ publicId: "leftover-2hg-game" }],
+  )
+})
+
 test("bots host and join as apps that edit any seat, so the table stays anyone-edit", async () => {
   const sent = new Map()
   const bot = Object.assign(Object.create(Bot.prototype), botIdentity(1), {

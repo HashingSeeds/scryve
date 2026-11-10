@@ -539,6 +539,7 @@ export default {
     close: "ログを閉じる",
     empty: "まだ変更はありません",
     commanderFrom: "{{name}}の統率者から",
+    by: "{{name}}による",
     row: "{{name}} {{delta}}(ライフ{{life}})",
     commanderRow: "{{name}} {{delta}}({{from}}の統率者から、ライフ{{life}})",
     counterRow: "{{name}} {{counter}} {{delta}} → {{value}}",

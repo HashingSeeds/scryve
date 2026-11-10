@@ -34,8 +34,7 @@ function publishableGame() {
   })
 }
 
-function renderSource(onPublished: jest.Mock) {
-  const game = publishableGame()
+function renderSource(onPublished: jest.Mock, game = publishableGame()) {
   let feed!: LocalConnectFeed
   render(
     <LocalGamePublishSource game={game} onPublished={onPublished}>
@@ -58,6 +57,19 @@ describe("LocalGamePublishSource", () => {
     jest.clearAllMocks()
     mockCreateLobbyIdentifiers.mockResolvedValue(identifiers)
     mockPublish.mockResolvedValue({ publicId: identifiers.publicId, manualCode: "ABC234" })
+  })
+
+  it("keeps a running Two-Headed Giant game local and says why", async () => {
+    const onPublished = jest.fn()
+    const source = renderSource(onPublished, { ...publishableGame(), variant: "twoHeadedGiant" })
+    expect(source.feed.error).toBe(
+      "Two-Headed Giant games can't be connected yet. Start a new one to play on devices.",
+    )
+    await act(async () => {
+      source.publish()
+    })
+    expect(mockPublish).not.toHaveBeenCalled()
+    expect(onPublished).not.toHaveBeenCalled()
   })
 
   it("retries with fresh identifiers after a failed generation", async () => {

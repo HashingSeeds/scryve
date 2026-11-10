@@ -41,7 +41,9 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
+import type { GameVariant } from "./treachery"
 import { isTurnAction, nextTurnSeat, startedByChange, type Turn } from "./turns"
+import { teammatesOf, teamTableRules, TWO_HEADED_GIANT } from "./twoHeadedGiant"
 import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
@@ -78,6 +80,7 @@ export const engineGameOf = (
     | "lifeEditing"
     | "turn"
     | "turnGroups"
+    | "variant"
   >,
 ): EngineGame => ({
   status: game.status,
@@ -87,6 +90,7 @@ export const engineGameOf = (
   ...(game.lifeEditing ? { lifeEditing: game.lifeEditing } : {}),
   ...(game.turn ? { turn: game.turn } : {}),
   ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+  ...(game.variant ? { variant: game.variant } : {}),
 })
 
 export interface EngineGame {
@@ -97,6 +101,7 @@ export interface EngineGame {
   lifeEditing?: LifeEditing
   turn?: Turn
   turnGroups?: TableState["turnGroups"]
+  variant?: GameVariant
 }
 
 export interface EngineSeat extends SeatOwner, PlayerTable {
@@ -361,10 +366,11 @@ export function* writeGame(
     deviceId: actor.deviceId,
     ...(isTapTime(write.tappedAt) ? { tappedAt: write.tappedAt } : {}),
   })
-  const stamped =
+  const turned =
     write.kind === "table" && isTurnAction(write.action)
       ? lastWrite
       : withTurnStarted(lastWrite, now)
+  const stamped = yield* withSharedTeam(turned)
   if (write.kind === "life") return yield* writeLife(stamped, actor, write, now)
   if (write.kind === "table") return yield* writeTable(stamped, actor, write, now)
   if (write.kind === "commander.claim") return yield* writeClaim(stamped, actor, write, now)
@@ -639,9 +645,12 @@ function* passOrder(store: GameStore): GameSteps<(from: string) => string | unde
   const seats = yield* read(store.seats())
   const totals = yield* read(store.commanderTotals())
   const { game } = store
+  const rules = tableRules(game.system, game.format)
+  const twoHeadedGiant = game.variant === TWO_HEADED_GIANT
   const state: OutState = {
+    ...(twoHeadedGiant ? { sharedFate: true as const } : {}),
     counter: systemDefinition(game.system)?.counter,
-    tableRules: tableRules(game.system, game.format),
+    tableRules: twoHeadedGiant ? teamTableRules(rules) : rules,
     table: {
       designations: game.designations,
       players: Object.fromEntries(seats.map((seat) => [seat.id, seatTable(seat)])),
@@ -696,6 +705,69 @@ function* writeTable(
   if (isEngineError(outcome)) return failed(outcome)
   yield* read(store.apply(outcome.changes))
   return acknowledged({ operationId, deduplicated: false })
+}
+
+/** why: older projections read a life per seat, so a team's shared life and poison are written to both heads. */
+function* withSharedTeam(store: GameStore): GameSteps<GameStore> {
+  const teams = store.game.variant === TWO_HEADED_GIANT ? store.game.turnGroups : undefined
+  if (!teams) return store
+  const seats = new Map<string, EngineSeat>()
+  for (const id of teams.flat()) {
+    const seat = yield* read(store.seat(id))
+    if (seat) seats.set(id, seat)
+  }
+  const shared = teamTableRules(tableRules(store.game.system, store.game.format))
+    .counters.filter((counter) => counter.shared)
+    .map(({ id }) => id)
+  return {
+    ...store,
+    apply: (changes) => store.apply(withTeammates(changes, teams, seats, shared)),
+  }
+}
+
+export function withTeammates(
+  changes: readonly GameChange[],
+  teams: readonly (readonly string[])[],
+  seats: ReadonlyMap<string, EngineSeat>,
+  shared: readonly string[],
+): GameChange[] {
+  const patches = new Map<string, SeatPatch>()
+  for (const change of changes)
+    if (change.kind === "seat.patch") patches.set(change.seatId, change.patch)
+  const mirrored = new Map<string, SeatPatch>()
+  for (const [seatId, patch] of patches) {
+    const counters = shared.filter((id) => patch.counters?.[id] !== undefined)
+    if (patch.currentLife === undefined && counters.length === 0) continue
+    for (const mateId of teammatesOf(teams, seatId)) {
+      const mate = seats.get(mateId)
+      if (!mate) continue
+      const own = patches.get(mateId)
+      const before = mirrored.get(mateId) ?? {}
+      const baseCounters = before.counters ?? own?.counters ?? mate.counters
+      mirrored.set(mateId, {
+        ...before,
+        ...(patch.currentLife === undefined ? {} : { currentLife: patch.currentLife }),
+        ...(counters.length === 0
+          ? {}
+          : {
+              counters: {
+                ...baseCounters,
+                ...Object.fromEntries(counters.map((id) => [id, patch.counters?.[id] ?? 0])),
+              },
+            }),
+        ...(patch.lastEventAt === undefined ? {} : { lastEventAt: patch.lastEventAt }),
+      })
+    }
+  }
+  if (mirrored.size === 0) return [...changes]
+  const merged = changes.map((change) =>
+    change.kind === "seat.patch" && mirrored.has(change.seatId)
+      ? { ...change, patch: { ...change.patch, ...mirrored.get(change.seatId) } }
+      : change,
+  )
+  for (const [seatId, patch] of mirrored)
+    if (!patches.has(seatId)) merged.push({ kind: "seat.patch", seatId, patch })
+  return merged
 }
 
 /** why: the first turn's clock starts on the table's first change from any seat or write, on the authority, so every device and every older client agrees. */

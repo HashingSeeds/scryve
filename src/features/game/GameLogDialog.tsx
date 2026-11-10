@@ -30,6 +30,7 @@ export function GameLogDialog({
   events,
   turns,
   groups,
+  sharedLife = false,
   counters,
   canUndo,
   undoLabel = translate("board:log.undoLast"),
@@ -43,6 +44,7 @@ export function GameLogDialog({
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
+  sharedLife?: boolean
   counters?: readonly CounterLogEntry[]
   canUndo: boolean
   undoLabel?: string
@@ -59,11 +61,15 @@ export function GameLogDialog({
   const rows = useMemo(
     () =>
       withTurnDividers(
-        mergedLog(gameLog(players, events), counterLog(counters ?? []), positionOf),
+        mergedLog(
+          gameLog(players, events, sharedLife ? groups : undefined),
+          counterLog(counters ?? []),
+          positionOf,
+        ),
         turns ?? [],
         positionOf,
       ),
-    [players, events, turns, counters, positionOf],
+    [players, events, turns, groups, sharedLife, counters, positionOf],
   )
   const shownRows = useRef<number | undefined>(undefined)
   const readOn = useEffectEvent(() => {
@@ -162,7 +168,8 @@ export function GameLogDialog({
     }
     const seat = seats.get(item.playerId)
     const source = item.fromPlayerId ? seats.get(item.fromPlayerId) : undefined
-    const name = seat?.name ?? ""
+    const name = (sharedLife ? teamName(players, groups, item.playerId) : seat?.name) ?? ""
+    const head = sharedLife && !source ? seat : undefined
     const delta = signed(item.delta)
     const when = relativeTime(item.at, openedAt)
     return (
@@ -217,6 +224,13 @@ export function GameLogDialog({
                   style={[$shrink, { color: colors.textDim }]}
                 />
               </>
+            ) : head ? (
+              <Text
+                text={`${translate("board:log.by", { name: head.name })} ·`}
+                size="xxs"
+                numberOfLines={1}
+                style={[$shrink, { color: colors.textDim }]}
+              />
             ) : null}
             <Text text={when} size="xxs" numberOfLines={1} style={{ color: colors.textDim }} />
           </View>

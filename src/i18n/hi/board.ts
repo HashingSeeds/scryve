@@ -562,6 +562,7 @@ export default {
     close: "लॉग बंद करें",
     empty: "अभी तक कोई बदलाव नहीं",
     commanderFrom: "{{name}} के कमांडर से",
+    by: "{{name}} द्वारा",
     row: "{{name}} {{delta}} से {{life}}",
     commanderRow: "{{name}} {{delta}}, {{from}} के कमांडर से, कुल {{life}}",
     counterRow: "{{name}} {{counter}} {{delta}}, अब {{value}}",

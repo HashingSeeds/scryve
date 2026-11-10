@@ -5,6 +5,7 @@ import type { Service } from "react-native-zeroconf"
 
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
+import { PLAYABLE_VARIANTS } from "@/features/connected/playableVariants"
 import {
   SyncLatency,
   type PeerLatency,
@@ -42,6 +43,7 @@ import {
   setLanDeck,
   setLanPlayerCount,
   startLanRound,
+  swapLanSeats,
   type LanGame,
   type LanGuestMessage,
   type LanHostMessage,
@@ -592,7 +594,7 @@ export class LanSession {
       protocol: LAN_PROTOCOL,
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
-      variants: ["treachery"],
+      variants: PLAYABLE_VARIANTS,
       editsAnySeat: true,
       tableVersion: TABLE_VERSION,
       maxSeats: LAN_MAX_SEATS,
@@ -704,6 +706,13 @@ export class LanSession {
     const game = this.game
     if (this.state.role !== "host" || !game) return
     const next = setLanPlayerCount(game, playerCount)
+    if (next !== game) this.publish(next)
+  }
+
+  swapSeats = (first: number, second: number) => {
+    const game = this.game
+    if (this.state.role !== "host" || !game) return
+    const next = swapLanSeats(game, first, second)
     if (next !== game) this.publish(next)
   }
 

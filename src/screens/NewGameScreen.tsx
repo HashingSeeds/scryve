@@ -22,6 +22,7 @@ import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
 import { Sheet } from "@/components/Sheet"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
+import { TeamPicker } from "@/components/TeamPicker"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
@@ -42,6 +43,7 @@ import {
   MAX_PLAYER_NAME_LENGTH,
   MAX_PLAYERS,
   meSeatOf,
+  teamSeats,
   PLAYER_COLORS,
   validatePlayerNames,
   validateStartingLife,
@@ -120,6 +122,13 @@ import {
   systemDefinition,
 } from "../../convex/lib/systems"
 import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
+import {
+  defaultTeamLife,
+  isTwoHeadedGiantPlayerCount,
+  isValidTeams,
+  pairedTeams,
+  teamLifePresets,
+} from "../../convex/lib/twoHeadedGiant"
 
 export type NewGameMode = "local" | "connected"
 
@@ -201,12 +210,14 @@ const NEW_GAME_FIELDS = [
   "playerCount",
   "layout",
   "treacheryChosen",
+  "teamsChosen",
+  "teams",
   "matchOn",
   "chosenBestOf",
   "clockMode",
   "chosenClockMinutes",
 ] as const
-const TREACHERY_MIN_SEATS = 4
+const VARIANT_MIN_SEATS = 4
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 const CLOCK_MODES = [
   { id: "off", labelTx: "play:newGame.clockOff" },
@@ -323,10 +334,27 @@ function NewGameForm({
     seed?.startingLife ?? defaults.defaultStartingLife,
   )
   const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
+  const [teamsChosen, setTeamsChosen] = useState(
+    lobby?.variant === "twoHeadedGiant" || seedGame?.variant === "twoHeadedGiant",
+  )
+  const [teamDraft, setTeamDraft] = useState<readonly (readonly number[])[]>(() =>
+    seedGame ? teamSeats(seedGame) : [],
+  )
   const [lifeStep, setLifeStep] = useState(
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
-  const lifeOptions = lifePresets(system, format)
+  const teamsAvailable = Boolean(systemDefinition(system)?.variants.includes("twoHeadedGiant"))
+  const twoHeadedGiant = teamsAvailable && teamsChosen
+  const seatIndexes = Array.from({ length: playerCount }, (_, index) => index)
+  const teams = !twoHeadedGiant
+    ? undefined
+    : isValidTeams(
+          teamDraft.map((team) => team.map(String)),
+          new Set(seatIndexes.map(String)),
+        )
+      ? teamDraft
+      : pairedTeams(seatIndexes)
+  const lifeOptions = twoHeadedGiant ? teamLifePresets(format) : lifePresets(system, format)
   const claimedGame = replaying ? undefined : initialGame
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
     claimedGame && (claimedGame.account || hasLocalGameStarted(claimedGame))
@@ -386,6 +414,11 @@ function NewGameForm({
   const treacheryAvailable =
     connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
+  const variant = treachery
+    ? ("treachery" as const)
+    : twoHeadedGiant
+      ? ("twoHeadedGiant" as const)
+      : undefined
   const draft = {
     system,
     format,
@@ -395,6 +428,8 @@ function NewGameForm({
     chosenLayout,
     layout,
     treacheryChosen,
+    teamsChosen,
+    teams,
     deck,
     matchOn,
     chosenBestOf,
@@ -441,12 +476,13 @@ function NewGameForm({
       : clockMode === "countdown"
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
-  const selectedTypeId = gameTypeId(system, format, treachery)
+  const selectedTypeId = gameTypeId(system, format, variant)
   const gameSetup = {
     layout,
     lifeStep,
     ...(system && format ? { system, format } : {}),
-    ...(treachery ? { variant: "treachery" as const } : {}),
+    ...(variant ? { variant } : {}),
+    ...(teams && !connectedMode ? { teams } : {}),
   }
   const gameTabs = useMemo(
     () =>
@@ -723,14 +759,25 @@ function NewGameForm({
 
   function chooseGameType(type: GameType) {
     const nextTreachery = type.variant === "treachery"
+    const nextTeams = type.variant === "twoHeadedGiant"
     const nextCount =
-      nextTreachery && !isTreacheryPlayerCount(playerCount) ? TREACHERY_MIN_SEATS : playerCount
+      (nextTreachery && !isTreacheryPlayerCount(playerCount)) ||
+      (nextTeams && !isTwoHeadedGiantPlayerCount(playerCount))
+        ? VARIANT_MIN_SEATS
+        : playerCount
+    const defaultLife = nextTeams
+      ? defaultTeamLife(type.format)
+      : defaultStartingLife(type.system, type.format, nextCount)
     if (type.system !== system) {
       setSystem(type.system)
-      setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
+      setStartingLife(defaultLife)
       setLifeStep(playSystemRules(type.system).counter.tapStep)
-    } else if (startingLife === defaultStartingLife(system, format, playerCount))
-      setStartingLife(defaultStartingLife(type.system, type.format, nextCount))
+    } else if (
+      twoHeadedGiant !== nextTeams ||
+      startingLife === defaultStartingLife(system, format, playerCount) ||
+      (twoHeadedGiant && startingLife === defaultTeamLife(format))
+    )
+      setStartingLife(defaultLife)
     if (type.system !== system || type.format !== format) {
       pinningRef.current = undefined
       setPinning(false)
@@ -738,6 +785,7 @@ function NewGameForm({
       setDeck(undefined)
     }
     setTreacheryChosen(nextTreachery)
+    setTeamsChosen(nextTeams)
     setFormatPicked(true)
     if (nextCount !== playerCount) resizeSeats(nextCount)
   }
@@ -834,7 +882,7 @@ function NewGameForm({
 
   function choosePlayerCount(value: number) {
     if (!isTreacheryPlayerCount(value)) setTreacheryChosen(false)
-    if (startingLife === defaultStartingLife(system, format, playerCount))
+    if (!twoHeadedGiant && startingLife === defaultStartingLife(system, format, playerCount))
       setStartingLife(defaultStartingLife(system, format, value))
     resizeSeats(value)
   }
@@ -943,9 +991,7 @@ function NewGameForm({
             detail={(type) =>
               gameTypeDetail(
                 type,
-                type.variant === "treachery"
-                  ? Math.max(playerCount, TREACHERY_MIN_SEATS)
-                  : playerCount,
+                type.variant ? Math.max(playerCount, VARIANT_MIN_SEATS) : playerCount,
               )
             }
             onChoose={pickGameType}
@@ -963,9 +1009,15 @@ function NewGameForm({
                     : translate("play:newGame.players")
                 }
                 options={PLAYER_COUNTS}
-                more={treachery ? undefined : MORE_PLAYER_COUNTS}
+                more={treachery || twoHeadedGiant ? undefined : MORE_PLAYER_COUNTS}
                 value={playerCount}
-                isDisabled={treachery ? (count) => !isTreacheryPlayerCount(count) : undefined}
+                isDisabled={
+                  treachery
+                    ? (count) => !isTreacheryPlayerCount(count)
+                    : twoHeadedGiant
+                      ? (count) => !isTwoHeadedGiantPlayerCount(count)
+                      : undefined
+                }
                 onSelect={(value) => {
                   choosePlayerCount(value)
                   setEdited(true)
@@ -974,7 +1026,9 @@ function NewGameForm({
               {lifeOptions.length > 0 ? (
                 <OptionGrid
                   testID="starting-counter"
-                  label={counterHeading(system)}
+                  label={
+                    twoHeadedGiant ? translate("play:newGame.teamLife") : counterHeading(system)
+                  }
                   options={lifeOptions}
                   value={startingLife}
                   custom={startingValueRange(system)}
@@ -1075,6 +1129,22 @@ function NewGameForm({
                   </View>
                 ))}
               </View>
+              {teams ? (
+                <TeamPicker
+                  players={players}
+                  teams={teams}
+                  onSwap={(first, second) => {
+                    setTeamDraft(
+                      teams.map((team) =>
+                        team.map((seat) =>
+                          seat === first ? second : seat === second ? first : seat,
+                        ),
+                      ),
+                    )
+                    setEdited(true)
+                  }}
+                />
+              ) : null}
               {account ? (
                 <View style={themed($accountSeat)}>
                   <SelectField

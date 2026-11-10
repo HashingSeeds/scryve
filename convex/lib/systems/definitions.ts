@@ -108,6 +108,7 @@ export type TableCounterDefinition = {
   readonly max: number
   readonly losesAt?: number
   readonly commandZoneOnly?: boolean
+  readonly shared?: boolean
 }
 
 export type DesignationDefinition = { readonly id: string; readonly label: string }
@@ -311,7 +312,7 @@ export const SYSTEMS = {
       ],
       customCounters: true,
     },
-    variants: ["treachery"],
+    variants: ["treachery", "twoHeadedGiant"],
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },
     deckAnalysis: true,

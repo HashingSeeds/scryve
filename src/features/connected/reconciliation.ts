@@ -10,6 +10,8 @@ import type {
 import { compareQueued } from "./model"
 import { PERMANENT_GAME_WRITE_CODES } from "../../../convex/lib/gameWriteErrors"
 import { applyTableAction, EMPTY_TABLE } from "../../../convex/lib/table"
+import { turnGroupOf } from "../../../convex/lib/turns"
+import { teamTableRules, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export function mergeConfirmedProjection(
   current: ConnectedProjection | null,
@@ -38,10 +40,13 @@ export function overlayPendingDeltas(
   }
   const confirmedOperations = new Set(confirmed.recentOperationIds)
   const deltas = new Map<string, number>()
-  const addDelta = (playerId: string, delta: number) =>
-    deltas.set(playerId, (deltas.get(playerId) ?? 0) + delta)
-  const rules = playTableRules(confirmed.system, confirmed.format)
   let table = confirmed.table ?? EMPTY_TABLE
+  const teams = confirmed.variant === TWO_HEADED_GIANT ? table.turnGroups : undefined
+  const addDelta = (playerId: string, delta: number) => {
+    for (const id of turnGroupOf(teams, playerId)) deltas.set(id, (deltas.get(id) ?? 0) + delta)
+  }
+  const seatRules = playTableRules(confirmed.system, confirmed.format)
+  const rules = teams ? teamTableRules(seatRules) : seatRules
   const resolvingClaims = new Set<string>()
   const commanderHits: {
     fromPlayerId: string

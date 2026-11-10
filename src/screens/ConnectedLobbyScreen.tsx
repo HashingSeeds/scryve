@@ -106,6 +106,7 @@ function ConnectedLobbyContent({
   })
   const isWebSocketConnected = useConvexOnline()
   const updateSettings = useMutation(api.games.updateLobbySettings)
+  const swapSeats = useMutation(api.games.swapLobbySeats)
   const [savingSettings, setSavingSettings] = useState(false)
   const settingsInFlight = useRef(false)
   const start = useMutation(api.games.startGame)
@@ -211,14 +212,17 @@ function ConnectedLobbyContent({
   }
 
   async function changeSettings(
-    settings: Omit<FunctionArgs<typeof api.games.updateLobbySettings>, "publicId">,
+    settings:
+      | Omit<FunctionArgs<typeof api.games.updateLobbySettings>, "publicId">
+      | { swap: Omit<FunctionArgs<typeof api.games.swapLobbySeats>, "publicId"> },
   ) {
     if (settingsInFlight.current || startInFlight.current || !isWebSocketConnected) return
     settingsInFlight.current = true
     setSavingSettings(true)
     try {
       setActionError(undefined)
-      await updateSettings({ publicId, ...settings })
+      if ("swap" in settings) await swapSeats({ publicId, ...settings.swap })
+      else await updateSettings({ publicId, ...settings })
     } catch (cause) {
       setActionError(convexErrorMessage(cause, translate("connected:lobby.errors.updateSettings")))
     } finally {
@@ -348,6 +352,11 @@ function ConnectedLobbyContent({
       onBack={onBack}
       onChangePlayerCount={(playerCount) => void changeSettings({ playerCount })}
       onChangeDeckRequired={(deckRequired) => void changeSettings({ deckRequired })}
+      onSwapSeats={
+        lobby.isHost && lobby.variant === "twoHeadedGiant"
+          ? (first, second) => void changeSettings({ swap: { first, second } })
+          : undefined
+      }
       invite={{
         qrPayload: inviteQrPayload,
         manualCode,

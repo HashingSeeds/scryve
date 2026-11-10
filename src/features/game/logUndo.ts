@@ -1,4 +1,10 @@
-import { applyGameCommand, asOperationId, localLogPositions, localTableRules } from "./domain"
+import {
+  applyGameCommand,
+  asOperationId,
+  localLogPositions,
+  localTableRules,
+  localTeams,
+} from "./domain"
 import { counterLog, gameLog, mergedLog, rowPosition } from "./LifeLog"
 import type { CommandContext, LocalGame } from "./types"
 import {
@@ -63,12 +69,14 @@ export function undoLogRow(
         }
       : { kind: "customCounter.changed", playerId: undo.playerId, name, delta: -undo.delta }
   const table = game.table ?? EMPTY_TABLE
-  const change = applyTableAction(table, action, {
+  const teams = localTeams(game)
+  const change = applyTableAction(teams ? { ...table, turnGroups: teams } : table, action, {
     rules: localTableRules(game),
     operationId: context.operationId(),
     lifeOf: (playerId) => game.players.find(({ id }) => id === playerId)?.life,
   })
   if (!change) return game
+  const { turnGroups: _groups, ...changed } = change.table
   const undone = new Set(undo.operationIds)
   const counterLogLeft = (game.counterLog ?? []).filter(
     ({ operationId }) => !undone.has(operationId),
@@ -76,7 +84,7 @@ export function undoLogRow(
   const { counterLog: _log, ...rest } = game
   return {
     ...rest,
-    table: change.table,
+    table: changed,
     ...(counterLogLeft.length > 0 ? { counterLog: counterLogLeft } : {}),
     updatedAt: Math.max(game.updatedAt, context.now()),
   }

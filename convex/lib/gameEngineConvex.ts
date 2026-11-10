@@ -211,7 +211,12 @@ export async function writeCloudGame(
           .query("gameCommanderDamage")
           .withIndex("by_game", (q) => q.eq("gameId", game._id))
           .take(MAX_PLAYERS * (MAX_PLAYERS - 1) * 2)
-      ).map(({ fromPlayerId, toPlayerId, total }) => ({ fromPlayerId, toPlayerId, total })),
+      ).map(({ fromPlayerId, toPlayerId, commander, total }) => ({
+        fromPlayerId,
+        toPlayerId,
+        ...commanderField(commander),
+        total,
+      })),
     isMember: async () => {
       const seat =
         seatsRead.find((row) => row.userId === user._id) ??

@@ -8,6 +8,7 @@ import {
   isValidTurnGroups,
   remapTurn,
   turnActionValidators,
+  turnGroupOf,
   turnGroupsValidator,
   turnValidator,
 } from "./turns"
@@ -465,12 +466,17 @@ export function applyTableAction(
     const current = counterValue(table, action.playerId, counter.id)
     const next = Math.max(0, Math.min(counter.max, current + action.delta))
     if (next === current) return unchanged
-    const player = playerTableOf(table, action.playerId)
+    const seats = counter.shared
+      ? turnGroupOf(table.turnGroups, action.playerId)
+      : [action.playerId]
     return {
-      table: withPlayer(table, action.playerId, {
-        ...player,
-        counters: { ...player.counters, [counter.id]: next },
-      }),
+      table: seats.reduce((after, playerId) => {
+        const player = playerTableOf(after, playerId)
+        return withPlayer(after, playerId, {
+          ...player,
+          counters: { ...player.counters, [counter.id]: next },
+        })
+      }, table),
       life: [],
     }
   }

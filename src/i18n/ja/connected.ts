@@ -201,6 +201,8 @@ export default {
   },
   publish: {
     failed: "このゲームを接続できませんでした。",
+    twoHeadedGiant:
+      "双頭の巨人のゲームはまだ接続できません。端末で遊ぶには新しいゲームを始めてください。",
   },
   invite: {
     label: "招待",

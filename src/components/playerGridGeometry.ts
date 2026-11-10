@@ -349,7 +349,7 @@ export function getCornerCutout(
   return edge && { edge, size: insets[edge] }
 }
 
-function seatCutout(
+export function seatCutout(
   cutout: ReturnType<typeof getCornerCutout>,
   rotation: LifeCardContentRotation,
   screenEdges: Record<LifeCardEdge, boolean>,

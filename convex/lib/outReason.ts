@@ -10,6 +10,7 @@ export type OutReason<Id extends string = string> =
 export interface CommanderTotal<Id extends string = string> {
   readonly fromPlayerId: Id
   readonly toPlayerId: Id
+  readonly commander?: number
   readonly total: number
 }
 
@@ -23,6 +24,7 @@ export interface OutState<Id extends string = string> {
     readonly totals: readonly CommanderTotal<Id>[]
   }
   readonly groups?: TurnGroups
+  readonly sharedFate?: true
 }
 
 export function commanderOutState<Id extends string>(
@@ -33,6 +35,38 @@ export function commanderOutState<Id extends string>(
 }
 
 export function outReason<Id extends string>(
+  state: OutState<Id>,
+  playerId: Id,
+): OutReason<Id> | undefined {
+  if (!state.sharedFate) return seatOutReason(state, playerId)
+  const team = turnGroupOf(state.groups, playerId) as readonly Id[]
+  const lethal = teamCommanderLethal(state, team)
+  if (lethal) return lethal
+  const seats = { ...state, commanderDamage: undefined }
+  for (const seat of team) {
+    const reason = seatOutReason(seats, seat)
+    if (reason) return reason
+  }
+  return undefined
+}
+
+function teamCommanderLethal<Id extends string>(
+  { commanderDamage }: OutState<Id>,
+  team: readonly Id[],
+): OutReason<Id> | undefined {
+  if (!commanderDamage) return undefined
+  const sums = new Map<string, { fromPlayerId: Id; total: number }>()
+  for (const { fromPlayerId, toPlayerId, commander, total } of commanderDamage.totals) {
+    if (!team.includes(toPlayerId) || team.includes(fromPlayerId)) continue
+    const key = `${fromPlayerId}#${commander ?? 0}`
+    sums.set(key, { fromPlayerId, total: (sums.get(key)?.total ?? 0) + total })
+  }
+  for (const { fromPlayerId, total } of sums.values())
+    if (total >= commanderDamage.lethal) return { cause: "commanderDamage", fromPlayerId, total }
+  return undefined
+}
+
+function seatOutReason<Id extends string>(
   state: OutState<Id>,
   playerId: Id,
 ): OutReason<Id> | undefined {

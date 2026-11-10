@@ -10,6 +10,7 @@ import {
 } from "./playSystems"
 import { isSystemVisible, VISIBLE_SYSTEM_IDS } from "./systemVisibility"
 import type { GameVariant } from "../../../convex/lib/treachery"
+import { defaultTeamLife } from "../../../convex/lib/twoHeadedGiant"
 
 export interface GameType {
   id: string
@@ -21,6 +22,8 @@ export interface GameType {
 const FEATURED: readonly GameType[] = [
   { id: "commander", system: "mtg", format: "commander" },
   { id: "treachery", system: "mtg", format: "commander", variant: "treachery" },
+  { id: "2hg", system: "mtg", format: "limited", variant: "twoHeadedGiant" },
+  { id: "2hg-commander", system: "mtg", format: "commander", variant: "twoHeadedGiant" },
   { id: "mtg-standard", system: "mtg", format: "standard" },
   { id: "ygo-advanced", system: "ygo", format: "advanced" },
   { id: "pokemon-standard", system: "pokemon", format: "standard" },
@@ -46,9 +49,14 @@ export const MORE_GAME_TYPES: readonly GameType[] = VISIBLE_SYSTEM_IDS.flatMap((
     .map(({ id }) => ({ id: `${system}-${id}`, system, format: id })),
 )
 
-export function gameTypeId(system: PlaySystemId | undefined, format?: string, treachery = false) {
+export function gameTypeId(
+  system: PlaySystemId | undefined,
+  format?: string,
+  variant?: GameVariant,
+) {
   if (!system || !format) return "none"
-  if (treachery) return "treachery"
+  if (variant === "treachery") return "treachery"
+  if (variant === "twoHeadedGiant") return format === "commander" ? "2hg-commander" : "2hg"
   return featuredFormat(system, format)?.id ?? `${system}-${format}`
 }
 
@@ -77,8 +85,7 @@ export function newGameTypes({
   const offered = [...FEATURED_GAME_TYPES, ...MORE_GAME_TYPES].filter(
     (type) => connected || type.variant !== "treachery",
   )
-  const recentId =
-    recent && gameTypeId(recent.system, recent.format, recent.variant === "treachery")
+  const recentId = recent && gameTypeId(recent.system, recent.format, recent.variant)
   const candidates = offered.filter((type) => type.id !== recentId)
   const chosenId = chosen && gameTypeId(chosen.system, chosen.format)
   const played = [chosen?.system, recent?.system]
@@ -118,7 +125,7 @@ export function newGameTabs({
     (type) => connected || type.variant !== "treachery",
   )
   const playedIds = [...recent, ...(chosen ? [chosen] : [])].map((played) =>
-    gameTypeId(played.system, played.format, played.variant === "treachery"),
+    gameTypeId(played.system, played.format, played.variant),
   )
   const systems = [
     ...new Set([chosen?.system, ...recent.map((played) => played.system), ...VISIBLE_SYSTEM_IDS]),
@@ -135,11 +142,22 @@ export function newGameTabs({
 
 export function gameTypeLabel(type: GameType) {
   if (type.variant === "treachery") return translate("connected:treachery.name")
+  if (type.variant === "twoHeadedGiant")
+    return translate(
+      type.format === "commander"
+        ? "play:newGame.twoHeadedGiantCommander"
+        : "play:newGame.twoHeadedGiant",
+    )
   if (!type.system) return translate("systems:noSystem")
   return playFormatLabel(type.system, type.format)
 }
 
 export function gameTypeDetail(type: GameType, seats: number) {
-  const life = counterValueLabel(type.system, defaultStartingLife(type.system, type.format, seats))
+  const life = counterValueLabel(
+    type.system,
+    type.variant === "twoHeadedGiant"
+      ? defaultTeamLife(type.format)
+      : defaultStartingLife(type.system, type.format, seats),
+  )
   return type.system ? `${playSystemShortLabel(type.system)} · ${life}` : life
 }

@@ -60,6 +60,7 @@ import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { parseTableState } from "../../../convex/lib/table"
 import { isValidTurn, isValidTurnGroups } from "../../../convex/lib/turns"
+import { isValidTeams, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -106,6 +107,7 @@ export interface LocalSettings {
   askWhatYouPlay?: true
   syncStats?: boolean
   turnTab?: true
+  teamBinding?: "frame"
   chessMinutes?: ChessBankMinutes
 }
 
@@ -478,6 +480,10 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const turn = isValidTurn(value.turn, playerIds) ? value.turn : undefined
   const turnLog = turn ? parseTurnLog(value.turnLog, playerIds) : undefined
   const turnGroups = isValidTurnGroups(value.turnGroups, playerIds) ? value.turnGroups : undefined
+  const teams =
+    value.variant === TWO_HEADED_GIANT && isValidTeams(turnGroups, playerIds)
+      ? turnGroups
+      : undefined
   const counterLog = parseCounterLog(value.counterLog, playerIds)
   return {
     schemaVersion: 1,
@@ -485,7 +491,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     status: value.status,
     ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
     ...(typeof value.format === "string" ? { format: value.format } : {}),
-    layout: playerGridLayoutForCount(players.length, value.layout),
+    layout: playerGridLayoutForCount(teams ? teams.length : players.length, value.layout),
     ...(isSeatOrder(value.seatOrder, players.length) ? { seatOrder: value.seatOrder } : {}),
     lifeStep:
       isLifeDelta(value.lifeStep) && value.lifeStep > 0
@@ -517,6 +523,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
+    ...(teams ? { variant: TWO_HEADED_GIANT } : {}),
     ...(counterLog ? { counterLog } : {}),
     ...(Array.isArray(value.logOrder)
       ? { logOrder: value.logOrder.filter((id): id is string => typeof id === "string") }
@@ -609,6 +616,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === true ? { turnTab: true } : {}),
+    ...(migrated.teamBinding === "frame" ? { teamBinding: "frame" } : {}),
     ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
   }
 }
@@ -864,6 +872,15 @@ export class LocalGameRepository {
     return () => {
       settingsListeners.delete(listener)
     }
+  }
+
+  teamBinding(): "link" | "frame" {
+    return this.loadSettings().teamBinding ?? "link"
+  }
+
+  saveTeamBinding(binding: "link" | "frame") {
+    const { teamBinding: _binding, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(binding === "frame" ? { teamBinding: "frame" } : {}) })
   }
 
   hapticsEnabled(): boolean {

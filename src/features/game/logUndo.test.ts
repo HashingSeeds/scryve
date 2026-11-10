@@ -134,3 +134,32 @@ describe("the game log's Undo", () => {
     })
   })
 })
+
+describe("log undo in Two-Headed Giant", () => {
+  it("takes shared poison back from both heads", () => {
+    const created = createLocalGame({
+      startingLife: 30,
+      system: "mtg",
+      format: "limited",
+      now: 0,
+      players: ["Ada", "Bo", "Cy", "Dee"].map((name) => ({ name, color: "#000" })),
+      teams: [
+        [0, 1],
+        [2, 3],
+      ],
+    })
+    const [ada, bo] = created.players
+    const poison: TableAction = {
+      kind: "counter.changed",
+      playerId: ada.id,
+      counterId: "poison",
+      delta: 2,
+    }
+    const poisoned = applyLocalTableAction(created, poison, at(1_000))
+    const undo = newestLogUndo(poisoned, { turns: true })
+    if (!undo || undo.kind === "turn") throw new Error("expected a counter row")
+    const after = undoLogRow(poisoned, undo, context)
+    expect(after.table?.players[ada.id]?.counters?.poison ?? 0).toBe(0)
+    expect(after.table?.players[bo.id]?.counters?.poison ?? 0).toBe(0)
+  })
+})

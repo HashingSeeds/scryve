@@ -22,7 +22,8 @@ export function startLocalGame(
   if (account) localGameRepository.saveMeSeat(account.meSeat)
   localGameRepository.rememberSetup({ mode: "local", game })
   localGameRepository.saveActiveGame(created)
-  localGameRepository.saveDefaultsFrom(created)
+  // why: a team's shared life and seat count would become every later game's defaults.
+  if (!created.variant) localGameRepository.saveDefaultsFrom(created)
   // why: setup sits above the board it came from, so replacing it would stack a second board that never unmounts.
   router.dismissTo({
     pathname: "/",

@@ -361,7 +361,9 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
           format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
         }
       : {}),
-    ...(value.variant === "treachery" ? { variant: value.variant } : {}),
+    ...(value.variant === "treachery" || value.variant === "twoHeadedGiant"
+      ? { variant: value.variant }
+      : {}),
     ...(isPlayerGridLayoutVariant(value.layout) ? { layout: value.layout } : {}),
     deckRequired: value.deckRequired ?? false,
     startingLife: value.startingLife,

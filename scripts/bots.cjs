@@ -12,10 +12,12 @@ const { parseArgs } = require("node:util")
 const { previewKey, previewName } = require("./preview.cjs")
 const { SYSTEM_IDS } = require("../convex/lib/systems/definitions.ts")
 
+const VARIANTS = ["treachery", "twoHeadedGiant"]
+
 const USAGE = `Stand-in players for connected games on a Convex preview.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
-                 [--variant treachery]  (players default to 4)
+                 [--variant treachery|twoHeadedGiant]  (players default to 4)
   pnpm bots join <CODE> [--count 1] [--first 1]
 
 Play
@@ -107,8 +109,12 @@ function parseCli(argv) {
   if (command === "join" && !code) throw new Error("join needs the lobby's invite code")
   if (!["confirm", "decline", "ignore"].includes(values.claims))
     throw new Error("--claims must be confirm, decline or ignore")
-  if (values.variant !== undefined && values.variant !== "treachery")
-    throw new Error("--variant must be treachery")
+  if (
+    values.variant !== undefined &&
+    values.variant !== "treachery" &&
+    values.variant !== "twoHeadedGiant"
+  )
+    throw new Error("--variant must be treachery or twoHeadedGiant")
   if (!["stay", "leave", "finish"].includes(values.end))
     throw new Error("--end must be stay, leave or finish")
   const players = parseCount(
@@ -243,6 +249,7 @@ class Bot {
     await this.client.mutation(api.users.syncCurrent, { displayName: this.name })
     const { page } = await this.client.query(api.games.activeConnectedGames, {
       paginationOpts: { numItems: 10, cursor: null },
+      variants: VARIANTS,
       maxSeats: MAX_SEATS,
     })
     for (const game of page.filter((game) => game.isHost)) {
@@ -277,7 +284,7 @@ class Bot {
       color: COLORS[this.slot % COLORS.length],
       deviceId: this.deviceId,
       systems: SYSTEM_IDS,
-      variants: ["treachery"],
+      variants: VARIANTS,
       maxSeats: MAX_SEATS,
       editsAnySeat: true,
     })

@@ -40,6 +40,7 @@ import {
 import {
   connectedBoardView,
   connectedStandingWinners,
+  connectedTeams,
   connectedLives,
   connectedOutState,
   outPlayerIds,
@@ -107,7 +108,8 @@ import { useStructurallyStable } from "@/utils/useStructurallyStable"
 import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
 import type { SystemId } from "../../convex/lib/systems"
-import { nextTurnSeat, sharesTurn, turnGroupOf } from "../../convex/lib/turns"
+import { nextTurnSeat, sharesTurn, turnGroupOf, turnLead } from "../../convex/lib/turns"
+import { TWO_HEADED_GIANT } from "../../convex/lib/twoHeadedGiant"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -482,9 +484,15 @@ export function ConnectedBoardWithRuntime({
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
   )
   const { pending } = runtime
+  const lifeTeams = useStructurallyStable(
+    runtime.status === "ready" ? connectedTeams(runtime.projection) : undefined,
+  )
   const lifeLog = useMemo(
-    (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
-    [cloud, publicId, pending],
+    (): LifeLogSource | undefined =>
+      cloud
+        ? { kind: "connected", publicId, pending, ...(lifeTeams ? { teams: lifeTeams } : {}) }
+        : undefined,
+    [cloud, publicId, pending, lifeTeams],
   )
   const { undoLife, undoTable } = runtime
   const logContext = useMemo(
@@ -695,10 +703,21 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const terminalStatus = game.status
   const rematchPublicId = game.rematchPublicId
   const table = useContext(ConnectedTableContext)
-  const tablePlayers = table?.table.players
-  const counterTable = useMemo(() => ({ players: tablePlayers }), [tablePlayers])
   const turn = turns ? table?.table.turn : undefined
   const turnGroups = table?.table.turnGroups
+  const tablePlayers = table?.table.players
+  const tableCounters = table?.tableRules.counters
+  const sharesCounters = game.variant === TWO_HEADED_GIANT
+  const counterTable = useMemo(
+    () => ({
+      players: tablePlayers,
+      counterKey: (playerId: string, counterId: string) =>
+        sharesCounters && tableCounters?.some(({ id, shared }) => id === counterId && shared)
+          ? `${turnLead(turnGroups, playerId)}:${counterId}`
+          : `${playerId}:${counterId}`,
+    }),
+    [tablePlayers, tableCounters, sharesCounters, turnGroups],
+  )
   const [turnsEnabled] = useTurnsEnabled(localGameRepository)
   const [chessMinutes] = useChessMinutes(localGameRepository)
   const chessAppliedTo = useRef<string>(undefined)
@@ -774,13 +793,27 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     ],
     [controlled, game.players],
   )
+  const teams = useMemo(() => {
+    const groups = connectedTeams({ variant: game.variant, table: table?.table })
+    return (
+      groups &&
+      [...groups].sort(
+        (a, b) =>
+          Number(a.some((id) => controlled.has(id))) - Number(b.some((id) => controlled.has(id))),
+      )
+    )
+  }, [controlled, game.variant, table?.table])
+  const cellCount = teams?.length ?? players.length
+  const [teamBinding] = useState(() => localGameRepository.teamBinding())
+  const actingHead = (playerId: string) =>
+    turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
   const layoutVariant =
-    layoutChoice?.playerCount === players.length
+    layoutChoice?.playerCount === cellCount
       ? layoutChoice.layout
       : playerGridLayoutForCount(
-          players.length,
+          cellCount,
           game.layout,
-          defaultConnectedLayout(players.length),
+          teams ? "auto" : defaultConnectedLayout(players.length),
         )
   const commanderLethal = playCommanderLethal(system, game.format || game.ruleset)
   const commanderDamageEnabled = commanderLethal !== undefined && game.commanderDamage !== undefined
@@ -914,10 +947,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     gameId: publicId,
     system,
     players,
+    teamCount: teams?.length,
     layout: {
       value: layoutVariant,
       onChange: (layout) => {
-        const choice = { playerCount: players.length, layout }
+        const choice = { playerCount: cellCount, layout }
         setLayoutChoice(choice)
         saveLayoutChoice(publicId, choice)
       },
@@ -1129,8 +1163,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             {...(anySeat
               ? {}
               : {
-                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(player.id),
-                  isPlayerOwned: (player: GamePlayer) => controlled.has(player.id),
+                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(actingHead(player.id)),
+                  isPlayerOwned: (player: GamePlayer) => controlled.has(actingHead(player.id)),
                 })}
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
@@ -1161,7 +1195,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 : undefined
             }
             dice={seatGrid}
-            onChange={controls.changeLife}
+            teams={teams}
+            teamBinding={teamBinding}
+            onChange={(playerId, delta) =>
+              controls.changeLife(asPlayerId(actingHead(playerId)), delta)
+            }
           />
         )}
       />
@@ -1201,6 +1239,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           seats={logSeats}
           turn={table?.table.turn}
           groups={turnGroups}
+          sharedLife={game.variant === TWO_HEADED_GIANT}
           counterTable={counterTable}
           turnsShown={tabOn}
           anyoneEdits={anySeat}

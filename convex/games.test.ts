@@ -3329,7 +3329,7 @@ describe("Treachery", () => {
     ).rejects.toThrow("4–6 seats")
     await expect(
       host.mutation(api.games.createLobby, { ...create, system: "ygo", ruleset: "standard" }),
-    ).rejects.toThrow("Magic variant")
+    ).rejects.toThrow("This game doesn't offer that variant")
     await expect(host.mutation(api.games.createLobby, withoutDevice)).rejects.toThrow(
       "need a device",
     )

@@ -20,6 +20,7 @@ import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import { PLAYABLE_VARIANTS } from "./playableVariants"
 import { api } from "../../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
 
@@ -95,7 +96,7 @@ function ConnectedHostQuerySource({
   const ready = connectedProfile.status === "ready"
   const activeGames = usePaginatedQuery(
     api.games.activeConnectedGames,
-    ready ? { maxSeats: MAX_PLAYERS } : "skip",
+    ready ? { variants: PLAYABLE_VARIANTS, maxSeats: MAX_PLAYERS } : "skip",
     {
       initialNumItems: 10,
     },

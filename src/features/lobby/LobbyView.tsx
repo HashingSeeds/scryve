@@ -17,6 +17,7 @@ import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Sheet } from "@/components/Sheet"
+import { TeamPicker } from "@/components/TeamPicker"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import { useSheetPresence } from "@/components/useSheetPresence"
@@ -53,6 +54,7 @@ import {
 import { clientSeesSeats, MAX_PLAYERS, MIN_PLAYERS } from "../../../convex/lib/policy"
 import { attachesDecks } from "../../../convex/lib/systems"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
+import { isTwoHeadedGiantPlayerCount, pairedTeams } from "../../../convex/lib/twoHeadedGiant"
 
 export interface LobbyViewLobby {
   playerCount: number
@@ -84,6 +86,7 @@ export interface LobbyViewProps {
   onBack?: () => void
   onChangePlayerCount?: (playerCount: number) => void
   onChangeDeckRequired?: (deckRequired: boolean) => void
+  onSwapSeats?: (first: number, second: number) => void
   invite?: { qrPayload: string | null; manualCode?: string; onShare?: () => void }
   decks?: {
     source: (render: (state: LobbyDeckState, device?: LobbyDeviceDecks) => ReactNode) => ReactNode
@@ -130,6 +133,7 @@ export function LobbyView({
   onBack,
   onChangePlayerCount,
   onChangeDeckRequired,
+  onSwapSeats,
   invite,
   decks: deckChoices,
   appearance,
@@ -290,7 +294,8 @@ export function LobbyView({
                     savingSettings ||
                     starting ||
                     lobby.players.some((player) => player.seat > count) ||
-                    (lobby.variant === "treachery" && !isTreacheryPlayerCount(count)),
+                    (lobby.variant === "treachery" && !isTreacheryPlayerCount(count)) ||
+                    (lobby.variant === "twoHeadedGiant" && !isTwoHeadedGiantPlayerCount(count)),
                 }))}
                 onSelect={(count) => onChangePlayerCount(Number(count))}
               />
@@ -332,6 +337,28 @@ export function LobbyView({
           ) : null}
           {decks ? decks.source(seatList) : seatList()}
         </View>
+        {lobby.variant === "twoHeadedGiant" ? (
+          <View style={themed($section)}>
+            <TeamPicker
+              players={Array.from({ length: lobby.playerCount }, (_, index) =>
+                lobby.players.find((player) => player.seat === index + 1),
+              ).map(
+                (player) =>
+                  player && {
+                    name: player.displayName,
+                    color: player.color,
+                    shape: shownMarkShape(player),
+                  },
+              )}
+              teams={pairedTeams(Array.from({ length: lobby.playerCount }, (_, index) => index))}
+              onSwap={
+                onSwapSeats && online && !starting && !savingSettings
+                  ? (first, second) => onSwapSeats(first + 1, second + 1)
+                  : undefined
+              }
+            />
+          </View>
+        ) : null}
       </ScrollView>
       <BottomActionBar endsWithLink style={themed($surface)}>
         {error && !openExitCopy ? <AlertNote testID="connected-action-error" text={error} /> : null}
