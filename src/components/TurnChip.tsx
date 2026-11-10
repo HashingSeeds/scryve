@@ -72,12 +72,14 @@ export function TurnChipLayer({
   menuCorner,
   menuEdgeCenter,
   filled,
+  onWidth,
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
   filled?: boolean
+  onWidth?: (width: number) => void
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   contentInsets?: LifeCardContentInsets
@@ -97,7 +99,10 @@ export function TurnChipLayer({
     >
       <View
         pointerEvents="box-none"
-        onLayout={({ nativeEvent: { layout } }) => setWidth(layout.width)}
+        onLayout={({ nativeEvent: { layout } }) => {
+          setWidth(layout.width)
+          onWidth?.(layout.width)
+        }}
         style={[$slot, { top: EDGE_GAP + insets.top, left }, width === 0 && $measuring]}
       >
         <TurnChip
