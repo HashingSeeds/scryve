@@ -99,6 +99,25 @@ describe("Two-Headed Giant", () => {
     ).rejects.toThrow("even number")
   })
 
+  it("turns down a game that doesn't offer it without naming another variant", async () => {
+    const host = await signedIn(makeConvexTest(), "host-subject", "Host")
+    await expect(
+      host.mutation(api.games.createLobby, {
+        publicId,
+        playerCount: 4,
+        startingLife: 60,
+        ruleset: "pokemon",
+        system: "pokemon",
+        variant: "twoHeadedGiant",
+        inviteToken: token,
+        manualCodeCandidates: ["ABC234"],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+        deviceId: "device-host-0001",
+      }),
+    ).rejects.toThrow("This game doesn't offer that variant")
+  })
+
   it("teams neighboring seats and shares life and poison from either head's device", async () => {
     const t = makeConvexTest()
     const {
