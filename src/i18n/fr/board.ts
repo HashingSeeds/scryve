@@ -558,6 +558,7 @@ export default {
     start: "Démarrer",
     startHint: "Touchez pour lancer le chrono du tour",
     pass: "Passer",
+    chipNumber: "Tour {{number}}",
     label: "Tour {{number}}, {{name}}",
     passHintTo: "Touchez pour passer à {{name}}",
     outOfTime: "Temps écoulé",

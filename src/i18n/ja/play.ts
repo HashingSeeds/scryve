@@ -41,6 +41,7 @@ export default {
     label: "ターン",
     lifeOnly: "ライフのみ",
     lifeAndTurns: "ライフとターン",
+    chessClock: "チェスクロック",
   },
   whatYouPlay: {
     heading: "何をプレイしますか?",

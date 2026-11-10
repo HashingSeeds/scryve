@@ -36,6 +36,7 @@ import {
   type RecentSetup,
 } from "./recentSetups"
 import { isRoundClockSetup, type RoundClock } from "./roundClock"
+import { isChessBankMinutes, type ChessBankMinutes } from "./turnTab"
 import type {
   CommanderDamageTotals,
   GameEvent,
@@ -96,6 +97,7 @@ export interface LocalSettings {
   askWhatYouPlay?: true
   syncStats?: boolean
   turnTab?: true
+  chessMinutes?: ChessBankMinutes
 }
 
 export const COMMANDER_SEATS = 4
@@ -558,6 +560,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === true ? { turnTab: true } : {}),
+    ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
   }
 }
 
@@ -776,6 +779,16 @@ export class LocalGameRepository {
   saveTurnsEnabled(enabled: boolean): void {
     const { turnTab: _turnTab, ...rest } = this.loadSettings()
     this.saveSettings({ ...rest, ...(enabled ? { turnTab: true } : {}) })
+  }
+
+  chessMinutes(): ChessBankMinutes | undefined {
+    const settings = this.loadSettings()
+    return settings.turnTab === true ? settings.chessMinutes : undefined
+  }
+
+  saveChessMinutes(minutes: ChessBankMinutes | undefined): void {
+    const { chessMinutes: _chessMinutes, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(minutes ? { chessMinutes: minutes } : {}) })
   }
 
   onSettingsChanged(listener: () => void): () => void {

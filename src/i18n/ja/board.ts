@@ -511,6 +511,7 @@ export default {
     start: "開始",
     startHint: "タップしてターンの時計を開始",
     pass: "パス",
+    chipNumber: "ターン{{number}}",
     label: "ターン{{number}}、{{name}}",
     passHintTo: "タップして{{name}}に渡す",
     outOfTime: "持ち時間切れ",

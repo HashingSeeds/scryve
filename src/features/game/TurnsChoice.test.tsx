@@ -47,4 +47,26 @@ describe("turns are opt-in", () => {
         .map((choice) => choice.props.accessibilityState?.checked),
     ).toEqual([true, true])
   })
+
+  it("saves a chess clock with its minutes, and dropping back to turns clears them", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = render(
+      <ThemeProvider>
+        <TurnsChoice repository={repository} />
+      </ThemeProvider>,
+    )
+    expect(view.queryByTestId("turns-chess-20")).toBeNull()
+
+    fireEvent.press(view.getByTestId("turns-choice-chess"))
+    expect(repository.turnsEnabled()).toBe(true)
+    expect(repository.chessMinutes()).toBe(20)
+
+    fireEvent.press(view.getByTestId("turns-chess-10"))
+    expect(repository.chessMinutes()).toBe(10)
+
+    fireEvent.press(view.getByTestId("turns-choice-turns"))
+    expect(repository.turnsEnabled()).toBe(true)
+    expect(repository.chessMinutes()).toBeUndefined()
+    expect(view.queryByTestId("turns-chess-10")).toBeNull()
+  })
 })

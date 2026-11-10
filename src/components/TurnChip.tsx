@@ -131,22 +131,26 @@ export function TurnChip({
   } = useAppTheme()
   const { turn, canPress } = state
   const next = useTurnSpotlight()?.passTo
-  const now = useNow(!turn.waiting)
+  const numbered = filled && !turn.bank
+  const waiting = turn.waiting && !numbered
+  const now = useNow(!turn.waiting && !numbered)
   const bank = bankLeft(turn, turn.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0
-  const time = formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
+  const time = numbered
+    ? translate("board:turn.chipNumber", { number: turn.number })
+    : formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
   const tick = Math.floor(now / TICK_MS) % 2 === 0
   const ink = outOfTime ? colors.board.text : foreground
   const name = state.nameOf(turn.playerId) ?? ""
   const nextName = next ? state.nameOf(next) : undefined
   const nextSeat = next ? state.seatOf?.(next) : undefined
-  const split = filled && !turn.waiting && !outOfTime && !!nextSeat
+  const split = filled && !waiting && !outOfTime && !!nextSeat
   const nextInk = nextSeat ? accessibleForeground(nextSeat.color) : ink
   const label = [
     translate("board:turn.label", { number: turn.number, name }),
-    turn.waiting ? undefined : outOfTime ? translate("board:turn.outOfTime") : time,
+    waiting || numbered ? undefined : outOfTime ? translate("board:turn.outOfTime") : time,
     canPress
-      ? turn.waiting
+      ? waiting
         ? translate("board:turn.startHint")
         : nextName
           ? translate("board:turn.passHintTo", { name: nextName })
@@ -156,7 +160,7 @@ export function TurnChip({
     .filter(Boolean)
     .join(". ")
 
-  const content = turn.waiting ? (
+  const content = waiting ? (
     <>
       <PlayGlyph color={ink} />
       <Text tx="board:turn.start" weight="bold" style={[themed($value), { color: ink }]} />
@@ -237,7 +241,7 @@ export function TurnChip({
       hitSlop={{ top: 6, bottom: 6 }}
       delayLongPress={450}
       onPress={() => {
-        if (turn.waiting) state.onStart()
+        if (waiting) state.onStart()
         else if (next) {
           if (filled) notePass()
           state.onPass(next)

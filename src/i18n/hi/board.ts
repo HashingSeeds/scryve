@@ -533,6 +533,7 @@ export default {
     start: "शुरू करें",
     startHint: "टर्न क्लॉक शुरू करने के लिए टैप करें",
     pass: "पास",
+    chipNumber: "टर्न {{number}}",
     label: "टर्न {{number}}, {{name}}",
     passHintTo: "{{name}} को पास करने के लिए टैप करें",
     outOfTime: "समय खत्म",

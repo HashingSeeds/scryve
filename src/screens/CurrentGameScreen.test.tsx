@@ -352,10 +352,9 @@ describe("CurrentGameScreen", () => {
     const view = renderGame(initial, repository)
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-2-claim"))
-    expect(view.getByTestId("turn-chip-1")).toHaveTextContent("Start")
-    expect(view.getByTestId("turn-chip-2")).toHaveTextContent("Start")
+    expect(view.getByTestId("turn-chip-1")).toHaveTextContent(/^Turn 1/)
+    expect(view.getByTestId("turn-chip-2")).toHaveTextContent(/^Turn 1/)
 
-    fireEvent.press(view.getByTestId("turn-chip-2"))
     fireEvent.press(view.getByTestId("turn-chip-2"))
     expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: katherine, number: 2 })
     expect(view.queryByTestId("turn-chip-1")).toBeNull()
@@ -369,9 +368,10 @@ describe("CurrentGameScreen", () => {
     expect(view.queryByTestId("turn-undo-pass-1")).toBeNull()
   })
 
-  it("lands the turn chip on the first player, waiting until the table's first change", () => {
+  it("starts a chess clock picked in setup on the first player, waiting until the table's first change", () => {
     const initial = game()
     const repository = turnsOn()
+    repository.saveChessMinutes(20)
     const view = renderGame(initial, repository)
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-1-claim"))
@@ -380,6 +380,7 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-seat-2-1"))
     expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: initial.players[0].id })
     expect(repository.loadActiveGame()?.turn?.waiting).toBeUndefined()
+    expect(repository.loadActiveGame()?.turn?.bank?.ms).toBe(20 * 60_000)
     expect(view.getByTestId("turn-chip-time")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("turn-chip-1"))

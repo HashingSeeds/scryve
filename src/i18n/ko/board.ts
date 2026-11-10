@@ -514,6 +514,7 @@ export default {
     start: "시작",
     startHint: "탭하여 턴 시계를 시작하세요",
     pass: "넘기기",
+    chipNumber: "{{number}}턴",
     label: "{{number}}번째 턴, {{name}}",
     passHintTo: "탭하여 {{name}}에게 넘기세요",
     outOfTime: "시간 초과",

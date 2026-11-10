@@ -79,7 +79,12 @@ import {
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import { teamChoices, teamMembers, teamName, teamValueLabel } from "@/features/game/teams"
-import { reportTurnsGame, TurnDialog, useTurnsEnabled } from "@/features/game/TurnDialog"
+import {
+  reportTurnsGame,
+  TurnDialog,
+  useChessMinutes,
+  useTurnsEnabled,
+} from "@/features/game/TurnDialog"
 import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
@@ -675,6 +680,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const turn = turns ? table?.table.turn : undefined
   const turnGroups = table?.table.turnGroups
   const [turnsEnabled] = useTurnsEnabled(localGameRepository)
+  const [chessMinutes] = useChessMinutes(localGameRepository)
+  const chessAppliedTo = useRef<string>(undefined)
   const [turnOpen, setTurnOpen] = useState(false)
   const [turnToast, setTurnToast] = useState<{
     operationId: string
@@ -956,6 +963,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     onAccount,
   })
   const { menuOpen, dice, dialogOrigin: menuDialogOrigin } = chrome
+  useEffect(() => {
+    if (!chessMinutes || !table || !turn || turn.number !== 1 || turn.bank) return
+    if (!controlled.has(turn.playerId) || chessAppliedTo.current === turn.operationId) return
+    chessAppliedTo.current = turn.operationId
+    table.setBank(turn.playerId, chessMinutes * 60_000)
+  }, [chessMinutes, table, turn, controlled])
   const turnSeats = [...game.players]
     .sort((left, right) => left.seat - right.seat)
     .map((player) => ({

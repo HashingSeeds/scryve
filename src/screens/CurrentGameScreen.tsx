@@ -43,6 +43,7 @@ import { teamName } from "@/features/game/teams"
 import {
   reportTurnsGame,
   TurnDialog,
+  useChessMinutes,
   useTurnsEnabled,
   type TurnSeat,
 } from "@/features/game/TurnDialog"
@@ -130,6 +131,8 @@ export function CurrentGameScreen({
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
   const [turnsEnabled] = useTurnsEnabled(repository ?? localGameRepository)
+  const [chessMinutes] = useChessMinutes(repository ?? localGameRepository)
+  const chessAppliedTo = useRef<string>(undefined)
   const [turnOpen, setTurnOpen] = useState(false)
   const [turnToast, setTurnToast] = useState<{
     operationId: string
@@ -303,6 +306,12 @@ export function CurrentGameScreen({
     shape: player.shape,
   }))
   const { passTurn, setTurn, undoTurn, setBank, startTurn } = runtime
+  useEffect(() => {
+    if (!chessMinutes || !turn || turn.number !== 1 || turn.bank) return
+    if (chessAppliedTo.current === turn.operationId) return
+    chessAppliedTo.current = turn.operationId
+    setBank(turn.playerId, chessMinutes * 60_000)
+  }, [chessMinutes, turn, setBank])
   const { turnGroups } = runtime.game
   const nameOf = (playerId: string) => teamName(runtime.game.players, turnGroups, playerId)
   function nextOf(clockwiseSlots: number[]) {

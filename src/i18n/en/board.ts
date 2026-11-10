@@ -527,6 +527,8 @@ const board = {
     startHint: "Tap to start the turn clock",
     // Very short tap target on the turn chip that ends this player's turn and starts the next player's. Never "End turn".
     pass: "Pass",
+    // On the turn chip when there is no clock, as in "Turn 3". Very short.
+    chipNumber: "Turn {{number}}",
     // Screen reader label for the turn chip, as in "Turn 4, Ada".
     label: "Turn {{number}}, {{name}}",
     passHintTo: "Tap to pass to {{name}}",

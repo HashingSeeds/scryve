@@ -38,8 +38,10 @@ const play = {
   // The two-choice row in game setup and on the first page: life totals alone, or with turns too.
   turnsChoice: {
     label: "Turns",
-    lifeOnly: "Just life totals",
-    lifeAndTurns: "Life and turns",
+    lifeOnly: "Life only",
+    lifeAndTurns: "Turns",
+    // A chess clock: each player's time bank counts down only on their turn.
+    chessClock: "Chess clock",
   },
   whatYouPlay: {
     heading: "What do you play?",
