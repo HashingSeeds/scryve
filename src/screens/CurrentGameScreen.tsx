@@ -339,7 +339,6 @@ export function CurrentGameScreen({
           turn,
           canPress: true,
           nameOf,
-          seatOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId),
           onStart: () => startTurn(turn.playerId),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),

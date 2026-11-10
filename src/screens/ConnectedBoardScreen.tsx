@@ -997,7 +997,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turn,
           canPress: myTurn,
           nameOf: (playerId) => teamName(named, turnGroups, playerId),
-          seatOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId),
           onStart: () => actingSeat && table?.startTurn(actingSeat),
           onPass: passTo,
           onLongPress: () => setTurnOpen(true),
