@@ -224,11 +224,13 @@ function SchemePlate({
   scheme,
   width,
   due,
+  compact,
   onPress,
 }: {
   scheme: SchemeView
   width: number
   due?: boolean
+  compact?: boolean
   onPress: () => void
 }) {
   const {
@@ -244,7 +246,7 @@ function SchemePlate({
       : ongoing > 1
         ? translate("board:scheme.ongoingCount", { count: ongoing })
         : (scheme.shown?.name ?? translate("board:scheme.schemes"))
-  const full = due || width >= FULL_PLATE_WIDTH
+  const full = !compact && (due || width >= FULL_PLATE_WIDTH)
   return (
     <BoardPressable
       testID={due ? "scheme-due-plate" : "scheme-plate"}
@@ -262,14 +264,14 @@ function SchemePlate({
         pressed && $pressed,
       ]}
     >
-      {due ? null : art ? (
+      {art && !due ? (
         <Image
           source={modeCardImage(art, "art_crop")}
           style={full ? $thumb : $iconThumb}
           contentFit="cover"
           accessibilityIgnoresInvertColors
         />
-      ) : (
+      ) : full && due ? null : (
         <SchemeGlyph size={16} color={ink} />
       )}
       {full ? (
@@ -327,12 +329,14 @@ export function ModeSeam({
   plan,
   planar,
   scheme,
+  compactDue,
   onOpen,
 }: {
   anchorY: number
   plan: { left?: SeamSlot; right?: SeamSlot }
   planar?: PlanarView
   scheme?: SchemeView
+  compactDue?: boolean
   onOpen: (dialog: "planar" | "scheme") => void
 }) {
   const share = (slot: SeamSlot) => {
@@ -358,7 +362,8 @@ export function ModeSeam({
           key={item}
           scheme={scheme}
           width={share(slot)}
-          due={item === "schemeDue"}
+          due={item === "schemeDue" || compactDue}
+          compact={item === "scheme" && compactDue}
           onPress={() => onOpen("scheme")}
         />
       )

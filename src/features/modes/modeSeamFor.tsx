@@ -67,19 +67,20 @@ export function modeSeamFor(
     }
     const planned = planSeam(rooms, items)
     const placed = [planned.left, planned.right].some((slot) => slot?.items.includes("schemeDue"))
-    const plan =
-      schemeItem === "schemeDue" && !placed && seamHoldsScheme
-        ? planSeam(
-            rooms,
-            items.map((item) => (item === "schemeDue" ? "scheme" : item)),
-          )
-        : planned
+    const compactDue = schemeItem === "schemeDue" && !placed
+    const plan = compactDue
+      ? planSeam(
+          rooms,
+          items.map((item) => (item === "schemeDue" ? "scheme" : item)),
+        )
+      : planned
     return (
       <ModeSeam
         anchorY={anchor.y}
         plan={plan}
         planar={planar}
         scheme={scheme}
+        compactDue={compactDue}
         onOpen={modes.openDialog}
       />
     )
