@@ -45,7 +45,7 @@ export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
   }
 }
 
-const PLAYER_MARK_MUTED_OPACITY = 0.72
+export const PLAYER_MARK_MUTED_OPACITY = 0.72
 
 export function seatIdentityLabel(seatNumber: number, playerName: string) {
   return translate("board:seat.identity", {
