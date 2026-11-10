@@ -96,7 +96,6 @@ describe("connected log", () => {
   })
 
   it("puts a change under the turn the authority recorded it in, whatever the device clock said", () => {
-    // why: Bo's clock runs behind Ada's, so Bo's hit after Ada's pass carries an earlier time.
     const confirmed = [
       pass("pass-ada", "ada", "bo", 100),
       life("hit-on-ada", "ada", -3, 50, { mine: true }),
@@ -123,7 +122,6 @@ describe("connected log", () => {
   })
 
   it("keeps passes in the authority's order when device clocks disagree", () => {
-    // why: Ada's clock runs ahead of Bo's, so Bo's later pass carries the earlier timestamp.
     const confirmed = [pass("pass-ada", "ada", "bo", 100), pass("pass-bo", "bo", "ada", 50)]
     const turn: Turn = {
       playerId: "ada",

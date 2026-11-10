@@ -119,17 +119,11 @@ export type GameLogItem =
   | (GameLogRow & { kind?: undefined })
   | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
 
-/** why: a connected log places a row by the newest change in it, where the authority recorded that change. */
 export const rowPosition = (
   row: Pick<GameLogRow, "operationIds">,
   positionOf: (operationId: string) => number | undefined,
 ) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
 
-/**
- * why: the log's order is a sequence, never a clock: `positionOf` is the authority's order in a
- * connected game and the apply order in a local one. A turn whose start hasn't loaded yet heads
- * every loaded row.
- */
 export function withTurnDividers(
   rows: readonly GameLogRow[],
   turns: readonly TurnLogEntry[],

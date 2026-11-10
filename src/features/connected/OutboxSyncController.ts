@@ -326,7 +326,6 @@ export class OutboxSyncController {
     this.publish()
   }
 
-  /** why: one compensating write per change it takes back, each naming its change, so the log hides both and a quick tap after it starts fresh. */
   undoLife = (changes: readonly { operationId: string; playerId: string; delta: number }[]) => {
     this.lastQueuedLifeChange = undefined
     this.changeError = undefined

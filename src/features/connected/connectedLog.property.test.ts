@@ -12,7 +12,6 @@ import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 
 const GAME = "game-log-property"
 
-/** why: a seeded generator, so a failing run replays from its seed alone. */
 function generator(seed: number) {
   let state = seed >>> 0
   const next = () => {
@@ -34,7 +33,6 @@ interface Operation {
   confirmed: boolean
 }
 
-/** why: a confirmed prefix in the authority's order, then this device's unsent changes in the order it queued them, stamped by clocks that skew and jump back. */
 function randomOperations(seed: number) {
   const random = generator(seed)
   const seats = ["ada", "bo", "cy"].slice(0, random.int(2, 3))
@@ -46,7 +44,6 @@ function randomOperations(seed: number) {
     const playerId = seats[random.int(0, seats.length - 1)]
     const confirmed = index < unsentFrom
     const previous = lastAt.get(playerId)
-    // why: often near the seat's last change, so bursts form, and often anywhere, including before it.
     const at =
       previous !== undefined && random.next() < 0.6
         ? previous + random.int(-2_500, 2_500)
@@ -104,7 +101,6 @@ function feed({
           attempts: 0,
         }) as PendingLifeAction,
     )
-  // why: the queue's order must come from its sequence, not from the order a caller happens to hold.
   const queued = [...pending].sort(() => shuffle.next() - 0.5)
   const events = connectedLogEvents(confirmed, queued, GAME)
   const players = seats.map((id) => ({ id: asPlayerId(id), life: 40 }))

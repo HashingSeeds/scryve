@@ -150,7 +150,6 @@ describe("outbox sync controller", () => {
     repository
       .outbox("game-public")
       .enqueue({ ...action("operation-queued-first", -1, 1_000), sequence: 0 })
-    // why: a build from before `sequence` writes the record and its index entry, and nothing else.
     const olderBuild = action("operation-older-build", -1, 2_000)
     storage.set(
       CONNECTED_KEYS.outboxRecord("game-public", "operation-older-build", "user-1"),

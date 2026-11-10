@@ -9,12 +9,6 @@ import type { Turn } from "../../../convex/lib/turns"
 const NO_ACTOR = asActorId("")
 const NO_DEVICE = asDeviceId("")
 
-/**
- * why: this device's unsent changes show at once and give way to the authority's copy, matched by
- * operation id, so the log reads the same offline, on reconnect, and after a rejection drops one.
- * Where anyone edits any seat, the authority confirms commander damage as it lands, so an unsent
- * claim shows as that confirmation, under the id the authority gives it.
- */
 export function connectedLogEvents(
   confirmed: readonly ConnectedLogEvent[],
   pending: readonly PendingLifeAction[],
@@ -61,11 +55,9 @@ export function connectedLogEvents(
       ]
     return []
   })
-  // why: the log's order is a sequence, never a clock: the authority's order, then this device's unsent changes in the order it queued them.
   return [...confirmed, ...unsent]
 }
 
-/** why: device clocks drift apart, so turn headings and Undo place a change by where the authority recorded it, and its own time stays for bursts and display. */
 export function logPositions(
   events: readonly ConnectedLogEvent[],
 ): (operationId: string) => number | undefined {
@@ -73,7 +65,6 @@ export function logPositions(
   return (operationId) => positions.get(operationId)
 }
 
-/** why: the local log's own builders draw the rows, so a connected game reads like a local one. */
 export function connectedLogInputs(
   events: readonly ConnectedLogEvent[],
   gameId: string,
@@ -114,12 +105,6 @@ export function connectedLogInputs(
   return { events: lifeEvents, turns: turnLog(events, turn) }
 }
 
-/**
- * why: connected events don't carry turn numbers, but each turn record names the pass that began
- * it, so numbers count back from the turn the table holds now. A hand-off keeps the number, and a
- * turn named twice (a first player picked again) shows once, as its newest holder. The log arrives
- * a page at a time, so the current turn heads it even before the change that began it has loaded.
- */
 function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): TurnLogEntry[] {
   if (!turn) return []
   const undone = new Set(
@@ -158,7 +143,6 @@ function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): 
     firstPasser = action.kind === "turn.passed" ? action.playerId : undefined
     if (action.kind === "turn.passed") number -= 1
   }
-  // why: a game can begin with its first turn already set, as Archenemy's does, so no change starts turn 1; its holder is whoever passed it on.
   if (number === 1 && firstPasser && entries.at(-1)?.number !== 1)
     entries.push({
       operationId: `${turn.operationId}:first`,
@@ -173,11 +157,6 @@ export type ConnectedLogUndo =
   | { kind: "life"; changes: { operationId: string; playerId: string; delta: number }[] }
   | { kind: "turn"; playerId: string; turnOperationId: string }
 
-/**
- * why: each device owns its seats, so Undo takes back only the newest change this account made:
- * a life change (a quick-tap burst at once) or its own pass while the table still holds that turn.
- * Commander damage needs the defender's say, so when that is the newest, Undo waits.
- */
 export function connectedLogUndo(
   events: readonly ConnectedLogEvent[],
   players: readonly Pick<GamePlayer, "id" | "life">[],

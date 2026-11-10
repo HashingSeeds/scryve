@@ -129,7 +129,6 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
-  /** why: life events, the turn log and table changes live in separate lists, and a device clock can jump, so the log reads their order from here: every operation, in the order it was applied. */
   logOrder?: string[]
 }
 
