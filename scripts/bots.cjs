@@ -20,7 +20,9 @@ const USAGE = `Stand-in players for connected games on a Convex preview.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
                  [--variant treachery|twoHeadedGiant]  (players default to 4)
-                 [--archenemy <seat>] [--schemes <deck id>] [--planechase <deck id>|own]
+                 [--archenemy <seat>]  plays Archenemy with that seat as the archenemy, in
+                                       place of --variant (players default to 4)
+                 [--schemes <deck id>] [--planechase <deck id>|own]
   pnpm bots join <CODE> [--count 1] [--first 1]
 
 Play
@@ -58,12 +60,17 @@ function parseDuration(value, name) {
 }
 
 // why: decks are checked by createLobby against convex/lib/modeDecks.ts, so a typo fails there with its message.
-function modeSetupOf({ archenemy, schemes, planechase }) {
+function modeSetupOf({ archenemy, schemes, planechase }, players) {
   if (!archenemy && !planechase) return undefined
   return {
     ...(planechase ? { planechase: planechase === "own" ? {} : { decks: [planechase] } } : {}),
     ...(archenemy
-      ? { archenemy: { seat: Number(archenemy), ...(schemes ? { deck: schemes } : {}) } }
+      ? {
+          archenemy: {
+            seat: parseCount(archenemy, "archenemy", 1, players),
+            ...(schemes ? { deck: schemes } : {}),
+          },
+        }
       : {}),
   }
 }
@@ -120,9 +127,12 @@ function parseCli(argv) {
     values.variant !== "twoHeadedGiant"
   )
     throw new Error("--variant must be treachery or twoHeadedGiant")
+  if (values.archenemy !== undefined && values.variant !== undefined)
+    throw new Error("--archenemy is its own variant, so it cannot go with --variant")
   if (!["stay", "leave", "finish"].includes(values.end))
     throw new Error("--end must be stay, leave or finish")
-  const players = parseCount(values.players ?? (values.variant ? "4" : "2"), "players", 2, 6)
+  const variant = values.archenemy !== undefined ? "archenemy" : values.variant
+  const players = parseCount(values.players ?? (variant ? "4" : "2"), "players", 2, 6)
   if (values.variant === "treachery" && players < 4)
     throw new Error("--variant treachery needs --players 4 to 6")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
@@ -135,8 +145,8 @@ function parseCli(argv) {
     fill,
     system: none ? "none" : "mtg",
     format: values.format,
-    variant: values.archenemy ? "archenemy" : values.variant,
-    modeSetup: modeSetupOf(values),
+    variant,
+    modeSetup: modeSetupOf(values, players),
     reveal: values.reveal,
     life: values.life
       ? parseCount(values.life, "life", 1, 999)

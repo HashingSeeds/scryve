@@ -63,6 +63,19 @@ test("cli defaults follow the format and reject seats that cannot exist", () => 
   assert.throws(() => parseCli(["host", "--life-every", "fast"]), /duration/)
 })
 
+test("cli takes --archenemy as the variant and checks its seat", () => {
+  const archenemy = parseCli(["host", "--archenemy", "3"])
+  assert.equal(archenemy.variant, "archenemy")
+  assert.equal(archenemy.players, 4)
+  assert.deepEqual(archenemy.modeSetup, { archenemy: { seat: 3 } })
+  assert.throws(
+    () => parseCli(["host", "--archenemy", "1", "--variant", "treachery"]),
+    /--archenemy/,
+  )
+  assert.throws(() => parseCli(["host", "--archenemy", "first"]), /--archenemy must be/)
+  assert.throws(() => parseCli(["host", "--archenemy", "5"]), /--archenemy must be/)
+})
+
 test("a host bot abandons its leftover game of any variant before hosting again", async () => {
   const { getFunctionName } = require("convex/server")
   const { Bot } = require("./bots.cjs")
