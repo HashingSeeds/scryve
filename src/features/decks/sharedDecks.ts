@@ -8,7 +8,7 @@ import type { api } from "../../../convex/_generated/api"
 
 export type SharedDeckView = NonNullable<FunctionReturnType<typeof api.decks.shared>>
 
-/** why: game setup pins its cards from this copy, so a shared deck plays offline without becoming one of your decks. */
+/** why: game setup pins cards from this copy, so a shared deck plays offline without joining your decks. */
 export type SharedDeck = {
   token: string
   deckKey: string

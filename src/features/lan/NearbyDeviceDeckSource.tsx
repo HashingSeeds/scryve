@@ -49,7 +49,6 @@ export function NearbyDeviceDeckSource({
       <LobbyDeviceDeckSource
         online={online}
         capacity={canCreate === undefined ? undefined : { canCreate }}
-        // why: the sync stays in progress until the seat takes the deck, so a pick made meanwhile isn't replaced.
         onUse={(_seat, versionId) =>
           new Promise<void>((resolve) => {
             const timeout = setTimeout(() => {

@@ -24,6 +24,7 @@ import {
 import {
   getCellSize,
   getLifeFontSize,
+  getPlayerContentRotation,
   getPlayerGridLayout,
   getPlayerGridLayoutOptions,
   getPlayerGridMenuAnchor,
@@ -127,6 +128,11 @@ function tableGrid(table: TableState) {
       nativeEvent: { layout: { width: 300, height: 400, x: 0, y: 0 } },
     })
   return { view, submit }
+}
+
+function layoutCards(view: ReturnType<typeof render>) {
+  for (const card of view.queryAllByTestId(/^life-card-seat-\d+$/))
+    fireEvent(card, "layout", { nativeEvent: { layout: { width: 300, height: 400, x: 0, y: 0 } } })
 }
 
 describe("PlayerGrid", () => {
@@ -370,7 +376,6 @@ describe("PlayerGrid", () => {
     expect(
       view.getByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
     ).toBeTruthy()
-    // why: a local hit already counts, so finishing stays an X rather than asking to confirm.
     expect(
       view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
     ).toBeTruthy()
@@ -600,6 +605,7 @@ describe("PlayerGrid", () => {
       </ThemeProvider>
     )
     const view = render(grid(false))
+    layoutCards(view)
     const markFromSeam = () =>
       Number(StyleSheet.flatten(view.getByTestId("life-identity-row-seat-3").props.style).left)
     const resting = markFromSeam()
@@ -699,6 +705,30 @@ describe("PlayerGrid", () => {
       expect(getPlayerGridRows(5, layout)).toEqual(expectedRows)
     }
   })
+
+  it.each([3, 5])(
+    "turns the last seat of a %i-player even grid to face its column's side",
+    (playerCount) => {
+      const layout = getPlayerGridLayout({
+        playerCount,
+        width: 390,
+        height: 844,
+        layoutVariant: "even-grid",
+      })
+      const rows = getPlayerGridRows(playerCount, layout)
+      const rowIndex = rows.length - 1
+      expect(
+        getPlayerContentRotation({
+          playerCount,
+          layout,
+          row: rows[rowIndex],
+          rowIndex,
+          columnIndex: 0,
+          slot: playerCount - 1,
+        }),
+      ).toBe(90)
+    },
+  )
 
   it("supports the four-player tabletop arrangement", () => {
     const layout = getPlayerGridLayout({
@@ -934,6 +964,7 @@ describe("PlayerGrid", () => {
         <PlayerGrid players={players(6)} onChange={jest.fn()} />
       </ThemeProvider>,
     )
+    layoutCards(view)
 
     expect(view.getByTestId("player-mark-seat-6", { includeHiddenElements: true })).toBeTruthy()
     expect(view.getAllByText("20")[5].props.maxFontSizeMultiplier).toBe(1.3)

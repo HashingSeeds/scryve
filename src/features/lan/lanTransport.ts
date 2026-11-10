@@ -9,14 +9,14 @@ export const LAN_SERVICE_TYPE = "scryve"
 const LAN_PROTOCOL = "tcp"
 const CONNECT_TIMEOUT_MS = 2_500
 const RESOLVE_TIMEOUT_SECONDS = 3
-// why: phone Wi-Fi radios doze between packets, and a dozing host on a real table held 1 in 10 changes for 300+ ms; traffic every 200 ms keeps the radio awake at no measurable battery cost.
+// why: Wi-Fi radios doze between packets; a dozing host held 1 in 10 changes for 300+ ms. Traffic every 200 ms keeps it awake at no measurable battery cost.
 const HEARTBEAT_MS = 200
 // why: a peer that loses Wi-Fi never sends a close, so silence is the only sign the socket is dead.
 const SILENCE_LIMIT_MS = 4_000
 
 type Socket = ReturnType<typeof TcpSocket.createConnection>
 
-// why: tcp-socket base64-encodes each write with its JS Buffer polyfill, the host's biggest JS cost. It only reads byteLength and toString("base64") from a Buffer, so this one hands native Hermes' btoa output as-is.
+// why: tcp-socket base64-encodes writes with a slow JS Buffer polyfill. It reads only byteLength and toString("base64"), so this hands it btoa output directly.
 function wire(text: string) {
   const base64 = btoa(text)
   return Object.defineProperties(Buffer.alloc(0), {

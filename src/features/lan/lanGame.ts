@@ -171,7 +171,7 @@ export type LanGuestMessage =
   | { type: "stats"; stats: SyncLatencySummary }
 
 export type LanHostMessage =
-  // why: a host from before partners drops the slot and lands a partner's damage on the first commander, so guests offer partners only when the welcome says so. A flag keeps mixed tables playing where a LAN_PROTOCOL bump would split them.
+  // why: a host from before partners lands a partner's damage on the first commander, so guests offer partners only when the welcome says so. A flag, not a LAN_PROTOCOL bump, keeps mixed tables playing.
   // why: a host from before turns rejects turn writes, so guests show the turn tab only when the welcome says so.
   | {
       type: "welcome"
@@ -237,7 +237,7 @@ const withSeat = (game: LanGame, key: string, update: (seat: LanSeat) => LanSeat
 
 const LAN_REJECTION_IDS = ["seatTaken", "started", "full", "update"] as const
 
-/** why: the wire carries English so hosts and guests on different builds still understand each other; each device translates on receipt. */
+/** why: the wire carries English so different builds understand each other; each device translates on receipt. */
 const LAN_REJECTIONS: Record<(typeof LAN_REJECTION_IDS)[number], string> = {
   seatTaken: "That seat belongs to another device.",
   started: "This game has already started.",
@@ -253,7 +253,7 @@ export function lanRejectionMessage(reason: string) {
   return id ? translate(`connected:nearby.rejected.${id}`) : reason
 }
 
-// why: the host's seat has no token anywhere, so no pass can ever claim it; a pass for a seat the lobby already freed just gets a new one.
+// why: the host's seat has no token, so no pass can claim it; a pass for a freed seat gets a new one.
 export function admitLanGuest(
   game: LanGame,
   tokens: ReadonlyMap<string, string>,
@@ -551,7 +551,6 @@ function commanderProjection(memory: MemoryGame, viewerKey: string, lethal: numb
   }
 }
 
-// why: shaped like Convex's lobbyProjection, so a nearby guest's board reads the same game state a cloud guest's does.
 export function lanProjection(
   game: LanGame,
   viewerKey: string,

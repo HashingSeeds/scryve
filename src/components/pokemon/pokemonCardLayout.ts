@@ -117,7 +117,7 @@ const BENCH_CHIP = {
   compact: { height: 44, nameSize: 12, nameLine: 14, hpSize: 17, hpLine: 19 },
 }
 
-// why: Android caps a font's size at maxFontSizeMultiplier but not its explicit lineHeight, so chip text opts out of system scaling and takes these sizes, scaled once here, on both platforms.
+// why: Android caps font size at maxFontSizeMultiplier but not explicit lineHeight, so chip text opts out of scaling and scales once here.
 export function benchChipMetrics(compact: boolean, fontScale: number) {
   const chip = compact ? BENCH_CHIP.compact : BENCH_CHIP.regular
   const scale = Math.min(fontScale, BENCH_MAX_FONT_SCALE)

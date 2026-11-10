@@ -101,7 +101,6 @@ export function commanderDamageDealers(
   return players.filter(({ id }) => id !== ownerPlayerId && (incoming[id] ?? 0) > 0)
 }
 
-/** why: a seat shows its grid in place of its mark and name once it has taken commander damage, and for as long as an attack it is part of runs. */
 export function commanderGridShown({
   players,
   ownerPlayerId,
@@ -116,7 +115,6 @@ export function commanderGridShown({
   return attacked || commanderDamageDealers(players, ownerPlayerId, incoming).length > 0
 }
 
-/** why: an attacker's partners each get a chip once both have dealt damage; otherwise its one total. */
 export function chipTotals(total: number, split?: readonly number[]) {
   const dealt = split?.filter((amount) => amount > 0) ?? []
   return dealt.length > 1 ? dealt : [total]
@@ -187,7 +185,6 @@ export const CommanderStrip = memo(function CommanderStrip({
   const attackerId = attack?.attackerId
   const flood = attack?.flood
   const sourceShown = !!source
-  // why: the grid is measured from its own center; until it lays out, it changes with the disc.
   const lit: Lit = {
     attacked: !!attackerId,
     wave: attack?.wave,
@@ -200,7 +197,6 @@ export const CommanderStrip = memo(function CommanderStrip({
           })
         : (flood?.discGap ?? 0),
   }
-  // why: a seat no one has damaged grows its grid out of its mark only for the attack, and folds it back after.
   const attackOnly = dealt.length === 0
   const grow: Grow = { attackOnly, lit, flight: source?.flight }
   const chips = (playerId: PlayerId) =>
@@ -399,7 +395,6 @@ export const CommanderStrip = memo(function CommanderStrip({
                         {total > 0 ? (
                           count
                         ) : attacking ? (
-                          // why: an attacker that has dealt nothing yet turns its mark into its 0 as the shadow reaches the strip.
                           <>
                             <Eased lit={lit} rest={1} attacked={0}>
                               {mark}
@@ -429,7 +424,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   )
 }, structurallyEqual)
 
-/** why: the own cell's center inside the map, from the same disc, gap, and padding the map lays out with, so the flight lands before the cell could report its own layout. Rows are centered, so a short row starts in by half its missing chips; a seat whose partners both dealt damage takes two. */
+/** why: uses the map's own disc, gap, and padding, since the flight lands before the cell reports its layout. Rows are centered, so a short row starts in by half its missing chips; a seat whose partners both dealt damage takes two. */
 function ownCellCenter(
   rows: readonly (readonly CommanderBoardSeat[])[],
   ownerPlayerId: PlayerId,
@@ -452,10 +447,9 @@ function ownCellCenter(
   return undefined
 }
 
-// why: the grid is small, so it eases over a longer stretch of the shadow's travel than its edge takes to cross it; a quick edge would flip it in a frame.
+// why: the small grid eases over more of the shadow's travel than its edge takes to cross the grid; a quick edge would flip it in one frame.
 const LIT_SPAN = 192
 
-/** why: how far the strip has eased into its attack look, from 0 to 1: as the shadow's edge passes the grid, or at once with no `wave`. */
 type Lit = { attacked: boolean; wave?: SharedValue<number>; flood?: CommanderFlood; gap: number }
 
 function litAt({ attacked, wave, flood, gap }: Lit) {
@@ -466,7 +460,6 @@ function litAt({ attacked, wave, flood, gap }: Lit) {
 
 type PipLook = { opacity: number; border: string }
 
-/** why: a pip eases from its resting look to its attack look as `lit` runs from 0 to 1, so the attacker's brightens and outlines and the rest fade with the passing shadow. */
 function Pip({
   lit,
   rest,
@@ -503,7 +496,6 @@ function Eased({
   return <Animated.View {...props} style={[style, fade]} />
 }
 
-/** why: the attacker's total pops as each hit lands, so a tap reads on the strip the defender is watching. */
 function Pop({ value, children }: { value: number; children: ReactNode }) {
   const reducedMotion = useReducedMotion()
   const scale = useSharedValue(1)
@@ -518,7 +510,6 @@ function Pop({ value, children }: { value: number; children: ReactNode }) {
   return <Animated.View style={style}>{children}</Animated.View>
 }
 
-/** why: the own cell holds the seat's mark with its sword, and on the attacker's card the sword gives way to the finish X or check once the mark has landed. */
 function OwnGlyph({
   finish,
   grow,
@@ -545,7 +536,6 @@ function OwnGlyph({
   )
 }
 
-/** why: how far a seat's grid has grown out of its mark, from 0 to 1. A damaged seat's grid is always fully grown; otherwise it follows the attacker's own flight or the shadow reaching this seat. */
 type Grow = { attackOnly: boolean; lit: Lit; flight?: SharedValue<number> }
 
 function grownAt({ attackOnly, lit, flight }: Grow) {
@@ -591,7 +581,6 @@ const STRIP_CORNER = {
   [-90]: ["right", "bottom", "top"],
 } as const satisfies Record<LifeCardContentRotation, readonly LifeCardEdge[]>
 
-/** why: the card corner the strip sits in, so other corner controls can keep clear of it. */
 export function commanderStripCorner(rotation: LifeCardContentRotation) {
   const [edge, side] = STRIP_CORNER[rotation]
   const [x, y] = edge === "left" || edge === "right" ? [edge, side] : [side, edge]
@@ -657,7 +646,7 @@ const $ownSeat: ThemedStyle<ViewStyle> = () => ({
 })
 
 const $ownGlyph: ViewStyle = { alignItems: "center", justifyContent: "center" }
-// why: the landing mark flies over its neighbours, so its cell draws above theirs.
+// why: the landing mark flies over its neighbours.
 const $aboveCells: ViewStyle = { zIndex: 1 }
 const $overlaid: ViewStyle = {
   ...StyleSheet.absoluteFill,
@@ -665,7 +654,7 @@ const $overlaid: ViewStyle = {
   justifyContent: "center",
 }
 const IDLE_OPACITY = 0.45
-// why: the lowest rim that, drawn over any attacker's disc, keeps 3:1 against every seat color, so each disc stands off its card.
+// why: lowest rim that keeps 3:1 against every seat color.
 const RIM_ALPHA = 0.75
 // why: the own cell is where the seat's mark lands, so it keeps the mark's muted look instead of fading like a cell.
 const OWN_OPACITY = 0.72

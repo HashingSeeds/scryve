@@ -67,7 +67,7 @@ const BLOOM_START_TURN_DEG = -40
 const BLOOM_EXIT_MS = 160
 // why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
 const GATED_MOTION = ReduceMotion.Never
-// why: the result itself flies into its chip, so the card behind it only fades. On web the exit copy lands at the wrong place and size on a turned seat, so web skips it and lets the chip carry the handoff.
+// why: the result flies into its chip, so the card only fades. On web the exit copy lands wrong on a turned seat, so web skips it.
 const BLOOM_EXITING =
   Platform.OS === "web" ? undefined : FadeOut.duration(BLOOM_EXIT_MS).reduceMotion(GATED_MOTION)
 const TUMBLE_TICKS = 9
@@ -373,7 +373,6 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView) {
   return undefined
 }
 
-// why: once the roll-off has a winner, a tap on any seat puts the dice away and the winner keeps the 1st chip.
 function hint(view: DiceSeatView) {
   return view.kind === "first" ||
     (view.kind === "rolloff" && (view.status === "won" || view.status === "lost"))

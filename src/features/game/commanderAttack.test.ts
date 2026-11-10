@@ -16,7 +16,7 @@ const ada = asPlayerId("ada")
 const grace = asPlayerId("grace")
 const katherine = asPlayerId("katherine")
 
-/** why: plays the authority's part, so committed hits show up in the next action's recorded totals as they do on a real board. */
+/** why: plays the authority, so committed hits reach the next action's recorded totals. */
 function attack({
   recorded = {},
   commanders = [{}],

@@ -110,7 +110,7 @@ export function useBoardChrome({
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const closeLayout = useCallback(() => setLayoutOpen(false), [])
-  // why: the menu pauses a commander attack rather than ending it, so closing the menu returns to the attack as it was. A petal that takes over or leaves the board finishes the attack first, sending any held hits as the attacker's check would.
+  // why: the menu pauses a commander attack; a petal that takes over or leaves the board finishes it first, sending held hits.
   const finishAttack = useCallback(() => dispatch({ type: "send" }), [dispatch])
   const fromMenu = useCallback(
     (run: () => void, { keepsAttack = false } = {}) =>
@@ -288,7 +288,6 @@ function LayoutDialog({
       accessibilityViewIsModal
       wide
     >
-      {/* why: layouts plus the seat map outgrow a small phone, so they scroll and the button stays put. */}
       <ScrollView
         testID="layout-picker-scroll"
         style={themed($sheetScroll)}

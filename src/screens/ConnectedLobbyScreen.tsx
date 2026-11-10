@@ -178,7 +178,6 @@ function ConnectedLobbyContent({
     const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
     if (!kept || selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) return setActionError(onlineOnlyNotice("deck"))
-    // why: the seat takes the owner's current list, so the copy this board reads is refreshed to match it first.
     const fresh = await convex.query(api.decks.shared, { token: kept.token }).catch(() => undefined)
     if (fresh === undefined) return setActionError(translate("connected:lobby.errors.selectDeck"))
     if (fresh === null) return setActionError(translate("decks:shared.unavailable"))

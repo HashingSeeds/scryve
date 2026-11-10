@@ -4,7 +4,7 @@ export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
   version: "2026-11-04",
-  effectiveDate: "November 4, 2026",
+  effectiveDate: "November 10, 2026",
   sections: [
     {
       blocks: [
@@ -232,7 +232,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "When you send feedback or a reply in Scryve, we keep what you write along with your app version and platform. We use it to answer you, decide what to build, and fix problems. Only you and the Scryve team see it. A bug report also sends details about your device, and any screenshot you add, to Sentry, which stores them for us.",
+          text: "When you send feedback or a reply in Scryve, we keep what you write along with your app version and platform. We use it to answer you, decide what to build, and fix problems. Only you and the Scryve team see it. A bug report also sends details about your device, and any screenshot you add, to Sentry, which stores them for us. We may use AI tools to translate, sort, and investigate feedback and bug reports. These tools do not train on your content.",
         },
         {
           type: "paragraph",
@@ -411,7 +411,7 @@ export const privacyContent = {
             "Apple and Google, when you purchase a subscription or use their platform services.",
             "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",
             "PostHog, for optional product analytics only when you enable usage sharing.",
-            "AI translation services, to read support messages written in languages other than English. We send only the message text, not your email address, screenshots, or account details. We use services that do not train on this content.",
+            "AI services, to translate, sort, and investigate feedback and bug reports. They do not train on your content.",
             "Resend, to email us when a player is reported so we can review it within 24 hours. That email contains the reported username and any note the reporter wrote; it does not identify the person who filed the report.",
             "Legal and Safety Disclosures. We may disclose information when required by law or when reasonably necessary to protect users, the Services, or our legal rights.",
             "Business Transfers. We may share or transfer information in connection with a merger, financing, acquisition, reorganization, or sale of all or part of our business or assets.",

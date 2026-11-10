@@ -922,8 +922,8 @@ describe("CurrentGameScreen", () => {
       })
     }
 
-    const renderGame = (initialGame = commanderGame()) =>
-      render(
+    const renderGame = (initialGame = commanderGame()) => {
+      const view = render(
         <ThemeProvider initialContext="light">
           <CurrentGameScreen
             initialGame={initialGame}
@@ -932,6 +932,9 @@ describe("CurrentGameScreen", () => {
           />
         </ThemeProvider>,
       )
+      layoutSeats(view)
+      return view
+    }
 
     const life = (view: ReturnType<typeof renderGame>, seat: number) =>
       view.getByTestId(`life-total-seat-${seat}`, { includeHiddenElements: true }).props.children
@@ -1090,6 +1093,7 @@ describe("CurrentGameScreen", () => {
           />
         </ThemeProvider>,
       )
+      layoutSeats(view)
 
       fireEvent.press(view.getByTestId("game-menu-button"))
       expect(view.getByTestId("connect-button")).toBeTruthy()

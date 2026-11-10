@@ -28,10 +28,9 @@ export type BackRoute = keyof typeof BACK_LABELS
 
 const BACK_LABEL_KEYS: ReadonlyMap<string, TxKeyPath> = new Map(Object.entries(BACK_LABELS))
 
-// why: past this a label crowds the centered title, so it reads "Back" as iOS does.
 const MAX_BACK_LABEL_LENGTH = 12
 
-/** why: names where back lands, as iOS does: the root stack route under this one, or `fallback` when nothing is under it (deep link, cold start). Reads context so it is safe outside a navigator, where expo-router's hooks throw. */
+/** why: names where back lands, as iOS does, or `fallback` when nothing is under it (deep link, cold start). Reads context so it is safe outside a navigator, where expo-router hooks throw. */
 export function useBackLabel(fallback: BackRoute = "index") {
   const navigation = useContext(NavigationContext)
   const route = useContext(NavigationRouteContext)
@@ -54,7 +53,7 @@ export function useBackLabel(fallback: BackRoute = "index") {
   }, [below, fallback])
 }
 
-/** why: a label too long to sit beside the chevron reads "Back", as iOS does, whether it came from the stack or the caller. */
+/** why: a label too long beside the chevron reads "Back", whether from the stack or the caller. */
 export function fitBackLabel(label: string | undefined) {
   return label && label.length <= MAX_BACK_LABEL_LENGTH ? label : translate("common:back")
 }

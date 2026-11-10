@@ -13,7 +13,6 @@ import type { ThemedStyle } from "@/theme/types"
 
 export interface MyFeedbackScreenProps {
   items: readonly FeedbackOwnItem[] | undefined
-  offline: boolean
   deleteFailed?: boolean
   onOpen: (item: FeedbackOwnItem) => void
   onDeleteAll: () => void
@@ -22,7 +21,6 @@ export interface MyFeedbackScreenProps {
 
 export function MyFeedbackScreen({
   items,
-  offline,
   deleteFailed,
   onOpen,
   onDeleteAll,
@@ -32,7 +30,7 @@ export function MyFeedbackScreen({
   const [confirming, setConfirming] = useState(false)
   const empty = items?.length === 0
   return (
-    <FeedbackLayout title={translate("feedback:mine.title")} offline={offline} onBack={onBack}>
+    <FeedbackLayout title={translate("feedback:mine.title")} onBack={onBack}>
       {empty ? <Text tx="feedback:mine.empty" tone="dim" /> : null}
       {items?.map((item) => (
         <Pressable

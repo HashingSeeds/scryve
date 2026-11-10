@@ -63,7 +63,6 @@ describe("LifeEditor", () => {
 
   it("shrinks the total on a short sideways seat only as far as the controls need", () => {
     const header = { top: 12, left: 12, right: 12 }
-    // why: a four-seat sideways seat on an iPhone 17 is about 430 by 197 in its own space.
     const short = lifeEditorValueLayout({
       width: 430,
       height: 197,

@@ -10,34 +10,34 @@ export default {
     newCount_other: "{{count}} nuevos",
     email: "Escribir al soporte",
     emailDetail: "Preguntas sobre la cuenta o la facturación",
-    suggest: "Sugerir una función o informar de un error",
+    suggestFeature: "Sugerir una función",
+    reportBug: "Informar de un error",
     noMatch: "No hay respuestas para “{{query}}”.",
     ask: "Pregúntanos sobre “{{query}}”",
   },
-  offline: "Sin conexión. Tu borrador se queda aquí hasta que vuelvas.",
+  offline: "Sin conexión. Tu borrador se queda aquí hasta que vuelvas a conectarte.",
   suggest: {
     title: "Enviar comentarios",
     kind: "¿De qué se trata?",
     feature: "Función",
     bug: "Error",
+    prompt: {
+      feature: "¿Qué te gustaría ver?",
+      bug: "¿Qué salió mal?",
+    },
     bodyPlaceholder: {
-      feature: "¿Qué te gustaría y cuándo lo usarías?",
-      bug: "¿Qué pasó? ¿Qué esperabas que pasara?",
+      feature: "¿Cuándo lo usarías?",
+      bug: "¿Qué esperabas?",
     },
     addScreenshot: "Añadir captura de pantalla",
     removeScreenshot: "Quitar captura de pantalla",
     selectedScreenshot: "Captura de pantalla seleccionada",
     screenshotFailed: "No se pudo añadir esa captura. Prueba con otra imagen.",
-    sentryDisclosure:
-      "Los informes de errores y las capturas de pantalla también envían a Sentry los datos de tu dispositivo.",
-    translationNotice:
-      "Escribe en el idioma que quieras. Podemos usar herramientas de IA para traducirlo. Consulta nuestra <privacy>Política de privacidad</privacy>.",
+    notice:
+      "Cualquier idioma sirve. Una IA puede ayudarnos a leerlo. <privacy>Privacidad</privacy>",
     includeAccount: "Incluir mi cuenta",
     includeAccountHelper:
-      "Las respuestas te siguen en todos los dispositivos en los que inicies sesión, y nosotros vemos tu nombre de usuario.",
-    anonymous:
-      "Enviado sin tu cuenta. Las respuestas se muestran en este dispositivo y, si reinstalas la app, podrías perderlas.",
-    signInToKeep: "Inicia sesión para conservarlo",
+      "Las respuestas se sincronizan con tus dispositivos y vemos tu nombre de usuario.",
     sendFailed: "No se pudo enviar. Inténtalo de nuevo.",
     rateLimited_one: "Demasiados envíos. Inténtalo de nuevo en {{count}} minuto.",
     rateLimited_many: "Demasiados envíos. Inténtalo de nuevo en {{count}} minutos.",
@@ -70,7 +70,7 @@ export default {
     linkedElsewhere: "Enviado con otra cuenta",
     notLinked: "Enviado sin tu cuenta.",
     includeAccount: "Incluirla",
-    signInToKeep: "Inicia sesión para conservarlo",
+    signInToSync: "Inicia sesión para sincronizarlo",
   },
   notifyPrompt: {
     title: "¿Quieres recibir una notificación cuando haya respuestas?",

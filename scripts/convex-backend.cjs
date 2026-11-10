@@ -45,9 +45,7 @@ function backendMatches(baseRef, headRef, cwd = root) {
 }
 
 /**
- * why: beta runs one at a time, so the finished run that started last is the last one that could
- * have deployed, even when it re-ran an older commit. Only a success proves production runs its
- * commit's backend: a failed or cancelled run may have deployed and then stopped.
+ * why: beta runs one at a time, so the last-started finished run is the last that could have deployed, even if it re-ran an older commit. Only a success proves production runs that commit's backend; a failed or cancelled run may have deployed, then stopped.
  */
 function betaDeployDecision(finishedRuns, matches) {
   const [lastRun] = finishedRuns.toSorted((a, b) =>
