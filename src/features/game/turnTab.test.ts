@@ -186,3 +186,63 @@ describe("the local log without a full logOrder", () => {
     }
   })
 })
+
+describe("a long-lived local board", () => {
+  it("keeps logOrder to the changes its lists still hold, and Undo still picks the newest", () => {
+    const created = createLocalGame({
+      startingLife: 40,
+      now: 0,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Bo", color: "#111" },
+      ],
+    })
+    const [ada, bo] = created.players
+    const actor = asActorId("local")
+    let game = withFirstTurn(created, ada.id, { operationId: "turn-first", now: 0 })
+    let at = 0
+    const tap = (playerId: typeof ada.id) => {
+      at += 1
+      game = applyGameCommand(
+        game,
+        { type: "life.change", playerId, delta: -1 },
+        {
+          actorId: actor,
+          deviceId: asDeviceId("device"),
+          now: () => at,
+          operationId: () => asOperationId(`operation-hit-${String(at).padStart(6, "0")}`),
+        },
+      )
+    }
+    const table = (action: Parameters<typeof applyLocalTableAction>[1], operationId: string) => {
+      at += 1
+      game = applyLocalTableAction(game, action, { operationId, now: at })
+    }
+
+    for (let round = 0; round < 300; round += 1) {
+      tap(ada.id)
+      tap(bo.id)
+      table({ kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id }, `turn-pass-${round}`)
+      table(
+        { kind: "turn.undone", playerId: ada.id, turnOperationId: `turn-pass-${round}` },
+        `turn-undo-${round}`,
+      )
+    }
+
+    const held = new Set<string>([
+      ...game.events.map(({ operationId }) => operationId),
+      ...(game.turnLog ?? []).map(({ operationId }) => operationId),
+    ])
+    expect(game.events.length).toBeGreaterThan(500)
+    expect(game.logOrder?.every((id) => held.has(id))).toBe(true)
+    expect(game.logOrder?.length).toBeLessThanOrEqual(held.size)
+
+    table({ kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id }, "turn-pass-last")
+    expect(undoableTurn(game, actor)).toEqual({
+      playerId: ada.id,
+      turnOperationId: "turn-pass-last",
+    })
+    tap(bo.id)
+    expect(undoableTurn(game, actor)).toBeUndefined()
+  })
+})

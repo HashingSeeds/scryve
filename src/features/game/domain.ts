@@ -519,10 +519,10 @@ export function applyLocalTableAction(
     : withLogged(startTurnOnChange(applied, context.now), context.operationId)
 }
 
-const withLogged = (game: LocalGame, operationId: string): LocalGame => ({
-  ...game,
-  logOrder: [...(game.logOrder ?? []), operationId],
-})
+function withLogged(game: LocalGame, operationId: string): LocalGame {
+  const logged = { ...game, logOrder: [...(game.logOrder ?? []), operationId] }
+  return { ...logged, logOrder: retainedLogOrder(logged) }
+}
 
 export function retainedLogOrder(game: Pick<LocalGame, "logOrder" | "events" | "turnLog">) {
   const retained = new Set(
