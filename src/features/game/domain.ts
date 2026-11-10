@@ -526,6 +526,14 @@ const withLogged = (game: LocalGame, operationId: string): LocalGame => ({
   logOrder: [...(game.logOrder ?? []), operationId],
 })
 
+/** why: `logOrder` gains an id per operation, so a save keeps only the ids of changes still in a list the log reads, in the same order. */
+export function retainedLogOrder(game: Pick<LocalGame, "logOrder" | "events" | "turnLog">) {
+  const retained = new Set(
+    [...game.events, ...(game.turnLog ?? [])].map(({ operationId }) => operationId),
+  )
+  return (game.logOrder ?? []).filter((id) => retained.has(id))
+}
+
 /**
  * why: the log's order is a sequence, never a clock, so a change sits where `logOrder` put it. A
  * change missing from it (saved before `logOrder`, or by an older build after a rollback, which

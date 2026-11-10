@@ -102,7 +102,11 @@ function expectStored(storage: MemoryStorage, saved: Board) {
   if (!loaded) throw new Error("the saved game did not load")
   const { events, ...rest } = loaded
   const { events: _savedEvents, ...savedRest } = saved.game
-  expect(rest).toEqual(savedRest)
+  const kept = new Set<string>(events.map(({ operationId }) => operationId))
+  expect(rest).toEqual({
+    ...savedRest,
+    ...(savedRest.logOrder ? { logOrder: savedRest.logOrder.filter((id) => kept.has(id)) } : {}),
+  })
   expect(JSON.stringify(events)).toBe(
     JSON.stringify(saved.fullHistory.slice(saved.fullHistory.length - events.length)),
   )
