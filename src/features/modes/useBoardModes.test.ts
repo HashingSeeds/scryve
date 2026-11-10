@@ -40,6 +40,31 @@ describe("useBoardModes", () => {
     expect(connected.result.current.dialogSeat).toBe("bo")
   })
 
+  it("lets every seat roll with Turns off in Archenemy, and only the active side with Turns on", () => {
+    const seats = ["ada", "bo", "cy", "dee"]
+    const started = startModes({ archenemy: { seat: 1 }, planechase: {} }, seats)
+    const input = { modes: started.modes, groups: started.turnGroups }
+    const off = boardModes({ ...input, turnsOn: false })
+    act(() => off.result.current.openDialog("planar", "cy"))
+    expect(off.result.current.dialogSeat).toBe("cy")
+    expect(seats.map((seat) => off.result.current.planar?.dieFor(seat).canRoll)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ])
+
+    const on = boardModes({ ...input, turnsOn: true })
+    act(() => on.result.current.openDialog("planar", "cy"))
+    expect(on.result.current.dialogSeat).toBe("ada")
+    expect(seats.map((seat) => on.result.current.planar?.dieFor(seat).canRoll)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ])
+  })
+
   it("offers Reset cost whenever Turns are off, even in a game that holds a turn", () => {
     expect(boardModes().result.current.planar?.manualReset).toBe(false)
     expect(boardModes({ turnsOn: false }).result.current.planar?.manualReset).toBe(true)

@@ -6,7 +6,6 @@ import { modeLogText } from "./modeCards"
 import type { ModeCard } from "../../../convex/lib/modeDecks"
 import {
   faceUpPlane,
-  mayRoll,
   PLANAR_DIE,
   planarCards,
   rollCost,
@@ -16,7 +15,7 @@ import {
   type PlanarFace,
   type TableModes,
 } from "../../../convex/lib/tableModes"
-import { turnGroupOf, type Turn, type TurnGroups } from "../../../convex/lib/turns"
+import { sharesTurn, turnGroupOf, type Turn, type TurnGroups } from "../../../convex/lib/turns"
 
 export interface BoardModesInput {
   modes: TableModes | undefined
@@ -87,17 +86,18 @@ export function useBoardModes({
     [planechase?.decks, archenemy?.deck],
   )
 
-  const roller = players.find(({ id }) => controls(id) && mayRoll(turn, groups, id))?.id
+  const mayRoll = (seat: string) =>
+    controls(seat) && (!turnsOn || !turn || sharesTurn(groups, turn.playerId, seat))
+  const roller = players.find(({ id }) => mayRoll(id))?.id
   const actor = roller ?? players.find(({ id }) => controls(id))?.id
-  const dialogSeat =
-    opener !== undefined && controls(opener) && mayRoll(turn, groups, opener) ? opener : roller
+  const dialogSeat = opener !== undefined && mayRoll(opener) ? opener : roller
   const log = modes?.log ?? []
   const lastRolled = [...log].reverse().find((entry) => entry.kind === "rolled")
 
   const phenomenon = faceUpPlane(planechase)?.kind === "phenomenon"
   const dieFor = (seat: string | undefined): PlanarDie => ({
     cost: planechase && seat ? rollCost(planechase, turn, seat) : 0,
-    canRoll: !!seat && controls(seat) && mayRoll(turn, groups, seat) && !phenomenon,
+    canRoll: !!seat && mayRoll(seat) && !phenomenon,
     roll: () => {
       if (seat) act({ kind: "planar.rolled", playerId: seat, face: PLANAR_DIE[randomIndex(6)] })
     },
