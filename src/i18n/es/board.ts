@@ -574,12 +574,6 @@ export default {
     chessOff: "Desactivado",
     roundClock: "Reloj de ronda",
     divider: "Turno {{number}} · {{name}}",
-    hideOffer: {
-      title: "¿Dejar de llevar los turnos?",
-      body: "Puedes volver a activarlo en Ajustes.",
-      hide: "Dejar",
-      keep: "Mantener",
-    },
   },
   log: {
     close: "Cerrar registro",

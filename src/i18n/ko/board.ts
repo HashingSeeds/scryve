@@ -530,12 +530,6 @@ export default {
     chessOff: "끔",
     roundClock: "라운드 시계",
     divider: "{{number}}턴 · {{name}}",
-    hideOffer: {
-      title: "턴 추적을 중단할까요?",
-      body: "설정에서 다시 켤 수 있습니다.",
-      hide: "중단",
-      keep: "유지",
-    },
   },
   log: {
     close: "기록 닫기",

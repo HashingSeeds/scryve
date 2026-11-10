@@ -527,12 +527,6 @@ export default {
     chessOff: "オフ",
     roundClock: "ラウンド時計",
     divider: "ターン{{number}} · {{name}}",
-    hideOffer: {
-      title: "ターンの記録をやめますか?",
-      body: "設定からいつでも再びオンにできます。",
-      hide: "やめる",
-      keep: "表示したまま",
-    },
   },
   log: {
     close: "ログを閉じる",
