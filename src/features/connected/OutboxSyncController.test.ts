@@ -634,6 +634,48 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().failed).toMatchObject([{ reason: "Game is not active" }])
   })
 
+  it("clears a full queue's error once an undo queues", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1", { maxPendingRecords: 2 })
+    const { clock, controller } = harness({ storage, repository })
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    for (const player of ["player-1", "player-2", "player-1"]) {
+      clock.time += 1
+      controller.changeLife(player, -1)
+    }
+    const [first] = stored(repository).pending
+    controller.setEnvironment(ONLINE)
+    await settle()
+    expect(controller.getSnapshot().changeError).toMatch(/queue for pending changes is full/)
+
+    controller.undoLife([{ operationId: first.event.operationId, playerId: "player-1", delta: -1 }])
+
+    expect(stored(repository).pending).toHaveLength(1)
+    expect(controller.getSnapshot().changeError).toBeUndefined()
+  })
+
+  it("says an undo was only partly saved when the queue fills partway through it", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1", { maxPendingRecords: 2 })
+    const { controller } = harness({ storage, repository })
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    controller.undoLife(
+      ["operation-undone-00001", "operation-undone-00002", "operation-undone-00003"].map(
+        (operationId) => ({
+          operationId,
+          playerId: "player-1",
+          delta: -1,
+        }),
+      ),
+    )
+
+    expect(stored(repository).pending).toHaveLength(2)
+    expect(controller.getSnapshot().changeError).toMatch(/only part of it was saved/)
+  })
+
   it("tells the attacker when the server declines a claim the defender has not answered yet", async () => {
     const { controller, repository } = harness({
       send: async ({ event }) => ({

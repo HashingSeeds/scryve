@@ -39,6 +39,7 @@
   "sync.announcement.offline": "00c7721db807",
   "sync.announcement.attention": "826407369326",
   "outbox.queueFull": "26a75c8c1c9c",
+  "outbox.undoPartial": "37135e23fb8b",
   "outbox.commanderDamageRange": "3f1cc20276a1",
   "outbox.commanderSelfDamage": "6f93992f4f17",
   "outbox.commanderClaimDeclined": "f36645002f94",

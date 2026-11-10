@@ -80,6 +80,8 @@ export default {
   outbox: {
     queueFull:
       "La cola sin conexión de cambios pendientes está llena. Vuelve a conectarte y sincroniza antes de hacer más cambios.",
+    undoPartial:
+      "La cola sin conexión se llenó a mitad de este deshacer, así que solo se guardó una parte. Vuelve a conectarte y sincroniza, luego deshaz el resto.",
     commanderDamageRange: "Los cambios de daño de comandante deben estar entre 1 y {{max}}.",
     commanderSelfDamage: "Un comandante no puede dañarse a sí mismo",
     commanderClaimDeclined:
