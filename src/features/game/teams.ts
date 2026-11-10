@@ -4,7 +4,6 @@ import { turnGroupOf, type TurnGroups } from "../../../convex/lib/turns"
 
 type Named = { id: string; name: string }
 
-/** why: a team is named by its players in seat order, so a group of one keeps its player's own name. */
 export function teamName(
   players: readonly Named[],
   groups: TurnGroups | undefined,
@@ -27,7 +26,6 @@ export function teamMembers<Player extends { id: string }>(
   return players.filter(({ id }) => group.includes(id))
 }
 
-/** why: a team is one winner choice, offered at its first seat; a player outside any team is their own choice. */
 export function teamChoices<Player extends { id: string }>(
   players: readonly Player[],
   groups: TurnGroups | undefined,
@@ -35,7 +33,6 @@ export function teamChoices<Player extends { id: string }>(
   return players.filter((player) => teamMembers(players, groups, player.id)[0] === player)
 }
 
-/** why: each team's name once, in seat order, for a result that lists its winners. */
 export function winnerNames(
   players: readonly Named[],
   groups: TurnGroups | undefined,
@@ -47,7 +44,6 @@ export function winnerNames(
   ).flatMap(({ id }) => teamName(players, groups, id) ?? [])
 }
 
-/** why: a team's row shows its value only when the team shares one, so the team's name keeps the room; screen readers still hear each member's value. */
 export function teamValueLabel(
   players: readonly { id: string; life: number }[],
   groups: TurnGroups | undefined,

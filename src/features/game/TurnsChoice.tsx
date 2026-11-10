@@ -14,7 +14,6 @@ const CHOICES = [
   { on: true, tx: "play:turnsChoice.lifeAndTurns", testID: "turns-choice-turns" },
 ] as const
 
-/** why: turns are opt-in, chosen where a game is set up, and the choice is saved so the next game starts the same way. */
 export function TurnsChoice({
   repository = localGameRepository,
   style,

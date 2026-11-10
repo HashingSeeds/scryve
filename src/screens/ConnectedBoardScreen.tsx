@@ -733,7 +733,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     id: playerId,
     name: displayName,
   }))
-  // why: a team wins together, so choosing it chooses every seat in it.
   function toggleWinner(playerId: string) {
     setDrawSelected(false)
     const team = teamMembers(named, turnGroups, playerId).map(({ id }) => id)
@@ -1029,7 +1028,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
-  // why: with turns on and nobody holding the first turn, each of this device's seats carries an empty 1st that takes it.
   const seatGrid = {
     ...dice.grid,
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
@@ -1039,7 +1037,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
-      // why: the turn chip marks who went first here, so a claim never leaves a local 1st badge behind.
       if (chip.kind === "claim") {
         if (!turn) table?.setTurn(player.id, player.id)
         return

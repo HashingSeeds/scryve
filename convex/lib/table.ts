@@ -5,6 +5,7 @@ import {
   applyTurnAction,
   isTurnAction,
   isValidTurn,
+  isValidTurnGroups,
   remapTurn,
   turnActionValidators,
   turnGroupsValidator,
@@ -695,6 +696,7 @@ export function isValidTableSnapshot(
 ): boolean {
   return (
     (table.turn === undefined || isValidTurn(table.turn, playerIds)) &&
+    (table.turnGroups === undefined || isValidTurnGroups(table.turnGroups, playerIds)) &&
     Object.entries(table.designations).every(
       ([designationId, holder]) =>
         rules.designations.some(({ id }) => id === designationId) && playerIds.has(holder),
@@ -734,6 +736,7 @@ function isValidCustomCounters(
 export function remapTableState(table: TableState, idOf: (playerId: string) => string): TableState {
   return {
     ...(table.turn ? { turn: remapTurn(table.turn, idOf) } : {}),
+    ...(table.turnGroups ? { turnGroups: table.turnGroups.map((group) => group.map(idOf)) } : {}),
     designations: Object.fromEntries(
       Object.entries(table.designations).map(([designationId, holder]) => [
         designationId,

@@ -19,7 +19,6 @@ export interface RoundClock {
   /** why: 0 is the turn in progress when time was called, which does not count toward the extra turns. */
   turn?: number
   bonusTurns?: number
-  /** why: the pass that counted the last extra turn, so taking that pass back takes the count back. */
   steppedBy?: string
 }
 
@@ -150,7 +149,6 @@ export function stepRoundTurn(
   return { ...clock, turn: Math.min(view.turns + 1, Math.max(0, view.turn + step)) }
 }
 
-/** why: a pass during the extra turns counts one, and taking it back from the toast, the turn dialog or the log takes the count back with it. */
 export function roundClockAfterTurn(
   clock: RoundClock,
   system: PlaySystemId | undefined,

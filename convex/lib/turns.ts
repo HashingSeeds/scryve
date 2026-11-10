@@ -6,22 +6,14 @@ const turnFields = {
   startedAt: v.number(),
   operationId: v.string(),
   spent: v.optional(v.record(v.string(), v.number())),
-  /** why: the first turn's clock waits for a Start tap or the table's first change, so setup time never counts against the first player. */
   waiting: v.optional(v.literal(true)),
 }
 
 export const previousTurnValidator = v.object(turnFields)
 
-/**
- * why: seats that share a turn, such as a Two-Headed Giant team or Archenemy's opponents. The turn
- * moves group to group in the board's clockwise order of each group's first seat. A seat in no
- * group is a group of its own, so a game without groups passes seat to seat. Each group's first
- * seat holds the turn record, so turn time and the chess bank count per group.
- */
 export const turnGroupsValidator = v.array(v.array(v.string()))
 export type TurnGroups = readonly (readonly string[])[]
 
-/** why: `base` is each seat's time already spent when the bank was set, so a bank chosen mid-game starts everyone full. */
 export const turnBankValidator = v.object({
   ms: v.number(),
   base: v.record(v.string(), v.number()),
@@ -29,20 +21,14 @@ export const turnBankValidator = v.object({
 
 export const turnValidator = v.object({
   ...turnFields,
-  /** why: one level is enough to take back an accidental pass, and keeps every projection small. */
   previous: v.optional(previousTurnValidator),
   bank: v.optional(turnBankValidator),
 })
 
-/**
- * why: `playerId` is the seat sending the action, so seat ownership decides who may act. Only the
- * seat holding the turn passes or hands it on, and only the seat that passed takes it back.
- */
 export const turnActionValidators = [
   v.object({ kind: v.literal("turn.passed"), playerId: v.string(), toPlayerId: v.string() }),
   v.object({ kind: v.literal("turn.set"), playerId: v.string(), toPlayerId: v.string() }),
   v.object({ kind: v.literal("turn.undone"), playerId: v.string(), turnOperationId: v.string() }),
-  /** why: any seat may set the chess clock, and every device reads the same bank from the authority. */
   v.object({ kind: v.literal("turn.clock"), playerId: v.string(), bankMs: v.optional(v.number()) }),
   v.object({ kind: v.literal("turn.started"), playerId: v.string() }),
 ] as const
@@ -73,7 +59,6 @@ export interface TurnContext {
 export const turnGroupOf = (groups: TurnGroups | undefined, playerId: string): readonly string[] =>
   groups?.find((group) => group.includes(playerId)) ?? [playerId]
 
-/** why: the group's first seat stands for the whole group in the turn record. */
 export const turnLead = (groups: TurnGroups | undefined, playerId: string) =>
   turnGroupOf(groups, playerId)[0]
 
@@ -108,12 +93,7 @@ function withBank(turn: Turn, bankMs: number | undefined, now: number): Turn | n
   return { ...rest, bank: { ms: bankMs, base: spentAfter(turn, now) } }
 }
 
-/**
- * why: one reducer for local games, the connected overlay, Convex, and a nearby host, so every
- * device lands on the same turn. Any seat in the group holding the turn may pass it, and any seat
- * in the group that passed may take it back. An undo restores the passer's start time too, so
- * their clock runs on as if the pass never happened.
- */
+/** why: one reducer for local games, the connected overlay, Convex, and a nearby host, so every device lands on the same turn. */
 export function applyTurnAction(
   turn: Turn | undefined,
   action: TurnAction,
@@ -154,15 +134,10 @@ function startedTurn(turn: Turn, now: number): Turn | undefined {
   return { ...running, startedAt: now }
 }
 
-/** why: the first player usually acts on someone else's card first, so any change anywhere on the table starts a waiting first turn. */
 export function startedByChange(turn: Turn | undefined, now: number) {
   return turn ? startedTurn(turn, now) : undefined
 }
 
-/**
- * why: `order` is every seat clockwise around the board. Groups follow the clockwise position of
- * their first seat there, and a group passes only once every seat in it is out.
- */
 export function nextTurnSeat(
   order: readonly string[],
   current: string,
@@ -179,7 +154,6 @@ export function nextTurnSeat(
   return undefined
 }
 
-/** why: a seat in two groups, or a group of no seats, would leave the turn with no single holder. */
 export function isValidTurnGroups(
   value: unknown,
   playerIds: ReadonlySet<string>,

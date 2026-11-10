@@ -220,12 +220,10 @@ export interface GameStore {
   readonly game: EngineGame
   seat(id: string): Read<EngineSeat | undefined>
   event(operationId: string): Read<GameEventRecord | undefined>
-  /** why: a change may be taken back once, so an undo checks no other undo already names it. */
   undoneBy(operationId: string): Read<GameEventRecord | undefined>
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
-  /** why: in seat order; a pass reads every seat to skip those that are out. */
   seats(): Read<readonly EngineSeat[]>
   commanderTotals(): Read<readonly CommanderTotal[]>
   isMember(): Read<boolean>
@@ -464,7 +462,6 @@ function* writeLife(
   return acknowledged({ operationId, deduplicated: false, currentLife })
 }
 
-/** why: the game log hides a change and its undo together, so an undo may only name a standing change of the same kind the same account made on the same seat. */
 const isOwnChange = (
   event: GameEventRecord | undefined,
   request: { kind: string; playerId: string; actorUserId: string },
@@ -474,7 +471,6 @@ const isOwnChange = (
   event.playerId === request.playerId &&
   event.actorUserId === request.actorUserId
 
-/** why: the log counts a counter back from its current value, so a tap the floor or cap absorbed records what it changed, not what was asked. */
 const appliedCounterDelta = (
   before: PlayerTable | undefined,
   after: PlayerTable | undefined,
@@ -663,7 +659,6 @@ function* writeTable(
 ): GameSteps<GameWriteResult> {
   const sent = normalizedTableAction(write.action)
   const action = gatedTableAction(sent)
-  // why: "anyone edits" lets the table fix each other's counts, not claim, pass or take back another seat's turn.
   const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
@@ -682,7 +677,6 @@ function* writeTable(
       return failed(writeError("invalid_undo", "Only your own change can be taken back"))
     if (yield* read(store.undoneBy(write.undoOf)))
       return failed(writeError("invalid_undo", "This change was already taken back"))
-    // why: a counter stops at 0 and at its max, so its undo reverses what the authority recorded, not what the device asked for.
     if (action.kind === "counter.changed" || action.kind === "customCounter.changed") {
       if (!undone?.delta) return failed(writeError("invalid_undo", "This change moved nothing"))
       request.action = { ...action, delta: -undone.delta }

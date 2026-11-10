@@ -21,7 +21,7 @@ export interface DurableOutboxCodec<
   createFailure(action: Pending, reason: string, failedAt: number): Failed
   operationId(action: Pending): string
   compare?(left: Pending, right: Pending): number
-  /** why: records come back in the order they were written, which a field another build didn't write can be filled from. Return the same object for a record left as is; a new one is written back. */
+  /** why: the outbox writes back every record this returns as a new object, so one left as is must come back as the same object. */
   inStoredOrder?(pending: readonly Pending[]): Pending[]
   /** why: a value that has to be unique across every writer of this storage is taken from what is stored now, not from one writer's copy. */
   stamp?(action: Pending, stored: readonly Pending[]): Pending
@@ -420,7 +420,6 @@ export class DurableOutbox<
     this.storage.set(this.keys.pendingIndex, JSON.stringify(validIds))
     this.reportQuarantined(quarantined)
     const filled = this.codec.inStoredOrder?.(pending) ?? pending
-    // why: a filled field is written back before anything new is queued, or the next read fills it again after records queued since.
     filled.forEach((action, index) => {
       if (action !== pending[index])
         this.storage.set(this.pendingKey(this.codec.operationId(action)), this.serialize(action))

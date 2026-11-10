@@ -45,7 +45,6 @@ function renderGame(
   )
 }
 
-/** why: turns are opt-in, so a fresh device has them off. */
 function turnsOff() {
   return new LocalGameRepository(new MemoryStorage())
 }

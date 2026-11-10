@@ -47,9 +47,7 @@ export function GameLogDialog({
   canUndo: boolean
   undoLabel?: string
   origin?: DialogOrigin
-  /** why: a connected game's log arrives a page at a time. */
   onMore?: () => void
-  /** why: rows go under turns by sequence, never a clock: the authority's order, or a local game's apply order. */
   positionOf: (operationId: string) => number | undefined
   onUndo: () => void
   onClose: () => void
@@ -67,7 +65,6 @@ export function GameLogDialog({
       ),
     [players, events, turns, counters, positionOf],
   )
-  // why: a page can hold only changes the log hides, such as a change with its undo or passes with turns hidden, which leaves no new row to scroll to, so the log reads on by itself.
   const shownRows = useRef<number | undefined>(undefined)
   const readOn = useEffectEvent(() => {
     const before = shownRows.current

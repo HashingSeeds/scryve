@@ -18,11 +18,7 @@ import { Text } from "./Text"
 const BORDER = 4
 const WARN_MS = 5 * 60_000
 
-/**
- * why: the round clock lives in the edge tabs where the first-player tab was, at the menu's seam,
- * each copy turned toward the players nearest it. Every copy opens the same controls, so screen
- * readers and keyboards get only the first.
- */
+/** why: every copy opens the same controls, so screen readers and keyboards get only the first. */
 export const RoundClockTabs = memo(function RoundClockTabs({
   tabs,
   clock,

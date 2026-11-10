@@ -175,7 +175,6 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       throw new SeedError(`life ${target} for seat ${index + 1} was rejected by the game rules.`)
   })
 
-  // why: groups=1+2,3+4 seats players who share a turn, until a game mode sets its own.
   const groups = list(params.groups).map((entry) =>
     entry.split("+").map((value) => game.players[integer("groups seat", value) - 1]?.id ?? value),
   )

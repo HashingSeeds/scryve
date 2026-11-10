@@ -74,7 +74,6 @@ export function DiceChips({
       style={themed($row)}
     >
       {chips.map((chip) => {
-        // why: the turn chip has its own spot at the top of the card, out of the name's row.
         if (chip.kind === "turn") return null
         const key = chipKey(chip)
         const claim = chip.kind === "claim"
