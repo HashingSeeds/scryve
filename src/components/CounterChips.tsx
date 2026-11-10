@@ -750,7 +750,9 @@ function CounterSheet({
     paddingRight: sheetSideInset(contentRotation, contentInsets, "right"),
   }
   const diceWidth = split ? NARROW_DICE_WIDTH + DIVIDER_SPACE : 0
-  const optionColumn = (width - padding.paddingLeft - padding.paddingRight - diceWidth) / 2
+  const trackerWidth = width - padding.paddingLeft - padding.paddingRight - diceWidth
+  const oneColumn = trackerWidth / 2 < TWO_COLUMN_MIN
+  const optionColumn = oneColumn ? trackerWidth : trackerWidth / 2
   const roomForRule = optionColumn >= RULE_BUTTON_COLUMN
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
@@ -908,6 +910,7 @@ function CounterSheet({
                           ink={ink}
                           rule={rule}
                           ruleButton={roomForRule}
+                          oneColumn={oneColumn}
                           ruleTestID={`counter-rule-${seatNumber}-${option.id}`}
                           iconOnly={split && allDice}
                           slide={slide}
@@ -943,6 +946,7 @@ function CounterSheet({
                           ink={ink}
                           rule={optionRule(option.id)}
                           ruleButton={roomForRule}
+                          oneColumn={oneColumn}
                           ruleTestID={`designation-rule-${seatNumber}-${option.id}`}
                           iconOnly={split && allDice}
                           slide={slide}
@@ -973,6 +977,7 @@ function CounterSheet({
                         accessibilityLabel={translate("board:counters.custom")}
                         ink={ink}
                         ruleButton={roomForRule}
+                        oneColumn={oneColumn}
                         ruleTestID={`counter-rule-${seatNumber}-custom`}
                         iconOnly={split && allDice}
                         slide={slide}
@@ -1278,12 +1283,14 @@ function SheetOption({
   ruleButton,
   ruleTestID,
   iconOnly,
+  oneColumn,
   slide,
   fade,
   onPress,
 }: {
   ruleButton: boolean
   iconOnly?: boolean
+  oneColumn?: boolean
   slide?: ReturnType<typeof useCornerSlide>
   fade?: boolean
   ref?: Ref<View>
@@ -1302,7 +1309,7 @@ function SheetOption({
   const fadeIn = fade ? FadeIn.duration(SHEET_FADE_MS) : undefined
   const fadeOut = fade ? FadeOut.duration(SHEET_FADE_MS) : undefined
   return (
-    <Animated.View layout={slide} style={$optionCell}>
+    <Animated.View layout={slide} style={[$optionCell, oneColumn && !iconOnly && $oneColumnCell]}>
       <BoardPressable
         ref={ref}
         testID={testID}
@@ -1546,6 +1553,11 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
+
+const $oneColumnCell: ViewStyle = { width: "100%" }
+
+// why: a narrower two-up column leaves no room for a name beside the glyph and value, so a crowded seat's trackers show bare values.
+const TWO_COLUMN_MIN = 88
 
 const $optionWords: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexShrink: 1,

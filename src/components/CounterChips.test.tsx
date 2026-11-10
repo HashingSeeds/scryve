@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/theme/context"
 
 import { CounterChips, fitChips, type CounterChipsProps, type SeatTable } from "./CounterChips"
 import { LifeCard } from "./LifeCard"
+import { customCounterId } from "../../convex/lib/table"
 
 const commander = playTableRules("mtg", "commander")
 
@@ -264,6 +265,37 @@ describe("CounterChips", () => {
     expect(view.queryByTestId("counter-chip-1-poison")).toBeNull()
     fireEvent.press(view.getByLabelText("Seat 1, Ada, 3 more counters"))
     expect(view.getByTestId("counter-sheet-seat-1")).toBeTruthy()
+  })
+
+  it("names every counter in the bag opened from +N on a six-seat 320pt phone", () => {
+    const names = ["Speed", "Rad", "Storm", "Tickets"]
+    const values = [2, 3, 1, 5]
+    const custom = names.map((name) => ({
+      id: customCounterId(name),
+      label: name,
+      step: 1,
+      max: 99,
+    }))
+    const table = seat({
+      rules: { ...commander, counters: [...commander.counters, ...custom], customCounters: true },
+      counters: Object.fromEntries(custom.map(({ id }, index) => [id, values[index]!])),
+    })
+    const view = chips(table, {
+      compact: true,
+      contentRotation: -90,
+      cardSize: { width: 159, height: 230 },
+      nameEnd: 120,
+      dice: { tools: ["d4", "d6", "d20", "coin"] as const, rollFor: jest.fn() },
+    })
+    fireEvent.press(view.getByLabelText(/more counters/))
+    const sheet = view.getByTestId("counter-sheet-seat-1")
+    custom.forEach(({ id }, index) => {
+      const option = within(sheet).getByTestId(`counter-option-1-${id}`)
+      expect(option).toHaveTextContent(`${values[index]}${names[index]}`)
+      let cell = option.parent
+      while (cell && StyleSheet.flatten(cell.props.style)?.width === undefined) cell = cell.parent
+      expect(StyleSheet.flatten(cell?.props.style)).toMatchObject({ width: "100%" })
+    })
   })
 
   it("speaks every counter change and a newly taken designation, but not a lost one", () => {
