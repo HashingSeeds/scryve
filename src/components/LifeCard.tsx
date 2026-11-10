@@ -567,7 +567,7 @@ export const LifeCard = memo(function LifeCard({
     !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
-  const calculatorButtonSize = seatBagSize(compact)
+  const trailingButtonSize = seatBagSize(compact)
   const claimShown = !!claims?.length
   const sourceShown = attackerSide || sourceLanding
   // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card.
@@ -601,11 +601,8 @@ export const LifeCard = memo(function LifeCard({
     insets: contentInsets,
     screenEdges,
     markHeight: markArt.height,
+    buttonSize: trailingButtonSize,
   })
-  // why: the bag and calculator center on the identity row across the edge from them; when their own corner sits deeper, they center on a row placed there instead.
-  const trailingBottom = (size: number) =>
-    Math.max(Number(identityCorner.position.bottom ?? 0), identityCorner.trailing.bottom) +
-    (markArt.height - size) / 2
   // why: a seat someone else holds keeps its own bag on its own device.
   const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
   const markAnchor =
@@ -965,7 +962,7 @@ export const LifeCard = memo(function LifeCard({
                 maxWidth:
                   calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
                     ? Math.max(
-                        identityCorner.rowMaxWidth - calculatorButtonSize - identityMetrics.gap,
+                        identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap,
                         0,
                       )
                     : identityCorner.rowMaxWidth,
@@ -1047,9 +1044,9 @@ export const LifeCard = memo(function LifeCard({
                 $cornerButton,
                 {
                   right: identityCorner.trailing.right,
-                  bottom: trailingBottom(calculatorButtonSize),
-                  width: calculatorButtonSize,
-                  height: calculatorButtonSize,
+                  bottom: identityCorner.trailing.bottom,
+                  width: trailingButtonSize,
+                  height: trailingButtonSize,
                 },
                 pressed && { opacity: 0.72 },
               ]}
@@ -1103,8 +1100,8 @@ export const LifeCard = memo(function LifeCard({
           bagAt={{
             right:
               identityCorner.trailing.right +
-              (calculatorButtonShown ? calculatorButtonSize + identityMetrics.gap : 0),
-            bottom: trailingBottom(seatBagSize(compact)),
+              (calculatorButtonShown ? trailingButtonSize + identityMetrics.gap : 0),
+            bottom: identityCorner.trailing.bottom,
           }}
           seatNumber={seatNumber}
           identity={identity}
@@ -1242,7 +1239,7 @@ export function proWatermarkPlacement(
 const MIN_NAME_ROOM = 48
 
 // why: insets give a notch's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
-const CUTOUT_HALF_WIDTH = 64
+export const CUTOUT_HALF_WIDTH = 64
 
 const CONTENT_BOTTOM_EDGE = {
   0: "bottom",
@@ -1291,11 +1288,13 @@ export function seatIdentityPlacement({
   insets,
   screenEdges,
   markHeight,
+  buttonSize,
 }: {
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   gap: number
   markHeight: number
+  buttonSize: number
   insets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
 }) {
@@ -1313,14 +1312,16 @@ export function seatIdentityPlacement({
   const cutoutAtMiddle = underCutout && roomAboveCutout
   const rightEdge = CONTENT_RIGHT_EDGE[rotation]
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
-  // why: the outside corner opposite the name holds the seat's calculator button.
-  const trailing = {
-    right: cornerOffset(gap, rightEdge, bottomEdge, insets, screenEdges),
-    bottom: cornerOffset(gap, bottomEdge, rightEdge, insets, screenEdges),
-  }
   const bottom = cutoutAtMiddle
     ? raised
     : cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
+  // why: the outside corner opposite the name holds the seat's bag and calculator, centered on the identity row; when their own corner sits deeper, they center on a row placed there instead.
+  const trailing = {
+    right: cornerOffset(gap, rightEdge, bottomEdge, insets, screenEdges),
+    bottom:
+      Math.max(bottom, cornerOffset(gap, bottomEdge, rightEdge, insets, screenEdges)) +
+      (markHeight - buttonSize) / 2,
+  }
   const run = sideways ? height : width
   const layer: ViewStyle | undefined = sideways
     ? {

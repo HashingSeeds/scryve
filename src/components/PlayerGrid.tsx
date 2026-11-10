@@ -32,7 +32,7 @@ import { concentricRadius, useBoardCornerRadii } from "./boardCorners"
 import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import type { LifeCardDice } from "./DiceSeatOverlay"
-import { FIRST_PLAYER_TAB, FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
+import { FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
 import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -44,20 +44,15 @@ import {
   TUCKS_INTO_SCREEN_CORNERS,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
-  type LifeCardCorner,
   type LifeCardEdge,
-  type LifeCardMenuCorner,
-  type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import {
-  getCentralMenuBoundary,
-  getFourCardMenuJunction,
-  getPlayerContentRotation,
+  boardInsetsFor,
   getPlayerGridLayout,
   getPlayerGridRowFlex,
   getPlayerGridRows,
+  seatFrames,
 } from "./playerGridGeometry"
-import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import { SeatSpotlight } from "./TurnSpotlight"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
@@ -254,25 +249,6 @@ export function PlayerGrid({
     }
   })
   const screenInsets = useSafeAreaInsets()
-  const reportedInsets = boardOrientation?.insets
-    ? boardOrientation.insets
-    : boardRotation === 90
-      ? {
-          top: screenInsets.right,
-          right: screenInsets.bottom,
-          bottom: screenInsets.left,
-          left: screenInsets.top,
-        }
-      : boardRotation === -90
-        ? {
-            top: screenInsets.left,
-            right: screenInsets.top,
-            bottom: screenInsets.right,
-            left: screenInsets.bottom,
-          }
-        : screenInsets
-  const cutout = getCornerCutout(reportedInsets, { width, height })
-  const insets = cutout ? { ...reportedInsets, [cutout.edge]: 0 } : reportedInsets
   const {
     themed,
     theme: { spacing },
@@ -320,17 +296,23 @@ export function PlayerGrid({
     )
   }
 
+  const tabsShown = useContext(FirstPlayerTabsShownContext)
+  const { insets, rows: frames } = seatFrames({
+    playerCount: players.length,
+    layout,
+    boardSize: { width, height },
+    measuredGrid: board,
+    topEdgeBand,
+    gap: spacing.xxs,
+    insets: boardOrientation?.insets ?? boardInsetsFor(screenInsets, boardRotation),
+    tabsShown,
+  })
   const rows = getPlayerGridRows(players.length, layout)
   const seatedRows = rows.map((row) =>
     row.map((slot) => (slot === null ? null : (seatOrder?.[slot] ?? slot))),
   )
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
   const displayRadii = useBoardCornerRadii()
-  const menuJunction = getFourCardMenuJunction(rows)
-  const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
-  const tabRow = useContext(FirstPlayerTabsShownContext)
-    ? (menuJunction?.boundary ?? fallbackMenuBoundary)
-    : null
   const boardSeats = commanderDamage
     ? commanderBoardSeats(
         seatedRows,
@@ -341,23 +323,10 @@ export function PlayerGrid({
   const armedPlayer = players.find(({ id }) => id === attack?.armedPlayerId)
   const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
   const seatRotations = new Map<number, LifeCardContentRotation>()
-  rows.forEach((row, rowIndex) =>
-    row.forEach((slot, columnIndex) => {
-      const index = seatedRows[rowIndex][columnIndex]
-      if (slot === null || index === null) return
-      seatRotations.set(
-        index,
-        getPlayerContentRotation({
-          playerCount: players.length,
-          layout,
-          row,
-          rowIndex,
-          columnIndex,
-          slot,
-        }),
-      )
-    }),
-  )
+  for (const frame of frames.flat()) {
+    const index = frame && seatedRows[frame.rowIndex][frame.columnIndex]
+    if (frame && index !== null) seatRotations.set(index, frame.rotation)
+  }
   const commanderPlayers = players.map(({ id, name, color, shape }): CommanderBoardPlayer => ({
     id,
     name,
@@ -389,15 +358,15 @@ export function PlayerGrid({
           (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
         ]}
       >
-        {rows.map((row, rowIndex) => (
+        {frames.map((row, rowIndex) => (
           <View
             key={rowIndex}
             testID={`player-grid-row-${rowIndex}`}
             style={[themed($row), { flex: rowFlexes[rowIndex] }]}
           >
-            {row.map((slot, columnIndex) => {
+            {row.map((frame, columnIndex) => {
               const index = seatedRows[rowIndex][columnIndex]
-              if (slot === null || index === null) {
+              if (!frame || index === null) {
                 return (
                   <View
                     key={`empty-${rowIndex}-${columnIndex}`}
@@ -409,35 +378,14 @@ export function PlayerGrid({
               const player = players[index]
               const seatNumber = index + 1
               const playerDisabled = Boolean(isPlayerDisabled?.(player))
-              const contentRotation = getPlayerContentRotation({
-                playerCount: players.length,
-                layout,
-                row,
-                rowIndex,
-                columnIndex,
-                slot,
-              })
+              const {
+                rotation: contentRotation,
+                screenEdges,
+                contentInsets,
+                menuCorner,
+                menuEdgeCenter,
+              } = frame
               const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
-              const screenEdges = {
-                top: rowIndex === 0,
-                bottom: rowIndex === rows.length - 1,
-                left: columnIndex === 0,
-                right: columnIndex === row.length - 1,
-              }
-              const contentInsets = {
-                top: screenEdges.top ? insets.top : 0,
-                bottom: screenEdges.bottom ? insets.bottom : 0,
-                left: screenEdges.left ? insets.left : 0,
-                right: screenEdges.right ? insets.right : 0,
-                cutout: seatCutout(cutout, contentRotation, screenEdges),
-                tabCorners: seatTabCorners(tabRow, rowIndex, contentRotation, screenEdges),
-              }
-              const fallbackMenu =
-                fallbackMenuBoundary === null
-                  ? undefined
-                  : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
-              const menuCorner =
-                menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
               const out = outState && outReason(outState, player.id)
               const seatDice = seatDiceFor(dice, player, stable)
               const seatTable = seatTableState(table, player.id)
@@ -473,7 +421,7 @@ export function PlayerGrid({
                       contentInsets={contentInsets}
                       screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                       menuCorner={menuCorner}
-                      menuEdgeCenter={fallbackMenu?.edgeCenter}
+                      menuEdgeCenter={menuEdgeCenter}
                       disabled={disabled || playerDisabled}
                       ownership={ownership}
                       staleSince={getStaleSince?.(player)}
@@ -518,7 +466,7 @@ export function PlayerGrid({
                     contentInsets={contentInsets}
                     screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                     menuCorner={menuCorner}
-                    menuEdgeCenter={fallbackMenu?.edgeCenter}
+                    menuEdgeCenter={menuEdgeCenter}
                     lifeFontSizeFor={lifeFontSizeFor}
                     system={system}
                     lifeStep={lifeStep}
@@ -649,6 +597,7 @@ export function PlayerGrid({
 export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
 export type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 export {
+  getCornerCutout,
   getPlayerContentRotation,
   getPlayerGridFacings,
   getPlayerGridLayout,
@@ -703,88 +652,6 @@ export function getLifeFontSize(input: {
       Math.max(Math.min(input.cellWidth - LIFE_CONTROL_GUTTER * 2, targetSpace), 1),
     ),
   )
-}
-
-function menuCornerAt(
-  junction: ReturnType<typeof getFourCardMenuJunction>,
-  row: number,
-  column: number,
-): LifeCardMenuCorner | undefined {
-  if (!junction) return undefined
-  if (row === junction.boundary - 1 && column === junction.column - 1) return "bottomRight"
-  if (row === junction.boundary - 1 && column === junction.column) return "bottomLeft"
-  if (row === junction.boundary && column === junction.column - 1) return "topRight"
-  if (row === junction.boundary && column === junction.column) return "topLeft"
-  return undefined
-}
-
-function fallbackMenuAt(
-  rows: (number | null)[][],
-  boundary: number,
-  row: number,
-  column: number,
-): { corner?: LifeCardMenuCorner; edgeCenter?: LifeCardMenuEdge } | undefined {
-  if (rows.length === 1 && rows[0].length === 2)
-    return row === 0 ? { edgeCenter: column === 0 ? "right" : "left" } : undefined
-  if (rows.length === 1) return undefined
-  if (row !== boundary - 1 && row !== boundary) return undefined
-  const upper = row === boundary - 1
-  const count = rows[row].length
-  const middle = Math.floor(count / 2)
-  if (count % 2) return column === middle ? { edgeCenter: upper ? "bottom" : "top" } : undefined
-  if (column === middle - 1) return { corner: upper ? "bottomRight" : "topRight" }
-  if (column === middle) return { corner: upper ? "bottomLeft" : "topLeft" }
-  return undefined
-}
-
-/** why: the iPhone Duo outer display reports its top-corner camera hole as safe area down that side, the only upright screen with a side inset. Seats keep full width; only that corner's chrome moves. */
-export function getCornerCutout(
-  insets: LifeCardContentInsets,
-  board: { width: number; height: number },
-) {
-  if (board.height <= board.width) return undefined
-  const edge =
-    insets.right > insets.top
-      ? ("right" as const)
-      : insets.left > insets.top
-        ? ("left" as const)
-        : undefined
-  return edge && { edge, size: insets[edge] }
-}
-
-function seatCutout(
-  cutout: ReturnType<typeof getCornerCutout>,
-  rotation: LifeCardContentRotation,
-  screenEdges: Record<LifeCardEdge, boolean>,
-): LifeCardContentInsets["cutout"] {
-  if (!cutout || !screenEdges.top || !screenEdges[cutout.edge]) return undefined
-  // why: corner chrome slides along its own row, so it stays against the seat's outer edge.
-  const facesCutoutSide = rotation === (cutout.edge === "right" ? -90 : 90)
-  return facesCutoutSide
-    ? { edge: "top", side: cutout.edge, size: cutout.size }
-    : { edge: cutout.edge, side: "top", size: cutout.size }
-}
-
-/** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. */
-function seatTabCorners(
-  tabRow: number | null,
-  rowIndex: number,
-  rotation: LifeCardContentRotation,
-  screenEdges: Record<LifeCardEdge, boolean>,
-): LifeCardCorner[] | undefined {
-  if (tabRow === null) return undefined
-  const seam = rowIndex === tabRow ? "top" : rowIndex === tabRow - 1 ? "bottom" : null
-  if (!seam) return undefined
-  const rowEdge = CONTENT_EDGES[rotation].bottom
-  return (["left", "right"] as const)
-    .filter((side) => screenEdges[side])
-    .flatMap((side): LifeCardCorner[] =>
-      rowEdge === seam
-        ? [{ edge: side, side: seam, size: FIRST_PLAYER_TAB.depth }]
-        : rowEdge === side
-          ? [{ edge: seam, side, size: FIRST_PLAYER_TAB.length / 2 }]
-          : [],
-    )
 }
 
 /** why: on web, pass insets: the page reaches a rounded screen corner only where the browser reports an inset. */

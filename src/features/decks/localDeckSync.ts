@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { randomUUID } from "expo-crypto"
 import { type ConvexReactClient, useConvex, useMutation } from "convex/react"
-import type { FunctionReturnType } from "convex/server"
+import type { FunctionArgs, FunctionReturnType } from "convex/server"
 import { ConvexError } from "convex/values"
 
 import { translate } from "@/i18n/translate"
@@ -148,16 +148,18 @@ function sameAsAccount(local: GuestDeck, account: Awaited<ReturnType<typeof acco
   )
 }
 
-function importedVersions(local: GuestDeck) {
+type ImportGuestArgs = FunctionArgs<typeof api.decks.importGuest>
+
+function importedVersions(local: GuestDeck): ImportGuestArgs["versions"] {
   return local.versions
-    ? {
-        versions: guestDeckVersions(local).map(({ name, note, cards }) => ({
+    ? guestDeckVersions(local).map(
+        ({ name, note, cards }): NonNullable<ImportGuestArgs["versions"]>[number] => ({
           name,
-          ...(note ? { note } : {}),
+          note: note || undefined,
           cards,
-        })),
-      }
-    : {}
+        }),
+      )
+    : undefined
 }
 
 export function versionLimitMessage({
@@ -229,8 +231,8 @@ export function useLocalDeckSync(ownerId: string | undefined) {
               game: local.deck.game,
               note: local.deck.note,
               cards: local.deck.cards,
-              ...importedVersions(local),
-              ...(local.movedFromAccount ? { movedFromAccount: true } : {}),
+              versions: importedVersions(local),
+              movedFromAccount: local.movedFromAccount || undefined,
               deckKey: local.deckKey ?? local.localId,
               localId: local.guestLocalId ?? localId,
               localUpdatedAt: local.updatedAt,
@@ -255,7 +257,7 @@ export function useLocalDeckSync(ownerId: string | undefined) {
                       game: local.deck.game,
                       note: local.deck.note,
                       cards: local.deck.cards,
-                      ...importedVersions(local),
+                      versions: importedVersions(local),
                       deckKey: newId,
                       localId: newId,
                       localUpdatedAt: local.updatedAt,
