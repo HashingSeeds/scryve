@@ -8,6 +8,7 @@ import { internalMutation, mutation, query } from "./_generated/server"
 import {
   appearanceIsTaken,
   ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+  MANY_SEAT_MARK_SHAPES,
   isPlayerMarkShape,
   isProMarkShape,
   resolveAppearance,
@@ -83,11 +84,15 @@ import {
   assertPlayerCount,
   assertRuleset,
   assertStartingLife,
+  clientSeesSeats,
   HISTORY_MIGRATION_VERSION,
   inviteIsUsable,
   INVITE_LIFETIME_MS,
+  MAX_PLAYERS,
   MEMBERSHIP_MIGRATION_VERSION,
+  MIN_PLAYERS,
   normalizeManualCode,
+  SEATS_BEFORE_CLIENT_LIMIT,
   STALE_GAME_CLEANUP_BATCH_SIZE,
   STALE_GAME_INACTIVITY_MS,
   UNTOUCHED_REMATCH_LIFETIME_MS,
@@ -122,7 +127,7 @@ import {
 } from "./lib/treachery"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
-const MAX_PLAYERS_PER_GAME_READ = 7
+const MAX_PLAYERS_PER_GAME_READ = MAX_PLAYERS + 1
 const MAX_COMMANDER_DAMAGE_ROWS = MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_GAME_READ - 1) * 2
 const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
@@ -307,6 +312,20 @@ function assertClientPlaysGame(
   throw new ConvexError({ code: "update_required", message: "Update Scryve to join this game" })
 }
 
+/** why: clients from before `maxSeats` draw at most six seats, so a bigger game asks them to update. */
+function assertClientSeesSeats(game: Doc<"games">, { maxSeats }: { maxSeats?: number }) {
+  if (!clientSeesSeats(game.playerCount, maxSeats))
+    throw new ConvexError({ code: "update_required", message: "Update Scryve to join this game" })
+}
+
+const seatLimitOf = (maxSeats: number | undefined) =>
+  maxSeats !== undefined && Number.isInteger(maxSeats) && maxSeats > SEATS_BEFORE_CLIENT_LIMIT
+    ? { maxSeats: Math.min(maxSeats, MAX_PLAYERS) }
+    : {}
+
+const connectedMarkShapes = (playerCount: number) =>
+  clientSeesSeats(playerCount) ? ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES : MANY_SEAT_MARK_SHAPES
+
 function seatLabelFor(player: { seat: number }) {
   return `Player ${player.seat}`
 }
@@ -435,7 +454,7 @@ async function playersForGame(ctx: QueryCtx, gameId: Id<"games">) {
     .query("gamePlayers")
     .withIndex("by_game", (q) => q.eq("gameId", gameId))
     .take(MAX_PLAYERS_PER_GAME_READ)
-  if (players.length > 6) throw new Error("Game has more than six seats")
+  if (players.length > MAX_PLAYERS) throw new Error(`Game has more than ${MAX_PLAYERS} seats`)
   return players
 }
 
@@ -812,6 +831,7 @@ export const createLobby = mutation({
     hostColor: v.string(),
     hostShape: v.optional(v.string()),
     deviceId: v.optional(v.string()),
+    maxSeats: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -839,8 +859,10 @@ export const createLobby = mutation({
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     assertAllowedColor(args.hostColor)
+    if (!clientSeesSeats(args.playerCount, args.maxSeats))
+      throw new ConvexError({ code: "update_required", message: "Update Scryve to host this game" })
     if (args.hostShape !== undefined)
-      assertAllowedShape(args.hostShape, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)
+      assertAllowedShape(args.hostShape, connectedMarkShapes(args.playerCount))
     if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
     const format = noSystem
@@ -896,13 +918,14 @@ export const createLobby = mutation({
         },
         taken: [],
         seat: 1,
-        shapes: ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+        shapes: connectedMarkShapes(args.playerCount),
       }).shape,
       currentLife: args.startingLife,
       eventCount: 0,
       resumable: true,
       joinedAt: now,
       ...(args.editsAnySeat ? { editsAnySeat: true } : {}),
+      ...seatLimitOf(args.maxSeats),
     })
     const invitationId = await ctx.db.insert("invitations", {
       gameId,
@@ -1016,14 +1039,14 @@ export const claimSeat = mutation({
     systems: v.optional(v.array(v.string())),
     variants: v.optional(v.array(v.string())),
     editsAnySeat: v.optional(v.boolean()),
+    maxSeats: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     const clerkUserId = String(user.clerkUserId)
     await consumeJoinAttempt(ctx, clerkUserId)
     if (args.color !== undefined) assertAllowedColor(args.color)
-    if (args.shape !== undefined)
-      assertAllowedShape(args.shape, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)
+    if (args.shape !== undefined) assertAllowedShape(args.shape, MANY_SEAT_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const game = await joinableInviteGame(ctx, args)
     if (!game) {
@@ -1038,6 +1061,9 @@ export const claimSeat = mutation({
       return null
     }
     assertClientPlaysGame(game, args)
+    assertClientSeesSeats(game, args)
+    if (args.shape !== undefined)
+      assertAllowedShape(args.shape, connectedMarkShapes(game.playerCount))
     if (game.variant !== undefined && !args.deviceId)
       throw new ConvexError({ code: "device_required", message: TREACHERY_DEVICE_MESSAGE })
     const existingPlayers = await playersForGame(ctx, game._id)
@@ -1074,7 +1100,12 @@ export const claimSeat = mutation({
         candidate.userId === user._id &&
         (args.deviceId ? candidate.deviceId === args.deviceId : candidate.deviceId === undefined),
     )
-    if (duplicate) return { publicId: game.publicId, seat: duplicate.seat }
+    if (duplicate) {
+      // why: a player who updated Scryve reclaims their seat with the new limit, so the host can grow past six.
+      const { maxSeats }: { maxSeats?: number } = seatLimitOf(args.maxSeats)
+      if (duplicate.maxSeats !== maxSeats) await ctx.db.patch(duplicate._id, { maxSeats })
+      return { publicId: game.publicId, seat: duplicate.seat }
+    }
     const players = existingPlayers
     const occupied = new Set(players.map((player) => player.seat))
     let seat = 1
@@ -1088,7 +1119,7 @@ export const claimSeat = mutation({
       },
       taken: takenAppearances(players),
       seat,
-      shapes: ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+      shapes: connectedMarkShapes(game.playerCount),
     })
     await ctx.db.insert("gamePlayers", {
       gameId: game._id,
@@ -1104,6 +1135,7 @@ export const claimSeat = mutation({
       resumable: true,
       joinedAt: Date.now(),
       ...(args.editsAnySeat ? { editsAnySeat: true } : {}),
+      ...seatLimitOf(args.maxSeats),
     })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return { publicId: game.publicId, seat }
@@ -1308,7 +1340,7 @@ export const publishLocalGame = mutation({
     const playerIdsBySeat = new Map<number, Id<"gamePlayers">>()
     for (const player of resolvePlayerAppearances(
       args.players,
-      ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+      connectedMarkShapes(args.players.length),
     )) {
       const isHost = player.localId === args.hostLocalId
       const playerId = await ctx.db.insert("gamePlayers", {
@@ -1552,7 +1584,7 @@ export const publishFinishedLocalGame = mutation({
       eventSequence: args.eventCount,
     })
     const playerIdsByLocalId = new Map<string, Id<"gamePlayers">>()
-    for (const player of resolvePlayerAppearances(players, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)) {
+    for (const player of resolvePlayerAppearances(players, connectedMarkShapes(players.length))) {
       const deckLabel = deckLabels.get(player.localId)
       const playerId = await ctx.db.insert("gamePlayers", {
         gameId,
@@ -1826,6 +1858,7 @@ export const claimableSeats = mutation({
     manualCode: v.optional(v.string()),
     systems: v.optional(v.array(v.string())),
     variants: v.optional(v.array(v.string())),
+    maxSeats: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1846,6 +1879,7 @@ export const claimableSeats = mutation({
       return { invalid: true as const, seats: [] }
     }
     assertClientPlaysGame(game, args)
+    assertClientSeesSeats(game, args)
     const players = await playersForGame(ctx, game._id)
     for (const seated of players) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -2187,8 +2221,8 @@ export const setMyAppearance = mutation({
   },
   handler: async (ctx, args) => {
     assertAllowedColor(args.color)
-    assertAllowedShape(args.shape, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)
     const game = await gameByPublicId(ctx, args.publicId)
+    assertAllowedShape(args.shape, connectedMarkShapes(game.playerCount))
     if (game.status !== "lobby")
       throw new ConvexError({
         code: "game_not_lobby",
@@ -2240,12 +2274,18 @@ export const updateLobbySettings = mutation({
       } catch (error) {
         throw new ConvexError({
           code: "invalid_player_count",
-          message: error instanceof Error ? error.message : "Choose 2–6 seats",
+          message: error instanceof Error ? error.message : "Choose a valid seat count",
         })
       }
       if (game.variant === "treachery" && !isTreacheryPlayerCount(args.playerCount))
         throw new ConvexError({ code: "invalid_player_count", message: TREACHERY_SEATS_MESSAGE })
       const players = await playersForGame(ctx, game._id)
+      const playerCount = args.playerCount
+      if (players.some((player) => !clientSeesSeats(playerCount, player.maxSeats)))
+        throw new ConvexError({
+          code: "seat_limit",
+          message: "A player needs to update Scryve before this game can have more seats",
+        })
       if (args.playerCount < Math.max(...players.map((player) => player.seat)))
         throw new ConvexError({
           code: "occupied_seat",
@@ -2280,10 +2320,14 @@ export const startGame = mutation({
     if (game.status !== "lobby")
       throw new ConvexError({ code: "game_not_lobby", message: "Only a lobby can be started" })
     const players = await playersForGame(ctx, game._id)
-    if (players.length < 2 || players.length > 6 || players.length !== game.playerCount)
+    if (
+      players.length < MIN_PLAYERS ||
+      players.length > MAX_PLAYERS ||
+      players.length !== game.playerCount
+    )
       throw new ConvexError({
         code: "seats_unclaimed",
-        message: "All configured seats (2–6) must be claimed before starting",
+        message: "All configured seats must be claimed before starting",
       })
     const decks = attachesDecks(gameDeckRules(game)[0])
     if (decks && game.deckRequired === true) {
@@ -2309,7 +2353,7 @@ export const startGame = mutation({
     })
     for (const [index, player] of resolvePlayerAppearances(
       players.map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK })),
-      ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+      connectedMarkShapes(players.length),
     ).entries()) {
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
@@ -3126,7 +3170,7 @@ export const migrateMyGameMemberships = mutation({
 })
 
 export const activeConnectedGames = query({
-  args: { paginationOpts: paginationOptsValidator },
+  args: { paginationOpts: paginationOptsValidator, maxSeats: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     const memberships = await ctx.db
@@ -3144,7 +3188,8 @@ export const activeConnectedGames = query({
           .order("desc")
           .take(MAX_HOSTED_GAMES_RECOVERY_READ)
         for (const game of hostedGames) {
-          if (includedGameIds.has(game._id)) continue
+          if (includedGameIds.has(game._id) || !clientSeesSeats(game.playerCount, args.maxSeats))
+            continue
           includedGameIds.add(game._id)
           active.push({
             publicId: game.publicId,
@@ -3165,7 +3210,11 @@ export const activeConnectedGames = query({
     for (const membership of memberships.page) {
       if (includedGameIds.has(membership.gameId)) continue
       const game = await ctx.db.get(membership.gameId)
-      if (game && (game.status === "lobby" || game.status === "active")) {
+      if (
+        game &&
+        (game.status === "lobby" || game.status === "active") &&
+        clientSeesSeats(game.playerCount, args.maxSeats)
+      ) {
         includedGameIds.add(membership.gameId)
         active.push({
           publicId: game.publicId,

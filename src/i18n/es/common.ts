@@ -82,5 +82,6 @@ export default {
   },
   optionGrid: {
     other: "Otro valor",
+    more: "{{label}}: {{from}} o más",
   },
 } satisfies LocaleNamespace

@@ -17,7 +17,7 @@ describe("AppearancePicker", () => {
         />
       </ThemeProvider>,
     )
-    expect(view.getAllByRole("radio")).toHaveLength(16)
+    expect(view.getAllByRole("radio")).toHaveLength(20)
     expect(view.getByTestId("appearance-color-39755c")).toBeDisabled()
     expect(view.getByTestId("appearance-shape-square")).toBeDisabled()
     fireEvent.press(view.getByTestId("appearance-color-117b9c"))
@@ -72,7 +72,7 @@ describe("AppearancePicker", () => {
         />
       </ThemeProvider>,
     )
-    expect(view.getAllByRole("radio")).toHaveLength(14)
+    expect(view.getAllByRole("radio")).toHaveLength(16)
     expect(view.queryByTestId("appearance-shape-circle")).toBeNull()
     expect(view.getByTestId("appearance-shape-heart")).toBeEnabled()
   })

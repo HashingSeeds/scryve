@@ -324,11 +324,14 @@ const APP_MARK_SHAPES: Record<SiteMarkShape, string> = {
   shield:
     '<path d="M21.04 8.4a2.5 2.5 0 0 1 1.92 0l9.5 3.96A2.5 2.5 0 0 1 34 14.67V23c0 6-5 10-12 14-7-4-12-8-12-14v-8.33a2.5 2.5 0 0 1 1.54-2.31Z"/>',
   heart: `<path fill-rule="evenodd" d="${SITE_LEAF}M21.2 13.5h1.6v18.5h-1.6Z"/>`,
+  moon: '<path d="M20.91 9.05A13 13 0 1 0 34.33 26.12 11 11 0 0 1 20.91 9.05Z"/>',
+  ring: '<path fill-rule="evenodd" d="M34.5 22A12.5 12.5 0 1 1 9.5 22 12.5 12.5 0 1 1 34.5 22ZM27.5 22A5.5 5.5 0 1 0 16.5 22 5.5 5.5 0 1 0 27.5 22Z"/>',
 }
 
 // The sword covers the leaf's rib, as the app's solid marks do.
 const SWORD_MARK_SHAPES: Partial<Record<SiteMarkShape, string>> = {
   heart: `<path d="${SITE_LEAF}"/>`,
+  ring: '<circle cx="22" cy="22" r="12.5"/>',
 }
 
 // Each shape's drawn edges on its 44 unit box (PlayerMark's MARK_ART_BOUNDS).
@@ -345,6 +348,8 @@ const MARK_ART_BOUNDS: Record<
   plus: { top: 8, bottom: 36, left: 8, right: 36 },
   shield: { top: 8.21, bottom: 37, left: 10, right: 34 },
   heart: { top: 7.5, bottom: 37.4, left: 11.12, right: 32.88 },
+  moon: { top: 9.05, bottom: 35, left: 9, right: 34.33 },
+  ring: { top: 9.5, bottom: 34.5, left: 9.5, right: 34.5 },
 }
 
 // A mark cropped to its drawn edges, so the shape itself, not its box, lines up with what sits
@@ -367,6 +372,8 @@ const SWORD_INSETS: Record<SiteMarkShape, { centerY: number; size: number }> = {
   plus: { centerY: 22, size: 12 },
   shield: { centerY: 21.5, size: 15 },
   heart: { centerY: 21.5, size: 14 },
+  moon: { centerY: 25, size: 10 },
+  ring: { centerY: 22, size: 14 },
 }
 
 // The sword glyph from src/components/Sword.tsx, on a 24 unit box.

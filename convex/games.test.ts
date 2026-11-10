@@ -16,6 +16,7 @@ async function lobby(
     layout?: "tabletop"
     system?: { system: string; ruleset: string; startingLife: number }
     editsAnySeat?: boolean
+    maxSeats?: number
   } = {},
 ) {
   const host = await signedIn(t, "host-subject", "Host")
@@ -28,6 +29,7 @@ async function lobby(
     ...(options.deckRequired === undefined ? {} : { deckRequired: options.deckRequired }),
     ...(options.layout ? { layout: options.layout } : {}),
     ...(options.editsAnySeat ? { editsAnySeat: true } : {}),
+    ...(options.maxSeats ? { maxSeats: options.maxSeats } : {}),
     inviteToken: token,
     manualCodeCandidates: ["ABC234", "DEF567"],
     hostDisplayName: "Host",
@@ -118,6 +120,60 @@ describe("Convex connected-game authorization", () => {
         systems,
       }),
     ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+  })
+
+  it("keeps clients that draw at most six seats out of bigger games", async () => {
+    const t = makeConvexTest()
+    await expect(lobby(t, { playerCount: 8 })).rejects.toMatchObject({
+      data: { code: "update_required" },
+    })
+    const { created } = await lobby(t, { playerCount: 8, maxSeats: 10 })
+    const old = await signedIn(t, "old", "Old")
+    const join = { token, displayName: "Old", color: "#2563EB" }
+    const updateRequired = { data: { code: "update_required" } }
+    await expect(old.mutation(api.games.claimableSeats, { token })).rejects.toMatchObject(
+      updateRequired,
+    )
+    await expect(old.mutation(api.games.claimSeat, join)).rejects.toMatchObject(updateRequired)
+    const current = await signedIn(t, "current", "Current")
+    await expect(
+      current.mutation(api.games.claimSeat, { ...join, displayName: "Current", maxSeats: 10 }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+    const page = { paginationOpts: { numItems: 10, cursor: null } }
+    await expect(current.query(api.games.activeConnectedGames, page)).resolves.toMatchObject({
+      page: [],
+    })
+    await expect(
+      current.query(api.games.activeConnectedGames, { ...page, maxSeats: 10 }),
+    ).resolves.toMatchObject({ page: [{ publicId: created.publicId, playerCount: 8 }] })
+  })
+
+  it("won't grow a lobby past six seats while an older client sits in it", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await lobby(t, { playerCount: 4, maxSeats: 10 })
+    const grow = { publicId: created.publicId, playerCount: 8 }
+    await expect(host.mutation(api.games.updateLobbySettings, grow)).resolves.toMatchObject({
+      playerCount: 8,
+    })
+    await host.mutation(api.games.updateLobbySettings, { ...grow, playerCount: 4 })
+    const old = await signedIn(t, "old", "Old")
+    await old.mutation(api.games.claimSeat, { token, displayName: "Old", color: "#2563EB" })
+    await expect(host.mutation(api.games.updateLobbySettings, grow)).rejects.toMatchObject({
+      data: { code: "seat_limit" },
+    })
+    await expect(
+      host.mutation(api.games.updateLobbySettings, { ...grow, playerCount: 6 }),
+    ).resolves.toMatchObject({ playerCount: 6 })
+    // why: once that player updates Scryve and rejoins, their seat stops holding the table at six.
+    await old.mutation(api.games.claimSeat, {
+      token,
+      displayName: "Old",
+      color: "#2563EB",
+      maxSeats: 10,
+    })
+    await expect(host.mutation(api.games.updateLobbySettings, grow)).resolves.toMatchObject({
+      playerCount: 8,
+    })
   })
 
   it("claims separate seats for separate devices on the same signed-in account", async () => {
@@ -222,7 +278,7 @@ describe("Convex connected-game authorization", () => {
         publicId: created.publicId,
         playerCount: 1,
       }),
-    ).rejects.toThrow("2–6 seats")
+    ).rejects.toThrow("2–10 seats")
     await expect(
       host.mutation(api.games.updateLobbySettings, {
         publicId: created.publicId,
@@ -3491,7 +3547,7 @@ describe("player-facing connected errors", () => {
     await rejectsWith(
       host.mutation(api.games.startGame, { publicId }),
       "seats_unclaimed",
-      "All configured seats (2–6) must be claimed before starting",
+      "All configured seats must be claimed before starting",
     )
     await rejectsWith(
       host.mutation(api.games.leaveMyGame, { publicId }),
