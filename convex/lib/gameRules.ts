@@ -103,6 +103,11 @@ export const isCommanderFormat = (system: unknown, format: unknown) =>
   commanderLethalDamage(system, format) !== undefined
 
 // why: a claim that can never land is declined when it arrives instead of rejected, so every installed outbox sees a success and stops retrying it.
+/** why: builds from before the 999 limit clamp every commander slot to 99 on each hit, so a hit from one of them on a defender already past 99 also claims that slot back down to exactly 99. Drop this once those builds age out. */
+const OLD_BUILD_COMMANDER_CAP = 99
+const isOldBuildClampBack = (total: number, nextTotal: number) =>
+  total > OLD_BUILD_COMMANDER_CAP && nextTotal === OLD_BUILD_COMMANDER_CAP
+
 export function commanderClaimOutcome(claim: {
   total: number
   delta: number
@@ -112,6 +117,7 @@ export function commanderClaimOutcome(claim: {
   const nextTotal = claim.total + claim.delta
   return nextTotal < 0 ||
     nextTotal > MAX_COMMANDER_DAMAGE ||
+    isOldBuildClampBack(claim.total, nextTotal) ||
     claim.pendingClaims >= MAX_PENDING_COMMANDER_CLAIMS ||
     claim.pairHasPendingClaim
     ? "declined"

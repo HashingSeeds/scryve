@@ -531,6 +531,29 @@ describe("engine parity: submitCommanderDamage", () => {
     await game.expectSameState()
   })
 
+  it("declines the claim an older build sends to pull a total past 99 back to 99", async () => {
+    const game = await parityGame(makeConvexTest(), { ...commander, lifeEditing: "anyone" })
+    const claim = (operationId: string, delta: number) =>
+      ({
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        delta,
+        ...sent(operationId),
+      }) as const
+
+    await game.write("host", claim("clamp-back-to-99-01", 120))
+    expect(await game.write("host", claim("clamp-back-to-99-02", -21))).toMatchObject({
+      ok: true,
+      ack: { status: "declined" },
+    })
+    expect(await game.write("host", claim("clamp-back-to-99-03", -20))).toMatchObject({
+      ok: true,
+      ack: { status: "confirmed", total: 100 },
+    })
+    await game.expectSameState()
+  })
+
   it("is only offered in Commander games", async () => {
     const game = await parityGame(makeConvexTest(), {
       system: "mtg",
