@@ -15,7 +15,7 @@ import {
 } from "./decksSyncWrites"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import { makeConvexTest } from "../../../test/convexTest"
+import { convexClientFor, makeConvexTest } from "../../../test/convexTest"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 import { setOutboxWriter } from "../sync/durableOutbox"
 
@@ -478,11 +478,9 @@ describe("deck metadata writes", () => {
     })
     const local = new MemoryStorage()
     new DeckSyncRepository("owner", local).mergeMetadata(page.page)
-    const client = {
-      mutation: (reference: typeof api.decks.syncWrite, args: SyncWriteArgs) =>
-        actor.mutation(reference, args),
-    } as unknown as ConvexReactClient
-    const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
+    const controller = new DeckMetadataWriteController(convexClientFor(actor), "owner", {
+      storage: local,
+    })
     return { t, actor, id, controller }
   }
 
@@ -540,16 +538,11 @@ describe("deck metadata writes", () => {
     const local = new MemoryStorage()
     new DeckSyncRepository("owner", local).mergeMetadata(page.page)
     const writer = { app: "1.4.0", update: "update-a", runtime: "runtime-1" }
-    const sent: Array<FunctionArgs<typeof api.decks.syncWrite>> = []
-    const client = {
-      mutation: async (
-        reference: typeof api.decks.syncWrite,
-        args: FunctionArgs<typeof api.decks.syncWrite>,
-      ) => {
-        sent.push(args)
-        return actor.mutation(reference, args)
-      },
-    } as unknown as ConvexReactClient
+    const sent: SyncWriteArgs[] = []
+    const client = convexClientFor<typeof api.decks.syncWrite>(actor, (send, args) => {
+      sent.push(args)
+      return send()
+    })
     setOutboxWriter(writer)
     const controller = new DeckMetadataWriteController(client, "owner", { storage: local })
     controller.update(id, { name: "Renamed" })
