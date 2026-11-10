@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated from "react-native-reanimated"
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from "react-native-reanimated"
 
 import { translate } from "@/i18n/translate"
 import { useElapsedSince } from "@/utils/useElapsedSince"
@@ -64,6 +64,7 @@ export interface SeatIdentityProps {
   foil?: boolean
   staleSince?: number
   markOnly?: boolean
+  nameRetracted?: boolean
   markHidden?: boolean
   nameStyle?: ComponentProps<typeof Animated.View>["style"]
   style?: StyleProp<ViewStyle>
@@ -80,6 +81,7 @@ export function SeatIdentity({
   foil,
   staleSince,
   markOnly,
+  nameRetracted,
   markHidden,
   nameStyle,
   style,
@@ -98,23 +100,30 @@ export function SeatIdentity({
         style={[$mark, art.trim, markHidden && $hidden]}
       />
       <Animated.View testID={`life-status-seat-${seatNumber}`} style={[$text, nameStyle]}>
-        {markOnly ? null : (
-          <Text
-            testID={`player-name-seat-${seatNumber}`}
-            text={playerName}
-            accessible={false}
-            size={metrics.name}
-            weight="medium"
-            maxFontSizeMultiplier={1.3}
-            numberOfLines={1}
-            style={{ color }}
-          />
-        )}
+        <LayoutAnimationConfig skipEntering>
+          {markOnly || nameRetracted ? null : (
+            <Animated.View entering={NAME_IN} exiting={NAME_OUT}>
+              <Text
+                testID={`player-name-seat-${seatNumber}`}
+                text={playerName}
+                accessible={false}
+                size={metrics.name}
+                weight="medium"
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={{ color }}
+              />
+            </Animated.View>
+          )}
+        </LayoutAnimationConfig>
         {staleSince !== undefined ? <UpdatedAgo since={staleSince} color={color} /> : null}
       </Animated.View>
     </View>
   )
 }
+
+const NAME_IN = FadeIn.duration(200)
+const NAME_OUT = FadeOut.duration(140)
 
 function UpdatedAgo({ since, color }: { since: number; color: string }) {
   const elapsed = useElapsedSince(since)

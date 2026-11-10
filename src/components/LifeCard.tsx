@@ -272,6 +272,8 @@ export const LifeCard = memo(function LifeCard({
   // why: a sideways corner layer is sized from the card, so laid out before the card measures, the row's corner slide carries the name across the seat into place.
   const cornerMeasured = !sidewaysContent || cardSize.width > 0
   const [identityRowAt, setIdentityRowAt] = useState<{ x: number; y: number }>()
+  const [fullIdentityWidth, setFullIdentityWidth] = useState(0)
+  const [rowChipWidth, setRowChipWidth] = useState(0)
   const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -623,6 +625,18 @@ export const LifeCard = memo(function LifeCard({
   })
   // why: a seat someone else holds keeps its own bag on its own device.
   const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
+  const rowCap =
+    calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
+      ? Math.max(identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap, 0)
+      : identityCorner.rowMaxWidth
+  const rowTurnChip = !!turnChip && turnStyle === "row" && turnChipShown
+  const rowUndo = !!undoPass && turnChipShown
+  const bagReserve = seatBag ? trailingButtonSize + identityMetrics.gap : 0
+  // why: on seats too short for the name and the chip, the name gives way so the chip never runs under the bag; the mark still says whose seat it is.
+  const nameRetracted =
+    (rowTurnChip || rowUndo) &&
+    typeof rowCap === "number" &&
+    fullIdentityWidth + identityMetrics.gap + rowChipWidth > rowCap - bagReserve
   const markAnchor =
     cardSize.width > 0
       ? identityMarkCenter({
@@ -655,6 +669,7 @@ export const LifeCard = memo(function LifeCard({
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
       markOnly={markOnly}
+      nameRetracted={nameRetracted}
       markHidden={commanderStripShown}
       nameStyle={nameFadeStyle}
     />
@@ -977,18 +992,15 @@ export const LifeCard = memo(function LifeCard({
                 gap: identityMetrics.gap,
                 left: identityCorner.position.left,
                 bottom: identityCorner.position.bottom,
-                maxWidth:
-                  calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
-                    ? Math.max(
-                        identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap,
-                        0,
-                      )
-                    : identityCorner.rowMaxWidth,
+                maxWidth: rowCap,
               },
             ]}
           >
             <View
               testID={`life-identity-seat-${seatNumber}`}
+              onLayout={({ nativeEvent: { layout } }) => {
+                if (!nameRetracted) setFullIdentityWidth(layout.width)
+              }}
               // why: the corner layer draws above the grid, so the hidden mark and name would swallow touches meant for the grid's lower chips.
               pointerEvents={commanderStripShown ? "none" : cornerTouches}
               accessibilityElementsHidden={diceCovers}
@@ -1050,22 +1062,32 @@ export const LifeCard = memo(function LifeCard({
                 }
               />
             ) : null}
-            {turnChip && turnStyle === "row" && turnChipShown ? (
-              <TurnChip
-                state={turnChip}
-                seatNumber={seatNumber}
-                foreground={foreground}
-                compact={compact}
-                filled
-              />
-            ) : null}
-            {undoPass && turnChipShown ? (
-              <UndoPassChip
-                seatNumber={seatNumber}
-                foreground={foreground}
-                compact={compact}
-                onUndo={undoPass}
-              />
+            {rowTurnChip || rowUndo ? (
+              <Animated.View
+                testID={`turn-row-chip-seat-${seatNumber}`}
+                layout={cornerSlide}
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(140)}
+                onLayout={({ nativeEvent: { layout } }) => setRowChipWidth(layout.width)}
+              >
+                {turnChip && rowTurnChip ? (
+                  <TurnChip
+                    state={turnChip}
+                    seatNumber={seatNumber}
+                    foreground={foreground}
+                    compact={compact}
+                    filled
+                  />
+                ) : null}
+                {undoPass && rowUndo ? (
+                  <UndoPassChip
+                    seatNumber={seatNumber}
+                    foreground={foreground}
+                    compact={compact}
+                    onUndo={undoPass}
+                  />
+                ) : null}
+              </Animated.View>
             ) : null}
           </Animated.View>
           {calculatorButtonShown ? (

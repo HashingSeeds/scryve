@@ -388,6 +388,32 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("turn-chip-2")).toBeTruthy()
   })
 
+  it("retracts the active player's name only while the turn chip would not fit beside it", () => {
+    const view = renderGame(game(), turnsOn())
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const widths = (identity: number, chip: number) => {
+      fireEvent(view.getByTestId("life-identity-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: identity, height: 30 } },
+      })
+      fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: chip, height: 36 } },
+      })
+    }
+
+    widths(80, 60)
+    expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
+
+    widths(80, 1_000)
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+    expect(view.getByTestId("player-name-seat-2")).toBeTruthy()
+
+    fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 60, height: 36 } },
+    })
+    expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
+  })
+
   it("forgets who went first when the result is cleared before play", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
