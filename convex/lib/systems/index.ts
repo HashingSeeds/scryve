@@ -83,7 +83,6 @@ export function hasCommandZone(system: unknown, format: string | undefined): boo
   )
 }
 
-/** why: a race counts toward its goal from the default value, so Prize cards lead by falling to 0 while lore leads by climbing to 20. */
 export function lowerLeads({ goal, defaultValue }: CounterDefinition) {
   return goal.kind === "race" && goal.to < defaultValue
 }
@@ -95,7 +94,6 @@ export function startingValueRange(system: unknown) {
   return { min: countsUp ? 0 : 1, max: counter.maxStartingValue }
 }
 
-/** why: one ordering for every goal, where a higher standing always leads. */
 export function counterStanding(counter: CounterDefinition, value: number) {
   return lowerLeads(counter) ? -value : value
 }

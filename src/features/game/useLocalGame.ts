@@ -162,7 +162,7 @@ export function useLocalGame(
     repository.forgetAbandoned()
   }, [repository])
 
-  // why: clock changes are rare taps (pause, adjust, next turn), so saving each one stays off the per-tick path.
+  // why: clock changes are rare taps, so saving each one stays off the per-tick path.
   const changeClock = useCallback(
     (update: (clock: RoundClock) => RoundClock | undefined) => {
       const current = gameRef.current
@@ -285,7 +285,7 @@ export function useLocalGame(
     [replaceBoard, repository],
   )
 
-  // why: setup starts the next game under this board without remounting it, so the offer is read whenever the board's game changes, and a start that ended it takes the toast away.
+  // why: setup starts the next game under this board without remounting, so re-read the offer when the game changes.
   useEffect(() => {
     const held = repository.recentlyAbandoned()
     setAbandoned(held && held.id !== game.id ? held : undefined)
@@ -379,7 +379,7 @@ function showSaveFailure() {
   else Alert.alert(title, message)
 }
 
-/** why: any board action means cards are drawn, so it closes the first-player offer for good, in the same write as the change itself. Undoing the change never brings the offer back. */
+/** why: any board action means cards are drawn, so it closes the first-player offer for good, in the same write. Undo never brings it back. */
 function withFirstPlayerSettled(game: LocalGame): LocalGame {
   return game.firstPlayerOffered ? game : { ...game, firstPlayerOffered: true }
 }

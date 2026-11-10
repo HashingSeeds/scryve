@@ -43,7 +43,6 @@ export function lifeLog(life: number, newestFirst: readonly LifeLogChange[]): Li
   return steps.reverse()
 }
 
-// why: an undo leaves the log as if the change never happened, so both it and the change it reverses drop out.
 function standingLifeEvents(events: readonly GameEvent[]) {
   const lifeEvents = events.filter(
     (event): event is LifeChangedEvent | CommanderDamageAssignedEvent =>
@@ -72,7 +71,7 @@ export function localLifeChanges(events: readonly GameEvent[], playerId: string)
 
 export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number; at: number }
 
-// why: a seat's card sums quick taps into one number until it rests this long, so the log reads the same burst as one change.
+// why: matches the card's tap-burst window, so the log reads a burst as one change.
 export const LIFE_BURST_MS = 1800
 
 export function gameLog(
@@ -98,7 +97,6 @@ export function gameLog(
     } else rows.push({ id: event.operationId, life, at: event.clientCreatedAt, ...change })
     newerAt = event.clientCreatedAt
   }
-  // why: a burst that nets to nothing, like a stray tap taken back, changed nothing at the table.
   return rows.filter(({ delta }) => delta !== 0)
 }
 
@@ -146,7 +144,7 @@ function ConnectedLifeLog({
   life,
   children,
 }: LifeLogProps & { source: Extract<LifeLogSource, { kind: "connected" }> }) {
-  // why: one page holds more steps than fit on a line, and an unsent change still shows from the pending queue offline.
+  // why: one page holds more steps than fit on a line; unsent changes show from the pending queue offline.
   const { results } = usePaginatedQuery(
     api.games.connectedEvents,
     { publicId: source.publicId },

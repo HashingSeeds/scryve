@@ -258,10 +258,7 @@ export function tableHasState(table: TableState | undefined): boolean {
   )
 }
 
-/**
- * why: Pokémon rules give up extra Prize cards for rule-box Pokémon. Names carry the mechanic across every era, while TCGdex's suffix and stage fields are filled in unevenly.
- * 3: Mega Evolution Pokémon ex, VMAX, V-UNION, TAG TEAM. 2: ex, EX (including XY Megas), GX, V, VSTAR, LEGEND. 1: everything else.
- */
+/** why: prize counts come from names, since TCGdex suffix and stage fields are uneven. 3: Mega ex, VMAX, V-UNION, TAG TEAM. 2: ex, EX (including XY Megas), GX, V, VSTAR, LEGEND. 1: everything else. */
 export function pokemonPrizeValue(name: string): 1 | 2 | 3 {
   const trimmed = name.trim()
   if (
@@ -368,9 +365,7 @@ export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
   return undefined
 }
 
-/**
- * why: one reducer for local games, the connected optimistic overlay, and the Convex mutation, so every device lands on the same table. Returns null for an action the table rejects, and the same table for a no-op.
- */
+/** why: one reducer for local games, the connected overlay, and the Convex mutation, so every device lands on the same table. Returns null for a rejected action and the same table for a no-op. */
 export function applyTableAction(
   table: TableState,
   action: TableAction,

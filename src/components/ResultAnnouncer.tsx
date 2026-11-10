@@ -7,8 +7,7 @@ import { Text } from "./Text"
 const LIVE_REGION_REISSUE_MS = 100
 
 /**
- * why: a result is a state change with no focus move, and a repeat of the same result changes no text, so every press announces itself.
- * react-native-web's announce is a no-op, so web gets the message back for a polite live region (`ResultLiveRegion`).
+ * why: repeating a result changes no text, so announce explicitly. react-native-web's announce is a no-op, so web gets a polite live region (`ResultLiveRegion`).
  */
 export function useResultAnnouncer() {
   const [webMessage, setWebMessage] = useState("")

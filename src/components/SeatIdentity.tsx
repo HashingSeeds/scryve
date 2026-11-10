@@ -6,35 +6,36 @@ import Animated from "react-native-reanimated"
 import { translate } from "@/i18n/translate"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 
-import type { LifeCardEdge } from "./playerCardTypes"
 import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "./PlayerMark"
 import { Text, type TextProps } from "./Text"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
+// why: the mark, dice bag, and calculator all draw `icon` tall, so a seat's bottom row reads as one band.
 const SEAT_IDENTITY = {
-  regular: { mark: 64, name: "md", gap: 8, edge: 16 },
-  compact: { mark: 48, name: "sm", gap: 6, edge: 12 },
+  regular: { icon: 32, name: "md", gap: 8, edge: 16 },
+  compact: { icon: 24, name: "sm", gap: 6, edge: 12 },
 } as const satisfies Record<
   string,
-  { mark: number; name: TextProps["size"]; gap: number; edge: number }
+  { icon: number; name: TextProps["size"]; gap: number; edge: number }
 >
 
 export function seatIdentityMetrics(compact?: boolean) {
   return compact ? SEAT_IDENTITY.compact : SEAT_IDENTITY.regular
 }
 
-// why: the home indicator draws inside its inset, so the pair keeps half its gap above it; a camera cutout's inset already ends clear of the cutout, so the pair sits right on it.
-export function seatIdentityBottomGap(edge: number, inset: number, screenEdge: LifeCardEdge) {
-  if (inset === 0) return edge
-  return screenEdge === "bottom" ? edge / 2 : 0
+// why: a safe-area inset already keeps clear of the home indicator's swipe strip or a camera cutout, so the pair sits right on it, as the HIG places a bottom toolbar.
+export function seatIdentityBottomGap(edge: number, inset: number) {
+  return inset === 0 ? edge : 0
 }
 
 export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
-  const scale = seatIdentityMetrics(compact).mark / MARK_VIEW_BOX
   const art = MARK_ART_BOUNDS[shape]
+  const height = seatIdentityMetrics(compact).icon
+  const scale = height / (art.bottom - art.top)
   return {
+    size: MARK_VIEW_BOX * scale,
     width: (art.right - art.left) * scale,
-    height: (art.bottom - art.top) * scale,
+    height,
     trim: {
       marginTop: -art.top * scale,
       marginBottom: -(MARK_VIEW_BOX - art.bottom) * scale,
@@ -93,7 +94,7 @@ export function SeatIdentity({
         color={color}
         insetSwordColor={insetSwordColor}
         foil={foil}
-        size={metrics.mark}
+        size={art.size}
         style={[$mark, art.trim, markHidden && $hidden]}
       />
       <Animated.View testID={`life-status-seat-${seatNumber}`} style={[$text, nameStyle]}>

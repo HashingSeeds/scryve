@@ -13,7 +13,6 @@ export function isColorMatch(value: unknown): value is ColorMatch {
   return COLOR_MATCHES.some(({ id }) => id === value)
 }
 
-/** why: colorless can't combine with a color, so picking it clears the others and the reverse. */
 export function toggleColor(current: readonly string[], color: string) {
   if (color === "C") return current.includes("C") ? [] : ["C"]
   return current.includes(color)
@@ -21,7 +20,6 @@ export function toggleColor(current: readonly string[], color: string) {
     : [...current.filter((value) => value !== "C"), color]
 }
 
-/** why: an unknown identity (undefined) never matches, and a commander that names its own color may miss one picked color. */
 export function matchesColors(
   identity: string | undefined,
   picked: readonly string[],

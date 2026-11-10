@@ -253,7 +253,7 @@ export default defineSchema({
     clientCreatedAt: v.number(),
     serverCreatedAt: v.number(),
     undoOfOperationId: v.optional(v.string()),
-    // why: table actions keep the canonical action they were sent with, so a replayed operation id must carry the same action.
+    // why: a replayed operation id must carry the same action as the first send.
     actionIdentity: v.optional(v.string()),
     // Legacy global ordering only. New events use serverCreatedAt + document ID.
     sequence: v.optional(v.number()),
@@ -663,7 +663,6 @@ export default defineSchema({
     legacyDeckId: v.optional(v.id("decks")),
     podSize: v.optional(v.number()),
     deckVersionId: v.optional(v.id("deckVersions")),
-    // why: an embedded array is safe because a game or match holds at most MAX_PLAYERS seats.
     opponents: v.optional(v.array(resultOpponentValidator)),
   })
     .index("by_user_and_result_id", ["userId", "resultId"])

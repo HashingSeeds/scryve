@@ -372,7 +372,7 @@ async function matchScoreFromGames(ctx: MutationCtx, match: ScryveMatch, gameCou
   return { wins, draws }
 }
 
-// why: the device finalizes once every game is acked, and a retry after a lost ack must not count the match twice.
+// why: a retry after a lost ack must not count the match twice.
 export const finishScryveMatch = mutation({
   args: {
     publicId: v.string(),

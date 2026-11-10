@@ -134,23 +134,8 @@ export default {
   support: {
     pageTitle: "Scryve 지원",
     pageDescription:
-      "Scryve 시작 방법을 확인하고, 자주 묻는 질문의 답을 찾고, 기능을 제안하거나 지원팀에 문의하세요.",
+      "자주 묻는 질문의 답변을 찾아보거나, 기능을 제안하거나, 버그를 신고하거나, 지원팀에 문의하세요.",
     title: "지원",
-    gettingStarted: {
-      heading: "시작하기",
-      startGame: {
-        title: "게임 시작",
-        body: "플레이를 여세요. 새 보드는 설정에 저장된 기본값을 사용합니다.",
-      },
-      choosePlay: {
-        title: "플레이 방식 선택",
-        body: "한 기기로 함께 플레이하거나, 각자의 기기로 플레이하려면 연결을 선택하세요.",
-      },
-      setUpTable: {
-        title: "테이블 설정",
-        body: "플레이어 수와 시작 생명점을 선택한 다음 게임을 시작하세요.",
-      },
-    },
     faq: {
       heading: "자주 묻는 질문",
       restorePro: {
@@ -174,7 +159,6 @@ export default {
           "Scryve의 계정 화면에서 계정을 관리할 수 있습니다. 계정 접근이나 삭제에 도움이 필요하면 지원팀에 이메일로 문의하세요.",
       },
     },
-    appVersion: "Scryve {{version}}",
   },
   profile: {
     title: "계정",

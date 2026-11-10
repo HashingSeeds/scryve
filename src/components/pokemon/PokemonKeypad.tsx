@@ -167,7 +167,6 @@ export function PokemonKeypad({
               accessibilityLabel={key.accessibilityLabel}
               accessibilityState={key.active === undefined ? undefined : { selected: key.active }}
               onPress={() => {
-                // why: a selection tick is the closest match to the system keyboard's key feedback.
                 if (reduceMotion === false && localGameRepository.hapticsEnabled())
                   void Haptics.selectionAsync().catch(() => undefined)
                 key.onPress()

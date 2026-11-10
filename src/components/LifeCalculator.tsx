@@ -67,7 +67,9 @@ type Props = {
 
 const GLYPH_KEYS = [8.6, 12, 15.4].flatMap((cx) => [13, 17].map((cy) => ({ cx, cy })))
 
-export function CalculatorGlyph({ color, size }: { color: string; size: number }) {
+/** why: the body's ink spans 20.9 of its 24-unit box, so the box grows until the ink is `inkHeight` tall. */
+export function CalculatorGlyph({ color, inkHeight }: { color: string; inkHeight: number }) {
+  const size = (inkHeight * 24) / 20.9
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect x={4.5} y={2.5} width={15} height={19} rx={3} stroke={color} strokeWidth={1.9} />
@@ -99,7 +101,7 @@ export function LifeCalculator({
   const reducedMotion = useReducedMotion()
   const [entry, setEntry] = useState("")
   const amount = Number(entry)
-  // why: halving rounds the total up, as Yu-Gi-Oh! rounds halved Life Points; past the largest accepted change, ½ stays off rather than closing with nothing applied.
+  // why: halving rounds up, as Yu-Gi-Oh! rounds halved Life Points; past the largest accepted change, ½ stays off rather than close with nothing applied.
   const halved = Math.ceil(life / 2) - life
   const halving = Math.abs(halved) <= MAX_LIFE_DELTA ? halved : 0
   const damaged = life + flooredLifeDelta(system, life, -amount)
@@ -286,7 +288,6 @@ export function LifeCalculator({
           numberOfLines={1}
           style={[inkText, $title]}
         />
-        {/* why: a menu at the middle of this edge sits between the name and the close button. */}
         {clearance.top ? <View style={{ width: MENU_CLEARANCE * 2 }} /> : null}
         <View style={$closeSlot}>
           <BoardPressable
@@ -385,7 +386,6 @@ function LifeTrail({
           (showTotal ? total.length * charWidth : 0),
       ) <= width
   let count = Math.min(cap, changes.length)
-  // why: a seat too narrow for even one change shows none rather than wrapping into the keypad.
   while (count > 0 && !fits(count)) count--
   const shown = changes.slice(changes.length - count)
   const item = (text: string, style: TextStyle, bold = false) => (
@@ -441,7 +441,6 @@ const $besideReadout: ViewStyle = { flex: 1, justifyContent: "space-between", mi
 const $keypad: ViewStyle = { gap: 5, flexShrink: 1, minHeight: 0 }
 const $keypadBeside: ViewStyle = { flex: 1.15, gap: 4 }
 const $keyRow: ViewStyle = { flexDirection: "row", gap: 5 }
-// why: a column row keeps a full key height and gives way only when the seat runs short.
 const $keyRowColumn: ViewStyle = { height: 44, flexShrink: 1, minHeight: 28 }
 const $keyRowBeside: ViewStyle = { flex: 1, gap: 4 }
 const $key: ViewStyle = {
