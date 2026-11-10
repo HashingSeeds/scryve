@@ -39,7 +39,7 @@ export default {
   turnsChoice: {
     label: "턴",
     lifeOnly: "생명점만",
-    lifeAndTurns: "생명점과 턴",
+    lifeAndTurns: "턴 포함",
     chessClock: "체스 시계",
   },
   whatYouPlay: {

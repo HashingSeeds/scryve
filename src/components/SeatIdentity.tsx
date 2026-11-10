@@ -6,9 +6,9 @@ import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from "react-native-r
 import { translate } from "@/i18n/translate"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 
+import { HANDOFF_MS, NAME_OUT_MS } from "./playerCardTypes"
 import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "./PlayerMark"
 import { Text, type TextProps } from "./Text"
-import { HANDOFF_MS, NAME_OUT_MS } from "./turnStyle"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 // why: the mark, dice bag, and calculator all draw `icon` tall, so a seat's bottom row reads as one band.

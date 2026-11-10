@@ -683,16 +683,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [chessMinutes] = useChessMinutes(localGameRepository)
   const chessAppliedTo = useRef<string>(undefined)
   const [turnOpen, setTurnOpen] = useState(false)
-  const [turnToast, setTurnToast] = useState<{
-    operationId: string
-    passerId: string
-    message: string
-  }>()
+  const [passUndo, setPassUndo] = useState<{ operationId: string; passerId: string }>()
   useEffect(() => {
-    if (!turnToast) return
-    const expire = setTimeout(() => setTurnToast(undefined), PASS_UNDO_MS)
+    if (!passUndo) return
+    const expire = setTimeout(() => setPassUndo(undefined), PASS_UNDO_MS)
     return () => clearTimeout(expire)
-  }, [turnToast])
+  }, [passUndo])
   const endedTurn = useRef(turn)
   useLayoutEffect(() => {
     endedTurn.current = turn
@@ -997,14 +993,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     if (!turn || !actingSeat || !table) return
     const operationId = table.passTurn(actingSeat, next)
     if (!operationId) return
-    setTurnToast({
-      operationId,
-      passerId: actingSeat,
-      message: translate("board:turn.passed", {
-        number: turn.number + 1,
-        name: teamName(named, turnGroups, next) ?? "",
-      }),
-    })
+    setPassUndo({ operationId, passerId: actingSeat })
   }
   const turnsOn = tabOn && active && table !== undefined
   const turnChip: TurnChipState | undefined =
@@ -1014,8 +1003,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           canPress: myTurn,
           nameOf: (playerId) => teamName(named, turnGroups, playerId),
           seatOf: (playerId) => turnSeats.find((seat) => seat.playerId === playerId),
+          passLabelShown: localGameRepository.passLabelShown(),
           onStart: () => actingSeat && table?.startTurn(actingSeat),
-          onPass: passTo,
+          onPass: (next) => {
+            localGameRepository.notePass()
+            passTo(next)
+          },
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
@@ -1025,14 +1018,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
         return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
-      if (turnToast && sharesTurn(turnGroups, turnToast.passerId, player.id))
+      if (passUndo && sharesTurn(turnGroups, passUndo.passerId, player.id))
         return [
           ...chips,
           {
             kind: "undoPass",
             onUndo: () => {
-              table?.undoTurn(turnToast.passerId, turnToast.operationId)
-              setTurnToast(undefined)
+              table?.undoTurn(passUndo.passerId, passUndo.operationId)
+              setPassUndo(undefined)
             },
           },
         ]
@@ -1164,7 +1157,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             turn && undoSeat
               ? () => {
                   table.undoTurn(undoSeat, turn.operationId)
-                  setTurnToast(undefined)
+                  setPassUndo(undefined)
                   setTurnOpen(false)
                 }
               : undefined

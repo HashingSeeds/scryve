@@ -1,9 +1,0 @@
-{
-  "platforms": ["apple", "android"],
-  "apple": {
-    "modules": ["DisplayCornersModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.displaycorners.DisplayCornersModule"]
-  }
-}

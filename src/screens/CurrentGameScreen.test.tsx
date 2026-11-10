@@ -389,6 +389,22 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("turn-chip-2")).toBeTruthy()
   })
 
+  it("says Pass on the turn chip until this device has passed three times", () => {
+    const repository = turnsOn()
+    const view = renderGame(game(), repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const passFrom = (seat: number) => {
+      expect(view.getByTestId(`turn-chip-${seat}`)).toHaveTextContent(/Pass/)
+      fireEvent.press(view.getByTestId(`turn-chip-${seat}`))
+    }
+    passFrom(1)
+    passFrom(2)
+    passFrom(1)
+    expect(view.getByTestId("turn-chip-2")).not.toHaveTextContent(/Pass/)
+    expect(repository.passLabelShown()).toBe(false)
+  })
+
   it("retracts the active player's name while the turn chip would not fit, until the undo window ends", () => {
     jest.useFakeTimers()
     const view = renderGame(game(), turnsOn())

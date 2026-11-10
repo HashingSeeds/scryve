@@ -21,18 +21,19 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
 import { BoardPressable } from "./BoardPressable"
-import type {
-  LifeCardContentInsets,
-  LifeCardContentRotation,
-  LifeCardMenuCorner,
-  LifeCardMenuEdge,
+import {
+  HANDOFF_MS,
+  NAME_OUT_MS,
+  type LifeCardContentInsets,
+  type LifeCardContentRotation,
+  type LifeCardMenuCorner,
+  type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { CONTENT_EDGES } from "./playerGridGeometry"
 import { MarkArt } from "./PlayerMark"
 import { contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
 import { Text } from "./Text"
 import { useTurnSpotlight } from "./TurnSpotlight"
-import { HANDOFF_MS, NAME_OUT_MS, notePass, passLabelShown } from "./turnStyle"
 import { shapeForSeat } from "../../convex/lib/appearance"
 import { bankLeft, turnElapsed } from "../../convex/lib/turns"
 
@@ -70,23 +71,18 @@ export function turnChipLeft(input: {
     : clamp(Math.min(centered, run - MENU_HALF_RUN - width))
 }
 
+/** why: a seat without a name row (Pokémon) carries its turn and undo chips on the card's top edge, clear of the menu pentagon. */
 export function TurnChipLayer({
-  state,
   seatNumber,
-  foreground,
-  compact,
   rotation,
   cardSize,
   contentInsets,
   menuCorner,
   menuEdgeCenter,
-  filled,
+  children,
 }: {
-  state: TurnChipState
   seatNumber: number
-  foreground: string
-  compact?: boolean
-  filled?: boolean
+  children: ReactNode
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   contentInsets?: LifeCardContentInsets
@@ -109,13 +105,7 @@ export function TurnChipLayer({
         onLayout={({ nativeEvent: { layout } }) => setWidth(layout.width)}
         style={[$slot, { top: EDGE_GAP + insets.top, left }, width === 0 && $measuring]}
       >
-        <TurnChip
-          state={state}
-          seatNumber={seatNumber}
-          foreground={foreground}
-          compact={compact}
-          filled={filled}
-        />
+        {children}
       </View>
     </View>
   )
@@ -126,13 +116,11 @@ export function TurnChip({
   seatNumber,
   foreground,
   compact,
-  filled,
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
-  filled?: boolean
 }) {
   const {
     themed,
@@ -140,20 +128,20 @@ export function TurnChip({
   } = useAppTheme()
   const { turn, canPress } = state
   const next = useTurnSpotlight()?.passTo
-  const numbered = filled && !turn.bank
+  // why: without a chess bank the chip counts turns, not time, so it never waits on a clock to start.
+  const numbered = !turn.bank
   const waiting = turn.waiting && !numbered
-  const now = useNow(!turn.waiting && !numbered)
+  const now = useNow(!waiting && !numbered)
   const bank = bankLeft(turn, turn.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0
   const time = numbered
     ? translate("board:turn.chipNumber", { number: turn.number })
     : formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
-  const tick = Math.floor(now / TICK_MS) % 2 === 0
   const ink = outOfTime ? colors.board.text : foreground
   const name = state.nameOf(turn.playerId) ?? ""
   const nextName = next ? state.nameOf(next) : undefined
   const nextSeat = next ? state.seatOf?.(next) : undefined
-  const split = filled && !waiting && !outOfTime && !!nextSeat
+  const split = !waiting && !outOfTime && !!nextSeat
   const nextInk = nextSeat ? accessibleForeground(nextSeat.color) : ink
   const label = [
     translate("board:turn.label", { number: turn.number, name }),
@@ -174,7 +162,7 @@ export function TurnChip({
       <PlayGlyph color={ink} />
       <Text tx="board:turn.start" weight="bold" style={[themed($value), { color: ink }]} />
     </>
-  ) : filled ? (
+  ) : (
     <>
       <Text
         text={time}
@@ -184,7 +172,7 @@ export function TurnChip({
       />
       {split && nextSeat ? (
         <View style={[$passSegment, { backgroundColor: nextSeat.color }]}>
-          {canPress && passLabelShown() ? (
+          {canPress && state.passLabelShown ? (
             <Text
               tx="board:turn.pass"
               weight="semiBold"
@@ -200,39 +188,13 @@ export function TurnChip({
         </View>
       ) : null}
     </>
-  ) : (
-    <>
-      {outOfTime ? null : (
-        <View
-          testID="turn-chip-tick"
-          style={[$dot, tick ? $tickOn : $tickOff, { backgroundColor: ink }]}
-        />
-      )}
-      <Text
-        text={time}
-        testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
-        weight="bold"
-        style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
-      />
-      {canPress && !outOfTime ? (
-        <>
-          <View style={[$rule, { backgroundColor: ink }]} />
-          <Text
-            tx="board:turn.pass"
-            weight="semiBold"
-            style={[compact ? $compactWord : $word, { color: ink }]}
-          />
-        </>
-      ) : null}
-    </>
   )
 
   const shape: ViewStyle[] = [
-    themed(compact ? $compactChip : $chip),
-    filled ? $filled : { borderColor: foreground },
+    compact ? $compactChip : $chip,
     ...(split ? [$split] : []),
-    ...(outOfTime ? [{ backgroundColor: colors.error, borderColor: colors.error }] : []),
-    ...(canPress ? [] : [filled ? $filledPassive : $passive]),
+    ...(outOfTime ? [{ backgroundColor: colors.error }] : []),
+    ...(canPress ? [] : [$passive]),
   ]
 
   if (!canPress)
@@ -251,10 +213,7 @@ export function TurnChip({
       delayLongPress={450}
       onPress={() => {
         if (waiting) state.onStart()
-        else if (next) {
-          if (filled) notePass()
-          state.onPass(next)
-        }
+        else if (next) state.onPass(next)
       }}
       onLongPress={state.onLongPress}
       style={({ pressed }) => [...shape, pressed && $pressed]}
@@ -275,7 +234,6 @@ export function UndoPassChip({
   compact?: boolean
   onUndo: () => void
 }) {
-  const { themed } = useAppTheme()
   return (
     <Animated.View entering={FadeIn.duration(HANDOFF_MS)} exiting={FadeOut.duration(NAME_OUT_MS)}>
       <BoardPressable
@@ -284,11 +242,7 @@ export function UndoPassChip({
         accessibilityLabel={translate("board:turn.undoPass")}
         hitSlop={{ top: 6, bottom: 6 }}
         onPress={onUndo}
-        style={({ pressed }) => [
-          themed(compact ? $compactChip : $chip),
-          $filled,
-          pressed && $pressed,
-        ]}
+        style={({ pressed }) => [compact ? $compactChip : $chip, pressed && $pressed]}
       >
         <UndoGlyph color={foreground} />
         <Text
@@ -403,42 +357,22 @@ const $measuringAside: ViewStyle = {
 const $layer: ViewStyle = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }
 const $slot: ViewStyle = { position: "absolute" }
 const $measuring: ViewStyle = { opacity: 0 }
-const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $chip: ViewStyle = {
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
-  gap: spacing.xxs,
+  gap: 6,
   minHeight: 36,
-  paddingHorizontal: spacing.xs,
-  borderRadius: radius.md,
-  borderWidth: 1.5,
-})
-const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: spacing.xxs,
-  minHeight: 32,
-  paddingHorizontal: spacing.xs,
-  borderRadius: radius.md,
-  borderWidth: 1.5,
-})
+  paddingHorizontal: 12,
+  borderRadius: 999,
+  backgroundColor: "rgba(0,0,0,0.22)",
+}
+const $compactChip: ViewStyle = { ...$chip, minHeight: 32 }
 const $value: ThemedStyle<TextStyle> = () => ({ fontSize: 15, lineHeight: 18 })
 const $compactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 14, lineHeight: 17 })
 const $digits: TextStyle = { fontVariant: ["tabular-nums"] }
 const $word: TextStyle = { fontSize: 12, lineHeight: 15 }
 const $compactWord: TextStyle = { fontSize: 11, lineHeight: 14 }
-const $rule: ViewStyle = { width: 1, alignSelf: "stretch", marginVertical: 8, opacity: 0.6 }
-const $dot: ViewStyle = { width: 5, height: 5, borderRadius: 3 }
-const $tickOn: ViewStyle = { opacity: 0.9 }
-const $tickOff: ViewStyle = { opacity: 0.3 }
-const $filled: ViewStyle = {
-  borderWidth: 0,
-  borderRadius: 999,
-  backgroundColor: "rgba(0,0,0,0.22)",
-  paddingHorizontal: 12,
-  gap: 6,
-}
 const $split: ViewStyle = { paddingRight: 0, overflow: "hidden" }
 const $passSegment: ViewStyle = {
   alignSelf: "stretch",
@@ -449,6 +383,5 @@ const $passSegment: ViewStyle = {
   paddingRight: 12,
   marginLeft: 4,
 }
-const $filledPassive: ViewStyle = { opacity: 0.7 }
-const $passive: ViewStyle = { opacity: 0.7, borderStyle: "dashed" }
+const $passive: ViewStyle = { opacity: 0.7 }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }

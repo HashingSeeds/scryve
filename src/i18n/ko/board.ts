@@ -525,7 +525,6 @@ export default {
     whoFirstHeading: "누가 선공입니까?",
     eventPlay: "이벤트 플레이: 넘기기로만 턴이 바뀝니다",
     undoPass: "넘기기 취소",
-    passed: "{{number}}턴, {{name}}",
     chessBank: "플레이어별 시간",
     chessMinutes: "{{minutes}}분",
     chessOff: "끔",

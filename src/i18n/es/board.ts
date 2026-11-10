@@ -569,7 +569,6 @@ export default {
     whoFirstHeading: "¿Quién juega primero?",
     eventPlay: "Juego de evento: solo pasar cambia el turno",
     undoPass: "Deshacer el pase",
-    passed: "Turno {{number}}, {{name}}",
     chessBank: "Tiempo por jugador",
     chessMinutes: "{{minutes}} min",
     chessOff: "Desactivado",

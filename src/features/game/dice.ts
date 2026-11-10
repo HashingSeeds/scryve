@@ -58,6 +58,8 @@ export interface TurnChipState {
   canPress: boolean
   nameOf: (playerId: string) => string | undefined
   seatOf?: (playerId: string) => TurnSeat | undefined
+  /** why: the pass segment says "Pass" until this device has passed a few times, then the chevron alone carries it. */
+  passLabelShown: boolean
   onStart: () => void
   onPass: (nextPlayerId: string) => void
   onLongPress: () => void

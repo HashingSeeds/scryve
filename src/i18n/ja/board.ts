@@ -522,7 +522,6 @@ export default {
     whoFirstHeading: "先攻は誰ですか?",
     eventPlay: "イベントプレイ:パスでのみターンが変わります",
     undoPass: "パスを取り消す",
-    passed: "ターン{{number}}、{{name}}",
     chessBank: "プレイヤーごとの持ち時間",
     chessMinutes: "{{minutes}}分",
     chessOff: "オフ",

@@ -544,7 +544,6 @@ export default {
     whoFirstHeading: "पहले कौन खेलेगा?",
     eventPlay: "इवेंट प्ले: केवल पास करने से टर्न बदलता है",
     undoPass: "पास वापस लें",
-    passed: "टर्न {{number}}, {{name}}",
     chessBank: "प्रति खिलाड़ी समय",
     chessMinutes: "{{minutes}} मिनट",
     chessOff: "बंद",

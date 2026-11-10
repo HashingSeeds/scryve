@@ -569,7 +569,6 @@ export default {
     whoFirstHeading: "Qui commence ?",
     eventPlay: "Jeu en événement : seul le passage change le tour",
     undoPass: "Annuler le passage",
-    passed: "Tour {{number}}, {{name}}",
     chessBank: "Temps par joueur",
     chessMinutes: "{{minutes}} min",
     chessOff: "Désactivé",

@@ -544,8 +544,6 @@ const board = {
     // Shown instead of the player list in event play, where only passing changes the turn.
     eventPlay: "Event play: only passing changes the turn",
     undoPass: "Take back the pass",
-    // A toast after a pass, as in "Turn 5, Grace".
-    passed: "Turn {{number}}, {{name}}",
     // A chess clock: each player's own time bank counts down only on their turn.
     chessBank: "Time per player",
     chessMinutes: "{{minutes}} min",

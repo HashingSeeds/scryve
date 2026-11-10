@@ -7,7 +7,6 @@ import { ChoiceButton } from "@/components/ChoiceButton"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
-import { setTurnStyle, TURN_STYLES, useTurnStyle } from "@/components/turnStyle"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -111,7 +110,6 @@ export function TurnDialog({
             onSelect={(minutes) => onBank(minutes === 0 ? undefined : minutes * 60_000)}
           />
         ) : null}
-        <StylePicker />
       </ScrollView>
       <View style={themed($dialogActions)}>
         {onRoundClock ? (
@@ -125,32 +123,6 @@ export function TurnDialog({
         <Button tx="common:done" style={themed($dialogButton)} onPress={onClose} />
       </View>
     </DialogCard>
-  )
-}
-
-const STYLE_LABELS = { frames: "Frames", dim: "Dim", row: "Dim + name row" } as const
-const STYLE_HEADING = "Prototype style"
-
-function StylePicker() {
-  const { themed } = useAppTheme()
-  const style = useTurnStyle()
-  return (
-    <View style={themed($section)}>
-      <Text size="xs" weight="medium" text={STYLE_HEADING} />
-      <View style={themed($choices)}>
-        {TURN_STYLES.map((option) => (
-          <ChoiceButton
-            key={option}
-            compact
-            testID={`turn-style-${option}`}
-            text={STYLE_LABELS[option]}
-            selected={option === style}
-            style={$choice}
-            onPress={() => setTurnStyle(option)}
-          />
-        ))}
-      </View>
-    </View>
   )
 }
 

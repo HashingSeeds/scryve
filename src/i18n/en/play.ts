@@ -35,7 +35,7 @@ const play = {
     continue: "Continue",
     endGame: "End game",
   },
-  // The two-choice row in game setup and on the first page: life totals alone, or with turns too.
+  // The three-choice row in game setup and on the first page: life totals alone, with turns, or with a chess clock.
   turnsChoice: {
     label: "Turns",
     lifeOnly: "Life only",

@@ -39,9 +39,9 @@ export default {
   },
   turnsChoice: {
     label: "Tours",
-    lifeOnly: "Points de vie uniquement",
-    lifeAndTurns: "Points de vie et tours",
-    chessClock: "Pendule d'échecs",
+    lifeOnly: "Points de vie seuls",
+    lifeAndTurns: "Tours",
+    chessClock: "Horloge d'échecs",
   },
   whatYouPlay: {
     heading: "À quoi jouez-vous ?",

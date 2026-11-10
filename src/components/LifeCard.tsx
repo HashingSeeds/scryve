@@ -72,7 +72,6 @@ import {
 } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
-import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
@@ -108,9 +107,8 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
-import { FadeOutSlot, RowChipSlot, TurnChip, TurnChipLayer, UndoPassChip } from "./TurnChip"
-import { useSeatDimmed } from "./TurnSpotlight"
-import { HANDOFF_MS, useTurnStyle } from "./turnStyle"
+import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip } from "./TurnChip"
+import { useSeatFill } from "./TurnSpotlight"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const LIFE_FADE_MS = SWAP_MS
@@ -218,14 +216,8 @@ export const LifeCard = memo(function LifeCard({
   onChange,
   style,
 }: LifeCardProps) {
-  const {
-    themed,
-    theme: { colors },
-  } = useAppTheme()
-  const turnStyle = useTurnStyle()
-  // why: dims only the fill, so life totals stay full white on every seat.
-  const dimmed = useSeatDimmed(playerId)
-  const fill = dimmed ? mixColorsInLinearLight(color, colors.board.background, 0.55) : color
+  const { themed } = useAppTheme()
+  const fillStyle = useSeatFill(color, playerId)
   const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
@@ -233,13 +225,6 @@ export const LifeCard = memo(function LifeCard({
   const undoPass = diceChips?.flatMap((chip) => (chip.kind === "undoPass" ? [chip.onUndo] : []))[0]
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
-  const animatedFill = useSharedValue(fill)
-  useEffect(() => {
-    animatedFill.value = reducedMotion
-      ? fill
-      : withTiming(fill, { duration: HANDOFF_MS, easing: Easing.out(Easing.cubic) })
-  }, [animatedFill, fill, reducedMotion])
-  const fillStyle = useAnimatedStyle(() => ({ backgroundColor: animatedFill.value }))
   const cornerSlide = useCornerSlide()
   const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
   const locked = !!out && out.cause !== "life"
@@ -636,7 +621,7 @@ export const LifeCard = memo(function LifeCard({
     calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
       ? Math.max(identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap, 0)
       : identityCorner.rowMaxWidth
-  const rowTurnChip = !!turnChip && turnStyle === "row" && turnChipShown
+  const rowTurnChip = !!turnChip && turnChipShown
   const rowUndo = !!undoPass && turnChipShown
   const bagReserve = seatBag ? trailingButtonSize + identityMetrics.gap : 0
   // why: on seats too short for the name and the chip, the name gives way so the chip never runs under the bag; the mark still says whose seat it is.
@@ -1086,7 +1071,6 @@ export const LifeCard = memo(function LifeCard({
                       seatNumber={seatNumber}
                       foreground={foreground}
                       compact={compact}
-                      filled
                     />
                   </FadeOutSlot>
                 ) : null}
@@ -1123,20 +1107,6 @@ export const LifeCard = memo(function LifeCard({
             </BoardPressable>
           ) : null}
         </Animated.View>
-      ) : null}
-      {turnChip && turnStyle !== "row" && turnChipShown ? (
-        <TurnChipLayer
-          state={turnChip}
-          seatNumber={seatNumber}
-          foreground={foreground}
-          compact={compact}
-          rotation={contentRotation}
-          cardSize={cardSize}
-          contentInsets={contentInsets}
-          menuCorner={menuCorner}
-          menuEdgeCenter={menuEdgeCenter}
-          filled={turnStyle === "dim"}
-        />
       ) : null}
       {claims?.length ? (
         <CommanderClaimBanner
