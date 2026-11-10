@@ -11,15 +11,12 @@ import {
   type AttackAction,
   type AttackBoard,
   type AttackChange,
-  type OthersChange,
 } from "./commanderAttack"
 import type { CommanderSlot, PlayerId } from "./types"
 
 export type CommanderDamagePort = {
   incoming: (to: PlayerId, commander?: CommanderSlot) => Record<PlayerId, number>
   commit: (from: PlayerId, changes: readonly AttackChange[]) => void
-  /** why: Others damage is a plain life loss, so it goes through the board's life change rather than commander damage. Absent where the attacker cannot change another seat's life, which leaves the attack without Others. */
-  loseLife?: (changes: readonly OthersChange[]) => void
 }
 
 export type CommanderAttack = ReturnType<typeof useCommanderAttack>
@@ -45,7 +42,6 @@ export function useCommanderAttack(
     recorded: (from, to, commander) => port.incoming(to, commander)[from] ?? 0,
     commanders: attackers.length ? attackers : NO_COMMANDER,
     buffered,
-    others: !!port.loseLife,
   }
   // why: two taps can land before a render, so the next tap reduces from the last tap's state rather than the rendered one.
   const current = useRef(state)
@@ -58,8 +54,7 @@ export function useCommanderAttack(
     if (next === current.current) return
     current.current = next
     setState(next)
-    if (commit?.changes.length) latest.current.port.commit(commit.from, commit.changes)
-    if (commit?.others.length) latest.current.port.loseLife?.(commit.others)
+    if (commit) latest.current.port.commit(commit.from, commit.changes)
   }, [])
 
   return {

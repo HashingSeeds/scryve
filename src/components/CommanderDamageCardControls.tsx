@@ -19,7 +19,7 @@ import Animated, {
 } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
 
-import { lowestPower, type AttackBox } from "@/features/game/commanderAttack"
+import { lowestPower } from "@/features/game/commanderAttack"
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -72,9 +72,6 @@ type AssignmentTarget = {
   acted: boolean
   dealt: number
   takeBack: number
-  /** why: the part of `dealt` and `takeBack` that is Others damage, which the labels name apart from commander damage. */
-  othersStep: number
-  othersTakeBack: number
   onHit: () => void
   onUndo: () => void
 }
@@ -85,14 +82,9 @@ type AssignmentSource = {
   submit: "done" | "send"
   mark?: CommanderAttacker
   commanders: readonly ArmedCommander[]
-  /** why: what each tap deals from the attacker's other creatures, which takes life but never counts toward commander lethal. */
-  others: number
-  onOthers: (power: number) => void
-  othersShown: boolean
-  othersSitting: boolean
   /** why: how far the commander grid reaches in from the seat's side and up from its foot, in upright space, so the boxes stay clear of it. */
   grid?: { width: number; height: number }
-  onSit: (box: AttackBox) => void
+  onSit: (slot: number) => void
   acted: boolean
   onPower: (power: number, index: number) => void
   // why: the card's own life total sits where the keypad opens, so the card hides it while a power is being typed.
@@ -458,15 +450,10 @@ function DefenderControls({
       <BoardPressable
         testID={`commander-hit-seat-${seatNumber}`}
         accessibilityRole="button"
-        accessibilityLabel={
-          mode.othersStep > 0
-            ? translate("board:commander.dealWithOthersTo", {
-                damage: dealt - mode.othersStep,
-                others: mode.othersStep,
-                name: playerName,
-              })
-            : translate("board:commander.dealTo", { damage: dealt, name: playerName })
-        }
+        accessibilityLabel={translate("board:commander.dealTo", {
+          damage: dealt,
+          name: playerName,
+        })}
         accessibilityState={{ disabled: dealt <= 0 }}
         disabled={dealt <= 0}
         onPress={hit}
@@ -504,14 +491,7 @@ function DefenderControls({
         <BoardPressable
           testID={`commander-undo-seat-${seatNumber}`}
           accessibilityRole="button"
-          accessibilityLabel={
-            mode.othersTakeBack > 0
-              ? translate("board:commander.undoHitWithOthers", {
-                  damage: takeBack - mode.othersTakeBack,
-                  others: mode.othersTakeBack,
-                })
-              : translate("board:commander.undoHit", { damage: takeBack })
-          }
+          accessibilityLabel={translate("board:commander.undoHit", { damage: takeBack })}
           onPress={mode.onUndo}
           style={[
             themed($undo),
@@ -545,14 +525,13 @@ function AttackerControls({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [room, setRoom] = useState<{ width: number; height: number } | null>(null)
-  const [open, setOpen] = useState<{ box: AttackBox; draft: string }>()
+  const [open, setOpen] = useState<{ slot: number; draft: string }>()
   const partners = mode.commanders.length > 1
   const sideways = Math.abs(contentRotation) === 90
   const space = room && (sideways ? { width: room.height, height: room.width } : room)
   const layout = attackerLayout({
     space,
     count: mode.commanders.length,
-    others: mode.othersShown,
     compact,
     grid: mode.grid,
   })
@@ -567,9 +546,9 @@ function AttackerControls({
   const shown = motion ? FadeIn.duration(EDIT_MS) : undefined
   const hidden = motion ? FadeOut.duration(EDIT_MS / 2) : undefined
 
-  function edit(box: AttackBox) {
-    const closing = open?.box === box
-    setOpen(closing ? undefined : { box, draft: "" })
+  function edit(slot: number) {
+    const closing = open?.slot === slot
+    setOpen(closing ? undefined : { slot, draft: "" })
     mode.onEditing(!closing)
   }
   function close() {
@@ -577,12 +556,10 @@ function AttackerControls({
     setOpen(undefined)
     mode.onEditing(false)
   }
-  const setPower = (box: AttackBox, power: number) =>
-    box === "others" ? mode.onOthers(power) : mode.onPower(power, box)
   // why: a − or + on the box being typed into replaces what was typed, so the box shows the power the next hit deals.
-  function step(box: AttackBox, power: number) {
-    if (open?.box === box) setOpen({ box, draft: "" })
-    setPower(box, power)
+  function step(slot: number, power: number) {
+    if (open?.slot === slot) setOpen({ slot, draft: "" })
+    mode.onPower(power, slot)
   }
   // why: each key sets the power at once, so a hit tapped while the keypad is open deals what was typed. It opens empty, so the first key replaces the power rather than adding to it.
   function type(char: string) {
@@ -590,13 +567,13 @@ function AttackerControls({
     if (open.draft.length >= String(MAX_COMMANDER_DAMAGE).length) return
     const draft = open.draft + char
     setOpen({ ...open, draft })
-    setPower(open.box, Number(draft))
+    mode.onPower(Number(draft), open.slot)
   }
   function erase() {
     if (!open) return
     const draft = open.draft.slice(0, -1)
     setOpen({ ...open, draft })
-    if (draft) setPower(open.box, Number(draft))
+    if (draft) mode.onPower(Number(draft), open.slot)
   }
 
   const box = {
@@ -617,37 +594,15 @@ function AttackerControls({
         partner={partners}
         power={power}
         sitting={!!sitting}
-        draft={open?.box === index ? open.draft : undefined}
+        draft={open?.slot === index ? open.draft : undefined}
         onPower={(next) => step(index, next)}
         onEdit={() => edit(index)}
         onSit={() => mode.onSit(index)}
       />
     </Animated.View>
   )
-  const othersBox = (
-    <Animated.View key="others" layout={moved} entering={shown} exiting={hidden}>
-      <PowerBox
-        {...box}
-        suffix={`${seatNumber}-others`}
-        name={translate("board:commander.others")}
-        others
-        partner
-        power={mode.others}
-        sitting={mode.othersSitting}
-        draft={open?.box === "others" ? open.draft : undefined}
-        onPower={(next) => step("others", next)}
-        onEdit={() => edit("others")}
-        onSit={() => mode.onSit("others")}
-      />
-    </Animated.View>
-  )
-  const editedCommander = typeof open?.box === "number" ? mode.commanders[open.box] : undefined
-  const edited =
-    open?.box === "others"
-      ? othersBox
-      : editedCommander && typeof open?.box === "number"
-        ? commanderBox(editedCommander, open.box)
-        : undefined
+  const editedCommander = open && mode.commanders[open.slot]
+  const edited = editedCommander && open && commanderBox(editedCommander, open.slot)
   const keypad = space ? keypadPlacement(space, layout, compact) : undefined
 
   return (
@@ -687,22 +642,13 @@ function AttackerControls({
             </Animated.View>
           </View>
         ) : (
-          <>
-            {/* why: Others leads on the left of a single row; with two rows, partners take the top and Others sits under them. The card's own total moves into its slot (see attackerLifeSlot) rather than a second copy fading in. */}
-            <View
-              testID={`commander-boxes-seat-${seatNumber}`}
-              style={[themed($boxRows), { transform: [{ translateY: layout.boxesY }] }]}
-            >
-              {(layout.rows > 1
-                ? [mode.commanders.map(commanderBox), [othersBox]]
-                : [[...(mode.othersShown ? [othersBox] : []), ...mode.commanders.map(commanderBox)]]
-              ).map((row, rowIndex) => (
-                <View key={rowIndex} style={themed($partners)}>
-                  {row}
-                </View>
-              ))}
-            </View>
-          </>
+          // why: the card's own total moves into its slot (see attackerLifeSlot) rather than a second copy fading in.
+          <View
+            testID={`commander-boxes-seat-${seatNumber}`}
+            style={[themed($commanderRow), { transform: [{ translateY: layout.boxesY }] }]}
+          >
+            {mode.commanders.map(commanderBox)}
+          </View>
         )}
       </View>
     </BoardPressable>
@@ -763,46 +709,31 @@ const MIN_NAME = 32
 const LIFE_SHARE = 0.5
 const MIN_LIFE = 18
 
-/** why: an attacker's power boxes take whichever arrangement and placement gives them the most face while keeping at least UNIT_GAP from every edge of the seat and clear of the commander grid in its lower corner. Beside: the boxes and the attacker's life sit in one column centered on the card, narrowed on both sides to clear the grid. Above: the boxes use the full width over the grid, and the life sits larger in the band beside the grid. Arrangements are one commander beside Others, or partners either above Others or in one row with it. Seats only get smaller from here (8 and 10 players), so the size comes from the room rather than a fixed minimum; the name bar stays a 32pt touch target until nothing else fits. `height` is the number row and `name` the row under it; `boxesY` and `lifeY` place the boxes' and the life's middles below the card's center, in the seat's upright space. */
+/** why: an attacker's power boxes take whichever placement gives them the most face while keeping at least UNIT_GAP from every edge of the seat and clear of the commander grid in its lower corner. Beside: the boxes and the attacker's life sit in one column centered on the card, narrowed on both sides to clear the grid. Above: the boxes use the full width over the grid, and the life sits larger in the band beside the grid. Partners share one row. Seats only get smaller from here (8 and 10 players), so the size comes from the room rather than a fixed minimum; the name bar stays a 32pt touch target until nothing else fits. `height` is the number row and `name` the row under it; `boxesY` and `lifeY` place the boxes' and the life's middles below the card's center, in the seat's upright space. */
 export function attackerLayout({
   space,
   count,
-  others = true,
   compact,
   grid,
 }: {
   space: { width: number; height: number } | null
   count: number
-  others?: boolean
   compact?: boolean
   /** why: how far the commander grid reaches in from the seat's side and up from its foot. */
   grid?: { width: number; height: number }
 }) {
   const largest = compact ? 52 : 64
-  const boxes = count + (others ? 1 : 0)
-  const arrangements: readonly Arrangement[] =
-    count > 1 && others
-      ? [
-          { rows: 2, perRow: 2 },
-          { rows: 1, perRow: boxes },
-        ]
-      : [{ rows: 1, perRow: boxes }]
   const placements: readonly Placement[] = grid?.height ? ["beside", "above"] : ["beside"]
-  const size = (
-    height: number,
-    nameFloor: number,
-    { rows, perRow }: Arrangement,
-    placement: Placement,
-  ) => {
+  const size = (height: number, nameFloor: number, placement: Placement) => {
     const beside = placement === "beside"
     const band = grid?.height ?? 0
     const clear = beside ? (grid?.width ?? 0) : 0
     const lane = space
-      ? (space.width - clear * 2 - UNIT_GAP * 2 - spacing[BOX_GAP] * (perRow - 1)) / perRow
+      ? (space.width - clear * 2 - UNIT_GAP * 2 - spacing[BOX_GAP] * (count - 1)) / count
       : Infinity
     const name = Math.max(nameFloor, Math.round(height * NAME_SHARE))
     const life = Math.max(MIN_LIFE, Math.round(height * LIFE_SHARE))
-    const boxesHeight = rows * (height + name) + (rows - 1) * spacing[BOX_ROW_GAP]
+    const boxesHeight = height + name
     return {
       height,
       width: Math.max(
@@ -810,8 +741,6 @@ export function attackerLayout({
         Math.floor(Math.min(lane, height * (beside ? BOX_RATIO : WIDE_BOX_RATIO))),
       ),
       name,
-      rows,
-      perRow,
       placement,
       boxesHeight,
       boxesY: beside ? -(spacing[ATTACKER_COLUMN_GAP] + life) / 2 : -band / 2,
@@ -830,7 +759,7 @@ export function attackerLayout({
       columnHeight: beside ? boxesHeight + spacing[ATTACKER_COLUMN_GAP] + life : boxesHeight,
     }
   }
-  if (!space) return size(largest, MIN_NAME, arrangements[0], "beside")
+  if (!space) return size(largest, MIN_NAME, "beside")
   const fits = (layout: ReturnType<typeof size>) => {
     if (layout.width < layout.height * MIN_BOX_RATIO) return false
     if (layout.placement === "beside") return layout.columnHeight <= space.height - UNIT_GAP * 2
@@ -843,11 +772,10 @@ export function attackerLayout({
     [MIN_NAME, SMALLEST_BOX],
     [TIGHT_NAME, TIGHT_BOX],
   ]) {
-    const best = arrangements
-      .flatMap((arrangement) => placements.map((placement) => ({ arrangement, placement })))
-      .map(({ arrangement, placement }) => {
+    const best = placements
+      .map((placement) => {
         for (let height = largest; height >= smallest; height--) {
-          const layout = size(height, nameFloor, arrangement, placement)
+          const layout = size(height, nameFloor, placement)
           if (fits(layout)) return layout
         }
         return undefined
@@ -856,14 +784,11 @@ export function attackerLayout({
       .sort((a, b) => b.height * b.width - a.height * a.width)[0]
     if (best) return best
   }
-  return arrangements
-    .flatMap((arrangement) =>
-      placements.map((placement) => size(TIGHT_BOX, TIGHT_NAME, arrangement, placement)),
-    )
+  return placements
+    .map((placement) => size(TIGHT_BOX, TIGHT_NAME, placement))
     .sort((a, b) => b.height * b.width - a.height * a.width)[0]
 }
 
-type Arrangement = { rows: number; perRow: number }
 type Placement = "beside" | "above"
 // why: a box narrower than this leaves its − and + no room beside the number.
 const MIN_BOX_RATIO = 1.4
@@ -880,7 +805,6 @@ const MAX_BAND_LIFE = 34
 const LIFE_DIGITS = 3
 
 const ATTACKER_COLUMN_GAP = "xxs"
-const BOX_ROW_GAP = "sm"
 
 /** why: the attacker's life stays in view in regular weight so it never reads as the attack's target. */
 export function attackerLifeSlot(layout: ReturnType<typeof attackerLayout>) {
@@ -894,8 +818,6 @@ const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, l
 const AnimatedPath = Animated.createAnimatedComponent(Path)
 // why: bright enough to read on the gutter ring over any shade.
 export const DAMAGE_INK = "#FF4D5A"
-// why: Others damage hurts too, so it reads warm like a hit, but orange so it never passes for commander damage.
-export const OTHERS_INK = "#FF8A1F"
 const TRACK_OPACITY = 0.18
 const GHOST_OPACITY = 0.4
 const FILL_MS = 520
@@ -1063,7 +985,6 @@ const $pulseCenter: ViewStyle = {
 function PowerBox({
   suffix,
   name,
-  others,
   partner,
   power,
   sitting,
@@ -1081,7 +1002,6 @@ function PowerBox({
 }: {
   suffix: string
   name?: string
-  others?: boolean
   partner: boolean
   power: number
   sitting: boolean
@@ -1107,9 +1027,8 @@ function PowerBox({
   const numberStyle = { color: ink, fontSize, lineHeight: height * 0.8 }
   const half = (step: 1 | -1) => {
     const disabled = step < 0 ? power <= lowest : power >= MAX_COMMANDER_DAMAGE
-    const label = others
-      ? translate(step < 0 ? "board:commander.lowerOthers" : "board:commander.raiseOthers")
-      : step < 0
+    const label =
+      step < 0
         ? partner && name
           ? translate("board:commander.lowerPowerOf", { name })
           : translate("board:commander.lowerPower")
@@ -1163,11 +1082,7 @@ function PowerBox({
         <BoardPressable
           testID={`commander-power-seat-${suffix}`}
           accessibilityRole="button"
-          accessibilityLabel={
-            others
-              ? translate("board:commander.othersPower", { power })
-              : translate("board:commander.power", { power })
-          }
+          accessibilityLabel={translate("board:commander.power", { power })}
           accessibilityState={{ expanded: editing }}
           accessibilityLiveRegion="polite"
           onPress={onEdit}
@@ -1347,12 +1262,7 @@ const $attackerColumn: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing[ATTACKER_COLUMN_GAP],
 })
 
-const $boxRows: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  alignItems: "center",
-  gap: spacing[BOX_ROW_GAP],
-})
-
-const $partners: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $commanderRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing[BOX_GAP],
