@@ -799,6 +799,23 @@ describe("nearby Planechase and Archenemy", () => {
     expect(modes?.archenemy).toEqual({ playerId: "host", deck: "e01-archenemy-nicol-bolas" })
   })
 
+  it("keeps modes only where Convex would start them", () => {
+    const archenemy: LanSetup = {
+      ...commander,
+      playerCount: 3,
+      variant: "archenemy",
+      modeSetup: { archenemy: { seat: 1 } },
+    }
+    expect(parseLanSetup(archenemy)).toEqual(archenemy)
+    const lorcana = { system: "lorcana", format: "core" }
+    expect(
+      parseLanSetup({ ...commander, ...lorcana, modeSetup: { planechase: {} } }),
+    ).not.toHaveProperty("modeSetup")
+    expect(parseLanSetup({ ...archenemy, ...lorcana })).not.toHaveProperty("modeSetup")
+    const { modeSetup: _, ...noSetup } = archenemy
+    expect(parseLanSetup(noSetup)).not.toHaveProperty("variant")
+  })
+
   it("keeps a rolled archenemy's seat in a rematch and reshuffles only the decks", () => {
     let game = lobby({
       ...commander,

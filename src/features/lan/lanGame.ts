@@ -52,6 +52,7 @@ import {
   revealedModes,
   modeGameFields,
   startModes,
+  systemPlaysModeSetup,
   type ModeSetup,
 } from "../../../convex/lib/tableModes"
 import {
@@ -710,21 +711,27 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     !playSystemFormats(system).some(({ id }) => id === format)
   )
     return null
+  const offered =
+    (variant === "treachery" ||
+      variant === "archenemy" ||
+      (variant === TWO_HEADED_GIANT && isTwoHeadedGiantPlayerCount(setup.playerCount))) &&
+    systemDefinition(system)?.variants.includes(variant)
+      ? variant
+      : undefined
+  const modes =
+    matchesValidator(modeSetupValidator, modeSetup) &&
+    systemPlaysModeSetup(system, modeSetup) &&
+    isValidModeSetup(modeSetup, setup.playerCount) &&
+    (modeSetup.archenemy !== undefined) === (offered === "archenemy")
+      ? modeSetup
+      : undefined
+  const kept = offered === "archenemy" && !modes ? undefined : offered
   return {
     ...setup,
     system,
     format,
-    ...((variant === "treachery" ||
-      variant === "archenemy" ||
-      (variant === TWO_HEADED_GIANT && isTwoHeadedGiantPlayerCount(setup.playerCount))) &&
-    systemDefinition(system)?.variants.includes(variant)
-      ? { variant }
-      : {}),
-    ...(matchesValidator(modeSetupValidator, modeSetup) &&
-    isValidModeSetup(modeSetup, playerCount as number) &&
-    (modeSetup.archenemy !== undefined) === (variant === "archenemy")
-      ? { modeSetup }
-      : {}),
+    ...(kept ? { variant: kept } : {}),
+    ...(modes ? { modeSetup: modes } : {}),
   }
 }
 
