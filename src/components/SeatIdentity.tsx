@@ -28,7 +28,6 @@ export function seatIdentityBottomGap(edge: number, inset: number) {
   return inset === 0 ? edge : 0
 }
 
-/** why: each shape is scaled until its drawn art is the row's icon height, so a star and a square read as the same size. */
 export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
   const art = MARK_ART_BOUNDS[shape]
   const height = seatIdentityMetrics(compact).icon

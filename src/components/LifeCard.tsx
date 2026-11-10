@@ -108,9 +108,7 @@ import {
 import { Text } from "./Text"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-// why: matches the attacker's power boxes swapping in, so the life total moves and its − and + fade with them.
 const LIFE_FADE_MS = SWAP_MS
-// why: about the number pad's own rise, so the card moves up with it.
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -138,11 +136,9 @@ export type LifeCardCommanderDamage = {
   /** why: the attacker's Others box, damage from its other creatures that takes life but never counts toward commander lethal. */
   others?: number
   onOthers?: (power: number) => void
-  /** why: false where the game has no Others, so the attacker's card shows commanders only. */
   othersShown?: boolean
   othersSitting?: boolean
   onSit?: (box: AttackBox) => void
-  /** why: the part of this attack's damage to a defender that came from Others. */
   othersLanded?: number
   onHit?: () => void
   onUndo?: () => void
@@ -295,7 +291,7 @@ export const LifeCard = memo(function LifeCard({
   const armedCommanderId = commanderDamage?.armedPlayerId
   const attacked =
     !!commanderDamage && !!armedCommanderId && armedCommanderId !== commanderDamage.ownerPlayerId
-  // why: a seat already out when an attack starts sits it out, untouchable and unshaded. One knocked out during the attack stays a target until it ends, so the lethal hit can still be undone.
+  // why: a seat already out sits an attack out; one knocked out during it stays a target so the lethal hit can be undone.
   const [outWhenArmed, setOutWhenArmed] = useState(() => (out ? armedCommanderId : undefined))
   const [armedSeen, setArmedSeen] = useState(armedCommanderId)
   if (armedSeen !== armedCommanderId) {
@@ -309,7 +305,6 @@ export const LifeCard = memo(function LifeCard({
   ]
   const causeGlyphShown =
     out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
-  // why: once an attack lands, a defender's life reads "34 − 4 − 3" small under it: the life it started from, less this attack's commander damage in red and its Others damage in orange.
   const incoming = armedCommanders.reduce((sum, { landed = 0 }) => sum + landed, 0)
   const othersIncoming = commanderDamage?.othersLanded ?? 0
   const attackParts =
@@ -353,7 +348,6 @@ export const LifeCard = memo(function LifeCard({
     opacity: stack.value,
     transform: [{ translateY: lifeRise + stacked.lineShift + (1 - stack.value) * 6 }],
   }))
-  // why: the disc rings whatever the readout shows, so an out seat's stacked readout gets a disc of its own size.
   const readoutInk = !out
     ? lifeInk(resolvedLifeFontSize, shownDigits)
     : out.cause === "life"
@@ -388,7 +382,6 @@ export const LifeCard = memo(function LifeCard({
   // why: an attacker typing a power hides its own life total, which sits where the in-card keypad opens. A new attack starts with it shown.
   const [powerEditing, setPowerEditing] = useState(false)
   if (powerEditing && armedCommanderId !== commanderDamage?.ownerPlayerId) setPowerEditing(false)
-  // why: the attacker's power boxes keep clear of the commander grid in its lower corner.
   const grid =
     stripBounds && cardSize.width > 0
       ? gridReach(stripBounds, cardSize, sidewaysContent)
@@ -441,7 +434,6 @@ export const LifeCard = memo(function LifeCard({
   })
   const shownCardMode = commanderCardMode ?? (floodedBy.takeover ? lastTarget.current : undefined)
   const attackerSide = commanderCardMode?.kind === "source"
-  // why: a defender's own controls stay until the attacker's flood has covered them.
   const commanderCovers = !!commanderCardMode && (!takeover || floodedBy.covered)
   const shownFlood = floodedBy.takeover?.flood
   // why: the strip keeps the attack's look until the flood has drained off it.
@@ -465,7 +457,6 @@ export const LifeCard = memo(function LifeCard({
     defending && armedCommanderId && commanderDamage
       ? { ...commanderDamage.split, [armedCommanderId]: armedCommanders.map(({ total }) => total) }
       : commanderDamage?.split
-  // why: a readout too big for its disc shrinks into it as the shadow's edge passes the disc, and grows back as it drains.
   const readoutFit = floodedBy.takeover?.fit ?? 1
   const fitFlood = readoutFit < 1 ? shownFlood : undefined
   const fitWave = floodedBy.wave
@@ -573,7 +564,7 @@ export const LifeCard = memo(function LifeCard({
     !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
   const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
-  const calculatorButtonSize = seatBagSize(compact)
+  const trailingButtonSize = seatBagSize(compact)
   const claimShown = !!claims?.length
   const sourceShown = attackerSide || sourceLanding
   // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card.
@@ -607,11 +598,8 @@ export const LifeCard = memo(function LifeCard({
     insets: contentInsets,
     screenEdges,
     markHeight: markArt.height,
+    buttonSize: trailingButtonSize,
   })
-  // why: the bag and calculator center on the identity row across the edge from them; when their own corner sits deeper, they center on a row placed there instead.
-  const trailingBottom = (size: number) =>
-    Math.max(Number(identityCorner.position.bottom ?? 0), identityCorner.trailing.bottom) +
-    (markArt.height - size) / 2
   // why: a seat someone else holds keeps its own bag on its own device.
   const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
   const markAnchor =
@@ -764,7 +752,6 @@ export const LifeCard = memo(function LifeCard({
               />
             </View>
           ) : out ? (
-            // why: life stays the big number; the mark or glyph of what knocked the seat out and its lethal amount sit small under it.
             <View style={[$outReadout, contentRotationStyle]}>
               {lifeTotal(lifeFontStyle)}
               <View testID={`life-out-cause-seat-${seatNumber}`} style={$outCause}>
@@ -972,7 +959,7 @@ export const LifeCard = memo(function LifeCard({
                 maxWidth:
                   calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
                     ? Math.max(
-                        identityCorner.rowMaxWidth - calculatorButtonSize - identityMetrics.gap,
+                        identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap,
                         0,
                       )
                     : identityCorner.rowMaxWidth,
@@ -1002,7 +989,6 @@ export const LifeCard = memo(function LifeCard({
                     { identity },
                   )}
                   accessibilityState={{ disabled: !!disabled || sittingOut }}
-                  // why: once the grid has taken the mark's place, the grid is the one target that opens an attack, so the hidden mark leaves the accessibility tree too.
                   accessible={!commanderStripShown}
                   accessibilityElementsHidden={commanderStripShown}
                   importantForAccessibility={commanderStripShown ? "no-hide-descendants" : "auto"}
@@ -1055,9 +1041,9 @@ export const LifeCard = memo(function LifeCard({
                 $cornerButton,
                 {
                   right: identityCorner.trailing.right,
-                  bottom: trailingBottom(calculatorButtonSize),
-                  width: calculatorButtonSize,
-                  height: calculatorButtonSize,
+                  bottom: identityCorner.trailing.bottom,
+                  width: trailingButtonSize,
+                  height: trailingButtonSize,
                 },
                 pressed && { opacity: 0.72 },
               ]}
@@ -1092,8 +1078,8 @@ export const LifeCard = memo(function LifeCard({
           bagAt={{
             right:
               identityCorner.trailing.right +
-              (calculatorButtonShown ? calculatorButtonSize + identityMetrics.gap : 0),
-            bottom: trailingBottom(seatBagSize(compact)),
+              (calculatorButtonShown ? trailingButtonSize + identityMetrics.gap : 0),
+            bottom: identityCorner.trailing.bottom,
           }}
           seatNumber={seatNumber}
           identity={identity}
@@ -1147,7 +1133,6 @@ export const LifeCard = memo(function LifeCard({
   )
 }, structurallyEqual)
 
-// why: the life eases up and the incoming line fades in over about a quarter second once the first hit lands.
 const STACK_MS = 260
 const KNOCKBACK = 12
 
@@ -1231,7 +1216,7 @@ export function proWatermarkPlacement(
 const MIN_NAME_ROOM = 48
 
 // why: insets give a notch's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
-const CUTOUT_HALF_WIDTH = 64
+export const CUTOUT_HALF_WIDTH = 64
 
 const CONTENT_BOTTOM_EDGE = {
   0: "bottom",
@@ -1240,7 +1225,7 @@ const CONTENT_BOTTOM_EDGE = {
   [-90]: "right",
 } as const
 
-/** why: the center of the identity row's mark in card coordinates. The row is laid out in the seat's own upright frame, which is centered on the card and turned by its rotation, so a point there turns about the card's center. */
+/** why: the row is laid out upright and centered on the card, then rotated, so its mark turns about the card center. */
 export function identityMarkCenter({
   rotation,
   cardSize,
@@ -1280,11 +1265,13 @@ export function seatIdentityPlacement({
   insets,
   screenEdges,
   markHeight,
+  buttonSize,
 }: {
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   gap: number
   markHeight: number
+  buttonSize: number
   insets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
 }) {
@@ -1302,14 +1289,16 @@ export function seatIdentityPlacement({
   const cutoutAtMiddle = underCutout && roomAboveCutout
   const rightEdge = CONTENT_RIGHT_EDGE[rotation]
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
-  // why: the outside corner opposite the name holds the seat's calculator button.
-  const trailing = {
-    right: cornerOffset(gap, rightEdge, bottomEdge, insets, screenEdges),
-    bottom: cornerOffset(gap, bottomEdge, rightEdge, insets, screenEdges),
-  }
   const bottom = cutoutAtMiddle
     ? raised
     : cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
+  // why: the outside corner opposite the name holds the seat's bag and calculator, centered on the identity row; when their own corner sits deeper, they center on a row placed there instead.
+  const trailing = {
+    right: cornerOffset(gap, rightEdge, bottomEdge, insets, screenEdges),
+    bottom:
+      Math.max(bottom, cornerOffset(gap, bottomEdge, rightEdge, insets, screenEdges)) +
+      (markHeight - buttonSize) / 2,
+  }
   const run = sideways ? height : width
   const layer: ViewStyle | undefined = sideways
     ? {
@@ -1334,7 +1323,7 @@ export function seatIdentityPlacement({
       ? insets.cutout.size - CUTOUT_ENDS_INSIDE_INSET
       : 0
   const farTab = cornerStep(insets?.tabCorners ?? [], rightEdge, bottomEdge)
-  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout. A long name or its chips stop short of a first-player tab at the far end.
+  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they'd reach the cutout; name and chips stop short of a far-end first-player tab.
   const rowMaxWidth =
     run && !tucked
       ? Math.max(run - left - Math.max(left, farCutout, farTab && gap + farTab), 0)
@@ -1353,7 +1342,7 @@ const $lockedOverlay: ViewStyle = { zIndex: 9 }
 
 const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
 
-/** why: how far a corner grid, measured in the card, reaches in from the nearer end of each of the seat's axes: along its width (the card's height when its content turns sideways) and up from its foot. A grid in a screen corner sits further in than one by the screen's middle, so every seat allows the screen corner's clearance, and attackers' boxes match from seat to seat. */
+/** why: how far a corner grid reaches in from the nearer end of each seat axis (width, and up from its foot). A grid in a screen corner sits further in, so every seat allows that clearance and attacker boxes match. */
 function gridReach(
   bounds: LayoutRectangle,
   card: { width: number; height: number },
@@ -1375,7 +1364,6 @@ function gridReach(
 }
 
 const $outReadout: ViewStyle = { width: "100%", alignItems: "center" }
-// why: the incoming line hangs from the life's center, so it never moves the life before the first hit.
 const $incomingSlot: ViewStyle = {
   position: "absolute",
   left: 0,

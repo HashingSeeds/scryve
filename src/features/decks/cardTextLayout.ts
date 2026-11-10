@@ -50,7 +50,6 @@ export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFramin
     x: line.x + line.width / 2 - photo.width / 2,
     y: line.y + line.height / 2 - photo.height / 2,
   }))
-  // why: a card the camera outlined excludes text from the card peeking out behind it.
   const { cardCorners } = photo
   const framed = cardCorners
     ? centered.filter(({ line }) =>

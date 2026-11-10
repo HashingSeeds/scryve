@@ -5,7 +5,7 @@ import { useBackLabel } from "@/utils/useBackLabel"
 
 export type BackAction = { label: string; onPress: () => void }
 
-/** why: screens opened over the board name what's behind them beside the back chevron ("Game", "Play", "Rules", "Lobby"). With nothing under them, back lands on Play. */
+/** why: screens over the board name what's behind them beside the back chevron. With nothing under them, back lands on Play. */
 export function useBackToBoard(): BackAction {
   const label = useBackLabel()
   return useMemo(

@@ -398,7 +398,7 @@ const isSyncTiming = (name: string): name is SyncTiming =>
 
 const MUTATION_ACK_KEEP_PROBABILITY = 0.05
 
-/** why: consent is checked when the event happens, never later, so nothing recorded while sharing is off can upload after opting in; PostHog's own queue is already cleared on withdrawal. */
+/** why: consent is checked when the event happens, so nothing recorded while sharing is off uploads after opting in. */
 export const syncTimingAdapter: TelemetryAdapter = {
   emit({ name, metadata }) {
     if (!enabled || !isSyncTiming(name) || metadata.durationMs === undefined) return

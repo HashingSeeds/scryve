@@ -5,7 +5,7 @@ import { DECK_VERSION_LAST_REASON, DeckVersionWriteController } from "./decksVer
 import { DeckVersionCacheController, DeckVersionCacheRepository } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import { makeConvexTest } from "../../../test/convexTest"
+import { convexClientFor, makeConvexTest } from "../../../test/convexTest"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const deckId = "deck-1" as Id<"decks">
@@ -115,19 +115,14 @@ describe("deck version lifecycle", () => {
     })
     const local = new MemoryStorage()
     let dropped = true
-    const client = {
-      mutation: async (
-        reference: Parameters<typeof actor.mutation>[0],
-        args: Parameters<typeof actor.mutation>[1],
-      ) => {
-        const result = await actor.mutation(reference, args)
-        if (dropped) {
-          dropped = false
-          throw new Error("acknowledgement lost")
-        }
-        return result
-      },
-    } as unknown as ConvexReactClient
+    const client = convexClientFor(actor, async (send) => {
+      const result = await send()
+      if (dropped) {
+        dropped = false
+        throw new Error("acknowledgement lost")
+      }
+      return result
+    })
     const controller = new DeckVersionWriteController(client, "owner", { storage: local })
     const stop = controller.start()
     const provisionalId = controller.createVersion(id as string, "Offline Draft", "", [

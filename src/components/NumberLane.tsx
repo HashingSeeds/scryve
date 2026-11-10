@@ -7,7 +7,6 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { Text, type TextProps } from "./Text"
 
-/** why: rows and section headers share one right lane, so their numbers line up down the screen. */
 export const NUMBER_LANE_WIDTH = 56
 
 export function TrailingNumber({

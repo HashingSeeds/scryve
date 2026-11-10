@@ -135,7 +135,7 @@ module.exports = {
           "error",
           {
             selector:
-              "BinaryExpression[operator=/^[!=]==$/]:matches([left.name=/([sS]ystem|[gG]ame)$/], [left.property.name=/([sS]ystem|[gG]ame)$/], [right.name=/([sS]ystem|[gG]ame)$/], [right.property.name=/([sS]ystem|[gG]ame)$/]):matches([left.value=/^(mtg|ygo|pokemon)$/], [right.value=/^(mtg|ygo|pokemon)$/])",
+              "BinaryExpression[operator=/^[!=]==$/]:matches([left.name=/([sS]ystem|[gG]ame)(Id)?$/], [left.property.name=/([sS]ystem|[gG]ame)(Id)?$/], [right.name=/([sS]ystem|[gG]ame)(Id)?$/], [right.property.name=/([sS]ystem|[gG]ame)(Id)?$/]):matches([left.value=/^(mtg|ygo|pokemon)$/], [right.value=/^(mtg|ygo|pokemon)$/])",
             message:
               "Read game rules from the system definition (convex/lib/systems) instead of comparing a game ID.",
           },

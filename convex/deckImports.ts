@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- each system's deck provider still branches here until it moves to convex/lib/games. */
 import { ConvexError, v } from "convex/values"
 
 import { internal } from "./_generated/api"
@@ -24,7 +23,7 @@ import {
   type ParsedDeckList,
   type SectionCard,
 } from "./lib/games/decks"
-import { GAME_PROVIDERS, type ProviderGame } from "./lib/games/providers"
+import { GAME_PROVIDERS, isProviderGame, type ProviderGame } from "./lib/games/providers"
 import { assertGameSystem, integrationFor, type GameSystemId } from "./lib/integrations"
 import {
   lookupKey,
@@ -377,7 +376,6 @@ function mtgJsonBoards(deck: Record<string, unknown>): Array<[PastedDeckBoard, u
   ]
 }
 
-/** why: MTGJSON cards carry their own color identity, so a precon's colors need no Scryfall lookup. */
 export function mtgJsonIdentity(format: string, payload: unknown) {
   const deck = objectRecord(objectRecord(payload)?.data)
   if (!deck) return undefined
@@ -762,10 +760,7 @@ export const storePreconIdentity = internalMutation({
   },
 })
 
-/**
- * why: MTGJSON's deck list carries no colors, so each command-zone precon's own file is read once.
- * Rows that already have colors are skipped, and a failed fetch is retried on the next scheduled refresh.
- */
+/** why: MTGJSON's deck list has no colors, so each command-zone precon's file is read once; failed fetches retry on the next refresh. */
 export const fillPreconIdentity = internalAction({
   args: { cursor: v.union(v.string(), v.null()) },
   handler: async (ctx, { cursor }): Promise<null> => {
@@ -1160,7 +1155,7 @@ export const resolvePasted = action({
     await limitDeckImport(ctx)
     const game = assertGameSystem(args.game ?? "mtg")
     await requireActionCapability(ctx, game, "deckImport")
-    if (game !== "mtg") {
+    if (isProviderGame(game)) {
       const parsed = parseGenericDeckList(args.list, game)
       const resolved = await resolveGenericDeck(ctx, game, parsed.entries)
       return { ...resolved, invalidLines: parsed.invalidLines }
@@ -1219,7 +1214,7 @@ export const resolveLink = action({
   args: { url: v.string(), game: v.string() },
   handler: async (ctx, args): Promise<DeckLinkResult> => {
     const game = assertGameSystem(args.game)
-    if (game === "mtg") {
+    if (!isProviderGame(game)) {
       const link = archidektDeckLink(args.url)
       await limitDeckImport(ctx)
       await requireActionCapability(ctx, game, "deckImport")

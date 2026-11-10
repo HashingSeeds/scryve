@@ -3,7 +3,6 @@ import { attackerLayout, keypadPlacement, pulseFrame } from "./CommanderDamageCa
 describe("attackerLayout", () => {
   const rowWidth = (layout: ReturnType<typeof attackerLayout>) =>
     layout.perRow * layout.width + (layout.perRow - 1) * 16
-  // why: the boxes' and the column's extents in the seat's upright space, measured from its top.
   const boxesTop = (space: { height: number }, layout: ReturnType<typeof attackerLayout>) =>
     space.height / 2 + layout.boxesY - layout.boxesHeight / 2
 

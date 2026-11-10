@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Share } from "react-native"
 import { useConvex, useMutation, useQuery } from "convex/react"
+import type { FunctionArgs } from "convex/server"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remoteValue } from "@/features/async/remoteState"
@@ -177,7 +178,6 @@ function ConnectedLobbyContent({
     const kept = sharedDecks.find((shared) => shared.deckKey === deckKey)
     if (!kept || selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) return setActionError(onlineOnlyNotice("deck"))
-    // why: the seat takes the owner's current list, so the copy this board reads is refreshed to match it first.
     const fresh = await convex.query(api.decks.shared, { token: kept.token }).catch(() => undefined)
     if (fresh === undefined) return setActionError(translate("connected:lobby.errors.selectDeck"))
     if (fresh === null) return setActionError(translate("decks:shared.unavailable"))
@@ -188,7 +188,7 @@ function ConnectedLobbyContent({
 
   async function selectSeatDeck(
     seat: number,
-    choice: { deckVersionId?: Id<"deckVersions">; shareToken?: string; deckFingerprint?: string },
+    choice: Omit<FunctionArgs<typeof api.decks.selectForSeat>, "publicId" | "seat">,
   ) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) {
@@ -210,7 +210,9 @@ function ConnectedLobbyContent({
     }
   }
 
-  async function changeSettings(settings: { playerCount?: number; deckRequired?: boolean }) {
+  async function changeSettings(
+    settings: Omit<FunctionArgs<typeof api.games.updateLobbySettings>, "publicId">,
+  ) {
     if (settingsInFlight.current || startInFlight.current || !isWebSocketConnected) return
     settingsInFlight.current = true
     setSavingSettings(true)

@@ -2,7 +2,6 @@ import { captureAnalytics } from "@/utils/analytics"
 
 import type { LastChange } from "../../../convex/lib/gameRules"
 
-// why: a long game would otherwise grow these forever; the newest samples are the ones worth keeping.
 const MAX_SAMPLES = 2_000
 // why: phone clocks drift a few ms a minute, so a best ping this old no longer pins the offset.
 const CLOCK_STALE_MS = 60_000

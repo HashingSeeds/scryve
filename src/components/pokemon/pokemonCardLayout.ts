@@ -13,17 +13,10 @@ import {
   getLifeFontSizeThatFits,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
-  type LifeCardEdge,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "../playerCardTypes"
-
-export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
-  0: { top: "top", right: "right", bottom: "bottom", left: "left" },
-  90: { top: "right", right: "bottom", bottom: "left", left: "top" },
-  [-90]: { top: "left", right: "top", bottom: "right", left: "bottom" },
-  180: { top: "bottom", right: "left", bottom: "top", left: "right" },
-}
+import { CONTENT_EDGES } from "../playerGridGeometry"
 
 export function contentInsetsFor(
   rotation: LifeCardContentRotation,
@@ -117,7 +110,7 @@ const BENCH_CHIP = {
   compact: { height: 44, nameSize: 12, nameLine: 14, hpSize: 17, hpLine: 19 },
 }
 
-// why: Android caps a font's size at maxFontSizeMultiplier but not its explicit lineHeight, so chip text opts out of system scaling and takes these sizes, scaled once here, on both platforms.
+// why: Android caps font size at maxFontSizeMultiplier but not explicit lineHeight, so chip text opts out of scaling and scales once here.
 export function benchChipMetrics(compact: boolean, fontScale: number) {
   const chip = compact ? BENCH_CHIP.compact : BENCH_CHIP.regular
   const scale = Math.min(fontScale, BENCH_MAX_FONT_SCALE)

@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useEffectEvent, useSyncExternalStor
 import { BackHandler } from "react-native"
 import { NavigationContext } from "expo-router/react-navigation"
 
-/** why: board overlays are plain views, not Modals, so nothing else consumes Android Back and it would leave the app. While `open` on the focused screen, Back calls `onClose` instead; a covered screen leaves Back to the navigator. BackHandler runs the newest listener first, so the last overlay opened closes first. */
+/** why: overlays are plain views, so nothing else consumes Android Back and it would leave the app. While open and focused, Back calls `onClose`; BackHandler runs the newest listener first, so the last overlay opened closes first. */
 export function useCloseOnBack(open: boolean, onClose: () => void) {
   const focused = useScreenFocused()
   const listening = open && focused

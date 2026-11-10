@@ -304,7 +304,6 @@ function AccountStatus({
   )
 }
 
-// why: the time alone reads as today; older messages lead with the date.
 function messageTime(at: number) {
   const date = new Date(at)
   const time = date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })

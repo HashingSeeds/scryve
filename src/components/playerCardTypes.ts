@@ -79,7 +79,6 @@ export function cornerObstacles(insets?: LifeCardContentInsets) {
   return [insets?.cutout, ...(insets?.tabCorners ?? [])]
 }
 
-/** why: corner chrome steps along its row past whatever sits in its corner, a camera hole or a first-player tab. */
 export function cornerStep(
   corners: readonly (LifeCardCorner | undefined)[],
   edge: LifeCardEdge,
@@ -94,7 +93,7 @@ export function cornerStep(
 // why: Reanimated reads the system setting only at startup, so the live preference gates this instead.
 const CORNER_SLIDE = LinearTransition.duration(220).reduceMotion(ReduceMotion.Never)
 
-/** why: corner chrome slides back when the first-player tabs leave instead of jumping. Web layout transitions animate a size change by scaling the row, which stretches the name whenever a chip comes or goes, so web moves it at once. */
+/** why: web layout transitions animate size by scaling the row, stretching the name, so web moves chrome at once. */
 export function useCornerSlide() {
   return useReducedMotion() === false && Platform.OS !== "web" ? CORNER_SLIDE : undefined
 }
@@ -129,7 +128,6 @@ export function getDeltaTextWidth(text: string, fontSize: number, fontScale: num
   return text.length * LIFE_DIGIT_ASPECT * fontSize * lifeTextScale(fontScale)
 }
 
-// why: the running change keeps its +/− slot beside the total, so it shrinks to the room left between the total and the slot's edge.
 export function getDeltaFontSizeThatFits(input: {
   text: string
   baseSize: number

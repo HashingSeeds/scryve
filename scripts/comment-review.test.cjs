@@ -221,6 +221,14 @@ test("a trailing why comment does not absorb the next standalone comment", () =>
   assert.equal(removeBlock(source, entry.block).source, "foo()\n// unrelated\nbar()\n")
 })
 
+test("removing a JSX comment removes its braces", () => {
+  const source = "<View>\n  {/* why: the strip is a toggle */}\n  <Text />\n</View>\n"
+  assert.equal(
+    removeBlock(source, "/* why: the strip is a toggle */", "a.tsx").source,
+    "<View>\n  <Text />\n</View>\n",
+  )
+})
+
 test("entries show the why lines in context with a permalink to the same range", () => {
   const source = [
     "function load() {",

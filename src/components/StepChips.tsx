@@ -84,7 +84,6 @@ export function StepChips({
       onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
       style={[styles.row, { gap: GAP[size] }, style]}
     >
-      {/* why: each label's natural width, measured off screen at the row's own type size, decides how many steps the row can show untruncated. */}
       <View
         pointerEvents="none"
         accessibilityElementsHidden
