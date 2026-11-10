@@ -22,7 +22,7 @@ export interface EventRows<Row> {
 
 // why: a 256-player event's lists took 1.2 s to mount on a Pixel 6a when switching tabs, and every result re-rendered all of them; the list builds only the rows near the screen.
 const ROW_HEIGHT = 52
-// why: LegendList's web build copies unknown props onto its <div>, so these native-only props made React warn on every event screen, and the dev warning toast covered the round button.
+// why: LegendList's web build copies unknown props onto its <div>, so native-only props made React warn on every event screen.
 const NATIVE_LIST_PROPS = Platform.select({
   native: { testID: "event-rows", keyboardShouldPersistTaps: "handled" as const },
 })

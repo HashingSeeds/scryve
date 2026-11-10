@@ -73,7 +73,6 @@ function card(life: number, onChange = jest.fn()) {
 
 const renderCard = (life: number) => render(card(life))
 
-/** why: how far round its ring an arc's path runs, from its start at twelve o'clock to its end. */
 function arcSweep(path: ReactTestInstance) {
   const [startX, startY, radius, , , , , endX, endY] = (path.props.animatedProps.d as string)
     .match(/-?[\d.]+/g)!
@@ -373,7 +372,6 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-strip-seat-2")).toHaveProp("pointerEvents", "none")
     expect(view.getByLabelText("6 commander damage from Player 1")).toBeTruthy()
     expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("6")
-    // why: a connected game holds hits until Send, so the lit totals follow the attack's running totals, one chip per partner.
     view.rerender(
       defendingCard({
         commanders: [
@@ -410,7 +408,6 @@ describe("LifeCard", () => {
       expect(view.getByTestId("commander-flood-seat-2")).toBeTruthy()
       // why: the strip stays over the draining shadow instead of dropping under it.
       expect(view.getByTestId("commander-strip-seat-2")).toHaveProp("pointerEvents", "none")
-      // why: the damage ring drains off with the shadow, as it came in, but takes no taps.
       expect(
         view.getByTestId("commander-card-mode-seat-2", { includeHiddenElements: true }),
       ).toHaveProp("pointerEvents", "none")
@@ -505,7 +502,6 @@ describe("LifeCard", () => {
   })
 
   it("names the life a defender started the attack from, less what the attack has dealt", () => {
-    // why: the life holds still until the first hit, so nothing hangs under it before then.
     const view = render(defendingCard({ commanders: [{ power: 1, total: 6 }] }))
     expect(view.queryByTestId("life-incoming-seat-2")).toBeNull()
 
@@ -565,15 +561,16 @@ describe("LifeCard", () => {
       flexDirection: "row",
     })
     const art = MARK_ART_BOUNDS.heart
+    const scale = 32 / (art.bottom - art.top)
     expect(
       StyleSheet.flatten(
         view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
       ),
     ).toMatchObject({
-      width: 64,
-      height: 64,
-      marginLeft: -art.left * (64 / 44),
-      marginBottom: -(44 - art.bottom) * (64 / 44),
+      width: 44 * scale,
+      height: 44 * scale,
+      marginLeft: -art.left * scale,
+      marginBottom: -(44 - art.bottom) * scale,
     })
     expect(view.getByTestId("life-card-seat-1").props.accessibilityLabel).toBe("Seat 1, Ada")
   })
@@ -596,11 +593,9 @@ describe("LifeCard", () => {
         </ThemeProvider>,
       )
 
-      const art = MARK_ART_BOUNDS.eye
-      const scale = (compact ? 48 : 64) / 44
       expect(
         StyleSheet.flatten(view.getByTestId("life-identity-row-seat-1").props.style).height,
-      ).toBeCloseTo((art.bottom - art.top) * scale)
+      ).toBe(compact ? 24 : 32)
     },
   )
 
@@ -620,6 +615,9 @@ describe("LifeCard", () => {
           />
         </ThemeProvider>,
       )
+      fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+        nativeEvent: { layout: { width: 200, height: 300 } },
+      })
 
       const layer = StyleSheet.flatten(view.getByTestId("life-corner-layer-seat-1").props.style)
       expect(layer.transform).toEqual([{ rotate: `${contentRotation}deg` }])
@@ -692,7 +690,7 @@ describe("LifeCard", () => {
   })
 
   it.each([
-    { inset: 34, bottom: 34 + 8 },
+    { inset: 34, bottom: 34 },
     { inset: 0, bottom: 16 },
   ])("sits the pair $bottom above a bottom seat with a $inset inset", ({ inset, bottom }) => {
     expect(
@@ -705,6 +703,41 @@ describe("LifeCard", () => {
         markHeight: 64,
       }).position.bottom,
     ).toBe(bottom)
+  })
+
+  it("centers a bottom seat's bag on its mark and name above the home indicator", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          contentInsets={{ top: 0, bottom: 34, left: 0, right: 0 }}
+          screenEdges={{ top: false, left: true, right: true, bottom: true }}
+          seatTable={{
+            rules: playTableRules("mtg", "commander"),
+            counters: {},
+            held: [],
+            editable: true,
+            adjustCounter: jest.fn(),
+            takeDesignation: jest.fn(),
+            releaseDesignation: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 300 } },
+    })
+
+    const row = StyleSheet.flatten(view.getByTestId("life-identity-row-seat-1").props.style)
+    const bag = StyleSheet.flatten(view.getByTestId("seat-bag-seat-1").props.style)
+    expect(row.bottom).toBe(34)
+    expect((bag.bottom as number) + (bag.height as number) / 2).toBe(
+      34 + (row.height as number) / 2,
+    )
   })
 
   it("swaps the identity layer's sides before turning a sideways card", () => {
@@ -928,7 +961,6 @@ describe("LifeCard", () => {
         />
       </ThemeProvider>,
     )
-    // why: upright, the grid holds the bottom-left corner.
     const undo = StyleSheet.flatten(view.getByTestId("commander-undo-seat-3").props.style)
     expect(undo).toHaveProperty("bottom")
     expect(undo).toHaveProperty("right")
@@ -1157,13 +1189,11 @@ describe("LifeCard", () => {
     expect(
       view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
     ).toBeTruthy()
-    // why: the mark and name stay to fade under the X, but take no taps.
     expect(
       view.getByTestId("life-corner-layer-seat-1", { includeHiddenElements: true }),
     ).toHaveProp("pointerEvents", "none")
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
     fireEvent.press(view.getByTestId("commander-power-down-seat-1"))
-    // why: the power opens an in-card keypad that sets the power with each key and hides the card's own total while it is open.
     fireEvent(view.getByTestId("commander-attacker-seat-1"), "layout", {
       nativeEvent: { layout: { width: 200, height: 300 } },
     })
@@ -1783,6 +1813,7 @@ describe("LifeCard", () => {
   })
 
   it("sizes the pair down with a compact card", () => {
+    const heart = MARK_ART_BOUNDS.heart
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeCard
@@ -1803,8 +1834,8 @@ describe("LifeCard", () => {
     expect(
       StyleSheet.flatten(
         view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
-      ),
-    ).toMatchObject({ width: 48, height: 48 })
+      ).width,
+    ).toBeCloseTo((44 * 24) / (heart.bottom - heart.top))
     expect(StyleSheet.flatten(view.getByTestId("player-name-seat-1").props.style)).toMatchObject({
       fontSize: 16,
     })
@@ -1826,7 +1857,6 @@ describe("LifeCard", () => {
       </ThemeProvider>,
     )
     expect(view.getByTestId("life-eliminated-seat-1")).toBeTruthy()
-    // why: life stays the big number, with the lethal amount small under it.
     const readout = within(view.getByTestId("life-readout-seat-1"))
     expect(readout.getAllByText(/^\d+$/).map((text) => text.props.children)).toEqual(["13", "21"])
     expect(view.getByTestId("life-out-amount-seat-1")).toHaveStyle({ fontSize: 26 })

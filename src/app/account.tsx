@@ -16,7 +16,7 @@ export default function AccountRoute() {
   const auth = useAuthAccess()
   const leaveAccount = () => (router.canGoBack() ? router.back() : router.replace("/"))
   const openAccountData = () => router.push("/delete-account")
-  // why: Clerk drops the session before signOut resolves, which remounts this route; it latches the sign-out so it keeps leaving after the flag clears instead of flashing the sign-in prompt.
+  // why: Clerk drops the session before signOut resolves, remounting this route; the latch keeps leaving after the flag clears instead of flashing the sign-in prompt.
   const [signedOutHere, setSignedOutHere] = useState(false)
   if (!signedOutHere && auth.signingOut && !auth.isSignedIn) setSignedOutHere(true)
   useEffect(() => {

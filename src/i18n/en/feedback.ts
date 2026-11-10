@@ -7,35 +7,37 @@ const feedback = {
     newCount_other: "{{count}} new",
     email: "Email support",
     emailDetail: "Account or billing questions",
-    suggest: "Suggest a feature or report a bug",
+    suggestFeature: "Suggest a feature",
+    reportBug: "Report a bug",
     // {{query}} is what the player typed in search.
     noMatch: "No answers for “{{query}}”.",
     ask: "Ask us about “{{query}}”",
   },
-  // Shown under the navigation bar while the app has no connection to Scryve's servers.
+  // Shown in a feedback conversation after the app has had no connection to Scryve's servers for a few seconds.
   offline: "Offline. Your draft stays here until you're back.",
   suggest: {
     title: "Send feedback",
     kind: "What is it?",
     feature: "Feature",
     bug: "Bug",
+    // Centered above the empty composer, before anything is sent.
+    prompt: {
+      feature: "What would you like to see?",
+      bug: "What went wrong?",
+    },
+    // Placeholders in a narrow composer next to two buttons. Keep each to one short line.
     bodyPlaceholder: {
-      feature: "What would you like, and when would you use it?",
-      bug: "What happened? What did you expect?",
+      feature: "When would you use it?",
+      bug: "What did you expect?",
     },
     addScreenshot: "Add screenshot",
     removeScreenshot: "Remove screenshot",
     selectedScreenshot: "Selected screenshot",
     screenshotFailed: "Couldn't add that screenshot. Try another image.",
-    sentryDisclosure: "Bug reports and screenshots also send your device details to Sentry.",
-    translationNotice:
-      "Write in any language. We may use AI tools to translate it. See our <privacy>Privacy Policy</privacy>.",
+    // One line above the composer. <privacy> links to the Privacy Policy.
+    notice: "Any language works. AI may help us read it. <privacy>Privacy</privacy>",
     includeAccount: "Include my account",
-    includeAccountHelper:
-      "Replies follow you to every device you sign in on, and we see your username.",
-    anonymous:
-      "Sent without your account. Replies show on this device, and reinstalling may lose them.",
-    signInToKeep: "Sign in to keep it",
+    includeAccountHelper: "Replies sync to your devices, and we see your username.",
     sendFailed: "Couldn't send. Try again.",
     // Shown when a player sent too much feedback in a short time.
     rateLimited_one: "Too many sends. Try again in {{count}} minute.",
@@ -70,8 +72,8 @@ const feedback = {
     notLinked: "Sent without your account.",
     // Links the thread to the signed-in account. Follows "Sent without your account."
     includeAccount: "Include it",
-    // Follows "Sent without your account." when signed out.
-    signInToKeep: "Sign in to keep it",
+    // Follows "Sent without your account." when signed out. Signing in syncs replies across devices.
+    signInToSync: "Sign in to sync it",
   },
   // Asked once, after the player's first feedback send.
   notifyPrompt: {

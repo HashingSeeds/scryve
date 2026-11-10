@@ -16,7 +16,7 @@ export interface SeatClaim {
 let owner: string | undefined
 const listeners = new Set<() => void>()
 
-/** why: the nearby session runs outside React, so the signed-in account reaches it here. Signed out is undefined, and then a finished game records nothing. */
+/** why: the nearby session runs outside React. Signed out is undefined, and a finished game then records nothing. */
 export const setNearbyOwner = (ownerId: string | undefined) => {
   owner = ownerId
 }

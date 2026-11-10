@@ -106,7 +106,6 @@ function HonestRate({ record }: { record: RecordCounts }) {
   )
 }
 
-/** why: rows with and without a chevron keep their numbers in the same lane. */
 export function ChevronSlot({ shown }: { shown: boolean }) {
   const { theme } = useAppTheme()
   return (

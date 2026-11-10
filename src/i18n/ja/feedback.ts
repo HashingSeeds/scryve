@@ -8,34 +8,33 @@ export default {
     newCount_other: "新着{{count}}件",
     email: "サポートにメール",
     emailDetail: "アカウントや支払いに関する質問",
-    suggest: "機能の提案・バグの報告",
+    suggestFeature: "機能を提案",
+    reportBug: "不具合を報告",
     noMatch: "「{{query}}」に該当する回答はありません。",
     ask: "「{{query}}」について問い合わせる",
   },
-  offline: "オフラインです。接続が戻るまで、下書きはここに残ります。",
+  offline: "オフラインです。接続が戻るまで下書きはここに保存されます。",
   suggest: {
     title: "フィードバックを送信",
     kind: "種類を選択",
     feature: "機能",
     bug: "バグ",
+    prompt: {
+      feature: "どんな機能がほしいですか?",
+      bug: "何が起きましたか?",
+    },
     bodyPlaceholder: {
-      feature: "どんな機能がほしいですか?どんなときに使いますか?",
-      bug: "何が起きましたか?どうなると思っていましたか?",
+      feature: "どんな場面で使いますか?",
+      bug: "どうなると思いましたか?",
     },
     addScreenshot: "スクリーンショットを追加",
     removeScreenshot: "スクリーンショットを削除",
     selectedScreenshot: "選択したスクリーンショット",
     screenshotFailed: "スクリーンショットを追加できませんでした。別の画像をお試しください。",
-    sentryDisclosure:
-      "バグ報告やスクリーンショットを送ると、お使いのデバイス情報も Sentry に送信されます。",
-    translationNotice:
-      "どの言語でも書けます。翻訳にAIツールを使うことがあります。<privacy>プライバシーポリシー</privacy>をご覧ください。",
+    notice:
+      "どの言語でも書けます。AIが読解を補助することがあります。<privacy>プライバシー</privacy>",
     includeAccount: "アカウントを含める",
-    includeAccountHelper:
-      "返信はサインインしているすべてのデバイスに届き、ユーザー名が運営に表示されます。",
-    anonymous:
-      "アカウントなしで送信されます。返信はこのデバイスに表示され、再インストールすると失われることがあります。",
-    signInToKeep: "サインインして保持",
+    includeAccountHelper: "返信はデバイス間で同期され、ユーザー名が開発者に表示されます。",
     sendFailed: "送信できませんでした。もう一度お試しください。",
     rateLimited_other: "送信回数が多すぎます。{{count}}分後にもう一度お試しください。",
   },
@@ -66,7 +65,7 @@ export default {
     linkedElsewhere: "別のアカウントで送信済み",
     notLinked: "アカウントなしで送信しました。",
     includeAccount: "含める",
-    signInToKeep: "サインインして保存",
+    signInToSync: "サインインして同期",
   },
   notifyPrompt: {
     title: "返信を通知で受け取りますか?",

@@ -233,7 +233,6 @@ export function LobbySeatList({
           (!format || deck.format === format)
         const usableDecks =
           decks?.filter((deck) => deck.versions.length > 0 && fitsLobby(deck)) ?? []
-        // why: a device deck whose sync already landed is listed once, as the account deck.
         const syncedKeys = new Set(decks?.map((deck) => deck.deckKey))
         const usableDeviceDecks = decks
           ? (deviceDecks?.decks.filter(

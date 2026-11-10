@@ -249,7 +249,6 @@ export interface HeaderBackProps {
   testID?: string
 }
 
-/** why: back drawn the platform's way. Android gets Material's bare arrow in a 48dp target; iOS and web get a chevron naming the screen it returns to. */
 export function HeaderBack({ onPress, label, fallback, testID }: HeaderBackProps) {
   const { themed, theme } = useAppTheme()
   const destination = useBackLabel(fallback)

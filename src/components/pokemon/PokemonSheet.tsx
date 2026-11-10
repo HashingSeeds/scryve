@@ -112,7 +112,7 @@ export function PokemonSheet({
   onClose,
 }: PokemonSheetProps) {
   const { themed } = useAppTheme()
-  // why: the system keyboard only reads right side up for a seat facing the window's bottom edge, so every native seat types on the same in-seat keypad. Web keeps the browser's keyboard.
+  // why: the system keyboard reads right side up only for a seat facing the window bottom, so native seats all use the in-seat keypad.
   const onKeypad = Platform.OS !== "web"
   const [typingInto, setTypingInto] = useState<Field>()
   const sheetColor = mixColorsInLinearLight(color, "#000000", 0.82)
@@ -146,7 +146,7 @@ export function PokemonSheet({
   const searchField = useRef<ComponentRef<typeof TextField>>(null)
   useEffect(() => moveFocus(searchField.current ?? firstControl.current), [])
   const catalog = usePokemonCatalog(lookupOpen ? query : "")
-  // why: a pick the catalog can't give HP for (a Trainer, a failed lookup) still names a cardless Pokémon, which keeps counting damage; its card only sticks once HP is typed, since a card with no HP would read as 999 HP.
+  // why: a pick with no catalog HP (Trainer, failed lookup) is still a cardless Pokémon; its card sticks only once HP is typed, else it reads 999 HP.
   const keepsCardlessHp = cardless && !draft.hp.trim()
   const hp = keepsCardlessHp ? editing.hp : parseHp(draft.hp)
   const card: PokemonCard | undefined = hp
@@ -191,7 +191,6 @@ export function PokemonSheet({
     return { query, name: draft.name, hp: draft.hp }[field]
   }
 
-  // why: keypad edits land at the end, so the caret stays there instead of suggesting a spot mid-text.
   function caretAtEnd(value: string) {
     return onKeypad ? { start: value.length, end: value.length } : undefined
   }
@@ -282,7 +281,6 @@ export function PokemonSheet({
 
   const hits = catalog.hits && catalogRows(catalog.hits)
   const deck = usePokemonDeck(seatDeck)
-  // why: a cached deck is searchable offline; only the catalog part waits for a connection.
   const searchable = catalog.available || deck.length > 0
   const showSearch = lookupOpen && searchable
   const wanted = query.trim().toLowerCase()
@@ -318,7 +316,7 @@ export function PokemonSheet({
     (!keypadBeside &&
       contentHeight <
         HEADER_HEIGHT + FIELD_HEIGHT + RESULTS_FLOOR + tallestKeypadHeight() + 3 * spacing.xs)
-  // why: beside or below the keypad there is room for the typed field and what answers it, not the whole form.
+  // why: beside or below the keypad there's room only for the typed field and its answers.
   const searchFocus = keypadField === "query"
   const formFocus = keypadField !== undefined && keypadField !== "query"
   // why: a search pick places in one tap, so placing only shows the typed form when search can't help, and a reconnect must not hide a half-typed Pokémon behind search.
@@ -740,7 +738,7 @@ const $bodyUnderResults: ViewStyle = { minHeight: 56 }
 // why: when the form outgrows the space above the keypad, it scrolls instead of showing through the translucent keys.
 const $clip: ViewStyle = { overflow: "hidden" }
 const $beside: ViewStyle = { flexDirection: "row" }
-// why: beside the keypad the column is too narrow for a name and its printing on one line, and the name matters more.
+// why: beside the keypad the column is too narrow for name and printing on one line.
 const $resultStacked: ViewStyle = {
   flexDirection: "column",
   alignItems: "flex-start",

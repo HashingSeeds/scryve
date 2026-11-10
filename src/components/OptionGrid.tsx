@@ -41,7 +41,7 @@ export function OptionGrid({
     if (next !== value) onSelect(next)
   }
 
-  // why: the action that consumes the value (Start, Done) can sit outside the scroll view, so a tap there can land before the field blurs; each keystroke that lands in range is picked at once.
+  // why: Start/Done can sit outside the scroll view, so a tap can land before the field blurs; pick in-range keystrokes at once.
   function type(text: string) {
     if (!custom) return
     const digits = text.replace(/\D/g, "").slice(0, String(custom.max).length)
@@ -116,7 +116,7 @@ const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexWrap: "wrap",
   gap: spacing.xs,
 })
-// why: equal growth from one basis keeps every chip in a row the same width, and lets big text wrap the row instead of clipping labels.
+// why: equal growth from one basis keeps chips in a row the same width and wraps big text instead of clipping.
 const $cell: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, flexBasis: 56 })
 const $input: ThemedStyle<ViewStyle> = ({ radius }) => ({
   minHeight: 48,

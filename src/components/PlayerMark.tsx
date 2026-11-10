@@ -13,7 +13,7 @@ import type { LifeCardContentRotation } from "./playerCardTypes"
 import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-/** why: shapes sit inside their 44 unit box with different margins, so lining up boxes leaves drawn edges misaligned (a pointed shape floated above the prize grid). */
+/** why: shapes have different margins inside their 44 unit box, so align drawn edges, not boxes. */
 export const MARK_ART_BOUNDS: Record<
   PlayerMarkShape,
   { top: number; bottom: number; left: number; right: number }
@@ -108,7 +108,7 @@ export const PlayerMark = memo(function PlayerMark({
   )
 }, structurallyEqual)
 
-/** why: the Pro corner watermark is the mark's art at card scale; it skips PlayerMark's seat testIDs so each seat still has exactly one mark to find. */
+/** why: the Pro corner watermark uses this, skipping PlayerMark's seat testIDs so each seat has exactly one mark to find. */
 export function MarkArt({
   shape,
   color,
@@ -125,7 +125,7 @@ export function MarkArt({
   )
 }
 
-// why: foil must contrast with what sits behind the mark. Cards draw black marks only on light seat colors, so without a backdrop a black mark gets the dark foil; pickers sit on the app background and pass it.
+// why: foil must contrast with what's behind the mark. Cards draw black marks only on light seats, so without a backdrop a black mark gets the dark foil; pickers pass the app background.
 const FOIL_STOPS = {
   light: ["#F6E7B0", "#FFFFFF", "#B9E9FF", "#E6C2FF", "#F3D27A"],
   dark: ["#4A3A0A", "#000000", "#0E3446", "#30184A", "#3D2E05"],
@@ -268,7 +268,7 @@ const GEM =
 const GEM_FACETS =
   "M9.4 19.15H34.6V17.25H9.4ZM17.5 10.61 14.8 17.91 16.4 18.49 19.1 11.19ZM24.9 11.19 27.6 18.49 29.2 17.91 26.5 10.61ZM14.82 18.53 20.42 31.83 21.98 31.17 16.38 17.87ZM27.62 17.87 22.02 31.17 23.58 31.83 29.18 18.53Z"
 
-/** why: a sword inset over the eye's hole, the gem's facets or the leaf's rib would get lost in the cut-outs, so `solid` draws the plain silhouette; the skull keeps raised eyes and lets the sword stand in for its nose and teeth. */
+/** why: a sword over the eye hole, gem facets or leaf rib gets lost in cut-outs, so `solid` draws the plain silhouette; the skull keeps raised eyes, the sword standing in for nose and teeth. */
 function MarkShape({
   shape,
   color,

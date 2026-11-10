@@ -163,7 +163,6 @@ describe("CommanderStrip", () => {
     const view = renderStrip({ incoming: damaged })
     const map = view.getByTestId("commander-map-seat-1")
     fireEvent(map, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 40, height: 40 } } })
-    // why: rotation 0 puts the grid in the bottom-left corner, so its slop may grow down and left only.
     expect(view.getByTestId("commander-map-seat-1").props.hitSlop).toMatchObject({
       top: 0,
       right: 0,

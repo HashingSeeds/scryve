@@ -21,14 +21,13 @@ export interface GameTabsProps {
 
 const tabKey = (tab: Pick<GameTab, "system">) => tab.system ?? "none"
 
-// why: a game row and a format row each scroll sideways, so adding games or formats never adds height.
+// why: both rows scroll sideways, so more games or formats never add height.
 export function GameTabs({ tabs, selectedId, detail, onChoose }: GameTabsProps) {
   const {
     themed,
     theme: { spacing },
   } = useAppTheme()
   const selectedTab = tabs.find((tab) => tab.types.some((type) => type.id === selectedId))
-  // why: returning to a game picks the format last played in it on this screen, so most switches are one tap.
   const [lastFormat, setLastFormat] = useState<Partial<Record<string, string>>>(() =>
     selectedTab ? { [tabKey(selectedTab)]: selectedId } : {},
   )

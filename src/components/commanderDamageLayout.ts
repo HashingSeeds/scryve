@@ -100,7 +100,7 @@ export function commanderReach(input: {
   const ax = attacker.x * board.width
   const ay = attacker.y * board.height
   const card = { width: attacker.width * board.width, height: attacker.height * board.height }
-  // why: a card grown by d on every side covers a point once d reaches the point's larger gap from the card along either axis.
+  // why: a card grown by d on every side covers a point once d reaches the point's larger gap along either axis.
   const farthest = gridRows.flat().flatMap((index) => {
     if (index === null || index === input.attackerIndex) return []
     const box = seatBox(gridRows, rowFlexes, index)
@@ -120,7 +120,7 @@ export function commanderReach(input: {
 export interface CommanderTakeover {
   content: { width: number; height: number }
   disc: number
-  // why: a readout too big for the disc its card has room for shrinks into it while the attack holds the card.
+  // why: a readout too big for the disc shrinks into it while the attack holds the card.
   fit: number
   discOffset: { x: number; y: number }
   cardDiscOffset: { x: number; y: number }
@@ -130,14 +130,13 @@ export interface CommanderTakeover {
   flood?: { x: number; y: number; discGap: number } & Pick<CommanderReach, "card" | "distance">
 }
 
-/** why: the box a seat's readout inks, in its own upright space. `y` places the box's center below the card's center. */
+/** why: the box a seat's readout inks, in its upright space; `y` is its center below the card's center. */
 export interface ReadoutInk {
   width: number
   height: number
   y: number
 }
 
-// why: the disc keeps this gap from the card's edges.
 const DISC_GAP = 6
 // why: the disc's ring matches the board's gutter between cards, and the damage arc runs along it.
 export const DISC_RING = 4
@@ -147,7 +146,7 @@ const MIN_FIT = 0.6
 const DIGIT_INK_WIDTH = 0.64
 export const DIGIT_INK_HEIGHT = 0.72
 const DISC_CLEARANCE = 0.08
-// why: a total's line box is centred on the card, but its digits sit high in it (measured on iOS; Android and web from Rubik's metrics and each line-height model), so the disc rises to meet them.
+// why: a total's line box is centred on the card but its digits sit high (measured on iOS, derived from Rubik's metrics elsewhere), so the disc rises to meet them.
 const DIGIT_RISE = Platform.select({ ios: 0.043, android: 0.037, default: 0.0125 })
 
 // why: an out seat's second line under its life total: OUT, or the lethal amount after the mark or glyph of what knocked it out. LifeCard styles it from these, so the disc that rings it stays in step.
@@ -165,7 +164,7 @@ export function lifeInk(fontSize: number, digits: number): ReadoutInk {
   }
 }
 
-// why: the gap between a defender's life and its "34 − 4" line grows with the life, so a tablet's big total doesn't crowd the line.
+// why: the gap under a defender's life scales with it, so a tablet's big total doesn't crowd its "34 − 4" line.
 const STACK_GAP = 0.1
 
 /** why: once an attack lands, a defender's life shrinks and rises to make room for its "34 − 4" line, inside the disc already drawn around the life alone, so the disc never jumps. `scale` is the life's new size; `lifeShift` and `lineShift` place the life's ink and the line's ink from where the life's ink sat. */
@@ -189,7 +188,6 @@ export function stackedReadout(fontSize: number, digits: number, lineChars: numb
   }
 }
 
-/** why: an out seat stacks a smaller line under its life total, and a cause glyph `lead`s wide may sit before that line's text. */
 export function outInk(input: {
   fontSize: number
   digits: number
@@ -220,7 +218,6 @@ function rotate(x: number, y: number, degrees: number) {
   }
 }
 
-/** why: how far the attacker's card, centered at `x`, `y` in a seat's own space, must grow to cover `point` there. */
 export function floodGap(
   flood: { x: number; y: number; card: { width: number; height: number } },
   point: { x: number; y: number },

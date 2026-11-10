@@ -166,7 +166,7 @@ export function RoundClockDialog({
   )
 }
 
-/** why: single elimination breaks an unfinished game on the counter, highest life or fewest Prize cards, so players want to see who leads. */
+/** why: single elimination breaks unfinished games on the counter, so players want to see who leads. */
 function leaderLine(players: readonly GamePlayer[], system: PlaySystemId | undefined) {
   const counter = playSystemRules(system).counter
   const best = Math.max(...players.map(({ life }) => counterStanding(counter, life)))

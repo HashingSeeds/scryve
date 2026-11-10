@@ -24,7 +24,6 @@ export default function JoinRoute() {
 
 function Join({ code }: { code?: string }) {
   const { configured } = useAuthAccess()
-  // why: cloud and nearby games share the code field, so a typed or scanned code joins whichever game is on this Wi-Fi.
   const [typed, setTyped] = useState(code)
   if (!configured && lanPlayAvailable()) return <NearbyOnlyJoin code={code} />
   return (

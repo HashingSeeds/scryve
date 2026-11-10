@@ -135,23 +135,8 @@ const account = {
   support: {
     pageTitle: "Scryve Support",
     pageDescription:
-      "Get started with Scryve, find answers to common questions, suggest features, or contact support.",
+      "Find answers to common questions, suggest a feature, report a bug, or contact support.",
     title: "Support",
-    gettingStarted: {
-      heading: "Getting started",
-      startGame: {
-        title: "Start a game",
-        body: "Open Play. Your fresh board uses the defaults saved in Settings.",
-      },
-      choosePlay: {
-        title: "Choose how to play",
-        body: "Play together on one device, or choose Connected to play on separate devices.",
-      },
-      setUpTable: {
-        title: "Set up the table",
-        body: "Select the number of players and starting life, then start the game.",
-      },
-    },
     faq: {
       heading: "Frequently asked questions",
       restorePro: {
@@ -175,7 +160,6 @@ const account = {
           "You can manage your account from Scryve’s account screen. Email support if you need help accessing or deleting your account.",
       },
     },
-    appVersion: "Scryve {{version}}",
   },
   profile: {
     title: "Account",

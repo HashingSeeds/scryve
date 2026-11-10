@@ -35,7 +35,6 @@ export function loadLayoutChoice(gameId: string): LayoutChoice | undefined {
   return stored && { playerCount: stored.playerCount, layout: stored.layout }
 }
 
-/** why: one entry per game would pile up in storage forever, so the oldest fall off past the resume list's size. */
 export function saveLayoutChoice(gameId: string, choice: LayoutChoice): void {
   save(
     LAYOUT_CHOICES_KEY,
