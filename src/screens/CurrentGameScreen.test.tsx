@@ -368,7 +368,9 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("seat-bag-seat-4"))
     fireEvent.press(view.getByTestId("bag-plane-seat-4"))
     fireEvent.press(view.getByTestId("planar-dialog-die"))
-    const rolled = repository.loadActiveGame()?.table?.modes?.log?.at(-1)
+    const rolled = repository
+      .loadActiveGame()
+      ?.table?.modes?.log?.findLast((entry) => entry.kind === "rolled")
     expect(rolled).toMatchObject({ kind: "rolled", playerId: dorothy })
   })
 
