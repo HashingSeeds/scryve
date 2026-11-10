@@ -447,7 +447,6 @@ export function localTableRules(game: Pick<LocalGame, "system" | "format">) {
 
 const MAX_TURN_LOG = 400
 
-/** why: an undo lands on a turn the log already holds, so it drops the start it took back instead of adding one. */
 export function withTurn(game: LocalGame, turn: Turn | undefined, now: number): LocalGame {
   if (turn === game.turn) return game
   const { turn: _turn, turnLog: log = [], ...rest } = game
@@ -476,7 +475,6 @@ export function withTurn(game: LocalGame, turn: Turn | undefined, now: number): 
   }
 }
 
-/** why: the first turn begins when the first player is known, so its clock starts as the game does. A first player chosen again before anyone passes replaces it. */
 export function withFirstTurn(
   game: LocalGame,
   playerId: PlayerId | undefined,
@@ -802,7 +800,6 @@ export function canUndo(game: LocalGame, actorId: ActorId): boolean {
   )
 }
 
-/** why: the log's Undo takes back whatever happened last, so a pass is undone only when it is newer than this device's newest life change. */
 export function undoableTurn(game: LocalGame, actorId: ActorId) {
   const turn = game.turn
   if (!turn?.previous) return undefined

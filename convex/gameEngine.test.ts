@@ -239,7 +239,6 @@ async function parityGame(
     ).toEqual(stored.pairs.map((pair) => [`${pair.fromPlayerId}>${pair.toPlayerId}`, pair.total]))
   }
 
-  // why: Convex stamps server time and the memory engine the time it is given, so only who holds which turn is compared.
   async function expectSameTurn() {
     const stored = await t.run(async (ctx) => (await ctx.db.get(game._id))?.turn)
     const holder = (turn: typeof stored) =>
@@ -512,7 +511,6 @@ describe("engine parity: turns", () => {
     )
     expect(await game.expectSameTurn()).toMatchObject({ playerId: joinerSeat, number: 2 })
     expect(await game.projectedTurn(TABLE_VERSION)).toMatchObject({ playerId: joinerSeat })
-    // why: an installed client's strict parser drops a table with a field it does not know.
     expect(await game.projectedTurn(2)).toBeUndefined()
     expect(await game.projectedTurn()).toBeUndefined()
 

@@ -1,7 +1,6 @@
 import type { Turn } from "../../../convex/lib/turns"
 
 export const CHESS_BANK_MINUTES = [10, 20, 30] as const
-/** why: a pass at a real table is noticed late, so its undo waits longer than other toasts. */
 export const PASS_UNDO_MS = 15_000
 
 export function clockwiseSlots(rows: readonly (readonly (number | null)[])[]): number[] {

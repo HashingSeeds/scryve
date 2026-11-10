@@ -65,7 +65,6 @@ const memoryStore = (game: MemoryGame): GameStore => ({
   claim: (operationId) => game.claims.get(operationId),
   pendingClaims: () => [...game.claims.values()].filter((claim) => claim.status === "pending"),
   pairTotal: (pair) => game.pairs.get(pairKey(pair))?.total ?? 0,
-  // why: a nearby host seats players in lobby order.
   seats: () => [...game.seats.values()],
   commanderTotals: () => commanderTotals(game),
   // why: a nearby host takes writes only from devices it seated.

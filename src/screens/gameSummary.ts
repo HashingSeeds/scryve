@@ -32,7 +32,6 @@ export interface SummaryPlayer {
   startingLife?: number
   outcome: SummaryOutcome
   deleted?: boolean
-  /** why: a seat that shared turns with others shows its team, since the team won or lost together. */
   team?: string
 }
 

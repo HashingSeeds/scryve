@@ -787,12 +787,7 @@ function seatTabCorners(
     )
 }
 
-/**
- * why: on web, pass the insets. The page only reaches a rounded screen corner where the browser
- * reports an inset; a browser tab or a solid status bar strip reports none. A card corner that
- * meets the screen's takes the display's radius from `displayRadii` (board corners, top left
- * clockwise), so the card and its turn frame follow the glass; with no radius it stays square.
- */
+/** why: on web the page reaches a rounded screen corner only where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number

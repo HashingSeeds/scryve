@@ -28,7 +28,6 @@ export interface FirstPlayerTab {
 
 const TAB_LENGTH = 52
 const TAB_DEPTH = 40
-/** why: the round clock tab takes the first-player tab's place at the same size, so seats clear one footprint and their chrome never shifts between the two. */
 export const FIRST_PLAYER_TAB = { length: TAB_LENGTH, depth: TAB_DEPTH } as const
 /** why: seats beside a tab step their corner chrome past it only while the tabs show, then slide back. */
 export const FirstPlayerTabsShownContext = createContext(false)

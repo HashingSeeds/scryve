@@ -291,7 +291,6 @@ export function CurrentGameScreen({
   const active = runtime.game.status === "active"
   const turnsOn = turnsEnabled && active
   const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
-  // why: a countdown is how a judge's official time is kept, so a counting-down game is treated as event play, where only a pass moves the turn.
   const casual = clock?.setup.mode !== "countdown"
   const turnSeats: TurnSeat[] = runtime.game.players.map((player, index) => ({
     playerId: player.id,
@@ -302,7 +301,6 @@ export function CurrentGameScreen({
   }))
   const { passTurn, setTurn, undoTurn, setBank, startTurn } = runtime
   const { turnGroups } = runtime.game
-  // why: a turn shared by a team is named for the team, in the chip, the pass toast, and the log.
   const nameOf = (playerId: string) => teamName(runtime.game.players, turnGroups, playerId)
   function nextOf(clockwiseSlots: number[]) {
     if (!turn) return undefined
@@ -348,7 +346,6 @@ export function CurrentGameScreen({
         }
       : undefined
 
-  // why: while the offer stands, or turns are on and nobody has the first turn, every seat carries an empty 1st that claims first in one tap. The turn chip takes the 1st's slot on the active seat.
   const claiming = !!firstPlayer || (turnsOn && !turn)
   const seatGrid = {
     ...dice.grid,

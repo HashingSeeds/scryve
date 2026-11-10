@@ -184,6 +184,5 @@ export interface LocalGameSummary {
   match?: LocalGameMatch
   matchPublish?: "pending" | "published" | "failed"
   seatPassHashes?: SeatPassHashes
-  /** why: History names a winning team, so the summary keeps who shared a turn. */
   turnGroups?: string[][]
 }
