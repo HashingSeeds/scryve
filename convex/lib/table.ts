@@ -26,7 +26,7 @@ export const MAX_POKEMON_DAMAGE = 999
 export const POKEMON_HP_FACET = "hp"
 export const POISON_CHECKUP_DAMAGE = 10
 export const BURN_CHECKUP_DAMAGE = 20
-/** why: clients that send this to lobbyProjection get Pokémon conditions (2), the turn (3), custom counters (4), and Planechase and Archenemy (5); older installs get the table without them, since their strict parser drops a table with fields it does not know. */
+/** why: an older install's strict parser drops a table with any field it does not know, so each client gets only the fields of the version it sends. */
 export const TABLE_VERSION = 5
 export const TURN_TABLE_VERSION = 3
 export const CUSTOM_COUNTER_TABLE_VERSION = 4
@@ -259,6 +259,7 @@ export function customCounterName(raw: string): string | undefined {
   return name.length > 0 && name.length <= MAX_CUSTOM_COUNTER_NAME_LENGTH ? name : undefined
 }
 
+/** why: a named counter's name is part of its stored change's identity, so padding a client sent must not reach it. */
 export function normalizedTableAction(action: TableAction): TableAction {
   if (action.kind !== "customCounter.changed") return action
   const name = customCounterName(action.name)
@@ -282,7 +283,6 @@ export function customCounterNameOf(counterId: string): string | undefined {
     : undefined
 }
 
-/** why: the game log keys named counters by name, beside the system's own counters. */
 export function loggedCounterId(action: TableAction): string | undefined {
   if (action.kind === "counter.changed") return action.counterId
   return action.kind === "customCounter.changed" ? customCounterId(action.name) : undefined

@@ -196,11 +196,13 @@ async function parityGame(
       currentLife: number
       eventCount?: number
       counters?: unknown
+      customCounters?: unknown
       pokemon?: unknown
     }) => ({
       currentLife: seat.currentLife,
       eventCount: seat.eventCount ?? 0,
       counters: seat.counters,
+      customCounters: seat.customCounters,
       pokemon: seat.pokemon,
     })
     expect(plain(memory.designations)).toEqual(plain(stored.designations))

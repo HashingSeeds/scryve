@@ -401,7 +401,7 @@ export default {
     customRecent: "{{label}} जोड़ें",
     starter: {
       speed: "स्पीड",
-      rad: "रेड",
+      rad: "रैड",
       storm: "स्टॉर्म",
     },
     more_one: "{{identity}}, {{count}} और काउंटर",

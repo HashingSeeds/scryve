@@ -295,6 +295,17 @@ describe("CounterChips", () => {
     expect(focus).toHaveBeenCalledTimes(4)
   })
 
+  it("moves focus to Name a counter when it is a no-system game's only option", () => {
+    const focus = jest.spyOn(AccessibilityInfo, "sendAccessibilityEvent")
+    const view = chips(seat({ rules: playTableRules(undefined) }))
+    focus.mockClear()
+
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+
+    expect(view.getByTestId("counter-option-1-custom")).toBeTruthy()
+    expect(focus).toHaveBeenCalledWith(expect.anything(), "focus")
+  })
+
   it("re-reads a repeated message on web, such as retaking Monarch", () => {
     jest.useFakeTimers()
     jest.replaceProperty(Platform, "OS", "web")
