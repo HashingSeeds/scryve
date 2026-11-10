@@ -398,13 +398,13 @@ const board = {
     customAdd: "Add",
     // Screen reader label for a recently used counter name; tapping it adds that counter. {{label}} is the name.
     customRecent: "Add {{label}}",
-    // Screen reader label for a "+2" button on a seat; it opens the seat's counters that didn't fit on the card.
     // Suggested names for a player's own counter, before they've named any. Use the term printed on Magic cards in this language. Keep under 20 characters.
     starter: {
       speed: "Speed",
       rad: "Rad",
       storm: "Storm",
     },
+    // Screen reader label for a "+2" button on a seat; it opens the seat's counters that didn't fit on the card.
     more_one: "{{identity}}, {{count}} more counter",
     more_other: "{{identity}}, {{count}} more counters",
   },
