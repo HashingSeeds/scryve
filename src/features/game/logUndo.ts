@@ -8,11 +8,6 @@ import {
   type TableAction,
 } from "../../../convex/lib/table"
 
-/**
- * why: with turns hidden the log shows no passes, so Undo never rewinds a turn the player cannot
- * see. A pass is weighed against the newest row the log shows, so taps that cancel out after it,
- * which show no row, don't hide it.
- */
 export function newestLogUndo(game: LocalGame, { turns }: { turns: boolean }) {
   const positionOf = localLogPositions(game)
   const [row] = mergedLog(

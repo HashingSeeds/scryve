@@ -123,11 +123,9 @@ export function connectedLogInputs(
 
 export interface CounterTable {
   players?: TableState["players"]
-  /** why: a Two-Headed Giant team shares poison, so both heads' taps count back from one value. */
   counterKey?: (playerId: string, counterId: string) => string
 }
 
-/** why: like life, each counter row's value counts back from what the table shows now, and a change taken back leaves with its undo. */
 function counterLog(events: readonly ConnectedLogEvent[], table: CounterTable): CounterLogEntry[] {
   const undone = new Set(
     events.flatMap(({ undoOf, action }) =>

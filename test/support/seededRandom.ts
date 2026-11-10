@@ -1,4 +1,3 @@
-/** why: property tests draw from a seeded generator, so a failing run replays from its seed alone. */
 export function seededRandom(seed: number) {
   let state = seed >>> 0
   const next = () => {

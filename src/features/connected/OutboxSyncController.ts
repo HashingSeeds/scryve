@@ -470,7 +470,6 @@ export class OutboxSyncController {
     }
   }
 
-  /** why: one compensating write per change it takes back, each naming its change, so the log hides both. */
   undoTable = (changes: readonly { operationId: string; action: TableAction }[]) => {
     for (const { operationId, action } of changes)
       if (!this.enqueueTableAction(action, createClientId("operation", this.now()), operationId))

@@ -148,7 +148,6 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
 
 type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
 
-/** why: newest first, by sequence: `positionOf` is the authority's order or a local game's apply order, never a clock. */
 export function mergedLog(
   life: readonly GameLogRow[],
   counters: readonly GameCounterRow[],

@@ -247,7 +247,6 @@ export function customCounterName(raw: string): string | undefined {
   return name.length > 0 && name.length <= MAX_CUSTOM_COUNTER_NAME_LENGTH ? name : undefined
 }
 
-/** why: a named counter's change is stored with its name, in its identity and the log, so the authority keeps only the name it would show, whatever padding was sent. */
 export function normalizedTableAction(action: TableAction): TableAction {
   if (action.kind !== "customCounter.changed") return action
   const name = customCounterName(action.name)
