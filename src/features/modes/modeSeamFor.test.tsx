@@ -9,9 +9,10 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerSlotFacings,
 } from "@/components/playerGridGeometry"
+import { headChipCrowded, teamGridLayout } from "@/components/teamGridGeometry"
 import { ThemeProvider } from "@/theme/context"
 
-import { modeSeamFor } from "./modeSeamFor"
+import { modeSeamFor, teamSeat } from "./modeSeamFor"
 import { useBoardModes } from "./useBoardModes"
 import { PLANAR_DECKS, SCHEME_DECKS } from "../../../convex/lib/modeDecks"
 import { startModes, type ModeSetup } from "../../../convex/lib/tableModes"
@@ -45,7 +46,7 @@ describe("modeSeamFor", () => {
     const seam = modeSeamFor(result.current, {
       dieOnChip: false,
       turnChips: false,
-      slotOf: (playerId) => seats.indexOf(playerId),
+      slotOf: (playerId) => ({ slot: seats.indexOf(playerId) }),
     })
     const element = seam?.({
       anchor: getPlayerGridMenuAnchor(4, layout),
@@ -87,7 +88,7 @@ describe("modeSeamFor", () => {
     const seam = modeSeamFor(result.current, {
       dieOnChip: true,
       turnChips: true,
-      slotOf: (playerId) => players.indexOf(playerId),
+      slotOf: (playerId) => ({ slot: players.indexOf(playerId) }),
     })
     render(
       <ThemeProvider initialContext="dark">
@@ -107,4 +108,48 @@ describe("modeSeamFor", () => {
     )
     expect(screen.getByTestId("plane-plate")).toBeTruthy()
   })
+
+  it.each(["auto", "featured-last"] as const)(
+    "keeps the planar die on each head's chip on a six-player %s team board",
+    (layoutVariant) => {
+      const players = ["ada", "bo", "cy", "dee", "eve", "fay"]
+      const teams = [
+        ["ada", "bo"],
+        ["cy", "dee"],
+        ["eve", "fay"],
+      ]
+      const { modes } = startModes({ planechase: { decks: [PLANAR_DECKS[0].id] } }, players)
+      const [width, height] = [390, 844]
+      const layout = teamGridLayout({ playerCount: 3, width, height, layoutVariant })
+      for (const [active] of teams) {
+        const { result } = renderHook(() =>
+          useBoardModes({
+            modes,
+            turn: { playerId: active!, number: 1, startedAt: 0, operationId: "t", waiting: true },
+            groups: teams,
+            players: players.map((id) => ({ id, name: id })),
+            controls: () => true,
+            act: () => true,
+          }),
+        )
+        const seam = modeSeamFor(result.current, {
+          dieOnChip: true,
+          turnChips: true,
+          slotOf: (playerId) => teamSeat(teams, playerId),
+        })
+        const element = seam?.({
+          anchor: getPlayerGridMenuAnchor(3, layout),
+          facings: getPlayerSlotFacings(3, layout),
+          edgeTabs: false,
+          sides: getMenuSeamNeighbors(3, layout),
+          width,
+          menuSize: COMPACT_MENU_BUTTON_SIZE,
+          rivets: [],
+          headCrowded: (slot, head) => headChipCrowded(3, layout, slot, head),
+        }) as ReactElement<ComponentProps<typeof ModeSeam>>
+        const { left, right } = element.props.plan
+        expect([...(left?.items ?? []), ...(right?.items ?? [])]).toEqual(["plane"])
+      }
+    },
+  )
 })

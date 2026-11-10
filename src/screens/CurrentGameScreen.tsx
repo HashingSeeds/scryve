@@ -62,7 +62,7 @@ import { useLocalGame } from "@/features/game/useLocalGame"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
 import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
-import { modeSeamFor } from "@/features/modes/modeSeamFor"
+import { modeSeamFor, teamSeat, type SeamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -372,11 +372,12 @@ export function CurrentGameScreen({
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
-  const slotOf = (playerId: string) => {
+  const slotOf = (playerId: string): SeamSeat | undefined => {
+    if (teams) return teamSeat(teams, playerId)
     const index = runtime.game.players.findIndex(({ id }) => id === playerId)
     if (index < 0) return undefined
     const slot = runtime.game.seatOrder?.indexOf(index)
-    return slot === undefined || slot < 0 ? index : slot
+    return { slot: slot === undefined || slot < 0 ? index : slot }
   }
 
   const claiming = !!firstPlayer || (turnsOn && !turn)

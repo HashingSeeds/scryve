@@ -8,10 +8,12 @@ import type {
 } from "./playerCardTypes"
 import {
   getPlayerGridLayout,
+  getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
   getPlayerSlotFacings,
 } from "./playerGridGeometry"
+import { CONTENT_EDGES } from "./pokemon/pokemonCardLayout"
 
 type GridLayout = ReturnType<typeof getPlayerGridLayout>
 
@@ -95,6 +97,22 @@ export function menuPlacementAt(
   if (x && near(anchor.y, (box.y0 + box.y1) / 2))
     return { edgeCenter: x === "Left" ? "left" : "right" }
   return {}
+}
+
+/** why: mirrors TurnChipLayer, which drops a head's beside control when the pentagon is centered on that head's top edge; the seam carries the control exactly then, or it shows twice or not at all. */
+export function headChipCrowded(teamCount: number, layout: GridLayout, slot: number, head: 0 | 1) {
+  const rows = getPlayerGridRows(teamCount, layout)
+  const panel = panelBoxes(
+    rows,
+    rows.map((row) => getPlayerGridRowFlex(row, layout)),
+  ).get(slot)
+  const rotation = getPlayerSlotFacings(teamCount, layout)[slot]
+  if (!panel || rotation === undefined) return false
+  const { edgeCenter } = menuPlacementAt(
+    headBox(panel, rotation, head),
+    getPlayerGridMenuAnchor(teamCount, layout),
+  )
+  return edgeCenter === CONTENT_EDGES[rotation].top
 }
 
 export function teamSeatRows(

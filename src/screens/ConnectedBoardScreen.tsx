@@ -95,7 +95,7 @@ import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
 import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
-import { modeSeamFor } from "@/features/modes/modeSeamFor"
+import { modeSeamFor, teamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -1167,8 +1167,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           dieOnChip,
           turnChips: turnsOn && !!turn,
           slotOf: (playerId) => {
+            if (teams) return teamSeat(teams, playerId)
             const slot = players.findIndex(({ id }) => id === playerId)
-            return slot < 0 ? undefined : slot
+            return slot < 0 ? undefined : { slot }
           },
           teamBinding,
         })}
