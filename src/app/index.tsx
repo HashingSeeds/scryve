@@ -138,7 +138,8 @@ export default function Index() {
     return (
       <WhatYouPlayScreen
         onChoose={(type) => {
-          const next = settingsForWhatYouPlay(settings, type)
+          // why: onboarding's turns choice saves while this screen is up, so the stored settings are newer than this route's copy.
+          const next = settingsForWhatYouPlay(localGameRepository.loadSettings(), type)
           localGameRepository.saveSettings(next)
           setSettings(next)
           setFreshGame(createFreshGame(prepared, next))
