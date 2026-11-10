@@ -211,6 +211,10 @@ const board = {
     hexagon: "hexagon",
     plus: "plus",
     shield: "shield",
+    // A crescent moon, the player mark's shape.
+    moon: "moon",
+    // A round ring with a hole in the middle, the player mark's shape.
+    ring: "ring",
     circle: "circle",
     crown: "crown",
     flame: "flame",

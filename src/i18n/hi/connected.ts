@@ -165,6 +165,8 @@ export default {
       hexagon: "षटकोण",
       plus: "प्लस",
       shield: "ढाल",
+      moon: "चाँद",
+      ring: "छल्ला",
       circle: "वृत्त",
       crown: "मुकुट",
       flame: "लौ",

@@ -96,7 +96,10 @@ describe("Two-Headed Giant", () => {
     expect((await listed(variants)).page).toHaveLength(1)
     await expect(
       host.mutation(api.games.updateLobbySettings, { publicId, playerCount: 5 }),
-    ).rejects.toThrow("even number")
+    ).rejects.toThrow("4 or 6 seats")
+    await expect(
+      host.mutation(api.games.updateLobbySettings, { publicId, playerCount: 8 }),
+    ).rejects.toThrow("4 or 6 seats")
   })
 
   it("turns down a game that doesn't offer it without naming another variant", async () => {
