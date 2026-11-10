@@ -692,6 +692,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const terminalStatus = game.status
   const rematchPublicId = game.rematchPublicId
   const table = useContext(ConnectedTableContext)
+  const tablePlayers = table?.table.players
+  const counterTable = useMemo(() => ({ players: tablePlayers }), [tablePlayers])
   const turn = turns ? table?.table.turn : undefined
   const turnGroups = table?.table.turnGroups
   const [turnsEnabled] = useTurnsEnabled(localGameRepository)
@@ -1200,7 +1202,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           seats={logSeats}
           turn={table?.table.turn}
           groups={turnGroups}
-          counterTable={{ players: table?.table.players }}
+          counterTable={counterTable}
           turnsShown={tabOn}
           anyoneEdits={anySeat}
           origin={menuDialogOrigin}
