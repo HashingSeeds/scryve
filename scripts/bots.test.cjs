@@ -1,7 +1,8 @@
+const { getFunctionName } = require("convex/server")
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { assertPreviewTarget, botIdentity, lobbyIdentifiers, parseCli } = require("./bots.cjs")
+const { assertPreviewTarget, Bot, botIdentity, lobbyIdentifiers, parseCli } = require("./bots.cjs")
 
 test("bots only run against the preview Convex returned, never production", () => {
   assert.doesNotThrow(() =>
@@ -61,4 +62,24 @@ test("cli defaults follow the format and reject seats that cannot exist", () => 
   assert.throws(() => parseCli(["host", "--players", "3", "--fill", "3"]), /--fill/)
   assert.throws(() => parseCli(["join"]), /invite code/)
   assert.throws(() => parseCli(["host", "--life-every", "fast"]), /duration/)
+})
+
+test("bots host and join as apps that edit any seat, so the table stays anyone-edit", async () => {
+  const sent = new Map()
+  const bot = Object.assign(Object.create(Bot.prototype), botIdentity(1), {
+    options: parseCli(["host"]),
+    report() {},
+    watch() {},
+    client: {
+      query: async () => ({ page: [] }),
+      mutation: async (fn, args) => {
+        sent.set(getFunctionName(fn), args)
+        return { publicId: "p", seat: 2 }
+      },
+    },
+  })
+  await bot.host()
+  await bot.join("AB12CD")
+  assert.equal(sent.get("games:createLobby").editsAnySeat, true)
+  assert.equal(sent.get("games:claimSeat").editsAnySeat, true)
 })
