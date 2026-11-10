@@ -188,8 +188,8 @@ export function SettingsScreen({
         testID="turns-switch"
         labelTx="account:settings.turns.label"
         helperTx="account:settings.turns.helper"
-        value={settings.turnTab !== false}
-        onValueChange={(value) => update(value ? { turnTab: true } : { turnTab: false })}
+        value={settings.turnTab === true}
+        onValueChange={(value) => update({ turnTab: value || undefined })}
       />
       <Text tx="account:settings.appearance" preset="subheading" accessibilityRole="header" />
       <Text tx="account:settings.theme.heading" style={themed($label)} />

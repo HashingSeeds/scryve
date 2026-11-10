@@ -36,7 +36,6 @@ const values = {
   scope: ["event"],
   peak_heat: ["nominal", "fair", "serious", "critical"],
   result: ["win", "draw", "none"],
-  hide_offer: ["none", "shown", "accepted"],
 } as const
 
 const LATENCY_KEYS = [
@@ -141,7 +140,6 @@ type Events = {
     pass_count: number
     player_count: number
     mode: "local" | "connected"
-    hide_offer: (typeof values.hide_offer)[number]
   }
 }
 
@@ -170,7 +168,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   rules_search: ["system", "result_count", "top_results", "query"],
   rules_opened: ["system", "rank", "open_count"],
   keyword_viewed: ["system", "rule"],
-  turns_game_ended: ["turns_enabled", "pass_count", "player_count", "mode", "hide_offer"],
+  turns_game_ended: ["turns_enabled", "pass_count", "player_count", "mode"],
 }
 
 const RULE_ID = /^\d{1,3}(\.\d{1,3}){0,2}[a-z]{0,2}$/

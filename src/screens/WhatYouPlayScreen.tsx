@@ -17,6 +17,7 @@ import {
   MORE_GAME_TYPES,
   type GameType,
 } from "@/features/game/gameTypes"
+import { TurnsChoice } from "@/features/game/TurnsChoice"
 import { whatYouPlaySeats } from "@/features/game/whatYouPlay"
 import { useFirstUseSharing } from "@/features/legal/useFirstUseSharing"
 import { useAppTheme } from "@/theme/context"
@@ -50,6 +51,7 @@ export function WhatYouPlayScreen({ onChoose }: WhatYouPlayScreenProps) {
           <Text text={BRAND_EYEBROW} preset="formLabel" style={themed($eyebrow)} />
           <Text tx="play:whatYouPlay.heading" preset="heading" accessibilityRole="header" />
         </View>
+        <TurnsChoice />
         <ScrollView style={$list} contentContainerStyle={themed($choices)}>
           <GameTypeList
             types={FIRST_GAME_TYPES}

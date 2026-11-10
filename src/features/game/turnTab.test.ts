@@ -11,7 +11,7 @@ import {
   startTurnOnChange,
 } from "./domain"
 import { gameLog, withTurnDividers } from "./LifeLog"
-import { clockwiseSlots, offersToHideTurns } from "./turnTab"
+import { clockwiseSlots } from "./turnTab"
 
 describe("clockwiseSlots", () => {
   it("walks the grid's edge clockwise", () => {
@@ -23,17 +23,6 @@ describe("clockwiseSlots", () => {
     ).toEqual([0, 1, 3, 2])
     expect(clockwiseSlots([[0], [1, 2], [3, 4], [5]])).toEqual([0, 2, 4, 5, 3, 1])
     expect(clockwiseSlots([[0], [1, 2]])).toEqual([0, 2, 1])
-  })
-})
-
-describe("offersToHideTurns", () => {
-  const prefs = { enabled: true, hideOffered: false }
-  it("offers once, and only after a game nobody passed in", () => {
-    expect(offersToHideTurns(prefs, undefined)).toBe(true)
-    expect(offersToHideTurns(prefs, { number: 1 })).toBe(true)
-    expect(offersToHideTurns(prefs, { number: 2 })).toBe(false)
-    expect(offersToHideTurns({ ...prefs, hideOffered: true }, undefined)).toBe(false)
-    expect(offersToHideTurns({ ...prefs, enabled: false }, undefined)).toBe(false)
   })
 })
 

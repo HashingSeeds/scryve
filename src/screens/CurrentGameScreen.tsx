@@ -43,13 +43,12 @@ import { playCommanderLethal } from "@/features/game/playSystems"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
 import { teamName } from "@/features/game/teams"
 import {
-  HideTurnsDialog,
   reportTurnsGame,
   TurnDialog,
-  useTurnPrefs,
+  useTurnsEnabled,
   type TurnSeat,
 } from "@/features/game/TurnDialog"
-import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
+import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import type {
   CommanderSlot,
   GamePlayer,
@@ -67,7 +66,7 @@ import type { GameEndSource } from "@/utils/analytics"
 
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
-import { nextTurnSeat, sharesTurn, type Turn } from "../../convex/lib/turns"
+import { nextTurnSeat, sharesTurn } from "../../convex/lib/turns"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
@@ -132,14 +131,13 @@ export function CurrentGameScreen({
   const [clockOpen, setClockOpen] = useState(false)
   const openClock = useCallback(() => setClockOpen(true), [])
   const closeClock = useCallback(() => setClockOpen(false), [])
-  const [turnPrefs, setTurnPrefs] = useTurnPrefs(repository ?? localGameRepository)
+  const [turnsEnabled] = useTurnsEnabled(repository ?? localGameRepository)
   const [turnOpen, setTurnOpen] = useState(false)
   const [turnToast, setTurnToast] = useState<{
     operationId: string
     passerId: string
     message: string
   }>()
-  const [hideOffer, setHideOffer] = useState<{ turn?: Turn; playerCount: number }>()
   const [logOpen, setLogOpen] = useState(false)
   const openLog = useCallback(() => setLogOpen(true), [])
   const clock = runtime.game.clock
@@ -303,7 +301,7 @@ export function CurrentGameScreen({
   ])
   const turn = runtime.game.turn
   const active = runtime.game.status === "active"
-  const turnsOn = turnPrefs.enabled && active
+  const turnsOn = turnsEnabled && active
   const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
   // why: a countdown is how a judge's official time is kept, so a counting-down game is treated as event play, where only a pass moves the turn.
   const casual = clock?.setup.mode !== "countdown"
@@ -362,18 +360,6 @@ export function CurrentGameScreen({
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
-  function answerHideOffer(hide: boolean) {
-    if (!hideOffer) return
-    if (hide) setTurnPrefs({ enabled: false })
-    reportTurnsGame({
-      prefs: { enabled: true },
-      turn: hideOffer.turn,
-      playerCount: hideOffer.playerCount,
-      mode: "local",
-      hideOffer: hide ? "accepted" : "shown",
-    })
-    setHideOffer(undefined)
-  }
 
   // why: while the offer stands, or turns are on and nobody has the first turn, every seat carries an empty 1st that claims first in one tap. The turn chip takes the 1st's slot on the active seat.
   const claiming = !!firstPlayer || (turnsOn && !turn)
@@ -413,11 +399,12 @@ export function CurrentGameScreen({
       setMatchPrompt(ended)
       return
     }
-    const ending = { turn: ended.turn, playerCount: ended.players.length }
-    if (offersToHideTurns(turnPrefs, ended.turn)) {
-      setTurnPrefs({ hideOffered: true })
-      setHideOffer(ending)
-    } else reportTurnsGame({ prefs: turnPrefs, ...ending, mode: "local", hideOffer: "none" })
+    reportTurnsGame({
+      turnsEnabled,
+      turn: ended.turn,
+      playerCount: ended.players.length,
+      mode: "local",
+    })
     setTurnToast(undefined)
     runtime.rematch()
     setEndSource(undefined)
@@ -618,20 +605,18 @@ export function CurrentGameScreen({
         />
       ) : null}
 
-      {hideOffer ? <HideTurnsDialog onAnswer={answerHideOffer} /> : null}
-
       {logOpen ? (
         <GameLogDialog
           players={runtime.game.players}
           events={events}
-          turns={turnPrefs.enabled ? runtime.game.turnLog : undefined}
+          turns={turnsEnabled ? runtime.game.turnLog : undefined}
           groups={turnGroups}
           sharedLife={!!teams}
           counters={runtime.game.counterLog}
           positionOf={localLogPositions(runtime.game)}
-          canUndo={runtime.canUndo(turnPrefs.enabled)}
+          canUndo={runtime.canUndo(turnsEnabled)}
           origin={chrome.dialogOrigin}
-          onUndo={() => runtime.undo(turnPrefs.enabled)}
+          onUndo={() => runtime.undo(turnsEnabled)}
           onClose={() => setLogOpen(false)}
         />
       ) : null}

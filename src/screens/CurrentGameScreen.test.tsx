@@ -45,10 +45,14 @@ function renderGame(
   )
 }
 
-/** why: with turns on, the turn chip takes the 1st badge's place, so badge tests turn them off. */
+/** why: turns are opt-in, so a fresh device has them off. */
 function turnsOff() {
+  return new LocalGameRepository(new MemoryStorage())
+}
+
+function turnsOn() {
   const repository = new LocalGameRepository(new MemoryStorage())
-  repository.saveTurnPrefs({ enabled: false })
+  repository.saveTurnsEnabled(true)
   return repository
 }
 
@@ -345,7 +349,7 @@ describe("CurrentGameScreen", () => {
         [katherine, dorothy],
       ],
     }
-    const repository = new LocalGameRepository(new MemoryStorage())
+    const repository = turnsOn()
     const view = renderGame(initial, repository)
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-2-claim"))
@@ -365,7 +369,7 @@ describe("CurrentGameScreen", () => {
 
   it("lands the turn chip on the first player, waiting until the table's first change", () => {
     const initial = game()
-    const repository = new LocalGameRepository(new MemoryStorage())
+    const repository = turnsOn()
     const view = renderGame(initial, repository)
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-1-claim"))

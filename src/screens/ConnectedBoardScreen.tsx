@@ -87,13 +87,8 @@ import {
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import { teamChoices, teamMembers, teamName, teamValueLabel } from "@/features/game/teams"
-import {
-  HideTurnsDialog,
-  reportTurnsGame,
-  TurnDialog,
-  useTurnPrefs,
-} from "@/features/game/TurnDialog"
-import { offersToHideTurns, PASS_UNDO_MS } from "@/features/game/turnTab"
+import { reportTurnsGame, TurnDialog, useTurnsEnabled } from "@/features/game/TurnDialog"
+import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
@@ -707,7 +702,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const table = useContext(ConnectedTableContext)
   const turn = turns ? table?.table.turn : undefined
   const turnGroups = table?.table.turnGroups
-  const [turnPrefs, setTurnPrefs] = useTurnPrefs(localGameRepository)
+  const [turnsEnabled] = useTurnsEnabled(localGameRepository)
   const [turnOpen, setTurnOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const openLog = useCallback(() => setLogOpen(true), [])
@@ -716,50 +711,32 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     passerId: string
     message: string
   }>()
-  const [hideOffer, setHideOffer] = useState(false)
   const dismissTurnToast = useCallback(() => setTurnToast(undefined), [])
   const endedTurn = useRef(turn)
-  endedTurn.current = turn
+  useLayoutEffect(() => {
+    endedTurn.current = turn
+  })
   const leaveFinished = useCallback(() => {
     if (rematchPublicId && onRematch) onRematch(rematchPublicId)
     else onGameEnded?.(publicId)
   }, [rematchPublicId, onRematch, onGameEnded, publicId])
-  const tabOn = turns && turnPrefs.enabled
+  const tabOn = turns && turnsEnabled
   const playerCount = game.players.length
-  // why: the board leaves when the game ends, so the hide offer holds it until answered.
   useEffect(() => {
     if (terminalStatus === "finished") {
       if (navigatedTerminal.current) return
       navigatedTerminal.current = true
-      if (turns && offersToHideTurns(turnPrefs, endedTurn.current)) {
-        setTurnPrefs({ hideOffered: true })
-        setHideOffer(true)
-        return
-      }
       reportTurnsGame({
-        prefs: { enabled: tabOn },
+        turnsEnabled: tabOn,
         turn: endedTurn.current,
         playerCount,
         mode: "connected",
-        hideOffer: "none",
       })
       leaveFinished()
     } else if (terminalStatus === "abandoned" && !navigatedTerminal.current) {
       setAbandonedOpen(true)
     }
-  }, [terminalStatus, leaveFinished, turns, turnPrefs, setTurnPrefs, tabOn, playerCount])
-  function answerHideOffer(hide: boolean) {
-    if (hide) setTurnPrefs({ enabled: false })
-    reportTurnsGame({
-      prefs: { enabled: true },
-      turn: endedTurn.current,
-      playerCount,
-      mode: "connected",
-      hideOffer: hide ? "accepted" : "shown",
-    })
-    setHideOffer(false)
-    leaveFinished()
-  }
+  }, [terminalStatus, leaveFinished, tabOn, playerCount])
   const named = game.players.map(({ playerId, displayName }) => ({
     id: playerId,
     name: displayName,
@@ -1247,8 +1224,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onClose={() => setTurnOpen(false)}
         />
       ) : null}
-
-      {hideOffer ? <HideTurnsDialog onAnswer={answerHideOffer} /> : null}
 
       {logOpen && logFeed ? (
         <ConnectedLogDialog
