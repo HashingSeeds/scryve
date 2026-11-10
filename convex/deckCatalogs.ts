@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- each system's deck provider still branches here until it moves to convex/lib/games. */
 import { paginationOptsValidator } from "convex/server"
 import { ConvexError, v, type Infer } from "convex/values"
 
@@ -591,7 +590,7 @@ export const ensureFresh = action({
     const format = assertDeckGameFormat(game, args.format)
     await requireActionCapability(ctx, game, "exampleDecks")
     await ctx.runMutation(internal.deckCatalogs.seedCuratedDecks, { game, format })
-    if (game === "mtg") await ensurePreconRows(ctx)
+    if (!isProviderGame(game)) await ensurePreconRows(ctx)
     if (!deckFeed(game)?.formats.includes(format)) return { status: "ready" }
     const { waited: _waited, ...freshness } = await refreshIfStale(ctx, game, format)
     return freshness
@@ -607,7 +606,7 @@ export const searchTopDecks = action({
         code: "deck_provider_unavailable",
         message: "Top Decks are temporarily unavailable",
       })
-    return args.format === undefined && args.game !== "pokemon"
+    return args.format === undefined && !deckFeed(args.game)?.searchesDefaultFormatOnly
       ? await ctx.runQuery(internal.deckCatalogs.searchCached, args)
       : result.decks
   },

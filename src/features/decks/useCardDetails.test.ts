@@ -234,3 +234,26 @@ test("refetches Lorcana text cached with printed line wraps once online, and kee
   await waitFor(() => expect(result.current.details?.oracleText).toBe(unwrapped))
   expect(mockLookup).toHaveBeenCalledTimes(2)
 })
+
+test.each([
+  ["mtg", { scryfallId: "0000579f-7b35-4ed3-b44c-db2a538066fe" }],
+  ["pokemon", { name: "Pikachu", originalReference: "Pikachu BS 58" }],
+  ["ygo", undefined],
+])("routes a %s card without a catalog id to its provider's lookup", async (game, expected) => {
+  mockLookup.mockReset().mockResolvedValue({ oracleText: "Looked up", text: "Looked up" })
+  const card = {
+    detailKey: `${game}:routing`,
+    name: "Pikachu",
+    game,
+    printingId: "0000579f-7b35-4ed3-b44c-db2a538066fe",
+    originalReference: "Pikachu BS 58",
+  }
+  const { result } = renderHook(() => useCardDetails(card))
+  if (expected) {
+    await waitFor(() => expect(result.current.details?.oracleText).toBe("Looked up"))
+    expect(mockLookup).toHaveBeenCalledWith(expect.objectContaining(expected))
+  } else {
+    await waitFor(() => expect(result.current.detailsError).toBeTruthy())
+    expect(mockLookup).not.toHaveBeenCalled()
+  }
+})
