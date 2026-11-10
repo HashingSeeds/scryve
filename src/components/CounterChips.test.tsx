@@ -268,7 +268,7 @@ describe("CounterChips", () => {
   })
 
   it("names every counter in the bag opened from +N on a six-seat 320pt phone", () => {
-    const names = ["Speed", "Rad", "Storm", "Tickets"]
+    const names = ["Speed", "Rad", "Storm", "Tickets of the realm"]
     const values = [2, 3, 1, 5]
     const custom = names.map((name) => ({
       id: customCounterId(name),
@@ -295,6 +295,10 @@ describe("CounterChips", () => {
       let cell = option.parent
       while (cell && StyleSheet.flatten(cell.props.style)?.width === undefined) cell = cell.parent
       expect(StyleSheet.flatten(cell?.props.style)).toMatchObject({ width: "100%" })
+      const label = within(sheet).getByTestId(`counter-option-1-${id}-label`)
+      expect(label).toHaveTextContent(names[index]!)
+      expect(label.props.numberOfLines).toBeGreaterThanOrEqual(3)
+      expect(label.props.adjustsFontSizeToFit).toBe(true)
     })
   })
 
