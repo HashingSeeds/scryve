@@ -72,6 +72,9 @@ const connected = {
   outbox: {
     queueFull:
       "The offline queue for pending changes is full. Reconnect and sync before making more changes.",
+    // Shown when an undo of several life changes could queue only some of them before the offline queue filled up.
+    undoPartial:
+      "The offline queue filled up partway through this undo, so only part of it was saved. Reconnect and sync, then undo the rest.",
     commanderDamageRange: "Commander damage changes have to be between 1 and {{max}}.",
     commanderSelfDamage: "A commander cannot damage itself",
     // Shown to the attacking player after the server turned down their commander damage claim. {{name}} is the defending player; {{delta}} is the damage that was not added. The usual cause is that the defender has not answered an earlier claim from this attacker yet.

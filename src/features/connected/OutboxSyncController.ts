@@ -329,7 +329,8 @@ export class OutboxSyncController {
   /** why: one compensating write per change it takes back, each naming its change, so the log hides both and a quick tap after it starts fresh. */
   undoLife = (changes: readonly { operationId: string; playerId: string; delta: number }[]) => {
     this.lastQueuedLifeChange = undefined
-    for (const change of changes) {
+    this.changeError = undefined
+    for (const [index, change] of changes.entries()) {
       const now = this.now()
       const queued = this.outbox.enqueue({
         schemaVersion: 1,
@@ -348,7 +349,9 @@ export class OutboxSyncController {
         attempts: 0,
       })
       if (!queued) {
-        this.changeError = translate("connected:outbox.queueFull")
+        this.changeError = translate(
+          index === 0 ? "connected:outbox.queueFull" : "connected:outbox.undoPartial",
+        )
         break
       }
     }
