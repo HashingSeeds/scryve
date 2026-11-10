@@ -36,7 +36,7 @@ import { Text } from "./Text"
 // why: a step narrower than this is hard to land on with a finger, so a short track shows fewer steps and the held end carries on past them.
 const MIN_STEP_PX = 8
 const MAJOR_TICK_EVERY = 5
-// why: Rubik Bold digits ink about 0.72em tall and 0.64em wide; the total keeps a little air around its ink instead of its whole line box, so it can stay near board size.
+// why: Rubik Bold digits ink about 0.72em tall and 0.64em wide; the total keeps a little air around its ink, not its line box, so it stays near board size.
 const VALUE_BOX = 0.84
 const DIGIT_WIDTH = 0.64
 const CLOSE_SIZE = 32
@@ -284,7 +284,6 @@ export function LifeEditor({
     }, EDGE_DELAY_MS)
   }
 
-  // why: each whole step the drag crosses ticks, so the slider feels its steps as well as showing them.
   function moveDraft(next: number) {
     if (next === draft.current) return
     draft.current = next
@@ -350,7 +349,6 @@ export function LifeEditor({
       >
         <Text
           testID={`life-editor-title-seat-${seatNumber}`}
-          // why: a name with no room beside the total would clip to a letter, so it steps aside; the seat's color still says whose editor this is.
           text={titleWidth !== undefined && titleWidth < MIN_TITLE_WIDTH ? "" : playerName}
           accessibilityLabel={playerName}
           weight="bold"

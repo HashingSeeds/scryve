@@ -284,7 +284,6 @@ export function diceSeatView(state: DiceState, seatId: PlayerId): DiceSeatView |
   if (first?.kind === "rolloff" && first.phase === "bloom") {
     const value = first.rolls[seatId]
     const round = Math.max(...first.pool.map((id) => first.attempts[id] ?? 1))
-    // why: a seat knocked out in an earlier round shows no number, so only the latest round's rolls are on the board.
     if (value !== undefined && (first.attempts[seatId] ?? 1) < round)
       return { kind: "first", status: "lost" }
     if (value !== undefined) {

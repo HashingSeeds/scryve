@@ -55,7 +55,6 @@ export const block = internalMutation({
   },
 })
 
-/** why: a request may queue at most this long; later slots are refused instead of held. */
 const SCRYFALL_MAX_WAIT_MS = 10_000
 const GLOBAL_SLOT_MS = 125
 /** why: slot rows are reused each lap; one more lap than a wait window spans keeps a held slot from reading as free. */
@@ -95,10 +94,7 @@ export const scryfallCooldownUntil = internalQuery({
   handler: async (ctx) => (await bucketRow(ctx, "scryfall:cooldown"))?.nextRequestAt ?? 0,
 })
 
-/**
- * why: one request time must satisfy both the shared and the endpoint quota. Reserving each
- * separately and waiting for the later one lets two searches fire 125 ms apart.
- */
+/** why: reserving shared and endpoint quotas separately lets two searches fire 125 ms apart; one time must satisfy both. */
 export const acquireScryfall = internalMutation({
   args: { path: v.string() },
   handler: async (ctx, { path }) => {

@@ -151,7 +151,7 @@ const parsedJson = (value: string | undefined): unknown => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-// why: provenance lives on the stored envelope only. Codecs and send paths never see it, so it can't reach a strict Convex validator whatever a codec passes through.
+// why: provenance lives on the envelope only, so no codec can leak it to a strict Convex validator.
 const withoutProvenance = (value: unknown): unknown => {
   if (!isRecord(value)) return value
   const { writtenBy: _record, ...rest } = value

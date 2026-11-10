@@ -117,7 +117,6 @@ function LayoutPreview({
   )
 }
 
-// why: a fixed width split "Balanced" mid-word at the largest text sizes; the option now widens to fit its label.
 const LABEL_MAX_FONT_SCALE = 1.5
 
 const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({

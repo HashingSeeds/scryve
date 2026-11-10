@@ -46,8 +46,7 @@ export function convexErrorRetryAfterMs(cause: unknown, fallbackMs = 0) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallbackMs
 }
 
-/** why: deployed backends say ArgumentValidationError and convex-test says "Validator error".
- *  Production deployments redact it to "Server Error", so this only catches it where the message survives. */
+/** why: deployed backends say ArgumentValidationError, convex-test says "Validator error"; production redacts to "Server Error". */
 export function isArgumentValidationError(cause: unknown) {
   return (
     cause instanceof Error &&

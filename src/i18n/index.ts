@@ -25,7 +25,6 @@ const pickSupportedLocale: () => Localization.Locale | undefined = () => {
 
 const locale = pickSupportedLocale()
 
-// why: development builds can preview another language without changing the device language.
 const devLocaleOverride = __DEV__ ? process.env.EXPO_PUBLIC_LOCALE : undefined
 
 export const appLocale = devLocaleOverride || locale?.languageTag || fallbackLocale

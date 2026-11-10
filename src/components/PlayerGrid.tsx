@@ -730,7 +730,7 @@ export function PlayerGrid({
                 topInset: topEdgeBand,
               })
               return (
-                // why: keyed by seat, so a rematch's new player ids reuse the card; remounting every seat each game kept the old cards' native animation memory.
+                // why: keyed by seat, not player id, so a rematch reuses cards; remounting every seat kept old native animation memory.
                 <View
                   key={table?.tableRules.pokemon ? player.id : `seat-${index}`}
                   testID={`player-cell-seat-${seatNumber}`}
@@ -890,7 +890,7 @@ function fallbackMenuAt(
   return undefined
 }
 
-/** why: the iPhone Duo's outer display reports the camera hole in its top corner as safe area down that whole side, the only upright screen with a side inset. Seats keep their full width and only the chrome in that corner moves. */
+/** why: the iPhone Duo outer display reports its top-corner camera hole as safe area down that side, the only upright screen with a side inset. Seats keep full width; only that corner's chrome moves. */
 export function getCornerCutout(
   insets: LifeCardContentInsets,
   board: { width: number; height: number },
@@ -946,7 +946,7 @@ function seatTabCorners(
     )
 }
 
-/** why: on web the page reaches a rounded screen corner only where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
+/** why: on web, pass insets: the page reaches a rounded screen corner only where the browser reports an inset. */
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number

@@ -168,6 +168,8 @@ describe("SettingsScreen", () => {
     })
     view.rerender(renderSettings())
     expect(view.getByText("Update ready")).toBeTruthy()
+    const screen = JSON.stringify(view.toJSON())
+    expect(screen.indexOf("Update ready")).toBeLessThan(screen.indexOf("Local game defaults"))
     fireEvent.press(view.getByLabelText("What's in this update"))
     expect(view.getByText("\u2022 Faster sync")).toBeTruthy()
     fireEvent.press(view.getByTestId("update-restart-button"))

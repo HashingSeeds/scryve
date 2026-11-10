@@ -25,7 +25,7 @@ const ENTITIES: Record<string, string> = { amp: "&", gt: ">", lt: "<", quot: '"'
 
 const baseName = (name: string) => name.replace(VARIANT_SUFFIX, "")
 
-/** why: a review deployment can show Riot a short demo list instead of the whole community catalog. Names are `;` separated, since card names hold commas. */
+/** why: a review deployment can show Riot a short demo list. Names are `;` separated since card names hold commas. */
 function cardAllowlist() {
   const names = env.RIFTBOUND_CARDS?.split(";").map((name) => normalizeCardName(name.trim()))
   return names?.some(Boolean) ? new Set(names.filter(Boolean)) : undefined

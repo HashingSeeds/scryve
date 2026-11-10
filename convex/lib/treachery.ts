@@ -17,7 +17,6 @@ const TREACHERY_ROLES: readonly unknown[] = ["leader", "guardian", "assassin", "
 export const isTreacheryRole = (value: unknown): value is TreacheryRole =>
   TREACHERY_ROLES.includes(value)
 
-// why: the creator's role table, cut to the seat counts a Scryve game allows.
 const ROLE_DECKS: Partial<Record<number, readonly TreacheryRole[]>> = {
   4: ["leader", "traitor", "assassin", "assassin"],
   5: ["leader", "traitor", "assassin", "assassin", "guardian"],

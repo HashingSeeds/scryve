@@ -133,23 +133,8 @@ export default {
   support: {
     pageTitle: "Scryve サポート",
     pageDescription:
-      "Scryveの使い方、よくある質問の回答、機能のリクエスト、サポートへのお問い合わせはこちらから。",
+      "よくある質問の回答を確認したり、機能の提案、不具合の報告、サポートへのお問い合わせができます。",
     title: "サポート",
-    gettingStarted: {
-      heading: "はじめに",
-      startGame: {
-        title: "ゲームを始める",
-        body: "オープンプレイを開きます。新しいボードには設定で保存した初期設定が使われます。",
-      },
-      choosePlay: {
-        title: "プレイ方法を選ぶ",
-        body: "1台のデバイスで一緒に遊ぶか、「通信対戦」を選んでそれぞれのデバイスで遊べます。",
-      },
-      setUpTable: {
-        title: "テーブルを設定する",
-        body: "プレイヤー数と初期ライフを選んで、ゲームを開始してください。",
-      },
-    },
     faq: {
       heading: "よくある質問",
       restorePro: {
@@ -173,7 +158,6 @@ export default {
           "アカウントの管理は、Scryveのアカウント画面から行えます。アカウントへのアクセスや削除でお困りの場合は、サポートまでメールでご連絡ください。",
       },
     },
-    appVersion: "Scryve {{version}}",
   },
   profile: {
     title: "アカウント",
