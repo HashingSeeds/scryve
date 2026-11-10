@@ -8,6 +8,7 @@ import { useElapsedSince } from "@/utils/useElapsedSince"
 
 import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "./PlayerMark"
 import { Text, type TextProps } from "./Text"
+import { HANDOFF_MS, NAME_OUT_MS } from "./turnStyle"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 // why: the mark, dice bag, and calculator all draw `icon` tall, so a seat's bottom row reads as one band.
@@ -122,8 +123,8 @@ export function SeatIdentity({
   )
 }
 
-const NAME_IN = FadeIn.duration(200)
-const NAME_OUT = FadeOut.duration(140)
+const NAME_IN = FadeIn.duration(HANDOFF_MS).delay(NAME_OUT_MS)
+const NAME_OUT = FadeOut.duration(NAME_OUT_MS)
 
 function UpdatedAgo({ since, color }: { since: number; color: string }) {
   const elapsed = useElapsedSince(since)

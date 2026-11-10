@@ -108,9 +108,9 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
-import { TurnChip, TurnChipLayer, UndoPassChip } from "./TurnChip"
+import { FadeOutSlot, RowChipSlot, TurnChip, TurnChipLayer, UndoPassChip } from "./TurnChip"
 import { useSeatDimmed } from "./TurnSpotlight"
-import { useTurnStyle } from "./turnStyle"
+import { HANDOFF_MS, useTurnStyle } from "./turnStyle"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const LIFE_FADE_MS = SWAP_MS
@@ -233,6 +233,13 @@ export const LifeCard = memo(function LifeCard({
   const undoPass = diceChips?.flatMap((chip) => (chip.kind === "undoPass" ? [chip.onUndo] : []))[0]
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
+  const animatedFill = useSharedValue(fill)
+  useEffect(() => {
+    animatedFill.value = reducedMotion
+      ? fill
+      : withTiming(fill, { duration: HANDOFF_MS, easing: Easing.out(Easing.cubic) })
+  }, [animatedFill, fill, reducedMotion])
+  const fillStyle = useAnimatedStyle(() => ({ backgroundColor: animatedFill.value }))
   const cornerSlide = useCornerSlide()
   const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
   const locked = !!out && out.cause !== "life"
@@ -633,8 +640,12 @@ export const LifeCard = memo(function LifeCard({
   const rowUndo = !!undoPass && turnChipShown
   const bagReserve = seatBag ? trailingButtonSize + identityMetrics.gap : 0
   // why: on seats too short for the name and the chip, the name gives way so the chip never runs under the bag; the mark still says whose seat it is.
+  const rowChip = rowTurnChip || rowUndo
+  useEffect(() => {
+    if (!rowChip) setRowChipWidth(0)
+  }, [rowChip])
   const nameRetracted =
-    (rowTurnChip || rowUndo) &&
+    rowChip &&
     typeof rowCap === "number" &&
     fullIdentityWidth + identityMetrics.gap + rowChipWidth > rowCap - bagReserve
   const markAnchor =
@@ -725,7 +736,7 @@ export const LifeCard = memo(function LifeCard({
         compact && themed($compactCard),
         ownership === "disabled" && themed($disabledCard),
         staleSince !== undefined && themed($staleCard),
-        { backgroundColor: fill },
+        fillStyle,
         style,
         knockStyle,
       ]}
@@ -1063,21 +1074,21 @@ export const LifeCard = memo(function LifeCard({
               />
             ) : null}
             {rowTurnChip || rowUndo ? (
-              <Animated.View
+              <RowChipSlot
                 testID={`turn-row-chip-seat-${seatNumber}`}
-                layout={cornerSlide}
-                entering={FadeIn.duration(200)}
-                exiting={FadeOut.duration(140)}
-                onLayout={({ nativeEvent: { layout } }) => setRowChipWidth(layout.width)}
+                retracting={nameRetracted}
+                onWidth={(width) => setRowChipWidth((widest) => Math.max(widest, width))}
               >
                 {turnChip && rowTurnChip ? (
-                  <TurnChip
-                    state={turnChip}
-                    seatNumber={seatNumber}
-                    foreground={foreground}
-                    compact={compact}
-                    filled
-                  />
+                  <FadeOutSlot>
+                    <TurnChip
+                      state={turnChip}
+                      seatNumber={seatNumber}
+                      foreground={foreground}
+                      compact={compact}
+                      filled
+                    />
+                  </FadeOutSlot>
                 ) : null}
                 {undoPass && rowUndo ? (
                   <UndoPassChip
@@ -1087,7 +1098,7 @@ export const LifeCard = memo(function LifeCard({
                     onUndo={undoPass}
                   />
                 ) : null}
-              </Animated.View>
+              </RowChipSlot>
             ) : null}
           </Animated.View>
           {calculatorButtonShown ? (

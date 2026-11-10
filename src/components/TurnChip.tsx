@@ -1,7 +1,16 @@
-import { useEffect, useReducer, useState } from "react"
+import { useEffect, useReducer, useRef, useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated"
 import Svg, { Path } from "react-native-svg"
 
 import type { TurnChipState } from "@/features/game/dice"
@@ -23,7 +32,7 @@ import { MarkArt } from "./PlayerMark"
 import { contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
 import { Text } from "./Text"
 import { useTurnSpotlight } from "./TurnSpotlight"
-import { notePass, passLabelShown } from "./turnStyle"
+import { HANDOFF_MS, NAME_OUT_MS, notePass, passLabelShown } from "./turnStyle"
 import { shapeForSeat } from "../../convex/lib/appearance"
 import { bankLeft, turnElapsed } from "../../convex/lib/turns"
 
@@ -268,7 +277,7 @@ export function UndoPassChip({
 }) {
   const { themed } = useAppTheme()
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(220)}>
+    <Animated.View entering={FadeIn.duration(HANDOFF_MS)} exiting={FadeOut.duration(NAME_OUT_MS)}>
       <BoardPressable
         testID={`turn-undo-pass-${seatNumber}`}
         accessibilityRole="button"
@@ -290,6 +299,55 @@ export function UndoPassChip({
       </BoardPressable>
     </Animated.View>
   )
+}
+
+/** why: a chip shown before it is measured lands past the name, then slides back once the name retracts; holding it hidden until measured lets the name leave first. */
+export function RowChipSlot({
+  testID,
+  retracting,
+  onWidth,
+  children,
+}: {
+  testID: string
+  retracting: boolean
+  onWidth: (width: number) => void
+  children: ReactNode
+}) {
+  const reducedMotion = useReducedMotion()
+  const shown = useSharedValue(0)
+  const [measured, setMeasured] = useState(false)
+  const started = useRef(false)
+  useEffect(() => {
+    if (!measured || started.current) return
+    started.current = true
+    shown.value = reducedMotion
+      ? 1
+      : withDelay(
+          retracting ? NAME_OUT_MS : 0,
+          withTiming(1, { duration: HANDOFF_MS, easing: Easing.out(Easing.cubic) }),
+        )
+  }, [measured, retracting, reducedMotion, shown])
+  const style = useAnimatedStyle(() => ({
+    opacity: shown.value,
+    transform: [{ scale: 0.6 + 0.4 * shown.value }],
+  }))
+  return (
+    <Animated.View
+      testID={testID}
+      exiting={reducedMotion ? undefined : FadeOut.duration(NAME_OUT_MS)}
+      onLayout={({ nativeEvent: { layout } }) => {
+        onWidth(layout.width)
+        setMeasured(true)
+      }}
+      style={[$growFromMark, style]}
+    >
+      {children}
+    </Animated.View>
+  )
+}
+
+export function FadeOutSlot({ children }: { children: ReactNode }) {
+  return <Animated.View exiting={FadeOut.duration(NAME_OUT_MS)}>{children}</Animated.View>
 }
 
 function UndoGlyph({ color }: { color: string }) {
@@ -330,6 +388,7 @@ function ChevronGlyph({ color }: { color: string }) {
   )
 }
 
+const $growFromMark: ViewStyle = { transformOrigin: "left center" }
 const $layer: ViewStyle = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }
 const $slot: ViewStyle = { position: "absolute" }
 const $measuring: ViewStyle = { opacity: 0 }

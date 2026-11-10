@@ -23,6 +23,9 @@ export function useTurnStyle() {
   )
 }
 
+export const HANDOFF_MS = 300
+export const NAME_OUT_MS = 150
+
 const PASS_LABEL_KEY = "turns.passLabelPasses"
 const PASS_LABEL_LESSONS = 3
 

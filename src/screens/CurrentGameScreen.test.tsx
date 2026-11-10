@@ -6,6 +6,7 @@ import { act, fireEvent, render, waitFor, within } from "@testing-library/react-
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
@@ -388,7 +389,8 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("turn-chip-2")).toBeTruthy()
   })
 
-  it("retracts the active player's name only while the turn chip would not fit beside it", () => {
+  it("retracts the active player's name while the turn chip would not fit, until the undo window ends", () => {
+    jest.useFakeTimers()
     const view = renderGame(game(), turnsOn())
     layoutSeats(view)
     fireEvent.press(view.getByTestId("dice-chip-1-claim"))
@@ -408,9 +410,12 @@ describe("CurrentGameScreen", () => {
     expect(view.queryByTestId("player-name-seat-1")).toBeNull()
     expect(view.getByTestId("player-name-seat-2")).toBeTruthy()
 
-    fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 60, height: 36 } },
-    })
+    fireEvent.press(view.getByTestId("turn-chip-1"))
+    expect(view.getByTestId("turn-undo-pass-1")).toBeTruthy()
+    expect(view.queryByTestId("player-name-seat-1")).toBeNull()
+
+    act(() => jest.advanceTimersByTime(PASS_UNDO_MS))
+    expect(view.queryByTestId("turn-undo-pass-1")).toBeNull()
     expect(view.getByTestId("player-name-seat-1")).toBeTruthy()
   })
 
