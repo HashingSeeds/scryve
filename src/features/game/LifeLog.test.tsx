@@ -249,4 +249,18 @@ describe("counter log rows", () => {
       9_000, 1_600, 1_550, 1_500,
     ])
   })
+
+  it("folds Speed and speed as one named counter, as the table counts them", () => {
+    const rows = counterLog([
+      entry("a", "custom:Speed", -1, 0, 1_000),
+      entry("b", "custom:speed", 1, 1, 1_500),
+    ])
+    expect(rows.map(({ delta, operationIds }) => [delta, operationIds])).toEqual([])
+    expect(
+      counterLog([
+        entry("a", "custom:Speed", 1, 2, 1_000),
+        entry("b", "custom:speed", 1, 3, 1_500),
+      ]).map(({ delta, value }) => [delta, value]),
+    ).toEqual([[2, 3]])
+  })
 })
