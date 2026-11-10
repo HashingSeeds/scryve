@@ -28,12 +28,12 @@ function createPendingLife() {
 
 interface PendingLifeScope {
   store: ReturnType<typeof createPendingLife>
-  keyOf: (playerId: string) => string
+  teamOf: (playerId: string) => readonly string[]
 }
 
 const PendingLifeContext = createContext<PendingLifeScope | undefined>(undefined)
 
-/** why: teammates share one life total, so a change still under one head's finger shows on both heads' cards, not only once it commits. */
+/** why: teammates share one life total, so a change still under one head's finger shows on both heads' cards, not only once it commits. Each seat keeps its own entry, so two heads changing life at once add up instead of clearing each other. */
 export function PendingLifeProvider({
   teams,
   children,
@@ -45,10 +45,8 @@ export function PendingLifeProvider({
   const scope = useMemo(
     () => ({
       store,
-      keyOf: (playerId: string) => {
-        const team = teams?.findIndex((members) => members.includes(playerId)) ?? -1
-        return team < 0 ? `seat:${playerId}` : `team:${team}`
-      },
+      teamOf: (playerId: string) =>
+        teams?.find((members) => members.includes(playerId)) ?? [playerId],
     }),
     [store, teams],
   )
@@ -59,8 +57,11 @@ export function usePendingLife(playerId: string | undefined) {
   const scope = useContext(PendingLifeContext)
   const [ownStore] = useState(createPendingLife)
   const store = scope?.store ?? ownStore
-  const key = scope && playerId !== undefined ? scope.keyOf(playerId) : "seat"
-  const delta = useSyncExternalStore(store.subscribe, () => store.get(key))
-  const setDelta = useCallback((next: number) => store.set(key, next), [store, key])
+  const seat = playerId ?? "seat"
+  const team = scope?.teamOf(seat) ?? [seat]
+  const delta = useSyncExternalStore(store.subscribe, () =>
+    team.reduce((sum, member) => sum + store.get(member), 0),
+  )
+  const setDelta = useCallback((next: number) => store.set(seat, next), [store, seat])
   return [delta, setDelta] as const
 }
