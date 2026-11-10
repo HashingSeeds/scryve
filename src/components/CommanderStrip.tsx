@@ -424,7 +424,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   )
 }, structurallyEqual)
 
-/** why: computed from the disc, gap, and padding because the flight lands before the cell reports its layout. Rows are centered, so a short row starts in by half its missing chips; two partners take two. */
+/** why: uses the map's own disc, gap, and padding, since the flight lands before the cell reports its layout. Rows are centered, so a short row starts in by half its missing chips; a seat whose partners both dealt damage takes two. */
 function ownCellCenter(
   rows: readonly (readonly CommanderBoardSeat[])[],
   ownerPlayerId: PlayerId,
@@ -447,7 +447,7 @@ function ownCellCenter(
   return undefined
 }
 
-// why: the small grid eases over a longer stretch of the shadow's travel; a quick edge would flip it in one frame.
+// why: the small grid eases over more of the shadow's travel than its edge takes to cross the grid; a quick edge would flip it in one frame.
 const LIT_SPAN = 192
 
 type Lit = { attacked: boolean; wave?: SharedValue<number>; flood?: CommanderFlood; gap: number }

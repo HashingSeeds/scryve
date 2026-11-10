@@ -59,7 +59,7 @@ function Sync() {
     return () => {
       stale = true
     }
-    // why: a sync that failed offline must rerun once online, and system settings may have changed while away.
+    // why: signing in or out changes the device's account, a sync that failed offline must rerun once online, and system settings may have changed while away.
   }, [
     key,
     foregrounds,

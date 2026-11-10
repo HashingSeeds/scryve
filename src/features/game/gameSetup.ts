@@ -9,7 +9,7 @@ export function activeGameBlocksSetup() {
   return game !== null && (hasLocalGameStarted(game) || isMatchInProgress(game))
 }
 
-/** why: an abandoned game is offered back only on the board that replaced it. `replacesAbandoned` marks setup's own Abandon. */
+/** why: an abandoned game is offered back only on the board that replaced it, so any other start ends the offer. `replacesAbandoned` marks setup's own Abandon, whose start is that board. */
 export function startLocalGame(
   setup: LocalSetup & { account?: LocalGameAccountInput },
   { replacesAbandoned = false }: { replacesAbandoned?: boolean } = {},

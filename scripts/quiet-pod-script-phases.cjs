@@ -2,7 +2,7 @@ const { spawn } = require("node:child_process")
 const { constants } = require("node:os")
 const { clearTimeout, setTimeout } = require("node:timers")
 
-// why: hide only pods whose script phases we inspected, so a new pod or a changed count still prints.
+// why: hide only pods whose script phases we inspected, so a new pod or a changed count still prints. Expo pods swap Debug/Release xcframeworks and resolve dSYMs; React Native pods swap Debug/Release binaries.
 const KNOWN_SCRIPT_PHASES = {
   "ExpoCamera": 2,
   "ExpoCameraBarcodeScanning": 2,

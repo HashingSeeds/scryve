@@ -65,7 +65,7 @@ const FLUSH_INTERVAL_MS = 33
 // why: a host that was killed never withdraws its Bonjour advert, which can outlive it by over an hour.
 const UNREACHABLE_HIDE_MS = 2 * 60_000
 const WRITES_PER_SECOND = 30
-// why: the saved game carries every event, so write it at most once a second.
+// why: the saved game carries every event, so write it at most once a second; a crash loses at most that second.
 const HOST_SAVE_INTERVAL_MS = 1_000
 const PASS_KEY = "lan.seatPass"
 const PING_INTERVAL_MS = 2_000

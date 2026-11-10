@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "react"
 
 type Callback = (...args: never[]) => unknown
 
-/** why: memoized consumers compare callbacks by identity, so each key keeps one identity. Closures become latest only after commit, and skipped keys are dropped so finished games' closures aren't retained. */
+/** why: memoized consumers compare callbacks by identity, so each key keeps one identity. Closures become latest only after commit, so a discarded render never leaks into a handler. Keys a commit skipped are dropped, so a board kept across games doesn't retain finished games' closures. */
 export function useStableCallbacks() {
   const entries = useRef(new Map<string, { latest: Callback; stable: Callback }>()).current
   const rendered = useRef(new Map<string, Callback>()).current

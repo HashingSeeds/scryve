@@ -9,7 +9,7 @@ export const LAN_SERVICE_TYPE = "scryve"
 const LAN_PROTOCOL = "tcp"
 const CONNECT_TIMEOUT_MS = 2_500
 const RESOLVE_TIMEOUT_SECONDS = 3
-// why: Wi-Fi radios doze between packets; a dozing host held 1 in 10 changes 300+ ms. Traffic every 200 ms keeps it awake.
+// why: Wi-Fi radios doze between packets; a dozing host held 1 in 10 changes for 300+ ms. Traffic every 200 ms keeps it awake at no measurable battery cost.
 const HEARTBEAT_MS = 200
 // why: a peer that loses Wi-Fi never sends a close, so silence is the only sign the socket is dead.
 const SILENCE_LIMIT_MS = 4_000

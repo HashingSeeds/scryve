@@ -269,7 +269,7 @@ function NewGameForm({
   } = useAppTheme()
   const { fontScale, width } = useWindowDimensions()
   const insets = useSafeAreaInsets()
-  // why: the iPhone Duo's outer display reports its status bar only as a side inset, so the toggle steps aside.
+  // why: the iPhone Duo's outer display reports its status bar only as a side inset, so the toggle steps in where it would run under it.
   const toggleOverhang = (inset: number) =>
     Math.max(inset - (width - Math.min(width, CONTENT_MAX_WIDTH)) / 2 - spacing.md, 0)
   // why: until a format is picked, switching modes loads that mode's last setup instead of carrying this one over.
@@ -403,7 +403,7 @@ function NewGameForm({
   const draftChanged = (from: SetupDraft) =>
     NEW_GAME_FIELDS.some((field) => from[field] !== draft[field])
   const optionsOpenedWith = useRef(draft)
-  // why: iOS drops a modal presented while another dismisses, so the end prompt waits for the options sheet to close.
+  // why: iOS drops a modal presented while another dismisses, so the end prompt waits for the options sheet to close. Closing the prompt keeps the staged setup for the next New game.
   const [ending, setEnding] = useState<{ afterSheet?: boolean }>()
   const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
@@ -585,7 +585,7 @@ function NewGameForm({
   const footerRow =
     (canConnectLocal || Boolean(localMatchEnd)) && fontScale <= FOOTER_ROW_MAX_FONT_SCALE
   const joinInFooter = connectedMode && Boolean(onJoin)
-  // why: a running game sits behind setup, so back names it and returns to it. Setup opens over the local board.
+  // why: a running game sits behind setup, so back names it and returns to it. Setup opens over the local board, so plain back reaches a local game.
   const resumeConnected =
     localGame || !onResumeConnected
       ? undefined

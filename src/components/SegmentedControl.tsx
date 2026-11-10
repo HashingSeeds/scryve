@@ -194,7 +194,7 @@ export function SegmentedControl({
               disabled={disabled}
               style={[
                 $segment,
-                // why: segments use the measured thumb width, not flex (labels were laid out by own length), and fixed widths when wrapped: percentage flexBasis collapsed to slivers on Android at large font scales.
+                // why: segments take the measured thumb width, not flex, which sized labels by length so the thumb covered a neighbor's first letter. Wrapped rows use fixed widths, since percentage flexBasis collapsed to slivers on Android at large font scales.
                 wrapped
                   ? { width: Math.floor(trackWidth / columns) }
                   : segmentWidth > 0

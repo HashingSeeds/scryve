@@ -36,7 +36,7 @@ import { Text } from "./Text"
 // why: a step narrower than this is hard to land on with a finger, so a short track shows fewer steps and the held end carries on past them.
 const MIN_STEP_PX = 8
 const MAJOR_TICK_EVERY = 5
-// why: Rubik Bold digits ink about 0.72em tall and 0.64em wide; size the total to its ink, not its line box.
+// why: Rubik Bold digits ink about 0.72em tall and 0.64em wide; the total keeps a little air around its ink, not its line box, so it stays near board size.
 const VALUE_BOX = 0.84
 const DIGIT_WIDTH = 0.64
 const CLOSE_SIZE = 32

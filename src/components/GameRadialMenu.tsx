@@ -778,7 +778,7 @@ const $cluster: ViewStyle = {
   marginTop: -CLUSTER_SIZE / 2,
 }
 const $clusterCenter: ViewStyle = { left: CLUSTER_SIZE / 2, top: CLUSTER_SIZE / 2 }
-// why: the row stays inside the cluster box because Android drops touches outside it.
+// why: Android drops touches outside the cluster box, so half the box must stay larger than the status line's reach.
 const $clusterStatusRow: ViewStyle = { left: 0, right: 0, top: CLUSTER_SIZE / 2 }
 const $backdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,

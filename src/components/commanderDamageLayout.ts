@@ -100,7 +100,7 @@ export function commanderReach(input: {
   const ax = attacker.x * board.width
   const ay = attacker.y * board.height
   const card = { width: attacker.width * board.width, height: attacker.height * board.height }
-  // why: a card grown by d on every side covers a point once d reaches its larger gap along either axis.
+  // why: a card grown by d on every side covers a point once d reaches the point's larger gap along either axis.
   const farthest = gridRows.flat().flatMap((index) => {
     if (index === null || index === input.attackerIndex) return []
     const box = seatBox(gridRows, rowFlexes, index)
@@ -146,7 +146,7 @@ const MIN_FIT = 0.6
 const DIGIT_INK_WIDTH = 0.64
 export const DIGIT_INK_HEIGHT = 0.72
 const DISC_CLEARANCE = 0.08
-// why: a total's line box is centred on the card but its digits sit high (measured on iOS), so the disc rises to meet them.
+// why: a total's line box is centred on the card but its digits sit high (measured on iOS, derived from Rubik's metrics elsewhere), so the disc rises to meet them.
 const DIGIT_RISE = Platform.select({ ios: 0.043, android: 0.037, default: 0.0125 })
 
 // why: an out seat's second line under its life total: OUT, or the lethal amount after the mark or glyph of what knocked it out. LifeCard styles it from these, so the disc that rings it stays in step.
@@ -164,7 +164,7 @@ export function lifeInk(fontSize: number, digits: number): ReadoutInk {
   }
 }
 
-// why: scales with life so a tablet's big total doesn't crowd the line.
+// why: the gap under a defender's life scales with it, so a tablet's big total doesn't crowd its "34 − 4" line.
 const STACK_GAP = 0.1
 
 /** why: once an attack lands, a defender's life shrinks and rises to make room for its "34 − 4" line, inside the disc already drawn around the life alone, so the disc never jumps. `scale` is the life's new size; `lifeShift` and `lineShift` place the life's ink and the line's ink from where the life's ink sat. */

@@ -245,7 +245,7 @@ export function tableHasState(table: TableState | undefined): boolean {
   )
 }
 
-/** why: prize counts come from names, since TCGdex suffix and stage fields are uneven. 3: Mega ex, VMAX, V-UNION, TAG TEAM. 2: ex, EX, GX, V, VSTAR, LEGEND. 1: else. */
+/** why: prize counts come from names, since TCGdex suffix and stage fields are uneven. 3: Mega ex, VMAX, V-UNION, TAG TEAM. 2: ex, EX (including XY Megas), GX, V, VSTAR, LEGEND. 1: everything else. */
 export function pokemonPrizeValue(name: string): 1 | 2 | 3 {
   const trimmed = name.trim()
   if (
@@ -349,7 +349,7 @@ export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
   return undefined
 }
 
-/** why: one reducer for local games, the connected overlay, and the Convex mutation, so every device lands on the same table. Returns null for a rejected action. */
+/** why: one reducer for local games, the connected overlay, and the Convex mutation, so every device lands on the same table. Returns null for a rejected action and the same table for a no-op. */
 export function applyTableAction(
   table: TableState,
   action: TableAction,

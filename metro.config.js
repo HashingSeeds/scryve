@@ -19,7 +19,7 @@ config.resolver.sourceExts.push("cjs")
 
 // why: obscenity's "import" export is an ESM shim Metro resolves to undefined on web.
 const OBSCENITY_CJS_ENTRY = require.resolve("obscenity")
-// why: Metro bundles both builds of @sentry/core and @sentry/conventions (about 1 MB on web).
+// why: Metro resolves some Sentry imports with "require" and others with "import", bundling both builds of @sentry/core and @sentry/conventions (about 1 MB on web).
 const SENTRY_DUAL_BUILD = /^@sentry\/(core|conventions)(\/|$)/
 const resolveRequest = config.resolver.resolveRequest
 config.resolver.resolveRequest = (context, moduleName, platform) => {

@@ -304,7 +304,7 @@ const connectionLost = (message) => Object.assign(new Error(message), { lost: tr
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const between = ([low, high]) => low + Math.random() * (high - low)
 
-// why: Wi-Fi delays packets unevenly but TCP never reorders them, so one chain delivers each message after the one before it.
+// why: Wi-Fi delays packets unevenly but TCP never reorders them. Timers due together can fire in either order, so one chain delivers each message after the one before it.
 function laggedQueue(lag) {
   let last = 0
   let chain = Promise.resolve()

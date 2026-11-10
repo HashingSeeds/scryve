@@ -16,7 +16,7 @@ export type AttackState = {
   /** why: each defender's hits this attack, newest last, so undo takes back exactly the last hit rather than the current power. */
   hits: Partial<Record<PlayerId, readonly Hit[]>>
   staged: readonly AttackChange[]
-  /** why: what each tap deals from the attacker's other creatures. Starts at 1 and sat out each attack, since those creatures change every turn. */
+  /** why: what each tap deals from the attacker's other creatures. Starts at 1 and sat out each attack, since those creatures change every turn and most hits are the commander's alone. */
   others: number
   stagedOthers: Partial<Record<PlayerId, number>>
   /** why: boxes sat out of this attack by tapping their names. They keep their number, so tapping again brings them back at the same power. */
@@ -110,7 +110,7 @@ export function attackView(state: AttackState, board: AttackBoard, to: PlayerId)
   const takeBacks = commanders.map(({ total }, slot) => Math.min(lastSteps[slot] ?? 0, total))
   const othersTakeBack = lastHit?.others ?? 0
   const othersLanded = sum(hits.map(({ others }) => others))
-  // why: a buffered hit waits for Send, so none of it is on their life yet.
+  // why: a local hit lowers the defender's life as it lands; a buffered one waits for Send, so none of it is applied yet.
   const applied = board.buffered ? 0 : sum(commanders.map(({ landed }) => landed)) + othersLanded
   return {
     commanders,

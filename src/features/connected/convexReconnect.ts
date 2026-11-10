@@ -5,7 +5,7 @@ import type { ConvexReactClient } from "convex/react"
 const reachableNetwork = ({ isConnected, isInternetReachable, type }: NetworkState) =>
   isConnected === true && isInternetReachable !== false ? (type ?? "unknown") : null
 
-// why: Convex skips reconnect backoff only on the browser `online` event, which React Native never fires, so native apps waited ~24 s.
+// why: Convex skips reconnect backoff only on the browser `online` event, which React Native never fires, so native apps waited up to ~24 s to reconnect after the network returned.
 export function reconnectConvexOnNetworkReturn(client: ConvexReactClient) {
   if (Platform.OS === "web") return () => undefined
   // why: starts unknown so the first usable network also retries; a launch while offline may never report offline first.

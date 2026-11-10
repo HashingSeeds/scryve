@@ -101,7 +101,7 @@ export function LifeCalculator({
   const reducedMotion = useReducedMotion()
   const [entry, setEntry] = useState("")
   const amount = Number(entry)
-  // why: halving rounds up, as Yu-Gi-Oh! rounds halved Life Points; past the largest accepted change, ½ stays off.
+  // why: halving rounds up, as Yu-Gi-Oh! rounds halved Life Points; past the largest accepted change, ½ stays off rather than close with nothing applied.
   const halved = Math.ceil(life / 2) - life
   const halving = Math.abs(halved) <= MAX_LIFE_DELTA ? halved : 0
   const damaged = life + flooredLifeDelta(system, life, -amount)

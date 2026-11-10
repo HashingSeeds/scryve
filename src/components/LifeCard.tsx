@@ -926,7 +926,7 @@ export const LifeCard = memo(function LifeCard({
         />
       ) : null}
       {cornerMeasured && (!commanderCovers || attackerSide) && !tableSheetOpen && !dice?.view ? (
-        // why: when an old game switches layout, a reused layer hid the identity on iOS; a fresh layer per rotation does not.
+        // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
         <Animated.View
           key={contentRotation}
           testID={`life-corner-layer-seat-${seatNumber}`}
@@ -1322,7 +1322,7 @@ export function seatIdentityPlacement({
       ? insets.cutout.size - CUTOUT_ENDS_INSIDE_INSET
       : 0
   const farTab = cornerStep(insets?.tabCorners ?? [], rightEdge, bottomEdge)
-  // why: dice chips trail the name past the half-run line, but not beside a tucked name (cutout) or a far-end first-player tab.
+  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they'd reach the cutout; name and chips stop short of a far-end first-player tab.
   const rowMaxWidth =
     run && !tucked
       ? Math.max(run - left - Math.max(left, farCutout, farTab && gap + farTab), 0)
@@ -1341,7 +1341,7 @@ const $lockedOverlay: ViewStyle = { zIndex: 9 }
 
 const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
 
-/** why: how far a corner grid reaches in from each end of the seat axes. Screen corners sit further in, so every seat allows that clearance and attacker boxes match. */
+/** why: how far a corner grid reaches in from the nearer end of each seat axis (width, and up from its foot). A grid in a screen corner sits further in, so every seat allows that clearance and attacker boxes match. */
 function gridReach(
   bounds: LayoutRectangle,
   card: { width: number; height: number },

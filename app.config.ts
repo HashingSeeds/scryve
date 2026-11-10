@@ -84,7 +84,7 @@ const getLegacyAppScheme = () => {
   return "count"
 }
 
-/** why: Xcode swaps in an Icon Composer file named like an alternate icon for its PNG set; expo-alternate-app-icons writes only PNGs. */
+/** why: expo-alternate-app-icons writes only PNGs. Xcode uses an Icon Composer file named like an alternate icon in place of its PNG set, and renders it for iOS before Liquid Glass. */
 function withLiquidGlassAlternateIcons(config: ExpoConfig, projectRoot: string): ExpoConfig {
   const glassIcons = APP_ICON_VARIANTS.map(({ name }) => ({
     name,
@@ -272,7 +272,7 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     return config
   })
 
-  // why: expo-alternate-app-icons copies only android.intentFilters to its aliases, so scheme links and Clerk's callback would reach no enabled activity.
+  // why: expo-alternate-app-icons copies only android.intentFilters to its aliases, so with an alternate icon on, scheme links and Clerk's callback would reach no enabled activity.
   return withAndroidManifest(withGradleHeap, (config) => {
     const main = AndroidConfig.Manifest.getMainActivityOrThrow(config.modResults)
     const application = AndroidConfig.Manifest.getMainApplicationOrThrow(config.modResults)

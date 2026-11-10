@@ -179,7 +179,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const identityMetrics = seatIdentityMetrics(cramped)
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
   const edges = CONTENT_EDGES[contentRotation]
-  // why: boards hide the status bar and a cutout ends at least 11pt above its inset, so a full-width row rises until its name line meets that line. Taller dice chips and the stale line keep it put.
+  // why: boards hide the status bar and a cutout ends at least 11pt above its inset, so a full-width row rises until its name line meets that line. Dice chips and the stale line are taller than the name, so they keep it put.
   const besideCutout =
     edges.bottom !== "bottom" &&
     insets.bottom > 0 &&
@@ -196,7 +196,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.bottom -
       padding
     : seatIdentityBottomGap(identityMetrics.edge, insets.bottom) - padding
-  // why: the board drops a corner camera hole side inset, so identity and prizes step along their row past the hole. The bench sits deeper than a tab reaches.
+  // why: the board drops a corner camera hole's side inset, so identity and prizes step along their row past whatever sits in their corner. The bench sits deeper than a first-player tab reaches, so only the hole moves it.
   const cornerChromeStep = (side: "left" | "right") =>
     cornerStep(cornerObstacles(contentInsets), edges[side], edges.bottom)
   const cornerSlide = useCornerSlide()

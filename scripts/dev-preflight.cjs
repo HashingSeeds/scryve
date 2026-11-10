@@ -207,7 +207,7 @@ async function stopProcesses(procs, info = processInfo) {
   for (const proc of signaled) signalIfSame(proc, "SIGKILL")
 }
 
-/** why: two starts must not both see a free port. Binding a loopback port is atomic and freed when the holder dies. Only an OS-named non-starter listener is skipped, so every starter walks the same list. */
+/** why: two starts must not both see a free port or an unclaimed deployment. Binding a loopback port is atomic and freed when the holder dies. Only an OS-named non-starter listener is skipped, so every starter walks the same list and meets on the same port. */
 async function withLock(fn, { ports = LOCK_PORTS, waitMs = LOCK_WAIT_MS } = {}) {
   const deadline = Date.now() + waitMs
   for (;;) {

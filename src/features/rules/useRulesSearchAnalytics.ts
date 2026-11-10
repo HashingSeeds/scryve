@@ -6,7 +6,7 @@ const SETTLE_MS = 1500
 
 type Search = { query: string; results: readonly string[] }
 
-/** why: search runs per keystroke, so it counts once typing settles, a result opens, or the screen closes; opens are numbered so a wrong first pick shows. */
+/** why: search runs per keystroke, so it counts once typing settles, a result opens, or the screen closes (clearing first drops it); opens are numbered so a wrong first pick shows as a second open. */
 export function useRulesSearchAnalytics(system: string, search: Search | undefined) {
   const latest = useRef({ system, search })
   latest.current = { system, search }

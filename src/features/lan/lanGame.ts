@@ -142,7 +142,7 @@ export type LanGuestMessage =
   | { type: "stats"; stats: SyncLatencySummary }
 
 export type LanHostMessage =
-  // why: a host from before partners lands a partner's damage on the first commander, so guests offer partners only when the welcome says so. A flag keeps mixed tables playing.
+  // why: a host from before partners lands a partner's damage on the first commander, so guests offer partners only when the welcome says so. A flag, not a LAN_PROTOCOL bump, keeps mixed tables playing.
   | { type: "welcome"; pass: LanSeatPass; partners?: boolean; editsAnySeat?: boolean }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
@@ -198,7 +198,7 @@ const withSeat = (game: LanGame, key: string, update: (seat: LanSeat) => LanSeat
 
 const LAN_REJECTION_IDS = ["seatTaken", "started", "full", "update"] as const
 
-/** why: the wire carries English so builds understand each other; each device translates on receipt. */
+/** why: the wire carries English so different builds understand each other; each device translates on receipt. */
 const LAN_REJECTIONS: Record<(typeof LAN_REJECTION_IDS)[number], string> = {
   seatTaken: "That seat belongs to another device.",
   started: "This game has already started.",

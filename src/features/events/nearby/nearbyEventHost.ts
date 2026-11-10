@@ -17,7 +17,7 @@ import {
 import type { EventActor } from "../../../../convex/lib/events/commands"
 
 const STORAGE_KEY = "events.nearby.hosted"
-// why: sending per change queued a 127-player result burst for 13 to 17 s on a Pixel 6a; waiting 250 ms after a change brought it under 0.5 s.
+// why: each send costs the host a render and a write per guest, so sending per change queued a 127-player result burst for 13 to 17 s on a Pixel 6a. Sending at once after a long gap still sent every change, since each send outlasted the gap; waiting 250 ms after a change brought it under 0.5 s.
 const BATCH_MS = 250
 
 export type HostStatus = "idle" | "starting" | "hosting" | "error"

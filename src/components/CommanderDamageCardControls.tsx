@@ -90,7 +90,7 @@ type AssignmentSource = {
   onOthers: (power: number) => void
   othersShown: boolean
   othersSitting: boolean
-  /** why: how far the commander grid reaches in from the seat's side and up from its foot, in upright space. */
+  /** why: how far the commander grid reaches in from the seat's side and up from its foot, in upright space, so the boxes stay clear of it. */
   grid?: { width: number; height: number }
   onSit: (box: AttackBox) => void
   acted: boolean
@@ -111,11 +111,11 @@ export interface CommanderDamageCardControlsProps {
   menuCorner?: LifeCardMenuCorner
   compact?: boolean
   mode: CommanderDamageCardMode
-  // why: a defender's last attack, kept up while the shadow drains so its ring fades as the edge passes. Takes no touches.
+  // why: a defender's last attack, kept up while the shadow drains so its ring fades as the shadow's edge passes it. Takes no touches.
   draining?: boolean
 }
 
-// why: paced for the eye to follow, so neighbours darken first and far seats after.
+// why: the shadow travels at a pace the eye can follow, so neighbours darken first and far seats after.
 export const TAKEOVER_MS = 950
 const TAKEOVER_EASING = Easing.bezier(0.45, 0.05, 0.25, 1)
 // why: closing is quicker than opening; the shadow pulls back slowly, then fast into the card.
@@ -123,7 +123,7 @@ const DRAIN_MS = 620
 const DRAIN_EASING = Easing.bezier(0.7, 0, 0.7, 0.4)
 // why: spreading by the blur puts its solid core at the card's grown edge, so it fades smoothly over twice this distance.
 const FLOOD_BLUR = 24
-// why: the attacker's card swaps quickly as the shadow leaves it; everything else changes when the shadow arrives.
+// why: the shadow starts at the attacker's card, so it swaps its life for power boxes quickly as the shadow leaves; everything else changes when the shadow arrives.
 export const SWAP_MS = 240
 const SWAP_FROM = 0.85
 
@@ -150,7 +150,7 @@ export function CommanderDamageCardControls({
     if (source) progress.value = withTiming(1, { duration: swap, easing: Easing.out(Easing.cubic) })
   }, [progress, source, swap])
 
-  // why: a defender's ring and badges show as the shadow's edge passes, when the gutter ring draws in.
+  // why: a defender's ring and badges show as the shadow's edge passes its disc, when the disc's gutter ring draws in.
   const entranceStyle = useAnimatedStyle(() => {
     if (!wave)
       return {
@@ -199,13 +199,13 @@ export function CommanderDamageCardControls({
 
 export type CommanderFlood = NonNullable<CommanderTakeover["flood"]>
 
-// why: the shadow is the card grown on every side, from just inside its edges, with a blur fading over twice FLOOD_BLUR past them.
+// why: the shadow is the attacker's card grown on every side, from just inside its edges until it covers the farthest seat; its blur fades over twice FLOOD_BLUR past them, so it arrives soft.
 function shadowGrown(flood: CommanderFlood, wave: number) {
   "worklet"
   return -FLOOD_BLUR * 2 + wave * (flood.distance + FLOOD_BLUR * 2)
 }
 
-/** why: 0 until the shadow's soft edge reaches `gap` away, 1 once its solid core covers it, or `span` later if there is room. */
+/** why: 0 until the shadow's soft edge reaches a point `gap` away, 1 once its solid core covers it, or once it grows `span` past that if it still can. */
 export function shadowReached(flood: CommanderFlood, wave: number, gap: number, span?: number) {
   "worklet"
   // why: a worklet captures only what its body uses, so the default lives here rather than in the signature.
@@ -274,7 +274,7 @@ export function useCommanderTakeover<Attacker>(
     }
   }, [active, duration, wave])
 
-  // why: the render ending an attack runs before the effect starts the drain, so keep the last takeover drawn rather than unmounting for a frame.
+  // why: the render that ends an attack runs before the effect starts the drain, so the last takeover stays drawn through it instead of unmounting for a frame. A flood with no reach is a still fill with nothing to drain.
   const shown = takeover
     ? { takeover, attacker }
     : (draining || wasActive.current) && last.current.takeover?.flood
@@ -293,7 +293,7 @@ export function deepShade(color: string) {
   return mixColorsInLinearLight(color, "#000000", 0.87)
 }
 
-// why: one dark oxblood for every defender reads as danger, never as the grey dimming of an out seat.
+// why: one dark oxblood for every defender reads as danger, never as the grey dimming of an out seat, and stays dark enough not to fight the life discs.
 export const ATTACK_SHADE = "#26080D"
 
 // why: every shadow is dark enough for white ink whatever the attacker's color.
@@ -340,7 +340,7 @@ export function CommanderTakeoverBackdrop({
       height: flood.card.height + by * 2,
     }
   })
-  // why: the ring darkens with the shadow, so it draws in as the soft edge passes.
+  // why: the ring darkens with the shadow under the disc, so it draws in as the soft edge passes over it.
   const ringStyle = useAnimatedStyle(() => ({
     opacity: flood ? shadowReached(flood, wave.value, flood.discGap) : 1,
   }))
@@ -754,12 +754,12 @@ export function keypadPlacement(
 }
 
 const UNIT_GAP = 16
-// why: a number row wide enough for its small − and + to sit at its ends.
+// why: a power box's number row is wide enough for its small − and + to sit at its ends, clear of the number.
 const BOX_RATIO = 2
 // why: the commander's name runs along the box's foot, under the number. It toggles the box in and out of the attack, so with its slop below it reaches about a 40pt touch target.
 const NAME_SHARE = 0.5
 const MIN_NAME = 32
-// why: about half a number row, small enough to read as secondary.
+// why: the attacker's life sits at about half a number row, small enough to read as secondary.
 const LIFE_SHARE = 0.5
 const MIN_LIFE = 18
 
@@ -818,7 +818,7 @@ export function attackerLayout({
       lifeY: beside
         ? (boxesHeight + spacing[ATTACKER_COLUMN_GAP]) / 2
         : (space?.height ?? 0) / 2 - band / 2,
-      // why: above the grid, the life shrinks to the room the grid leaves on both sides.
+      // why: above the grid, the life is centered beside it, so it shrinks to the room the grid leaves on both sides.
       lifeFont: beside
         ? life * 0.8
         : Math.min(
@@ -870,7 +870,7 @@ const MIN_BOX_RATIO = 1.4
 // why: above the grid, a short row has the seat's full width, so boxes stretch past BOX_RATIO.
 const WIDE_BOX_RATIO = 2.8
 const SMALLEST_BOX = 28
-// why: the name bar and number row shrink this far only when a seat is too small otherwise.
+// why: the name bar drops from 32pt, and the number row below SMALLEST_BOX, only when a seat is too small for the boxes otherwise.
 const TIGHT_NAME = 24
 const TIGHT_BOX = 20
 const BOX_GAP = "md"
@@ -917,7 +917,7 @@ function arcPath(center: number, radius: number, fraction: number) {
   return `M ${center} ${center - radius} A ${radius} ${radius} 0 ${large} 1 ${x} ${y}`
 }
 
-/** why: a red arc filling a faint ring, clockwise from the top. `fraction` is damage from before this attack; `ghost` reaches as far as this attack dealt. */
+/** why: damage toward lethal is a red arc filling a faint ring, clockwise from the top of the seat's upright view. `fraction` is damage from before this attack; `ghost` reaches as far as this attack dealt. */
 function DamageArc({
   seatNumber,
   size,
@@ -1059,7 +1059,7 @@ const $pulseCenter: ViewStyle = {
   justifyContent: "center",
 }
 
-/** why: a creature-style power box; its ends lower and raise power, tapping the number types one in. A partner at 0 sits out and dims. */
+/** why: a creature-style power box; its left and right ends lower and raise power, and tapping the number types one in. A partner at 0 sits the hit out and dims. */
 function PowerBox({
   suffix,
   name,
@@ -1100,7 +1100,7 @@ function PowerBox({
   const editing = draft !== undefined
   const pressedTint = { backgroundColor: overlayTint(ink, 0.14) }
   const lowest = lowestPower(partner)
-  // why: shrink the number to its row's middle so two digits fit a narrowed box instead of wrapping out of sight.
+  // why: shrink the number to its row's middle so two digits fit a narrowed box instead of wrapping out of sight; the platform shrinks it further if the font runs wider than this estimate.
   const valueWidth = (width * VALUE_FLEX) / (VALUE_FLEX + HALF_FLEX * 2)
   const digits = Math.max(1, String(power).length)
   const fontSize = Math.min(height * 0.62, valueWidth / (digits * DIGIT_ADVANCE))

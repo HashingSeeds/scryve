@@ -277,7 +277,7 @@ async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualC
   return game
 }
 
-/** why: older clients show unknown systems as Magic, so a newer system asks them to update. Builds older than Yu-Gi-Oh! and Pokémon still join those. */
+/** why: clients that send no `systems` show unknown systems as Magic and know none beyond these three, so a newer system asks them to update. Builds older than Yu-Gi-Oh! and Pokémon still join those, as before this check. */
 const SYSTEMS_BEFORE_CLIENT_LIST: readonly string[] = ["mtg", "ygo", "pokemon"]
 // why: hidden roles are shown per device, so a Treachery seat must belong to one.
 const TREACHERY_DEVICE_MESSAGE = "Treachery seats need a device"
@@ -1018,7 +1018,7 @@ export const claimSeat = mutation({
     if (args.deviceId) assertDeviceId(args.deviceId)
     const game = await joinableInviteGame(ctx, args)
     if (!game) {
-      /* why: installed clients claim right after claimableSeats rejected the same invite and expect this throw. Grace is timed from that lookup, so a window rollover still throws. Other wrong invites return null so the counted attempt commits. */
+      /* why: installed clients claim right after claimableSeats rejected the same invite and expect this throw; that lookup already counted the failure. Grace is timed from the lookup, so a window rollover between the calls still throws. Other wrong invites return null so the counted attempt commits. */
       const joins = await joinAttemptsFor(ctx, clerkUserId)
       if (
         joins?.failedInvite === inviteKey(args) &&
@@ -1667,7 +1667,7 @@ async function claimableDeck(
     : undefined
 }
 
-/** why: a claim naming a stale or mismatched shared deck still takes the seat, just without a deck; the owner may have edited the list since. */
+/** why: a claim naming a stale or mismatched shared deck still takes the seat, just without a deck: the owner may have edited it since, so a list other than the one played is not attributed. */
 async function claimableSharedDeck(
   ctx: QueryCtx,
   { deckShareToken, deckFingerprint }: { deckShareToken?: string; deckFingerprint?: string },

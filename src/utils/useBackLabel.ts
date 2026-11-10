@@ -30,7 +30,7 @@ const BACK_LABEL_KEYS: ReadonlyMap<string, TxKeyPath> = new Map(Object.entries(B
 
 const MAX_BACK_LABEL_LENGTH = 12
 
-/** why: names where back lands, as iOS does. Reads context so it is safe outside a navigator, where expo-router hooks throw. */
+/** why: names where back lands, as iOS does, or `fallback` when nothing is under it (deep link, cold start). Reads context so it is safe outside a navigator, where expo-router hooks throw. */
 export function useBackLabel(fallback: BackRoute = "index") {
   const navigation = useContext(NavigationContext)
   const route = useContext(NavigationRouteContext)

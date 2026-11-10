@@ -346,7 +346,7 @@ function showSaveFailure() {
   else Alert.alert(title, message)
 }
 
-/** why: any board action closes the first-player offer for good, in the same write. Undo never brings it back. */
+/** why: any board action means cards are drawn, so it closes the first-player offer for good, in the same write. Undo never brings it back. */
 function withFirstPlayerSettled(game: LocalGame): LocalGame {
   return game.firstPlayerOffered ? game : { ...game, firstPlayerOffered: true }
 }

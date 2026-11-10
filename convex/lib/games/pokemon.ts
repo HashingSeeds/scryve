@@ -395,7 +395,7 @@ export async function pokemonImageCandidates(ctx: ActionCtx, cardId: string) {
   return images
 }
 
-// why: brief search results lack a type line and older cached cards lack HP, so both refetch once. A card with no category is a full card a brief result overwrote before Oct 10.
+// why: brief search results lack a type line and older cached Pokémon lack HP, so both refetch once. Every full TCGdex card has a category, so one without was overwritten by a brief result before Oct 10 and refetches too.
 function isFullPokemonCard(card: CatalogCard) {
   return (
     card.typeLabel !== undefined &&

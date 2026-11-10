@@ -59,7 +59,7 @@ export const syncFromClerk = internalMutation({
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
       .unique()
     const sync = await usernameForSync(ctx, args.username, args.clerkUserId)
-    // why: a late older removal event can be stale, so Clerk's current profile decides.
+    // why: a held name is stale on the holder and a removal may be a late older event, so Clerk's current profile decides.
     const refreshFor =
       sync.action === "keep"
         ? sync.heldBy

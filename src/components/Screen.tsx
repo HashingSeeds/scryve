@@ -312,7 +312,7 @@ const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.md,
 })
 
-/** why: the closed iPhone Duo reports its side rail as a safe-area inset; it is the only portrait screen whose side inset beats its top. Screen content already pads by `spacing.md`, so add only the excess. */
+/** why: the closed iPhone Duo reports its side rail as a safe-area inset; it is the only portrait screen whose side inset beats its top, so landscape notches keep their layout. Screen content already pads by `spacing.md`, so add only the rail's excess. */
 const NO_SIDE_GUTTER = { left: 0, right: 0 }
 
 function useSideSafeAreaGutter(enabled: boolean) {

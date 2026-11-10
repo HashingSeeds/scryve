@@ -137,7 +137,7 @@ export function contentFrame(
   }
 }
 
-/** why: the life − and + ink about 18 dp in from a side's safe area, so tracker icons and dice start there, past a camera hole only where one sits. */
+/** why: the life − and + ignore the safe area and ink about 18 dp in, so tracker icons and dice do too, clearing only a corner camera hole or a top notch or Dynamic Island. */
 function sheetSideInset(
   rotation: LifeCardContentRotation,
   insets: LifeCardContentInsets | undefined,
@@ -167,7 +167,7 @@ export function seatBagSize(compact?: boolean) {
   return seatIdentityMetrics(compact).icon + 8
 }
 const COMPACT_CHIP_WIDTH = 28
-/** why: below this column width "0 Commander tax" no longer fits on one line. */
+/** why: below this column width "0 Commander tax" no longer fits on one line, so items with a short label use it. */
 const SHORT_LABEL_COLUMN = 180
 const RULE_LINK_WIDTH = 28
 /** why: a column narrower than this gives its label the room instead, and a long press on the option opens its rule. */
@@ -476,7 +476,7 @@ export const CounterChips = memo(function CounterChips({
 }, structurallyEqual)
 
 /**
- * why: every counter change is spoken once, from this device or another. react-native-web's announce is a no-op, so web gets the message back for a polite live region.
+ * why: every counter change is spoken once, from this device or another; a moved designation only for the seat that took it. react-native-web's announce is a no-op, so web gets the message back for a polite live region.
  */
 function useAnnouncements({ rules, counters, held }: SeatTable, identity: string) {
   const previous = useRef({ counters, held })
@@ -505,7 +505,7 @@ function useAnnouncements({ rules, counters, held }: SeatTable, identity: string
       changes: changes.join(", "),
     })
     if (Platform.OS !== "web") return AccessibilityInfo.announceForAccessibility(message)
-    // why: a live region only speaks when its text changes, so clear first and set the message a beat later.
+    // why: a live region only speaks when its text changes, so it clears first and the message lands a beat later; retaking Monarch is read again.
     clearTimeout(reissue.current)
     setWebMessage("")
     reissue.current = setTimeout(() => setWebMessage(message), LIVE_REGION_REISSUE_MS)

@@ -147,7 +147,7 @@ export function manualHistoryEntry(match: {
   }
 }
 
-// why: the account's own seat turns a table result into a personal win or loss, as on the server; an owned game with no seat stays unrecorded.
+// why: the account's own seat turns a table result into a personal win or loss, as on the server; an owned game with no seat stays unrecorded, matching the server's unknown outcome.
 function localOutcome(game: LocalGameSummary, winnerNames: string[]): HistoryOutcome {
   const result = game.result
   const me = game.account?.mePlayerId

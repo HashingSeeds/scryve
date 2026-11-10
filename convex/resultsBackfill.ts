@@ -12,7 +12,7 @@ function batchSize(size: number) {
 }
 
 /**
- * why: identity cards stay out, since versions are edited in place and today's commander may not be the one played.
+ * why: identity cards stay out, since versions are edited in place and today's commander may not be the one played. Rows with opponents are skipped, so reruns and restarts are safe.
  */
 export const backfillResultOpponents = internalMutation({
   args: batchArgs,

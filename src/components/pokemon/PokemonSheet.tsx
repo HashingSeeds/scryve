@@ -328,7 +328,7 @@ export function PokemonSheet({
   const narrowForm = keypadBeside && keypadField !== undefined
   const stepLabel = (step: number) => `${step > 0 ? "+" : "−"}${Math.abs(step * damageStep)}`
 
-  // why: follows the seat shape, not the open keypad, so focusing HP never moves (and remounts) it.
+  // why: beside the keypad, HP and Look up would squeeze Name to a sliver. This follows the seat shape, not the open keypad, so focusing HP never moves (and remounts) it.
   const hpAndLookup = (
     <>
       <TextField

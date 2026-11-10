@@ -119,9 +119,12 @@ export interface StringStorage {
 }
 
 /**
- * why: a save rewrites only the newest chunk. Past MAX_ACTIVE_EVENTS the oldest whole chunk drops, so chunks
- * start at 0 where schema 1 builds read them. A save from an older build lacks `eventCount`, so the next
- * rewrites every chunk. A newer format must keep this key and raise `schemaVersion`.
+ * why: a life tap appends one event, so a save rewrites only the newest chunk. Past
+ * MAX_ACTIVE_EVENTS the oldest whole chunk of events is dropped in one rewrite, so chunks always
+ * start at 0 where schema 1 builds read them, and any older JS a crash or rollback falls back to
+ * can still open the game. `eventCount` and `lastOperationId` mark what the last save committed;
+ * a save from an older build has neither, so the next save rewrites every chunk. A newer format
+ * must keep this key and raise `schemaVersion`, so this build keeps that game instead of replacing it.
  */
 interface ActiveMetadata {
   schemaVersion: typeof ACTIVE_SCHEMA_VERSION
@@ -193,7 +196,8 @@ function storedWindow(
 
 /**
  * why: chunks are written before the metadata that commits them, so a killed save can leave an extra
- * event or a repeated chunk. Keep each operation once, up to the committed one.
+ * event or a repeated chunk. Keeping each operation once, up to the committed one, matches the
+ * life totals the metadata stored.
  */
 function committedEvents(events: readonly GameEvent[], tail: ActiveEventLayout["tail"]) {
   const seen = new Set<string>()
@@ -521,7 +525,7 @@ function parseSettings(value: unknown): LocalSettings | null {
   }
 }
 
-// why: Brawl preferences saved before Brawl had its own default stored Magic's 20, which would read as a custom value.
+// why: Brawl preferences saved before Brawl had its own default stored Magic's 20, which would otherwise read as a custom value and stop following format changes.
 function migrateBrawlStartingLife(settings: LocalSettings): LocalSettings {
   const { defaultSystem, defaultFormat, defaultStartingLife: startingLife } = settings
   return defaultSystem === "mtg" && defaultFormat === "brawl" && startingLife === 20
@@ -867,7 +871,7 @@ export class LocalGameRepository {
     this.clearActiveGame()
   }
 
-  /** why: Abandon asks nothing first, so the next board offers the game back until its first action. Memory only, as that board may sit on another route. The report waits for the offer to end. */
+  /** why: Abandon asks nothing first, so the next board offers a started game back until its first action. Memory only, as that board may sit on another route. The report waits for the offer to end, so a game taken back never counts as abandoned. */
   rememberAbandoned(game: LocalGame, endSource: GameEndSource): void {
     this.forgetAbandoned()
     if (hasLocalGameStarted(game)) this.abandoned = { game, endSource }
@@ -913,7 +917,7 @@ export class LocalGameRepository {
     }
   }
 
-  // why: a game claimed at setup keeps its owner even if another account is signed in at the end.
+  // why: a game claimed at setup keeps its owner even if another account is signed in at the end, so one account's seat and deck never move to another.
   archiveGame(
     game: LocalGame,
     endSource: GameEndSource = "game_menu",

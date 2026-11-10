@@ -7,7 +7,7 @@ import { systemDefinition } from "../../../convex/lib/systems"
 /** why: a judge keeps the official time, so a countdown starts from the minutes left on the venue clock. */
 export type RoundClockSetup = { mode: "stopwatch" } | { mode: "countdown"; minutes: number }
 
-/** why: timestamps, not ticks, so the board saves only when the clock changes. Elapsed is `(pausedAt ?? now) - startedAt`. */
+/** why: timestamps, not ticks, so the board saves only when the clock changes (#452). Resume shifts `startedAt`, so elapsed is always `(pausedAt ?? now) - startedAt`. */
 export interface RoundClock {
   setup: RoundClockSetup
   startedAt: number

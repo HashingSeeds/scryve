@@ -55,7 +55,7 @@ export type SharedSeatDeck =
       startingValue?: number
     }
 
-/** why: a seat playing someone's shared deck copies only key, list and label, so owner ids and stats never reach the game. */
+/** why: another player's seat copies only the share's key, list and label, so the owner's ids, deck key and stats never reach the game. The owner plays their own deck. */
 export async function sharedSeatDeck(
   ctx: QueryCtx,
   token: string,

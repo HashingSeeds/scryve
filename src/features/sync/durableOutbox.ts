@@ -27,7 +27,7 @@ export interface DurableOutboxCodec<
   knownKeys?: readonly string[]
 }
 
-/** why: `keyof` on a union keeps only shared keys; this keeps every member's. */
+/** why: `keyof` on a union keeps only shared keys; this keeps every member's, so a `knownKeys` record must list them all. */
 export type FieldName<T> = T extends unknown ? Extract<keyof T, string> : never
 
 export interface DurableOutboxKeys {

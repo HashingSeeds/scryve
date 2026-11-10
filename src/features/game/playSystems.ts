@@ -109,7 +109,7 @@ export function defaultStartingLife(system?: unknown, format?: string, playerCou
   )
 }
 
-// why: setup offers what each format starts at. Empty means one fixed start, so setup shows no life row.
+// why: system definitions hold one preset list per game, but setup offers what each format starts at. Empty means one fixed start, so setup shows no life row.
 const LIFE_PRESETS: Record<
   PlaySystemId,
   { formats?: Record<string, readonly number[]>; rest: readonly number[] }
