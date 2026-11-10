@@ -13,6 +13,7 @@ import {
   isSameCommanderClaim,
   isSameCommanderResolution,
   isSameLifeChange,
+  MAX_COMMANDER_DAMAGE,
   PARTNER_COMMANDER,
   type CommanderClaimRequest,
   type CommanderSlot,
@@ -200,6 +201,7 @@ export type GameWrite =
       toPlayerId: string
       commander?: number
       delta: number
+      commanderLimit?: number
     })
   | (WriteRequest & {
       kind: "commander.resolve"
@@ -305,7 +307,9 @@ export function rejectRequest(write: GameWrite): EngineError | null {
     return (
       (isCommanderDamageDelta(write.delta)
         ? null
-        : rejected("Commander damage delta must be a non-zero whole number from -99 to 99")) ??
+        : rejected(
+            `Commander damage delta must be a non-zero whole number from -${MAX_COMMANDER_DAMAGE} to ${MAX_COMMANDER_DAMAGE}`,
+          )) ??
       (isCommanderSlot(write.commander)
         ? null
         : rejected("Commander must be omitted for the first commander or 1 for the partner")) ??
@@ -889,6 +893,7 @@ function* writeClaim(
   const status = commanderClaimOutcome({
     total,
     delta: write.delta,
+    commanderLimit: write.commanderLimit,
     pendingClaims: pending.length,
     pairHasPendingClaim: pending.some((claim) => isSamePair(claim, pair)),
   })
@@ -1034,7 +1039,8 @@ export function resolveClaim(
     life: target.currentLife,
     delta: claim.delta,
   })
-  if (!confirmed) return rejected("Commander damage total must remain between 0 and 99")
+  if (!confirmed)
+    return rejected(`Commander damage total must remain between 0 and ${MAX_COMMANDER_DAMAGE}`)
   const { total, currentLife } = confirmed
   return {
     total,

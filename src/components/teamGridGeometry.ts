@@ -99,7 +99,7 @@ export function menuPlacementAt(
   return {}
 }
 
-/** why: mirrors TurnChipLayer, which drops a head's beside control when the pentagon is centered on that head's top edge; the seam carries the control exactly then, or it shows twice or not at all. */
+/** why: mirrors LifeCard, which drops a head's mode control from its turn chip when the pentagon is centered on that head's top edge; the seam carries the control exactly then, or it shows twice or not at all. */
 export function headChipCrowded(teamCount: number, layout: GridLayout, slot: number, head: 0 | 1) {
   const rows = getPlayerGridRows(teamCount, layout)
   const panel = panelBoxes(

@@ -173,7 +173,7 @@ export function planSeam(
   }
 }
 
-/** why: an active card facing across the seam has the pentagon centered on its edge, so its turn chip has no room for what rides beside it (TurnChipLayer drops it) and the seam carries it. */
+/** why: an active card facing across the seam has the pentagon centered on its edge, so its turn chip drops what rides beside it (LifeCard's modeBeside) and the seam carries it. */
 export function chipCrowdedBySeam(
   geometry: Pick<SeamGeometry, "sides" | "facings">,
   busySlots: ReadonlySet<number>,

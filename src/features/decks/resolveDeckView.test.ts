@@ -5,12 +5,12 @@ import type { PendingDeckWrite } from "./decksSyncWrites"
 import type { PendingVersionWrite } from "./decksVersionWrites"
 import { DECK_CONFLICT_REASON } from "./deckSyncReasons"
 import type { StoredVersion } from "./deckVersionsCache"
-import { deckQueryVersionId, resolveDeckView, type DeckViewInput } from "./resolveDeckView"
+import { resolveDeckView, serverVersionId, type DeckViewInput } from "./resolveDeckView"
 import type { Id } from "../../../convex/_generated/dataModel"
 
 const deckId = "deck-1" as Id<"decks">
 const versionId = "version-1" as Id<"deckVersions">
-const provisionalId = "draft-1" as Id<"deckVersions">
+const provisionalId = "00000000-0000-4000-8000-000000000001" as Id<"deckVersions">
 const noGames = {
   games: 0,
   wins: 0,
@@ -146,6 +146,7 @@ function input(overrides: Partial<DeckViewInput> = {}): DeckViewInput {
       failures: [],
       capacityBlocked: false,
       mappedVersion: (id) => id,
+      mappedVersionId: () => undefined,
     },
     versionCache: { versions: [], version: undefined, cards: undefined },
     selectedVersionId: undefined,
@@ -170,14 +171,12 @@ describe("resolveDeckView cards", () => {
       input({
         detail: detail(),
         versionWrites: {
+          ...input().versionWrites,
           pending: [
             pendingCards([card("Swamp")], { expectedRevision: 2 }),
             pendingCards([card("Forest")], { expectedRevision: 3, operationId: "op-2" }),
             pendingCards([card("Mountain")], { op: "rename", expectedRevision: 9 }),
           ],
-          failures: [],
-          capacityBlocked: false,
-          mappedVersion: (id) => id,
         },
       }),
     )
@@ -190,9 +189,8 @@ describe("resolveDeckView cards", () => {
       input({
         detail: detail(),
         versionWrites: {
+          ...input().versionWrites,
           pending: [pendingCards([card("Swamp")], { versionId: provisionalId })],
-          failures: [],
-          capacityBlocked: false,
           mappedVersion: (id) => (id === provisionalId ? versionId : id),
         },
       }),
@@ -324,11 +322,14 @@ describe("resolveDeckView metadata and status", () => {
 
 describe("resolveDeckView matchVersionId", () => {
   it("adds a match against the cached version while offline, but not an unsynced one", () => {
-    const offline = (version: StoredVersion, mappedVersion = (id: string) => id) =>
+    const offline = (
+      version: StoredVersion,
+      mappedVersionId: DeckViewInput["versionWrites"]["mappedVersionId"] = () => undefined,
+    ) =>
       resolveDeckView(
         input({
           versionCache: { versions: [version], version, cards: [] },
-          versionWrites: { ...input().versionWrites, mappedVersion },
+          versionWrites: { ...input().versionWrites, mappedVersionId },
         }),
       ).matchVersionId
     expect(offline(storedVersion())).toBe(versionId)
@@ -346,11 +347,11 @@ describe("resolveDeckView matchVersionId", () => {
   })
 })
 
-describe("deckQueryVersionId", () => {
-  it("reads the default version until a provisional offline version is acknowledged", () => {
-    const provisional = [storedVersion({ versionId: provisionalId, local: true })]
-    expect(deckQueryVersionId(provisionalId, provisionalId, provisional)).toBeUndefined()
-    expect(deckQueryVersionId(provisionalId, versionId, provisional)).toBe(versionId)
-    expect(deckQueryVersionId(undefined, undefined, [])).toBeUndefined()
+describe("serverVersionId", () => {
+  it("names a provisional version only once its offline create is acknowledged", () => {
+    expect(serverVersionId(provisionalId, () => undefined)).toBeUndefined()
+    expect(serverVersionId(provisionalId, () => versionId)).toBe(versionId)
+    expect(serverVersionId(versionId, () => undefined)).toBe(versionId)
+    expect(serverVersionId(undefined, () => versionId)).toBeUndefined()
   })
 })

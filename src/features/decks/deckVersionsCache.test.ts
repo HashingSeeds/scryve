@@ -736,4 +736,28 @@ describe("deck version cache", () => {
       Object.keys(new DeckVersionCacheRepository("owner-b", storage).loadKnownCards()),
     ).toEqual([])
   })
+
+  it("never asks the server for a version that exists only as an offline draft", async () => {
+    const repository = new DeckVersionCacheRepository("owner-a", new MemoryStorage())
+    const draftId = "00000000-0000-4000-8000-000000000042"
+    repository.saveDraft(deckId, {
+      ...versionRow({ versionNumber: 2, revision: 0 }),
+      versionId: draftId as Id<"deckVersions">,
+      local: true,
+    })
+    const readVersion = jest.fn(() => ({ version: versionRow(), cards: [cardRow] }))
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => ({ deckId, page: [versionRow()], isDone: true, continueCursor: null }),
+        readVersion,
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, draftId)
+    await flush()
+    stop()
+
+    expect(readVersion).not.toHaveBeenCalledWith(expect.objectContaining({ versionId: draftId }))
+  })
 })

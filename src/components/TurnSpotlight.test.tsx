@@ -1,39 +1,26 @@
-import { StyleSheet } from "react-native"
-import { render } from "@testing-library/react-native"
+import type { ReactNode } from "react"
+import { renderHook } from "@testing-library/react-native"
 
-import { ThemeProvider } from "@/theme/context"
+import { TurnSpotlightContext, useSeatDimmed } from "./TurnSpotlight"
 
-import { seatCardRadius } from "./playerCardTypes"
-import { SeatSpotlight, TurnSpotlightContext } from "./TurnSpotlight"
-
-function frame(props: Parameters<typeof SeatSpotlight>[0]) {
-  const view = render(
-    <ThemeProvider initialContext="dark">
-      <TurnSpotlightContext.Provider value={{ active: ["ada"], next: ["bo"] }}>
-        <SeatSpotlight {...props} />
-      </TurnSpotlightContext.Provider>
-    </ThemeProvider>,
+function dimmed(playerId: string, active: readonly string[] | undefined) {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <TurnSpotlightContext.Provider value={active ? { active } : undefined}>
+      {children}
+    </TurnSpotlightContext.Provider>
   )
-  return StyleSheet.flatten(view.getByTestId(/^seat-spotlight-/).props.style)
+  return renderHook(() => useSeatDimmed(playerId), { wrapper }).result.current
 }
 
-describe("SeatSpotlight", () => {
-  it("rounds with its card, compact or not, and squares the corners its card squares", () => {
-    expect(frame({ playerId: "ada" }).borderRadius).toBe(seatCardRadius())
-    const compact = frame({
-      playerId: "bo",
-      compact: true,
-      corners: { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
-    })
-    expect(compact).toMatchObject({
-      borderRadius: seatCardRadius(true),
-      borderTopLeftRadius: 0,
-      borderBottomLeftRadius: 0,
-      borderStyle: "dashed",
-    })
+describe("useSeatDimmed", () => {
+  it("dims only the seats outside the turn, so both teammates stay lit on their team's turn", () => {
+    expect(dimmed("ada", ["ada", "bo"])).toBe(false)
+    expect(dimmed("bo", ["ada", "bo"])).toBe(false)
+    expect(dimmed("cy", ["ada", "bo"])).toBe(true)
   })
 
-  it("says solid on the active frame, since Android keeps a next frame's dash when the style drops it", () => {
-    expect(frame({ playerId: "ada" }).borderStyle).toBe("solid")
+  it("leaves every seat lit until someone has the turn", () => {
+    expect(dimmed("ada", undefined)).toBe(false)
+    expect(dimmed("ada", [])).toBe(false)
   })
 })

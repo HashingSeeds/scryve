@@ -71,7 +71,7 @@ function CommanderGrid({
   onPressSword?: (player: GamePlayer) => void
 }) {
   const attack = useCommanderAttack(
-    { incoming: () => ({}), commit: () => {}, loseLife: () => {} },
+    { incoming: () => ({}), commit: () => {} },
     { seatDeck: () => undefined, singleCommander },
   )
   return (

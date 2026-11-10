@@ -40,7 +40,8 @@ export default {
   turnsChoice: {
     label: "ターン",
     lifeOnly: "ライフのみ",
-    lifeAndTurns: "ライフとターン",
+    lifeAndTurns: "ターン",
+    chessClock: "チェスクロック",
   },
   whatYouPlay: {
     heading: "何をプレイしますか?",
