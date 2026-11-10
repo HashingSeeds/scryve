@@ -71,6 +71,15 @@ export function PlanarGlyph({
   )
 }
 
+function SchemeGlyph({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg testID="scheme-glyph" width={size} height={size} viewBox="0 0 24 24">
+      <Rect x={7} y={2} width={13} height={17} rx={2} fill={color} opacity={0.5} />
+      <Rect x={4} y={5} width={13} height={17} rx={2} fill={color} />
+    </Svg>
+  )
+}
+
 function useFresh(at: number | undefined) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -234,7 +243,7 @@ function SchemePlate({
       ? scheme.ongoing[0]!.card.name
       : ongoing > 1
         ? translate("board:scheme.ongoingCount", { count: ongoing })
-        : (scheme.shown?.name ?? "")
+        : (scheme.shown?.name ?? translate("board:scheme.schemes"))
   const full = due || width >= FULL_PLATE_WIDTH
   return (
     <BoardPressable
@@ -253,14 +262,16 @@ function SchemePlate({
         pressed && $pressed,
       ]}
     >
-      {art && !due ? (
+      {due ? null : art ? (
         <Image
           source={modeCardImage(art, "art_crop")}
           style={full ? $thumb : $iconThumb}
           contentFit="cover"
           accessibilityIgnoresInvertColors
         />
-      ) : null}
+      ) : (
+        <SchemeGlyph size={16} color={ink} />
+      )}
       {full ? (
         <View style={$plateText}>
           <Text
