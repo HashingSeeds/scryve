@@ -8,15 +8,16 @@ import {
 } from "./recentSetups"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
-const local = (names: string[], startingLife = 40): NewRecentSetup => ({
-  mode: "local",
-  game: {
-    players: names.map((name, index) => ({ name, color: ["#B85636", "#41476E"][index % 2] })),
-    startingLife,
-    system: "mtg",
-    format: "commander",
-  },
-})
+const local = (names: string[], startingLife = 40) =>
+  ({
+    mode: "local",
+    game: {
+      players: names.map((name, index) => ({ name, color: ["#B85636", "#41476E"][index % 2] })),
+      startingLife,
+      system: "mtg",
+      format: "commander",
+    },
+  }) satisfies NewRecentSetup
 
 const treachery: NewRecentSetup = {
   mode: "connected",
@@ -80,6 +81,34 @@ describe("recent setups", () => {
     repository.saveActiveGame(createLocalGame({ players, startingLife: 40, system: "fab" }))
     expect(repository.loadActiveGame()?.players.map(({ life }) => life)).toEqual([38, 40])
     expect(repository.loadActiveGame()?.players[0].startingLife).toBe(38)
+  })
+
+  it("keeps Archenemy and Planechase setups through storage", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const modeSetup = { archenemy: { seat: 2 }, planechase: {} }
+    const archenemy: NewRecentSetup = {
+      mode: "connected",
+      lobby: { ...treachery.lobby, playerCount: 4, variant: "archenemy", modeSetup },
+    }
+    const planechase: NewRecentSetup = {
+      mode: "local",
+      game: { ...local(["Ada", "Grace"]).game, modeSetup: { planechase: {} } },
+    }
+    repository.rememberSetup(archenemy, 1)
+    repository.rememberSetup(planechase, 2)
+    expect(repository.loadRecentSetups()).toEqual([
+      { savedAt: 2, ...planechase },
+      { savedAt: 1, ...archenemy },
+    ])
+    const { modeSetup: _, ...noSetup } = archenemy.lobby
+    expect(parseRecentSetup({ savedAt: 1, mode: "connected", lobby: noSetup })).toBeUndefined()
+    expect(
+      parseRecentSetup({
+        savedAt: 1,
+        mode: "connected",
+        lobby: { ...archenemy.lobby, modeSetup: { archenemy: { seat: 5 } } },
+      }),
+    ).toBeUndefined()
   })
 
   it("keeps a Lorcana setup that starts at 0 lore", () => {

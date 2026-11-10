@@ -6,7 +6,13 @@ import { isSystemVisible } from "./systemVisibility"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf } from "../../../convex/lib/matchResults"
 import { systemDefinition } from "../../../convex/lib/systems"
-import type { ModeSetup } from "../../../convex/lib/tableModes"
+import { matchesValidator } from "../../../convex/lib/table"
+import {
+  isValidModeSetup,
+  modeSetupValidator,
+  systemPlaysModeSetup,
+  type ModeSetup,
+} from "../../../convex/lib/tableModes"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
 import { isTwoHeadedGiantPlayerCount } from "../../../convex/lib/twoHeadedGiant"
 
@@ -46,6 +52,11 @@ const isSeatTeams = (value: unknown): value is number[][] =>
 
 const isPositiveInteger = (value: unknown): value is number => isWholeNumber(value) && value > 0
 
+const parseModeSetup = (value: unknown, playerCount: number) =>
+  matchesValidator(modeSetupValidator, value) && isValidModeSetup(value, playerCount)
+    ? value
+    : undefined
+
 function parseLocalSetup(value: unknown): LocalSetup | undefined {
   if (!isRecord(value) || !Array.isArray(value.players)) return undefined
   const players = value.players.map((player: unknown) =>
@@ -59,6 +70,7 @@ function parseLocalSetup(value: unknown): LocalSetup | undefined {
   )
   if (players.some((player) => player === undefined) || !isWholeNumber(value.startingLife))
     return undefined
+  const modeSetup = parseModeSetup(value.modeSetup, players.length)
   const setup: LocalSetup = {
     players: players.filter((player) => player !== undefined),
     startingLife: value.startingLife,
@@ -74,6 +86,7 @@ function parseLocalSetup(value: unknown): LocalSetup | undefined {
       : {}),
     ...(isPositiveInteger(value.lifeStep) ? { lifeStep: value.lifeStep } : {}),
     ...(isSeatTeams(value.teams) ? { teams: value.teams } : {}),
+    ...(modeSetup ? { modeSetup } : {}),
     ...(isRecord(value.match) && isMatchBestOf(value.match.bestOf)
       ? { match: { bestOf: value.match.bestOf } }
       : {}),
@@ -112,24 +125,32 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     (typeof value.format !== "string" || playSystemFormat(system, value.format) !== value.format)
   )
     return undefined
+  const modeSetup = parseModeSetup(value.modeSetup, value.playerCount)
+  if (value.modeSetup !== undefined && !(modeSetup && systemPlaysModeSetup(system, modeSetup)))
+    return undefined
   if (
     value.variant !== undefined &&
     !(
       (value.variant === "treachery" && isTreacheryPlayerCount(value.playerCount)) ||
-      (value.variant === "twoHeadedGiant" && isTwoHeadedGiantPlayerCount(value.playerCount))
+      (value.variant === "twoHeadedGiant" && isTwoHeadedGiantPlayerCount(value.playerCount)) ||
+      value.variant === "archenemy"
     )
   )
     return undefined
   if (value.variant !== undefined && !systemDefinition(system)?.variants.includes(value.variant))
     return undefined
+  if ((modeSetup?.archenemy !== undefined) !== (value.variant === "archenemy")) return undefined
   return {
     playerCount: value.playerCount,
     startingLife: value.startingLife,
     ruleset: value.ruleset,
     ...(system && typeof value.format === "string" ? { system, format: value.format } : {}),
-    ...(value.variant === "treachery" || value.variant === "twoHeadedGiant"
+    ...(value.variant === "treachery" ||
+    value.variant === "twoHeadedGiant" ||
+    value.variant === "archenemy"
       ? { variant: value.variant }
       : {}),
+    ...(modeSetup ? { modeSetup } : {}),
     layout: playerGridLayoutForCount(
       value.variant === "twoHeadedGiant" ? value.playerCount / 2 : value.playerCount,
       value.layout,
