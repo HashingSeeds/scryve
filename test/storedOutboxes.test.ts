@@ -216,6 +216,7 @@ describe("outboxes stored by v0.2.1", () => {
           clientCreatedAt: 120,
         },
         queuedAt: 120,
+        sequence: 0,
         attempts: 1,
         lastAttemptAt: expect.any(Number),
       },

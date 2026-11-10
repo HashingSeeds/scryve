@@ -1,5 +1,6 @@
 import { translate } from "@/i18n/translate"
 
+import { encodeLine, MAX_LINE_BYTES } from "./lineReader"
 import {
   MANY_SEAT_MARK_SHAPES,
   PLAYER_COLOR_CHOICES,
@@ -15,6 +16,11 @@ import {
   writeMemoryGame,
   type MemoryGame,
 } from "../../../convex/lib/gameEngineMemory"
+import {
+  connectedLogEvent,
+  NEARBY_LOG_LIMIT,
+  type ConnectedLogEvent,
+} from "../../../convex/lib/gameLog"
 import {
   commanderField,
   commanderLethalDamage,
@@ -146,6 +152,7 @@ export type LanGuestMessage =
     }
   | { type: "op"; event: ConnectedActionEvent; tappedAt?: number }
   | { type: "reveal" }
+  | { type: "log"; before?: string }
   | { type: "deck"; deck: LanSeatDeck | null }
   | { type: "ping"; at: number }
   | { type: "stats"; stats: SyncLatencySummary }
@@ -159,6 +166,8 @@ export type LanHostMessage =
       partners?: boolean
       editsAnySeat?: boolean
       turns?: boolean
+      /** why: a host from before the game log ignores a guest's log request, so guests offer the log only when the welcome says so. */
+      log?: boolean
     }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
@@ -166,6 +175,7 @@ export type LanHostMessage =
   | { type: "ack"; operationId: string; status?: ClaimStatus }
   | { type: "nack"; operationId: string; code?: string; message: string }
   | { type: "pong"; at: number; hostAt: number }
+  | ({ type: "log" } & LanLogPage)
 
 export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
 
@@ -400,8 +410,20 @@ function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined
     ...tap,
   }
   if (event.type === "life.changed")
-    return { kind: "life", playerId: event.playerId, delta: event.delta, ...sent }
-  if (event.type === "table.action") return { kind: "table", action: event.action, ...sent }
+    return {
+      kind: "life",
+      playerId: event.playerId,
+      delta: event.delta,
+      ...(event.compensatesOperationId ? { undoOf: event.compensatesOperationId } : {}),
+      ...sent,
+    }
+  if (event.type === "table.action")
+    return {
+      kind: "table",
+      action: event.action,
+      ...(event.undoOf ? { undoOf: event.undoOf } : {}),
+      ...sent,
+    }
   if (event.type === "commanderDamage.submitted")
     return {
       kind: "commander.claim",
@@ -680,9 +702,17 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
       ...base,
       playerId: asPlayerId(value.playerId),
       delta: value.delta,
+      ...(isId(value.compensatesOperationId)
+        ? { compensatesOperationId: asOperationId(value.compensatesOperationId) }
+        : {}),
     }
   if (value.type === "table.action" && matchesValidator(tableActionValidator, value.action))
-    return { type: "table.action", ...base, action: value.action }
+    return {
+      type: "table.action",
+      ...base,
+      action: value.action,
+      ...(isId(value.undoOf) ? { undoOf: asOperationId(value.undoOf) } : {}),
+    }
   if (
     value.type === "commanderDamage.submitted" &&
     isId(value.fromPlayerId) &&
@@ -734,6 +764,8 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(isCount(value.maxSeats) ? { maxSeats: value.maxSeats } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
+  if (value.type === "log")
+    return { type: "log", ...(isId(value.before) ? { before: value.before } : {}) }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }
   if (value.type === "stats") {
     const stats = parseLatencySummary(value.stats)
@@ -797,6 +829,7 @@ export function parseHostMessage(line: string): LanHostMessage | null {
       ...(value.partners === true ? { partners: true } : {}),
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(value.turns === true ? { turns: true } : {}),
+      ...(value.log === true ? { log: true } : {}),
     }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {
@@ -817,5 +850,69 @@ export function parseHostMessage(line: string): LanHostMessage | null {
     }
   if (value.type === "pong" && isCount(value.at) && isCount(value.hostAt))
     return { type: "pong", at: value.at, hostAt: value.hostAt }
+  if (value.type === "log" && Array.isArray(value.events))
+    return {
+      type: "log",
+      events: value.events.slice(-NEARBY_LOG_LIMIT).flatMap((event) => parseLogEvent(event) ?? []),
+      more: value.more === true,
+      ...(isId(value.before) ? { before: value.before } : {}),
+    }
   return null
+}
+
+/** why: a newer host may send actions this build can't read, so a row keeps its change and drops only the action. */
+function parseLogEvent(value: unknown): ConnectedLogEvent | null {
+  if (!isRecord(value)) return null
+  const { operationId, playerId, kind, delta, fromPlayerId, clientCreatedAt, action, undoOf } =
+    value
+  if (!isId(operationId) || !isId(playerId) || !isId(kind) || !isCount(clientCreatedAt)) return null
+  return {
+    operationId,
+    playerId,
+    kind,
+    ...(isWhole(delta) ? { delta } : {}),
+    ...(isId(fromPlayerId) ? { fromPlayerId } : {}),
+    clientCreatedAt,
+    ...(matchesValidator(tableActionValidator, action) ? { action } : {}),
+    ...(isId(undoOf) ? { undoOf } : {}),
+    ...(value.mine === true ? { mine: true as const } : {}),
+  }
+}
+
+export interface LanLogPage {
+  events: ConnectedLogEvent[]
+  more: boolean
+  before?: string
+}
+
+/** why: the log rides one line, and a peer drops a line past MAX_LINE_BYTES, so the host sends the newest changes that fit and older ones page in on request. */
+export function lanLog(game: LanGame, viewerKey: string, before?: string): LanLogPage {
+  const all = [...(game.memory?.events.values() ?? [])]
+  const cursor = before === undefined ? {} : { before }
+  const end = before === undefined ? all.length : all.findIndex((e) => e.operationId === before)
+  if (end < 0) return { events: [], more: false, ...cursor }
+  let bytes = encodeLine({ type: "log", events: [], more: true, ...cursor }).length
+  const events: ConnectedLogEvent[] = []
+  let start = end
+  while (start > 0 && events.length < NEARBY_LOG_LIMIT) {
+    const event = connectedLogEvent(all[start - 1], viewerKey)
+    const size = encodeLine(event).length
+    if (bytes + size > MAX_LINE_BYTES) break
+    bytes += size
+    events.unshift(event)
+    start -= 1
+  }
+  return { events, more: start > 0, ...cursor }
+}
+
+export function mergeLanLog(
+  current: { events: readonly ConnectedLogEvent[]; more?: boolean } | undefined,
+  page: LanLogPage,
+): { events: ConnectedLogEvent[]; more: boolean } {
+  const fresh = new Set(page.events.map(({ operationId }) => operationId))
+  const kept = (current?.events ?? []).filter(({ operationId }) => !fresh.has(operationId))
+  if (page.before !== undefined) return { events: [...page.events, ...kept], more: page.more }
+  const overlaps = kept.length < (current?.events.length ?? 0)
+  if (!overlaps || kept.length === 0) return { events: page.events, more: page.more }
+  return { events: [...kept, ...page.events], more: current?.more ?? false }
 }

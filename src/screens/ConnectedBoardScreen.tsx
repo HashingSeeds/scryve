@@ -47,6 +47,12 @@ import {
   type ConnectedBoardSeat,
   type ConnectedBoardView,
 } from "@/features/connected/boardView"
+import {
+  CloudLogFeed,
+  ConnectedLogContext,
+  ConnectedLogDialog,
+  type ConnectedLogFeed,
+} from "@/features/connected/ConnectedLogDialog"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
 import { loadLayoutChoice, saveLayoutChoice } from "@/features/connected/layoutChoice"
@@ -282,6 +288,7 @@ type ConnectedBoardReadyProps = {
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline: boolean
   turns: boolean
+  logFeed?: ConnectedLogFeed
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -360,6 +367,8 @@ interface ConnectedBoardRuntimeProps {
   ownerId: string
   // why: report, block, and the life log read or write Convex by game and seat id, which a nearby game doesn't have.
   cloud?: boolean
+  /** why: a nearby host from before the game log can't send one, so its guests get no Log. */
+  logFeed?: ConnectedLogFeed
   partners?: boolean
   turns?: boolean
   awayPlayerIds?: readonly string[]
@@ -429,6 +438,7 @@ export function ConnectedBoardWithRuntime({
   accountEntry,
   ownerId,
   cloud = true,
+  logFeed = cloud ? CloudLogFeed : undefined,
   partners = cloud,
   turns = cloud,
   awayPlayerIds,
@@ -476,6 +486,8 @@ export function ConnectedBoardWithRuntime({
     (): LifeLogSource | undefined => (cloud ? { kind: "connected", publicId, pending } : undefined),
     [cloud, publicId, pending],
   )
+  const { undoLife } = runtime
+  const logContext = useMemo(() => ({ pending, lives, undoLife }), [pending, lives, undoLife])
   const tableState = useStructurallyStable(runtime.table)
   const {
     tableRules,
@@ -592,31 +604,34 @@ export function ConnectedBoardWithRuntime({
       <ConnectedTableContext.Provider value={table}>
         <ConnectedUnsentContext.Provider value={runtime.pending.length}>
           <LifeLogContext.Provider value={lifeLog}>
-            <ConnectedBoardReady
-              publicId={publicId}
-              initialInviteOpen={initialInviteOpen}
-              onBack={onBack}
-              onHistory={onHistory}
-              onRules={onRules}
-              onDecks={onDecks}
-              onSettings={onSettings}
-              onSupport={onSupport}
-              onAccount={onAccount}
-              accountEntry={accountEntry}
-              onGameEnded={onGameEnded}
-              onRematch={onRematch}
-              onGameAbandoned={onGameAbandoned}
-              onLeave={onLeave}
-              view={view}
-              controls={controls}
-              ownerId={ownerId}
-              cloud={cloud}
-              partners={partners}
-              awayPlayerIds={awayPlayerIds}
-              onRevealRole={onRevealRole}
-              roleRevealOnline={roleRevealOnline}
-              turns={turns}
-            />
+            <ConnectedLogContext.Provider value={logContext}>
+              <ConnectedBoardReady
+                publicId={publicId}
+                initialInviteOpen={initialInviteOpen}
+                onBack={onBack}
+                onHistory={onHistory}
+                onRules={onRules}
+                onDecks={onDecks}
+                onSettings={onSettings}
+                onSupport={onSupport}
+                onAccount={onAccount}
+                accountEntry={accountEntry}
+                onGameEnded={onGameEnded}
+                onRematch={onRematch}
+                onGameAbandoned={onGameAbandoned}
+                onLeave={onLeave}
+                view={view}
+                controls={controls}
+                ownerId={ownerId}
+                cloud={cloud}
+                partners={partners}
+                awayPlayerIds={awayPlayerIds}
+                onRevealRole={onRevealRole}
+                roleRevealOnline={roleRevealOnline}
+                turns={turns}
+                logFeed={logFeed}
+              />
+            </ConnectedLogContext.Provider>
             <SyncStatsOverlay latency={runtime.latency} peers={peerLatency} />
           </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
@@ -649,6 +664,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onRevealRole,
   roleRevealOnline,
   turns,
+  logFeed,
 }: ConnectedBoardReadyProps) {
   const {
     themed,
@@ -682,6 +698,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [chessMinutes] = useChessMinutes(localGameRepository)
   const chessAppliedTo = useRef<string>(undefined)
   const [turnOpen, setTurnOpen] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
+  const openLog = useCallback(() => setLogOpen(true), [])
   const [passUndo, setPassUndo] = useState<{ operationId: string; passerId: string }>()
   useEffect(() => {
     if (!passUndo) return
@@ -951,8 +969,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     onSettings,
     onSupport,
     onAccount,
+    onLog: logFeed ? openLog : undefined,
   })
   const { menuOpen, dice, dialogOrigin: menuDialogOrigin } = chrome
+  const logSeats = useMemo(
+    () => [...game.players].sort((left, right) => left.seat - right.seat).map(toBoardSeat),
+    [game.players],
+  )
   // why: the chess clock is the host's setup choice, so only the host's device sets the bank, through any seat it holds; whoever goes first may be on a device that chose otherwise.
   const hostSeat = game.isHost ? [...controlled][0] : undefined
   useEffect(() => {
@@ -1163,6 +1186,24 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             return turn && mine ? (bankMs) => table.setBank(mine.playerId, bankMs) : undefined
           })()}
           onClose={() => setTurnOpen(false)}
+        />
+      ) : null}
+
+      {logOpen && logFeed ? (
+        <ConnectedLogDialog
+          publicId={publicId}
+          Feed={logFeed}
+          seats={logSeats}
+          turn={table?.table.turn}
+          groups={turnGroups}
+          turnsShown={tabOn}
+          anyoneEdits={anySeat}
+          origin={menuDialogOrigin}
+          onUndoTurn={(playerId, operationId) => {
+            table?.undoTurn(playerId, operationId)
+            setPassUndo(undefined)
+          }}
+          onClose={() => setLogOpen(false)}
         />
       ) : null}
 

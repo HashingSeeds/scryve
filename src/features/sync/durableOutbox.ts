@@ -21,6 +21,10 @@ export interface DurableOutboxCodec<
   createFailure(action: Pending, reason: string, failedAt: number): Failed
   operationId(action: Pending): string
   compare?(left: Pending, right: Pending): number
+  /** why: the outbox writes back every record this returns as a new object, so one left as is must come back as the same object. */
+  inStoredOrder?(pending: readonly Pending[]): Pending[]
+  /** why: a value that has to be unique across every writer of this storage is taken from what is stored now, not from one writer's copy. */
+  stamp?(action: Pending, stored: readonly Pending[]): Pending
   /** why: a report names only these kinds, so a corrupt record can't pass a value off as its type. */
   operationTypes?: readonly string[]
   /** why: a report names only field names this codec writes; any other key may be data (a card name, an ID), so it is reported as a numbered placeholder. */
@@ -346,9 +350,10 @@ export class DurableOutbox<
   }
 
   enqueue(
-    action: Pending,
+    unstamped: Pending,
     currentPending: readonly Pending[] = this.loadPending(),
   ): DurableEnqueueResult<Pending> {
+    const action = this.codec.stamp?.(unstamped, this.loadPending()) ?? unstamped
     const pending = this.order(currentPending)
     const operationId = this.codec.operationId(action)
     if (pending.some((candidate) => this.codec.operationId(candidate) === operationId))
@@ -414,7 +419,12 @@ export class DurableOutbox<
     }
     this.storage.set(this.keys.pendingIndex, JSON.stringify(validIds))
     this.reportQuarantined(quarantined)
-    return this.order(pending)
+    const filled = this.codec.inStoredOrder?.(pending) ?? pending
+    filled.forEach((action, index) => {
+      if (action !== pending[index])
+        this.storage.set(this.pendingKey(this.codec.operationId(action)), this.serialize(action))
+    })
+    return this.order(filled)
   }
 
   updateAttempt(operationId: string, attemptedAt: number): Pending | null {

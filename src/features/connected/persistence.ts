@@ -19,7 +19,7 @@ import type {
   PendingLifeAction,
   TableActionEvent,
 } from "./model"
-import { toConnectedProjection } from "./model"
+import { compareQueued, nextQueuedSequence, toConnectedProjection } from "./model"
 import { matchesValidator, tableActionValidator } from "../../../convex/lib/table"
 import {
   asActorId,
@@ -201,7 +201,9 @@ function parseTableActionEvent(value: Record<string, unknown>): TableActionEvent
     typeof value.clientCreatedAt !== "number" ||
     !Number.isSafeInteger(value.clientCreatedAt) ||
     value.clientCreatedAt < 0 ||
-    !matchesValidator(tableActionValidator, value.action)
+    !matchesValidator(tableActionValidator, value.action) ||
+    (value.undoOf !== undefined &&
+      (typeof value.undoOf !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.undoOf)))
   )
     return null
   return {
@@ -209,6 +211,7 @@ function parseTableActionEvent(value: Record<string, unknown>): TableActionEvent
     operationId: asOperationId(value.operationId),
     gameId: asGameId(value.gameId),
     action: value.action,
+    ...(typeof value.undoOf === "string" ? { undoOf: asOperationId(value.undoOf) } : {}),
     actorId: asActorId(value.actorId),
     deviceId: asDeviceId(value.deviceId),
     clientCreatedAt: value.clientCreatedAt,
@@ -236,6 +239,9 @@ function parsePending(value: unknown): PendingLifeAction | null {
     schemaVersion: 1,
     event,
     queuedAt: value.queuedAt,
+    ...(typeof value.sequence === "number" && Number.isSafeInteger(value.sequence)
+      ? { sequence: value.sequence }
+      : {}),
     attempts,
     ...(typeof value.lastAttemptAt === "number" && Number.isFinite(value.lastAttemptAt)
       ? { lastAttemptAt: value.lastAttemptAt }
@@ -395,6 +401,7 @@ const fieldNames: Record<FieldName<PendingLifeAction | ConnectedActionEvent>, tr
   schemaVersion: true,
   event: true,
   queuedAt: true,
+  sequence: true,
   attempts: true,
   lastAttemptAt: true,
   type: true,
@@ -413,6 +420,7 @@ const fieldNames: Record<FieldName<PendingLifeAction | ConnectedActionEvent>, tr
   claimOperationId: true,
   accepted: true,
   action: true,
+  undoOf: true,
 }
 
 const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
@@ -420,10 +428,16 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   parseFailed,
   createFailure: (action, reason, failedAt) => ({ schemaVersion: 1, action, reason, failedAt }),
   operationId: (action) => action.event.operationId,
-  compare: (left, right) =>
-    left.queuedAt - right.queuedAt ||
-    left.event.clientCreatedAt - right.event.clientCreatedAt ||
-    left.event.operationId.localeCompare(right.event.operationId),
+  compare: compareQueued,
+  // why: a build from before `sequence` queues without one; it was queued after whatever came before it in storage.
+  inStoredOrder: (pending) => {
+    let next = nextQueuedSequence(pending)
+    return pending.map((action) =>
+      action.sequence === undefined ? { ...action, sequence: next++ } : action,
+    )
+  },
+  // why: two tabs of one game share this storage, so the next sequence comes from what it holds now.
+  stamp: (action, stored) => ({ ...action, sequence: nextQueuedSequence(stored) }),
   operationTypes: [
     "life.changed",
     "table.action",

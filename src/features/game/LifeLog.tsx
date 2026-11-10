@@ -69,9 +69,14 @@ export function localLifeChanges(events: readonly GameEvent[], playerId: string)
     .reverse()
 }
 
-export type GameLogRow = ReturnType<typeof lifeChangeOf> & { id: string; life: number; at: number }
+export type GameLogRow = ReturnType<typeof lifeChangeOf> & {
+  id: string
+  life: number
+  at: number
+  operationIds: string[]
+}
 
-// why: matches the card's tap-burst window, so the log reads a burst as one change.
+// why: matches the card's tap-burst window, so the log reads a burst as one change, even when another seat changes in between.
 export const LIFE_BURST_MS = 1800
 
 export function gameLog(
@@ -80,22 +85,30 @@ export function gameLog(
 ): GameLogRow[] {
   const totals = new Map<string, number>(players.map(({ id, life }) => [id, life]))
   const rows: GameLogRow[] = []
-  let newerAt = Infinity
+  const bursts = new Map<string, { row: GameLogRow; oldestAt: number }>()
   for (const event of standingLifeEvents(events).reverse()) {
     const change = lifeChangeOf(event)
     const life = totals.get(change.playerId)
     if (life === undefined) continue
     totals.set(change.playerId, life - change.delta)
-    const newer = rows.at(-1)
-    if (
-      newer?.playerId === change.playerId &&
-      newer.fromPlayerId === change.fromPlayerId &&
-      newerAt - event.clientCreatedAt <= LIFE_BURST_MS
-    ) {
-      newer.delta += change.delta
-      newer.id = event.operationId
-    } else rows.push({ id: event.operationId, life, at: event.clientCreatedAt, ...change })
-    newerAt = event.clientCreatedAt
+    const key = `${change.playerId}\u0000${change.fromPlayerId ?? ""}`
+    const burst = bursts.get(key)
+    if (burst && Math.abs(burst.oldestAt - event.clientCreatedAt) <= LIFE_BURST_MS) {
+      burst.row.delta += change.delta
+      burst.row.id = event.operationId
+      burst.row.operationIds.push(event.operationId)
+      burst.oldestAt = event.clientCreatedAt
+    } else {
+      const row = {
+        id: event.operationId,
+        life,
+        at: event.clientCreatedAt,
+        operationIds: [event.operationId],
+        ...change,
+      }
+      rows.push(row)
+      bursts.set(key, { row, oldestAt: event.clientCreatedAt })
+    }
   }
   return rows.filter(({ delta }) => delta !== 0)
 }
@@ -104,15 +117,24 @@ export type GameLogItem =
   | (GameLogRow & { kind?: undefined })
   | (Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & { kind: "turn" })
 
+export const rowPosition = (
+  row: Pick<GameLogRow, "operationIds">,
+  positionOf: (operationId: string) => number | undefined,
+) => Math.max(...row.operationIds.map((id) => positionOf(id) ?? -Infinity))
+
 export function withTurnDividers(
   rows: readonly GameLogRow[],
   turns: readonly TurnLogEntry[],
+  positionOf: (operationId: string) => number | undefined,
 ): GameLogItem[] {
+  const startOf = (turn: TurnLogEntry) => positionOf(turn.operationId) ?? -Infinity
+  const placeOf = (row: GameLogRow) => rowPosition(row, positionOf)
   const items: GameLogItem[] = []
   let index = 0
   for (const turn of [...turns].reverse()) {
     const start = index
-    while (index < rows.length && rows[index].at >= turn.at) index += 1
+    const begins = startOf(turn)
+    while (index < rows.length && placeOf(rows[index]) >= begins) index += 1
     items.push({ kind: "turn", ...turn }, ...rows.slice(start, index))
   }
   return [...items, ...rows.slice(index)]

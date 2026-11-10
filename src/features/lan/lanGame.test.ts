@@ -5,6 +5,8 @@ import {
   endLanRound,
   LAN_PROTOCOL,
   lanLobbyOf,
+  lanLog,
+  mergeLanLog,
   lanProjection,
   lanSeatAppearance,
   lanSeatsReady,
@@ -21,6 +23,8 @@ import {
   type LanSeatPass,
   type LanSetup,
 } from "./lanGame"
+import { encodeLine, MAX_LINE_BYTES } from "./lineReader"
+import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import type { ConnectedActionEvent } from "../connected/model"
 
 const NOW = 1_700_000_000_000
@@ -598,6 +602,90 @@ describe("nearby messages", () => {
       playerCount: 4,
     })
     expect(lanProjection(lobby(tabletop), "guest").layout).toBe("tabletop")
+  })
+})
+
+describe("nearby game log", () => {
+  it("sends each guest the log on request, marking only its own changes and undos", () => {
+    const tapped = write(started(), "guest", life("life-guest-tap-0001", "guest", -3)).next
+    const { next, result } = write(
+      tapped,
+      "guest",
+      op({
+        type: "life.changed",
+        operationId: "life-guest-undo-001",
+        playerId: "guest",
+        delta: 3,
+        compensatesOperationId: "life-guest-tap-0001",
+      }),
+    )
+    expect(result).toMatchObject({ ok: true })
+    expect(parseGuestMessage(JSON.stringify({ type: "log" }))).toEqual({ type: "log" })
+
+    const received = parseHostMessage(JSON.stringify({ type: "log", ...lanLog(next, "guest") }))
+    expect(received).toMatchObject({
+      type: "log",
+      events: [
+        { operationId: "life-guest-tap-0001", delta: -3, mine: true },
+        { operationId: "life-guest-undo-001", undoOf: "life-guest-tap-0001", mine: true },
+      ],
+    })
+    expect(lanLog(next, "host").events.some((event) => event.mine)).toBe(false)
+  })
+
+  it("starts the log over from a newest page that repeats nothing the guest holds", () => {
+    const event = (index: number): ConnectedLogEvent => ({
+      operationId: `log-op-${String(index).padStart(4, "0")}`,
+      playerId: "guest",
+      kind: "life.changed",
+      delta: -1,
+      clientCreatedAt: index,
+    })
+    const range = (from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, offset) => event(from + offset))
+    const read = mergeLanLog(
+      { events: range(1, 200), more: false },
+      { events: range(401, 600), more: true },
+    )
+    expect(read.events.map(({ operationId }) => operationId)).toEqual(
+      range(401, 600).map(({ operationId }) => operationId),
+    )
+    expect(read.more).toBe(true)
+  })
+
+  it("sends the newest changes that fit one line, and older ones page in after", () => {
+    const game = started()
+    const counterId = "c".repeat(300)
+    for (let index = 0; index < 200; index += 1) {
+      const operationId = `counter-op-${String(index).padStart(4, "0")}`
+      game.memory?.events.set(operationId, {
+        playerId: "guest",
+        operationId,
+        kind: "counter.changed",
+        delta: 1,
+        actionIdentity: JSON.stringify({
+          kind: "counter.changed",
+          playerId: "guest",
+          counterId,
+          delta: 1,
+        }),
+        actorUserId: "guest",
+        clientCreatedAt: index + 1,
+        serverCreatedAt: index + 1,
+      })
+    }
+
+    const newest = lanLog(game, "guest")
+    expect(encodeLine({ type: "log", ...newest }).length).toBeLessThanOrEqual(MAX_LINE_BYTES)
+    expect(newest).toMatchObject({ more: true })
+    expect(newest.events.at(-1)?.operationId).toBe("counter-op-0199")
+
+    const older = lanLog(game, "guest", newest.events[0].operationId)
+    const read = mergeLanLog(newest, older)
+    expect(read.events.map(({ operationId }) => operationId)).toEqual(
+      Array.from({ length: 200 }, (_, index) => `counter-op-${String(index).padStart(4, "0")}`),
+    )
+    expect(read.more).toBe(false)
   })
 })
 

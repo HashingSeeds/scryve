@@ -97,7 +97,7 @@ describe("connected acknowledgement recovery", () => {
         currentLife: terminalLife,
         pendingDelta: 0,
       })
-      expect(queued).toEqual([pending])
+      expect(queued).toEqual([{ ...pending, sequence: 0 }])
     },
   )
 })

@@ -262,6 +262,7 @@ export default defineSchema({
   })
     .index("by_game_server_time", ["gameId", "serverCreatedAt"])
     .index("by_game_operation", ["gameId", "operationId"])
+    .index("by_game_and_undo_of", ["gameId", "undoOfOperationId"])
     .index("by_actor_user", ["actorUserId"]),
 
   // One row per commander/defender pair keeps totals bounded and avoids replaying the event log.

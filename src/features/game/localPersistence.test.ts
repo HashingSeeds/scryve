@@ -275,6 +275,27 @@ describe("LocalGameRepository", () => {
     expect(repository.loadActiveGame()?.events).toEqual(tappedAfterReopen.events)
   })
 
+  it("saves the log order only for changes it still keeps, in the same order", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    let game = tap(makeGame())
+    const turn = {
+      operationId: "turn-operation-00001",
+      playerId: game.players[0].id,
+      number: 1,
+      at: 2,
+    }
+    game = { ...game, turnLog: [turn], logOrder: [...(game.logOrder ?? []), turn.operationId] }
+    for (let index = 0; index < MAX_ACTIVE_EVENTS; index += 1) game = tap(game)
+    repository.saveActiveGame(game)
+
+    const reopened = repository.loadActiveGame()
+    const kept = new Set<string>(reopened?.events.map(({ operationId }) => operationId))
+    expect(reopened?.events.length).toBeLessThan(game.events.length)
+    expect(reopened?.logOrder).toEqual(
+      game.logOrder?.filter((id) => kept.has(id) || id === turn.operationId),
+    )
+  })
+
   it("keeps a game saved by a newer version until the player replaces it", () => {
     const storage = new MemoryStorage()
     const newer = JSON.stringify({ schemaVersion: 3, game: {}, eventChunkCount: 0 })

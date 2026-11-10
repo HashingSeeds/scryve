@@ -129,6 +129,7 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
+  logOrder?: string[]
 }
 
 export interface TurnLogEntry {

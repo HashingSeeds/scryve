@@ -65,6 +65,8 @@ export default {
   outbox: {
     queueFull:
       "대기 중인 변경 사항의 오프라인 대기열이 가득 찼습니다. 다시 연결해 동기화한 후에 더 변경하세요.",
+    undoPartial:
+      "실행 취소 도중 오프라인 대기열이 가득 차서 일부만 저장되었습니다. 다시 연결하고 동기화한 다음 나머지를 실행 취소하세요.",
     commanderDamageRange: "커맨더 피해 변경은 1에서 {{max}} 사이여야 합니다.",
     commanderSelfDamage: "커맨더는 자신에게 피해를 줄 수 없습니다",
     commanderClaimDeclined:

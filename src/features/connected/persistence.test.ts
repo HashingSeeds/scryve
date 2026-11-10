@@ -102,7 +102,9 @@ describe("connected MMKV repository", () => {
     outbox.enqueue(pending[1])
 
     expect(outbox.enqueue(action("operation-capacity-03", 3, "user-1"))).toBe(false)
-    expect(outbox.getState().pending).toEqual(pending)
+    expect(outbox.getState().pending).toEqual(
+      pending.map((queued, sequence) => ({ ...queued, sequence })),
+    )
     expect(
       storage.getString(
         CONNECTED_KEYS.outboxRecord("game-public", "operation-capacity-03", "user-1"),
@@ -142,10 +144,12 @@ describe("connected MMKV repository", () => {
       attempts: 0,
     }
     queue(new ConnectedGameRepository(storage), tableAction)
-    expect(stored(new ConnectedGameRepository(storage)).pending).toEqual([tableAction])
+    expect(stored(new ConnectedGameRepository(storage)).pending).toEqual([
+      { ...tableAction, sequence: 0 },
+    ])
   })
 
-  it("keeps client-created time as the tie-breaker for equal queue times", () => {
+  it("keeps the order changes were queued in, whatever their clocks say", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage)
     const laterClientTime = {
@@ -160,8 +164,8 @@ describe("connected MMKV repository", () => {
     queue(repository, earlierClientTime)
 
     expect(stored(repository).pending.map((item) => item.event.operationId)).toEqual([
-      earlierClientTime.event.operationId,
       laterClientTime.event.operationId,
+      earlierClientTime.event.operationId,
     ])
   })
 
@@ -172,7 +176,9 @@ describe("connected MMKV repository", () => {
       CONNECTED_KEYS.outboxRecord("game-public", "operation-orphaned"),
       JSON.stringify(orphan),
     )
-    expect(stored(new ConnectedGameRepository(storage)).pending).toEqual([orphan])
+    expect(stored(new ConnectedGameRepository(storage)).pending).toEqual([
+      { ...orphan, sequence: 0 },
+    ])
 
     storage.set(CONNECTED_KEYS.outboxIndex("game-public"), JSON.stringify(["operation-missing"]))
     expect(
@@ -195,7 +201,7 @@ describe("connected MMKV repository", () => {
     )
     storage.set(failedKey, JSON.stringify({ schemaVersion: 2, action: pending }))
 
-    expect(stored(repository).pending).toEqual([pending])
+    expect(stored(repository).pending).toEqual([{ ...pending, sequence: 0 }])
     expect(storage.getString(failedKey)).toBeUndefined()
 
     storage.set(
@@ -210,7 +216,7 @@ describe("connected MMKV repository", () => {
         failedAt: 2,
       }),
     )
-    expect(stored(repository).pending).toEqual([pending])
+    expect(stored(repository).pending).toEqual([{ ...pending, sequence: 0 }])
     expect(storage.getString(failedKey)).toBeUndefined()
   })
 

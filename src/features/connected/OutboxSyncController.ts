@@ -326,6 +326,37 @@ export class OutboxSyncController {
     this.publish()
   }
 
+  undoLife = (changes: readonly { operationId: string; playerId: string; delta: number }[]) => {
+    this.lastQueuedLifeChange = undefined
+    this.changeError = undefined
+    for (const [index, change] of changes.entries()) {
+      const now = this.now()
+      const queued = this.outbox.enqueue({
+        schemaVersion: 1,
+        event: {
+          type: "life.changed",
+          operationId: asOperationId(createClientId("operation", now)),
+          gameId: asGameId(this.options.publicId),
+          playerId: asPlayerId(change.playerId),
+          delta: -change.delta,
+          compensatesOperationId: asOperationId(change.operationId),
+          actorId: asActorId(this.options.ownerId),
+          deviceId: this.options.deviceId,
+          clientCreatedAt: now,
+        },
+        queuedAt: now,
+        attempts: 0,
+      })
+      if (!queued) {
+        this.changeError = translate(
+          index === 0 ? "connected:outbox.queueFull" : "connected:outbox.undoPartial",
+        )
+        break
+      }
+    }
+    this.publish()
+  }
+
   private addToLastQueuedLifeChange(playerId: string, delta: LifeDelta): boolean {
     const last = this.lastQueuedLifeChange
     if (last?.playerId !== playerId) return false

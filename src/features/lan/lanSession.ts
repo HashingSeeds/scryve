@@ -28,6 +28,9 @@ import {
   LAN_MAX_SEATS,
   LAN_PROTOCOL,
   lanLobbyOf,
+  lanLog,
+  mergeLanLog,
+  type LanLogPage,
   lanProjection,
   lanRejectionMessage,
   lanRoundId,
@@ -57,6 +60,7 @@ import {
 import { nearbyOwner, rememberSeatClaim, retrySeatClaims } from "./nearbyAccount"
 import { nearbyCodeFor, nearbyServiceName } from "./nearbyCode"
 import type { MemoryGame } from "../../../convex/lib/gameEngineMemory"
+import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import { TABLE_VERSION } from "../../../convex/lib/table"
 
 const RECONNECT_DELAY_MS = 1_500
@@ -82,6 +86,8 @@ export interface LanSessionState {
   partners?: boolean
   hostEditsAnySeat?: boolean
   turns?: boolean
+  logs?: boolean
+  log?: { publicId: string; events: ConnectedLogEvent[]; more: boolean }
   error?: string
 }
 
@@ -396,10 +402,13 @@ export class LanSession {
             partners: true,
             editsAnySeat: true,
             turns: true,
+            log: true,
           })
           return this.publish(admitted.game)
         }
         if (!seatKey) return
+        if (message.type === "log")
+          return peer.send({ type: "log", ...lanLog(game, seatKey, message.before) })
         if (message.type === "stats") return void this.guestLatency.set(seatKey, message.stats)
         const now = Date.now()
         if (now - windowStart >= 1_000) {
@@ -619,7 +628,12 @@ export class LanSession {
         partners: message.partners === true,
         hostEditsAnySeat: message.editsAnySeat === true,
         turns: message.turns === true,
+        logs: message.log === true,
       })
+    }
+    if (message.type === "log") {
+      const publicId = this.state.projection?.publicId
+      return publicId && this.set({ log: { publicId, ...this.mergedLog(publicId, message) } })
     }
     if (message.type === "pong")
       return this.latency.clockSample(message.at, Date.now(), message.hostAt)
@@ -699,6 +713,24 @@ export class LanSession {
     if (role === "host" && game && seatKey) return this.publish(setLanDeck(game, seatKey, deck))
     if (!this.connection || status !== "connected") throw new Error("Not connected to the host")
     this.connection.send({ type: "deck", deck })
+  }
+
+  requestLog = (before?: string) => {
+    const { role, seatKey, status } = this.state
+    const game = this.game
+    if (role === "host" && game && seatKey) {
+      const publicId = lanRoundId(game)
+      return this.set({
+        log: { publicId, ...this.mergedLog(publicId, lanLog(game, seatKey, before)) },
+      })
+    }
+    if (status === "connected")
+      this.connection?.send({ type: "log", ...(before === undefined ? {} : { before }) })
+  }
+
+  private mergedLog(publicId: string, page: LanLogPage) {
+    const { log } = this.state
+    return mergeLanLog(log?.publicId === publicId ? log : undefined, page)
   }
 
   revealRole = async () => {

@@ -555,6 +555,8 @@ const board = {
     // A commander damage row, as in "Ada −5 from Grace's commander, to 12".
     commanderRow: "{{name}} {{delta}} from {{from}}'s commander, to {{life}}",
     undoLast: "Undo the last change",
+    // Connected games: Undo takes back the newest change this player made, not anyone else's.
+    undoMine: "Undo your last change",
   },
   calculator: {
     damage: "− Damage",

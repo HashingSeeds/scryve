@@ -511,10 +511,55 @@ export function applyLocalTableAction(
       isSeat: (playerId) => game.players.some(({ id }) => id === playerId),
       groups: game.turnGroups,
     })
-    return turn === null ? game : withTurn(game, turn, context.now)
+    return turn === null ? game : withLogged(withTurn(game, turn, context.now), context.operationId)
   }
   const applied = applyBoardTableAction(game, action, context)
-  return applied === game ? game : startTurnOnChange(applied, context.now)
+  return applied === game
+    ? game
+    : withLogged(startTurnOnChange(applied, context.now), context.operationId)
+}
+
+function withLogged(game: LocalGame, operationId: string): LocalGame {
+  const logged = { ...game, logOrder: [...(game.logOrder ?? []), operationId] }
+  return { ...logged, logOrder: retainedLogOrder(logged) }
+}
+
+export function retainedLogOrder(game: Pick<LocalGame, "logOrder" | "events" | "turnLog">) {
+  const retained = new Set(
+    [...game.events, ...(game.turnLog ?? [])].map(({ operationId }) => operationId),
+  )
+  return (game.logOrder ?? []).filter((id) => retained.has(id))
+}
+
+/** why: a game saved before `logOrder`, or by an older build after a rollback, has changes missing from it, which go right after the last logged change before them in their own list. */
+export function localLogPositions(
+  game: Pick<LocalGame, "logOrder" | "events" | "turnLog">,
+  extra: readonly { operationId: string; at: number }[] = [],
+): (operationId: string) => number | undefined {
+  const positions = new Map((game.logOrder ?? []).map((id, index) => [id, index]))
+  const unlogged = [
+    game.events.map(({ operationId, clientCreatedAt }) => ({ operationId, at: clientCreatedAt })),
+    (game.turnLog ?? []).map(({ operationId, at }) => ({ operationId, at })),
+    extra,
+  ].flatMap((list) => {
+    let after = -1
+    let at = -Infinity
+    return list.flatMap(({ operationId, at: stamped }) => {
+      const logged = positions.get(operationId)
+      if (logged !== undefined) {
+        after = logged
+        at = -Infinity
+        return []
+      }
+      at = Math.max(at, stamped)
+      return [{ operationId, after, at }]
+    })
+  })
+  unlogged.sort((left, right) => left.after - right.after || left.at - right.at)
+  unlogged.forEach(({ operationId, after }, index) =>
+    positions.set(operationId, after + (index + 1) / (unlogged.length + 1)),
+  )
+  return (operationId) => positions.get(operationId)
 }
 
 export function startTurnOnChange(game: LocalGame, now: number): LocalGame {
@@ -758,7 +803,9 @@ export function applyGameCommand(
   context: CommandContext,
 ): LocalGame {
   const event = commandToEvent(game, command, context)
-  return event ? reduceGameEvent(game, event) : game
+  if (!event) return game
+  const next = reduceGameEvent(game, event)
+  return next === game ? game : withLogged(next, event.operationId)
 }
 
 export function hasPlayBegun(game: LocalGame): boolean {
@@ -811,7 +858,12 @@ export function undoableTurn(game: LocalGame, actorId: ActorId) {
       event.actorId === actorId &&
       !compensated.has(event.operationId),
   )
-  if (lastChange && lastChange.clientCreatedAt > turn.startedAt) return undefined
+  const positionOf = localLogPositions(game)
+  if (
+    lastChange &&
+    (positionOf(lastChange.operationId) ?? -Infinity) > (positionOf(turn.operationId) ?? -Infinity)
+  )
+    return undefined
   return { playerId: turn.previous.playerId, turnOperationId: turn.operationId }
 }
 

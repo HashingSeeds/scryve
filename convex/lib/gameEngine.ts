@@ -179,8 +179,8 @@ export interface WriteRequest {
 export type ClaimDecision = "confirmed" | "declined"
 
 export type GameWrite =
-  | (WriteRequest & { kind: "life"; playerId: string; delta: number })
-  | (WriteRequest & { kind: "table"; action: TableAction })
+  | (WriteRequest & { kind: "life"; playerId: string; delta: number; undoOf?: string })
+  | (WriteRequest & { kind: "table"; action: TableAction; undoOf?: string })
   | (WriteRequest & {
       kind: "commander.claim"
       fromPlayerId: string
@@ -218,6 +218,7 @@ export interface GameStore {
   readonly game: EngineGame
   seat(id: string): Read<EngineSeat | undefined>
   event(operationId: string): Read<GameEventRecord | undefined>
+  undoneBy(operationId: string): Read<GameEventRecord | undefined>
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
   pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
@@ -277,14 +278,17 @@ const checkActive = (game: Pick<EngineGame, "status">) =>
 export function rejectRequest(write: GameWrite): EngineError | null {
   if (write.kind === "life")
     return (
+      (write.undoOf === undefined ? null : checkOperationId(write.undoOf)) ??
       (isLifeDelta(write.delta)
         ? null
         : writeError(
             "invalid_life_delta",
             "Life delta must be a non-zero whole number from -999999 to 999999",
-          )) ?? checkWrite(write)
+          )) ??
+      checkWrite(write)
     )
-  if (write.kind === "table") return checkWrite(write)
+  if (write.kind === "table")
+    return (write.undoOf === undefined ? null : checkOperationId(write.undoOf)) ?? checkWrite(write)
   if (write.kind === "commander.claim")
     return (
       (isCommanderDamageDelta(write.delta)
@@ -396,10 +400,11 @@ export function matchLifeRetry(
 export function changeLife(
   game: Pick<EngineGame, "system">,
   seat: EngineSeat,
-  request: LifeChangeRequest & { operationId: string },
+  request: LifeChangeRequest & { operationId: string; undoOf?: string },
   now: number,
+  applying = request.delta,
 ) {
-  const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, request.delta)
+  const { delta, currentLife } = applyLifeChange(game.system, seat.currentLife, applying)
   const changes: GameChange[] = [
     {
       kind: "event.insert",
@@ -409,6 +414,7 @@ export function changeLife(
         kind: "life.changed",
         ...(delta === 0 ? {} : { delta }),
         ...(delta === request.delta ? {} : { actionIdentity: String(request.delta) }),
+        ...(request.undoOf === undefined ? {} : { undoOfOperationId: request.undoOf }),
         actorUserId: request.actorUserId,
         deviceId: request.deviceId,
         clientCreatedAt: request.clientCreatedAt,
@@ -438,12 +444,40 @@ function* writeLife(
   if (retry === "duplicate")
     return acknowledged({ operationId, deduplicated: true, currentLife: seat.currentLife })
   if (retry !== "new") return failed(retry)
+  let applying = request.delta
+  if (write.undoOf !== undefined) {
+    const undone = yield* read(store.event(write.undoOf))
+    if (!isOwnChange(undone, { ...request, kind: "life.changed" }))
+      return failed(writeError("invalid_undo", "Only your own life change can be taken back"))
+    if (yield* read(store.undoneBy(write.undoOf)))
+      return failed(writeError("invalid_undo", "This change was already taken back"))
+    // why: a queued change can land clamped, so its undo reverses what the authority applied, not what the device asked for.
+    applying = -(undone?.delta ?? 0)
+  }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
-  const { currentLife, changes } = changeLife(store.game, seat, request, now)
+  const { currentLife, changes } = changeLife(store.game, seat, request, now, applying)
   yield* read(store.apply(changes))
   return acknowledged({ operationId, deduplicated: false, currentLife })
+}
+
+const isOwnChange = (
+  event: GameEventRecord | undefined,
+  request: { kind: string; playerId: string; actorUserId: string },
+) =>
+  event?.kind === request.kind &&
+  event.undoOfOperationId === undefined &&
+  event.playerId === request.playerId &&
+  event.actorUserId === request.actorUserId
+
+const appliedCounterDelta = (
+  before: PlayerTable | undefined,
+  after: PlayerTable | undefined,
+  counterId: string,
+) => {
+  const delta = (after?.counters?.[counterId] ?? 0) - (before?.counters?.[counterId] ?? 0)
+  return delta === 0 ? undefined : delta
 }
 
 function gatedCard<Card extends PokemonCard>(card: Card): Card {
@@ -485,6 +519,7 @@ export interface TableActionRequest extends WriteRequest {
   actorUserId: string
   action: TableAction
   actionIdentity: string
+  undoOf?: string
 }
 
 export function matchTableRetry(
@@ -554,7 +589,14 @@ export function changeTable(
   if (result.table.turn !== table.turn) changes.push({ kind: "turn.set", turn: result.table.turn })
 
   const lifeChange = result.life[0]
-  const actionDelta = tableActionDelta(action)
+  const actionDelta =
+    action.kind === "counter.changed"
+      ? appliedCounterDelta(
+          table.players[actor.id],
+          result.table.players[actor.id],
+          action.counterId,
+        )
+      : tableActionDelta(action)
   changes.push({
     kind: "event.insert",
     event: {
@@ -573,7 +615,9 @@ export function changeTable(
               : { delta: actionDelta }),
       ...(action.kind === "pokemon.knockoutUndone"
         ? { undoOfOperationId: action.knockoutOperationId }
-        : {}),
+        : request.undoOf === undefined
+          ? {}
+          : { undoOfOperationId: request.undoOf }),
       actorUserId: request.actorUserId,
       deviceId: request.deviceId,
       clientCreatedAt: request.clientCreatedAt,
@@ -614,7 +658,7 @@ function* writeTable(
   const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
-  const request = {
+  const request: TableActionRequest = {
     ...write,
     action,
     actorUserId: actor.userId,
@@ -623,6 +667,17 @@ function* writeTable(
   const retry = matchTableRetry(yield* read(store.event(operationId)), seat.id, request)
   if (retry === "duplicate") return acknowledged({ operationId, deduplicated: true })
   if (retry !== "new") return failed(retry)
+  if (write.undoOf !== undefined) {
+    const undone = yield* read(store.event(write.undoOf))
+    if (!isOwnChange(undone, { kind: action.kind, playerId: seat.id, actorUserId: actor.userId }))
+      return failed(writeError("invalid_undo", "Only your own change can be taken back"))
+    if (yield* read(store.undoneBy(write.undoOf)))
+      return failed(writeError("invalid_undo", "This change was already taken back"))
+    if (action.kind === "counter.changed") {
+      if (!undone?.delta) return failed(writeError("invalid_undo", "This change moved nothing"))
+      request.action = { ...action, delta: -undone.delta }
+    }
+  }
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)

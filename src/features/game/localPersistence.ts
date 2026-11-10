@@ -16,6 +16,7 @@ import {
   isLifeDelta,
   localGameAccount,
   MAX_COMMANDER_DAMAGE,
+  retainedLogOrder,
   validatePlayerNames,
 } from "./domain"
 import { gameShape } from "./gameShape"
@@ -514,6 +515,9 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
+    ...(Array.isArray(value.logOrder)
+      ? { logOrder: value.logOrder.filter((id): id is string => typeof id === "string") }
+      : {}),
   }
 }
 
@@ -890,7 +894,10 @@ export class LocalGameRepository {
     }
     const metadata: ActiveMetadata = {
       schemaVersion: isWide(game) ? WIDE_ACTIVE_SCHEMA_VERSION : ACTIVE_SCHEMA_VERSION,
-      game: gameWithoutEvents,
+      game: {
+        ...gameWithoutEvents,
+        ...(game.logOrder ? { logOrder: retainedLogOrder({ ...game, events: kept }) } : {}),
+      },
       eventChunkCount: chunkCount,
       eventCount: kept.length,
       ...(kept.length > 0 ? { lastOperationId: kept[kept.length - 1].operationId } : {}),

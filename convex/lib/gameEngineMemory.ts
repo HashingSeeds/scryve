@@ -62,6 +62,8 @@ const memoryStore = (game: MemoryGame): GameStore => ({
   game,
   seat: (id) => game.seats.get(id),
   event: (operationId) => game.events.get(operationId),
+  undoneBy: (operationId) =>
+    [...game.events.values()].find((event) => event.undoOfOperationId === operationId),
   claim: (operationId) => game.claims.get(operationId),
   pendingClaims: () => [...game.claims.values()].filter((claim) => claim.status === "pending"),
   pairTotal: (pair) => game.pairs.get(pairKey(pair))?.total ?? 0,

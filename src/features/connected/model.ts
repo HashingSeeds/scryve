@@ -112,6 +112,7 @@ export interface TableActionEvent {
   operationId: OperationId
   gameId: GameId
   action: TableAction
+  undoOf?: OperationId
   actorId: ActorId
   deviceId: DeviceId
   clientCreatedAt: number
@@ -162,9 +163,26 @@ export interface PendingConnectedAction {
   schemaVersion: 1
   event: ConnectedActionEvent
   queuedAt: number
+  sequence?: number
   attempts: number
   lastAttemptAt?: number
 }
+
+/** why: a change queued before `sequence` existed goes first, in the order it always had. */
+export function compareQueued(left: PendingConnectedAction, right: PendingConnectedAction) {
+  if (left.sequence !== undefined && right.sequence !== undefined)
+    return left.sequence - right.sequence
+  if (left.sequence !== undefined || right.sequence !== undefined)
+    return left.sequence === undefined ? -1 : 1
+  return (
+    left.queuedAt - right.queuedAt ||
+    left.event.clientCreatedAt - right.event.clientCreatedAt ||
+    left.event.operationId.localeCompare(right.event.operationId)
+  )
+}
+
+export const nextQueuedSequence = (pending: readonly PendingConnectedAction[]) =>
+  pending.reduce((next, { sequence }) => Math.max(next, (sequence ?? -1) + 1), 0)
 
 export interface FailedConnectedAction {
   schemaVersion: 1

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, View } from "react-native"
 
@@ -28,7 +28,10 @@ export function GameLogDialog({
   turns,
   groups,
   canUndo,
+  undoLabel = translate("board:log.undoLast"),
   origin,
+  onMore,
+  positionOf,
   onUndo,
   onClose,
 }: {
@@ -37,7 +40,10 @@ export function GameLogDialog({
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
   canUndo: boolean
+  undoLabel?: string
   origin?: DialogOrigin
+  onMore?: () => void
+  positionOf: (operationId: string) => number | undefined
   onUndo: () => void
   onClose: () => void
 }) {
@@ -46,9 +52,16 @@ export function GameLogDialog({
     theme: { colors },
   } = useAppTheme()
   const rows = useMemo(
-    () => withTurnDividers(gameLog(players, events), turns ?? []),
-    [players, events, turns],
+    () => withTurnDividers(gameLog(players, events), turns ?? [], positionOf),
+    [players, events, turns, positionOf],
   )
+  const shownRows = useRef<number | undefined>(undefined)
+  const readOn = useEffectEvent(() => {
+    const before = shownRows.current
+    shownRows.current = rows.length
+    if (rows.length === 0 || rows.length === before) onMore?.()
+  })
+  useEffect(() => readOn(), [events, turns])
   const [openedAt] = useState(Date.now)
   const seats = useMemo(
     () =>
@@ -174,6 +187,7 @@ export function GameLogDialog({
           data={rows}
           keyExtractor={(item) => (item.kind === "turn" ? `turn:${item.operationId}` : item.id)}
           renderItem={renderRow}
+          onEndReached={onMore}
           style={themed($sheetScroll)}
           contentContainerStyle={themed($sheetScrollContent)}
         />
@@ -182,7 +196,7 @@ export function GameLogDialog({
         <Button
           testID="game-log-undo"
           tx="common:undo"
-          accessibilityLabel={translate("board:log.undoLast")}
+          accessibilityLabel={undoLabel}
           disabled={!canUndo}
           style={themed($dialogButton)}
           onPress={onUndo}
