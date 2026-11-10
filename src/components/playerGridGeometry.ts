@@ -403,20 +403,3 @@ function fallbackMenuAt(
   if (column === middle) return { corner: upper ? "bottomLeft" : "topLeft" }
   return undefined
 }
-
-export type ContentDirection = "left" | "right" | "up" | "down"
-
-type SeatRect = { card: { x: number; y: number; width: number; height: number } }
-
-export function contentDirectionToward(
-  from: SeatRect & { rotation: LifeCardContentRotation },
-  to: SeatRect,
-): ContentDirection {
-  const dx = to.card.x + to.card.width / 2 - (from.card.x + from.card.width / 2)
-  const dy = to.card.y + to.card.height / 2 - (from.card.y + from.card.height / 2)
-  const turn = (from.rotation * Math.PI) / 180
-  const x = dx * Math.cos(turn) + dy * Math.sin(turn)
-  const y = dy * Math.cos(turn) - dx * Math.sin(turn)
-  if (Math.abs(x) >= Math.abs(y)) return x > 0 ? "right" : "left"
-  return y > 0 ? "down" : "up"
-}

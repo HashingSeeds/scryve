@@ -16,7 +16,7 @@ import type {
   LifeCardMenuCorner,
   LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { CONTENT_EDGES, type ContentDirection } from "./playerGridGeometry"
+import { CONTENT_EDGES } from "./playerGridGeometry"
 import { contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
 import { Text } from "./Text"
 import { useTurnSpotlight } from "./TurnSpotlight"
@@ -67,14 +67,12 @@ export function TurnChipLayer({
   menuCorner,
   menuEdgeCenter,
   filled,
-  passDirection,
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
   filled?: boolean
-  passDirection?: ContentDirection
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   contentInsets?: LifeCardContentInsets
@@ -103,7 +101,6 @@ export function TurnChipLayer({
           foreground={foreground}
           compact={compact}
           filled={filled}
-          passDirection={passDirection}
         />
       </View>
     </View>
@@ -116,14 +113,12 @@ export function TurnChip({
   foreground,
   compact,
   filled,
-  passDirection = "right",
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
   filled?: boolean
-  passDirection?: ContentDirection
 }) {
   const {
     themed,
@@ -160,18 +155,13 @@ export function TurnChip({
     </>
   ) : filled ? (
     <>
-      {canPress && !outOfTime && passDirection === "left" ? (
-        <ChevronGlyph color={ink} direction={passDirection} />
-      ) : null}
       <Text
         text={time}
         testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
         weight="bold"
         style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
       />
-      {canPress && !outOfTime && passDirection !== "left" ? (
-        <ChevronGlyph color={ink} direction={passDirection} />
-      ) : null}
+      {canPress && !outOfTime ? <ChevronGlyph color={ink} /> : null}
     </>
   ) : (
     <>
@@ -241,21 +231,9 @@ function PlayGlyph({ color }: { color: string }) {
   )
 }
 
-const CHEVRON_TURN: Record<ContentDirection, string> = {
-  right: "0deg",
-  down: "90deg",
-  left: "180deg",
-  up: "-90deg",
-}
-
-function ChevronGlyph({ color, direction }: { color: string; direction: ContentDirection }) {
+function ChevronGlyph({ color }: { color: string }) {
   return (
-    <Svg
-      width={12}
-      height={12}
-      viewBox="-1.5 0 12 12"
-      style={{ transform: [{ rotate: CHEVRON_TURN[direction] }] }}
-    >
+    <Svg width={9} height={12} viewBox="0 0 9 12">
       <Path
         d="M2 1.5 6.5 6 2 10.5"
         stroke={color}
