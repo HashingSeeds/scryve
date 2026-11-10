@@ -920,6 +920,9 @@ function NewGameForm({
           })
         return next
       })
+    setModeChoices((current) =>
+      Number(current.archenemy) > value ? { ...current, archenemy: "roll" } : current,
+    )
     setPlayerCount(value)
   }
 

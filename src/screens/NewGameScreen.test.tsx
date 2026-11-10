@@ -795,6 +795,19 @@ describe("NewGameScreen", () => {
     })
   })
 
+  it("rolls the archenemy again once its chosen seat is gone", () => {
+    const view = setup()
+    fireEvent.press(view.getByTestId("game-tab-mtg"))
+    fireEvent.press(view.getByTestId("game-type-archenemy"))
+    openOptions()
+    fireEvent.press(view.getByTestId("player-count-4"))
+    fireEvent.press(view.getByTestId("archenemy-seat"))
+    fireEvent.press(view.getByTestId("archenemy-seat-option-4"))
+    fireEvent.press(view.getByTestId("player-count-3"))
+    fireEvent.press(view.getByTestId("player-count-4"))
+    expect(view.getByTestId("archenemy-seat").props.accessibilityLabel).toContain("Roll at start")
+  })
+
   it("hosts Treachery with 4–6 seats and drops it once the seats no longer fit", () => {
     const host = jest.fn()
     const props = { mode: "connected" as const, connected: { ...readyHost, host } }
