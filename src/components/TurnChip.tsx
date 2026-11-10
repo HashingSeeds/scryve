@@ -7,6 +7,7 @@ import type { TurnChipState } from "@/features/game/dice"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
 import { BoardPressable } from "./BoardPressable"
@@ -19,6 +20,7 @@ import type {
 import { CONTENT_EDGES } from "./playerGridGeometry"
 import { MarkArt } from "./PlayerMark"
 import { contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
+import { PLAYER_MARK_MUTED_OPACITY } from "./SeatIdentity"
 import { Text } from "./Text"
 import { useTurnSpotlight } from "./TurnSpotlight"
 import { shapeForSeat } from "../../convex/lib/appearance"
@@ -167,11 +169,17 @@ export function TurnChip({
       {nextSeat && !outOfTime ? (
         <>
           <ChevronGlyph color={ink} />
-          <MarkArt
-            shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
-            color={nextSeat.color}
-            size={compact ? 18 : 20}
-          />
+          <View
+            style={[$nextSeat, compact && $compactNextSeat, { backgroundColor: nextSeat.color }]}
+          >
+            <View style={$nextMark}>
+              <MarkArt
+                shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
+                color={accessibleForeground(nextSeat.color)}
+                size={compact ? 16 : 18}
+              />
+            </View>
+          </View>
         </>
       ) : null}
     </>
@@ -297,6 +305,15 @@ const $filled: ViewStyle = {
   paddingHorizontal: 12,
   gap: 6,
 }
+const $nextSeat: ViewStyle = {
+  width: 26,
+  height: 26,
+  borderRadius: 7,
+  alignItems: "center",
+  justifyContent: "center",
+}
+const $compactNextSeat: ViewStyle = { width: 24, height: 24, borderRadius: 6 }
+const $nextMark: ViewStyle = { opacity: PLAYER_MARK_MUTED_OPACITY }
 const $filledPassive: ViewStyle = { opacity: 0.7 }
 const $passive: ViewStyle = { opacity: 0.7, borderStyle: "dashed" }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }
