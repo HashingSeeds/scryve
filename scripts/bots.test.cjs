@@ -1,7 +1,8 @@
+const { getFunctionName } = require("convex/server")
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { assertPreviewTarget, botIdentity, lobbyIdentifiers, parseCli } = require("./bots.cjs")
+const { assertPreviewTarget, Bot, botIdentity, lobbyIdentifiers, parseCli } = require("./bots.cjs")
 
 test("bots only run against the preview Convex returned, never production", () => {
   assert.doesNotThrow(() =>
@@ -82,8 +83,6 @@ test("cli takes --archenemy as the variant and checks its seat", () => {
 })
 
 test("a host bot abandons its leftover game of any variant before hosting again", async () => {
-  const { getFunctionName } = require("convex/server")
-  const { Bot } = require("./bots.cjs")
   const calls = []
   const bot = Object.create(Bot.prototype)
   Object.assign(bot, {
@@ -111,4 +110,24 @@ test("a host bot abandons its leftover game of any variant before hosting again"
     calls.filter(([name]) => name === "games:abandonGame").map(([, args]) => args),
     [{ publicId: "leftover-2hg-game" }],
   )
+})
+
+test("bots host and join as apps that edit any seat, so the table stays anyone-edit", async () => {
+  const sent = new Map()
+  const bot = Object.assign(Object.create(Bot.prototype), botIdentity(1), {
+    options: parseCli(["host"]),
+    report() {},
+    watch() {},
+    client: {
+      query: async () => ({ page: [] }),
+      mutation: async (fn, args) => {
+        sent.set(getFunctionName(fn), args)
+        return { publicId: "p", seat: 2 }
+      },
+    },
+  })
+  await bot.host()
+  await bot.join("AB12CD")
+  assert.equal(sent.get("games:createLobby").editsAnySeat, true)
+  assert.equal(sent.get("games:claimSeat").editsAnySeat, true)
 })
