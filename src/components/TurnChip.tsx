@@ -17,9 +17,11 @@ import type {
   LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { CONTENT_EDGES } from "./playerGridGeometry"
+import { MarkArt } from "./PlayerMark"
 import { contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
 import { Text } from "./Text"
 import { useTurnSpotlight } from "./TurnSpotlight"
+import { shapeForSeat } from "../../convex/lib/appearance"
 import { bankLeft, turnElapsed } from "../../convex/lib/turns"
 
 const TICK_MS = 1_000
@@ -134,6 +136,7 @@ export function TurnChip({
   const ink = outOfTime ? colors.board.text : foreground
   const name = state.nameOf(turn.playerId) ?? ""
   const nextName = next ? state.nameOf(next) : undefined
+  const nextSeat = next ? state.seatOf?.(next) : undefined
   const label = [
     translate("board:turn.label", { number: turn.number, name }),
     turn.waiting ? undefined : outOfTime ? translate("board:turn.outOfTime") : time,
@@ -161,7 +164,16 @@ export function TurnChip({
         weight="bold"
         style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
       />
-      {canPress && !outOfTime ? <ChevronGlyph color={ink} /> : null}
+      {nextSeat && !outOfTime ? (
+        <>
+          <ChevronGlyph color={ink} />
+          <MarkArt
+            shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
+            color={nextSeat.color}
+            size={compact ? 18 : 20}
+          />
+        </>
+      ) : null}
     </>
   ) : (
     <>

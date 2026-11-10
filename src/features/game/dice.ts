@@ -1,5 +1,6 @@
 import { translate } from "@/i18n/translate"
 
+import type { TurnSeat } from "./TurnDialog"
 import type { GamePlayer, PlayerId } from "./types"
 import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/lib/systems"
 import type { Turn } from "../../../convex/lib/turns"
@@ -56,6 +57,7 @@ export interface TurnChipState {
   turn: Turn
   canPress: boolean
   nameOf: (playerId: string) => string | undefined
+  seatOf?: (playerId: string) => TurnSeat | undefined
   onStart: () => void
   onPass: (nextPlayerId: string) => void
   onLongPress: () => void
