@@ -338,6 +338,27 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("planar-walk")).toBeTruthy()
   })
 
+  it("lets a seat other than the archenemy roll the planar die with Turns off", () => {
+    const initial = createLocalGame({
+      players: ["Ada", "Grace", "Katherine"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 20,
+      system: "mtg",
+      format: "constructed",
+      modeSetup: { archenemy: { seat: 1 }, planechase: {} },
+      now: 1,
+    })
+    const repository = turnsOff()
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("seat-bag-seat-3"))
+    fireEvent.press(view.getByTestId("bag-plane-seat-3"))
+    fireEvent.press(view.getByTestId("planar-dialog-die"))
+    const rolled = repository
+      .loadActiveGame()
+      ?.table?.modes?.log?.find(({ kind }) => kind === "rolled")
+    expect(rolled).toMatchObject({ playerId: initial.players[2]!.id })
+  })
+
   it("rolls the planar die for the teammate whose bag opened the plane", () => {
     const created = createLocalGame({
       players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),

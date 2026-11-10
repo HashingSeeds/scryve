@@ -479,7 +479,6 @@ export function applyTableAction(
   if (isModeAction(action)) {
     const modes = applyModeAction(table.modes, action, {
       turn: table.turn,
-      groups: table.turnGroups,
       now: context.now ?? Date.now(),
       operationId: context.operationId,
     })

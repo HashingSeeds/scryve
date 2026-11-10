@@ -9,7 +9,7 @@ import {
   type ModeAction,
   type TableModes,
 } from "./tableModes"
-import type { Turn, TurnGroups } from "./turns"
+import type { Turn } from "./turns"
 
 const turn = (playerId: string, number: number): Turn => ({
   playerId,
@@ -18,12 +18,10 @@ const turn = (playerId: string, number: number): Turn => ({
   operationId: `turn-${number}`,
 })
 const inOrder = () => 0
-const groups: TurnGroups = [["ada", "bo"], ["cy"]]
 
 function play(modes: TableModes | null, steps: [ModeAction, Turn | undefined][]) {
   return steps.reduce<TableModes | null>(
-    (current, [action, at]) =>
-      current && applyModeAction(current, action, { turn: at, groups, now: 1 }),
+    (current, [action, at]) => current && applyModeAction(current, action, { turn: at, now: 1 }),
     modes,
   )
 }
@@ -64,7 +62,7 @@ describe("Planechase", () => {
 
   it("names the change behind each log entry, so the game log places it by sequence", () => {
     const blank = { kind: "planar.rolled", playerId: "ada", face: "blank" } as const
-    const context = { turn: turn("ada", 1), groups, now: 1 }
+    const context = { turn: turn("ada", 1), now: 1 }
     const first = applyModeAction(modes!, blank, { ...context, operationId: "roll-1" })!
     const second = applyModeAction(first, blank, { ...context, operationId: "roll-2" })!
     expect(second.log?.map(({ operationId }) => operationId)).toEqual(["roll-1", "roll-2"])
@@ -83,16 +81,20 @@ describe("Planechase", () => {
     expect(play(rolled, [[blank, turn("ada", 3)]])!.log?.at(-1)?.cost).toBe(0)
   })
 
-  it("lets only the active team roll, each teammate with their own cost", () => {
+  it("lets any seat roll during another's turn, each with their own cost", () => {
     const at = turn("ada", 1)
-    expect(play(modes!, [[{ kind: "planar.rolled", playerId: "cy", face: "blank" }, at]])).toBe(
-      null,
-    )
-    const team = play(modes!, [
+    const rolled = play(modes!, [
       [{ kind: "planar.rolled", playerId: "ada", face: "blank" }, at],
       [{ kind: "planar.rolled", playerId: "bo", face: "blank" }, at],
+      [{ kind: "planar.rolled", playerId: "cy", face: "blank" }, at],
+      [{ kind: "planar.rolled", playerId: "cy", face: "blank" }, at],
     ])!
-    expect(team.log?.map((entry) => entry.cost)).toEqual([0, 0])
+    expect(rolled.log?.map(({ playerId, cost }) => [playerId, cost])).toEqual([
+      ["ada", 0],
+      ["bo", 0],
+      ["cy", 0],
+      ["cy", 1],
+    ])
   })
 
   it("resets by hand when turns are off", () => {

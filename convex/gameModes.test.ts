@@ -92,7 +92,7 @@ describe("Planechase and Archenemy games", () => {
     }
   })
 
-  it("syncs scheme reveals and planar rolls through Convex", async () => {
+  it("syncs scheme reveals and planar rolls through Convex, a roll from any seat its device holds", async () => {
     const { host, joiners } = await archenemyGame(3)
     const view = await host.query(api.games.lobbyProjection, {
       publicId,
@@ -110,21 +110,29 @@ describe("Planechase and Archenemy games", () => {
       ...write("operation-reveal-000001", "device-joiner-2"),
       action: { kind: "scheme.revealed", playerId: archenemyId },
     })
-    await expect(
-      host.mutation(api.games.tableAction, {
-        ...write("operation-roll-0000001", "device-host-0001"),
-        action: { kind: "planar.rolled", playerId: hostId, face: "chaos" },
-      }),
-    ).rejects.toThrow("no longer applies")
+    await host.mutation(api.games.tableAction, {
+      ...write("operation-roll-0000001", "device-host-0001"),
+      action: { kind: "planar.rolled", playerId: hostId, face: "chaos" },
+    })
     await joiners[0].mutation(api.games.tableAction, {
       ...write("operation-roll-0000002", "device-joiner-2"),
       action: { kind: "planar.rolled", playerId: archenemyId, face: "chaos" },
     })
+    await expect(
+      host.mutation(api.games.tableAction, {
+        ...write("operation-roll-0000003", "device-host-0001"),
+        action: { kind: "planar.rolled", playerId: archenemyId, face: "chaos" },
+      }),
+    ).rejects.toThrow("Seat-owner permission required")
     const after = await host.query(api.games.lobbyProjection, {
       publicId,
       tableVersion: TABLE_VERSION,
     })
-    expect(after.table?.modes?.log?.map((entry) => entry.kind)).toEqual(["revealed", "rolled"])
+    expect(after.table?.modes?.log?.map(({ kind, playerId }) => [kind, playerId])).toEqual([
+      ["revealed", archenemyId],
+      ["rolled", hostId],
+      ["rolled", archenemyId],
+    ])
     expect(after.table?.turn?.waiting).toBeUndefined()
   })
 

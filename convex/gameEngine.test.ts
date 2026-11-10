@@ -15,7 +15,7 @@ import { writeMemoryGame, type MemoryGame } from "./lib/gameEngineMemory"
 import { connectedLogEvent } from "./lib/gameLog"
 import { PLANAR_DECKS, SCHEME_DECKS } from "./lib/modeDecks"
 import { TABLE_VERSION, type TableAction } from "./lib/table"
-import { startModes } from "./lib/tableModes"
+import { CLIENT_VARIANTS, startModes, type ModeSetup } from "./lib/tableModes"
 
 const token = "t".repeat(43)
 const HOST_DEVICE = "device-host-0001"
@@ -27,7 +27,7 @@ type Outcome = { ok: true; ack: MemoryAck } | { ok: false; error: EngineError }
 
 async function parityGame(
   t: ConvexTestHarness,
-  setup: { system: string; format: string; startingLife: number },
+  setup: { system: string; format: string; startingLife: number; modeSetup?: ModeSetup },
 ) {
   const host = await signedIn(t, "parity-host", "Host")
   const created = await host.mutation(api.games.createLobby, {
@@ -42,6 +42,7 @@ async function parityGame(
     hostDisplayName: "Host",
     hostColor: "#7C3AED",
     deviceId: HOST_DEVICE,
+    ...(setup.modeSetup ? { modeSetup: setup.modeSetup } : {}),
   })
   const joiner = await signedIn(t, "parity-joiner", "Joiner")
   await joiner.mutation(api.games.claimSeat, {
@@ -49,6 +50,7 @@ async function parityGame(
     displayName: "Joiner",
     color: "#2563EB",
     deviceId: JOINER_DEVICE,
+    ...(setup.modeSetup ? { variants: [...CLIENT_VARIANTS] } : {}),
   })
   await host.mutation(api.games.startGame, { publicId: created.publicId })
   const { game, players } = await t.run(async (ctx) => {
@@ -263,6 +265,14 @@ async function parityGame(
     return memory.turn
   }
 
+  async function expectSameModeLog() {
+    const stored = await t.run(async (ctx) => (await ctx.db.get(game._id))?.modes)
+    const rows = (modes: typeof stored) =>
+      modes?.log?.map(({ kind, playerId, cost, face }) => ({ kind, playerId, cost, face }))
+    expect(rows(memory.modes)).toEqual(rows(stored))
+    return rows(memory.modes)
+  }
+
   const projectedTurn = async (tableVersion?: number) =>
     (
       await joiner.query(api.games.lobbyProjection, {
@@ -287,6 +297,7 @@ async function parityGame(
     end,
     expectSameState,
     expectSameTurn,
+    expectSameModeLog,
     projectedTurn,
   }
 }
@@ -553,6 +564,37 @@ describe("engine parity: tableAction", () => {
     })
     await game.write("host", table("table-after-end-001", poison))
     await game.expectSameState()
+  })
+})
+
+describe("engine parity: planar die", () => {
+  const table = (operationId: string, action: TableAction, deviceId?: string) =>
+    ({ kind: "table", action, ...sent(operationId, deviceId) }) as const
+
+  it("takes a roll from any seat its device holds during another seat's turn, never for a seat it doesn't", async () => {
+    const game = await parityGame(makeConvexTest(), { ...commander, modeSetup: { planechase: {} } })
+    const { hostSeat, joinerSeat } = game
+    await game.write(
+      "host",
+      table("turn-start-host-01", { kind: "turn.set", playerId: hostSeat, toPlayerId: hostSeat }),
+    )
+    const roll = (playerId: string) => ({ kind: "planar.rolled", playerId, face: "blank" }) as const
+    for (const operationId of ["planar-joiner-0001", "planar-joiner-0002"])
+      expect(
+        await game.write("joiner", table(operationId, roll(joinerSeat), JOINER_DEVICE)),
+      ).toMatchObject({ ok: true })
+    expect(
+      await game.write("joiner", table("planar-joiner-0003", roll(hostSeat), JOINER_DEVICE)),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "seat_owner_required" },
+    })
+    await game.write("host", table("planar-host-00001", roll(hostSeat)))
+    expect(await game.expectSameModeLog()).toEqual([
+      { kind: "rolled", playerId: joinerSeat, cost: 0, face: "blank" },
+      { kind: "rolled", playerId: joinerSeat, cost: 1, face: "blank" },
+      { kind: "rolled", playerId: hostSeat, cost: 0, face: "blank" },
+    ])
   })
 })
 

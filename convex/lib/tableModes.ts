@@ -2,7 +2,7 @@ import { v, type Infer } from "convex/values"
 
 import { PLANAR_DECKS, SCHEME_DECKS, type ModeCard } from "./modeDecks"
 import { systemDefinition } from "./systems"
-import { sharesTurn, type Turn, type TurnGroups } from "./turns"
+import type { Turn } from "./turns"
 
 // why: these follow Comprehensive Rules 901 (Planechase) and 904 (Archenemy); rule changes start there.
 
@@ -138,9 +138,6 @@ export function rollCost(planechase: Planechase, turn: Turn | undefined, playerI
   return turnRolls(planechase, turn)[playerId] ?? 0
 }
 
-export const mayRoll = (turn: Turn | undefined, groups: TurnGroups | undefined, playerId: string) =>
-  !turn || sharesTurn(groups, turn.playerId, playerId)
-
 export function shuffled<T>(items: readonly T[], random: () => number): T[] {
   const result = [...items]
   for (let index = result.length - 1; index > 0; index--) {
@@ -233,7 +230,6 @@ export function modeGameFields(started: StartedModes, now: number, operationId: 
 
 export interface ModeContext {
   turn?: Turn
-  groups?: TurnGroups
   now: number
   operationId?: string
 }
@@ -331,7 +327,6 @@ function appliedModeAction(
     const walked = walk(planechase)
     return logged({ ...modes, planechase: walked }, walkedEntry(walked, playerId, at))
   }
-  if (!mayRoll(context.turn, context.groups, playerId)) return null
   if (faceUpPlane(planechase)?.kind === "phenomenon") return null
   const cost = rollCost(planechase, context.turn, playerId)
   const counted = turnRolls(planechase, context.turn)

@@ -663,7 +663,6 @@ function applyLocalModeAction(
   const table = game.table ?? EMPTY_TABLE
   const modes = applyModeAction(table.modes, action, {
     turn: game.turn,
-    groups: game.turnGroups,
     now: context.now,
     operationId: context.operationId,
   })
