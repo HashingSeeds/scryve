@@ -1,5 +1,5 @@
 import { asPlayerId } from "@/features/game/domain"
-import { gameLog, withTurnDividers } from "@/features/game/LifeLog"
+import { counterLog, gameLog, withTurnDividers } from "@/features/game/LifeLog"
 
 import {
   connectedLogEvents,
@@ -366,5 +366,30 @@ describe("connected log", () => {
         },
       ],
     })
+  })
+
+  it("reads Speed and speed as one named counter, in a burst and in running values", () => {
+    const speed = (operationId: string, name: string, at: number) =>
+      ({
+        operationId,
+        playerId: "ada",
+        kind: "customCounter.changed",
+        delta: 1,
+        clientCreatedAt: at,
+        action: { kind: "customCounter.changed", playerId: "ada", name, delta: 1 },
+      }) satisfies ConnectedLogEvent
+    const events = [
+      speed("op-speed-000001", "speed", 1_000),
+      speed("op-speed-000002", "Speed", 2_000),
+      speed("op-speed-000003", "speed", 60_000),
+    ]
+    const table = { players: { ada: { customCounters: [{ name: "Speed", value: 3 }] } } }
+
+    const rows = counterLog(connectedLogInputs(events, GAME, undefined, table).counters)
+
+    expect(rows.map(({ delta, value, operationIds }) => ({ delta, value, operationIds }))).toEqual([
+      { delta: 1, value: 3, operationIds: ["op-speed-000003"] },
+      { delta: 2, value: 2, operationIds: ["op-speed-000002", "op-speed-000001"] },
+    ])
   })
 })

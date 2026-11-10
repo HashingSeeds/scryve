@@ -14,6 +14,7 @@ import type {
 } from "./types"
 import { api } from "../../../convex/_generated/api"
 import { CONNECTED_EVENT_PAGE_MAX_ITEMS } from "../../../convex/lib/pagination"
+import { sameLoggedCounters } from "../../../convex/lib/table"
 
 export interface LifeLogStep {
   id: string
@@ -125,8 +126,9 @@ export type GameCounterRow = Omit<CounterLogEntry, "operationId"> & {
 export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[] {
   const rows: GameCounterRow[] = []
   const bursts = new Map<string, { row: GameCounterRow; oldestAt: number }>()
+  const counterIdOf = sameLoggedCounters()
   for (const { operationId, ...entry } of [...entries].reverse()) {
-    const key = `${entry.playerId}\u0000${entry.counterId}`
+    const key = `${entry.playerId}\u0000${counterIdOf(entry.counterId)}`
     const burst = bursts.get(key)
     if (burst && Math.abs(burst.oldestAt - entry.at) <= LIFE_BURST_MS) {
       burst.row.delta += entry.delta

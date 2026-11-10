@@ -276,6 +276,17 @@ export function loggedCounterId(action: TableAction): string | undefined {
   return action.kind === "customCounter.changed" ? customCounterId(action.name) : undefined
 }
 
+export function sameLoggedCounters() {
+  const names: string[] = []
+  return (counterId: string) => {
+    const name = customCounterNameOf(counterId)
+    if (name === undefined) return counterId
+    const known = names.find((seen) => sameName(seen, name))
+    if (known === undefined) names.push(name)
+    return customCounterId(known ?? name)
+  }
+}
+
 export function loggedCounterValue(player: PlayerTable | undefined, counterId: string): number {
   const name = customCounterNameOf(counterId)
   if (name === undefined) return player?.counters?.[counterId] ?? 0
