@@ -1,3 +1,5 @@
+import type { ReactNode } from "react"
+
 import { translate } from "@/i18n/translate"
 
 import type { TurnSeat } from "./turnTab"
@@ -63,6 +65,7 @@ export interface TurnChipState {
   onStart: () => void
   onPass: (nextPlayerId: string) => void
   onLongPress: () => void
+  beside?: ReactNode
 }
 
 export type DiceSeatChip =

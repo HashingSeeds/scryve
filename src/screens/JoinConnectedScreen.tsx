@@ -15,7 +15,6 @@ import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
-import { PLAYABLE_VARIANTS } from "@/features/connected/playableVariants"
 import { connectedProfileName } from "@/features/connected/useConnectedProfile"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { hasLocalGameStarted, MAX_PLAYERS } from "@/features/game/domain"
@@ -32,6 +31,7 @@ import { emitTelemetry } from "@/utils/telemetry"
 import { InviteScannerScreen } from "./InviteScannerScreen"
 import { api } from "../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
+import { CLIENT_VARIANTS } from "../../convex/lib/tableModes"
 
 // why: the server refuses games in a system this build cannot play, rather than letting it render as another one.
 const PLAYABLE_SYSTEMS = [...PLAY_SYSTEM_IDS]
@@ -140,7 +140,7 @@ export function JoinConnectedScreen({
         token,
         manualCode: manualCode ?? undefined,
         systems: PLAYABLE_SYSTEMS,
-        variants: PLAYABLE_VARIANTS,
+        variants: [...CLIENT_VARIANTS],
         maxSeats: MAX_PLAYERS,
       })
       if ("invalid" in lookup) throw new Error(translate("connected:join.invalidInvite"))
@@ -162,7 +162,7 @@ export function JoinConnectedScreen({
         color: PLAYER_COLOR_CHOICES[0],
         deviceId,
         systems: PLAYABLE_SYSTEMS,
-        variants: PLAYABLE_VARIANTS,
+        variants: [...CLIENT_VARIANTS],
         editsAnySeat: true,
         maxSeats: MAX_PLAYERS,
       })

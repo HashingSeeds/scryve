@@ -5,6 +5,7 @@ import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
 import type { TableState } from "../../../convex/lib/table"
+import type { ModeSetup } from "../../../convex/lib/tableModes"
 import type { GameVariant } from "../../../convex/lib/treachery"
 import type { Turn } from "../../../convex/lib/turns"
 
@@ -130,8 +131,9 @@ export interface LocalGame {
   turn?: Turn
   turnLog?: TurnLogEntry[]
   turnGroups?: string[][]
-  variant?: GameVariant
   counterLog?: CounterLogEntry[]
+  modeSetup?: ModeSetup
+  variant?: GameVariant
   logOrder?: string[]
 }
 

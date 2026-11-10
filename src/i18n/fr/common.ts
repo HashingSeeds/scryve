@@ -62,6 +62,9 @@ export default {
       yourDeck: "Ouvre les choix de votre deck",
       system: "Ouvre les choix de système",
       list: "Ouvre les choix de la liste",
+      planechase: "Ouvre les choix de paquet planaire",
+      archenemy: "Ouvre les choix d'archennemi",
+      schemes: "Ouvre les choix de paquet de machinations",
     },
     closeLabel: {
       format: "Fermer les choix de format",
@@ -72,6 +75,9 @@ export default {
       yourDeck: "Fermer les choix de votre deck",
       system: "Fermer les choix de système",
       list: "Fermer les choix de la liste",
+      planechase: "Fermer les choix de paquet planaire",
+      archenemy: "Fermer les choix d'archennemi",
+      schemes: "Fermer les choix de paquet de machinations",
     },
   },
   valueField: {

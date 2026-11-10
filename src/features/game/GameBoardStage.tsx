@@ -13,6 +13,7 @@ import {
 } from "@/components/FirstPlayerTabs"
 import {
   ANCHOR_LOW_ON_SCREEN,
+  COMPACT_MENU_BUTTON_SIZE,
   GameMenuBackdrop,
   GameMenuCluster,
   GameRadialMenu,
@@ -25,11 +26,17 @@ import {
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
-import { getPlayerGridRows } from "@/components/playerGridGeometry"
+import {
+  getMenuSeamNeighbors,
+  getPlayerGridRows,
+  getPlayerSlotFacings,
+} from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
+import { headChipCrowded, teamRivets } from "@/components/teamGridGeometry"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
+import type { SeamRivet } from "@/features/modes/seamPlan"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
@@ -53,6 +60,7 @@ export interface GameBoardStageProps {
   firstPlayer?: FirstPlayerOffer
   roundClock?: BoardRoundClock
   turns?: BoardTurns
+  seam?: (geometry: BoardSeamGeometry) => ReactNode
   windowOverlay?: ReactNode
   toast?: ReactNode
   onBoardSizeChange?: (size: BoardSize) => void
@@ -71,6 +79,43 @@ export interface BoardTurns {
   nextOf: (clockwiseSlots: number[]) => string | undefined
 }
 
+export interface BoardSeamGeometry {
+  anchor: { x: number; y: number }
+  facings: readonly number[]
+  edgeTabs: boolean
+  sides: ReturnType<typeof getMenuSeamNeighbors>
+  width: number
+  menuSize: number
+  rivets: readonly SeamRivet[]
+  headCrowded?: (slot: number, head: 0 | 1) => boolean
+}
+
+function seamRivets(
+  teamBoard: boolean | undefined,
+  playerCount: number,
+  layout: Parameters<typeof teamRivets>[1],
+  board: { width: number; height: number },
+  anchor: { x: number; y: number },
+): SeamRivet[] {
+  if (!teamBoard) return []
+  return teamRivets(playerCount, layout, board, anchor).map(({ x, y, size }) => ({
+    x,
+    dy: y - anchor.y * board.height,
+    size,
+  }))
+}
+
+const seamHeads = (
+  teamBoard: boolean | undefined,
+  teamCount: number,
+  layout: Parameters<typeof headChipCrowded>[1],
+) =>
+  teamBoard
+    ? {
+        headCrowded: (slot: number, head: 0 | 1) => headChipCrowded(teamCount, layout, slot, head),
+      }
+    : {}
+
 export interface BoardSize {
   width: number
   height: number
@@ -87,6 +132,7 @@ function PinnedGameBoardStage({
   firstPlayer,
   roundClock,
   turns,
+  seam,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -127,6 +173,10 @@ function PinnedGameBoardStage({
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout)),
     [boardAnchor, playerCount, gridLayout],
   )
+  const facings = useMemo(
+    () => getPlayerSlotFacings(playerCount, gridLayout),
+    [playerCount, gridLayout],
+  )
   const holderAnchor = useMemo(
     () => boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle),
     [boardAnchor, width, height, holderAngle],
@@ -160,6 +210,24 @@ function PinnedGameBoardStage({
                 {renderGrid(boardOrientation)}
               </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
+            {seam && !menu.open
+              ? seam({
+                  anchor: boardAnchor,
+                  facings,
+                  edgeTabs: tabsShown,
+                  sides: getMenuSeamNeighbors(playerCount, gridLayout),
+                  width,
+                  menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+                  rivets: seamRivets(
+                    teamBoard,
+                    playerCount,
+                    gridLayout,
+                    { width, height },
+                    boardAnchor,
+                  ),
+                  ...seamHeads(teamBoard, playerCount, gridLayout),
+                })
+              : null}
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
             <GameMenuCluster
               open={menu.open}
@@ -198,6 +266,7 @@ function LegacyGameBoardStage({
   firstPlayer,
   roundClock,
   turns,
+  seam,
   windowOverlay,
   toast,
   onBoardSizeChange,
@@ -228,6 +297,10 @@ function LegacyGameBoardStage({
     () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
     [boardAnchor, playerCount, gridLayout, rotation],
   )
+  const facings = useMemo(
+    () => getPlayerSlotFacings(playerCount, gridLayout),
+    [playerCount, gridLayout],
+  )
   const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
 
@@ -243,6 +316,18 @@ function LegacyGameBoardStage({
           {renderGrid(boardOrientation)}
         </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
+      {seam && !menu.open && rotation === 0
+        ? seam({
+            anchor: boardAnchor,
+            facings,
+            edgeTabs: tabsShown,
+            sides: getMenuSeamNeighbors(playerCount, gridLayout),
+            width,
+            menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+            rivets: seamRivets(teamBoard, playerCount, gridLayout, { width, height }, boardAnchor),
+            ...seamHeads(teamBoard, playerCount, gridLayout),
+          })
+        : null}
       <GameRadialMenu
         {...menu}
         anchor={menuAnchor}

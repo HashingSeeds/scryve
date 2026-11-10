@@ -111,6 +111,7 @@ import {
   isValidTableSnapshot,
   remapTableState,
   seatTable,
+  TABLE_VERSION,
   TURN_TABLE_VERSION,
   tableActionIdentity,
   tableForVersion,
@@ -118,6 +119,17 @@ import {
   tableActionValidator,
   type TableState,
 } from "./lib/table"
+import {
+  ARCHENEMY_LIFE,
+  ARCHENEMY_MIN_SEATS,
+  isValidModeSetup,
+  modeSetupValidator,
+  PLANECHASE_CAPABILITY,
+  revealedModes,
+  modeGameFields,
+  startModes,
+  systemPlaysModeSetup,
+} from "./lib/tableModes"
 import {
   dealTreacheryRoles,
   gameVariantValidator,
@@ -313,11 +325,15 @@ function assertClientPlaysGame(
   const system = game.system ?? game.game
   if (
     (system === undefined || system === NO_GAME_SYSTEM || systems.includes(system)) &&
-    (game.variant === undefined || variants.includes(game.variant))
+    (game.variant === undefined || variants.includes(game.variant)) &&
+    (!usesPlanechase(game) || variants.includes(PLANECHASE_CAPABILITY))
   )
     return
   throw new ConvexError({ code: "update_required", message: "Update Scryve to join this game" })
 }
+
+const usesPlanechase = (game: Pick<Doc<"games">, "modes" | "modeSetup">) =>
+  Boolean(game.modes?.planechase ?? game.modeSetup?.planechase)
 
 /** why: clients from before `maxSeats` draw at most six seats, so a bigger game asks them to update. */
 function assertClientSeesSeats(game: Doc<"games">, { maxSeats }: { maxSeats?: number }) {
@@ -831,6 +847,7 @@ export const createLobby = mutation({
     system: v.optional(v.string()),
     format: v.optional(v.string()),
     variant: v.optional(gameVariantValidator),
+    modeSetup: v.optional(modeSetupValidator),
     layout: v.optional(playerGridLayoutValidator),
     editsAnySeat: v.optional(v.boolean()),
     inviteToken: v.string(),
@@ -859,6 +876,15 @@ export const createLobby = mutation({
       assertVariantSeats(args.variant, args.playerCount)
       if (args.variant === "treachery" && !args.deviceId) throw new Error(TREACHERY_DEVICE_MESSAGE)
     }
+    if (args.modeSetup) {
+      if (!systemPlaysModeSetup(gameSystem, args.modeSetup))
+        throw new Error("Planechase and Archenemy are for Magic")
+      if (
+        (args.modeSetup.archenemy !== undefined) !== (args.variant === "archenemy") ||
+        !isValidModeSetup(args.modeSetup, args.playerCount)
+      )
+        throw new Error("Invalid Planechase or Archenemy setup")
+    } else if (args.variant === "archenemy") throw new Error("Archenemy needs a setup")
     assertStartingLife(args.startingLife, startingValueRange(gameSystem))
     if (args.lifeStep !== undefined) {
       assertLifeDelta(args.lifeStep)
@@ -906,6 +932,7 @@ export const createLobby = mutation({
       system: gameSystem,
       ...(format ? { format } : {}),
       ...(args.variant ? { variant: args.variant } : {}),
+      ...(args.modeSetup ? { modeSetup: args.modeSetup } : {}),
       ...(args.layout ? { layout: args.layout } : {}),
       createdAt: now,
       updatedAt: now,
@@ -2009,6 +2036,7 @@ export const lobbyProjection = query({
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
       ...(game.variant ? { variant: game.variant } : {}),
+      ...(game.modeSetup ? { modeSetup: game.modeSetup } : {}),
       ...(game.layout ? { layout: game.layout } : {}),
       ...(game.lifeEditing === "anyone" ? { lifeEditing: game.lifeEditing } : {}),
       isHost,
@@ -2062,7 +2090,8 @@ export const lobbyProjection = query({
       ...(commanderDamage ? { commanderDamage } : {}),
       ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
       ...(hasTable(gameTableRules(game)) ||
-      ((game.turn || game.turnGroups) && (args.tableVersion ?? 1) >= TURN_TABLE_VERSION)
+      ((game.turn || game.turnGroups) && (args.tableVersion ?? 1) >= TURN_TABLE_VERSION) ||
+      (game.modes && (args.tableVersion ?? 1) >= TABLE_VERSION)
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
     }
@@ -2117,6 +2146,7 @@ function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): Tab
     players: Object.fromEntries(players.map((player) => [player._id, seatTable(player)])),
     ...(game.turn ? { turn: game.turn } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+    ...(game.modes ? { modes: revealedModes(game.modes) } : {}),
   }
 }
 
@@ -2352,6 +2382,8 @@ function assertVariantSeats(variant: GameVariant, playerCount: number) {
     throw new Error(TREACHERY_SEATS_MESSAGE)
   if (variant === TWO_HEADED_GIANT && !isTwoHeadedGiantPlayerCount(playerCount))
     throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
+  if (variant === "archenemy" && playerCount < ARCHENEMY_MIN_SEATS)
+    throw new Error("Archenemy needs at least 3 seats")
 }
 
 function rolesFor(game: Doc<"games">, playerCount: number) {
@@ -2395,11 +2427,16 @@ export const startGame = mutation({
     }
     const roles = rolesFor(game, players.length)
     const now = Date.now()
+    const started = startModes(
+      game.modeSetup,
+      [...players].sort((a, b) => a.seat - b.seat).map((player) => player._id),
+    )
     await ctx.db.patch(game._id, {
       status: "active",
       startedAt: now,
       updatedAt: now,
       ...lifeEditingFor(players),
+      ...modeGameFields(started, now, `archenemy_${game.publicId}`),
       ...(game.variant === TWO_HEADED_GIANT
         ? {
             turnGroups: pairedTeams(
@@ -2434,6 +2471,9 @@ export const startGame = mutation({
             ? await pinnedDeck(ctx, player.deckVersionId)
             : {}),
         ...(deckLife === undefined ? {} : { currentLife: deckLife, startingLife: deckLife }),
+        ...(started.archenemyId === player._id
+          ? { currentLife: ARCHENEMY_LIFE, startingLife: ARCHENEMY_LIFE }
+          : {}),
         ...roles?.[index],
       })
     }
@@ -2797,6 +2837,7 @@ async function startRematch(
     ...(finished.system === undefined ? {} : { system: finished.system }),
     ...(finished.format === undefined ? {} : { format: finished.format }),
     ...(finished.variant === undefined ? {} : { variant: finished.variant }),
+    ...(finished.modeSetup === undefined ? {} : { modeSetup: finished.modeSetup }),
     ...(finished.layout === undefined ? {} : { layout: finished.layout }),
     ...lifeEditingFor(players),
     rematchOfGameId: finished._id,
@@ -2848,6 +2889,23 @@ async function startRematch(
       ...roles?.[index],
     })
     seatIds.push(seatId)
+  }
+  if (finished.modeSetup) {
+    const archenemySeat = players.find(
+      (player) => player._id === finished.modes?.archenemy?.playerId,
+    )?.seat
+    const started = startModes(
+      finished.modeSetup.archenemy && archenemySeat !== undefined
+        ? {
+            ...finished.modeSetup,
+            archenemy: { ...finished.modeSetup.archenemy, seat: archenemySeat },
+          }
+        : finished.modeSetup,
+      seatIds,
+    )
+    await ctx.db.patch(gameId, {
+      ...modeGameFields(started, now, `archenemy_${request.publicId}`),
+    })
   }
   if (game.variant === TWO_HEADED_GIANT)
     await ctx.db.patch(gameId, { turnGroups: pairedTeams(seatIds) })

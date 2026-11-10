@@ -59,6 +59,11 @@ import type {
 } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { useLocalGame } from "@/features/game/useLocalGame"
+import { modeChipBeside } from "@/features/modes/modeChipBeside"
+import { modeLogRow } from "@/features/modes/modeLogRow"
+import { ModesDialog } from "@/features/modes/ModesDialog"
+import { bagWithPlane, modeSeamFor, teamSeat, type SeamSeat } from "@/features/modes/modeSeamFor"
+import { useBoardModes } from "@/features/modes/useBoardModes"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -346,6 +351,16 @@ export function CurrentGameScreen({
     undoTurn(passUndo.passerId, passUndo.operationId)
     setPassUndo(undefined)
   }
+  const boardModes = useBoardModes({
+    modes: runtime.game.table?.modes,
+    turn,
+    groups: turnGroups,
+    players: runtime.game.players,
+    controls: () => true,
+    act: runtime.tableRuntime.modeAction,
+    turnsOn,
+  })
+  const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -362,14 +377,34 @@ export function CurrentGameScreen({
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
+  const slotOf = (playerId: string): SeamSeat | undefined => {
+    if (teams) return teamSeat(teams, playerId)
+    const index = runtime.game.players.findIndex(({ id }) => id === playerId)
+    if (index < 0) return undefined
+    const slot = runtime.game.seatOrder?.indexOf(index)
+    return { slot: slot === undefined || slot < 0 ? index : slot }
+  }
 
   const claiming = !!firstPlayer || (turnsOn && !turn)
   const seatGrid = {
     ...dice.grid,
+    bag: bagWithPlane(dice.grid.bag, boardModes),
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
-        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+        return [
+          ...chips.filter(({ kind }) => kind === "roll"),
+          {
+            kind: "turn",
+            state: {
+              ...turnChip,
+              beside: modeChipBeside(boardModes, player.id, {
+                dieOnChip,
+                plays: () => true,
+              }),
+            },
+          },
+        ]
       if (passUndo && sharesTurn(turnGroups, passUndo.passerId, player.id))
         return [...chips, { kind: "undoPass", onUndo: undoPass }]
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]
@@ -469,6 +504,12 @@ export function CurrentGameScreen({
           turns={
             turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
           }
+          seam={modeSeamFor(boardModes, {
+            dieOnChip,
+            turnChips: turnsOn && !!turn,
+            slotOf,
+            teamBinding,
+          })}
           toast={
             saved ? (
               <GameToast
@@ -548,6 +589,7 @@ export function CurrentGameScreen({
         />
       ) : null}
 
+      <ModesDialog modes={boardModes} />
       {clockOpen && clock ? (
         <RoundClockDialog
           clock={clock}
@@ -602,8 +644,9 @@ export function CurrentGameScreen({
           events={events}
           turns={turnsEnabled ? runtime.game.turnLog : undefined}
           groups={turnGroups}
-          sharedLife={!!teams}
           counters={runtime.game.counterLog}
+          sharedLife={!!teams}
+          modes={boardModes.log.map(modeLogRow)}
           positionOf={localLogPositions(runtime.game)}
           canUndo={runtime.canUndo(turnsEnabled)}
           origin={chrome.dialogOrigin}

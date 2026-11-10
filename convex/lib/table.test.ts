@@ -142,7 +142,7 @@ describe("custom counters", () => {
     }
     expect(isValidTableSnapshot(duplicate, commander, seats)).toBe(false)
     expect(tableForVersion(table, 3).players.me).toEqual({})
-    expect(tableForVersion(table, 4)).toBe(table)
+    expect(tableForVersion(table, 4)).toEqual(table)
   })
 })
 

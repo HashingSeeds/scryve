@@ -49,6 +49,18 @@ import {
   type PlayerTable,
 } from "../../../convex/lib/table"
 import {
+  ARCHENEMY_LIFE,
+  CLIENT_VARIANTS,
+  isValidModeSetup,
+  modeSetupValidator,
+  PLANECHASE_CAPABILITY,
+  revealedModes,
+  modeGameFields,
+  startModes,
+  systemPlaysModeSetup,
+  type ModeSetup,
+} from "../../../convex/lib/tableModes"
+import {
   dealTreacheryRoles,
   isTreacheryPlayerCount,
   treacheryOutcome,
@@ -94,6 +106,7 @@ export interface LanSetup {
   format?: string
   layout?: PlayerGridLayoutVariant
   variant?: GameVariant
+  modeSetup?: ModeSetup
 }
 
 export interface LanSeatDeck {
@@ -151,7 +164,7 @@ export type LanGuestMessage =
       name: string
       pass?: LanSeatPass
       systems?: readonly PlaySystemId[]
-      variants?: readonly GameVariant[]
+      variants?: readonly string[]
       editsAnySeat?: boolean
       /** why: a guest sends the table it can parse, so a host leaves out a turn an older guest's strict parser would drop the whole table over. */
       tableVersion?: number
@@ -256,11 +269,12 @@ export function admitLanGuest(
 ): { game: LanGame; pass: LanSeatPass } | { rejected: string } {
   const { system } = game.setup
   const systems = join.systems ?? SYSTEMS_BEFORE_GUEST_LIST
-  const { variant } = game.setup
+  const { variant, modeSetup } = game.setup
   if (
     join.protocol !== LAN_PROTOCOL ||
     (system && !systems.includes(system)) ||
     (variant && !join.variants?.includes(variant)) ||
+    (modeSetup?.planechase && !join.variants?.includes(PLANECHASE_CAPABILITY)) ||
     !clientSeesSeats(game.setup.playerCount, join.maxSeats)
   )
     return { rejected: LAN_REJECTIONS.update }
@@ -375,6 +389,18 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
   const { setup } = game
   const { roles: _lastRound, ...rest } = game
   const roles = dealLanRoles(game, random)
+  const archenemySeat = game.seats.findIndex(
+    ({ key }) => key === game.memory?.modes?.archenemy?.playerId,
+  )
+  const modeSetup =
+    setup.modeSetup?.archenemy && archenemySeat >= 0
+      ? { ...setup.modeSetup, archenemy: { ...setup.modeSetup.archenemy, seat: archenemySeat + 1 } }
+      : setup.modeSetup
+  const started = startModes(
+    modeSetup,
+    game.seats.map((seat) => seat.key),
+    random,
+  )
   return {
     ...rest,
     ...(roles ? { roles } : {}),
@@ -393,6 +419,7 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
         : {}),
       ...(game.seats.every((seat) => seat.editsAnySeat) ? { lifeEditing: "anyone" as const } : {}),
       designations: {},
+      ...modeGameFields(started, now, `archenemy_${lanRoundId(game)}`),
       seats: new Map(
         game.seats.map((seat) => [
           seat.key,
@@ -400,9 +427,11 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
             id: seat.key,
             userId: seat.key,
             currentLife:
-              setup.variant === TWO_HEADED_GIANT
-                ? setup.startingLife
-                : startingLifeFor(setup, seat.deck),
+              started.archenemyId === seat.key
+                ? ARCHENEMY_LIFE
+                : setup.variant === TWO_HEADED_GIANT
+                  ? setup.startingLife
+                  : startingLifeFor(setup, seat.deck),
             eventCount: 0,
           },
         ]),
@@ -570,6 +599,7 @@ export function lanProjection(
     ruleset: setup.ruleset,
     ...(setup.layout ? { layout: setup.layout } : {}),
     ...(setup.variant ? { variant: setup.variant } : {}),
+    ...(setup.modeSetup ? { modeSetup: setup.modeSetup } : {}),
     isHost: viewerKey === game.hostKey,
     ...(memory?.lifeEditing === "anyone" ? { lifeEditing: "anyone" as const } : {}),
     eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
@@ -592,7 +622,9 @@ export function lanProjection(
     })),
     ...(commander ? { commanderDamage: commander } : {}),
     ...(memory &&
-    (hasTable(rules) || ((memory.turn || memory.turnGroups) && tableVersion >= TURN_TABLE_VERSION))
+    (hasTable(rules) ||
+      ((memory.turn || memory.turnGroups) && tableVersion >= TURN_TABLE_VERSION) ||
+      (memory.modes && tableVersion >= TABLE_VERSION))
       ? {
           table: tableForVersion(
             {
@@ -600,6 +632,7 @@ export function lanProjection(
               players: Object.fromEntries(seatsOf.map((seat) => [seat.id, playerTableOf(seat)])),
               ...(memory.turn ? { turn: memory.turn } : {}),
               ...(memory.turnGroups ? { turnGroups: memory.turnGroups } : {}),
+              ...(memory.modes ? { modes: revealedModes(memory.modes) } : {}),
             },
             tableVersion,
           ),
@@ -658,7 +691,17 @@ const isPass = (value: unknown): value is LanSeatPass =>
 
 export function parseLanSetup(value: unknown): LanSetup | null {
   if (!isRecord(value)) return null
-  const { playerCount, startingLife, lifeStep, ruleset, system, format, layout, variant } = value
+  const {
+    playerCount,
+    startingLife,
+    lifeStep,
+    ruleset,
+    system,
+    format,
+    layout,
+    variant,
+    modeSetup,
+  } = value
   if (
     !Number.isInteger(playerCount) ||
     (playerCount as number) < LAN_MIN_PLAYERS ||
@@ -684,15 +727,27 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     !playSystemFormats(system).some(({ id }) => id === format)
   )
     return null
+  const offered =
+    (variant === "treachery" ||
+      variant === "archenemy" ||
+      (variant === TWO_HEADED_GIANT && isTwoHeadedGiantPlayerCount(setup.playerCount))) &&
+    systemDefinition(system)?.variants.includes(variant)
+      ? variant
+      : undefined
+  const modes =
+    matchesValidator(modeSetupValidator, modeSetup) &&
+    systemPlaysModeSetup(system, modeSetup) &&
+    isValidModeSetup(modeSetup, setup.playerCount) &&
+    (modeSetup.archenemy !== undefined) === (offered === "archenemy")
+      ? modeSetup
+      : undefined
+  const kept = offered === "archenemy" && !modes ? undefined : offered
   return {
     ...setup,
     system,
     format,
-    ...((variant === "treachery" ||
-      (variant === TWO_HEADED_GIANT && isTwoHeadedGiantPlayerCount(setup.playerCount))) &&
-    systemDefinition(system)?.variants.includes(variant)
-      ? { variant }
-      : {}),
+    ...(kept ? { variant: kept } : {}),
+    ...(modes ? { modeSetup: modes } : {}),
   }
 }
 
@@ -786,7 +841,8 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(Array.isArray(value.variants)
         ? {
             variants: value.variants.filter(
-              (variant) => variant === "treachery" || variant === "twoHeadedGiant",
+              (variant): variant is string =>
+                typeof variant === "string" && CLIENT_VARIANTS.includes(variant),
             ),
           }
         : {}),

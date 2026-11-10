@@ -42,6 +42,7 @@ export interface LifeCardDice {
 export interface SeatDiceBag {
   tools: readonly DiceTool[]
   rollFor: (tool: DiceTool) => void
+  openPlane?: () => void
 }
 
 export function diceCoversSeat(dice: LifeCardDice | undefined): boolean {

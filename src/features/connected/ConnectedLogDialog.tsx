@@ -4,6 +4,7 @@ import { usePaginatedQuery } from "convex/react"
 import type { DialogOrigin } from "@/components/DialogCard"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { GameLogDialog } from "@/features/game/GameLogDialog"
+import type { GameModeRow } from "@/features/game/LifeLog"
 import type { GamePlayer } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 
@@ -73,6 +74,7 @@ export function ConnectedLogDialog({
   groups,
   sharedLife,
   counterTable,
+  modes,
   turnsShown,
   anyoneEdits,
   origin,
@@ -86,6 +88,7 @@ export function ConnectedLogDialog({
   groups?: TurnGroups
   sharedLife?: boolean
   counterTable?: CounterTable
+  modes?: readonly GameModeRow[]
   turnsShown: boolean
   anyoneEdits?: boolean
   origin?: DialogOrigin
@@ -103,6 +106,7 @@ export function ConnectedLogDialog({
           groups={groups}
           sharedLife={sharedLife}
           counterTable={counterTable}
+          modes={modes}
           turnsShown={turnsShown}
           anyoneEdits={anyoneEdits}
           origin={origin}
@@ -122,6 +126,7 @@ function ConnectedLog({
   groups,
   sharedLife,
   counterTable,
+  modes,
   turnsShown,
   anyoneEdits,
   origin,
@@ -156,6 +161,7 @@ function ConnectedLog({
       groups={groups}
       sharedLife={sharedLife}
       counters={inputs.counters}
+      modes={modes}
       canUndo={undo !== undefined}
       undoLabel={translate("board:log.undoMine")}
       origin={origin}

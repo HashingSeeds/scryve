@@ -293,11 +293,18 @@ describe("LocalGameRepository", () => {
       value: 1,
       at: 3,
     }
+    const mode = {
+      kind: "rolled" as const,
+      playerId: game.players[0].id,
+      at: 4,
+      operationId: "mode-operation-000001",
+    }
     game = {
       ...game,
       turnLog: [turn],
       counterLog: [counter],
-      logOrder: [...(game.logOrder ?? []), turn.operationId, counter.operationId],
+      table: { designations: {}, players: {}, modes: { log: [mode] } },
+      logOrder: [...(game.logOrder ?? []), turn.operationId, counter.operationId, mode.operationId],
     }
     for (let index = 0; index < MAX_ACTIVE_EVENTS; index += 1) game = tap(game)
     repository.saveActiveGame(game)
@@ -307,7 +314,7 @@ describe("LocalGameRepository", () => {
     expect(reopened?.events.length).toBeLessThan(game.events.length)
     expect(reopened?.logOrder).toEqual(
       game.logOrder?.filter(
-        (id) => kept.has(id) || id === turn.operationId || id === counter.operationId,
+        (id) => kept.has(id) || [turn, counter, mode].some(({ operationId }) => operationId === id),
       ),
     )
   })

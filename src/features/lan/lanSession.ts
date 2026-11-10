@@ -5,7 +5,6 @@ import type { Service } from "react-native-zeroconf"
 
 import type { ConnectedProjection, PendingLifeAction } from "@/features/connected/model"
 import type { ConnectedGameResult } from "@/features/connected/OutboxSyncController"
-import { PLAYABLE_VARIANTS } from "@/features/connected/playableVariants"
 import {
   SyncLatency,
   type PeerLatency,
@@ -64,6 +63,7 @@ import { nearbyCodeFor, nearbyServiceName } from "./nearbyCode"
 import type { MemoryGame } from "../../../convex/lib/gameEngineMemory"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import { TABLE_VERSION } from "../../../convex/lib/table"
+import { CLIENT_VARIANTS } from "../../../convex/lib/tableModes"
 
 const RECONNECT_DELAY_MS = 1_500
 // why: a guest whose host is gone for good must stop retrying and say so instead of spinning forever.
@@ -594,7 +594,7 @@ export class LanSession {
       protocol: LAN_PROTOCOL,
       name: playerName(),
       systems: PLAY_SYSTEM_IDS,
-      variants: PLAYABLE_VARIANTS,
+      variants: CLIENT_VARIANTS,
       editsAnySeat: true,
       tableVersion: TABLE_VERSION,
       maxSeats: LAN_MAX_SEATS,

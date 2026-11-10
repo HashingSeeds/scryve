@@ -1,0 +1,191 @@
+import type { SeamNeighbor, SeamSide } from "@/components/playerGridGeometry"
+
+export type SeamItem = "plane" | "scheme" | "schemeDue" | "die"
+type Side = "left" | "right"
+
+const GLYPH_HALF = 25
+const GAP = 2
+export const PLATE_HEIGHT = 34
+export const ICON_WIDTH = 30
+export const FULL_PLATE_WIDTH = 96
+const SEAM_GUTTER = 4
+
+export interface SeamRoom {
+  width: number
+  shift: number
+  rotation: 0 | 180
+  start: number
+  direction: 1 | -1
+  inActiveCard: boolean
+}
+
+export interface SeamGeometry {
+  sides: { left: SeamSide; right: SeamSide }
+  facings: readonly number[]
+  anchorX: number
+  width: number
+  menuSize: number
+  edge: number
+  rivets?: readonly SeamRivet[]
+}
+
+export interface SeamRivet {
+  x: number
+  dy: number
+  size: number
+}
+
+const across = (facing: number | undefined) => facing === 0 || facing === 180
+
+const chipSideOf = (facing: number): Side => (facing === 180 ? "left" : "right")
+
+const inCard = PLATE_HEIGHT / 2 + SEAM_GUTTER / 2 + GAP
+
+/** why: plates may only sit where the turn chip, the + and − glyphs, the life total, and the name row with its counter chips never are, so moving any of those moves these bounds. */
+export function seamRoom(
+  geometry: SeamGeometry,
+  side: Side,
+  busySlots: ReadonlySet<number>,
+): SeamRoom | undefined {
+  const { sides, facings, anchorX, width, menuSize, edge } = geometry
+  const { upper, lower } = sides[side]
+  const direction = side === "left" ? -1 : 1
+  const start = anchorX * width + direction * (menuSize / 2 + GAP)
+  const facingOf = (neighbor: SeamNeighbor | undefined) =>
+    neighbor === undefined ? undefined : facings[neighbor.slot]
+  const usable = (neighbor: SeamNeighbor | undefined) => {
+    const facing = facingOf(neighbor)
+    return (
+      neighbor !== undefined &&
+      facing !== undefined &&
+      across(facing) &&
+      !(busySlots.has(neighbor.slot) && chipSideOf(facing) === side)
+    )
+  }
+  const room = (
+    limit: number,
+    shift: number,
+    rotation: 0 | 180,
+    host?: SeamNeighbor,
+  ): SeamRoom | undefined => {
+    const run = (limit - start) * direction
+    const inActiveCard = host !== undefined && busySlots.has(host.slot)
+    return run > 0
+      ? clearOfRivets(
+          { width: run, shift, rotation, start, direction, inActiveCard },
+          geometry.rivets ?? [],
+        )
+      : undefined
+  }
+  const outer = (neighbor: SeamNeighbor) =>
+    (side === "left" ? neighbor.leftFraction : neighbor.rightFraction) * width - direction * edge
+  const hosts = [upper, lower]
+    .filter(usable)
+    .sort((a, b) => Number(busySlots.has(b!.slot)) - Number(busySlots.has(a!.slot)))
+  const host = hosts[0]
+  if (host)
+    return room(
+      outer(host),
+      host === upper ? -inCard : inCard,
+      facingOf(host) === 180 ? 180 : 0,
+      host,
+    )
+
+  const sideways = [upper, lower].filter(
+    (neighbor): neighbor is SeamNeighbor => neighbor !== undefined && !across(facingOf(neighbor)),
+  )
+  if (sideways.length === 0) return undefined
+  const glyphs = sideways.map(
+    (neighbor) =>
+      ((neighbor.leftFraction + neighbor.rightFraction) / 2) * width -
+      direction * (GLYPH_HALF + GAP),
+  )
+  const limit = side === "left" ? Math.max(...glyphs) : Math.min(...glyphs)
+  const shift = sideways.length === 2 ? 0 : sideways[0] === upper ? -inCard : inCard
+  return room(limit, shift, 0)
+}
+
+function clearOfRivets(room: SeamRoom, rivets: readonly SeamRivet[]): SeamRoom | undefined {
+  let clear = room
+  for (const { x, dy, size } of rivets) {
+    const reach = size / 2 + GAP
+    const end = clear.start + clear.direction * clear.width
+    const touchesRun =
+      x + reach > Math.min(clear.start, end) && x - reach < Math.max(clear.start, end)
+    if (!touchesRun || Math.abs(clear.shift - dy) >= PLATE_HEIGHT / 2 + reach) continue
+    if (clear.shift !== 0) {
+      clear = {
+        ...clear,
+        shift:
+          dy + (Math.sign(clear.shift - dy) || Math.sign(clear.shift)) * (PLATE_HEIGHT / 2 + reach),
+      }
+      continue
+    }
+    const before = (x - clear.direction * reach - clear.start) * clear.direction
+    const after = clear.width - (x + clear.direction * reach - clear.start) * clear.direction
+    clear =
+      before >= after
+        ? { ...clear, width: before }
+        : { ...clear, start: x + clear.direction * reach, width: after }
+  }
+  return clear.width > 0 ? clear : undefined
+}
+
+export const minWidth = (item: SeamItem) => (item === "schemeDue" ? FULL_PLATE_WIDTH : ICON_WIDTH)
+
+export interface SeamSlot {
+  room: SeamRoom
+  items: SeamItem[]
+}
+
+export function planSeam(
+  rooms: { left?: SeamRoom; right?: SeamRoom },
+  items: readonly SeamItem[],
+): { left?: SeamSlot; right?: SeamSlot } {
+  const fits = (room: SeamRoom | undefined, placed: readonly SeamItem[]) =>
+    room !== undefined &&
+    placed.reduce((total, item) => total + minWidth(item) + GAP, -GAP) <= room.width
+  const dieSide: Side = rooms.left?.inActiveCard && !rooms.right?.inActiveCard ? "left" : "right"
+  const sideOf = (item: SeamItem): Side =>
+    item === "die" || item === "schemeDue"
+      ? dieSide
+      : item === "plane" && items.includes("die") && dieSide === "left"
+        ? "right"
+        : item === "plane"
+          ? "left"
+          : "right"
+  const left = items.filter((item) => sideOf(item) === "left")
+  const right = items.filter((item) => sideOf(item) === "right")
+  if (!fits(rooms.left, left) || !fits(rooms.right, right)) {
+    if (items.includes("die"))
+      return planSeam(
+        rooms,
+        items.filter((item) => item !== "die"),
+      )
+    const roomier = (rooms.left?.width ?? 0) >= (rooms.right?.width ?? 0) ? "left" : "right"
+    const room = rooms[roomier]
+    const kept = items.filter((_, index) => fits(room, items.slice(0, index + 1)))
+    return room && kept.length > 0 ? { [roomier]: { room, items: kept } } : {}
+  }
+  return {
+    ...(rooms.left && left.length ? { left: { room: rooms.left, items: left } } : {}),
+    ...(rooms.right && right.length ? { right: { room: rooms.right, items: right } } : {}),
+  }
+}
+
+/** why: an active card facing across the seam has the pentagon centered on its edge, so its turn chip drops what rides beside it (LifeCard's modeBeside) and the seam carries it. */
+export function chipCrowdedBySeam(
+  geometry: Pick<SeamGeometry, "sides" | "facings">,
+  busySlots: ReadonlySet<number>,
+) {
+  const neighbors = [geometry.sides.left, geometry.sides.right].flatMap(({ upper, lower }) => [
+    upper,
+    lower,
+  ])
+  return neighbors.some(
+    (neighbor) =>
+      neighbor !== undefined &&
+      busySlots.has(neighbor.slot) &&
+      across(geometry.facings[neighbor.slot]),
+  )
+}

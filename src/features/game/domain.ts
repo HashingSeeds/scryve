@@ -74,6 +74,17 @@ import {
   type TableState,
 } from "../../../convex/lib/table"
 import {
+  applyModeAction,
+  ARCHENEMY_LIFE,
+  isModeAction,
+  isValidModeSetup,
+  modeGameFields,
+  startModes,
+  systemPlaysModeSetup,
+  type ModeAction,
+  type ModeSetup,
+} from "../../../convex/lib/tableModes"
+import {
   applyTurnAction,
   isTurnAction,
   startedByChange,
@@ -173,6 +184,7 @@ export function createLocalGame(input: {
   account?: Omit<LocalGameAccount, "mePlayerId"> & { meSeat?: number }
   match?: { bestOf: MatchBestOf }
   clock?: RoundClockSetup
+  modeSetup?: ModeSetup
   teams?: readonly (readonly number[])[]
 }): LocalGame {
   const system = isPlaySystemId(input.system) ? input.system : undefined
@@ -200,7 +212,7 @@ export function createLocalGame(input: {
     throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
   const now = input.now ?? Date.now()
   const id = input.gameId ?? asGameId(createClientId("game", now))
-  const players: GamePlayer[] = input.players.map((player, seat) => ({
+  const created: GamePlayer[] = input.players.map((player, seat) => ({
     id: asPlayerId(createClientId("player", now + seat)),
     name: validatedNames.names[seat],
     color: player.color || PLAYER_COLORS[seat],
@@ -211,6 +223,22 @@ export function createLocalGame(input: {
       ? { startingLife: player.startingLife }
       : {}),
   }))
+  const modeSetup =
+    input.modeSetup &&
+    systemPlaysModeSetup(system, input.modeSetup) &&
+    isValidModeSetup(input.modeSetup, created.length)
+      ? input.modeSetup
+      : undefined
+  const started = startModes(
+    modeSetup,
+    created.map(({ id: playerId }) => playerId),
+  )
+  const players = created.map((player) =>
+    player.id === started.archenemyId
+      ? { ...player, life: ARCHENEMY_LIFE, startingLife: ARCHENEMY_LIFE }
+      : player,
+  )
+  const { modes, ...turnFields } = modeGameFields(started, now, createClientId("operation", now))
 
   return {
     schemaVersion: 1,
@@ -233,6 +261,12 @@ export function createLocalGame(input: {
       : {}),
     ...(input.match ? { match: newMatch(input.match.bestOf, players.length, now) } : {}),
     ...(isRoundClockSetup(input.clock) ? { clock: startRoundClock(input.clock, now) } : {}),
+    ...(modeSetup ? { modeSetup } : {}),
+    ...(modes ? { table: { ...EMPTY_TABLE, modes } } : {}),
+    ...turnFields,
+    ...(started.archenemyId
+      ? { firstPlayerId: asPlayerId(started.archenemyId), firstPlayerOffered: true as const }
+      : {}),
     ...teamsFor(players, input.teams),
   }
 }
@@ -410,8 +444,17 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
     ...(game.account ? { account: { ...game.account, meSeat: meSeatOf(game) } } : {}),
     ...(game.match ? { match: { bestOf: game.match.bestOf } } : {}),
     ...(game.clock ? { clock: game.clock.setup } : {}),
+    ...(game.modeSetup ? { modeSetup: rematchModeSetup(game, game.modeSetup) } : {}),
     ...(localTeams(game) ? { teams: teamSeats(game) } : {}),
   })
+}
+
+function rematchModeSetup(game: LocalGame, setup: ModeSetup): ModeSetup {
+  const archenemyId = game.table?.modes?.archenemy?.playerId
+  const seat = game.players.findIndex(({ id }) => id === archenemyId)
+  return setup.archenemy && seat >= 0
+    ? { ...setup, archenemy: { ...setup.archenemy, seat: seat + 1 } }
+    : setup
 }
 
 export const teamSeats = (game: Pick<LocalGame, "players" | "variant" | "turnGroups">) =>
@@ -555,7 +598,9 @@ export function applyLocalTableAction(
     })
     return turn === null ? game : withLogged(withTurn(game, turn, context.now), context.operationId)
   }
-  const applied = applyBoardTableAction(game, action, context)
+  const applied = isModeAction(action)
+    ? applyLocalModeAction(game, action, context)
+    : applyBoardTableAction(game, action, context)
   return applied === game
     ? game
     : withLogged(startTurnOnChange(applied, context.now), context.operationId)
@@ -567,13 +612,14 @@ function withLogged(game: LocalGame, operationId: string): LocalGame {
 }
 
 export function retainedLogOrder(
-  game: Pick<LocalGame, "logOrder" | "events" | "turnLog" | "counterLog">,
+  game: Pick<LocalGame, "logOrder" | "events" | "turnLog" | "counterLog" | "table">,
 ) {
-  const retained = new Set(
-    [...game.events, ...(game.turnLog ?? []), ...(game.counterLog ?? [])].map(
+  const retained = new Set([
+    ...[...game.events, ...(game.turnLog ?? []), ...(game.counterLog ?? [])].map(
       ({ operationId }) => operationId,
     ),
-  )
+    ...(game.table?.modes?.log ?? []).flatMap(({ operationId }) => operationId ?? []),
+  ])
   return (game.logOrder ?? []).filter((id) => retained.has(id))
 }
 
@@ -607,6 +653,25 @@ export function localLogPositions(
     positions.set(operationId, after + (index + 1) / (unlogged.length + 1)),
   )
   return (operationId) => positions.get(operationId)
+}
+
+function applyLocalModeAction(
+  game: LocalGame,
+  action: ModeAction,
+  context: { operationId: string; now: number },
+): LocalGame {
+  const table = game.table ?? EMPTY_TABLE
+  const modes = applyModeAction(table.modes, action, {
+    turn: game.turn,
+    now: context.now,
+    operationId: context.operationId,
+  })
+  if (!modes || modes === table.modes) return game
+  return {
+    ...game,
+    table: { ...table, modes },
+    updatedAt: Math.max(game.updatedAt, context.now),
+  }
 }
 
 export function startTurnOnChange(game: LocalGame, now: number): LocalGame {

@@ -145,6 +145,7 @@ export type SystemDefinition = {
   readonly formats: readonly FormatDefinition[]
   readonly table: TableDefinition
   readonly variants: readonly GameVariant[]
+  readonly planechase?: true
   readonly firstPlayer: FirstPlayerDefinition
   readonly roundClock: RoundClockDefinition
   readonly deckAnalysis: boolean
@@ -312,7 +313,8 @@ export const SYSTEMS = {
       ],
       customCounters: true,
     },
-    variants: ["treachery", "twoHeadedGiant"],
+    variants: ["treachery", "archenemy", "twoHeadedGiant"],
+    planechase: true,
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },
     deckAnalysis: true,

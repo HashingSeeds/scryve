@@ -18,7 +18,15 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { counterLog, gameLog, mergedLog, withTurnDividers, type GameLogItem } from "./LifeLog"
+import {
+  counterLog,
+  gameLog,
+  mergedLog,
+  withModeRows,
+  withTurnDividers,
+  type GameLogItem,
+  type GameModeRow,
+} from "./LifeLog"
 import { tableItemLabel } from "./playSystems"
 import { teamName } from "./teams"
 import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "./types"
@@ -30,8 +38,9 @@ export function GameLogDialog({
   events,
   turns,
   groups,
-  sharedLife = false,
   counters,
+  sharedLife = false,
+  modes,
   canUndo,
   undoLabel = translate("board:log.undoLast"),
   origin,
@@ -44,8 +53,9 @@ export function GameLogDialog({
   events: readonly GameEvent[]
   turns?: readonly TurnLogEntry[]
   groups?: TurnGroups
-  sharedLife?: boolean
   counters?: readonly CounterLogEntry[]
+  sharedLife?: boolean
+  modes?: readonly GameModeRow[]
   canUndo: boolean
   undoLabel?: string
   origin?: DialogOrigin
@@ -61,15 +71,19 @@ export function GameLogDialog({
   const rows = useMemo(
     () =>
       withTurnDividers(
-        mergedLog(
-          gameLog(players, events, sharedLife ? groups : undefined),
-          counterLog(counters ?? []),
+        withModeRows(
+          mergedLog(
+            gameLog(players, events, sharedLife ? groups : undefined),
+            counterLog(counters ?? []),
+            positionOf,
+          ),
+          modes ?? [],
           positionOf,
         ),
         turns ?? [],
         positionOf,
       ),
-    [players, events, turns, groups, sharedLife, counters, positionOf],
+    [players, events, turns, counters, groups, sharedLife, modes, positionOf],
   )
   const shownRows = useRef<number | undefined>(undefined)
   const readOn = useEffectEvent(() => {
@@ -115,6 +129,29 @@ export function GameLogDialog({
             size="xxs"
             style={{ color: colors.textDim }}
           />
+        </View>
+      )
+    }
+    if (item.kind === "mode") {
+      const seat = seats.get(item.playerId)
+      return (
+        <View testID={`game-log-mode-${item.id}`} accessible style={themed($row)}>
+          {seat ? (
+            <PlayerMark
+              seatNumber={seat.seatNumber}
+              color={seat.color}
+              shape={seat.shape}
+              size={MARK}
+            />
+          ) : null}
+          <View style={$lines}>
+            <Text text={item.text} weight="medium" numberOfLines={2} />
+            <Text
+              text={relativeTime(item.at, openedAt)}
+              size="xxs"
+              style={{ color: colors.textDim }}
+            />
+          </View>
         </View>
       )
     }
@@ -262,7 +299,9 @@ export function GameLogDialog({
               ? `turn:${item.operationId}`
               : item.kind === "counter"
                 ? `counter:${item.id}`
-                : item.id
+                : item.kind === "mode"
+                  ? `mode:${item.id}`
+                  : item.id
           }
           renderItem={renderRow}
           onEndReached={onMore}

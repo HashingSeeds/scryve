@@ -62,6 +62,9 @@ export default {
       yourDeck: "自分のデッキの選択肢を開きます",
       system: "システムの選択肢を開きます",
       list: "選択肢の一覧を開く",
+      planechase: "プレインチェイスのデッキの選択肢を開きます",
+      archenemy: "アーチエネミーの選択肢を開きます",
+      schemes: "スキームデッキの選択肢を開きます",
     },
     closeLabel: {
       format: "フォーマットの選択肢を閉じる",
@@ -72,6 +75,9 @@ export default {
       yourDeck: "自分のデッキの選択肢を閉じる",
       system: "システムの選択肢を閉じる",
       list: "選択肢の一覧を閉じる",
+      planechase: "プレインチェイスのデッキの選択肢を閉じる",
+      archenemy: "アーチエネミーの選択肢を閉じる",
+      schemes: "スキームデッキの選択肢を閉じる",
     },
   },
   valueField: {

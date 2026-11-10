@@ -12,6 +12,7 @@ import {
   type TableAction,
   type TableState,
 } from "../../../convex/lib/table"
+import type { ModeAction } from "../../../convex/lib/tableModes"
 
 export type TableKnockout = PokemonKnockout & { playerId: string }
 
@@ -48,6 +49,7 @@ export interface TableActions {
   undoTurn: (playerId: string, turnOperationId: string) => string | null
   setBank: (playerId: string, bankMs: number | undefined) => string | null
   startTurn: (playerId: string) => string | null
+  modeAction: (action: ModeAction) => boolean
 }
 
 export interface TableRuntime extends TableActions {
@@ -153,6 +155,7 @@ export function createTableActions(
     undoTurn: (playerId, turnOperationId) =>
       run({ kind: "turn.undone", playerId, turnOperationId })?.operationId ?? null,
     startTurn: (playerId) => run({ kind: "turn.started", playerId })?.operationId ?? null,
+    modeAction: (action) => run(action) !== null,
     setBank: (playerId, bankMs) =>
       run({ kind: "turn.clock", playerId, ...(bankMs === undefined ? {} : { bankMs }) })
         ?.operationId ?? null,

@@ -95,6 +95,11 @@ import { PASS_UNDO_MS } from "@/features/game/turnTab"
 import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
+import { modeChipBeside } from "@/features/modes/modeChipBeside"
+import { modeLogRow } from "@/features/modes/modeLogRow"
+import { ModesDialog } from "@/features/modes/ModesDialog"
+import { bagWithPlane, modeSeamFor, teamSeat } from "@/features/modes/modeSeamFor"
+import { useBoardModes } from "@/features/modes/useBoardModes"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -519,6 +524,7 @@ export function ConnectedBoardWithRuntime({
     undoTurn,
     setBank,
     startTurn,
+    modeAction,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -541,6 +547,7 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      modeAction,
     }),
     [
       tableState,
@@ -562,6 +569,7 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      modeAction,
     ],
   )
   const latest = useRef(runtime)
@@ -1054,6 +1062,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     setPassUndo({ operationId, passerId: actingSeat })
   }
   const turnsOn = tabOn && active && table !== undefined
+  const boardModes = useBoardModes({
+    modes: active ? table?.table.modes : undefined,
+    turn: table?.table.turn,
+    groups: turnGroups,
+    players: turnSeats.map(({ playerId, name }) => ({ id: playerId, name })),
+    controls: (playerId) => controlled.has(playerId),
+    act: (action) => table?.modeAction(action) ?? false,
+    turnsOn,
+  })
+  const dieOnChip = turnsOn && !!turn && !!boardModes.planar
   const turnChip: TurnChipState | undefined =
     turnsOn && turn
       ? {
@@ -1072,10 +1090,23 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       : undefined
   const seatGrid = {
     ...dice.grid,
+    bag: bagWithPlane(dice.grid.bag, boardModes),
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
-        return [...chips.filter(({ kind }) => kind === "roll"), { kind: "turn", state: turnChip }]
+        return [
+          ...chips.filter(({ kind }) => kind === "roll"),
+          {
+            kind: "turn",
+            state: {
+              ...turnChip,
+              beside: modeChipBeside(boardModes, player.id, {
+                dieOnChip,
+                plays: (seat) => controlled.has(seat),
+              }),
+            },
+          },
+        ]
       if (passUndo && sharesTurn(turnGroups, passUndo.passerId, player.id))
         return [
           ...chips,
@@ -1151,6 +1182,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf: nextPlayerId }
             : undefined
         }
+        seam={modeSeamFor(boardModes, {
+          dieOnChip,
+          turnChips: turnsOn && !!turn,
+          slotOf: (playerId) => {
+            if (teams) return teamSeat(teams, playerId)
+            const slot = players.findIndex(({ id }) => id === playerId)
+            return slot < 0 ? undefined : { slot }
+          },
+          teamBinding,
+        })}
         renderGrid={(boardOrientation) => (
           <ConnectedLifeGrid
             boardOrientation={boardOrientation}
@@ -1240,6 +1281,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turn={table?.table.turn}
           groups={turnGroups}
           sharedLife={game.variant === TWO_HEADED_GIANT}
+          modes={boardModes.log.map(modeLogRow)}
           counterTable={counterTable}
           turnsShown={tabOn}
           anyoneEdits={anySeat}
@@ -1432,6 +1474,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
+      <ModesDialog modes={boardModes} />
       {roleOpen && myRole?.role && onRevealRole ? (
         <TreacheryRoleDialog
           role={myRole.role}

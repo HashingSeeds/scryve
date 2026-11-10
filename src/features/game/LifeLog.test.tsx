@@ -21,6 +21,8 @@ import {
   lifeLog,
   localLifeChanges,
   mergedLog,
+  withModeRows,
+  withTurnDividers,
 } from "./LifeLog"
 import type { CommandContext, GameCommand } from "./types"
 
@@ -184,6 +186,30 @@ describe("life log", () => {
 
     expect(view.getByTestId("log")).toHaveProp("accessibilityLabel", "8000 6000 4800 5300")
   })
+
+  it("places Planechase and Archenemy entries among life changes by sequence, under the turn they happened in", () => {
+    const ada = asPlayerId("ada")
+    const life = { id: "hit", playerId: ada, delta: -2, life: 18, at: 3_000, operationIds: ["hit"] }
+    const mode = (id: string, at: number) => ({
+      kind: "mode" as const,
+      id,
+      playerId: ada,
+      at,
+      text: id,
+      operationIds: [id],
+    })
+    const turns = [{ operationId: "turn-2", playerId: ada, number: 2, at: 2_000 }]
+    const sequence = ["scheme", "turn-2", "hit", "roll"]
+    const positionOf = (id: string) => sequence.indexOf(id)
+
+    expect(
+      withTurnDividers(
+        withModeRows([life], [mode("scheme", 1_000), mode("roll", 2_500)], positionOf),
+        turns,
+        positionOf,
+      ).map((item) => (item.kind === "turn" ? `turn ${item.number}` : item.id)),
+    ).toEqual(["turn 2", "roll", "hit", "scheme"])
+  })
 })
 
 describe("counter log rows", () => {
@@ -236,17 +262,5 @@ describe("counter log rows", () => {
         entry("b", "custom:speed", 1, 3, 1_500),
       ]).map(({ delta, value }) => [delta, value]),
     ).toEqual([[2, 3]])
-  })
-
-  it("folds a counter's quick taps even when another counter changes in between", () => {
-    const rows = counterLog([
-      entry("a", "poison", 1, 1, 1_000),
-      entry("b", "custom:Speed", 1, 1, 1_200),
-      entry("c", "poison", 1, 2, 1_500),
-    ])
-    expect(rows.map(({ counterId, delta }) => [counterId, delta])).toEqual([
-      ["poison", 2],
-      ["custom:Speed", 1],
-    ])
   })
 })

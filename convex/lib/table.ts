@@ -2,6 +2,14 @@ import { v, type GenericValidator, type Infer } from "convex/values"
 
 import type { PokemonBoardDefinition, TableDefinition } from "./systems"
 import {
+  applyModeAction,
+  isModeAction,
+  isValidModes,
+  modeActionValidators,
+  remapModes,
+  tableModesValidator,
+} from "./tableModes"
+import {
   applyTurnAction,
   isTurnAction,
   isValidTurn,
@@ -19,8 +27,9 @@ export const POKEMON_HP_FACET = "hp"
 export const POISON_CHECKUP_DAMAGE = 10
 export const BURN_CHECKUP_DAMAGE = 20
 /** why: an older install's strict parser drops a table with any field it does not know, so each client gets only the fields of the version it sends. */
-export const TABLE_VERSION = 4
+export const TABLE_VERSION = 5
 export const TURN_TABLE_VERSION = 3
+export const CUSTOM_COUNTER_TABLE_VERSION = 4
 export const CUSTOM_COUNTER_PREFIX = "custom:"
 export const MAX_CUSTOM_COUNTERS = 4
 export const MAX_CUSTOM_COUNTER_NAME_LENGTH = 20
@@ -77,6 +86,7 @@ export const tableStateValidator = v.object({
   players: v.record(v.string(), playerTableValidator),
   turn: v.optional(turnValidator),
   turnGroups: v.optional(turnGroupsValidator),
+  modes: v.optional(tableModesValidator),
 })
 
 export const tableActionValidator = v.union(
@@ -154,6 +164,7 @@ export const tableActionValidator = v.union(
     takerPlayerId: v.optional(v.string()),
   }),
   ...turnActionValidators,
+  ...modeActionValidators,
 )
 
 export type PokemonSlot = Infer<typeof pokemonSlotValidator>
@@ -460,6 +471,16 @@ export function applyTableAction(
     return { table: turn ? { ...rest, turn } : rest, life: [] }
   }
 
+  if (isModeAction(action)) {
+    const modes = applyModeAction(table.modes, action, {
+      turn: table.turn,
+      now: context.now ?? Date.now(),
+      operationId: context.operationId,
+    })
+    if (modes === null) return null
+    return modes === table.modes ? unchanged : { table: { ...table, modes }, life: [] }
+  }
+
   if (action.kind === "counter.changed") {
     const counter = rules.counters.find(({ id }) => id === action.counterId)
     if (!counter || !isNonZeroStep(action.delta, counter.max)) return null
@@ -707,6 +728,7 @@ export function isValidTableSnapshot(
 ): boolean {
   return (
     (table.turn === undefined || isValidTurn(table.turn, playerIds)) &&
+    (table.modes === undefined || isValidModes(table.modes, playerIds)) &&
     (table.turnGroups === undefined || isValidTurnGroups(table.turnGroups, playerIds)) &&
     Object.entries(table.designations).every(
       ([designationId, holder]) =>
@@ -747,6 +769,7 @@ function isValidCustomCounters(
 export function remapTableState(table: TableState, idOf: (playerId: string) => string): TableState {
   return {
     ...(table.turn ? { turn: remapTurn(table.turn, idOf) } : {}),
+    ...(table.modes ? { modes: remapModes(table.modes, idOf) } : {}),
     ...(table.turnGroups ? { turnGroups: table.turnGroups.map((group) => group.map(idOf)) } : {}),
     designations: Object.fromEntries(
       Object.entries(table.designations).map(([designationId, holder]) => [
@@ -776,14 +799,16 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
 
 export function tableForVersion(table: TableState, tableVersion = 1): TableState {
   if (tableVersion >= TABLE_VERSION) return table
-  const { turn, turnGroups, ...beforeTurns } = table
+  const { modes: _modes, turn, turnGroups, ...beforeTurns } = table
   const turns = tableVersion >= TURN_TABLE_VERSION
+  const counters = tableVersion >= CUSTOM_COUNTER_TABLE_VERSION
   return {
     ...(turn && turns ? { turn } : {}),
     ...(turnGroups && turns ? { turnGroups } : {}),
     ...beforeTurns,
     players: Object.fromEntries(
-      Object.entries(table.players).map(([playerId, { customCounters: _custom, ...player }]) => {
+      Object.entries(table.players).map(([playerId, { customCounters, ...older }]) => {
+        const player = counters && customCounters ? { ...older, customCounters } : older
         const board = player.pokemon
         if (!board || tableVersion >= 2) return [playerId, player]
         const { active, lastKnockout, ...rest } = board

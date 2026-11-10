@@ -62,6 +62,9 @@ export default {
       yourDeck: "Abre las opciones de «Tu mazo»",
       system: "Abre las opciones de sistema",
       list: "Abre las opciones de la lista",
+      planechase: "Abre las opciones del mazo planar",
+      archenemy: "Abre las opciones de archienemigo",
+      schemes: "Abre las opciones del mazo de planes",
     },
     closeLabel: {
       format: "Cerrar opciones de formato",
@@ -72,6 +75,9 @@ export default {
       yourDeck: "Cerrar opciones de «Tu mazo»",
       system: "Cerrar opciones de sistema",
       list: "Cerrar opciones de la lista",
+      planechase: "Cerrar opciones del mazo planar",
+      archenemy: "Cerrar opciones de archienemigo",
+      schemes: "Cerrar opciones del mazo de planes",
     },
   },
   valueField: {

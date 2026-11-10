@@ -68,6 +68,7 @@ import {
   menuPlacementAt,
   panelBoxes,
   seamEdge,
+  teamPanelCompact,
   teamSeatRows,
   teamSplit,
 } from "./teamGridGeometry"
@@ -110,6 +111,7 @@ export interface DiceGridBinding {
   bag?: {
     tools: readonly DiceTool[]
     rollFor: (player: GamePlayer, tool: DiceTool) => void
+    openPlane?: (player: GamePlayer) => void
   }
 }
 
@@ -183,6 +185,9 @@ function seatDiceFor(
     bag: bag && {
       tools: bag.tools,
       rollFor: stable(`dice-roll:${player.id}`, (tool: DiceTool) => bag.rollFor(player, tool)),
+      ...(bag.openPlane
+        ? { openPlane: stable(`open-plane:${player.id}`, () => bag.openPlane?.(player)) }
+        : {}),
     },
     onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
       dice.onChoose(player, order),
@@ -293,7 +298,7 @@ export function PlayerGrid({
     layout,
     gap: spacing.xxs,
   })
-  const compact = layout.compact || (!!teams && players.length >= 5)
+  const compact = teams ? teamPanelCompact(layout, teams.length) : layout.compact
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const sidewaysGlyphReserve =
     2 * ((compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)

@@ -22,6 +22,7 @@ export interface GameType {
 const FEATURED: readonly GameType[] = [
   { id: "commander", system: "mtg", format: "commander" },
   { id: "treachery", system: "mtg", format: "commander", variant: "treachery" },
+  { id: "archenemy", system: "mtg", format: "constructed", variant: "archenemy" },
   { id: "2hg", system: "mtg", format: "limited", variant: "twoHeadedGiant" },
   { id: "2hg-commander", system: "mtg", format: "commander", variant: "twoHeadedGiant" },
   { id: "mtg-standard", system: "mtg", format: "standard" },
@@ -55,7 +56,7 @@ export function gameTypeId(
   variant?: GameVariant,
 ) {
   if (!system || !format) return "none"
-  if (variant === "treachery") return "treachery"
+  if (variant === "treachery" || variant === "archenemy") return variant
   if (variant === "twoHeadedGiant") return format === "commander" ? "2hg-commander" : "2hg"
   return featuredFormat(system, format)?.id ?? `${system}-${format}`
 }
@@ -142,6 +143,7 @@ export function newGameTabs({
 
 export function gameTypeLabel(type: GameType) {
   if (type.variant === "treachery") return translate("connected:treachery.name")
+  if (type.variant === "archenemy") return translate("board:scheme.title")
   if (type.variant === "twoHeadedGiant")
     return translate(
       type.format === "commander"

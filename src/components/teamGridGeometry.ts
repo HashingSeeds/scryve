@@ -6,7 +6,14 @@ import type {
   LifeCardMenuCorner,
   LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { getPlayerGridLayout } from "./playerGridGeometry"
+import {
+  CONTENT_EDGES,
+  getPlayerGridLayout,
+  getPlayerGridMenuAnchor,
+  getPlayerGridRowFlex,
+  getPlayerGridRows,
+  getPlayerSlotFacings,
+} from "./playerGridGeometry"
 
 type GridLayout = ReturnType<typeof getPlayerGridLayout>
 
@@ -92,6 +99,22 @@ export function menuPlacementAt(
   return {}
 }
 
+/** why: mirrors LifeCard, which drops a head's mode control from its turn chip when the pentagon is centered on that head's top edge; the seam carries the control exactly then, or it shows twice or not at all. */
+export function headChipCrowded(teamCount: number, layout: GridLayout, slot: number, head: 0 | 1) {
+  const rows = getPlayerGridRows(teamCount, layout)
+  const panel = panelBoxes(
+    rows,
+    rows.map((row) => getPlayerGridRowFlex(row, layout)),
+  ).get(slot)
+  const rotation = getPlayerSlotFacings(teamCount, layout)[slot]
+  if (!panel || rotation === undefined) return false
+  const { edgeCenter } = menuPlacementAt(
+    headBox(panel, rotation, head),
+    getPlayerGridMenuAnchor(teamCount, layout),
+  )
+  return edgeCenter === CONTENT_EDGES[rotation].top
+}
+
 export function teamSeatRows(
   rows: readonly (readonly (number | null)[])[],
   rowFlexes: readonly number[],
@@ -121,4 +144,67 @@ export function teamSeatRows(
     }
   })
   return { rows: seated, flexes }
+}
+
+export const teamPanelCompact = (layout: GridLayout, teamCount: number) =>
+  layout.compact || teamCount >= 3
+
+const MENU_CLEARANCE = 48
+const TOWARD_CENTER: Record<LifeCardContentRotation, { x: number; y: number }> = {
+  0: { x: 0, y: -1 },
+  180: { x: 0, y: 1 },
+  90: { x: 1, y: 0 },
+  [-90]: { x: -1, y: 0 },
+}
+
+export interface TeamRivet {
+  x: number
+  y: number
+  size: number
+}
+
+export function teamRivet(
+  panel: { width: number; height: number },
+  rotation: LifeCardContentRotation,
+  compact: boolean | undefined,
+  menuAtSeam: boolean,
+): TeamRivet {
+  const size = compact ? 24 : 28
+  const sideways = Math.abs(rotation) === 90
+  const depth = sideways ? panel.width : panel.height
+  const headRun = (sideways ? panel.height : panel.width) / 2
+  const wanted = depth * (headRun < depth ? 0.25 : 0.2)
+  const shift = Math.max(
+    0,
+    menuAtSeam ? Math.min(wanted, depth / 2 - MENU_CLEARANCE - size / 2) : wanted,
+  )
+  const toward = TOWARD_CENTER[rotation]
+  return { x: toward.x * shift, y: toward.y * shift, size }
+}
+
+export function teamRivets(
+  teamCount: number,
+  layout: GridLayout,
+  board: { width: number; height: number },
+  anchor: { x: number; y: number },
+): TeamRivet[] {
+  const rows = getPlayerGridRows(teamCount, layout)
+  const facings = getPlayerSlotFacings(teamCount, layout)
+  const boxes = panelBoxes(
+    rows,
+    rows.map((row) => getPlayerGridRowFlex(row, layout)),
+  )
+  return [...boxes].map(([slot, box]) => {
+    const offset = teamRivet(
+      { width: (box.x1 - box.x0) * board.width, height: (box.y1 - box.y0) * board.height },
+      facings[slot],
+      teamPanelCompact(layout, teamCount),
+      menuPlacementAt(box, anchor).edgeCenter !== undefined,
+    )
+    return {
+      x: ((box.x0 + box.x1) / 2) * board.width + offset.x,
+      y: ((box.y0 + box.y1) / 2) * board.height + offset.y,
+      size: offset.size,
+    }
+  })
 }

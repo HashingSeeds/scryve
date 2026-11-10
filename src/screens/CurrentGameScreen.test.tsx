@@ -400,6 +400,97 @@ describe("CurrentGameScreen", () => {
     )
   })
 
+  it("opens the plane from any seat's bag, even where the seam has no room for it", () => {
+    const initial = createLocalGame({
+      players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 20,
+      system: "mtg",
+      format: "constructed",
+      modeSetup: { planechase: {} },
+      now: 1,
+    })
+    const view = renderGame(initial, turnsOff())
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("seat-bag-seat-3"))
+    fireEvent.press(view.getByTestId("bag-plane-seat-3"))
+    expect(view.getByTestId("planar-walk")).toBeTruthy()
+  })
+
+  it("puts the planar die beside the active seat's turn chip in its name row", () => {
+    const initial = createLocalGame({
+      players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 20,
+      system: "mtg",
+      format: "constructed",
+      modeSetup: { planechase: {} },
+      now: 1,
+    })
+    const view = renderGame(initial, turnsOn())
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const row = within(view.getByTestId("turn-row-chip-seat-1"))
+    expect(row.getByTestId("turn-chip-1")).toBeTruthy()
+    expect(row.getByTestId(`planar-die-chip-${initial.players[0]!.id}`)).toBeTruthy()
+    expect(view.queryByTestId(`planar-die-chip-${initial.players[1]!.id}`)).toBeNull()
+  })
+
+  it("lets a seat other than the archenemy roll the planar die with Turns off", () => {
+    const initial = createLocalGame({
+      players: ["Ada", "Grace", "Katherine"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 20,
+      system: "mtg",
+      format: "constructed",
+      modeSetup: { archenemy: { seat: 1 }, planechase: {} },
+      now: 1,
+    })
+    const repository = turnsOff()
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("seat-bag-seat-3"))
+    fireEvent.press(view.getByTestId("bag-plane-seat-3"))
+    fireEvent.press(view.getByTestId("planar-dialog-die"))
+    const rolled = repository
+      .loadActiveGame()
+      ?.table?.modes?.log?.find(({ kind }) => kind === "rolled")
+    expect(rolled).toMatchObject({ playerId: initial.players[2]!.id })
+  })
+
+  it("rolls the planar die for the teammate whose bag opened the plane", () => {
+    const created = createLocalGame({
+      players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 30,
+      system: "mtg",
+      format: "constructed",
+      modeSetup: { planechase: {} },
+      teams: [
+        [0, 1],
+        [2, 3],
+      ],
+      now: 1,
+    })
+    const [, , katherine, dorothy] = created.players.map(({ id }) => id)
+    const initial = {
+      ...created,
+      turn: {
+        playerId: katherine!,
+        number: 1,
+        startedAt: 1,
+        operationId: "turn-1",
+        waiting: true as const,
+      },
+    }
+    const repository = turnsOn()
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("seat-bag-seat-4"))
+    fireEvent.press(view.getByTestId("bag-plane-seat-4"))
+    fireEvent.press(view.getByTestId("planar-dialog-die"))
+    const rolled = repository
+      .loadActiveGame()
+      ?.table?.modes?.log?.findLast((entry) => entry.kind === "rolled")
+    expect(rolled).toMatchObject({ kind: "rolled", playerId: dorothy })
+  })
+
   it("lets a seat claim first from its empty 1st, which closes the offer everywhere", () => {
     const initial = game()
     const repository = turnsOff()

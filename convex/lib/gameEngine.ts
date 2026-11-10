@@ -41,6 +41,7 @@ import {
   type TableAction,
   type TableState,
 } from "./table"
+import { isModeAction } from "./tableModes"
 import type { GameVariant } from "./treachery"
 import { isTurnAction, nextTurnSeat, startedByChange, type Turn } from "./turns"
 import { teammatesOf, teamTableRules, TWO_HEADED_GIANT } from "./twoHeadedGiant"
@@ -80,6 +81,7 @@ export const engineGameOf = (
     | "lifeEditing"
     | "turn"
     | "turnGroups"
+    | "modes"
     | "variant"
   >,
 ): EngineGame => ({
@@ -90,6 +92,7 @@ export const engineGameOf = (
   ...(game.lifeEditing ? { lifeEditing: game.lifeEditing } : {}),
   ...(game.turn ? { turn: game.turn } : {}),
   ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+  ...(game.modes ? { modes: game.modes } : {}),
   ...(game.variant ? { variant: game.variant } : {}),
 })
 
@@ -101,6 +104,7 @@ export interface EngineGame {
   lifeEditing?: LifeEditing
   turn?: Turn
   turnGroups?: TableState["turnGroups"]
+  modes?: TableState["modes"]
   variant?: GameVariant
 }
 
@@ -177,6 +181,7 @@ export type GameChange =
   | (CommanderPair & { kind: "pair.put"; total: number; updatedAt: number })
   | { kind: "designations.set"; designations: TableState["designations"] }
   | { kind: "turn.set"; turn: Turn | undefined }
+  | { kind: "modes.set"; modes: TableState["modes"] }
 
 export interface WriteRequest {
   operationId: string
@@ -564,6 +569,7 @@ export function changeTable(
     players: Object.fromEntries([...rows.values()].map((row) => [row.id, seatTable(row)])),
     ...(game.turn ? { turn: game.turn } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+    ...(game.modes ? { modes: game.modes } : {}),
   }
   const result = applyTableAction(table, action, {
     rules: tableRules(game.system, game.format),
@@ -603,6 +609,8 @@ export function changeTable(
   if (result.table.designations !== table.designations)
     changes.push({ kind: "designations.set", designations: result.table.designations })
   if (result.table.turn !== table.turn) changes.push({ kind: "turn.set", turn: result.table.turn })
+  if (result.table.modes !== table.modes)
+    changes.push({ kind: "modes.set", modes: result.table.modes })
 
   const lifeChange = result.life[0]
   const counterId = loggedCounterId(action)
@@ -672,7 +680,8 @@ function* writeTable(
 ): GameSteps<GameWriteResult> {
   const sent = normalizedTableAction(write.action)
   const action = gatedTableAction(sent)
-  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !isTurnAction(action))
+  const ownSeatOnly = isTurnAction(action) || isModeAction(action)
+  const seat = yield* editableSeat(store, action.playerId, actor, undefined, !ownSeatOnly)
   if (isEngineError(seat)) return failed(seat)
   const { operationId } = write
   const request: TableActionRequest = {

@@ -168,6 +168,7 @@ export async function writeCloudGame(
           updatedAt: change.updatedAt,
         })
     } else if (change.kind === "turn.set") await ctx.db.patch(game._id, { turn: change.turn })
+    else if (change.kind === "modes.set") await ctx.db.patch(game._id, { modes: change.modes })
     else
       await ctx.db.patch(game._id, { designations: storedDesignations(ctx, change.designations) })
   }

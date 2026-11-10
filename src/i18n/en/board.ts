@@ -564,6 +564,62 @@ const board = {
     // The log divider at the start of each turn, as in "Turn 4 · Ada".
     divider: "Turn {{number}} · {{name}}",
   },
+  // Planechase, a Magic variant with a shared deck of plane cards and a six-sided planar die. Keep official card terms: "plane", "phenomenon", "planeswalk", "chaos".
+  planar: {
+    title: "Planechase",
+    // A plane card the players are on. As in "Plane: Eloren Wilds".
+    plane: "Plane",
+    phenomenon: "Phenomenon",
+    ownCards: "Your planar deck",
+    // Button that rolls the planar die.
+    roll: "Roll",
+    // Mana the next planar die roll costs this turn, as in "Next roll: 2".
+    nextCost: "Next roll: {{cost}}",
+    // Short cost badge on the die button, as in "+2" mana for the next roll.
+    costBadge: "+{{cost}}",
+    free: "Free",
+    reset: "Reset cost",
+    planeswalk: "Planeswalk",
+    // Button shown while a phenomenon is face up: its effect happens, then the active player planeswalks.
+    resolve: "Resolved, planeswalk",
+    // Shown to a player who can't roll because it isn't their turn.
+    activeOnly: "Only the active player rolls",
+    faces: {
+      planeswalk: "Planeswalk",
+      chaos: "Chaos",
+      blank: "Blank",
+    },
+    dieLabel: "Planar die, next roll costs {{cost}}",
+    opensPlane: "Opens the plane",
+    // Log rows. "rolled" as in "Ada rolled Chaos, paid 1".
+    rolledFree: "{{name}} rolled {{face}}",
+    rolledPaid: "{{name}} rolled {{face}}, paid {{cost}}",
+    walkedTo: "{{name}} planeswalked to {{plane}}",
+    walked: "{{name}} planeswalked",
+    resetBy: "{{name}} reset the roll cost",
+  },
+  // Archenemy, a Magic variant where one player with a scheme deck faces a team. Keep official card terms: "scheme", "ongoing", "set in motion", "abandon".
+  scheme: {
+    title: "Archenemy",
+    archenemy: "Archenemy",
+    // Button the archenemy taps at the start of their main phase to reveal the top scheme.
+    setInMotion: "Set a scheme in motion",
+    // Short plate text on the board when the archenemy still has to reveal a scheme this turn.
+    due: "Scheme due",
+    schemes: "Schemes",
+    // Count of ongoing schemes on the board plate, as in "2 ongoing".
+    ongoingCount: "{{count}} ongoing",
+    ongoing: "Ongoing",
+    abandon: "Abandon",
+    last: "Last scheme",
+    ownCards: "Your scheme deck",
+    archenemyOnly: "Only the archenemy sets schemes in motion",
+    opensSchemes: "Opens the schemes",
+    // Log rows, as in "Ada set Behold the Power of Destruction in motion".
+    revealed: "{{name}} set {{scheme}} in motion",
+    revealedOwn: "{{name}} set a scheme in motion",
+    abandoned: "{{name}} abandoned {{scheme}}",
+  },
   log: {
     close: "Close log",
     empty: "No changes yet",

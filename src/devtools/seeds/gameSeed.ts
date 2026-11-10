@@ -33,6 +33,7 @@ import type { LocalGame } from "@/features/game/types"
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import type { TableAction } from "../../../convex/lib/table"
+import { isValidModeSetup } from "../../../convex/lib/tableModes"
 import { isValidTurnGroups } from "../../../convex/lib/turns"
 import { defaultTeamLife } from "../../../convex/lib/twoHeadedGiant"
 
@@ -106,6 +107,7 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       system,
       format,
       layout,
+      ...modeSetupOf(params, playerCount),
       ...(teams.length > 0 ? { teams } : {}),
     })
   } catch (error) {
@@ -206,6 +208,30 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
     )
   }
   return game
+}
+
+function modeSetupOf(params: SeedParams, playerCount: number) {
+  const planechase =
+    params.planechase === undefined
+      ? undefined
+      : params.planechase === "own"
+        ? {}
+        : { decks: list(params.planechase) }
+  const archenemy =
+    params.archenemy === undefined
+      ? undefined
+      : {
+          ...(params.archenemy === "roll" ? {} : { seat: integer("archenemy", params.archenemy) }),
+          ...(params.schemes && params.schemes !== "own" ? { deck: params.schemes } : {}),
+        }
+  if (!planechase && !archenemy) return {}
+  const modeSetup = {
+    ...(planechase ? { planechase } : {}),
+    ...(archenemy ? { archenemy } : {}),
+  }
+  if (!isValidModeSetup(modeSetup, playerCount))
+    throw new SeedError("planechase, archenemy, or schemes names an unknown deck or seat.")
+  return { modeSetup }
 }
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {

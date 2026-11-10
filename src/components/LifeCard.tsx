@@ -97,6 +97,7 @@ import {
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
+import { CONTENT_EDGES } from "./playerGridGeometry"
 import { MarkArt, PlayerMark } from "./PlayerMark"
 import {
   SeatIdentity,
@@ -601,6 +602,9 @@ export const LifeCard = memo(function LifeCard({
   const bagReserve = seatBag ? trailingButtonSize + identityMetrics.gap : 0
   // why: on seats too short for the name and the chip, the name gives way so the chip never runs under the bag; the mark still says whose seat it is.
   const rowChip = rowTurnChip || rowUndo
+  // why: with the pentagon centered on the card's top edge the seam carries a mode's control instead (seamPlan's chipCrowdedBySeam), so it never shows twice or not at all.
+  const modeBeside =
+    menuEdgeCenter === CONTENT_EDGES[contentRotation].top ? undefined : turnChip?.beside
   useEffect(() => {
     if (!rowChip) setRowChipWidth(0)
   }, [rowChip])
@@ -1036,12 +1040,15 @@ export const LifeCard = memo(function LifeCard({
               >
                 {turnChip && rowTurnChip ? (
                   <FadeOutSlot>
-                    <TurnChip
-                      state={turnChip}
-                      seatNumber={seatNumber}
-                      foreground={foreground}
-                      compact={compact}
-                    />
+                    <View pointerEvents="box-none" style={$chipWithMode}>
+                      <TurnChip
+                        state={turnChip}
+                        seatNumber={seatNumber}
+                        foreground={foreground}
+                        compact={compact}
+                      />
+                      {modeBeside}
+                    </View>
                   </FadeOutSlot>
                 ) : null}
                 {undoPass && rowUndo ? (
@@ -1200,6 +1207,7 @@ const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
 })
 
 const $cornerRow: ViewStyle = { position: "absolute", flexDirection: "row", alignItems: "center" }
+const $chipWithMode: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
 const $cornerIdentity: ViewStyle = { flexShrink: 1, minWidth: 0 }
 const $cornerButton: ViewStyle = {
   position: "absolute",

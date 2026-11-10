@@ -82,7 +82,11 @@ export function lobbyDetail(
   return [
     counterValueLabel(resolvedSystem, startingLife),
     resolvedSystem ? playFormatLabel(resolvedSystem, format || ruleset) : undefined,
-    variant === "treachery" ? translate("connected:treachery.name") : undefined,
+    variant === "treachery"
+      ? translate("connected:treachery.name")
+      : variant === "archenemy"
+        ? translate("board:scheme.title")
+        : undefined,
   ]
     .filter(Boolean)
     .join(" · ")

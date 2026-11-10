@@ -12,12 +12,15 @@ const { parseArgs } = require("node:util")
 const { previewKey, previewName } = require("./preview.cjs")
 const { SYSTEM_IDS } = require("../convex/lib/systems/definitions.ts")
 
-const VARIANTS = ["treachery", "twoHeadedGiant"]
+const VARIANTS = ["treachery", "archenemy", "twoHeadedGiant", "planechase"]
 
 const USAGE = `Stand-in players for connected games on a Convex preview.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
                  [--variant treachery|twoHeadedGiant]  (players default to 4)
+                 [--archenemy <seat>]  plays Archenemy with that seat as the archenemy, in
+                                       place of --variant (players default to 4)
+                 [--schemes <deck id>] [--planechase <deck id>|own]
   pnpm bots join <CODE> [--count 1] [--first 1]
 
 Play
@@ -66,6 +69,22 @@ function parseDuration(value, name) {
   return Number(match[1]) * { ms: 1, s: 1000, m: 60_000 }[match[2] ?? "s"]
 }
 
+// why: decks are checked by createLobby against convex/lib/modeDecks.ts, so a typo fails there with its message.
+function modeSetupOf({ archenemy, schemes, planechase }, players) {
+  if (!archenemy && !planechase) return undefined
+  return {
+    ...(planechase ? { planechase: planechase === "own" ? {} : { decks: [planechase] } } : {}),
+    ...(archenemy
+      ? {
+          archenemy: {
+            seat: parseCount(archenemy, "archenemy", 1, players),
+            ...(schemes ? { deck: schemes } : {}),
+          },
+        }
+      : {}),
+  }
+}
+
 function parseCount(value, name, min, max) {
   const count = Number(value)
   if (!Number.isInteger(count) || count < min || count > max)
@@ -83,6 +102,9 @@ function parseCli(argv) {
       "fill": { type: "string", default: "0" },
       "format": { type: "string", default: "commander" },
       "variant": { type: "string" },
+      "archenemy": { type: "string" },
+      "schemes": { type: "string" },
+      "planechase": { type: "string" },
       "reveal": { type: "boolean", default: false },
       "life": { type: "string" },
       "count": { type: "string", default: "1" },
@@ -115,16 +137,15 @@ function parseCli(argv) {
     values.variant !== "twoHeadedGiant"
   )
     throw new Error("--variant must be treachery or twoHeadedGiant")
+  if (values.archenemy !== undefined && values.variant !== undefined)
+    throw new Error("--archenemy is its own variant, so it cannot go with --variant")
   if (!["stay", "leave", "finish"].includes(values.end))
     throw new Error("--end must be stay, leave or finish")
-  const players = parseCount(
-    values.players ?? (values.variant ? "4" : "2"),
-    "players",
-    2,
-    MAX_SEATS,
-  )
+  const variant = values.archenemy !== undefined ? "archenemy" : values.variant
+  const players = parseCount(values.players ?? (variant ? "4" : "2"), "players", 2, MAX_SEATS)
   if (values.variant === "treachery" && (players < 4 || players > 6))
     throw new Error("--variant treachery needs --players 4 to 6")
+  if (variant === "archenemy" && players < 3) throw new Error("--archenemy needs --players 3 or more")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
   const none = values.format === "none"
   return {
@@ -135,7 +156,8 @@ function parseCli(argv) {
     fill,
     system: none ? "none" : "mtg",
     format: values.format,
-    variant: values.variant,
+    variant,
+    modeSetup: modeSetupOf(values, players),
     reveal: values.reveal,
     life: values.life
       ? parseCount(values.life, "life", 1, 999)
@@ -256,7 +278,7 @@ class Bot {
       await this.client.mutation(api.games.abandonGame, { publicId: game.publicId })
       this.report(this, "abandoned-leftover", { publicId: game.publicId })
     }
-    const { players, system, format, variant, life } = this.options
+    const { players, system, format, variant, modeSetup, life } = this.options
     const lobby = await this.client.mutation(api.games.createLobby, {
       ...lobbyIdentifiers(),
       playerCount: players,
@@ -265,6 +287,7 @@ class Bot {
       system,
       ...(system === "none" ? {} : { format }),
       ...(variant ? { variant } : {}),
+      ...(modeSetup ? { modeSetup } : {}),
       hostDisplayName: this.name,
       hostColor: COLORS[0],
       deviceId: this.deviceId,

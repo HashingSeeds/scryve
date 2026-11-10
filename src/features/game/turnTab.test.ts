@@ -193,6 +193,7 @@ describe("a long-lived local board", () => {
       startingLife: 40,
       system: "mtg",
       format: "commander",
+      modeSetup: { planechase: {} },
       now: 0,
       players: [
         { name: "Ada", color: "#000" },
@@ -233,6 +234,7 @@ describe("a long-lived local board", () => {
         },
         `counter-${round}`,
       )
+      table({ kind: "planar.rolled", playerId: ada.id, face: "blank" }, `roll-${round}`)
       table({ kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id }, `turn-pass-${round}`)
       table(
         { kind: "turn.undone", playerId: ada.id, turnOperationId: `turn-pass-${round}` },
@@ -244,11 +246,13 @@ describe("a long-lived local board", () => {
       ...game.events.map(({ operationId }) => operationId),
       ...(game.turnLog ?? []).map(({ operationId }) => operationId),
       ...(game.counterLog ?? []).map(({ operationId }) => operationId),
+      ...(game.table?.modes?.log ?? []).flatMap(({ operationId }) => operationId ?? []),
     ])
     expect(game.events.length).toBeGreaterThan(500)
     expect(game.logOrder?.every((id) => held.has(id))).toBe(true)
     expect(game.logOrder?.length).toBeLessThanOrEqual(held.size)
     expect(game.logOrder).toContain("counter-299")
+    expect(game.logOrder).toContain("roll-299")
 
     table({ kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id }, "turn-pass-last")
     expect(undoableTurn(game, actor)).toEqual({

@@ -10,6 +10,7 @@ import type {
   GameEvent,
   GamePlayer,
   LifeChangedEvent,
+  PlayerId,
   TurnLogEntry,
 } from "./types"
 import { api } from "../../../convex/_generated/api"
@@ -158,15 +159,34 @@ export function counterLog(entries: readonly CounterLogEntry[]): GameCounterRow[
   return rows.filter(({ delta }) => delta !== 0)
 }
 
-type GameLogChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
+export interface GameModeRow {
+  kind: "mode"
+  id: string
+  playerId: PlayerId
+  at: number
+  text: string
+  operationIds: string[]
+}
+
+type GameTableChange = (GameLogRow & { kind?: undefined }) | GameCounterRow
+type GameLogChange = GameTableChange | GameModeRow
 
 export function mergedLog(
   life: readonly GameLogRow[],
   counters: readonly GameCounterRow[],
   positionOf: (operationId: string) => number | undefined,
+): GameTableChange[] {
+  const placeOf = (row: GameTableChange) => rowPosition(row, positionOf)
+  return [...life, ...counters].sort((left, right) => placeOf(right) - placeOf(left))
+}
+
+export function withModeRows(
+  rows: readonly GameLogChange[],
+  modes: readonly GameModeRow[],
+  positionOf: (operationId: string) => number | undefined,
 ): GameLogChange[] {
   const placeOf = (row: GameLogChange) => rowPosition(row, positionOf)
-  return [...life, ...counters].sort((left, right) => placeOf(right) - placeOf(left))
+  return [...rows, ...modes].sort((left, right) => placeOf(right) - placeOf(left))
 }
 
 type TurnDivider = Pick<TurnLogEntry, "operationId" | "playerId" | "number" | "at"> & {
@@ -186,13 +206,13 @@ export function withTurnDividers(
   positionOf: (operationId: string) => number | undefined,
 ): GameLogItem[] {
   const startOf = (turn: TurnLogEntry) => positionOf(turn.operationId) ?? -Infinity
-  const placeOf = (row: GameLogChange) => rowPosition(row, positionOf)
+  const places = rows.map((row) => rowPosition(row, positionOf))
   const items: GameLogItem[] = []
   let index = 0
   for (const turn of [...turns].reverse()) {
     const start = index
     const begins = startOf(turn)
-    while (index < rows.length && placeOf(rows[index]) >= begins) index += 1
+    while (index < rows.length && places[index] >= begins) index += 1
     items.push({ kind: "turn", ...turn }, ...rows.slice(start, index))
   }
   return [...items, ...rows.slice(index)]

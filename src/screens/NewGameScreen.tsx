@@ -89,6 +89,7 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 import type { LanSetup } from "@/features/lan/lanGame"
+import { modeChoicesOf, modeSetupOf, ModeSetupFields } from "@/features/modes/ModeSetupFields"
 import {
   deckChoiceId,
   localDeckChoices,
@@ -121,7 +122,8 @@ import {
   startingValueRange,
   systemDefinition,
 } from "../../convex/lib/systems"
-import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
+import { ARCHENEMY_MIN_SEATS, type ModeSetup } from "../../convex/lib/tableModes"
+import { isTreacheryPlayerCount, type GameVariant } from "../../convex/lib/treachery"
 import {
   defaultTeamLife,
   isTwoHeadedGiantPlayerCount,
@@ -171,6 +173,7 @@ export interface NewGameScreenProps {
       account?: LocalGameAccountInput
       match?: { bestOf: MatchBestOf }
       clock?: RoundClockSetup
+      modeSetup?: ModeSetup
     },
   ) => void
   connected?: ConnectedHostFeed
@@ -334,6 +337,11 @@ function NewGameForm({
     seed?.startingLife ?? defaults.defaultStartingLife,
   )
   const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
+  const seedModes = lobby ? lobby.modeSetup : seedGame?.modeSetup
+  const [archenemyChosen, setArchenemyChosen] = useState(
+    lobby ? lobby.variant === "archenemy" : seedModes?.archenemy !== undefined,
+  )
+  const [modeChoices, setModeChoices] = useState(() => modeChoicesOf(seedModes))
   const [teamsChosen, setTeamsChosen] = useState(
     lobby?.variant === "twoHeadedGiant" || seedGame?.variant === "twoHeadedGiant",
   )
@@ -414,11 +422,16 @@ function NewGameForm({
   const treacheryAvailable =
     connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
   const treachery = treacheryAvailable && treacheryChosen
-  const variant = treachery
-    ? ("treachery" as const)
-    : twoHeadedGiant
-      ? ("twoHeadedGiant" as const)
-      : undefined
+  const planechaseAvailable = systemDefinition(system)?.planechase === true
+  const archenemy =
+    Boolean(systemDefinition(system)?.variants.includes("archenemy")) && archenemyChosen
+  const variant: GameVariant | undefined = treachery
+    ? "treachery"
+    : archenemy
+      ? "archenemy"
+      : twoHeadedGiant
+        ? "twoHeadedGiant"
+        : undefined
   const draft = {
     system,
     format,
@@ -477,11 +490,15 @@ function NewGameForm({
         ? { mode: "countdown", minutes: clockMinutes }
         : { mode: "stopwatch" }
   const selectedTypeId = gameTypeId(system, format, variant)
+  const modeSetup = planechaseAvailable
+    ? modeSetupOf(modeChoices, { archenemy, playerCount })
+    : undefined
   const gameSetup = {
     layout,
     lifeStep,
     ...(system && format ? { system, format } : {}),
     ...(variant ? { variant } : {}),
+    ...(modeSetup ? { modeSetup } : {}),
     ...(teams && !connectedMode ? { teams } : {}),
   }
   const gameTabs = useMemo(
@@ -764,7 +781,9 @@ function NewGameForm({
       (nextTreachery && !isTreacheryPlayerCount(playerCount)) ||
       (nextTeams && !isTwoHeadedGiantPlayerCount(playerCount))
         ? VARIANT_MIN_SEATS
-        : playerCount
+        : type.variant === "archenemy" && playerCount < ARCHENEMY_MIN_SEATS
+          ? ARCHENEMY_MIN_SEATS
+          : playerCount
     const defaultLife = nextTeams
       ? defaultTeamLife(type.format)
       : defaultStartingLife(type.system, type.format, nextCount)
@@ -785,6 +804,7 @@ function NewGameForm({
       setDeck(undefined)
     }
     setTreacheryChosen(nextTreachery)
+    setArchenemyChosen(type.variant === "archenemy")
     setTeamsChosen(nextTeams)
     setFormatPicked(true)
     if (nextCount !== playerCount) resizeSeats(nextCount)
@@ -900,6 +920,9 @@ function NewGameForm({
           })
         return next
       })
+    setModeChoices((current) =>
+      Number(current.archenemy) > value ? { ...current, archenemy: "roll" } : current,
+    )
     setPlayerCount(value)
   }
 
@@ -1014,9 +1037,11 @@ function NewGameForm({
                 isDisabled={
                   treachery
                     ? (count) => !isTreacheryPlayerCount(count)
-                    : twoHeadedGiant
-                      ? (count) => !isTwoHeadedGiantPlayerCount(count)
-                      : undefined
+                    : archenemy
+                      ? (count) => count < ARCHENEMY_MIN_SEATS
+                      : twoHeadedGiant
+                        ? (count) => !isTwoHeadedGiantPlayerCount(count)
+                        : undefined
                 }
                 onSelect={(value) => {
                   choosePlayerCount(value)
@@ -1039,6 +1064,17 @@ function NewGameForm({
                 />
               ) : null}
               <TurnsChoice />
+              {planechaseAvailable ? (
+                <ModeSetupFields
+                  choices={modeChoices}
+                  archenemy={archenemy}
+                  seatNames={seatNames}
+                  onChange={(next) => {
+                    setModeChoices(next)
+                    setEdited(true)
+                  }}
+                />
+              ) : null}
               <View style={themed($summaryRow)}>
                 <Text size="xs" text={optionsSummary} style={themed($summaryText)} />
                 <Button
