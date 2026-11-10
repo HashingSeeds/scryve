@@ -5,6 +5,7 @@ import { View } from "react-native"
 import { useAppTheme } from "@/theme/context"
 
 import { seatCardRadius } from "./playerCardTypes"
+import { useTurnStyle } from "./turnStyle"
 
 export interface TurnSpotlight {
   active: readonly string[]
@@ -16,6 +17,17 @@ export const TurnSpotlightContext = createContext<TurnSpotlight | undefined>(und
 
 export const useTurnSpotlight = () => useContext(TurnSpotlightContext)
 
+export function useSeatDimmed(playerId: string | undefined) {
+  const spotlight = useTurnSpotlight()
+  const style = useTurnStyle()
+  return (
+    style !== "frames" &&
+    !!playerId &&
+    !!spotlight?.active.length &&
+    !spotlight.active.includes(playerId)
+  )
+}
+
 export function SeatSpotlight({
   playerId,
   compact,
@@ -26,9 +38,11 @@ export function SeatSpotlight({
   corners?: StyleProp<ViewStyle>
 }) {
   const spotlight = useTurnSpotlight()
+  const style = useTurnStyle()
   const {
     theme: { colors },
   } = useAppTheme()
+  if (style !== "frames") return null
   const active = !!spotlight?.active.includes(playerId)
   const next = !!spotlight?.next.includes(playerId)
   if (!active && !next) return null

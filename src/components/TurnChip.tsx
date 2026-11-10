@@ -66,11 +66,13 @@ export function TurnChipLayer({
   contentInsets,
   menuCorner,
   menuEdgeCenter,
+  filled,
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
+  filled?: boolean
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   contentInsets?: LifeCardContentInsets
@@ -93,7 +95,13 @@ export function TurnChipLayer({
         onLayout={({ nativeEvent: { layout } }) => setWidth(layout.width)}
         style={[$slot, { top: EDGE_GAP + insets.top, left }, width === 0 && $measuring]}
       >
-        <TurnChip state={state} seatNumber={seatNumber} foreground={foreground} compact={compact} />
+        <TurnChip
+          state={state}
+          seatNumber={seatNumber}
+          foreground={foreground}
+          compact={compact}
+          filled={filled}
+        />
       </View>
     </View>
   )
@@ -104,11 +112,13 @@ export function TurnChip({
   seatNumber,
   foreground,
   compact,
+  filled,
 }: {
   state: TurnChipState
   seatNumber: number
   foreground: string
   compact?: boolean
+  filled?: boolean
 }) {
   const {
     themed,
@@ -143,6 +153,16 @@ export function TurnChip({
       <PlayGlyph color={ink} />
       <Text tx="board:turn.start" weight="bold" style={[themed($value), { color: ink }]} />
     </>
+  ) : filled ? (
+    <>
+      <Text
+        text={time}
+        testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
+        weight="bold"
+        style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
+      />
+      {canPress && !outOfTime ? <ChevronGlyph color={ink} /> : null}
+    </>
   ) : (
     <>
       {outOfTime ? null : (
@@ -172,9 +192,9 @@ export function TurnChip({
 
   const shape: ViewStyle[] = [
     themed(compact ? $compactChip : $chip),
-    { borderColor: foreground },
+    filled ? $filled : { borderColor: foreground },
     ...(outOfTime ? [{ backgroundColor: colors.error, borderColor: colors.error }] : []),
-    ...(canPress ? [] : [$passive]),
+    ...(canPress ? [] : [filled ? $filledPassive : $passive]),
   ]
 
   if (!canPress)
@@ -211,6 +231,21 @@ function PlayGlyph({ color }: { color: string }) {
   )
 }
 
+function ChevronGlyph({ color }: { color: string }) {
+  return (
+    <Svg width={9} height={12} viewBox="0 0 9 12">
+      <Path
+        d="M2 1.5 6.5 6 2 10.5"
+        stroke={color}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  )
+}
+
 const $layer: ViewStyle = { position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }
 const $slot: ViewStyle = { position: "absolute" }
 const $measuring: ViewStyle = { opacity: 0 }
@@ -243,5 +278,13 @@ const $rule: ViewStyle = { width: 1, alignSelf: "stretch", marginVertical: 8, op
 const $dot: ViewStyle = { width: 5, height: 5, borderRadius: 3 }
 const $tickOn: ViewStyle = { opacity: 0.9 }
 const $tickOff: ViewStyle = { opacity: 0.3 }
+const $filled: ViewStyle = {
+  borderWidth: 0,
+  borderRadius: 999,
+  backgroundColor: "rgba(0,0,0,0.22)",
+  paddingHorizontal: 12,
+  gap: 6,
+}
+const $filledPassive: ViewStyle = { opacity: 0.7 }
 const $passive: ViewStyle = { opacity: 0.7, borderStyle: "dashed" }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }

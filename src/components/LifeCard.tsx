@@ -72,6 +72,7 @@ import {
 } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
+import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
@@ -107,7 +108,9 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { Text } from "./Text"
-import { TurnChipLayer } from "./TurnChip"
+import { TurnChip, TurnChipLayer } from "./TurnChip"
+import { useSeatDimmed } from "./TurnSpotlight"
+import { useTurnStyle } from "./turnStyle"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const LIFE_FADE_MS = SWAP_MS
@@ -215,7 +218,14 @@ export const LifeCard = memo(function LifeCard({
   onChange,
   style,
 }: LifeCardProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const turnStyle = useTurnStyle()
+  // why: dims only the fill, so life totals stay full white on every seat.
+  const dimmed = useSeatDimmed(playerId)
+  const fill = dimmed ? mixColorsInLinearLight(color, colors.board.background, 0.55) : color
   const commanderSeat = !!commanderDamage
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
@@ -438,6 +448,13 @@ export const LifeCard = memo(function LifeCard({
   const shownCardMode = commanderCardMode ?? (floodedBy.takeover ? lastTarget.current : undefined)
   const attackerSide = commanderCardMode?.kind === "source"
   const commanderCovers = !!commanderCardMode && (!takeover || floodedBy.covered)
+  const turnChipShown =
+    !dice?.view &&
+    !editorOpen &&
+    !tableSheetOpen &&
+    !commanderCovers &&
+    !diceCovers &&
+    !attackerSide
   const shownFlood = floodedBy.takeover?.flood
   // why: the strip keeps the attack's look until the flood has drained off it.
   const stripAttackerId = defending ? armedCommanderId : floodedBy.attacker?.id
@@ -692,7 +709,7 @@ export const LifeCard = memo(function LifeCard({
         compact && themed($compactCard),
         ownership === "disabled" && themed($disabledCard),
         staleSince !== undefined && themed($staleCard),
-        { backgroundColor: color },
+        { backgroundColor: fill },
         style,
         knockStyle,
       ]}
@@ -1032,6 +1049,15 @@ export const LifeCard = memo(function LifeCard({
                 }
               />
             ) : null}
+            {turnChip && turnStyle === "row" && turnChipShown ? (
+              <TurnChip
+                state={turnChip}
+                seatNumber={seatNumber}
+                foreground={foreground}
+                compact={compact}
+                filled
+              />
+            ) : null}
           </Animated.View>
           {calculatorButtonShown ? (
             <BoardPressable
@@ -1056,13 +1082,7 @@ export const LifeCard = memo(function LifeCard({
           ) : null}
         </Animated.View>
       ) : null}
-      {turnChip &&
-      !dice?.view &&
-      !editorOpen &&
-      !tableSheetOpen &&
-      !commanderCovers &&
-      !diceCovers &&
-      !attackerSide ? (
+      {turnChip && turnStyle !== "row" && turnChipShown ? (
         <TurnChipLayer
           state={turnChip}
           seatNumber={seatNumber}
@@ -1073,6 +1093,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuCorner={menuCorner}
           menuEdgeCenter={menuEdgeCenter}
+          filled={turnStyle === "dim"}
         />
       ) : null}
       {claims?.length ? (
