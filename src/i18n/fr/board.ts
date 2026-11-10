@@ -587,12 +587,6 @@ export default {
     chessOff: "Désactivé",
     roundClock: "Horloge de ronde",
     divider: "Tour {{number}} · {{name}}",
-    hideOffer: {
-      title: "Arrêter le suivi des tours ?",
-      body: "Vous pouvez le réactiver dans les Réglages.",
-      hide: "Arrêter",
-      keep: "Garder",
-    },
   },
   planar: {
     title: "Planechase",

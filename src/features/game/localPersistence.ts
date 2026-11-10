@@ -36,7 +36,6 @@ import {
   type RecentSetup,
 } from "./recentSetups"
 import { isRoundClockSetup, type RoundClock } from "./roundClock"
-import { type TurnPrefs } from "./turnTab"
 import type {
   CommanderDamageTotals,
   GameEvent,
@@ -99,8 +98,8 @@ export interface LocalSettings {
   defaultFormat?: string
   askWhatYouPlay?: true
   syncStats?: boolean
-  turnTab?: boolean
-  turnTabHideOffered?: true
+  /** why: turns are opt-in, so only a player who chose them has this; a missing field means off. */
+  turnTab?: true
   teamBinding?: "frame"
 }
 
@@ -615,8 +614,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...systemPreference,
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
-    ...(migrated.turnTab === false ? { turnTab: false } : {}),
-    ...(migrated.turnTabHideOffered === true ? { turnTabHideOffered: true } : {}),
+    ...(migrated.turnTab === true ? { turnTab: true } : {}),
     ...(migrated.teamBinding === "frame" ? { teamBinding: "frame" } : {}),
   }
 }
@@ -735,6 +733,9 @@ function withinHistoryCap(games: readonly LocalGameSummary[]): LocalGameSummary[
 
 export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
 
+// why: shared by every repository on this device, since they read and write the same settings.
+const settingsListeners = new Set<() => void>()
+
 export class LocalGameRepository {
   private readonly finishListeners = new Set<() => void>()
   private readonly historyListeners = new Set<() => void>()
@@ -827,24 +828,21 @@ export class LocalGameRepository {
     return settings
   }
 
-  turnPrefs(): TurnPrefs {
-    const settings = this.loadSettings()
-    return {
-      enabled: settings.turnTab !== false,
-      hideOffered: settings.turnTabHideOffered === true,
-    }
+  turnsEnabled(): boolean {
+    return this.loadSettings().turnTab === true
   }
 
-  saveTurnPrefs(prefs: Partial<TurnPrefs>): TurnPrefs {
-    const settings = this.loadSettings()
-    const { turnTab: _on, turnTabHideOffered: _offered, ...rest } = settings
-    const next = { ...this.turnPrefs(), ...prefs }
-    this.saveSettings({
-      ...rest,
-      ...(next.enabled ? {} : { turnTab: false }),
-      ...(next.hideOffered ? { turnTabHideOffered: true } : {}),
-    })
-    return next
+  saveTurnsEnabled(enabled: boolean): void {
+    const { turnTab: _turnTab, ...rest } = this.loadSettings()
+    this.saveSettings({ ...rest, ...(enabled ? { turnTab: true } : {}) })
+  }
+
+  /** why: Settings, game setup and a board stay mounted together, so each hears a change the others save. */
+  onSettingsChanged(listener: () => void): () => void {
+    settingsListeners.add(listener)
+    return () => {
+      settingsListeners.delete(listener)
+    }
   }
 
   teamBinding(): "link" | "frame" {
@@ -868,6 +866,7 @@ export class LocalGameRepository {
       LOCAL_KEYS.settings,
       JSON.stringify({ ...valid, brawlLifeMigrated: true, podDefaultMigrated: true }),
     )
+    settingsListeners.forEach((listener) => listener())
   }
 
   saveDefaultsFrom(game: Pick<LocalGame, "players" | "startingLife" | "system" | "format">): void {

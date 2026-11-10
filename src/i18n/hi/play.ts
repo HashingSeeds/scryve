@@ -35,6 +35,11 @@ export default {
     continue: "जारी रखें",
     endGame: "गेम खत्म करें",
   },
+  turnsChoice: {
+    label: "टर्न",
+    lifeOnly: "सिर्फ़ लाइफ़ टोटल",
+    lifeAndTurns: "लाइफ़ और टर्न",
+  },
   whatYouPlay: {
     heading: "आप क्या खेलते हैं?",
     changeLater: "आप इसे सेटिंग्स में बदल सकते हैं।",

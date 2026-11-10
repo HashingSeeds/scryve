@@ -37,6 +37,11 @@ export default {
     continue: "続ける",
     endGame: "ゲームを終了",
   },
+  turnsChoice: {
+    label: "ターン",
+    lifeOnly: "ライフのみ",
+    lifeAndTurns: "ライフとターン",
+  },
   whatYouPlay: {
     heading: "何をプレイしますか?",
     changeLater: "設定でいつでも変更できます。",

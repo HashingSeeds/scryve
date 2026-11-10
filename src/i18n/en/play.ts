@@ -35,6 +35,12 @@ const play = {
     continue: "Continue",
     endGame: "End game",
   },
+  // The two-choice row in game setup and on the first page: life totals alone, or with turns too.
+  turnsChoice: {
+    label: "Turns",
+    lifeOnly: "Just life totals",
+    lifeAndTurns: "Life and turns",
+  },
   whatYouPlay: {
     heading: "What do you play?",
     changeLater: "You can change this in Settings.",

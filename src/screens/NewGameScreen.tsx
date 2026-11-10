@@ -79,6 +79,7 @@ import {
   ROUND_CLOCK_MINUTES,
   type RoundClockSetup,
 } from "@/features/game/roundClock"
+import { TurnsChoice } from "@/features/game/TurnsChoice"
 import type {
   LocalGame,
   LocalGameResult,
@@ -1058,6 +1059,7 @@ function NewGameForm({
                   }}
                 />
               ) : null}
+              <TurnsChoice />
               {planechaseAvailable ? (
                 <ModeSetupFields
                   choices={modeChoices}

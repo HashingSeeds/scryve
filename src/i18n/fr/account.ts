@@ -124,7 +124,7 @@ export default {
     turns: {
       label: "Tours",
       helper:
-        "Encadre la place active et affiche un chronomètre de tour sur sa carte. Touchez le chronomètre pour passer.",
+        "Indique à qui est le tour avec un minuteur de tour. Touchez le minuteur pour passer.",
     },
     syncStats: {
       label: "Stats pour les geeks",
