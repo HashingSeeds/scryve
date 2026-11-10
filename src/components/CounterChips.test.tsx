@@ -156,6 +156,23 @@ describe("CounterChips", () => {
     expect(dice.rollFor).toHaveBeenLastCalledWith("d4")
   })
 
+  it("opens the plane from the bag, keeping a narrow bag to two rows", () => {
+    const dice = {
+      tools: ["d4", "d6", "d20", "coin"] as const,
+      rollFor: jest.fn(),
+      openPlane: jest.fn(),
+    }
+    const view = chips(seat(), { dice })
+
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+    expect(view.getByTestId("bag-tool-d20-seat-1")).toBeTruthy()
+    expect(view.queryByTestId("bag-tool-coin-seat-1")).toBeNull()
+    fireEvent.press(view.getByRole("button", { name: "Planechase" }))
+    expect(dice.openPlane).toHaveBeenCalledTimes(1)
+    expect(dice.rollFor).not.toHaveBeenCalled()
+    expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
+  })
+
   it("edits from a held chip: steps never go below zero and remove clears the count", () => {
     const table = seat({ counters: { commanderTax: 1 } })
     const view = chips(table)

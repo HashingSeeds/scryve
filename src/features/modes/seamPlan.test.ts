@@ -43,6 +43,18 @@ describe("seamPlan", () => {
     })
   })
 
+  it("drops every plate where no side has room for an icon, which the seat bags cover", () => {
+    const geometry = geometryFor(4, 320, 693)
+    const rooms = {
+      left: seamRoom(geometry, "left", new Set([0])),
+      right: seamRoom(geometry, "right", new Set([0])),
+    }
+    expect([rooms.left?.width ?? 0, rooms.right?.width ?? 0].every((w) => w < ICON_WIDTH)).toBe(
+      true,
+    )
+    expect(planSeam(rooms, ["plane", "die"])).toEqual({})
+  })
+
   it("keeps the side an active across seat's chip slides to, and puts the die in that seat's card", () => {
     const geometry = geometryFor(2, 390, 844)
     const topSeatActive = new Set([0])

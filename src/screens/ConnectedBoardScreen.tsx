@@ -95,7 +95,7 @@ import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
 import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
-import { modeSeamFor, teamSeat } from "@/features/modes/modeSeamFor"
+import { bagWithPlane, modeSeamFor, teamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
@@ -1083,6 +1083,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       : undefined
   const seatGrid = {
     ...dice.grid,
+    bag: bagWithPlane(dice.grid.bag, boardModes),
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))

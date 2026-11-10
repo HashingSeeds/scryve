@@ -322,6 +322,22 @@ describe("CurrentGameScreen", () => {
     )
   })
 
+  it("opens the plane from any seat's bag, even where the seam has no room for it", () => {
+    const initial = createLocalGame({
+      players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
+      startingLife: 20,
+      system: "mtg",
+      format: "constructed",
+      modeSetup: { planechase: {} },
+      now: 1,
+    })
+    const view = renderGame(initial, turnsOff())
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("seat-bag-seat-3"))
+    fireEvent.press(view.getByTestId("bag-plane-seat-3"))
+    expect(view.getByTestId("planar-walk")).toBeTruthy()
+  })
+
   it("lets a seat claim first from its empty 1st, which closes the offer everywhere", () => {
     const initial = game()
     const repository = turnsOff()

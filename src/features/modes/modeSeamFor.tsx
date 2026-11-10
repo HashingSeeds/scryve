@@ -19,6 +19,15 @@ export function teamSeat(
   return head === 0 || head === 1 ? { slot, head } : undefined
 }
 
+/** why: a crowded seam drops the plane plate, and with Turns off the die too, so every seat's bag opens the plane and nobody loses it. */
+export function bagWithPlane<Bag extends object>(
+  bag: Bag | undefined,
+  modes: BoardModes,
+): (Bag & { openPlane?: () => void }) | undefined {
+  const { planar, openDialog } = modes
+  return bag && planar ? { ...bag, openPlane: () => openDialog("planar") } : bag
+}
+
 const EDGE = 8
 const EDGE_WITH_TABS = 40
 

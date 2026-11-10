@@ -23,6 +23,7 @@ import type { SeatDiceBag } from "./DiceSeatOverlay"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
+import { PlanarGlyph } from "./modes/ModeSeam"
 import {
   CUTOUT_ENDS_INSIDE_INSET,
   useCornerSlide,
@@ -1159,9 +1160,31 @@ function DiceSection({
   onRolled: () => void
 }) {
   const { themed } = useAppTheme()
-  const tools = narrow && !allDice ? QUICK_DICE : dice.tools
+  const { openPlane } = dice
+  const tools = narrow && !allDice ? QUICK_DICE.slice(0, openPlane ? -1 : undefined) : dice.tools
   return (
     <View style={themed($diceTools)}>
+      {openPlane ? (
+        <Animated.View layout={slide}>
+          <BoardPressable
+            testID={`bag-plane-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={translate("board:planar.title")}
+            accessibilityHint={translate("board:planar.opensPlane")}
+            hitSlop={4}
+            onPress={() => {
+              onRolled()
+              openPlane()
+            }}
+            style={({ pressed }) => [
+              themed($diceTool),
+              pressed && { backgroundColor: overlayTint(ink, 0.14) },
+            ]}
+          >
+            <PlanarGlyph face="planeswalk" size={compact ? 20 : 22} color={ink} />
+          </BoardPressable>
+        </Animated.View>
+      ) : null}
       {tools.map((tool) => (
         <Animated.View
           key={tool}

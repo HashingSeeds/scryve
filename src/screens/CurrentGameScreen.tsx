@@ -62,7 +62,7 @@ import { useLocalGame } from "@/features/game/useLocalGame"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
 import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
-import { modeSeamFor, teamSeat, type SeamSeat } from "@/features/modes/modeSeamFor"
+import { bagWithPlane, modeSeamFor, teamSeat, type SeamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -383,6 +383,7 @@ export function CurrentGameScreen({
   const claiming = !!firstPlayer || (turnsOn && !turn)
   const seatGrid = {
     ...dice.grid,
+    bag: bagWithPlane(dice.grid.bag, boardModes),
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))

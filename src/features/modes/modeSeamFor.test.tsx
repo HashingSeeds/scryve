@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactElement } from "react"
-import { render, renderHook, screen } from "@testing-library/react-native"
+import { act, render, renderHook, screen } from "@testing-library/react-native"
 
-import { COMPACT_MENU_BUTTON_SIZE } from "@/components/GameRadialMenu"
+import { COMPACT_MENU_BUTTON_SIZE, MENU_BUTTON_SIZE } from "@/components/GameRadialMenu"
 import type { ModeSeam } from "@/components/modes/ModeSeam"
 import {
   getMenuSeamNeighbors,
@@ -12,7 +12,7 @@ import {
 import { headChipCrowded, teamGridLayout } from "@/components/teamGridGeometry"
 import { ThemeProvider } from "@/theme/context"
 
-import { modeSeamFor, teamSeat } from "./modeSeamFor"
+import { bagWithPlane, modeSeamFor, teamSeat } from "./modeSeamFor"
 import { useBoardModes } from "./useBoardModes"
 import { PLANAR_DECKS, SCHEME_DECKS } from "../../../convex/lib/modeDecks"
 import { startModes, type ModeSetup } from "../../../convex/lib/tableModes"
@@ -149,6 +149,71 @@ describe("modeSeamFor", () => {
         }) as ReactElement<ComponentProps<typeof ModeSeam>>
         const { left, right } = element.props.plan
         expect([...(left?.items ?? []), ...(right?.items ?? [])]).toEqual(["plane"])
+      }
+    },
+  )
+
+  it.each([
+    [4, false, 320],
+    [5, false, 375],
+    [6, false, 320],
+    [4, true, 390],
+  ] as const)(
+    "keeps the plane one tap away when a %i-seat board (teams: %s) at %ipt has no seam room",
+    (count, team, width) => {
+      const players = Array.from({ length: count }, (_, index) => `p${index}`)
+      const teams = team
+        ? Array.from({ length: count / 2 }, (_, index) => players.slice(2 * index, 2 * index + 2))
+        : undefined
+      const cells = teams?.length ?? count
+      const layout = (team ? teamGridLayout : getPlayerGridLayout)({
+        playerCount: cells,
+        width,
+        height: 700,
+      })
+      const { modes, turnGroups } = startModes(
+        { planechase: { decks: [PLANAR_DECKS[0].id] } },
+        players,
+      )
+      for (const turnsOn of [true, false]) {
+        const { result } = renderHook(() =>
+          useBoardModes({
+            modes,
+            turn: turnsOn
+              ? { playerId: "p0", number: 1, startedAt: 0, operationId: "t", waiting: true }
+              : undefined,
+            groups: teams ?? turnGroups,
+            players: players.map((id) => ({ id, name: id })),
+            controls: () => true,
+            act: () => true,
+          }),
+        )
+        const seam = modeSeamFor(result.current, {
+          dieOnChip: turnsOn,
+          turnChips: turnsOn,
+          slotOf: (playerId) =>
+            teams ? teamSeat(teams, playerId) : { slot: players.indexOf(playerId) },
+        })
+        const element = seam?.({
+          anchor: getPlayerGridMenuAnchor(cells, layout),
+          facings: getPlayerSlotFacings(cells, layout),
+          edgeTabs: false,
+          sides: getMenuSeamNeighbors(cells, layout),
+          width,
+          menuSize: cells > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
+          rivets: [],
+          ...(teams
+            ? {
+                headCrowded: (slot: number, head: 0 | 1) =>
+                  headChipCrowded(cells, layout, slot, head),
+              }
+            : {}),
+        }) as ReactElement<ComponentProps<typeof ModeSeam>>
+        const { left, right } = element.props.plan
+        expect([...(left?.items ?? []), ...(right?.items ?? [])]).not.toContain("plane")
+        const bag = bagWithPlane({ tools: [], rollFor: () => {} }, result.current)
+        act(() => bag?.openPlane?.())
+        expect(result.current.dialog).toBe("planar")
       }
     },
   )
