@@ -270,6 +270,7 @@ describe("useDice", () => {
   })
 
   it("rolls off only the seats it is given, one per Two-Headed Giant team", () => {
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     const four = [...players, { ...players[0], id: asPlayerId("p4"), name: "Dorothy", seat: 3 }]
     const { result } = renderHook(() => useDice(four, "game-teams", "mtg", ["p1", "p3"]))
     act(() => result.current.rollOff())
