@@ -69,7 +69,8 @@ export interface TurnChipState {
 }
 
 export type DiceSeatChip =
-  | { kind: "roll"; roll: DiceRoll }
+  /** why: `seatId` marks a teammate's roll shown on a Two-Headed Giant team zone, so two rolls of one die keep apart. */
+  | { kind: "roll"; roll: DiceRoll; seatId?: string }
   | { kind: "first" }
   | { kind: "claim" }
   | { kind: "turn"; state: TurnChipState }

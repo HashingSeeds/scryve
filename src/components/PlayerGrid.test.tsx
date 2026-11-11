@@ -137,6 +137,44 @@ function layoutCards(view: ReturnType<typeof render>) {
 }
 
 describe("PlayerGrid", () => {
+  it("gives a team zone the claim of the teammate this device holds, and keeps both teammates' rolls apart", () => {
+    const seats = players(4)
+    const roll = { kind: "roll" as const, roll: { tool: "d20" as const, value: 7 } }
+    const claim = { kind: "claim" as const }
+    const onPressChip = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          dice={{
+            seatFor: () => undefined,
+            chipsFor: ({ id }) =>
+              id === seats[1].id ? [roll, claim] : id === seats[0].id ? [roll] : [],
+            onPressSeat: jest.fn(),
+            onChoose: jest.fn(),
+            onPressChip,
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    expect(onPressChip).toHaveBeenLastCalledWith(seats[1], claim)
+    fireEvent.press(view.getByTestId("dice-chip-1-d20"))
+    expect(onPressChip).toHaveBeenLastCalledWith(seats[1], roll)
+    fireEvent.press(view.getByTestId(`dice-chip-1-${seats[0].id}-d20`))
+    expect(onPressChip).toHaveBeenLastCalledWith(
+      seats[0],
+      expect.objectContaining({ kind: "roll", seatId: seats[0].id }),
+    )
+  })
+
   it("draws a foil player's Pro mark in foil on a Pokémon seat, and leaves a free mark flat", () => {
     const rules = playTableRules("pokemon", "standard")
     const table = EMPTY_TABLE

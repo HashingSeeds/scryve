@@ -182,7 +182,7 @@ function seatDiceFor(
   }
 }
 
-/** why: a team zone shows the team's one roll-off die and turn chip (the first player's), plus whatever die a teammate rolled from their strip's bag; the bags themselves stay on the strips. */
+/** why: a team zone shows the team's one roll-off die and turn chip, plus whatever die either teammate rolled from their strip's bag; the bags stay on the strips. Its claim and turn chip come from the teammate this device acts for, since only that seat's chips can claim the turn or roll the planar die. */
 function teamDiceFor(
   dice: DiceGridBinding | undefined,
   lead: GamePlayer,
@@ -190,18 +190,25 @@ function teamDiceFor(
   stable: ReturnType<typeof useStableCallbacks>,
 ): LifeCardDice | undefined {
   if (!dice) return undefined
-  const leadView = dice.seatFor(lead)
-  const viewer = leadView === undefined && dice.seatFor(teammate) ? teammate : lead
-  const rolls = dice.chipsFor(teammate).filter(({ kind }) => kind === "roll")
+  const acts = (player: GamePlayer) =>
+    dice
+      .chipsFor(player)
+      .some((chip) => chip.kind === "claim" || (chip.kind === "turn" && !!chip.state.beside))
+  const actor = !acts(lead) && acts(teammate) ? teammate : lead
+  const other = actor === lead ? teammate : lead
+  const viewer = dice.seatFor(actor) === undefined && dice.seatFor(other) ? other : actor
+  const rolls = dice
+    .chipsFor(other)
+    .flatMap((chip) => (chip.kind === "roll" ? [{ ...chip, seatId: other.id }] : []))
   return {
     view: dice.seatFor(viewer),
-    chips: [...dice.chipsFor(lead), ...rolls],
+    chips: [...dice.chipsFor(actor), ...rolls],
     onPress: stable(`dice:${viewer.id}`, () => dice.onPressSeat(viewer)),
     onChoose: stable(`dice-choose:${viewer.id}`, (order: "first" | "second") =>
       dice.onChoose(viewer, order),
     ),
     onPressChip: stable(`dice-chip:${lead.id}`, (chip: DiceSeatChip) =>
-      dice.onPressChip(rolls.includes(chip) ? teammate : lead, chip),
+      dice.onPressChip(chip.kind === "roll" && chip.seatId === other.id ? other : actor, chip),
     ),
   }
 }

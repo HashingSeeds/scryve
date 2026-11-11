@@ -184,7 +184,9 @@ function ChipFlight({
 }
 
 function chipKey(chip: Exclude<DiceSeatChip, { kind: "turn" | "undoPass" }>) {
-  return chip.kind === "roll" ? chip.roll.tool : chip.kind
+  return chip.kind === "roll"
+    ? `${chip.seatId ? `${chip.seatId}-` : ""}${chip.roll.tool}`
+    : chip.kind
 }
 
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
