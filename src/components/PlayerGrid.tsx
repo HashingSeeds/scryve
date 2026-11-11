@@ -182,7 +182,6 @@ function seatDiceFor(
   }
 }
 
-/** why: a team zone shows the team's one roll-off die and turn chip, plus whatever die either teammate rolled from their strip's bag; the bags stay on the strips. Its claim and turn chip come from the teammate this device acts for, since only that seat's chips can claim the turn or roll the planar die. */
 function teamDiceFor(
   dice: DiceGridBinding | undefined,
   lead: GamePlayer,
@@ -368,7 +367,6 @@ export function PlayerGrid({
   const seatedRows = seated.rows
   const seatedRowFlexes = seated.flexes
   const panelBoxMap = teams ? panelBoxes(rows, rowFlexes) : undefined
-  // why: team rows can differ in height (6 seats), so a team zone sizes its total to its own panel.
   const zoneLifeFontSizeFor = (slot: number) =>
     stable(`zone-font:${slot}`, (digits: number) => {
       const box = panelBoxMap?.get(slot)
@@ -407,7 +405,6 @@ export function PlayerGrid({
     shape,
   }))
 
-  /** why: with `members`, the card is a Two-Headed Giant team zone for players[index], the team's first player: it takes the team's hits and reads its commander totals, and turns into the attacker's controls when either teammate's commander attacks. */
   function seatCard(
     index: number,
     place: SeatPlace,

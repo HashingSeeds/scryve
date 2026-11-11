@@ -32,7 +32,6 @@ export interface SelectFieldProps {
   testID?: string
   /** Shows the current choice but refuses to open the menu. */
   disabled?: boolean
-  /** why: a field that is its own section of a form (a game setup row) titles it like the sections around it. */
   heading?: boolean
   onSelect: (id?: string) => void
 }

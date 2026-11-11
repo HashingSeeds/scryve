@@ -174,7 +174,6 @@ export interface LifeCardProps {
   out?: LifeCardOut
   seatTable?: SeatTable
   dice?: LifeCardDice
-  /** why: a Two-Headed Giant team zone, shaded from one teammate's color to the other's, content-left first. Each teammate's name and mark sit in their top corner and their own counters in their bottom corner; `shared` counters (poison) join the turn chip and the team's commander grid, centered by the players' edge. */
   team?: { heads: readonly [TeamHead, TeamHead]; shared: readonly string[] }
   onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
@@ -270,7 +269,6 @@ export const LifeCard = memo(function LifeCard({
   const calculator = !!playSystemRules(system).counter.calculator
   // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
   const [tableSheetOpen, setTableSheetOpen] = useState(false)
-  // why: a team zone has three chip layers (the shared poison and each teammate's corner); while one holds an open sheet the others step out so nothing behind the sheet stays reachable.
   const [sheetOwner, setSheetOwner] = useState<TeamSheetOwner>()
   const sheetFor = useCallback((owner: TeamSheetOwner, open: boolean) => {
     setTableSheetOpen(open)
@@ -1254,7 +1252,6 @@ export const LifeCard = memo(function LifeCard({
   )
 }, structurallyEqual)
 
-/** why: lays a team zone's bottom row out as one run centered on the card, skipping empty parts. */
 export function centeredRow(run: number, gap: number, widths: readonly number[]) {
   const shown = widths.filter((width) => width > 0)
   const total = shown.reduce((sum, width) => sum + width, 0) + gap * Math.max(shown.length - 1, 0)

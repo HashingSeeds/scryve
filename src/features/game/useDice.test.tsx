@@ -1,5 +1,5 @@
 import { AccessibilityInfo, Platform, Pressable, View } from "react-native"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render, renderHook } from "@testing-library/react-native"
 
 import { DiceChips } from "@/components/DiceChips"
 import { diceCoversSeat, DiceSeatOverlay } from "@/components/DiceSeatOverlay"
@@ -267,5 +267,17 @@ describe("useDice", () => {
     expect(region()).toHaveTextContent("")
     act(() => jest.runOnlyPendingTimers())
     expect(region()).toHaveTextContent("Ada, d6, 4")
+  })
+
+  it("rolls off only the seats it is given, one per Two-Headed Giant team", () => {
+    const four = [...players, { ...players[0], id: asPlayerId("p4"), name: "Dorothy", seat: 3 }]
+    const { result } = renderHook(() => useDice(four, "game-teams", "mtg", ["p1", "p3"]))
+    act(() => result.current.rollOff())
+    expect(four.map((player) => result.current.grid.seatFor(player) !== undefined)).toEqual([
+      true,
+      false,
+      true,
+      false,
+    ])
   })
 })

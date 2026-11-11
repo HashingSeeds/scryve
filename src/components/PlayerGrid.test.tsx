@@ -220,6 +220,11 @@ describe("PlayerGrid", () => {
     fireEvent.press(zone.getByTestId("counter-close-1"))
     expect(zone.getByTestId("counter-chip-1-poison")).toBeTruthy()
     expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
+
+    fireEvent(zone.getByTestId("counter-chip-1-poison"), "longPress")
+    expect(zone.getByTestId("counter-sheet-seat-1")).toBeTruthy()
+    expect(zone.queryByTestId("seat-bag-seat-1")).toBeNull()
+    expect(zone.queryByTestId("seat-bag-seat-2")).toBeNull()
   })
 
   it("acts as the second teammate on a device that holds only that seat", () => {

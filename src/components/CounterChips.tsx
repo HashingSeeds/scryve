@@ -217,7 +217,6 @@ function moveFocus(target: View | null | undefined) {
 export interface CounterChipsProps {
   seat: SeatTable
   dice?: SeatDiceBag
-  /** why: a Two-Headed Giant teammate's counters sit in their own bottom corner, so the first teammate's bag anchors on the left and its chips grow right. */
   bagAt: ({ right: number } | { left: number }) & { bottom: number }
   seatNumber: number
   identity: string
@@ -228,12 +227,9 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
-  /** why: where the chips must stop, across the content frame: past it for a right-anchored row, before it for a left-anchored one. */
   nameEnd?: number
   hidden?: readonly string[]
-  /** why: a team zone centers its turn chip, commander grid, and shared poison as one row, so it needs the poison row's width. */
   onRowWidth?: (width: number) => void
-  /** why: a team zone keeps only the shared counters; each teammate's bag sits on their own strip. */
   bagless?: boolean
   onSheetOpenChange?: (open: boolean) => void
 }

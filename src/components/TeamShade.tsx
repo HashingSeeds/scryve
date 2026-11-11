@@ -17,7 +17,6 @@ import { useSeatDimmed } from "./TurnSpotlight"
 
 const MIDDLE_DEPTH = 0.88
 
-/** why: the middle under the total stays near the board, tinted by both teammates, so the two colors never blend into a bright third one. */
 export function teamZoneMiddle(colors: readonly [string, string], background: string) {
   return mixColorsInLinearLight(
     mixColorsInLinearLight(colors[0], colors[1], 0.5),
@@ -36,7 +35,6 @@ const GRADIENT_AXIS: Record<
   [-90]: { x1: 0, y1: 1, x2: 0, y2: 0 },
 }
 
-/** why: a team zone runs from the first teammate's color at its content-left edge to the second's at its right, and dims with the seat fill when the team is out of the turn. */
 export function TeamShade({
   colors,
   rotation,
@@ -76,7 +74,6 @@ export function TeamShade({
         height={size.height}
       >
         <Defs>
-          {/* why: each teammate's full color starts at their outer edge and fades over the dark middle, with no hard edge anywhere. */}
           <LinearGradient id={id} {...GRADIENT_AXIS[rotation]}>
             <Stop offset="0" stopColor={colors[0]} />
             <Stop offset="0.14" stopColor={colors[0]} stopOpacity={EDGE_FADE} />

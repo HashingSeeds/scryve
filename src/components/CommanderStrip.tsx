@@ -69,14 +69,12 @@ export interface CommanderStripProps {
   contentInsets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
   compact?: boolean
-  /** why: a Two-Headed Giant team zone centers its grid in its bottom row, this far from the content's left edge, instead of in a corner. */
   from?: number
   disabled?: boolean
   attack?: CommanderStripAttack
   source?: CommanderStripSource
   markAnchor?: { x: number; y: number; size: number }
   onBoundsChange?: (bounds: LayoutRectangle) => void
-  /** why: a Two-Headed Giant team's grid has none, since each teammate's strip mark starts their own attack; it then only reads the totals. */
   onPress?: () => void
 }
 

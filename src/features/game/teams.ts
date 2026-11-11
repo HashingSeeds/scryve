@@ -58,7 +58,6 @@ export function teamValueLabel(
   return { spoken: lives.map(label).join(", ") }
 }
 
-/** why: in Two-Headed Giant a commander's damage to either head counts toward the team's one 21, so a team reads (and an attack builds on) the sum across its heads. */
 export function teamIncoming<Id extends string, Commander>(
   teams: readonly (readonly string[])[] | undefined,
   incoming: (to: Id, commander?: Commander) => Record<Id, number>,

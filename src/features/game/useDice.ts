@@ -39,7 +39,6 @@ const FIRST_HOLD = "first"
 
 type State = { gameId: string; dice: DiceState }
 
-/** why: `rollers` are the seats that roll off and choose to go first; a Two-Headed Giant team rolls once, as its first player. */
 export function useDice(
   players: readonly Pick<GamePlayer, "id" | "name">[],
   gameId: string,

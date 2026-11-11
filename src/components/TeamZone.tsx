@@ -21,7 +21,6 @@ import { CONTENT_EDGES } from "./playerGridGeometry"
 import { SeatIdentity, seatIdentityLabel, seatIdentityMetrics } from "./SeatIdentity"
 import { isProMarkShape, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-/** why: one teammate on a Two-Headed Giant team zone: their name and mark in their own top corner, their own counters and bag in the bottom corner below. */
 export interface TeamHead {
   seatNumber: number
   name: string
@@ -32,7 +31,6 @@ export interface TeamHead {
   ownership?: "owned" | "unowned" | "disabled"
   seat?: SeatTable
   bag?: SeatDiceBag
-  /** why: in Commander a teammate's mark starts their commander's attack, as a seat's mark does. */
   sword?: { onPress: () => void; disabled: boolean }
 }
 
@@ -43,7 +41,6 @@ type Side = (typeof SIDES)[number]
 
 const touches = (corner: LifeCardMenuCorner, edge: string) => corner.toLowerCase().includes(edge)
 
-/** why: the teammates' corners of a team zone, laid out upright in its content frame. Names stop short of the menu when it sits on the top edge or in a corner; counters stop short of the zone's centered row (`row.start` to `row.end`). */
 export function TeamCorners({
   heads,
   shared,
