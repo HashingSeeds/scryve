@@ -415,7 +415,7 @@ export function seatCutout(
     : { edge: cutout.edge, side: "top", size: cutout.size }
 }
 
-/** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. */
+/** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. Chrome runs along the content's bottom row, and a team zone's names along its top. */
 function seatTabCorners(
   tabRow: number | null,
   rowIndex: number,
@@ -425,15 +425,17 @@ function seatTabCorners(
   if (tabRow === null) return undefined
   const seam = rowIndex === tabRow ? "top" : rowIndex === tabRow - 1 ? "bottom" : null
   if (!seam) return undefined
-  const rowEdge = CONTENT_EDGES[rotation].bottom
+  const { top, bottom } = CONTENT_EDGES[rotation]
   return (["left", "right"] as const)
     .filter((side) => screenEdges[side])
-    .flatMap((side): LifeCardCorner[] =>
-      rowEdge === seam
-        ? [{ edge: side, side: seam, size: FIRST_PLAYER_TAB.depth }]
-        : rowEdge === side
-          ? [{ edge: seam, side, size: FIRST_PLAYER_TAB.length / 2 }]
-          : [],
+    .flatMap((side) =>
+      [bottom, top].flatMap((rowEdge): LifeCardCorner[] =>
+        rowEdge === seam
+          ? [{ edge: side, side: seam, size: FIRST_PLAYER_TAB.depth }]
+          : rowEdge === side
+            ? [{ edge: seam, side, size: FIRST_PLAYER_TAB.length / 2 }]
+            : [],
+      ),
     )
 }
 
