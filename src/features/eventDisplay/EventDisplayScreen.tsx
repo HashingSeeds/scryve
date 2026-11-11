@@ -20,6 +20,7 @@ import { colors } from "@/theme/colorsDark"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { chunk, clockPhase, fitGrid, formatClock } from "./display"
+import { useEventIdForCode } from "./useEventIdForCode"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import {
@@ -91,7 +92,7 @@ function useDisplayStyles() {
 }
 
 function EventByCode({ code, s }: { code: string; s: Styles }) {
-  const eventId = useQuery(api.events.byCode, { code })
+  const eventId = useEventIdForCode(code)
   if (eventId === undefined) return null
   if (eventId === null) return <Message text={translate("eventDisplay:notFound")} s={s} />
   return <EventBoard key={eventId} eventId={eventId} s={s} />
