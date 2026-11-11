@@ -137,6 +137,38 @@ function layoutCards(view: ReturnType<typeof render>) {
 }
 
 describe("PlayerGrid", () => {
+  it("names each teammate in their own top corner of one team zone, reading with the total", () => {
+    const seats = players(4)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+
+    expect(view.queryAllByTestId(/^life-card-seat-\d+$/).map(({ props }) => props.testID)).toEqual([
+      "life-card-seat-1",
+      "life-card-seat-3",
+    ])
+    const zone = within(view.getByTestId("life-card-seat-1"))
+    expect(zone.getByTestId("team-identity-seat-1")).toHaveTextContent("Player 1")
+    expect(zone.getByTestId("team-identity-seat-2")).toHaveTextContent("Player 2")
+    const [first, second] = ["team-identity-seat-1", "team-identity-seat-2"].map((id) =>
+      StyleSheet.flatten(zone.getByTestId(id).props.style),
+    )
+    expect(first).toMatchObject({ flexDirection: "row" })
+    expect(first.left).toBeGreaterThan(0)
+    expect(second).toMatchObject({ flexDirection: "row-reverse" })
+    expect(second.right).toBeGreaterThan(0)
+  })
+
   it("gives a team zone the claim of the teammate this device holds, and keeps both teammates' rolls apart", () => {
     const seats = players(4)
     const roll = { kind: "roll" as const, roll: { tool: "d20" as const, value: 7 } }

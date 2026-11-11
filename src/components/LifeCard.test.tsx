@@ -30,6 +30,7 @@ import {
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import {
+  centeredRow,
   LifeCard,
   type LifeCardCommanderDamage,
   type LifeCardOut,
@@ -79,6 +80,21 @@ function arcSweep(path: ReactTestInstance) {
     .map(Number)
   return Math.atan2(endX - startX, startY + radius - endY) / (2 * Math.PI)
 }
+
+describe("centeredRow", () => {
+  it("centers a team zone's bottom row and skips its empty parts", () => {
+    expect(centeredRow(300, 8, [100, 0, 40])).toEqual({
+      start: 76,
+      end: 224,
+      starts: [76, 184, 184],
+    })
+    expect(centeredRow(300, 8, [0, 0, 0])).toEqual({
+      start: 150,
+      end: 150,
+      starts: [150, 150, 150],
+    })
+  })
+})
 
 describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())

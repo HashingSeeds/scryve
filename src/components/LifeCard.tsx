@@ -604,10 +604,12 @@ export const LifeCard = memo(function LifeCard({
       : identityCorner.rowMaxWidth
   const [sharedRowWidth, setSharedRowWidth] = useState(0)
   const zoneRun = sidewaysContent ? cardSize.height : cardSize.width
+  // why: during an attack the attacker's controls and the defender's disc lay out around a corner grid, so a team's grid leaves the centered row for its corner until the attack has drained.
+  const gridCentered = !!team && !shownCardMode && !sourceShown
   const teamRow = team
     ? centeredRow(zoneRun, identityMetrics.gap, [
         diceChips?.length ? (identityRowAt?.width ?? 0) : 0,
-        commanderStripShown && stripBounds
+        gridCentered && commanderStripShown && stripBounds
           ? sidewaysContent
             ? stripBounds.height
             : stripBounds.width
@@ -946,7 +948,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
-          from={teamRow?.starts[1]}
+          from={gridCentered ? teamRow?.starts[1] : undefined}
           attack={stripAttack}
           source={
             sourceShown
@@ -1017,7 +1019,8 @@ export const LifeCard = memo(function LifeCard({
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
                 commanderSeat && { maxWidth: identityCorner.position.maxWidth },
-                commanderStripShown &&
+                !team &&
+                  commanderStripShown &&
                   stripBounds &&
                   !!diceChips?.length && {
                     minWidth: sidewaysContent ? stripBounds.height : stripBounds.width,

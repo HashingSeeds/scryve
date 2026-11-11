@@ -401,7 +401,7 @@ describe("CurrentGameScreen", () => {
     }
     const repository = turnsOn()
     const view = renderGame(initial, repository)
-    layoutSeats(view, "team-panel")
+    layoutSeats(view)
     fireEvent.press(view.getByTestId("seat-bag-seat-4"))
     fireEvent.press(view.getByTestId("bag-plane-seat-4"))
     fireEvent.press(view.getByTestId("planar-dialog-die"))
