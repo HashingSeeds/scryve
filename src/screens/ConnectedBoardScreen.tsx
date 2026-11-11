@@ -861,20 +861,22 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         : undefined
   }
   const commanderPort = {
-    incoming: teamIncoming(teams, (to: PlayerId, commander?: CommanderSlot) =>
-      Object.fromEntries(
-        players
-          .filter(({ id }) => id !== to)
-          .map((source) => [
-            source.id,
-            commanderTotals.find(
-              (total) =>
-                total.fromPlayerId === source.id &&
-                total.toPlayerId === to &&
-                total.commander === commander,
-            )?.total ?? 0,
-          ]),
-      ) as Record<PlayerId, number>,
+    incoming: teamIncoming(
+      teams,
+      (to: PlayerId, commander?: CommanderSlot) =>
+        Object.fromEntries(
+          players
+            .filter(({ id }) => id !== to)
+            .map((source) => [
+              source.id,
+              commanderTotals.find(
+                (total) =>
+                  total.fromPlayerId === source.id &&
+                  total.toPlayerId === to &&
+                  total.commander === commander,
+              )?.total ?? 0,
+            ]),
+        ) as Record<PlayerId, number>,
     ),
     commit: controls.submitCommanderDamage,
   }

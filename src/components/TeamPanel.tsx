@@ -87,9 +87,6 @@ export function TeamPanel({
   style,
   renderZone,
 }: TeamPanelProps) {
-  const {
-    theme: { spacing },
-  } = useAppTheme()
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [sheetOpen, setSheetOpen] = useState<readonly [boolean, boolean]>([false, false])
   const [stackEnds, setStackEnds] = useState<readonly [number, number]>([0, 0])

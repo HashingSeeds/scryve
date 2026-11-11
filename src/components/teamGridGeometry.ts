@@ -2,7 +2,6 @@ import type { ViewStyle } from "react-native"
 
 import type {
   LifeCardContentRotation,
-  LifeCardEdge,
   LifeCardMenuCorner,
   LifeCardMenuEdge,
 } from "./playerCardTypes"

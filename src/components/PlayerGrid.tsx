@@ -42,28 +42,21 @@ import {
   TUCKS_INTO_SCREEN_CORNERS,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
-  type LifeCardCorner,
   type LifeCardEdge,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import {
   boardInsetsFor,
-  CONTENT_EDGES,
-  FIRST_PLAYER_TAB,
-  getCentralMenuBoundary,
-  getFourCardMenuJunction,
   getPlayerGridLayout,
-  getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
-  seatCutout,
   seatFrames,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
+import { panelBoxes, teamPanelCompact, teamSeatRows, teamStripWidth } from "./teamGridGeometry"
 import { TeamPanel, type TeamStripHead } from "./TeamPanel"
 import { teamZoneShades } from "./TeamShade"
-import { panelBoxes, teamPanelCompact, teamSeatRows, teamStripWidth } from "./teamGridGeometry"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
@@ -338,11 +331,7 @@ export function PlayerGrid({
   }
 
   const tabsShown = useContext(FirstPlayerTabsShownContext)
-  const {
-    insets,
-    cutout,
-    rows: frames,
-  } = seatFrames({
+  const { insets, rows: frames } = seatFrames({
     playerCount: cellCount,
     layout,
     boardSize: { width, height },

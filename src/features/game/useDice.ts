@@ -94,8 +94,7 @@ export function useDice(
   }
 
   const name = (seatId: PlayerId) => dicePlayerName(players, seatId)
-  const seatIds = () =>
-    players.flatMap(({ id }) => (!rollers || rollers.includes(id) ? [id] : []))
+  const seatIds = () => players.flatMap(({ id }) => (!rollers || rollers.includes(id) ? [id] : []))
 
   function holdFirst(next: DiceState) {
     return settleFirst(next) === next ? next : hold(FIRST_HOLD, BLOOM_MS.first, settleFirst)(next)

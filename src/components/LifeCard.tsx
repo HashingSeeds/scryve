@@ -105,9 +105,9 @@ import {
   seatIdentityMetrics,
   seatMarkArt,
 } from "./SeatIdentity"
+import { TeamShade } from "./TeamShade"
 import { Text } from "./Text"
 import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
-import { TeamShade } from "./TeamShade"
 import { useSeatFill } from "./TurnSpotlight"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 

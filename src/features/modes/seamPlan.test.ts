@@ -6,7 +6,7 @@ import {
   getPlayerSlotFacings,
 } from "@/components/playerGridGeometry"
 
-import { chipCrowdedBySeam, ICON_WIDTH, PLATE_HEIGHT, planSeam, seamRoom } from "./seamPlan"
+import { chipCrowdedBySeam, ICON_WIDTH, planSeam, seamRoom } from "./seamPlan"
 
 function geometryFor(playerCount: number, width: number, height: number) {
   const layout = getPlayerGridLayout({ playerCount, width, height })

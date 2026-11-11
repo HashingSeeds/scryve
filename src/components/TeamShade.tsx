@@ -1,6 +1,11 @@
 import { useEffect } from "react"
 import { StyleSheet } from "react-native"
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated"
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg"
 
 import { useAppTheme } from "@/theme/context"
@@ -28,7 +33,10 @@ export function teamZoneShades(colors: readonly [string, string], background: st
   }
 }
 
-const GRADIENT_AXIS: Record<LifeCardContentRotation, { x1: number; y1: number; x2: number; y2: number }> = {
+const GRADIENT_AXIS: Record<
+  LifeCardContentRotation,
+  { x1: number; y1: number; x2: number; y2: number }
+> = {
   0: { x1: 0, y1: 0, x2: 1, y2: 0 },
   180: { x1: 1, y1: 0, x2: 0, y2: 0 },
   90: { x1: 0, y1: 0, x2: 0, y2: 1 },

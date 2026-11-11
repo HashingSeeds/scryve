@@ -3,7 +3,6 @@ import { Alert, StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
-import type { ReactTestInstance } from "react-test-renderer"
 
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -46,9 +45,6 @@ function renderGame(
     </ThemeProvider>,
   )
 }
-
-const textOf = (node: ReactTestInstance | string): string =>
-  typeof node === "string" ? node : node.children.map(textOf).join("")
 
 function turnsOff() {
   return new LocalGameRepository(new MemoryStorage())

@@ -33,11 +33,7 @@ import {
 } from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
-import {
-  teamChipCrowded,
-  teamPanelCompact,
-  teamStripWidth,
-} from "@/components/teamGridGeometry"
+import { teamChipCrowded, teamPanelCompact, teamStripWidth } from "@/components/teamGridGeometry"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
