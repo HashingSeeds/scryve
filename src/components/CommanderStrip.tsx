@@ -69,6 +69,7 @@ export interface CommanderStripProps {
   contentInsets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
   compact?: boolean
+  from?: number
   disabled?: boolean
   attack?: CommanderStripAttack
   source?: CommanderStripSource
@@ -144,6 +145,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   contentInsets,
   screenEdges,
   compact,
+  from,
   disabled,
   attack,
   source,
@@ -181,6 +183,7 @@ export const CommanderStrip = memo(function CommanderStrip({
     seatIdentityMetrics(compact).edge - pad,
     contentInsets,
     screenEdges,
+    from,
   )
   const attackerId = attack?.attackerId
   const flood = attack?.flood
@@ -251,19 +254,21 @@ export const CommanderStrip = memo(function CommanderStrip({
           finishing ? `commander-exit-seat-${seatNumber}` : `commander-map-seat-${seatNumber}`
         }
         onLayout={(event) => setMapBounds(event.nativeEvent.layout)}
-        accessibilityRole="button"
+        accessibilityRole={finishing || onPress ? "button" : undefined}
         accessibilityLabel={
           finishing
             ? translate(`board:commander.submitAssigningFromSeat.${source.submit}`, {
                 seat: seatNumber,
               })
-            : dealt.length
-              ? translate("board:commander.assignFromWithDamage", { identity, sources })
-              : translate("board:commander.assignFrom", { identity })
+            : !onPress
+              ? translate("board:counters.seatItem", { identity, label: sources })
+              : dealt.length
+                ? translate("board:commander.assignFromWithDamage", { identity, sources })
+                : translate("board:commander.assignFrom", { identity })
         }
         accessibilityState={{ disabled: !!disabled && !finishing }}
         accessible={!attackerId}
-        disabled={finishing ? false : disabled || !!attackerId || sourceShown}
+        disabled={finishing ? false : disabled || !onPress || !!attackerId || sourceShown}
         // why: the grid's slop reaches only toward the card's edges, so it never takes touches from the − and + or the total.
         hitSlop={
           mapBounds
@@ -593,10 +598,14 @@ function stripEdge(
   gap: number,
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
+  from?: number,
 ): Partial<Record<LifeCardEdge, number>> {
   return {
-    [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
-    [side]: cornerOffset(gap, side, edge, insets, screenEdges),
+    [edge]:
+      from === undefined
+        ? cornerOffset(gap, edge, side, insets, screenEdges)
+        : gap + (insets?.[edge] ?? 0),
+    [side]: from ?? cornerOffset(gap, side, edge, insets, screenEdges),
     [end]: gap + (insets?.[end] ?? 0),
   }
 }

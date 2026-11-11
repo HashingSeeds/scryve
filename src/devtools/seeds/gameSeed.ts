@@ -196,7 +196,7 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
 
   for (const entry of list(params.poison)) {
     const [seatValue, amount] = entry.split(":")
-    game = applyLocalTableAction(
+    const next = applyLocalTableAction(
       game,
       {
         kind: "counter.changed",
@@ -206,6 +206,8 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       },
       { operationId: context.operationId(), now: context.now() },
     )
+    if (next === game) throw new SeedError(`poison "${entry}" was rejected by the game rules.`)
+    game = next
   }
   return game
 }
@@ -236,8 +238,6 @@ function modeSetupOf(params: SeedParams, playerCount: number) {
 
 export function seedGame(params: SeedParams, repository = localGameRepository): Href {
   const game = buildSeededGame(params, repository)
-  if (params.binding === "frame" || params.binding === "link")
-    repository.saveTeamBinding(params.binding)
   repository.clearActiveGame()
   repository.saveActiveGame(game)
   return { pathname: "/", params: { destination: "play" } }

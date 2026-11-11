@@ -49,6 +49,7 @@ describe("game seed", () => {
     [{ life: "20,abc" }, /life must be a whole number/],
     [{ players: "" }, /players must be a whole number/],
     [{ start: "" }, /start must be a whole number/],
+    [{ system: "none", poison: "1:3" }, /poison "1:3" was rejected/],
   ])("explains a bad link %j", (params, message) => {
     expect(() => buildSeededGame(params, repository())).toThrow(message)
   })

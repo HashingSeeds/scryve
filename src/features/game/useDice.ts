@@ -43,6 +43,7 @@ export function useDice(
   players: readonly Pick<GamePlayer, "id" | "name">[],
   gameId: string,
   system: unknown,
+  rollers?: readonly string[],
 ) {
   const rules = systemDice(system)
   const { die } = rules
@@ -92,7 +93,7 @@ export function useDice(
   }
 
   const name = (seatId: PlayerId) => dicePlayerName(players, seatId)
-  const seatIds = () => players.map(({ id }) => id)
+  const seatIds = () => players.flatMap(({ id }) => (!rollers || rollers.includes(id) ? [id] : []))
 
   function holdFirst(next: DiceState) {
     return settleFirst(next) === next ? next : hold(FIRST_HOLD, BLOOM_MS.first, settleFirst)(next)

@@ -38,6 +38,7 @@ import {
 import { FIRST_PLAYER_TAB } from "./playerGridGeometry"
 import type { OutState } from "../../convex/lib/outReason"
 import { EMPTY_TABLE, type TableState } from "../../convex/lib/table"
+import { teamTableRules } from "../../convex/lib/twoHeadedGiant"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -137,6 +138,195 @@ function layoutCards(view: ReturnType<typeof render>) {
 }
 
 describe("PlayerGrid", () => {
+  it("names each teammate in their own top corner of one team zone, reading with the total", () => {
+    const seats = players(4)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+
+    expect(view.queryAllByTestId(/^life-card-seat-\d+$/).map(({ props }) => props.testID)).toEqual([
+      "life-card-seat-1",
+      "life-card-seat-3",
+    ])
+    const zone = within(view.getByTestId("life-card-seat-1"))
+    expect(zone.getByTestId("team-identity-seat-1")).toHaveTextContent("Player 1")
+    expect(zone.getByTestId("team-identity-seat-2")).toHaveTextContent("Player 2")
+    const [first, second] = ["team-identity-seat-1", "team-identity-seat-2"].map((id) =>
+      StyleSheet.flatten(zone.getByTestId(id).props.style),
+    )
+    expect(first).toMatchObject({ flexDirection: "row" })
+    expect(first.left).toBeGreaterThan(0)
+    expect(second).toMatchObject({ flexDirection: "row-reverse" })
+    expect(second.right).toBeGreaterThan(0)
+  })
+
+  it("leaves only the opened teammate's counters reachable while their bag sheet covers the zone", () => {
+    const seats = players(4)
+    const rules = teamTableRules(playTableRules("mtg", "limited"))
+    const table: TableState = {
+      ...EMPTY_TABLE,
+      players: {
+        [seats[0].id]: { counters: { poison: 2 } },
+        [seats[1].id]: { counters: { poison: 2 } },
+      },
+    }
+    const runtime: TableRuntime = {
+      table,
+      tableRules: rules,
+      ...createTableActions(
+        () => ({
+          table,
+          rules,
+          playerIds: seats.map(({ id }) => id),
+          lifeOf: () => 30,
+          canAct: () => true,
+        }),
+        jest.fn(() => true),
+      ),
+    }
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          table={runtime}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+    const zone = within(view.getByTestId("life-card-seat-1"))
+    expect(zone.getByTestId("counter-chip-1-poison")).toBeTruthy()
+    expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
+
+    fireEvent.press(zone.getByTestId("seat-bag-seat-1"))
+    expect(zone.getByTestId("counter-sheet-seat-1")).toBeTruthy()
+    expect(zone.queryByTestId("counter-chip-1-poison")).toBeNull()
+    expect(zone.queryByTestId("seat-bag-seat-2")).toBeNull()
+
+    fireEvent.press(zone.getByTestId("counter-close-1"))
+    expect(zone.getByTestId("counter-chip-1-poison")).toBeTruthy()
+    expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
+
+    fireEvent(zone.getByTestId("counter-chip-1-poison"), "longPress")
+    expect(zone.getByTestId("counter-sheet-seat-1")).toBeTruthy()
+    expect(zone.queryByTestId("seat-bag-seat-1")).toBeNull()
+    expect(zone.queryByTestId("seat-bag-seat-2")).toBeNull()
+  })
+
+  it("acts as the second teammate on a device that holds only that seat", () => {
+    const seats = players(4)
+    const rules = teamTableRules(playTableRules("mtg", "commander"))
+    const table: TableState = {
+      ...EMPTY_TABLE,
+      players: {
+        [seats[0].id]: { counters: { poison: 2 } },
+        [seats[1].id]: { counters: { poison: 2 } },
+      },
+    }
+    const adjustCounter = jest.fn()
+    const runtime: TableRuntime = {
+      table,
+      tableRules: rules,
+      ...createTableActions(
+        () => ({
+          table,
+          rules,
+          playerIds: seats.map(({ id }) => id),
+          lifeOf: () => 60,
+          canAct: () => true,
+        }),
+        jest.fn(() => true),
+      ),
+      adjustCounter,
+    }
+    const onChange = jest.fn()
+    const held = (player: GamePlayer) => player.id === seats[1].id
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          table={runtime}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          isPlayerOwned={held}
+          isPlayerDisabled={(player) => !held(player)}
+          commanderDamage={idleCommanderDamage}
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+    const zone = within(view.getByTestId("life-card-seat-1"))
+
+    fireEvent.press(zone.getByTestId("counter-chip-1-poison"))
+    expect(adjustCounter).toHaveBeenLastCalledWith(seats[1].id, "poison", 1)
+    fireEvent.press(zone.getByTestId(lifeControlTestId(1, -1)))
+    expect(onChange).toHaveBeenLastCalledWith(seats[1].id, expect.anything())
+
+    expect(zone.getByTestId("commander-mark-seat-1").props.accessibilityState).toMatchObject({
+      disabled: true,
+    })
+    expect(zone.getByTestId("commander-mark-seat-2").props.accessibilityState).toMatchObject({
+      disabled: false,
+    })
+    expect(zone.queryByTestId("seat-bag-seat-1")).toBeNull()
+    expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
+  })
+
+  it("gives a team zone the claim of the teammate this device holds, and keeps both teammates' rolls apart", () => {
+    const seats = players(4)
+    const roll = { kind: "roll" as const, roll: { tool: "d20" as const, value: 7 } }
+    const claim = { kind: "claim" as const }
+    const onPressChip = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          dice={{
+            seatFor: () => undefined,
+            chipsFor: ({ id }) =>
+              id === seats[1].id ? [roll, claim] : id === seats[0].id ? [roll] : [],
+            onPressSeat: jest.fn(),
+            onChoose: jest.fn(),
+            onPressChip,
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    expect(onPressChip).toHaveBeenLastCalledWith(seats[1], claim)
+    fireEvent.press(view.getByTestId("dice-chip-1-d20"))
+    expect(onPressChip).toHaveBeenLastCalledWith(seats[1], roll)
+    fireEvent.press(view.getByTestId(`dice-chip-1-${seats[0].id}-d20`))
+    expect(onPressChip).toHaveBeenLastCalledWith(
+      seats[0],
+      expect.objectContaining({ kind: "roll", seatId: seats[0].id }),
+    )
+  })
+
   it("draws a foil player's Pro mark in foil on a Pokémon seat, and leaves a free mark flat", () => {
     const rules = playTableRules("pokemon", "standard")
     const table = EMPTY_TABLE

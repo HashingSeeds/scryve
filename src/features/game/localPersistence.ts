@@ -108,7 +108,6 @@ export interface LocalSettings {
   askWhatYouPlay?: true
   syncStats?: boolean
   turnTab?: true
-  teamBinding?: "frame"
   chessMinutes?: ChessBankMinutes
 }
 
@@ -628,7 +627,6 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(migrated.askWhatYouPlay === true ? { askWhatYouPlay: true } : {}),
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === true ? { turnTab: true } : {}),
-    ...(migrated.teamBinding === "frame" ? { teamBinding: "frame" } : {}),
     ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
   }
 }
@@ -884,15 +882,6 @@ export class LocalGameRepository {
     return () => {
       settingsListeners.delete(listener)
     }
-  }
-
-  teamBinding(): "link" | "frame" {
-    return this.loadSettings().teamBinding ?? "link"
-  }
-
-  saveTeamBinding(binding: "link" | "frame") {
-    const { teamBinding: _binding, ...rest } = this.loadSettings()
-    this.saveSettings({ ...rest, ...(binding === "frame" ? { teamBinding: "frame" } : {}) })
   }
 
   hapticsEnabled(): boolean {

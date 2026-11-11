@@ -5,16 +5,8 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerSlotFacings,
 } from "@/components/playerGridGeometry"
-import { teamGridLayout, teamRivets } from "@/components/teamGridGeometry"
 
-import {
-  chipCrowdedBySeam,
-  ICON_WIDTH,
-  PLATE_HEIGHT,
-  planSeam,
-  seamRoom,
-  type SeamRivet,
-} from "./seamPlan"
+import { chipCrowdedBySeam, ICON_WIDTH, planSeam, seamRoom } from "./seamPlan"
 
 function geometryFor(playerCount: number, width: number, height: number) {
   const layout = getPlayerGridLayout({ playerCount, width, height })
@@ -85,37 +77,5 @@ describe("seamPlan", () => {
       left: { items: ["plane"] },
       right: { items: ["die", "schemeDue"], room: { inActiveCard: true } },
     })
-  })
-
-  it("keeps a Two-Headed Giant plane plate off the teams' link rivets", () => {
-    const [width, height] = [402, 874]
-    const layout = teamGridLayout({ playerCount: 2, width, height })
-    const anchor = getPlayerGridMenuAnchor(2, layout)
-    const rivets: SeamRivet[] = teamRivets(2, layout, { width, height }, anchor).map(
-      ({ x, y, size }) => ({ x, dy: y - anchor.y * height, size }),
-    )
-    const geometry = {
-      sides: getMenuSeamNeighbors(2, layout),
-      facings: getPlayerSlotFacings(2, layout),
-      anchorX: anchor.x,
-      width,
-      menuSize: MENU_BUTTON_SIZE,
-      edge: 8,
-      rivets,
-    }
-    const rooms = {
-      left: seamRoom(geometry, "left", new Set()),
-      right: seamRoom(geometry, "right", new Set()),
-    }
-    const { room } = planSeam(rooms, ["plane"]).left!
-    const plateLeft = room.direction === 1 ? room.start : room.start - ICON_WIDTH
-    const onPlate = ({ x, dy, size }: SeamRivet) =>
-      x + size / 2 > plateLeft &&
-      x - size / 2 < plateLeft + ICON_WIDTH &&
-      Math.abs(room.shift - dy) < (PLATE_HEIGHT + size) / 2
-    expect(
-      rivets.some((rivet) => rivet.dy === 0 && Math.abs(rivet.x - room.start) < ICON_WIDTH),
-    ).toBe(true)
-    expect(rivets.filter(onPlate)).toEqual([])
   })
 })

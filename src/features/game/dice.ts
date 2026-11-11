@@ -69,7 +69,7 @@ export interface TurnChipState {
 }
 
 export type DiceSeatChip =
-  | { kind: "roll"; roll: DiceRoll }
+  | { kind: "roll"; roll: DiceRoll; seatId?: string }
   | { kind: "first" }
   | { kind: "claim" }
   | { kind: "turn"; state: TurnChipState }

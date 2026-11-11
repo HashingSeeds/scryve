@@ -111,6 +111,7 @@ export function ModeSetupFields({
         <>
           <SelectField
             testID="archenemy-seat"
+            heading
             label={translate("play:newGame.archenemy")}
             field="archenemy"
             value={choices.archenemy}
@@ -123,6 +124,7 @@ export function ModeSetupFields({
           />
           <SelectField
             testID="scheme-deck"
+            heading
             label={translate("play:newGame.schemeDeck")}
             field="schemes"
             value={choices.schemes}
@@ -134,6 +136,7 @@ export function ModeSetupFields({
       ) : null}
       <SelectField
         testID="planechase"
+        heading
         label={translate("play:newGame.planechase")}
         field="planechase"
         value={choices.planar}

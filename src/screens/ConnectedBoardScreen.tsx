@@ -84,7 +84,13 @@ import {
   playCommanderLethal,
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
-import { teamChoices, teamMembers, teamName, teamValueLabel } from "@/features/game/teams"
+import {
+  teamChoices,
+  teamIncoming,
+  teamMembers,
+  teamName,
+  teamValueLabel,
+} from "@/features/game/teams"
 import {
   reportTurnsGame,
   TurnDialog,
@@ -812,9 +818,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     )
   }, [controlled, game.variant, table?.table])
   const cellCount = teams?.length ?? players.length
-  const [teamBinding] = useState(() => localGameRepository.teamBinding())
-  const actingHead = (playerId: string) =>
-    turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
   const layoutVariant =
     layoutChoice?.playerCount === cellCount
       ? layoutChoice.layout
@@ -856,20 +859,23 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         : undefined
   }
   const commanderPort = {
-    incoming: (to: PlayerId, commander?: CommanderSlot): Record<PlayerId, number> =>
-      Object.fromEntries(
-        players
-          .filter(({ id }) => id !== to)
-          .map((source) => [
-            source.id,
-            commanderTotals.find(
-              (total) =>
-                total.fromPlayerId === source.id &&
-                total.toPlayerId === to &&
-                total.commander === commander,
-            )?.total ?? 0,
-          ]),
-      ) as Record<PlayerId, number>,
+    incoming: teamIncoming(
+      teams,
+      (to: PlayerId, commander?: CommanderSlot) =>
+        Object.fromEntries(
+          players
+            .filter(({ id }) => id !== to)
+            .map((source) => [
+              source.id,
+              commanderTotals.find(
+                (total) =>
+                  total.fromPlayerId === source.id &&
+                  total.toPlayerId === to &&
+                  total.commander === commander,
+              )?.total ?? 0,
+            ]),
+        ) as Record<PlayerId, number>,
+    ),
     commit: controls.submitCommanderDamage,
   }
   const attack = useCommanderAttack(commanderPort, {
@@ -955,7 +961,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     gameId: publicId,
     system,
     players,
-    teamCount: teams?.length,
+    teams,
     layout: {
       value: layoutVariant,
       onChange: (layout) => {
@@ -1190,7 +1196,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             const slot = players.findIndex(({ id }) => id === playerId)
             return slot < 0 ? undefined : { slot }
           },
-          teamBinding,
         })}
         renderGrid={(boardOrientation) => (
           <ConnectedLifeGrid
@@ -1204,8 +1209,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             {...(anySeat
               ? {}
               : {
-                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(actingHead(player.id)),
-                  isPlayerOwned: (player: GamePlayer) => controlled.has(actingHead(player.id)),
+                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(player.id),
+                  isPlayerOwned: (player: GamePlayer) => controlled.has(player.id),
                 })}
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
@@ -1237,10 +1242,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             }
             dice={seatGrid}
             teams={teams}
-            teamBinding={teamBinding}
-            onChange={(playerId, delta) =>
-              controls.changeLife(asPlayerId(actingHead(playerId)), delta)
-            }
+            onChange={(playerId, delta) => controls.changeLife(asPlayerId(playerId), delta)}
           />
         )}
       />

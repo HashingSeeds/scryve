@@ -217,7 +217,7 @@ function moveFocus(target: View | null | undefined) {
 export interface CounterChipsProps {
   seat: SeatTable
   dice?: SeatDiceBag
-  bagAt: { right: number; bottom: number }
+  bagAt: ({ right: number } | { left: number }) & { bottom: number }
   seatNumber: number
   identity: string
   color: string
@@ -228,6 +228,9 @@ export interface CounterChipsProps {
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
   nameEnd?: number
+  hidden?: readonly string[]
+  onRowWidth?: (width: number) => void
+  bagless?: boolean
   onSheetOpenChange?: (open: boolean) => void
 }
 
@@ -295,6 +298,9 @@ export const CounterChips = memo(function CounterChips({
   menuEdgeCenter,
   cardSize,
   nameEnd,
+  hidden,
+  onRowWidth,
+  bagless,
   dice,
   bagAt,
   onSheetOpenChange,
@@ -324,7 +330,7 @@ export const CounterChips = memo(function CounterChips({
     ),
     ...rules.counters.flatMap((counter) => {
       const value = counters[counter.id] ?? 0
-      return value > 0
+      return value > 0 && !hidden?.includes(counter.id)
         ? [
             {
               kind: "counter" as const,
@@ -341,6 +347,11 @@ export const CounterChips = memo(function CounterChips({
   const measure = (key: string, width: number) =>
     setWidths((current) => (current[key] === width ? current : { ...current, [key]: width }))
   const webAnnouncement = useAnnouncements(seat, identity)
+  const [rowWidth, setRowWidth] = useState(0)
+  const shownRowWidth = items.length > 0 ? rowWidth : 0
+  useEffect(() => {
+    onRowWidth?.(shownRowWidth)
+  }, [onRowWidth, shownRowWidth])
   const sheetOpen = sheet !== null
 
   useEffect(() => {
@@ -376,16 +387,19 @@ export const CounterChips = memo(function CounterChips({
     spacing,
   })
   const bagSlop = targetSlop({ width: bagSize, height: bagSize }, bagAt)
-  const bagShown = editable || !!dice
+  const bagShown = !bagless && (editable || !!dice)
   const chipGap = compact ? spacing.xxxs : spacing.xxs
-  const rowRight = bagAt.right + (bagShown ? bagSize + chipGap : 0)
+  const fromLeft = "left" in bagAt
+  const bagInset = fromLeft ? bagAt.left : bagAt.right
+  const rowInset = bagInset + (bagShown ? bagSize + chipGap : 0)
   const menuOnRow = menuEdgeCenter === CONTENT_EDGES[contentRotation].bottom
+  const stopAt = nameEnd ?? frameWidth / 2
   const room = Math.max(
     0,
     Math.min(
-      frameWidth - rowRight - (nameEnd ?? frameWidth / 2) - chipGap,
+      (fromLeft ? stopAt - rowInset : frameWidth - rowInset - stopAt) - chipGap,
       menuOnRow
-        ? frameWidth / 2 - (compact ? COMPACT_MENU_CLEARANCE : MENU_CLEARANCE) - rowRight
+        ? frameWidth / 2 - (compact ? COMPACT_MENU_CLEARANCE : MENU_CLEARANCE) - rowInset
         : Infinity,
     ),
   )
@@ -478,9 +492,11 @@ export const CounterChips = memo(function CounterChips({
           <View
             testID={`counter-chips-seat-${seatNumber}`}
             pointerEvents="box-none"
+            onLayout={({ nativeEvent: { layout } }) => setRowWidth(layout.width)}
             style={[
               $bottomRow,
-              { gap: chipGap, right: rowRight, bottom: bagAt.bottom, height: bagSize },
+              fromLeft ? [$fromLeft, { left: rowInset }] : [$fromRight, { right: rowInset }],
+              { gap: chipGap, bottom: bagAt.bottom, height: bagSize },
             ]}
           >
             {items.slice(0, fit.shown).map((item) => {
@@ -636,7 +652,7 @@ export const CounterChips = memo(function CounterChips({
           contentInsets={contentInsets}
           closeSlop={bagSlop}
           closeButton={{
-            left: frameWidth - bagAt.right - bagSize,
+            left: fromLeft ? bagAt.left : frameWidth - bagAt.right - bagSize,
             top: frameHeight - bagAt.bottom - bagSize,
             size: bagSize,
           }}
@@ -860,16 +876,18 @@ function CounterSheet({
             </View>
           </>
         ) : sheet.kind === "name" ? (
-          <NameCounter
-            seatNumber={seatNumber}
-            ink={ink}
-            taken={seat.rules.counters.flatMap(({ id }) => customCounterNameOf(id) ?? [])}
-            onAdd={(name) => {
-              seat.adjustCounter(customCounterId(name), 1)
-              rememberCounterName(name)
-              onClose()
-            }}
-          />
+          <View style={[$fill, KEYBOARD_CLEAR_HALF[contentRotation]]}>
+            <NameCounter
+              seatNumber={seatNumber}
+              ink={ink}
+              taken={seat.rules.counters.flatMap(({ id }) => customCounterNameOf(id) ?? [])}
+              onAdd={(name) => {
+                seat.adjustCounter(customCounterId(name), 1)
+                rememberCounterName(name)
+                onClose()
+              }}
+            />
+          </View>
         ) : (
           <>
             {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
@@ -1419,10 +1437,18 @@ const $measureRow: ViewStyle = {
   opacity: 0,
 }
 
-const $bottomRow: ViewStyle = {
-  position: "absolute",
-  flexDirection: "row-reverse",
-  alignItems: "center",
+const $bottomRow: ViewStyle = { position: "absolute", alignItems: "center" }
+const $fromLeft: ViewStyle = { flexDirection: "row" }
+const $fromRight: ViewStyle = { flexDirection: "row-reverse" }
+
+const $fill: ViewStyle = { flex: 1 }
+
+/** why: the keyboard rises from the screen's bottom edge, which a sideways seat's content runs along, so naming a counter keeps to the half nearest the top of the screen. */
+const KEYBOARD_CLEAR_HALF: Record<LifeCardContentRotation, ViewStyle | undefined> = {
+  0: undefined,
+  180: undefined,
+  90: { width: "50%", alignSelf: "flex-start" },
+  [-90]: { width: "50%", alignSelf: "flex-end" },
 }
 
 const $nameCounter: ThemedStyle<ViewStyle> = ({ spacing }) => ({

@@ -26,13 +26,6 @@ export interface SeamGeometry {
   width: number
   menuSize: number
   edge: number
-  rivets?: readonly SeamRivet[]
-}
-
-export interface SeamRivet {
-  x: number
-  dy: number
-  size: number
 }
 
 const across = (facing: number | undefined) => facing === 0 || facing === 180
@@ -70,12 +63,7 @@ export function seamRoom(
   ): SeamRoom | undefined => {
     const run = (limit - start) * direction
     const inActiveCard = host !== undefined && busySlots.has(host.slot)
-    return run > 0
-      ? clearOfRivets(
-          { width: run, shift, rotation, start, direction, inActiveCard },
-          geometry.rivets ?? [],
-        )
-      : undefined
+    return run > 0 ? { width: run, shift, rotation, start, direction, inActiveCard } : undefined
   }
   const outer = (neighbor: SeamNeighbor) =>
     (side === "left" ? neighbor.leftFraction : neighbor.rightFraction) * width - direction * edge
@@ -103,32 +91,6 @@ export function seamRoom(
   const limit = side === "left" ? Math.max(...glyphs) : Math.min(...glyphs)
   const shift = sideways.length === 2 ? 0 : sideways[0] === upper ? -inCard : inCard
   return room(limit, shift, 0)
-}
-
-function clearOfRivets(room: SeamRoom, rivets: readonly SeamRivet[]): SeamRoom | undefined {
-  let clear = room
-  for (const { x, dy, size } of rivets) {
-    const reach = size / 2 + GAP
-    const end = clear.start + clear.direction * clear.width
-    const touchesRun =
-      x + reach > Math.min(clear.start, end) && x - reach < Math.max(clear.start, end)
-    if (!touchesRun || Math.abs(clear.shift - dy) >= PLATE_HEIGHT / 2 + reach) continue
-    if (clear.shift !== 0) {
-      clear = {
-        ...clear,
-        shift:
-          dy + (Math.sign(clear.shift - dy) || Math.sign(clear.shift)) * (PLATE_HEIGHT / 2 + reach),
-      }
-      continue
-    }
-    const before = (x - clear.direction * reach - clear.start) * clear.direction
-    const after = clear.width - (x + clear.direction * reach - clear.start) * clear.direction
-    clear =
-      before >= after
-        ? { ...clear, width: before }
-        : { ...clear, start: x + clear.direction * reach, width: after }
-  }
-  return clear.width > 0 ? clear : undefined
 }
 
 export const minWidth = (item: SeamItem) => (item === "schemeDue" ? FULL_PLATE_WIDTH : ICON_WIDTH)

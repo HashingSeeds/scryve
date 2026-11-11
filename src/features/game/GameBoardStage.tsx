@@ -33,10 +33,9 @@ import {
 } from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
-import { headChipCrowded, teamRivets } from "@/components/teamGridGeometry"
+import { teamChipCrowded } from "@/components/teamGridGeometry"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
-import type { SeamRivet } from "@/features/modes/seamPlan"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
@@ -86,35 +85,15 @@ export interface BoardSeamGeometry {
   sides: ReturnType<typeof getMenuSeamNeighbors>
   width: number
   menuSize: number
-  rivets: readonly SeamRivet[]
-  headCrowded?: (slot: number, head: 0 | 1) => boolean
+  teamChipCrowded?: (slot: number) => boolean
 }
 
-function seamRivets(
-  teamBoard: boolean | undefined,
-  playerCount: number,
-  layout: Parameters<typeof teamRivets>[1],
-  board: { width: number; height: number },
-  anchor: { x: number; y: number },
-): SeamRivet[] {
-  if (!teamBoard) return []
-  return teamRivets(playerCount, layout, board, anchor).map(({ x, y, size }) => ({
-    x,
-    dy: y - anchor.y * board.height,
-    size,
-  }))
-}
-
-const seamHeads = (
+const seamTeams = (
   teamBoard: boolean | undefined,
   teamCount: number,
-  layout: Parameters<typeof headChipCrowded>[1],
+  layout: Parameters<typeof teamChipCrowded>[1],
 ) =>
-  teamBoard
-    ? {
-        headCrowded: (slot: number, head: 0 | 1) => headChipCrowded(teamCount, layout, slot, head),
-      }
-    : {}
+  teamBoard ? { teamChipCrowded: (slot: number) => teamChipCrowded(teamCount, layout, slot) } : {}
 
 export interface BoardSize {
   width: number
@@ -218,14 +197,7 @@ function PinnedGameBoardStage({
                   sides: getMenuSeamNeighbors(playerCount, gridLayout),
                   width,
                   menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
-                  rivets: seamRivets(
-                    teamBoard,
-                    playerCount,
-                    gridLayout,
-                    { width, height },
-                    boardAnchor,
-                  ),
-                  ...seamHeads(teamBoard, playerCount, gridLayout),
+                  ...seamTeams(teamBoard, playerCount, gridLayout),
                 })
               : null}
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
@@ -324,8 +296,7 @@ function LegacyGameBoardStage({
             sides: getMenuSeamNeighbors(playerCount, gridLayout),
             width,
             menuSize: playerCount > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
-            rivets: seamRivets(teamBoard, playerCount, gridLayout, { width, height }, boardAnchor),
-            ...seamHeads(teamBoard, playerCount, gridLayout),
+            ...seamTeams(teamBoard, playerCount, gridLayout),
           })
         : null}
       <GameRadialMenu

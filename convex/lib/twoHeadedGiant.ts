@@ -7,10 +7,10 @@ export const TEAM_LIFE = 30
 export const COMMANDER_TEAM_LIFE = 60
 export const TEAM_POISON = 15
 
-export const TWO_HEADED_GIANT_SEATS_MESSAGE = "Two-Headed Giant needs 4 or 6 seats"
+export const TWO_HEADED_GIANT_SEATS_MESSAGE = "Two-Headed Giant needs 4, 6, 8, or 10 seats"
 
-// why: team layouts exist for two and three teams, so 7-10 seat tables stay out of 2HG until they have one.
-export const isTwoHeadedGiantPlayerCount = (count: number) => count === 4 || count === 6
+export const isTwoHeadedGiantPlayerCount = (count: number) =>
+  count >= 4 && count <= 10 && count % 2 === 0
 
 export const defaultTeamLife = (format: string | undefined) =>
   format === "commander" ? COMMANDER_TEAM_LIFE : TEAM_LIFE

@@ -82,6 +82,11 @@ describe("Two-Headed Giant", () => {
       ]),
     ).toThrow()
     expect(() => makeGame(4, [[0, 1, 2], [3]])).toThrow()
+    const pairs = (count: number) =>
+      Array.from({ length: count / 2 }, (_, team) => [2 * team, 2 * team + 1])
+    expect(makeGame(8, pairs(8)).turnGroups).toHaveLength(4)
+    expect(makeGame(10, pairs(10)).turnGroups).toHaveLength(5)
+    expect(() => makeGame(12, pairs(12))).toThrow()
   })
 
   it("shares life between teammates, from either head and from commander damage", () => {

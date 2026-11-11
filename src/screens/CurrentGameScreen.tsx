@@ -41,7 +41,7 @@ import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import { localGameRepository, type LocalGameRepository } from "@/features/game/localPersistence"
 import { playCommanderLethal } from "@/features/game/playSystems"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
-import { teamName } from "@/features/game/teams"
+import { teamIncoming, teamName } from "@/features/game/teams"
 import {
   reportTurnsGame,
   TurnDialog,
@@ -165,9 +165,11 @@ export function CurrentGameScreen({
       ? { deckKey: account.deckKey, fingerprint: account.deckFingerprint }
       : undefined
   }
+  const teams = localTeams(runtime.game)
   const commanderPort = {
-    incoming: (to: PlayerId, commander?: CommanderSlot) =>
+    incoming: teamIncoming(teams, (to: PlayerId, commander?: CommanderSlot) =>
       incomingCommanderDamage(runtime.game, to, commander),
+    ),
     commit: (from: PlayerId, changes: readonly AttackChange[]) =>
       changes.forEach(({ toPlayerId, commander, delta }) =>
         runtime.assignCommanderDamage(from, toPlayerId, delta, commander),
@@ -176,13 +178,11 @@ export function CurrentGameScreen({
   const attack = useCommanderAttack(commanderPort, { seatDeck })
   const attackDispatch = attack.dispatch
   const layoutVariant = runtime.game.layout ?? "auto"
-  const teams = localTeams(runtime.game)
-  const [teamBinding] = useState(() => (repository ?? localGameRepository).teamBinding())
   const chrome = useBoardChrome({
     gameId: runtime.game.id,
     system,
     players: runtime.game.players,
-    teamCount: teams?.length,
+    teams,
     layout: {
       value: layoutVariant,
       onChange: runtime.changeLayout,
@@ -508,7 +508,6 @@ export function CurrentGameScreen({
             dieOnChip,
             turnChips: turnsOn && !!turn,
             slotOf,
-            teamBinding,
           })}
           toast={
             saved ? (
@@ -546,7 +545,6 @@ export function CurrentGameScreen({
               layoutVariant={layoutVariant}
               seatOrder={runtime.game.seatOrder}
               teams={teams}
-              teamBinding={teamBinding}
               disabled={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
               outState={outState}

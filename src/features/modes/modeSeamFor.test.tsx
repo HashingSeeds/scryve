@@ -9,7 +9,7 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerSlotFacings,
 } from "@/components/playerGridGeometry"
-import { headChipCrowded, teamGridLayout } from "@/components/teamGridGeometry"
+import { teamChipCrowded, teamGridLayout } from "@/components/teamGridGeometry"
 import { ThemeProvider } from "@/theme/context"
 
 import { bagWithPlane, modeSeamFor, teamSeat } from "./modeSeamFor"
@@ -56,7 +56,6 @@ describe("modeSeamFor", () => {
       sides: getMenuSeamNeighbors(4, layout),
       width,
       menuSize: COMPACT_MENU_BUTTON_SIZE,
-      rivets: [],
     }) as ReactElement<ComponentProps<typeof ModeSeam>>
     const { left, right } = element.props.plan
     const sides = [left?.items ?? [], right?.items ?? []]
@@ -101,7 +100,6 @@ describe("modeSeamFor", () => {
           sides: getMenuSeamNeighbors(3, layout),
           width,
           menuSize: COMPACT_MENU_BUTTON_SIZE,
-          rivets: [],
         })}
       </ThemeProvider>,
     )
@@ -112,7 +110,7 @@ describe("modeSeamFor", () => {
   })
 
   it.each(["auto", "featured-last"] as const)(
-    "keeps the planar die on each head's chip on a six-player %s team board",
+    "moves the planar die to the seam only for the team whose zone the menu sits on, six players, %s",
     (layoutVariant) => {
       const players = ["ada", "bo", "cy", "dee", "eve", "fay"]
       const teams = [
@@ -123,6 +121,7 @@ describe("modeSeamFor", () => {
       const { modes } = startModes({ planechase: { decks: [PLANAR_DECKS[0].id] } }, players)
       const [width, height] = [390, 844]
       const layout = teamGridLayout({ playerCount: 3, width, height, layoutVariant })
+      const featured = layoutVariant === "auto" ? "ada" : "eve"
       for (const [active] of teams) {
         const { result } = renderHook(() =>
           useBoardModes({
@@ -147,11 +146,12 @@ describe("modeSeamFor", () => {
           sides: getMenuSeamNeighbors(3, layout),
           width,
           menuSize: COMPACT_MENU_BUTTON_SIZE,
-          rivets: [],
-          headCrowded: (slot, head) => headChipCrowded(3, layout, slot, head),
+          teamChipCrowded: (slot) => teamChipCrowded(3, layout, slot),
         }) as ReactElement<ComponentProps<typeof ModeSeam>>
         const { left, right } = element.props.plan
-        expect([...(left?.items ?? []), ...(right?.items ?? [])]).toEqual(["plane"])
+        expect([...(left?.items ?? []), ...(right?.items ?? [])].sort()).toEqual(
+          active === featured ? ["die", "plane"] : ["plane"],
+        )
       }
     },
   )
@@ -205,11 +205,9 @@ describe("modeSeamFor", () => {
           sides: getMenuSeamNeighbors(cells, layout),
           width,
           menuSize: cells > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
-          rivets: [],
           ...(teams
             ? {
-                headCrowded: (slot: number, head: 0 | 1) =>
-                  headChipCrowded(cells, layout, slot, head),
+                teamChipCrowded: (slot: number) => teamChipCrowded(cells, layout, slot),
               }
             : {}),
         }) as ReactElement<ComponentProps<typeof ModeSeam>>

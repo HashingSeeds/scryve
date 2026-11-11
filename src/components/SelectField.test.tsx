@@ -121,4 +121,19 @@ describe("SelectField", () => {
       false,
     )
   })
+
+  it("titles a setup row as a header when it is its own section", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SelectField
+          label="Planechase"
+          field="planechase"
+          options={OPTIONS}
+          heading
+          onSelect={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByRole("header", { name: "Planechase" })).toBeTruthy()
+  })
 })
