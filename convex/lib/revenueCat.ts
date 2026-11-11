@@ -81,7 +81,7 @@ export function readRevenueCatSnapshot(
   }
 }
 
-export async function fetchRevenueCatSnapshot(
+async function fetchSubscriber(
   appUserId: string,
   apiKey: string,
   environment: RevenueCatEnvironment,
@@ -94,9 +94,30 @@ export async function fetchRevenueCatSnapshot(
     },
   )
   if (!response.ok) throw new Error(`RevenueCat subscriber fetch failed with ${response.status}`)
-  const snapshot = readRevenueCatSnapshot(await response.json(), environment)
+  const body: unknown = await response.json()
+  const snapshot = readRevenueCatSnapshot(body, environment)
   if (!snapshot) throw new Error("RevenueCat returned an invalid subscriber response")
-  return snapshot
+  return { body, snapshot }
+}
+
+export async function fetchRevenueCatSnapshot(
+  appUserId: string,
+  apiKey: string,
+  environment: RevenueCatEnvironment,
+) {
+  return (await fetchSubscriber(appUserId, apiKey, environment)).snapshot
+}
+
+/** why: a webhook body can name any app user IDs, so only the IDs RevenueCat's own response links to the customer receive its state. */
+export async function fetchRevenueCatCustomer(
+  appUserId: string,
+  apiKey: string,
+  environment: RevenueCatEnvironment,
+) {
+  const { body, snapshot } = await fetchSubscriber(appUserId, apiKey, environment)
+  const original = asRecord(asRecord(body)?.subscriber)?.original_app_user_id
+  const appUserIds = typeof original === "string" && original ? [appUserId, original] : [appUserId]
+  return { appUserIds: [...new Set(appUserIds)], ...snapshot }
 }
 
 export async function applyRevenueCatState(

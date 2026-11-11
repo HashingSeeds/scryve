@@ -4,6 +4,10 @@ packages:
 ignoredBuiltDependencies:
   - dtrace-provider
 
+# why: most malicious releases are caught and unpublished within a day or two, so new versions wait
+# three days before pnpm resolves them. Add an urgent fix to minimumReleaseAgeExclude to skip the wait.
+minimumReleaseAge: 4320
+
 nodeLinker: hoisted
 
 onlyBuiltDependencies:

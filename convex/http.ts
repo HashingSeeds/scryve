@@ -4,10 +4,12 @@ import { Webhook } from "svix"
 import { internal } from "./_generated/api"
 import { env, httpAction } from "./_generated/server"
 import {
+  fetchRevenueCatCustomer,
   fetchRevenueCatSnapshot,
   revenueCatEnvironment,
   type RevenueCatEnvironment,
 } from "./lib/revenueCat"
+import { secretMatches } from "./lib/webhookSecret"
 
 const http = httpRouter()
 
@@ -18,7 +20,7 @@ type RevenueCatEvent = {
 } & (
   | { kind: "test" }
   | { kind: "transfer"; transfer: { transferredFrom: string[]; transferredTo: string[] } }
-  | { kind: "subscriber"; appUserId: string; appUserIds: string[] }
+  | { kind: "subscriber"; appUserId: string }
 )
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -64,18 +66,7 @@ function readRevenueCatEvent(value: unknown): RevenueCatEvent | null {
     }
   }
   if (typeof event.app_user_id !== "string" || event.app_user_id.length === 0) return null
-  const aliases = readStringArray(event.aliases ?? [])
-  if (!aliases) return null
-  const originalAppUserId =
-    typeof event.original_app_user_id === "string" ? event.original_app_user_id : undefined
-  return {
-    ...common,
-    kind: "subscriber",
-    appUserId: event.app_user_id,
-    appUserIds: [
-      ...new Set([event.app_user_id, originalAppUserId, ...aliases].filter(Boolean)),
-    ] as string[],
-  }
+  return { ...common, kind: "subscriber", appUserId: event.app_user_id }
 }
 
 async function fetchTransferSnapshots(
@@ -100,7 +91,7 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     if (!env.REVENUECAT_WEBHOOK_AUTH || !env.REVENUECAT_SECRET_API_KEY)
       return new Response("RevenueCat is not configured", { status: 503 })
-    if (request.headers.get("authorization") !== env.REVENUECAT_WEBHOOK_AUTH)
+    if (!(await secretMatches(request.headers.get("authorization"), env.REVENUECAT_WEBHOOK_AUTH)))
       return new Response("Unauthorized", { status: 401 })
     const configuredEnvironment = revenueCatEnvironment(env.REVENUECAT_ENVIRONMENT)
     if (!configuredEnvironment)
@@ -130,14 +121,11 @@ http.route({
                 configuredEnvironment,
               )
             : [
-                {
-                  appUserIds: event.appUserIds,
-                  ...(await fetchRevenueCatSnapshot(
-                    event.appUserId,
-                    env.REVENUECAT_SECRET_API_KEY,
-                    configuredEnvironment,
-                  )),
-                },
+                await fetchRevenueCatCustomer(
+                  event.appUserId,
+                  env.REVENUECAT_SECRET_API_KEY,
+                  configuredEnvironment,
+                ),
               ]
       await ctx.runMutation(internal.revenuecat.commitSync, {
         environment: configuredEnvironment,
@@ -201,7 +189,12 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     if (!env.APOLLO_HOOK_SECRET)
       return new Response("Apollo hook is not configured", { status: 503 })
-    if (request.headers.get("authorization") !== `Bearer ${env.APOLLO_HOOK_SECRET}`)
+    if (
+      !(await secretMatches(
+        request.headers.get("authorization"),
+        `Bearer ${env.APOLLO_HOOK_SECRET}`,
+      ))
+    )
       return new Response("Unauthorized", { status: 401 })
     await ctx.scheduler.runAfter(0, internal.feedback.pullApollo, {})
     return new Response(null, { status: 204 })
