@@ -9,14 +9,16 @@ import {
 } from "react-native"
 import { activateKeepAwakeAsync, useKeepAwake } from "expo-keep-awake"
 import { useLocalSearchParams } from "expo-router"
-import { useQuery } from "convex/react"
+import { useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import Head from "expo-router/head"
 
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
+import { convexErrorRetryAfterMs } from "@/utils/convexError"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { chunk, clockPhase, fitGrid, formatClock } from "./display"
@@ -90,8 +92,36 @@ function useDisplayStyles() {
   return useMemo(() => displayStyles(unit), [unit])
 }
 
+const LOOKUP_RETRY_MS = 10_000
+
+function useEventIdForCode(code: string) {
+  const resolveCode = useMutation(api.events.resolveCode)
+  const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
+  const [found, setFound] = useState<{ code: string; eventId: Id<"events"> | null }>()
+  useEffect(() => {
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const lookup = () =>
+      resolveCode({ code, deviceId }).then(
+        (eventId) => {
+          if (!cancelled) setFound({ code, eventId })
+        },
+        (cause: unknown) => {
+          if (!cancelled)
+            timer = setTimeout(lookup, convexErrorRetryAfterMs(cause, LOOKUP_RETRY_MS))
+        },
+      )
+    void lookup()
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [code, deviceId, resolveCode])
+  return found?.code === code ? found.eventId : undefined
+}
+
 function EventByCode({ code, s }: { code: string; s: Styles }) {
-  const eventId = useQuery(api.events.byCode, { code })
+  const eventId = useEventIdForCode(code)
   if (eventId === undefined) return null
   if (eventId === null) return <Message text={translate("eventDisplay:notFound")} s={s} />
   return <EventBoard key={eventId} eventId={eventId} s={s} />

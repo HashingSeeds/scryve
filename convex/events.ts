@@ -21,7 +21,12 @@ import { MAX_EVENT_PLAYERS, MAX_EVENT_ROUNDS, type EventSettings } from "./lib/e
 import { eventRules } from "./lib/events/rules"
 import { computeStandings } from "./lib/events/standings"
 import { eventPoints, eventTableResult } from "./lib/events/validators"
-import { limitGameRate } from "./lib/gameRateLimits"
+import {
+  assertCodeGuessesOpen,
+  countCodeMiss,
+  limitEventLookup,
+  limitGameRate,
+} from "./lib/gameRateLimits"
 import { assertGameSystem } from "./lib/integrations"
 import { publicUsernameFor } from "./lib/moderation"
 import { nameFailsGate } from "./lib/nameFilter"
@@ -242,19 +247,27 @@ export const update = mutation({
   },
 })
 
+/** why: a miss spends the shared guess budget, so callers must return null on one; a throw rolls the token back. */
+async function eventForCode(ctx: MutationCtx, raw: string) {
+  await assertCodeGuessesOpen(ctx, "events")
+  const code = codeOrUndefined(raw)
+  const event = code
+    ? await ctx.db
+        .query("events")
+        .withIndex("by_code", (q) => q.eq("code", code))
+        .first()
+    : null
+  if (!event) await countCodeMiss(ctx, "events")
+  return event
+}
+
 export const join = mutation({
   args: { code: v.string() },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     await limitGameRate(ctx, "eventJoin", user._id)
-    const code = codeOrUndefined(args.code)
-    const event = code
-      ? await ctx.db
-          .query("events")
-          .withIndex("by_code", (q) => q.eq("code", code))
-          .first()
-      : null
-    // why: returning keeps the spent rate-limit token; a throw would roll it back and let codes be guessed freely.
+    const event = await eventForCode(ctx, args.code)
+    // why: returning keeps the spent rate-limit tokens; a throw would roll them back and let codes be guessed freely.
     if (!event) return null
     const existing = await playerFor(ctx, event._id, user._id)
     if (existing) return { eventId: event._id, playerId: existing._id }
@@ -576,6 +589,16 @@ export const importNearby = mutation({
   },
 })
 
+export const resolveCode = mutation({
+  args: { code: v.string(), deviceId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    await limitEventLookup(ctx, args.deviceId)
+    const event = await eventForCode(ctx, args.code)
+    return event?._id ?? null
+  },
+})
+
+/** why: installed display screens from before `resolveCode` still call this. A query cannot spend rate-limit tokens, so remove it once they age out. */
 export const byCode = query({
   args: { code: v.string() },
   handler: async (ctx, args) => {

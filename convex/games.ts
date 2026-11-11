@@ -42,7 +42,7 @@ import {
 } from "./lib/gameEngine"
 import { storedDesignations, throwIfRejected, writeCloudGame } from "./lib/gameEngineConvex"
 import { connectedLogEvent } from "./lib/gameLog"
-import { limitGameRate } from "./lib/gameRateLimits"
+import { codeGuessWait, countCodeMiss, limitGameRate } from "./lib/gameRateLimits"
 import {
   commanderField,
   commanderLethalDamage,
@@ -281,6 +281,23 @@ function inviteKey(args: { token?: string; manualCode?: string }) {
   return args.manualCode ? (manualCodeOrUndefined(args.manualCode) ?? args.manualCode) : ""
 }
 
+/** why: manual codes are short enough to guess; invite links carry long tokens, so they skip the shared guess budget and keep working while it is spent. */
+const guessable = (args: { token?: string; manualCode?: string }) =>
+  !args.token && !!args.manualCode
+
+async function assertInviteGuessesOpen(
+  ctx: MutationCtx,
+  args: { token?: string; manualCode?: string },
+) {
+  if (guessable(args) && (await codeGuessWait(ctx, "games")) !== undefined)
+    throw tooManyJoinAttempts()
+}
+
+/** why: callers must return rather than throw after this, or the spent token rolls back. */
+async function countMissedCode(ctx: MutationCtx, args: { token?: string; manualCode?: string }) {
+  if (guessable(args)) await countCodeMiss(ctx, "games")
+}
+
 /**
  * why: callers must return rather than throw after this, because a thrown error rolls the
  * counter back. The remembered invite lets claimSeat keep throwing for clients that predate this.
@@ -291,6 +308,7 @@ async function recordFailedInvite(
   args: { token?: string; manualCode?: string },
 ) {
   await consumeJoinAttempt(ctx, clerkUserId)
+  await countMissedCode(ctx, args)
   const record = await joinAttemptsFor(ctx, clerkUserId)
   if (record)
     await ctx.db.patch(record._id, { failedInvite: inviteKey(args), failedInviteAt: Date.now() })
@@ -985,11 +1003,18 @@ export const resolveInvite = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     await consumeJoinAttempt(ctx, String(user.clerkUserId))
+    await assertInviteGuessesOpen(ctx, args)
     const invite = await findInvite(ctx, args)
-    if (!invite) return { valid: false }
-    const game = await ctx.db.get(invite.gameId)
-    if (!game || game.status !== "lobby" || !(await inviteIsCurrent(ctx, game, invite, Date.now())))
+    const game = invite ? await ctx.db.get(invite.gameId) : null
+    if (
+      !invite ||
+      !game ||
+      game.status !== "lobby" ||
+      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+    ) {
+      await countMissedCode(ctx, args)
       return { valid: false }
+    }
     const players = await playersForGame(ctx, game._id)
     return { valid: players.length < game.playerCount }
   },
@@ -1080,6 +1105,7 @@ export const claimSeat = mutation({
     const user = await requireUser(ctx)
     const clerkUserId = String(user.clerkUserId)
     await consumeJoinAttempt(ctx, clerkUserId)
+    await assertInviteGuessesOpen(ctx, args)
     if (args.color !== undefined) assertAllowedColor(args.color)
     if (args.shape !== undefined) assertAllowedShape(args.shape, MANY_SEAT_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
@@ -1093,6 +1119,7 @@ export const claimSeat = mutation({
         Date.now() - joins.failedInviteAt < JOIN_ATTEMPT_WINDOW_MS
       )
         throw new ConvexError({ code: "invalid_invite", message: INVALID_INVITE_MESSAGE })
+      await countMissedCode(ctx, args)
       return null
     }
     assertClientPlaysGame(game, args)
@@ -1907,6 +1934,7 @@ export const claimableSeats = mutation({
     )
       throw tooManyJoinAttempts()
     await consumeJoinAttempt(ctx, clerkUserId, "seatLookup")
+    await assertInviteGuessesOpen(ctx, args)
     const game = await joinableInviteGame(ctx, args)
     if (!game) {
       await recordFailedInvite(ctx, clerkUserId, args)

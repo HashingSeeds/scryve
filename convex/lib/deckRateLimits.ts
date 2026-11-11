@@ -18,9 +18,15 @@ export const deckRateLimiter = new RateLimiter(components.rateLimiter, {
 
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,128}$/
 
+/** why: `deviceId` is client-supplied and spoofable, so it only splits guest budgets; pair it with one bucket all guests share. */
+export function guestDeviceKey(deviceId?: string) {
+  return deviceId !== undefined && DEVICE_ID.test(deviceId) ? `device:${deviceId}` : undefined
+}
+
 async function limitGuest(ctx: ActionCtx, perDevice?: "guestCardLookup", deviceId?: string) {
-  if (perDevice && deviceId !== undefined && DEVICE_ID.test(deviceId)) {
-    const device = await deckRateLimiter.limit(ctx, perDevice, { key: `device:${deviceId}` })
+  const key = guestDeviceKey(deviceId)
+  if (perDevice && key) {
+    const device = await deckRateLimiter.limit(ctx, perDevice, { key })
     if (!device.ok) return device
   }
   return await deckRateLimiter.limit(ctx, "guestShare")

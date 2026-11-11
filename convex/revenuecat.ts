@@ -3,6 +3,7 @@ import { v } from "convex/values"
 import { internal } from "./_generated/api"
 import { action, env, internalMutation, internalQuery } from "./_generated/server"
 import { hasAccountDeletion } from "./lib/auth"
+import { limitRevenueCatSync } from "./lib/billingRateLimits"
 import {
   applyRevenueCatState,
   fetchRevenueCatSnapshot,
@@ -103,6 +104,7 @@ export const syncCurrent = action({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) throw new Error("Authentication required")
+    await limitRevenueCatSync(ctx, identity.tokenIdentifier)
     if (!env.REVENUECAT_SECRET_API_KEY) throw new Error("RevenueCat is not configured")
     const environment = revenueCatEnvironment(env.REVENUECAT_ENVIRONMENT)
     if (!environment) throw new Error("RevenueCat environment is invalid")

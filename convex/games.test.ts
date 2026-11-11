@@ -448,6 +448,32 @@ describe("Convex connected-game authorization", () => {
     )
   })
 
+  it("caps wrong manual codes across accounts but keeps invite links working", async () => {
+    jest.useFakeTimers()
+    try {
+      const t = makeConvexTest()
+      await lobby(t)
+      for (let account = 0; account < 12; account += 1) {
+        const guesser = await signedIn(t, `guesser-${account}`)
+        for (let guess = 0; guess < 10; guess += 1)
+          await expect(
+            guesser.mutation(api.games.claimableSeats, {
+              manualCode: `Z${String(account * 10 + guess).padStart(5, "0")}`,
+            }),
+          ).resolves.toMatchObject({ invalid: true })
+      }
+      const joiner = await signedIn(t, "joiner", "Joiner")
+      await expect(
+        joiner.mutation(api.games.claimableSeats, { manualCode: "ABC234" }),
+      ).rejects.toThrow("Too many join attempts")
+      await expect(joiner.mutation(api.games.claimableSeats, { token })).resolves.toMatchObject({
+        publicId: "public-game-id-123456",
+      })
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("rejects oversized rulesets and manual-code candidate payloads before database work", async () => {
     const t = makeConvexTest()
     const host = await signedIn(t, "bounded-host", "Host")

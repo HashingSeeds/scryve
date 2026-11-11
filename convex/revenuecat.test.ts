@@ -443,6 +443,22 @@ describe("RevenueCat entitlement sync", () => {
     )
   })
 
+  it("limits how often one account spends a RevenueCat request", async () => {
+    jest.useFakeTimers()
+    try {
+      const t = makeConvexTest()
+      const actor = await signedIn(t, "clerk_busy")
+      const fetchSpy = jest
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async () => subscriberResponse({ enabled: true, observedAt: 700 }))
+      for (let sync = 0; sync < 20; sync += 1) await actor.action(api.revenuecat.syncCurrent, {})
+      await expect(actor.action(api.revenuecat.syncCurrent, {})).rejects.toThrow("Try again in")
+      expect(fetchSpy).toHaveBeenCalledTimes(20)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("reads the next charge only while the subscription will renew", () => {
     const expires = "2027-01-01T00:00:00Z"
     const snapshot = (subscription: Record<string, unknown>) =>

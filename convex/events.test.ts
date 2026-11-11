@@ -202,6 +202,49 @@ describe("events", () => {
     )
   })
 
+  describe("code lookups", () => {
+    beforeEach(() => jest.useFakeTimers())
+    afterEach(() => jest.useRealTimers())
+
+    it("lets a signed-out display find its event, a few lookups a device", async () => {
+      const { t, eventId, code } = await setup([])
+      for (let lookup = 0; lookup < 10; lookup += 1)
+        expect(await t.mutation(api.events.resolveCode, { code, deviceId: "display-a" })).toBe(
+          eventId,
+        )
+      await expect(
+        t.mutation(api.events.resolveCode, { code, deviceId: "display-a" }),
+      ).rejects.toThrow("Too many requests")
+      expect(await t.mutation(api.events.resolveCode, { code, deviceId: "display-b" })).toBe(
+        eventId,
+      )
+    })
+
+    it("caps signed-out lookups across every device", async () => {
+      const { t, code } = await setup([])
+      for (let device = 0; device < 30; device += 1)
+        await t.mutation(api.events.resolveCode, { code, deviceId: `display-${device}` })
+      await expect(
+        t.mutation(api.events.resolveCode, { code, deviceId: "display-new" }),
+      ).rejects.toThrow("Too many requests")
+    })
+
+    it("caps wrong codes across accounts, then refuses live codes too", async () => {
+      const { t, code } = await setup([])
+      for (let account = 0; account < 12; account += 1) {
+        const guesser = await signedIn(t, `guesser-${account}`)
+        for (let guess = 0; guess < 10; guess += 1)
+          expect(
+            await guesser.mutation(api.events.join, {
+              code: `Z${String(account * 10 + guess).padStart(5, "0")}`,
+            }),
+          ).toBeNull()
+      }
+      const player = await signedIn(t, "player")
+      await expect(player.mutation(api.events.join, { code })).rejects.toThrow("Too many requests")
+    })
+  })
+
   it("keeps the organizer's controls from players", async () => {
     const { actors, eventId } = await setup()
     await expect(
