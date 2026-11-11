@@ -74,6 +74,7 @@ export interface CommanderStripProps {
   source?: CommanderStripSource
   markAnchor?: { x: number; y: number; size: number }
   onBoundsChange?: (bounds: LayoutRectangle) => void
+  /** why: a Two-Headed Giant team's grid has none, since each teammate's strip mark starts their own attack; it then only reads the totals. */
   onPress?: () => void
 }
 
@@ -251,19 +252,21 @@ export const CommanderStrip = memo(function CommanderStrip({
           finishing ? `commander-exit-seat-${seatNumber}` : `commander-map-seat-${seatNumber}`
         }
         onLayout={(event) => setMapBounds(event.nativeEvent.layout)}
-        accessibilityRole="button"
+        accessibilityRole={finishing || onPress ? "button" : undefined}
         accessibilityLabel={
           finishing
             ? translate(`board:commander.submitAssigningFromSeat.${source.submit}`, {
                 seat: seatNumber,
               })
-            : dealt.length
-              ? translate("board:commander.assignFromWithDamage", { identity, sources })
-              : translate("board:commander.assignFrom", { identity })
+            : !onPress
+              ? translate("board:counters.seatItem", { identity, label: sources })
+              : dealt.length
+                ? translate("board:commander.assignFromWithDamage", { identity, sources })
+                : translate("board:commander.assignFrom", { identity })
         }
         accessibilityState={{ disabled: !!disabled && !finishing }}
         accessible={!attackerId}
-        disabled={finishing ? false : disabled || !!attackerId || sourceShown}
+        disabled={finishing ? false : disabled || !onPress || !!attackerId || sourceShown}
         // why: the grid's slop reaches only toward the card's edges, so it never takes touches from the − and + or the total.
         hitSlop={
           mapBounds

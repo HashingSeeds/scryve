@@ -931,6 +931,7 @@ describe("LifeCard", () => {
           commanderDamage={commanderDamage({
             players: commanderPlayers,
             incoming: { [commanderIds[1]]: 6 },
+            onPressSword: jest.fn(),
           })}
           onChange={jest.fn()}
         />

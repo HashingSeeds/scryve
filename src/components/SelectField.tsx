@@ -32,6 +32,8 @@ export interface SelectFieldProps {
   testID?: string
   /** Shows the current choice but refuses to open the menu. */
   disabled?: boolean
+  /** why: a field that is its own section of a form (a game setup row) titles it like the sections around it. */
+  heading?: boolean
   onSelect: (id?: string) => void
 }
 
@@ -73,6 +75,7 @@ export function SelectField({
   clearLabel,
   testID,
   disabled = false,
+  heading = false,
   onSelect,
 }: SelectFieldProps) {
   const {
@@ -115,7 +118,11 @@ export function SelectField({
 
   return (
     <View style={themed($field)}>
-      <Text preset="formLabel" size="xs" text={label} />
+      {heading ? (
+        <Text preset="subheading" accessibilityRole="header" text={label} />
+      ) : (
+        <Text preset="formLabel" size="xs" text={label} />
+      )}
       <Pressable
         ref={trigger}
         testID={testID}

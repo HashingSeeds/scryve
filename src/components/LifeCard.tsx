@@ -73,7 +73,6 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOv
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
-import { usePendingLife } from "./pendingLife"
 import {
   seatCardRadius,
   COMPACT_LIFE_FONT_SIZE,
@@ -108,6 +107,7 @@ import {
 } from "./SeatIdentity"
 import { Text } from "./Text"
 import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
+import { TeamShade } from "./TeamShade"
 import { useSeatFill } from "./TurnSpotlight"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -173,6 +173,8 @@ export interface LifeCardProps {
   out?: LifeCardOut
   seatTable?: SeatTable
   dice?: LifeCardDice
+  /** why: a Two-Headed Giant team zone: shaded between the teammates' colors, content-left first, with each teammate's name, mark, and bag on their own strip instead. */
+  team?: { colors: readonly [string, string] }
   onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -204,6 +206,7 @@ export const LifeCard = memo(function LifeCard({
   dice,
   out,
   seatTable,
+  team,
   onPlayStart,
   onChange,
   style,
@@ -227,15 +230,12 @@ export const LifeCard = memo(function LifeCard({
   const displayName = playerName.trim() || translate("board:seat.unnamedPlayer")
   const identity = seatIdentityLabel(seatNumber, playerName)
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
-  const [preview, setPreview] = usePendingLife(playerId)
+  const [preview, setPreview] = useState(0)
   const stopTapTiming = useRef<() => void>(undefined)
-  const showPreview = useCallback(
-    (delta: number) => {
-      stopTapTiming.current = delta === 0 ? undefined : startTapTiming()
-      setPreview(delta)
-    },
-    [setPreview],
-  )
+  const showPreview = useCallback((delta: number) => {
+    stopTapTiming.current = delta === 0 ? undefined : startTapTiming()
+    setPreview(delta)
+  }, [])
   useLayoutEffect(() => {
     stopTapTiming.current?.()
     stopTapTiming.current = undefined
@@ -272,6 +272,7 @@ export const LifeCard = memo(function LifeCard({
   const [seatedPlayerId, setSeatedPlayerId] = useState(playerId)
   if (seatedPlayerId !== playerId) {
     setSeatedPlayerId(playerId)
+    setPreview(0)
     setEditorOpen(false)
     setTableSheetOpen(false)
   }
@@ -719,7 +720,16 @@ export const LifeCard = memo(function LifeCard({
         knockStyle,
       ]}
     >
-      {shape && isProMarkShape(shape) && cardSize.height > 0 ? (
+      {team ? (
+        <TeamShade
+          colors={team.colors}
+          rotation={contentRotation}
+          playerId={playerId}
+          seatNumber={seatNumber}
+          size={cardSize}
+        />
+      ) : null}
+      {!team && shape && isProMarkShape(shape) && cardSize.height > 0 ? (
         <View
           testID={`pro-mark-watermark-seat-${seatNumber}`}
           pointerEvents="none"
@@ -995,7 +1005,7 @@ export const LifeCard = memo(function LifeCard({
                   },
               ]}
             >
-              {commanderDamage ? (
+              {team ? null : commanderDamage ? (
                 <BoardPressable
                   testID={`commander-mark-seat-${seatNumber}`}
                   accessibilityRole="button"
@@ -1141,6 +1151,7 @@ export const LifeCard = memo(function LifeCard({
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
           nameEnd={identityRowAt && identityRowAt.x + identityRowAt.width}
+          bagless={!!team}
           onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}
@@ -1177,7 +1188,6 @@ export const LifeCard = memo(function LifeCard({
           menuCorner={menuCorner}
           menuEdgeCenter={menuEdgeCenter}
           onChange={onChange}
-          onPreview={setPreview}
           onClose={() => setEditorOpen(false)}
         />
       ) : null}

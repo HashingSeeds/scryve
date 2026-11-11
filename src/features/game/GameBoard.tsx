@@ -47,7 +47,7 @@ export interface BoardChromeOptions {
     onChange: (layout: PlayerGridLayoutVariant) => void
     seats?: ReactNode
   }
-  teamCount?: number
+  teams?: readonly (readonly string[])[]
   petals: readonly [BoardPetal, BoardPetal]
   attack: Pick<CommanderAttack, "dispatch">
   onDiceTool?: () => void
@@ -71,7 +71,7 @@ export function useBoardChrome({
   players,
   layout,
   petals: [third, end],
-  teamCount,
+  teams,
   attack: { dispatch },
   onDiceTool,
   onLog,
@@ -90,7 +90,12 @@ export function useBoardChrome({
   const [menuOpen, setMenuOpen] = useState(false)
   const [layoutOpen, setLayoutOpen] = useState(false)
   const [dialogOrigin, setDialogOrigin] = useState<DialogOrigin>()
-  const seatDice = useDice(players, gameId, system)
+  const seatDice = useDice(
+    players,
+    gameId,
+    system,
+    teams?.map(([lead]) => lead),
+  )
   // why: rolling by hand means the players skipped the first-player offer.
   const rollFor = stable("bagRoll", (player: GamePlayer, tool: DiceTool) => {
     onDiceTool?.()
@@ -105,7 +110,7 @@ export function useBoardChrome({
     if (rules?.kind === "text") prefetchRules(rules)
   }, [rules])
   const hasRules = Boolean(rules && (rules.kind === "link" || onRules))
-  const playerCount = teamCount ?? players.length
+  const playerCount = teams?.length ?? players.length
   const canPickLayout = getPlayerGridLayoutOptions(playerCount).length > 1 || Boolean(layout.seats)
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
@@ -204,7 +209,7 @@ export function useBoardChrome({
     dialogOrigin,
     dice,
     playerCount,
-    teamBoard: teamCount !== undefined,
+    teamBoard: teams !== undefined,
     layout,
     closeLayout,
     menu: {

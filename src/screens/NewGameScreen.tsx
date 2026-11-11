@@ -1032,7 +1032,7 @@ function NewGameForm({
                     : translate("play:newGame.players")
                 }
                 options={PLAYER_COUNTS}
-                more={treachery || twoHeadedGiant ? undefined : MORE_PLAYER_COUNTS}
+                more={treachery ? undefined : MORE_PLAYER_COUNTS}
                 value={playerCount}
                 isDisabled={
                   treachery

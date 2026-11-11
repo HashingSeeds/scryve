@@ -1,5 +1,4 @@
 import { ModeSeam } from "@/components/modes/ModeSeam"
-import type { TeamBinding } from "@/components/TeamPanelLayer"
 import type { BoardSeamGeometry } from "@/features/game/GameBoardStage"
 
 import { chipCrowdedBySeam, planSeam, seamRoom, type SeamItem } from "./seamPlan"
@@ -7,7 +6,6 @@ import type { BoardModes } from "./useBoardModes"
 
 export interface SeamSeat {
   slot: number
-  head?: 0 | 1
 }
 
 export function teamSeat(
@@ -15,8 +13,7 @@ export function teamSeat(
   playerId: string,
 ): SeamSeat | undefined {
   const slot = teams.findIndex((members) => members.includes(playerId))
-  const head = teams[slot]?.indexOf(playerId)
-  return head === 0 || head === 1 ? { slot, head } : undefined
+  return slot < 0 ? undefined : { slot }
 }
 
 /** why: a crowded seam drops the plane plate, and with Turns off the die too, so every seat's bag opens the plane and nobody loses it. */
@@ -37,12 +34,10 @@ export function modeSeamFor(
     dieOnChip,
     turnChips,
     slotOf,
-    teamBinding,
   }: {
     dieOnChip: boolean
     turnChips: boolean
     slotOf: (playerId: string) => SeamSeat | undefined
-    teamBinding?: TeamBinding
   },
 ) {
   const { planar, scheme } = modes
@@ -54,8 +49,8 @@ export function modeSeamFor(
     sides,
     width,
     menuSize,
-    rivets,
-    headCrowded,
+    teamStrip,
+    teamChipCrowded,
   }: BoardSeamGeometry) {
     const active = modes.activeGroup.flatMap((playerId) => slotOf(playerId) ?? [])
     const busySlots = new Set(active.map(({ slot }) => slot))
@@ -65,11 +60,10 @@ export function modeSeamFor(
       anchorX: anchor.x,
       width,
       menuSize,
-      edge: edgeTabs ? EDGE_WITH_TABS : EDGE,
-      rivets: teamBinding === "frame" ? [] : rivets,
+      edge: (edgeTabs ? EDGE_WITH_TABS : EDGE) + teamStrip,
     }
-    const crowded = headCrowded
-      ? active.some(({ slot, head }) => head !== undefined && headCrowded(slot, head))
+    const crowded = teamChipCrowded
+      ? active.some(({ slot }) => teamChipCrowded(slot))
       : chipCrowdedBySeam(geometry, busySlots)
     const seamHoldsScheme = !turnChips && !!scheme?.mine
     const schemeItem: SeamItem | undefined =

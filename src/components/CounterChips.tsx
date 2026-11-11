@@ -228,6 +228,13 @@ export interface CounterChipsProps {
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
   nameEnd?: number
+  /** why: a Two-Headed Giant strip stacks its chips down its own run, `center` across and from `top` to `bottom` in the content frame, and leaves the team's shared counters to the zone. */
+  stack?: { center: number; width: number; top: number; bottom: number }
+  hidden?: readonly string[]
+  /** why: the strip's name runs from its foot up to where the stacked chips end. */
+  onStackEnd?: (bottom: number) => void
+  /** why: a team zone keeps only the shared counters; each teammate's bag sits on their own strip. */
+  bagless?: boolean
   onSheetOpenChange?: (open: boolean) => void
 }
 
@@ -295,6 +302,10 @@ export const CounterChips = memo(function CounterChips({
   menuEdgeCenter,
   cardSize,
   nameEnd,
+  stack,
+  hidden,
+  onStackEnd,
+  bagless,
   dice,
   bagAt,
   onSheetOpenChange,
@@ -324,7 +335,7 @@ export const CounterChips = memo(function CounterChips({
     ),
     ...rules.counters.flatMap((counter) => {
       const value = counters[counter.id] ?? 0
-      return value > 0
+      return value > 0 && !hidden?.includes(counter.id)
         ? [
             {
               kind: "counter" as const,
@@ -338,9 +349,16 @@ export const CounterChips = memo(function CounterChips({
     }),
   ]
   const [widths, setWidths] = useState<Readonly<Record<string, number>>>({})
-  const measure = (key: string, width: number) =>
-    setWidths((current) => (current[key] === width ? current : { ...current, [key]: width }))
+  const measure = (key: string, { width, height }: { width: number; height: number }) => {
+    const length = stack ? height : width
+    setWidths((current) => (current[key] === length ? current : { ...current, [key]: length }))
+  }
   const webAnnouncement = useAnnouncements(seat, identity)
+  const [stackHeight, setStackHeight] = useState(0)
+  const stackEnd = stack && items.length > 0 ? stack.top + stackHeight : 0
+  useEffect(() => {
+    onStackEnd?.(stackEnd)
+  }, [onStackEnd, stackEnd])
   const sheetOpen = sheet !== null
 
   useEffect(() => {
@@ -376,7 +394,7 @@ export const CounterChips = memo(function CounterChips({
     spacing,
   })
   const bagSlop = targetSlop({ width: bagSize, height: bagSize }, bagAt)
-  const bagShown = editable || !!dice
+  const bagShown = !bagless && (editable || !!dice)
   const chipGap = compact ? spacing.xxxs : spacing.xxs
   const rowRight = bagAt.right + (bagShown ? bagSize + chipGap : 0)
   const menuOnRow = menuEdgeCenter === CONTENT_EDGES[contentRotation].bottom
@@ -389,14 +407,17 @@ export const CounterChips = memo(function CounterChips({
         : Infinity,
     ),
   )
-  const unmeasured = compact ? COMPACT_CHIP_WIDTH : CHIP_SIZE
+  const unmeasured = stack ? bagSize : compact ? COMPACT_CHIP_WIDTH : CHIP_SIZE
   const fit = fitChips(
     items.map((item) => widths[item.key] ?? unmeasured),
-    room,
+    stack ? Math.max(0, stack.bottom - stack.top) : room,
     chipGap,
     widths[OVERFLOW_KEY] ?? unmeasured,
   )
-  const chipBox = themed(compact ? $compactChip : $chip)
+  const chipBox = [
+    themed(compact ? $compactChip : $chip),
+    stack && [$stackedChip, { maxWidth: stack.width }],
+  ]
   const chipStyleOf = (item: ChipItem) => [
     chipBox,
     item.kind === "counter" && item.lethal && { borderColor: foreground },
@@ -416,7 +437,11 @@ export const CounterChips = memo(function CounterChips({
             weight="bold"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
-            style={[compact ? $compactCustomChipName : $customChipName, { color: foreground }]}
+            style={[
+              compact ? $compactCustomChipName : $customChipName,
+              stack && { maxWidth: stack.width - 4 },
+              { color: foreground },
+            ]}
           />
         )}
         <Text
@@ -457,19 +482,19 @@ export const CounterChips = memo(function CounterChips({
             aria-hidden
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
-            style={[$measureRow, { gap: chipGap }]}
+            style={[$measureRow, stack && $measureColumn, { gap: chipGap }]}
           >
             {items.map((item) => (
               <View
                 key={item.key}
-                onLayout={({ nativeEvent }) => measure(item.key, nativeEvent.layout.width)}
+                onLayout={({ nativeEvent }) => measure(item.key, nativeEvent.layout)}
                 style={chipStyleOf(item)}
               >
                 {chipFace(item)}
               </View>
             ))}
             <View
-              onLayout={({ nativeEvent }) => measure(OVERFLOW_KEY, nativeEvent.layout.width)}
+              onLayout={({ nativeEvent }) => measure(OVERFLOW_KEY, nativeEvent.layout)}
               style={chipBox}
             >
               {overflowFace(items.length)}
@@ -478,10 +503,25 @@ export const CounterChips = memo(function CounterChips({
           <View
             testID={`counter-chips-seat-${seatNumber}`}
             pointerEvents="box-none"
-            style={[
-              $bottomRow,
-              { gap: chipGap, right: rowRight, bottom: bagAt.bottom, height: bagSize },
-            ]}
+            onLayout={
+              stack ? ({ nativeEvent: { layout } }) => setStackHeight(layout.height) : undefined
+            }
+            style={
+              stack
+                ? [
+                    $stackColumn,
+                    {
+                      gap: chipGap,
+                      left: stack.center - stack.width / 2,
+                      width: stack.width,
+                      top: stack.top,
+                    },
+                  ]
+                : [
+                    $bottomRow,
+                    { gap: chipGap, right: rowRight, bottom: bagAt.bottom, height: bagSize },
+                  ]
+            }
           >
             {items.slice(0, fit.shown).map((item) => {
               const style = chipStyleOf(item)
@@ -860,16 +900,18 @@ function CounterSheet({
             </View>
           </>
         ) : sheet.kind === "name" ? (
-          <NameCounter
-            seatNumber={seatNumber}
-            ink={ink}
-            taken={seat.rules.counters.flatMap(({ id }) => customCounterNameOf(id) ?? [])}
-            onAdd={(name) => {
-              seat.adjustCounter(customCounterId(name), 1)
-              rememberCounterName(name)
-              onClose()
-            }}
-          />
+          <View style={[$fill, KEYBOARD_CLEAR_HALF[contentRotation]]}>
+            <NameCounter
+              seatNumber={seatNumber}
+              ink={ink}
+              taken={seat.rules.counters.flatMap(({ id }) => customCounterNameOf(id) ?? [])}
+              onAdd={(name) => {
+                seat.adjustCounter(customCounterId(name), 1)
+                rememberCounterName(name)
+                onClose()
+              }}
+            />
+          </View>
         ) : (
           <>
             {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
@@ -1423,6 +1465,28 @@ const $bottomRow: ViewStyle = {
   position: "absolute",
   flexDirection: "row-reverse",
   alignItems: "center",
+}
+
+const $measureColumn: ViewStyle = { flexDirection: "column" }
+
+const $stackColumn: ViewStyle = { position: "absolute", alignItems: "center" }
+
+// why: a strip is a chip wide, so a chip stacks its glyph or name over its value.
+const $stackedChip: ViewStyle = {
+  flexDirection: "column",
+  gap: 0,
+  paddingHorizontal: 2,
+  paddingVertical: 2,
+}
+
+const $fill: ViewStyle = { flex: 1 }
+
+/** why: the keyboard rises from the screen's bottom edge, which a sideways seat's content runs along, so naming a counter keeps to the half nearest the top of the screen. */
+const KEYBOARD_CLEAR_HALF: Record<LifeCardContentRotation, ViewStyle | undefined> = {
+  0: undefined,
+  180: undefined,
+  90: { width: "50%", alignSelf: "flex-start" },
+  [-90]: { width: "50%", alignSelf: "flex-end" },
 }
 
 const $nameCounter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
