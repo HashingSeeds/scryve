@@ -81,6 +81,10 @@ export function TeamCorners({
       ? menuHalf
       : 0)
   const topMenu = menuEdgeCenter === edges.top ? menuHalf : 0
+  const nameAlong = SIDES.map((side) => inset(side, "top"))
+  const nameTop = SIDES.map((side) =>
+    cornerOffset(gap, edges.top, edges[side], contentInsets, screenEdges),
+  )
   return (
     <>
       <View
@@ -89,23 +93,19 @@ export function TeamCorners({
         importantForAccessibility={namesHidden ? "no-hide-descendants" : "auto"}
         style={[contentFrame(rotation, cardSize), $layer, namesHidden && $hidden]}
       >
-        {heads.map((head, index) => {
-          const side = SIDES[index]
-          const along = inset(side, "top")
-          return (
-            <TeamName
-              key={head.seatNumber}
-              head={head}
-              compact={compact}
-              style={{
-                top: cornerOffset(gap, edges.top, edges[side], contentInsets, screenEdges),
-                [side]: along,
-                maxWidth: Math.max(run / 2 - along - gap - topMenu, 0),
-                flexDirection: side === "left" ? "row" : "row-reverse",
-              }}
-            />
-          )
-        })}
+        {heads.map((head, index) => (
+          <TeamName
+            key={head.seatNumber}
+            head={head}
+            compact={compact}
+            reversed={index === 1}
+            style={{
+              top: nameTop[index],
+              [SIDES[index]]: nameAlong[index],
+              maxWidth: Math.max(run / 2 - nameAlong[index] - gap - topMenu, 0),
+            }}
+          />
+        ))}
       </View>
       {countersShown
         ? heads.map((head, index) =>
@@ -139,7 +139,17 @@ export function TeamCorners({
   )
 }
 
-function TeamName({ head, compact, style }: { head: TeamHead; compact?: boolean; style: ViewStyle }) {
+function TeamName({
+  head,
+  compact,
+  reversed,
+  style,
+}: {
+  head: TeamHead
+  compact?: boolean
+  reversed: boolean
+  style: ViewStyle
+}) {
   const identity = seatIdentityLabel(head.seatNumber, head.name)
   const seatIdentity = (
     <SeatIdentity
@@ -151,10 +161,15 @@ function TeamName({ head, compact, style }: { head: TeamHead; compact?: boolean;
       insetSwordColor={head.sword ? head.color : undefined}
       foil={head.foil && !!head.shape && isProMarkShape(head.shape)}
       staleSince={head.staleSince}
-      style={{ flexDirection: style.flexDirection }}
+      style={reversed ? $reversed : undefined}
     />
   )
-  const shown = [$name, style, head.ownership === "disabled" && $disabled]
+  const shown = [
+    $name,
+    reversed ? $reversed : $forward,
+    style,
+    head.ownership === "disabled" && $disabled,
+  ]
   return head.sword ? (
     <BoardPressable
       testID={`commander-mark-seat-${head.seatNumber}`}
@@ -189,6 +204,8 @@ function TeamName({ head, compact, style }: { head: TeamHead; compact?: boolean;
 
 const $layer: ViewStyle = { zIndex: 10 }
 const $name: ViewStyle = { position: "absolute" }
+const $forward: ViewStyle = { flexDirection: "row" }
+const $reversed: ViewStyle = { flexDirection: "row-reverse" }
 const $hidden: ViewStyle = { opacity: 0 }
 const $disabled: ViewStyle = { opacity: 0.72 }
 const $pressed: ViewStyle = { opacity: 0.72 }
