@@ -267,7 +267,6 @@ export const join = mutation({
     const user = await requireUser(ctx)
     await limitGameRate(ctx, "eventJoin", user._id)
     const event = await eventForCode(ctx, args.code)
-    // why: returning keeps the spent rate-limit tokens; a throw would roll them back and let codes be guessed freely.
     if (!event) return null
     const existing = await playerFor(ctx, event._id, user._id)
     if (existing) return { eventId: event._id, playerId: existing._id }

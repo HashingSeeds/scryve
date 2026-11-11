@@ -9,19 +9,18 @@ import {
 } from "react-native"
 import { activateKeepAwakeAsync, useKeepAwake } from "expo-keep-awake"
 import { useLocalSearchParams } from "expo-router"
-import { useMutation, useQuery } from "convex/react"
+import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import Head from "expo-router/head"
 
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { LocalGameRepository } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
-import { convexErrorRetryAfterMs } from "@/utils/convexError"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { chunk, clockPhase, fitGrid, formatClock } from "./display"
+import { useEventIdForCode } from "./useEventIdForCode"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import {
@@ -90,34 +89,6 @@ function useDisplayStyles() {
   const { width, height } = useWindowDimensions()
   const unit = Math.round(Math.min(32, Math.max(14, Math.min(width / 64, height / 36))))
   return useMemo(() => displayStyles(unit), [unit])
-}
-
-const LOOKUP_RETRY_MS = 10_000
-
-function useEventIdForCode(code: string) {
-  const resolveCode = useMutation(api.events.resolveCode)
-  const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
-  const [found, setFound] = useState<{ code: string; eventId: Id<"events"> | null }>()
-  useEffect(() => {
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const lookup = () =>
-      resolveCode({ code, deviceId }).then(
-        (eventId) => {
-          if (!cancelled) setFound({ code, eventId })
-        },
-        (cause: unknown) => {
-          if (!cancelled)
-            timer = setTimeout(lookup, convexErrorRetryAfterMs(cause, LOOKUP_RETRY_MS))
-        },
-      )
-    void lookup()
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [code, deviceId, resolveCode])
-  return found?.code === code ? found.eventId : undefined
 }
 
 function EventByCode({ code, s }: { code: string; s: Styles }) {

@@ -281,7 +281,6 @@ function inviteKey(args: { token?: string; manualCode?: string }) {
   return args.manualCode ? (manualCodeOrUndefined(args.manualCode) ?? args.manualCode) : ""
 }
 
-/** why: manual codes are short enough to guess; invite links carry long tokens, so they skip the shared guess budget and keep working while it is spent. */
 const guessable = (args: { token?: string; manualCode?: string }) =>
   !args.token && !!args.manualCode
 
