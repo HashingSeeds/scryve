@@ -38,6 +38,7 @@ import {
 import { FIRST_PLAYER_TAB } from "./playerGridGeometry"
 import type { OutState } from "../../convex/lib/outReason"
 import { EMPTY_TABLE, type TableState } from "../../convex/lib/table"
+import { teamTableRules } from "../../convex/lib/twoHeadedGiant"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -167,6 +168,58 @@ describe("PlayerGrid", () => {
     expect(first.left).toBeGreaterThan(0)
     expect(second).toMatchObject({ flexDirection: "row-reverse" })
     expect(second.right).toBeGreaterThan(0)
+  })
+
+  it("leaves only the opened teammate's counters reachable while their bag sheet covers the zone", () => {
+    const seats = players(4)
+    const rules = teamTableRules(playTableRules("mtg", "limited"))
+    const table: TableState = {
+      ...EMPTY_TABLE,
+      players: {
+        [seats[0].id]: { counters: { poison: 2 } },
+        [seats[1].id]: { counters: { poison: 2 } },
+      },
+    }
+    const runtime: TableRuntime = {
+      table,
+      tableRules: rules,
+      ...createTableActions(
+        () => ({
+          table,
+          rules,
+          playerIds: seats.map(({ id }) => id),
+          lifeOf: () => 30,
+          canAct: () => true,
+        }),
+        jest.fn(() => true),
+      ),
+    }
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          table={runtime}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+    const zone = within(view.getByTestId("life-card-seat-1"))
+    expect(zone.getByTestId("counter-chip-1-poison")).toBeTruthy()
+    expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
+
+    fireEvent.press(zone.getByTestId("seat-bag-seat-1"))
+    expect(zone.getByTestId("counter-sheet-seat-1")).toBeTruthy()
+    expect(zone.queryByTestId("counter-chip-1-poison")).toBeNull()
+    expect(zone.queryByTestId("seat-bag-seat-2")).toBeNull()
+
+    fireEvent.press(zone.getByTestId("counter-close-1"))
+    expect(zone.getByTestId("counter-chip-1-poison")).toBeTruthy()
+    expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
   })
 
   it("gives a team zone the claim of the teammate this device holds, and keeps both teammates' rolls apart", () => {

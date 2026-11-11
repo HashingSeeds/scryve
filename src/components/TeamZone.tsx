@@ -1,3 +1,4 @@
+import { useCallback } from "react"
 import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
@@ -35,6 +36,8 @@ export interface TeamHead {
   sword?: { onPress: () => void; disabled: boolean }
 }
 
+export type TeamSheetOwner = "zone" | 0 | 1
+
 const SIDES = ["left", "right"] as const
 type Side = (typeof SIDES)[number]
 
@@ -54,7 +57,8 @@ export function TeamCorners({
   row,
   namesHidden,
   countersShown,
-  onSheetOpenChange,
+  sheetOwner,
+  onSheetFor,
 }: {
   heads: readonly [TeamHead, TeamHead]
   shared: readonly string[]
@@ -68,8 +72,11 @@ export function TeamCorners({
   row: { start: number; end: number; bottom: number }
   namesHidden: boolean
   countersShown: boolean
-  onSheetOpenChange: (open: boolean) => void
+  sheetOwner?: TeamSheetOwner
+  onSheetFor: (owner: TeamSheetOwner, open: boolean) => void
 }) {
+  const firstSheet = useCallback((open: boolean) => onSheetFor(0, open), [onSheetFor])
+  const secondSheet = useCallback((open: boolean) => onSheetFor(1, open), [onSheetFor])
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const edges = CONTENT_EDGES[rotation]
   const { gap } = seatIdentityMetrics(compact)
@@ -109,7 +116,7 @@ export function TeamCorners({
       </View>
       {countersShown
         ? heads.map((head, index) =>
-            head.seat || head.bag ? (
+            (head.seat || head.bag) && (sheetOwner === undefined || sheetOwner === index) ? (
               <CounterChips
                 key={head.seatNumber}
                 seat={head.seat ?? DICE_ONLY_SEAT}
@@ -130,7 +137,7 @@ export function TeamCorners({
                 contentInsets={contentInsets}
                 menuEdgeCenter={menuEdgeCenter}
                 cardSize={cardSize}
-                onSheetOpenChange={onSheetOpenChange}
+                onSheetOpenChange={index === 0 ? firstSheet : secondSheet}
               />
             ) : null,
           )
@@ -161,7 +168,7 @@ function TeamName({
       insetSwordColor={head.sword ? head.color : undefined}
       foil={head.foil && !!head.shape && isProMarkShape(head.shape)}
       staleSince={head.staleSince}
-      style={reversed ? $reversed : undefined}
+      style={[$shrink, reversed && $reversed]}
     />
   )
   const shown = [
@@ -205,6 +212,7 @@ function TeamName({
 const $layer: ViewStyle = { zIndex: 10 }
 const $name: ViewStyle = { position: "absolute" }
 const $forward: ViewStyle = { flexDirection: "row" }
+const $shrink: ViewStyle = { flexShrink: 1, minWidth: 0 }
 const $reversed: ViewStyle = { flexDirection: "row-reverse" }
 const $hidden: ViewStyle = { opacity: 0 }
 const $disabled: ViewStyle = { opacity: 0.72 }

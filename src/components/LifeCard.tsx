@@ -106,7 +106,7 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { TeamShade } from "./TeamShade"
-import { TeamCorners, type TeamHead } from "./TeamZone"
+import { TeamCorners, type TeamHead, type TeamSheetOwner } from "./TeamZone"
 import { Text } from "./Text"
 import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
 import { useSeatFill } from "./TurnSpotlight"
@@ -270,12 +270,20 @@ export const LifeCard = memo(function LifeCard({
   const calculator = !!playSystemRules(system).counter.calculator
   // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
   const [tableSheetOpen, setTableSheetOpen] = useState(false)
+  // why: a team zone has three chip layers (the shared poison and each teammate's corner); while one holds an open sheet the others step out so nothing behind the sheet stays reachable.
+  const [sheetOwner, setSheetOwner] = useState<TeamSheetOwner>()
+  const sheetFor = useCallback((owner: TeamSheetOwner, open: boolean) => {
+    setTableSheetOpen(open)
+    setSheetOwner(open ? owner : undefined)
+  }, [])
+  const zoneSheet = useCallback((open: boolean) => sheetFor("zone", open), [sheetFor])
   const [seatedPlayerId, setSeatedPlayerId] = useState(playerId)
   if (seatedPlayerId !== playerId) {
     setSeatedPlayerId(playerId)
     setPreview(0)
     setEditorOpen(false)
     setTableSheetOpen(false)
+    setSheetOwner(undefined)
   }
   useEffect(() => {
     if (tableSheetOpen || editorOpen) onPlayStart?.()
@@ -1148,6 +1156,7 @@ export const LifeCard = memo(function LifeCard({
         />
       ) : null}
       {(seatTable || seatBag) &&
+      (!team || sheetOwner === undefined || sheetOwner === "zone") &&
       !claimShown &&
       !diceCovers &&
       !commanderCovers &&
@@ -1182,7 +1191,7 @@ export const LifeCard = memo(function LifeCard({
           nameEnd={teamRow ? 0 : identityRowAt && identityRowAt.x + identityRowAt.width}
           bagless={!!team}
           onRowWidth={team ? setSharedRowWidth : undefined}
-          onSheetOpenChange={setTableSheetOpen}
+          onSheetOpenChange={team ? zoneSheet : setTableSheetOpen}
         />
       ) : null}
       {team && teamRow ? (
@@ -1201,7 +1210,8 @@ export const LifeCard = memo(function LifeCard({
           countersShown={
             !claimShown && !diceCovers && !commanderCovers && !sittingOut && !editorOpen
           }
-          onSheetOpenChange={setTableSheetOpen}
+          sheetOwner={sheetOwner}
+          onSheetFor={sheetFor}
         />
       ) : null}
       {editorOpen && calculator ? (
