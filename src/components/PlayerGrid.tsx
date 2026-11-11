@@ -419,11 +419,18 @@ export function PlayerGrid({
   ) {
     const player = players[index]
     const seatNumber = index + 1
-    const playerDisabled = Boolean(isPlayerDisabled?.(player))
-    const { contentRotation, screenEdges } = place
-    const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
-    const out = outState && outReason(outState, player.id)
     const team = zone?.members.map((member) => players[member])
+    const ownershipOf = (seat: GamePlayer) =>
+      seatOwnership(seat, { isPlayerOwned, isPlayerDisabled, disabled })
+    const actor =
+      team?.find((member) => {
+        const held = ownershipOf(member)
+        return held === undefined || held === "owned"
+      }) ?? player
+    const playerDisabled = Boolean(isPlayerDisabled?.(actor))
+    const { contentRotation, screenEdges } = place
+    const ownership = ownershipOf(actor)
+    const out = outState && outReason(outState, player.id)
     const teammate = team?.find(({ id }) => id !== player.id)
     const armedTeammate = team?.find(({ id }) => id === armedPlayer?.id)
     const owner = armedTeammate ?? player
@@ -593,8 +600,10 @@ export function PlayerGrid({
             ? {
                 ...seatTable,
                 editable: !(disabled || playerDisabled),
-                adjustCounter: stable(`counter:${player.id}`, (counterId: string, delta: number) =>
-                  table.adjustCounter(player.id, counterId, delta),
+                adjustCounter: stable(
+                  `seat-counter:${actor.id}`,
+                  (counterId: string, delta: number) =>
+                    table.adjustCounter(actor.id, counterId, delta),
                 ),
                 takeDesignation: stable(`take:${player.id}`, (designationId: string) =>
                   table.takeDesignation(player.id, designationId),
@@ -610,7 +619,7 @@ export function PlayerGrid({
         }
         dice={seatDice}
         onPlayStart={onPlayStart && stable("playStart", onPlayStart)}
-        onChange={stable(`change:${player.id}`, (delta: LifeDelta) => onChange(player.id, delta))}
+        onChange={stable(`change:${player.id}`, (delta: LifeDelta) => onChange(actor.id, delta))}
         style={place.style}
       />
     )

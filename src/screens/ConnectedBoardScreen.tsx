@@ -818,8 +818,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     )
   }, [controlled, game.variant, table?.table])
   const cellCount = teams?.length ?? players.length
-  const actingHead = (playerId: string) =>
-    turnGroupOf(teams, playerId).find((id) => controlled.has(id)) ?? playerId
   const layoutVariant =
     layoutChoice?.playerCount === cellCount
       ? layoutChoice.layout
@@ -1211,8 +1209,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             {...(anySeat
               ? {}
               : {
-                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(actingHead(player.id)),
-                  isPlayerOwned: (player: GamePlayer) => controlled.has(actingHead(player.id)),
+                  isPlayerDisabled: (player: GamePlayer) => !controlled.has(player.id),
+                  isPlayerOwned: (player: GamePlayer) => controlled.has(player.id),
                 })}
             isPlayerFoil={(player) =>
               Boolean(game.players.find((candidate) => candidate.playerId === player.id)?.foil)
@@ -1244,9 +1242,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             }
             dice={seatGrid}
             teams={teams}
-            onChange={(playerId, delta) =>
-              controls.changeLife(asPlayerId(actingHead(playerId)), delta)
-            }
+            onChange={(playerId, delta) => controls.changeLife(asPlayerId(playerId), delta)}
           />
         )}
       />

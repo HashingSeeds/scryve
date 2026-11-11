@@ -222,6 +222,68 @@ describe("PlayerGrid", () => {
     expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
   })
 
+  it("acts as the second teammate on a device that holds only that seat", () => {
+    const seats = players(4)
+    const rules = teamTableRules(playTableRules("mtg", "commander"))
+    const table: TableState = {
+      ...EMPTY_TABLE,
+      players: {
+        [seats[0].id]: { counters: { poison: 2 } },
+        [seats[1].id]: { counters: { poison: 2 } },
+      },
+    }
+    const adjustCounter = jest.fn()
+    const runtime: TableRuntime = {
+      table,
+      tableRules: rules,
+      ...createTableActions(
+        () => ({
+          table,
+          rules,
+          playerIds: seats.map(({ id }) => id),
+          lifeOf: () => 60,
+          canAct: () => true,
+        }),
+        jest.fn(() => true),
+      ),
+      adjustCounter,
+    }
+    const onChange = jest.fn()
+    const held = (player: GamePlayer) => player.id === seats[1].id
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid
+          players={seats}
+          table={runtime}
+          teams={[
+            [seats[0].id, seats[1].id],
+            [seats[2].id, seats[3].id],
+          ]}
+          isPlayerOwned={held}
+          isPlayerDisabled={(player) => !held(player)}
+          commanderDamage={idleCommanderDamage}
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+    layoutCards(view)
+    const zone = within(view.getByTestId("life-card-seat-1"))
+
+    fireEvent.press(zone.getByTestId("counter-chip-1-poison"))
+    expect(adjustCounter).toHaveBeenLastCalledWith(seats[1].id, "poison", 1)
+    fireEvent.press(zone.getByTestId(lifeControlTestId(1, -1)))
+    expect(onChange).toHaveBeenLastCalledWith(seats[1].id, expect.anything())
+
+    expect(zone.getByTestId("commander-mark-seat-1").props.accessibilityState).toMatchObject({
+      disabled: true,
+    })
+    expect(zone.getByTestId("commander-mark-seat-2").props.accessibilityState).toMatchObject({
+      disabled: false,
+    })
+    expect(zone.queryByTestId("seat-bag-seat-1")).toBeNull()
+    expect(zone.getByTestId("seat-bag-seat-2")).toBeTruthy()
+  })
+
   it("gives a team zone the claim of the teammate this device holds, and keeps both teammates' rolls apart", () => {
     const seats = players(4)
     const roll = { kind: "roll" as const, roll: { tool: "d20" as const, value: 7 } }
