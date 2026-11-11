@@ -13,6 +13,7 @@ function subscriberResponse({
   expiresDate,
   gracePeriodExpiresDate = null,
   productIdentifier = "scryve_pro_monthly",
+  originalAppUserId,
 }: {
   enabled: boolean
   observedAt: number
@@ -20,11 +21,13 @@ function subscriberResponse({
   expiresDate?: string
   gracePeriodExpiresDate?: string | null
   productIdentifier?: string
+  originalAppUserId?: string
 }) {
   return new Response(
     JSON.stringify({
       request_date_ms: observedAt,
       subscriber: {
+        original_app_user_id: originalAppUserId,
         entitlements: enabled
           ? {
               "Count Pro": {
@@ -86,7 +89,9 @@ describe("RevenueCat entitlement sync", () => {
     await signedIn(t, "clerk_alias")
     const fetchSpy = jest
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(subscriberResponse({ enabled: true, observedAt: 200 }))
+      .mockResolvedValue(
+        subscriberResponse({ enabled: true, observedAt: 200, originalAppUserId: "clerk_alias" }),
+      )
     const event = {
       id: "event-alias",
       type: "RENEWAL",
@@ -94,7 +99,7 @@ describe("RevenueCat entitlement sync", () => {
       environment: "PRODUCTION",
       app_user_id: "$RCAnonymousID:one",
       original_app_user_id: "$RCAnonymousID:one",
-      aliases: ["clerk_alias"],
+      aliases: [],
     }
 
     const unauthorized = await t.fetch("/revenuecat/webhooks", {
@@ -118,6 +123,31 @@ describe("RevenueCat entitlement sync", () => {
         ),
       ),
     )
+  })
+
+  it("grants nothing to a body alias RevenueCat does not link to the customer", async () => {
+    const t = makeConvexTest()
+    await signedIn(t, "clerk_payer")
+    await signedIn(t, "clerk_freeloader")
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        subscriberResponse({ enabled: true, observedAt: 200, originalAppUserId: "clerk_payer" }),
+      )
+
+    const response = await sendWebhook(t, {
+      id: "event-forged-alias",
+      type: "RENEWAL",
+      event_timestamp_ms: 190,
+      environment: "PRODUCTION",
+      app_user_id: "clerk_payer",
+      original_app_user_id: "clerk_payer",
+      aliases: ["clerk_freeloader"],
+    })
+
+    expect(response.status).toBe(200)
+    expect(await entitlements(t, "clerk_payer")).not.toHaveLength(0)
+    expect(await entitlements(t, "clerk_freeloader")).toEqual([])
   })
 
   it("keeps the newest fetched state when webhook delivery is out of order", async () => {
