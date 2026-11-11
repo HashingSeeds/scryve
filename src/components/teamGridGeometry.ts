@@ -123,6 +123,3 @@ export function teamSeatRows(
 
 export const teamPanelCompact = (layout: GridLayout, teamCount: number) =>
   layout.compact || teamCount >= 3
-
-/** why: each teammate's strip runs along one end of the zone, wide enough for a counter chip, so the zone's − and + and the seam's plates keep clear of it. */
-export const teamStripWidth = (compact?: boolean) => (compact ? 40 : 46)

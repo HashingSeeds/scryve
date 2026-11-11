@@ -54,9 +54,9 @@ import {
   seatFrames,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
-import { panelBoxes, teamPanelCompact, teamSeatRows, teamStripWidth } from "./teamGridGeometry"
-import { TeamPanel, type TeamStripHead } from "./TeamPanel"
-import { teamZoneShades } from "./TeamShade"
+import { panelBoxes, teamPanelCompact, teamSeatRows } from "./teamGridGeometry"
+import { teamZoneMiddle } from "./TeamShade"
+import type { TeamHead } from "./TeamZone"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
 
@@ -368,16 +368,14 @@ export function PlayerGrid({
   const seatedRows = seated.rows
   const seatedRowFlexes = seated.flexes
   const panelBoxMap = teams ? panelBoxes(rows, rowFlexes) : undefined
-  // why: a team zone sizes its total to the room between its teammates' strips.
-  const zoneLifeFontSizeFor = (slot: number, rotation: LifeCardContentRotation) =>
+  // why: team rows can differ in height (6 seats), so a team zone sizes its total to its own panel.
+  const zoneLifeFontSizeFor = (slot: number) =>
     stable(`zone-font:${slot}`, (digits: number) => {
       const box = panelBoxMap?.get(slot)
       if (!box) return undefined
-      const strips = 2 * teamStripWidth(compact)
-      const sideways = Math.abs(rotation) === 90
       return getLifeFontSize({
-        cellWidth: (box.x1 - box.x0) * board.width - (sideways ? 0 : strips),
-        cellHeight: (box.y1 - box.y0) * (board.height - topEdgeBand) - (sideways ? strips : 0),
+        cellWidth: (box.x1 - box.x0) * board.width,
+        cellHeight: (box.y1 - box.y0) * (board.height - topEdgeBand),
         digits,
         fontScale,
         targetSize: lifeTargetSize,
@@ -410,14 +408,22 @@ export function PlayerGrid({
   }))
 
   /** why: with `members`, the card is a Two-Headed Giant team zone for players[index], the team's first player: it takes the team's hits and reads its commander totals, and turns into the attacker's controls when either teammate's commander attacks. */
-  function seatCard(index: number, place: SeatPlace, members?: readonly [number, number]) {
+  function seatCard(
+    index: number,
+    place: SeatPlace,
+    zone?: {
+      members: readonly [number, number]
+      heads: readonly [TeamHead, TeamHead]
+      shared: readonly string[]
+    },
+  ) {
     const player = players[index]
     const seatNumber = index + 1
     const playerDisabled = Boolean(isPlayerDisabled?.(player))
     const { contentRotation, screenEdges } = place
     const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
     const out = outState && outReason(outState, player.id)
-    const team = members?.map((member) => players[member])
+    const team = zone?.members.map((member) => players[member])
     const teammate = team?.find(({ id }) => id !== player.id)
     const armedTeammate = team?.find(({ id }) => id === armedPlayer?.id)
     const owner = armedTeammate ?? player
@@ -500,10 +506,10 @@ export function PlayerGrid({
         life={player.life}
         color={
           team
-            ? teamZoneShades([team[0].color, team[1].color], colors.board.background).middle
+            ? teamZoneMiddle([team[0].color, team[1].color], colors.board.background)
             : player.color
         }
-        team={team && { colors: [team[0].color, team[1].color] }}
+        team={zone && { heads: zone.heads, shared: zone.shared }}
         compact={compact}
         contentRotation={contentRotation}
         boardRotation={boardOrientation?.touchRotation ?? boardRotation}
@@ -616,14 +622,13 @@ export function PlayerGrid({
     if (!team || !frame) return null
     const { rotation, contentInsets, screenEdges, menuCorner, menuEdgeCenter } = frame
     const [lead, second] = team
-    const strip = (index: number): TeamStripHead => {
+    const head = (index: number): TeamHead => {
       const player = players[index]
       const playerDisabled = disabled || Boolean(isPlayerDisabled?.(player))
       const seatTable = seatTableState(table, player.id)
       const ownership = seatOwnership(player, { isPlayerOwned, isPlayerDisabled, disabled })
       const bag = ownership === "unowned" || playerDisabled ? undefined : dice?.bag
       return {
-        playerId: player.id,
         seatNumber: index + 1,
         name: player.name,
         color: player.color,
@@ -631,7 +636,6 @@ export function PlayerGrid({
         foil: isPlayerFoil?.(player),
         staleSince: getStaleSince?.(player),
         ownership,
-        out: !!outState && outReason(outState, player.id) !== undefined,
         seat:
           table && seatTable
             ? {
@@ -667,44 +671,33 @@ export function PlayerGrid({
         },
       }
     }
-    const shared = (table?.tableRules.counters ?? []).flatMap(({ id, shared }) =>
-      shared ? [id] : [],
-    )
     return (
-      <TeamPanel
-        key={`team-${slot}`}
-        slot={slot}
-        rotation={rotation}
-        compact={compact}
-        heads={[strip(lead), strip(second)]}
-        shared={shared}
-        contentInsets={contentInsets}
-        screenEdges={screenEdges}
-        menuCorner={menuCorner}
-        menuEdgeCenter={menuEdgeCenter}
-        style={getScreenCornerSquaringStyle({
-          rows,
-          rowIndex,
-          columnIndex,
-          insets: Platform.OS === "web" ? insets : undefined,
-        })}
-        renderZone={(zone) => (
-          <View testID={`player-cell-seat-${lead + 1}`} style={$head}>
-            {seatCard(
-              lead,
-              {
-                contentRotation: rotation,
-                screenEdges: zone.screenEdges,
-                contentInsets: zone.contentInsets,
-                menuEdgeCenter: zone.menuEdgeCenter,
-                lifeFontSizeFor: zoneLifeFontSizeFor(slot, rotation),
-                style: $zoneCorners,
-              },
-              team,
-            )}
-          </View>
+      <View key={`team-${slot}`} testID={`player-cell-seat-${lead + 1}`} style={themed($cell)}>
+        {seatCard(
+          lead,
+          {
+            contentRotation: rotation,
+            screenEdges,
+            contentInsets,
+            menuCorner,
+            menuEdgeCenter,
+            lifeFontSizeFor: zoneLifeFontSizeFor(slot),
+            style: getScreenCornerSquaringStyle({
+              rows,
+              rowIndex,
+              columnIndex,
+              insets: Platform.OS === "web" ? insets : undefined,
+            }),
+          },
+          {
+            members: team,
+            heads: [head(lead), head(second)],
+            shared: (table?.tableRules.counters ?? []).flatMap(({ id, shared }) =>
+              shared ? [id] : [],
+            ),
+          },
         )}
-      />
+      </View>
     )
   }
 
@@ -906,10 +899,6 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-
-const $head: ViewStyle = { flex: 1 }
-
-const $zoneCorners: ViewStyle = { borderRadius: radius.none }
 
 const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
 

@@ -217,7 +217,8 @@ function moveFocus(target: View | null | undefined) {
 export interface CounterChipsProps {
   seat: SeatTable
   dice?: SeatDiceBag
-  bagAt: { right: number; bottom: number }
+  /** why: a Two-Headed Giant teammate's counters sit in their own bottom corner, so the first teammate's bag anchors on the left and its chips grow right. */
+  bagAt: ({ right: number } | { left: number }) & { bottom: number }
   seatNumber: number
   identity: string
   color: string
@@ -227,12 +228,11 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
+  /** why: where the chips must stop, across the content frame: past it for a right-anchored row, before it for a left-anchored one. */
   nameEnd?: number
-  /** why: a Two-Headed Giant strip stacks its chips down its own run, `center` across and from `top` to `bottom` in the content frame, and leaves the team's shared counters to the zone. */
-  stack?: { center: number; width: number; top: number; bottom: number }
   hidden?: readonly string[]
-  /** why: the strip's name runs from its foot up to where the stacked chips end. */
-  onStackEnd?: (bottom: number) => void
+  /** why: a team zone centers its turn chip, commander grid, and shared poison as one row, so it needs the poison row's width. */
+  onRowWidth?: (width: number) => void
   /** why: a team zone keeps only the shared counters; each teammate's bag sits on their own strip. */
   bagless?: boolean
   onSheetOpenChange?: (open: boolean) => void
@@ -302,9 +302,8 @@ export const CounterChips = memo(function CounterChips({
   menuEdgeCenter,
   cardSize,
   nameEnd,
-  stack,
   hidden,
-  onStackEnd,
+  onRowWidth,
   bagless,
   dice,
   bagAt,
@@ -349,16 +348,14 @@ export const CounterChips = memo(function CounterChips({
     }),
   ]
   const [widths, setWidths] = useState<Readonly<Record<string, number>>>({})
-  const measure = (key: string, { width, height }: { width: number; height: number }) => {
-    const length = stack ? height : width
-    setWidths((current) => (current[key] === length ? current : { ...current, [key]: length }))
-  }
+  const measure = (key: string, width: number) =>
+    setWidths((current) => (current[key] === width ? current : { ...current, [key]: width }))
   const webAnnouncement = useAnnouncements(seat, identity)
-  const [stackHeight, setStackHeight] = useState(0)
-  const stackEnd = stack && items.length > 0 ? stack.top + stackHeight : 0
+  const [rowWidth, setRowWidth] = useState(0)
+  const shownRowWidth = items.length > 0 ? rowWidth : 0
   useEffect(() => {
-    onStackEnd?.(stackEnd)
-  }, [onStackEnd, stackEnd])
+    onRowWidth?.(shownRowWidth)
+  }, [onRowWidth, shownRowWidth])
   const sheetOpen = sheet !== null
 
   useEffect(() => {
@@ -396,28 +393,28 @@ export const CounterChips = memo(function CounterChips({
   const bagSlop = targetSlop({ width: bagSize, height: bagSize }, bagAt)
   const bagShown = !bagless && (editable || !!dice)
   const chipGap = compact ? spacing.xxxs : spacing.xxs
-  const rowRight = bagAt.right + (bagShown ? bagSize + chipGap : 0)
+  const fromLeft = "left" in bagAt
+  const bagInset = fromLeft ? bagAt.left : bagAt.right
+  const rowInset = bagInset + (bagShown ? bagSize + chipGap : 0)
   const menuOnRow = menuEdgeCenter === CONTENT_EDGES[contentRotation].bottom
+  const stopAt = nameEnd ?? frameWidth / 2
   const room = Math.max(
     0,
     Math.min(
-      frameWidth - rowRight - (nameEnd ?? frameWidth / 2) - chipGap,
+      (fromLeft ? stopAt - rowInset : frameWidth - rowInset - stopAt) - chipGap,
       menuOnRow
-        ? frameWidth / 2 - (compact ? COMPACT_MENU_CLEARANCE : MENU_CLEARANCE) - rowRight
+        ? frameWidth / 2 - (compact ? COMPACT_MENU_CLEARANCE : MENU_CLEARANCE) - rowInset
         : Infinity,
     ),
   )
-  const unmeasured = stack ? bagSize : compact ? COMPACT_CHIP_WIDTH : CHIP_SIZE
+  const unmeasured = compact ? COMPACT_CHIP_WIDTH : CHIP_SIZE
   const fit = fitChips(
     items.map((item) => widths[item.key] ?? unmeasured),
-    stack ? Math.max(0, stack.bottom - stack.top) : room,
+    room,
     chipGap,
     widths[OVERFLOW_KEY] ?? unmeasured,
   )
-  const chipBox = [
-    themed(compact ? $compactChip : $chip),
-    stack && [$stackedChip, { maxWidth: stack.width }],
-  ]
+  const chipBox = themed(compact ? $compactChip : $chip)
   const chipStyleOf = (item: ChipItem) => [
     chipBox,
     item.kind === "counter" && item.lethal && { borderColor: foreground },
@@ -437,11 +434,7 @@ export const CounterChips = memo(function CounterChips({
             weight="bold"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
-            style={[
-              compact ? $compactCustomChipName : $customChipName,
-              stack && { maxWidth: stack.width - 4 },
-              { color: foreground },
-            ]}
+            style={[compact ? $compactCustomChipName : $customChipName, { color: foreground }]}
           />
         )}
         <Text
@@ -482,19 +475,19 @@ export const CounterChips = memo(function CounterChips({
             aria-hidden
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
-            style={[$measureRow, stack && $measureColumn, { gap: chipGap }]}
+            style={[$measureRow, { gap: chipGap }]}
           >
             {items.map((item) => (
               <View
                 key={item.key}
-                onLayout={({ nativeEvent }) => measure(item.key, nativeEvent.layout)}
+                onLayout={({ nativeEvent }) => measure(item.key, nativeEvent.layout.width)}
                 style={chipStyleOf(item)}
               >
                 {chipFace(item)}
               </View>
             ))}
             <View
-              onLayout={({ nativeEvent }) => measure(OVERFLOW_KEY, nativeEvent.layout)}
+              onLayout={({ nativeEvent }) => measure(OVERFLOW_KEY, nativeEvent.layout.width)}
               style={chipBox}
             >
               {overflowFace(items.length)}
@@ -503,25 +496,12 @@ export const CounterChips = memo(function CounterChips({
           <View
             testID={`counter-chips-seat-${seatNumber}`}
             pointerEvents="box-none"
-            onLayout={
-              stack ? ({ nativeEvent: { layout } }) => setStackHeight(layout.height) : undefined
-            }
-            style={
-              stack
-                ? [
-                    $stackColumn,
-                    {
-                      gap: chipGap,
-                      left: stack.center - stack.width / 2,
-                      width: stack.width,
-                      top: stack.top,
-                    },
-                  ]
-                : [
-                    $bottomRow,
-                    { gap: chipGap, right: rowRight, bottom: bagAt.bottom, height: bagSize },
-                  ]
-            }
+            onLayout={({ nativeEvent: { layout } }) => setRowWidth(layout.width)}
+            style={[
+              $bottomRow,
+              fromLeft ? [$fromLeft, { left: rowInset }] : [$fromRight, { right: rowInset }],
+              { gap: chipGap, bottom: bagAt.bottom, height: bagSize },
+            ]}
           >
             {items.slice(0, fit.shown).map((item) => {
               const style = chipStyleOf(item)
@@ -676,7 +656,7 @@ export const CounterChips = memo(function CounterChips({
           contentInsets={contentInsets}
           closeSlop={bagSlop}
           closeButton={{
-            left: frameWidth - bagAt.right - bagSize,
+            left: fromLeft ? bagAt.left : frameWidth - bagAt.right - bagSize,
             top: frameHeight - bagAt.bottom - bagSize,
             size: bagSize,
           }}
@@ -1461,23 +1441,9 @@ const $measureRow: ViewStyle = {
   opacity: 0,
 }
 
-const $bottomRow: ViewStyle = {
-  position: "absolute",
-  flexDirection: "row-reverse",
-  alignItems: "center",
-}
-
-const $measureColumn: ViewStyle = { flexDirection: "column" }
-
-const $stackColumn: ViewStyle = { position: "absolute", alignItems: "center" }
-
-// why: a strip is a chip wide, so a chip stacks its glyph or name over its value.
-const $stackedChip: ViewStyle = {
-  flexDirection: "column",
-  gap: 0,
-  paddingHorizontal: 2,
-  paddingVertical: 2,
-}
+const $bottomRow: ViewStyle = { position: "absolute", alignItems: "center" }
+const $fromLeft: ViewStyle = { flexDirection: "row" }
+const $fromRight: ViewStyle = { flexDirection: "row-reverse" }
 
 const $fill: ViewStyle = { flex: 1 }
 

@@ -33,7 +33,7 @@ import {
 } from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
-import { teamChipCrowded, teamPanelCompact, teamStripWidth } from "@/components/teamGridGeometry"
+import { teamChipCrowded } from "@/components/teamGridGeometry"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
@@ -85,8 +85,6 @@ export interface BoardSeamGeometry {
   sides: ReturnType<typeof getMenuSeamNeighbors>
   width: number
   menuSize: number
-  /** why: on a team board each panel's ends hold its teammates' strips, so seam plates stop this much shorter. */
-  teamStrip: number
   teamChipCrowded?: (slot: number) => boolean
 }
 
@@ -95,12 +93,7 @@ const seamTeams = (
   teamCount: number,
   layout: Parameters<typeof teamChipCrowded>[1],
 ) =>
-  teamBoard
-    ? {
-        teamStrip: teamStripWidth(teamPanelCompact(layout, teamCount)),
-        teamChipCrowded: (slot: number) => teamChipCrowded(teamCount, layout, slot),
-      }
-    : { teamStrip: 0 }
+  teamBoard ? { teamChipCrowded: (slot: number) => teamChipCrowded(teamCount, layout, slot) } : {}
 
 export interface BoardSize {
   width: number

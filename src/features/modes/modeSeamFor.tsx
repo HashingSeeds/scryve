@@ -49,7 +49,6 @@ export function modeSeamFor(
     sides,
     width,
     menuSize,
-    teamStrip,
     teamChipCrowded,
   }: BoardSeamGeometry) {
     const active = modes.activeGroup.flatMap((playerId) => slotOf(playerId) ?? [])
@@ -60,7 +59,7 @@ export function modeSeamFor(
       anchorX: anchor.x,
       width,
       menuSize,
-      edge: (edgeTabs ? EDGE_WITH_TABS : EDGE) + teamStrip,
+      edge: edgeTabs ? EDGE_WITH_TABS : EDGE,
     }
     const crowded = teamChipCrowded
       ? active.some(({ slot }) => teamChipCrowded(slot))

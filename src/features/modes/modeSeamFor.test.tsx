@@ -9,7 +9,7 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerSlotFacings,
 } from "@/components/playerGridGeometry"
-import { teamChipCrowded, teamGridLayout, teamStripWidth } from "@/components/teamGridGeometry"
+import { teamChipCrowded, teamGridLayout } from "@/components/teamGridGeometry"
 import { ThemeProvider } from "@/theme/context"
 
 import { bagWithPlane, modeSeamFor, teamSeat } from "./modeSeamFor"
@@ -56,7 +56,6 @@ describe("modeSeamFor", () => {
       sides: getMenuSeamNeighbors(4, layout),
       width,
       menuSize: COMPACT_MENU_BUTTON_SIZE,
-      teamStrip: 0,
     }) as ReactElement<ComponentProps<typeof ModeSeam>>
     const { left, right } = element.props.plan
     const sides = [left?.items ?? [], right?.items ?? []]
@@ -101,7 +100,6 @@ describe("modeSeamFor", () => {
           sides: getMenuSeamNeighbors(3, layout),
           width,
           menuSize: COMPACT_MENU_BUTTON_SIZE,
-          teamStrip: 0,
         })}
       </ThemeProvider>,
     )
@@ -148,7 +146,6 @@ describe("modeSeamFor", () => {
           sides: getMenuSeamNeighbors(3, layout),
           width,
           menuSize: COMPACT_MENU_BUTTON_SIZE,
-          teamStrip: teamStripWidth(true),
           teamChipCrowded: (slot) => teamChipCrowded(3, layout, slot),
         }) as ReactElement<ComponentProps<typeof ModeSeam>>
         const { left, right } = element.props.plan
@@ -210,10 +207,9 @@ describe("modeSeamFor", () => {
           menuSize: cells > 2 ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE,
           ...(teams
             ? {
-                teamStrip: teamStripWidth(true),
                 teamChipCrowded: (slot: number) => teamChipCrowded(cells, layout, slot),
               }
-            : { teamStrip: 0 }),
+            : {}),
         }) as ReactElement<ComponentProps<typeof ModeSeam>>
         const { left, right } = element.props.plan
         expect([...(left?.items ?? []), ...(right?.items ?? [])]).not.toContain("plane")

@@ -69,6 +69,8 @@ export interface CommanderStripProps {
   contentInsets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
   compact?: boolean
+  /** why: a Two-Headed Giant team zone centers its grid in its bottom row, this far from the content's left edge, instead of in a corner. */
+  from?: number
   disabled?: boolean
   attack?: CommanderStripAttack
   source?: CommanderStripSource
@@ -145,6 +147,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   contentInsets,
   screenEdges,
   compact,
+  from,
   disabled,
   attack,
   source,
@@ -182,6 +185,7 @@ export const CommanderStrip = memo(function CommanderStrip({
     seatIdentityMetrics(compact).edge - pad,
     contentInsets,
     screenEdges,
+    from,
   )
   const attackerId = attack?.attackerId
   const flood = attack?.flood
@@ -596,10 +600,14 @@ function stripEdge(
   gap: number,
   insets?: LifeCardContentInsets,
   screenEdges?: LifeCardScreenEdges,
+  from?: number,
 ): Partial<Record<LifeCardEdge, number>> {
   return {
-    [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
-    [side]: cornerOffset(gap, side, edge, insets, screenEdges),
+    [edge]:
+      from === undefined
+        ? cornerOffset(gap, edge, side, insets, screenEdges)
+        : gap + (insets?.[edge] ?? 0),
+    [side]: from ?? cornerOffset(gap, side, edge, insets, screenEdges),
     [end]: gap + (insets?.[end] ?? 0),
   }
 }

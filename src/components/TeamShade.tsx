@@ -15,22 +15,15 @@ import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { HANDOFF_MS, type LifeCardContentRotation } from "./playerCardTypes"
 import { useSeatDimmed } from "./TurnSpotlight"
 
-const END_DEPTH = 0.48
-const MIDDLE_DEPTH = 0.9
+const MIDDLE_DEPTH = 0.88
 
-/** why: each end of the zone is its teammate's color darkened, and the middle under the total stays near the board so it never blends the two into a third color. */
-export function teamZoneShades(colors: readonly [string, string], background: string) {
-  return {
-    ends: colors.map((color) => mixColorsInLinearLight(color, background, END_DEPTH)) as [
-      string,
-      string,
-    ],
-    middle: mixColorsInLinearLight(
-      mixColorsInLinearLight(colors[0], colors[1], 0.5),
-      background,
-      MIDDLE_DEPTH,
-    ),
-  }
+/** why: the middle under the total stays near the board, tinted by both teammates, so the two colors never blend into a bright third one. */
+export function teamZoneMiddle(colors: readonly [string, string], background: string) {
+  return mixColorsInLinearLight(
+    mixColorsInLinearLight(colors[0], colors[1], 0.5),
+    background,
+    MIDDLE_DEPTH,
+  )
 }
 
 const GRADIENT_AXIS: Record<
@@ -43,7 +36,7 @@ const GRADIENT_AXIS: Record<
   [-90]: { x1: 0, y1: 1, x2: 0, y2: 0 },
 }
 
-/** why: a team zone runs from the first teammate's strip to the second's along its content's left-to-right, and dims with the seat fill when the team is out of the turn. */
+/** why: a team zone runs from the first teammate's color at its content-left edge to the second's at its right, and dims with the seat fill when the team is out of the turn. */
 export function TeamShade({
   colors,
   rotation,
@@ -71,7 +64,7 @@ export function TeamShade({
       : withTiming(dimmed ? DIM : 0, { duration: HANDOFF_MS, easing: Easing.out(Easing.cubic) })
   }, [dimmed, reducedMotion, shade])
   const dimStyle = useAnimatedStyle(() => ({ opacity: shade.value }))
-  const { ends, middle } = teamZoneShades(colors, theme.board.background)
+  const middle = teamZoneMiddle(colors, theme.board.background)
   const id = `team-shade-${seatNumber}`
   return (
     <>
@@ -83,12 +76,17 @@ export function TeamShade({
         height={size.height}
       >
         <Defs>
+          {/* why: each teammate's full color starts at their outer edge and fades over the dark middle, with no hard edge anywhere. */}
           <LinearGradient id={id} {...GRADIENT_AXIS[rotation]}>
-            <Stop offset="0" stopColor={ends[0]} />
-            <Stop offset="0.5" stopColor={middle} />
-            <Stop offset="1" stopColor={ends[1]} />
+            <Stop offset="0" stopColor={colors[0]} />
+            <Stop offset="0.14" stopColor={colors[0]} stopOpacity={EDGE_FADE} />
+            <Stop offset="0.5" stopColor={colors[0]} stopOpacity={0} />
+            <Stop offset="0.5" stopColor={colors[1]} stopOpacity={0} />
+            <Stop offset="0.86" stopColor={colors[1]} stopOpacity={EDGE_FADE} />
+            <Stop offset="1" stopColor={colors[1]} />
           </LinearGradient>
         </Defs>
+        <Rect width={size.width} height={size.height} fill={middle} />
         <Rect width={size.width} height={size.height} fill={`url(#${id})`} />
       </Svg>
       <Animated.View
@@ -100,3 +98,4 @@ export function TeamShade({
 }
 
 const DIM = 0.55
+const EDGE_FADE = 0.62

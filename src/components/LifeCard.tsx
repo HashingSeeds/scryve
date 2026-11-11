@@ -106,6 +106,7 @@ import {
   seatMarkArt,
 } from "./SeatIdentity"
 import { TeamShade } from "./TeamShade"
+import { TeamCorners, type TeamHead } from "./TeamZone"
 import { Text } from "./Text"
 import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
 import { useSeatFill } from "./TurnSpotlight"
@@ -173,8 +174,8 @@ export interface LifeCardProps {
   out?: LifeCardOut
   seatTable?: SeatTable
   dice?: LifeCardDice
-  /** why: a Two-Headed Giant team zone: shaded between the teammates' colors, content-left first, with each teammate's name, mark, and bag on their own strip instead. */
-  team?: { colors: readonly [string, string] }
+  /** why: a Two-Headed Giant team zone, shaded from one teammate's color to the other's, content-left first. Each teammate's name and mark sit in their top corner and their own counters in their bottom corner; `shared` counters (poison) join the turn chip and the team's commander grid, centered by the players' edge. */
+  team?: { heads: readonly [TeamHead, TeamHead]; shared: readonly string[] }
   onPlayStart?: () => void
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -596,10 +597,27 @@ export const LifeCard = memo(function LifeCard({
   })
   // why: a seat someone else holds keeps its own bag on its own device.
   const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
-  const rowCap =
-    calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
+  const rowCap = team
+    ? undefined
+    : calculatorButtonShown && typeof identityCorner.rowMaxWidth === "number"
       ? Math.max(identityCorner.rowMaxWidth - trailingButtonSize - identityMetrics.gap, 0)
       : identityCorner.rowMaxWidth
+  const [sharedRowWidth, setSharedRowWidth] = useState(0)
+  const zoneRun = sidewaysContent ? cardSize.height : cardSize.width
+  const teamRow = team
+    ? centeredRow(zoneRun, identityMetrics.gap, [
+        diceChips?.length ? (identityRowAt?.width ?? 0) : 0,
+        commanderStripShown && stripBounds
+          ? sidewaysContent
+            ? stripBounds.height
+            : stripBounds.width
+          : 0,
+        sharedRowWidth,
+      ])
+    : undefined
+  const bottomInset = contentInsets?.[CONTENT_BOTTOM_EDGE[contentRotation]] ?? 0
+  const teamRowBottom = seatIdentityBottomGap(identityMetrics.edge, bottomInset) + bottomInset
+  const teamBagBottom = teamRowBottom + (markArt.height - trailingButtonSize) / 2
   const rowTurnChip = !!turnChip && turnChipShown
   const rowUndo = !!undoPass && turnChipShown
   const bagReserve = seatBag ? trailingButtonSize + identityMetrics.gap : 0
@@ -722,7 +740,7 @@ export const LifeCard = memo(function LifeCard({
     >
       {team ? (
         <TeamShade
-          colors={team.colors}
+          colors={[team.heads[0].color, team.heads[1].color]}
           rotation={contentRotation}
           playerId={playerId}
           seatNumber={seatNumber}
@@ -889,7 +907,7 @@ export const LifeCard = memo(function LifeCard({
               lifeFontSize={resolvedLifeFontSize}
               lifeDigits={shownDigits}
               obstacle={
-                stripStays && stripBounds
+                stripStays && stripBounds && !team
                   ? { edge: CONTENT_LEFT_EDGE[contentRotation], bounds: stripBounds }
                   : undefined
               }
@@ -928,6 +946,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
+          from={teamRow?.starts[1]}
           attack={stripAttack}
           source={
             sourceShown
@@ -979,8 +998,8 @@ export const LifeCard = memo(function LifeCard({
                 // why: the row is the trimmed mark's height so a taller name, status, or chip centers on the mark instead of lifting it off the spot the commander exit mark takes.
                 height: markArt.height,
                 gap: identityMetrics.gap,
-                left: identityCorner.position.left,
-                bottom: identityCorner.position.bottom,
+                left: teamRow ? teamRow.starts[0] : identityCorner.position.left,
+                bottom: teamRow ? teamRowBottom : identityCorner.position.bottom,
                 maxWidth: rowCap,
               },
             ]}
@@ -1135,12 +1154,19 @@ export const LifeCard = memo(function LifeCard({
           key={playerId}
           seat={seatTable ?? DICE_ONLY_SEAT}
           dice={seatBag}
-          bagAt={{
-            right:
-              identityCorner.trailing.right +
-              (calculatorButtonShown ? trailingButtonSize + identityMetrics.gap : 0),
-            bottom: identityCorner.trailing.bottom,
-          }}
+          bagAt={
+            teamRow
+              ? {
+                  right: zoneRun - teamRow.starts[2] - sharedRowWidth,
+                  bottom: teamBagBottom,
+                }
+              : {
+                  right:
+                    identityCorner.trailing.right +
+                    (calculatorButtonShown ? trailingButtonSize + identityMetrics.gap : 0),
+                  bottom: identityCorner.trailing.bottom,
+                }
+          }
           seatNumber={seatNumber}
           identity={identity}
           color={color}
@@ -1150,8 +1176,28 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
-          nameEnd={identityRowAt && identityRowAt.x + identityRowAt.width}
+          nameEnd={teamRow ? 0 : identityRowAt && identityRowAt.x + identityRowAt.width}
           bagless={!!team}
+          onRowWidth={team ? setSharedRowWidth : undefined}
+          onSheetOpenChange={setTableSheetOpen}
+        />
+      ) : null}
+      {team && teamRow ? (
+        <TeamCorners
+          heads={team.heads}
+          shared={team.shared}
+          rotation={contentRotation}
+          cardSize={cardSize}
+          contentInsets={contentInsets}
+          screenEdges={screenEdges}
+          menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
+          compact={compact}
+          row={{ start: teamRow.start, end: teamRow.end, bottom: teamBagBottom }}
+          namesHidden={tableSheetOpen || diceCovers || (commanderCovers && !attackerSide)}
+          countersShown={
+            !claimShown && !diceCovers && !commanderCovers && !sittingOut && !editorOpen
+          }
           onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}
@@ -1194,6 +1240,20 @@ export const LifeCard = memo(function LifeCard({
     </Animated.View>
   )
 }, structurallyEqual)
+
+/** why: lays a team zone's bottom row out as one run centered on the card, skipping empty parts. */
+export function centeredRow(run: number, gap: number, widths: readonly number[]) {
+  const shown = widths.filter((width) => width > 0)
+  const total = shown.reduce((sum, width) => sum + width, 0) + gap * Math.max(shown.length - 1, 0)
+  const start = (run - total) / 2
+  let at = start
+  const starts = widths.map((width) => {
+    const here = at
+    if (width > 0) at += width + gap
+    return here
+  })
+  return { start, end: start + total, starts }
+}
 
 const STACK_MS = 260
 const KNOCKBACK = 12
