@@ -35,6 +35,7 @@ export default {
     commanderTax: "커맨더 세금",
     monarch: "모나크",
     initiative: "이니셔티브",
+    marked: "표식",
   },
   tableItemShort: {
     commanderTax: "세금",

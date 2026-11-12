@@ -1,6 +1,6 @@
 import { v, type GenericValidator, type Infer } from "convex/values"
 
-import type { PokemonBoardDefinition, TableDefinition } from "./systems"
+import type { DesignationDefinition, PokemonBoardDefinition, TableDefinition } from "./systems"
 import {
   applyModeAction,
   isModeAction,
@@ -309,6 +309,16 @@ export function counterValue(table: TableState, playerId: string, counterId: str
   return playerTableOf(table, playerId).counters?.[counterId] ?? 0
 }
 
+export function holdsDesignation(
+  table: TableState,
+  designation: DesignationDefinition,
+  playerId: string,
+): boolean {
+  return designation.exclusive === false
+    ? counterValue(table, playerId, designation.id) === 1
+    : table.designations[designation.id] === playerId
+}
+
 export function pokemonBoardOf(table: TableState, playerId: string): PokemonBoard {
   return playerTableOf(table, playerId).pokemon ?? EMPTY_BOARD
 }
@@ -530,10 +540,22 @@ export function applyTableAction(
   }
 
   if (action.kind === "designation.taken" || action.kind === "designation.released") {
-    if (!rules.designations.some(({ id }) => id === action.designationId)) return null
-    const holder = table.designations[action.designationId]
-    if (action.kind === "designation.taken") {
-      if (holder === action.playerId) return unchanged
+    const designation = rules.designations.find(({ id }) => id === action.designationId)
+    if (!designation) return null
+    const taken = action.kind === "designation.taken"
+    if (holdsDesignation(table, designation, action.playerId) === taken) return unchanged
+    if (designation.exclusive === false) {
+      const player = playerTableOf(table, action.playerId)
+      const { [designation.id]: _released, ...counters } = player.counters ?? {}
+      return {
+        table: withPlayer(table, action.playerId, {
+          ...player,
+          counters: taken ? { ...counters, [designation.id]: 1 } : counters,
+        }),
+        life: [],
+      }
+    }
+    if (taken) {
       return {
         table: {
           ...table,
@@ -542,7 +564,6 @@ export function applyTableAction(
         life: [],
       }
     }
-    if (holder !== action.playerId) return unchanged
     const { [action.designationId]: _released, ...designations } = table.designations
     return { table: { ...table, designations }, life: [] }
   }
@@ -732,14 +753,20 @@ export function isValidTableSnapshot(
     (table.turnGroups === undefined || isValidTurnGroups(table.turnGroups, playerIds)) &&
     Object.entries(table.designations).every(
       ([designationId, holder]) =>
-        rules.designations.some(({ id }) => id === designationId) && playerIds.has(holder),
+        rules.designations.some(
+          ({ id, exclusive }) => id === designationId && exclusive !== false,
+        ) && playerIds.has(holder),
     ) &&
     Object.entries(table.players).every(
       ([playerId, player]) =>
         playerIds.has(playerId) &&
         Object.entries(player.counters ?? {}).every(([counterId, value]) => {
           const counter = rules.counters.find(({ id }) => id === counterId)
-          return counter !== undefined && isWholeNumber(value, 0, counter.max)
+          if (counter) return isWholeNumber(value, 0, counter.max)
+          return (
+            value === 1 &&
+            rules.designations.some(({ id, exclusive }) => id === counterId && exclusive === false)
+          )
         }) &&
         isValidCustomCounters(player.customCounters, rules) &&
         (player.pokemon === undefined ||

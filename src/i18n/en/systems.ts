@@ -33,6 +33,8 @@ const systems = {
     commanderTax: "Commander tax",
     monarch: "Monarch",
     initiative: "Initiative",
+    // Flesh and Blood: a hero is marked until an opponent's source hits them.
+    marked: "Marked",
   },
   // Shorter name shown where the full name does not fit, such as narrow counter menus.
   tableItemShort: {

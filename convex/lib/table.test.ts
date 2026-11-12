@@ -83,6 +83,32 @@ describe("table counters and designations", () => {
     )!.table
     expect(released.designations).toEqual({})
   })
+
+  it("lets every hero be marked at once, each on their own seat", () => {
+    const fab = tableRules("fab", "cc")
+    const mark = (
+      table: TableState,
+      kind: "designation.taken" | "designation.released",
+      playerId: string,
+    ) => run(table, { kind, playerId, designationId: "marked" }, { rules: fab })!.table
+    const both = mark(mark(EMPTY_TABLE, "designation.taken", "me"), "designation.taken", "them")
+    expect(both).toEqual({
+      designations: {},
+      players: { me: { counters: { marked: 1 } }, them: { counters: { marked: 1 } } },
+    })
+    expect(mark(both, "designation.taken", "me")).toBe(both)
+    const hit = mark(both, "designation.released", "them")
+    expect(hit.players).toEqual({ me: { counters: { marked: 1 } }, them: { counters: {} } })
+
+    const seats = new Set(["me", "them"])
+    expect(isValidTableSnapshot(both, fab, seats)).toBe(true)
+    expect(
+      isValidTableSnapshot({ ...both, players: { me: { counters: { marked: 2 } } } }, fab, seats),
+    ).toBe(false)
+    expect(
+      isValidTableSnapshot({ ...EMPTY_TABLE, designations: { marked: "me" } }, fab, seats),
+    ).toBe(false)
+  })
 })
 
 describe("custom counters", () => {

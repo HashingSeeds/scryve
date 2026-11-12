@@ -12,6 +12,7 @@ import { isSystemId, type SYSTEMS, type SystemId } from "../../../convex/lib/sys
 
 type MagicTable = (typeof SYSTEMS)["mtg"]["table"]
 type MagicTableItemId = (MagicTable["counters"] | MagicTable["designations"])[number]["id"]
+type FabTableItemId = (typeof SYSTEMS)["fab"]["table"]["designations"][number]["id"]
 
 export type TextRules = {
   kind: "text"
@@ -57,7 +58,7 @@ export const GAME_RULES = {
     parse: parseFabRules,
     references: FAB_RULE_REFERENCE,
     revalidate: true,
-    tableItemRules: {},
+    tableItemRules: { marked: "9.3" } satisfies Partial<Record<FabTableItemId, string>>,
   },
   riftbound: {
     kind: "link",
