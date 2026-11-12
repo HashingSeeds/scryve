@@ -34,9 +34,9 @@ Development configuration is split three ways:
 
 - `.env.development` is tracked and holds only public client values, so it reaches
   every checkout and worktree through git.
-- `~/.config/scryve/.env.local` holds this machine's per-developer values and
-  local secrets, such as your own Convex deployment and `SENTRY_AUTH_TOKEN`. It
-  lives outside the repo so worktrees can share one copy. Link it with:
+- `~/.config/scryve/.env.local` holds this machine's per-developer values, such
+  as your own Convex deployment. It holds no secrets. It lives outside the repo so
+  worktrees can share one copy. Link it with:
 
 ```bash
 ./scripts/link-dev-env.sh
@@ -55,16 +55,20 @@ chmod +x "$(git rev-parse --git-common-dir)/hooks/post-checkout"
   `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `CLERK_FRONTEND_API_URL`,
   `RESEND_API_KEY`, and `MODERATION_ALERT_*` are read by `convex/` code running on
   the deployment. Set them with `npx convex env set`.
+- Secrets for local scripts (`SENTRY_AUTH_TOKEN`, `ANTHROPIC_API_KEY`,
+  `CONVEX_PREVIEW_DEPLOY_KEY`) live in 1Password. `.env.schema` holds their
+  references, and scripts fetch each one through varlock only when they need it.
+  This needs the `op` CLI with the 1Password app's CLI integration turned on. A
+  value set in the shell wins. Run `pnpm exec varlock load` to check that they
+  resolve; it prints sensitive values redacted.
 
 Contributors without the shared file can copy `.env.example` to `.env.local`.
 
 ### Convex preview for this worktree
 
-Put a Convex **preview deploy key** in `~/.config/scryve/.env.preview` as
-`CONVEX_DEPLOY_KEY=preview:...`, or provide `CONVEX_DEPLOY_KEY` in the shell.
-The older `CONVEX_PREVIEW_DEPLOY_KEY` name works too. With a different
-`XDG_CONFIG_HOME`, use `$XDG_CONFIG_HOME/scryve/.env.preview`. Keep this file
-outside the repo; the post-checkout hook does not link deploy keys.
+`pnpm preview:up` reads the Convex **preview deploy key** from 1Password
+(`CONVEX_PREVIEW_DEPLOY_KEY` in `.env.schema`), or from `CONVEX_DEPLOY_KEY` in the
+shell.
 
 Run `pnpm preview:up` to create or update a preview for the current branch.
 It writes the preview URL, site URL, and deployment name to this worktree's

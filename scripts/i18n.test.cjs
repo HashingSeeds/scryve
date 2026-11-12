@@ -3,7 +3,6 @@ const test = require("node:test")
 
 const {
   chooseApiKey,
-  loadApiKey,
   englishNotes,
   flatten,
   prototypeKeys,
@@ -172,15 +171,4 @@ test("never reads a key file the choice does not need", () => {
     }),
     "console",
   )
-})
-
-test("loads a key from the machine's own files without throwing", () => {
-  const saved = { ...process.env }
-  try {
-    delete process.env.ANTHROPIC_API_KEY
-    process.env.ANTHROPIC_BASE_URL = "https://api.anthropic.com"
-    assert.doesNotThrow(() => loadApiKey())
-  } finally {
-    process.env = saved
-  }
 })

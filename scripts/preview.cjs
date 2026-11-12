@@ -5,6 +5,8 @@ const os = require("node:os")
 const path = require("node:path")
 const { URL } = require("node:url")
 
+const { readSecret } = require("./secrets.cjs")
+
 const root = path.join(path.dirname(require.resolve("./preview.cjs")), "..")
 const convex = path.join(root, "node_modules", ".bin", "convex")
 const override = path.join(root, ".env.development.local")
@@ -19,15 +21,8 @@ function previewName(branch) {
 }
 
 function previewKey() {
-  const config = path.join(
-    process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"),
-    "scryve",
-    ".env.preview",
-  )
-  const contents = fs.existsSync(config) ? fs.readFileSync(config, "utf8") : ""
-  const fromFile = contents.match(/^(?:CONVEX_DEPLOY_KEY|CONVEX_PREVIEW_DEPLOY_KEY)=(.*)$/m)?.[1]
-  const key = process.env.CONVEX_DEPLOY_KEY || process.env.CONVEX_PREVIEW_DEPLOY_KEY || fromFile
-  if (!key) throw new Error(`Set CONVEX_DEPLOY_KEY or create ${config}`)
+  const key = process.env.CONVEX_DEPLOY_KEY || readSecret("CONVEX_PREVIEW_DEPLOY_KEY")
+  if (!key) throw new Error("Set CONVEX_DEPLOY_KEY or add CONVEX_PREVIEW_DEPLOY_KEY to 1Password")
   if (!/^preview:[^:|]+:[^:|]+\|\S+$/.test(key))
     throw new Error("A Convex preview deploy key is required")
   return key

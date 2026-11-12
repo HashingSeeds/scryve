@@ -148,6 +148,7 @@
     "@typescript-eslint/eslint-plugin": "8.63.0",
     "@typescript/native": "npm:typescript@7.0.2",
     "@typescript/native-preview": "link:./tools/tsrs-as-tsgo",
+    "@varlock/1password-plugin": "^2.0.6",
     "babel-jest": "^30.5.2",
     "convex-test": "0.0.54",
     "dependency-cruiser": "^17.0.2",
@@ -171,11 +172,15 @@
     "tsrs": "0.21.0-ts7.1.0-beta",
     "tsx": "^4.20.3",
     "typescript": "npm:@typescript/typescript6@6.0.2",
+    "varlock": "^1.24.0",
     "vitest": "4.1.11",
     "wrangler": "4.127.1"
   },
   "engines": {
     "node": "24.18.1",
     "pnpm": "10.34.5"
+  },
+  "varlock": {
+    "loadPath": "./.env.schema"
   }
 }
