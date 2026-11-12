@@ -756,7 +756,6 @@ function CounterSheet({
     seat.rules.counters.length + seat.rules.designations.length > 0 || !!seat.rules.customCounters
   // why: with both, dice take the bag's half of the card and trackers the other, so neither scrolls; only the dice half keeps clear of Close in its corner.
   const split = !!dice && trackers && sheet.kind === "add"
-  // why: a left-hand bag (a 2HG team's first head) puts Close bottom-left, so the dice half moves there with it.
   const closeOnLeft = closeButton.left < width / 2
   const [allDice, setAllDice] = useState(false)
   const closeRow = closeButton.size + gap
