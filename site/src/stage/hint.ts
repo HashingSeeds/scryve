@@ -11,7 +11,7 @@ const HINT_ANGLE = 45
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)"
 const INTO_PRESS = "cubic-bezier(0.55, 0, 1, 0.45)"
 
-// Tabler's hand-click (MIT). `tip` is the fingertip as a fraction of the box. The tap lines are
+// Tabler's hand-click (MIT; notice in src/components/Tabler.LICENSES.txt). `tip` is the fingertip as a fraction of the box. The tap lines are
 // grouped so they can burst out from the fingertip on each press.
 const HAND = {
   tip: [0.396, 0.125],

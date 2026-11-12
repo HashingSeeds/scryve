@@ -284,7 +284,7 @@ const BANNER =
   "M10 8.5H34A1.5 1.5 0 0 1 34 11.5H10A1.5 1.5 0 0 1 10 8.5ZM12.5 11H31.5V35.5L22 29.5 12.5 35.5Z"
 const QUATREFOIL =
   "M28.6 14.6A6.6 6.6 0 1 1 15.4 14.6 6.6 6.6 0 1 1 28.6 14.6ZM36 22A6.6 6.6 0 1 1 22.8 22 6.6 6.6 0 1 1 36 22ZM28.6 29.4A6.6 6.6 0 1 1 15.4 29.4 6.6 6.6 0 1 1 28.6 29.4ZM21.2 22A6.6 6.6 0 1 1 8 22 6.6 6.6 0 1 1 21.2 22ZM15 15H29V29H15Z"
-// why: meeple and hourglass are Tabler's filled icons (MIT, tabler.io) on a 24 unit box; MarkShape scales them into 44 units.
+/** why: MIT requires its notice to travel with these copied paths; see Tabler.LICENSES.txt. They use Tabler's 24-unit box. */
 const MEEPLE =
   "M12 2c2.486 0 3.713 1.766 3.955 4.1l.01 .124l.129 .036c3.17 .928 5.754 2.487 5.9 4.556l.006 .184c0 1.427 -1.297 2.322 -2.871 2.733l-.201 .049l.026 .03c.244 .276 .532 .603 .7 .797l.057 .066c.49 .573 .884 1.073 1.216 1.56c.69 1.01 1.073 1.904 1.073 2.765a2 2 0 0 1 -2 2h-5c-1.043 0 -1.344 -.453 -2.394 -2.553c-.29 -.58 -.448 -.882 -.593 -1.118l-.013 -.022l-.013 .022c-.129 .21 -.268 .472 -.5 .935l-.093 .183c-1.05 2.1 -1.351 2.553 -2.394 2.553h-5a2 2 0 0 1 -2 -2c0 -.86 .384 -1.755 1.073 -2.765a18 18 0 0 1 1.216 -1.56c.152 -.178 .482 -.553 .757 -.863l.025 -.03l-.2 -.049c-1.506 -.393 -2.758 -1.23 -2.864 -2.55l-.007 -.183c0 -2.16 2.643 -3.785 5.906 -4.74l.128 -.036l.011 -.124c.235 -2.26 1.394 -3.99 3.726 -4.095z"
 const HOURGLASS =
@@ -360,7 +360,6 @@ function MarkShape({
     case "quatrefoil":
       return <Path {...common} d={QUATREFOIL} />
     case "meeple":
-      // why: Tabler's meeple sits high in its box, so it drops 0.7 units to center.
       return <Path {...common} d={MEEPLE} transform="matrix(1.35 0 0 1.35 5.8 6.5)" />
     case "hourglass":
       return <Path {...common} d={HOURGLASS} transform="matrix(1.35 0 0 1.35 5.8 5.8)" />

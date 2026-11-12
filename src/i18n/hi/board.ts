@@ -227,7 +227,7 @@ export default {
     banner: "बैनर",
     quatrefoil: "क्वाट्रफ़ॉइल",
     meeple: "मीपल",
-    hourglass: "砂時計",
+    hourglass: "आवरग्लास",
     crown: "मुकुट",
     flame: "लौ",
     bolt: "बिजली",
