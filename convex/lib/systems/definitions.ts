@@ -639,7 +639,7 @@ export const SYSTEMS = {
         ]),
       },
     ],
-    table: { counters: [], designations: [] },
+    table: { counters: [{ id: "xp", label: "XP", step: 1, max: 99 }], designations: [] },
     variants: [],
     firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 3 },
