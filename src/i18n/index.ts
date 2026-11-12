@@ -1,23 +1,23 @@
 import { I18nManager } from "react-native"
 import * as Localization from "expo-localization"
-import i18n from "i18next"
+import i18n, { type BackendModule } from "i18next"
 import { initReactI18next } from "react-i18next"
 import "intl-pluralrules"
 
 import type { Translations } from "./en"
-import { resources } from "./resources"
+import type { LocaleNamespace } from "./localeNamespace"
+import { namespaces, resources } from "./resources"
 
 const fallbackLocale = "en-US"
 
 const systemLocales = Localization.getLocales()
 
-const supportedTags = Object.keys(resources)
+const isBundledLocale = (tag: string): tag is keyof typeof resources =>
+  Object.hasOwn(resources, tag)
 
 // Device locale may be more specific and still match (e.g., en-US matches en)
-const systemTagMatchesSupportedTags = (deviceTag: string) => {
-  const primaryTag = deviceTag.split("-")[0]
-  return supportedTags.includes(primaryTag)
-}
+const systemTagMatchesSupportedTags = (deviceTag: string) =>
+  isBundledLocale(deviceTag.split("-")[0])
 
 const pickSupportedLocale: () => Localization.Locale | undefined = () => {
   return systemLocales.find((locale) => systemTagMatchesSupportedTags(locale.languageTag))
@@ -39,16 +39,29 @@ if (!devLocaleOverride && locale?.languageTag && locale?.textDirection === "rtl"
   I18nManager.allowRTL(false)
 }
 
-// why: resources are bundled, so init runs synchronously and copy is ready before the first render.
-void i18n.use(initReactI18next).init({
-  resources,
-  lng: appLocale,
-  fallbackLng: fallbackLocale,
-  interpolation: {
-    escapeValue: false,
+const loadLocaleOnDemand: BackendModule = {
+  type: "backend",
+  init: () => undefined,
+  read: (language, namespace, callback) => {
+    const bundle: Readonly<Record<string, LocaleNamespace>> | undefined = isBundledLocale(language)
+      ? resources[language]()
+      : undefined
+    callback(null, bundle?.[namespace])
   },
-  initImmediate: false,
-})
+}
+
+void i18n
+  .use(loadLocaleOnDemand)
+  .use(initReactI18next)
+  .init({
+    ns: namespaces,
+    lng: appLocale,
+    fallbackLng: fallbackLocale,
+    interpolation: {
+      escapeValue: false,
+    },
+    initImmediate: false,
+  })
 
 export { i18n }
 
