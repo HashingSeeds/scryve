@@ -6,6 +6,7 @@ const path = require("node:path")
 const util = require("node:util")
 
 const { settleOffMainVersion, settleVersion } = require("./release-native.cjs")
+const { readSecret } = require("./secrets.cjs")
 
 const root = path.join(__dirname, "..")
 const easCli = `eas-cli@${require("../package.json").config.easCli}`
@@ -107,11 +108,13 @@ function buildEnv({ target, buildPath }) {
   }
   const [environment] = TARGETS[target].profile.split(":")
   if (environment === "development") return { APP_VARIANT: "development" }
-  if (environment === "preview") {
-    const { SENTRY_AUTH_TOKEN } = readEnvFile(".env.local")
-    return SENTRY_AUTH_TOKEN ? { SENTRY_AUTH_TOKEN } : {}
-  }
-  return { ...readEnvFile(".env.local"), ...readEnvFile(".env.production") }
+  if (environment === "preview") return sentryToken()
+  return { ...readEnvFile(".env.local"), ...readEnvFile(".env.production"), ...sentryToken() }
+}
+
+function sentryToken() {
+  const SENTRY_AUTH_TOKEN = readSecret("SENTRY_AUTH_TOKEN")
+  return SENTRY_AUTH_TOKEN ? { SENTRY_AUTH_TOKEN } : {}
 }
 
 function run([command, ...args], env) {

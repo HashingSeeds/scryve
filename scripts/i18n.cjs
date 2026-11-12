@@ -2,7 +2,8 @@ const crypto = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
-const util = require("node:util")
+
+const { readSecret } = require("./secrets.cjs")
 
 const ROOT = path.resolve(__dirname, "..")
 const I18N_DIR = path.join(ROOT, "src/i18n")
@@ -337,10 +338,7 @@ function loadApiKey() {
     apiKey: process.env.ANTHROPIC_API_KEY,
     baseUrl: process.env.ANTHROPIC_BASE_URL,
     readPoolKey: () => readIfPresent(path.join(os.homedir(), ".config/ai-pool/key"))?.trim(),
-    readConsoleKey: () => {
-      const envFile = readIfPresent(path.join(ROOT, ".env.local"))
-      return envFile && util.parseEnv(envFile).ANTHROPIC_API_KEY
-    },
+    readConsoleKey: () => readSecret("ANTHROPIC_API_KEY"),
   })
   if (apiKey) process.env.ANTHROPIC_API_KEY = apiKey
 }
