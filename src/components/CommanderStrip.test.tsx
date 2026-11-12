@@ -189,7 +189,7 @@ describe("CommanderStrip", () => {
       players: [players[0], { ...players[1], color: "#F2D45C" }, players[2]],
       incoming: { [bo]: 19 },
     })
-    expect(count(pale, bo, "19")).toHaveStyle({ color: "#41476E" })
+    expect(count(pale, bo, "19")).toHaveStyle({ color: "#000000" })
   })
 
   it("tiers an attacker's total at half of lethal and within five of it", () => {

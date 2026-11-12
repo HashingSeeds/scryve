@@ -370,7 +370,7 @@ export const CommanderStrip = memo(function CommanderStrip({
                               ? ink
                               : contrastRatio(player.color, foreground) >= FILLED_COUNT_CONTRAST
                                 ? player.color
-                                : cardColor,
+                                : accessibleForeground(foreground),
                           },
                           total > 99 && (compact ? $compactThreeDigits : $threeDigits),
                           glyphRotation,
