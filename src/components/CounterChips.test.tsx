@@ -156,6 +156,19 @@ describe("CounterChips", () => {
     expect(dice.rollFor).toHaveBeenLastCalledWith("d4")
   })
 
+  it("puts the dice half on Close's side of a split sheet, so trackers never sit under it", () => {
+    const dice = { tools: ["d6", "d20", "coin"] as const, rollFor: jest.fn() }
+    const direction = (bagAt: CounterChipsProps["bagAt"]) => {
+      const view = chips(seat(), { dice, bagAt })
+      fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+      return StyleSheet.flatten(view.getByTestId("counter-options-seat-1").props.style)
+        .flexDirection
+    }
+
+    expect(direction({ right: 16, bottom: 16 })).toBe("row")
+    expect(direction({ left: 16, bottom: 16 })).toBe("row-reverse")
+  })
+
   it("opens the plane from the bag, keeping a narrow bag to two rows", () => {
     const dice = {
       tools: ["d4", "d6", "d20", "coin"] as const,
