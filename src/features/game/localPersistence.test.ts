@@ -97,7 +97,7 @@ describe("LocalGameRepository", () => {
     expect(repository.loadActiveGame()).not.toHaveProperty("seatOrder")
   })
 
-  it("keeps a running 2HG game's teammates on their lead's color when players are saved", () => {
+  it("saves a running 2HG team's color only when both teammates were sent it", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const game = createLocalGame({
       startingLife: 30,
@@ -111,20 +111,16 @@ describe("LocalGameRepository", () => {
       })),
     })
     repository.saveActiveGame(game)
-    repository.updateActivePlayers(
-      game.id,
-      game.players.map(({ name, shape }, index) => ({
-        name,
-        shape,
-        color: ["#B85636", "#41476E", "#117B9C", "#39755C"][index],
-      })),
-    )
-    expect(repository.loadActiveGame()?.players.map(({ color }) => color)).toEqual([
-      "#B85636",
-      "#B85636",
-      "#117B9C",
-      "#117B9C",
-    ])
+    const save = (colors: string[]) =>
+      repository.updateActivePlayers(
+        game.id,
+        game.players.map(({ name, shape }, index) => ({ name, shape, color: colors[index] })),
+      )
+    const colors = () => repository.loadActiveGame()?.players.map(({ color }) => color)
+    save(["#41476E", "#B85636", "#117B9C", "#39755C"])
+    expect(colors()).toEqual(["#B85636", "#B85636", "#117B9C", "#117B9C"])
+    save(["#A33A52", "#A33A52", "#117B9C", "#117B9C"])
+    expect(colors()).toEqual(["#A33A52", "#A33A52", "#117B9C", "#117B9C"])
   })
 
   it("updates players on the latest board and keeps events and commander damage", () => {

@@ -2314,6 +2314,7 @@ export const setMyAppearance = mutation({
     shape: v.string(),
     // why: installed clients omit it, which must leave the seat's Pro mark as it is.
     proShape: v.optional(v.union(v.string(), v.null())),
+    keepColor: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     assertAllowedColor(args.color)
@@ -2327,7 +2328,10 @@ export const setMyAppearance = mutation({
     const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
     await limitGameRate(ctx, "gameWrite", user._id)
     const players = await playersForGame(ctx, game._id)
-    const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
+    const requested = {
+      color: (args.keepColor ? player.color : args.color).toUpperCase(),
+      shape: args.shape as PlayerMarkShape,
+    }
     const teammate = lobbyTeammate(game, players, player.seat)
     if (appearanceIsTaken(takenAppearances(players, player._id, teammate), requested))
       throw appearanceTaken()

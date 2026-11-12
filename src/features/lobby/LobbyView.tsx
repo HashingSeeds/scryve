@@ -100,7 +100,7 @@ export interface LobbyViewProps {
     saving: boolean
     proLocked: boolean
     foil: boolean
-    save: (seat: number, draft: PlayerAppearance) => Promise<boolean>
+    save: (seat: number, draft: PlayerAppearance, keepColor?: boolean) => Promise<boolean>
     presentPaywall: () => Promise<void>
   }
   onReport?: (seat: LobbySeat) => void
@@ -216,9 +216,8 @@ export function LobbyView({
 
   async function saveAppearance() {
     if (!appearance || appearanceSeat === undefined || !appearanceDraft) return
-    const teamColor = lobbyTeams && seatAt(appearanceSeat - 1)?.color
-    const saved = teamColor ? { ...appearanceDraft, color: teamColor } : appearanceDraft
-    if (await appearance.save(appearanceSeat, saved)) setAppearanceSeat(undefined)
+    if (await appearance.save(appearanceSeat, appearanceDraft, Boolean(lobbyTeams)))
+      setAppearanceSeat(undefined)
   }
 
   async function confirmExit() {

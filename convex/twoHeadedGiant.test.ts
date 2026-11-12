@@ -182,6 +182,14 @@ describe("Two-Headed Giant", () => {
       })
     await recolor(teammate, 2, "#B85636")
     expect(await seatColors(host)).toEqual(["#B85636", "#B85636", "#16A34A", "#16A34A"])
+    await teammate.mutation(api.games.setMyAppearance, {
+      publicId,
+      seat: 2,
+      color: "#7C3AED",
+      shape: "star",
+      keepColor: true,
+    })
+    expect(await seatColors(host)).toEqual(["#B85636", "#B85636", "#16A34A", "#16A34A"])
     await expect(recolor(rival, 3, "#B85636")).rejects.toMatchObject({
       data: { code: "appearance_taken" },
     })

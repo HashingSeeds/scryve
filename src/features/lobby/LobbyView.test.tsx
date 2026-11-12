@@ -127,7 +127,7 @@ describe("LobbyView", () => {
     expect(screen.queryByTestId("team-colors-1")).toBeNull()
   })
 
-  it("saves a 2HG mark with the team's current color, and keeps the team row shut while a save runs", async () => {
+  it("saves a 2HG mark without touching the team color, and keeps the team row shut while a save runs", async () => {
     const save = jest.fn(async () => true)
     const props = view({
       lobby: {
@@ -146,25 +146,16 @@ describe("LobbyView", () => {
       appearance: { saving: false, proLocked: true, foil: false, save, presentPaywall: jest.fn() },
     })
     fireEvent.press(screen.getByTestId("edit-appearance-seat-2"))
-    const recolored = {
-      ...props,
-      lobby: {
-        ...props.lobby,
-        players: [
-          seat(1, { color: "#117B9C", controlledByMe: false }),
-          seat(2, { color: "#117B9C", controlledByMe: true, shape: "triangle" }),
-        ],
-      },
-    }
-    screen.rerender(themed(<LobbyView {...recolored} />))
     fireEvent.press(screen.getByTestId("appearance-shape-star"))
     fireEvent.press(screen.getByTestId("save-appearance-button"))
-    await waitFor(() => expect(save).toHaveBeenCalledWith(2, { color: "#117B9C", shape: "star" }))
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(2, expect.objectContaining({ shape: "star" }), true),
+    )
 
     fireEvent.press(screen.getByTestId("edit-appearance-seat-2"))
     fireEvent.press(screen.getByTestId("appearance-team-color"))
     screen.rerender(
-      themed(<LobbyView {...recolored} appearance={{ ...recolored.appearance!, saving: true }} />),
+      themed(<LobbyView {...props} appearance={{ ...props.appearance!, saving: true }} />),
     )
     expect(screen.queryByTestId("team-colors-1")).toBeNull()
   })
