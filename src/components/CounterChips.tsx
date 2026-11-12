@@ -1650,7 +1650,6 @@ const $optionWords: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 
-/** why: with every die out, the trackers keep only their icons, two to a row with counts beneath, as a way back. */
 const $iconStrip: ViewStyle = { width: 2 * (16 + 2 * 4) + 8 }
 
 const $split: ViewStyle = { flex: 1, flexDirection: "row" }
