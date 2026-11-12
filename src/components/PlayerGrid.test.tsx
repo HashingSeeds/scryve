@@ -807,6 +807,37 @@ describe("PlayerGrid", () => {
     expect(markFromSeam()).toBe(resting)
   })
 
+  it("steps a team zone's names past the first-player tabs on the seam", () => {
+    const seats = players(6)
+    const grid = (tabsShown: boolean) => (
+      <ThemeProvider initialContext="dark">
+        <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+          <PlayerGrid
+            players={seats}
+            teams={[
+              [seats[0].id, seats[1].id],
+              [seats[2].id, seats[3].id],
+              [seats[4].id, seats[5].id],
+            ]}
+            onChange={jest.fn()}
+          />
+        </FirstPlayerTabsShownContext.Provider>
+      </ThemeProvider>
+    )
+    const view = render(grid(false))
+    layoutCards(view)
+    const fromSides = () => {
+      const [first, second] = [1, 2].map((seat) =>
+        StyleSheet.flatten(view.getByTestId(`team-identity-seat-${seat}`).props.style),
+      )
+      return [Number(first.left), Number(second.right)]
+    }
+    const resting = fromSides()
+
+    view.rerender(grid(true))
+    expect(fromSides()).toEqual(resting.map((offset) => offset + FIRST_PLAYER_TAB.depth))
+  })
+
   it("squares only the corners that meet the device's rounded screen corners", () => {
     const view = render(
       <ThemeProvider initialContext="light">
