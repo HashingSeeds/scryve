@@ -415,7 +415,6 @@ export function seatCutout(
     : { edge: cutout.edge, side: "top", size: cutout.size }
 }
 
-/** why: the first-player tabs straddle the menu's row at the board's side edges. Corner chrome beside one steps along its row: past half the tab up a side edge, or past its depth along the seam. Chrome runs along the content's bottom row, and a team zone's names along its top. */
 function seatTabCorners(
   tabRow: number | null,
   rowIndex: number,
