@@ -26,7 +26,7 @@ describe("game seed", () => {
 
   it("gives seats the marks it lists, Pro marks included", () => {
     const game = buildSeededGame({ players: "3", marks: "crown,eye" }, repository())
-    expect(game.players.map(({ shape }) => shape)).toEqual(["crown", "eye", "square"])
+    expect(game.players.map(({ shape }) => shape)).toEqual(["crown", "eye", "banner"])
     expect(() => buildSeededGame({ marks: "octagon" }, repository())).toThrow("unknown mark")
   })
 

@@ -14,7 +14,7 @@ export const ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES = [
   "circle",
 ] as const
 
-/** why: only builds that draw more than six seats can sit at a bigger table, and those draw every free mark. */
+/** why: only builds that draw more than six seats can sit at a bigger table, and those draw every mark here. Marks added after them stay out of hosted games. */
 export const MANY_SEAT_MARK_SHAPES = [
   "heart",
   "triangle",
@@ -29,17 +29,30 @@ export const MANY_SEAT_MARK_SHAPES = [
   "circle",
 ] as const
 
+/** why: hosted lobbies over six seats offer the marks every build that seats them draws; circle stays accepted but is not offered. */
+export const MANY_SEAT_PICKER_SHAPES = MANY_SEAT_MARK_SHAPES.filter((shape) => shape !== "circle")
+
+/** why: seat defaults for games on one device. Installed builds cannot draw banner, quatrefoil, meeple or hourglass, so hosted games never offer them and a published local game trades them for hosted marks. */
 export const PLAYER_MARK_SHAPES = [
   "heart",
   "triangle",
-  "square",
-  "diamond",
+  "banner",
+  "quatrefoil",
   "star",
   "hexagon",
-  "plus",
+  "meeple",
   "shield",
-  "moon",
+  "hourglass",
   "ring",
+] as const
+
+/** why: square, diamond, plus and moon were seat defaults until clearer marks replaced them; saved games and recent setups still hold them, so local pickers offer them after the defaults. */
+export const LOCAL_MARK_SHAPES = [
+  ...PLAYER_MARK_SHAPES,
+  "square",
+  "diamond",
+  "plus",
+  "moon",
 ] as const
 
 /** why: Pro marks render only in builds that know them, so they never join the seat-default or connected lists that every installed client must draw. */
@@ -57,7 +70,7 @@ export const PRO_MARK_SHAPES = [
 export type ProMarkShape = (typeof PRO_MARK_SHAPES)[number]
 
 export type PlayerMarkShape =
-  | (typeof PLAYER_MARK_SHAPES)[number]
+  | (typeof LOCAL_MARK_SHAPES)[number]
   | (typeof ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)[number]
   | ProMarkShape
 
@@ -80,7 +93,7 @@ export function isPlayerMarkShape(value: unknown): value is PlayerMarkShape {
   return (
     typeof value === "string" &&
     (value === "circle" ||
-      PLAYER_MARK_SHAPES.some((shape) => shape === value) ||
+      LOCAL_MARK_SHAPES.some((shape) => shape === value) ||
       isProMarkShape(value))
   )
 }
@@ -117,7 +130,7 @@ export function resolveAppearance({
   preferred,
   taken,
   seat,
-  shapes = PLAYER_MARK_SHAPES,
+  shapes = LOCAL_MARK_SHAPES,
 }: {
   preferred?: Partial<PlayerAppearance>
   taken: PlayerAppearance[]
@@ -144,7 +157,7 @@ export function resolveAppearance({
 
 export function resolvePlayerAppearances<T extends { seat: number; color: string; shape?: string }>(
   players: T[],
-  shapes: readonly PlayerMarkShape[] = PLAYER_MARK_SHAPES,
+  shapes: readonly PlayerMarkShape[] = LOCAL_MARK_SHAPES,
 ) {
   const taken: PlayerAppearance[] = []
   return [...players]

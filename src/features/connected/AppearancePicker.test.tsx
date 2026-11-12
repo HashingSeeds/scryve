@@ -17,7 +17,7 @@ describe("AppearancePicker", () => {
         />
       </ThemeProvider>,
     )
-    expect(view.getAllByRole("radio")).toHaveLength(20)
+    expect(view.getAllByRole("radio")).toHaveLength(24)
     expect(view.getByTestId("appearance-color-39755c")).toBeDisabled()
     expect(view.getByTestId("appearance-shape-square")).toBeDisabled()
     fireEvent.press(view.getByTestId("appearance-color-117b9c"))

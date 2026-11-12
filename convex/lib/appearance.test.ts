@@ -5,6 +5,8 @@ import {
   MANY_SEAT_MARK_SHAPES,
   isPlayerMarkShape,
   isProMarkShape,
+  LOCAL_MARK_SHAPES,
+  MANY_SEAT_PICKER_SHAPES,
   PLAYER_COLOR_CHOICES,
   PLAYER_MARK_SHAPES,
   PRO_MARK_SHAPES,
@@ -41,6 +43,29 @@ describe("player appearance", () => {
     expect(CONNECTED_PLAYER_MARK_SHAPES.length).toBeGreaterThanOrEqual(SEATS_BEFORE_CLIENT_LIMIT)
   })
 
+  it("keeps marks installed builds cannot draw out of hosted games, and retired defaults readable", () => {
+    const localOnly = ["banner", "quatrefoil", "meeple", "hourglass"] as const
+    for (const shape of localOnly) {
+      expect(PLAYER_MARK_SHAPES).toContain(shape)
+      expect(isPlayerMarkShape(shape)).toBe(true)
+      expect(MANY_SEAT_MARK_SHAPES).not.toContain(shape)
+      expect(ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES).not.toContain(shape)
+    }
+    expect(MANY_SEAT_PICKER_SHAPES).toEqual(MANY_SEAT_MARK_SHAPES.filter((s) => s !== "circle"))
+    for (const shape of ["square", "diamond", "plus", "moon"] as const) {
+      expect(PLAYER_MARK_SHAPES).not.toContain(shape)
+      expect(LOCAL_MARK_SHAPES).toContain(shape)
+    }
+    expect(
+      resolveAppearance({
+        preferred: { color: RED, shape: "meeple" },
+        taken: [],
+        seat: 1,
+        shapes: MANY_SEAT_MARK_SHAPES,
+      }).shape,
+    ).toBe("heart")
+  })
+
   it("reads Pro marks without offering them to seat defaults or connected lobbies", () => {
     for (const shape of PRO_MARK_SHAPES) {
       expect(isPlayerMarkShape(shape)).toBe(true)
@@ -67,7 +92,7 @@ describe("player appearance", () => {
     ).toEqual([
       { color: RED, shape: "triangle" },
       { color: BLUE, shape: "heart" },
-      { color: PLAYER_COLOR_CHOICES[2], shape: "square" },
+      { color: PLAYER_COLOR_CHOICES[2], shape: "banner" },
     ])
   })
 

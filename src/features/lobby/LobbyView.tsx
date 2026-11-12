@@ -45,7 +45,7 @@ import type { ThemedStyle } from "@/theme/types"
 import {
   CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
-  PLAYER_MARK_SHAPES,
+  MANY_SEAT_PICKER_SHAPES,
   PRO_MARK_SHAPES,
   shapeForSeat,
   shownMarkShape,
@@ -481,7 +481,9 @@ export function LobbyView({
             value={appearanceDraft}
             taken={takenAppearances}
             shapes={
-              clientSeesSeats(lobby.playerCount) ? CONNECTED_PLAYER_MARK_SHAPES : PLAYER_MARK_SHAPES
+              clientSeesSeats(lobby.playerCount)
+                ? CONNECTED_PLAYER_MARK_SHAPES
+                : MANY_SEAT_PICKER_SHAPES
             }
             proShapes={PRO_MARK_SHAPES}
             proLocked={appearance.proLocked}

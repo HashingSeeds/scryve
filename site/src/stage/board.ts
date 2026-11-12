@@ -326,6 +326,15 @@ const APP_MARK_SHAPES: Record<SiteMarkShape, string> = {
   heart: `<path fill-rule="evenodd" d="${SITE_LEAF}M21.2 13.5h1.6v18.5h-1.6Z"/>`,
   moon: '<path d="M20.91 9.05A13 13 0 1 0 34.33 26.12 11 11 0 0 1 20.91 9.05Z"/>',
   ring: '<path fill-rule="evenodd" d="M34.5 22A12.5 12.5 0 1 1 9.5 22 12.5 12.5 0 1 1 34.5 22ZM27.5 22A5.5 5.5 0 1 0 16.5 22 5.5 5.5 0 1 0 27.5 22Z"/>',
+  banner:
+    '<path d="M10 8.5H34A1.5 1.5 0 0 1 34 11.5H10A1.5 1.5 0 0 1 10 8.5ZM12.5 11H31.5V35.5L22 29.5 12.5 35.5Z"/>',
+  quatrefoil:
+    '<path d="M28.6 14.6A6.6 6.6 0 1 1 15.4 14.6 6.6 6.6 0 1 1 28.6 14.6ZM36 22A6.6 6.6 0 1 1 22.8 22 6.6 6.6 0 1 1 36 22ZM28.6 29.4A6.6 6.6 0 1 1 15.4 29.4 6.6 6.6 0 1 1 28.6 29.4ZM21.2 22A6.6 6.6 0 1 1 8 22 6.6 6.6 0 1 1 21.2 22ZM15 15H29V29H15Z"/>',
+  // Tabler's filled meeple and hourglass (MIT), scaled from 24 units.
+  meeple:
+    '<path transform="matrix(1.35 0 0 1.35 5.8 6.5)" d="M12 2c2.486 0 3.713 1.766 3.955 4.1l.01 .124l.129 .036c3.17 .928 5.754 2.487 5.9 4.556l.006 .184c0 1.427 -1.297 2.322 -2.871 2.733l-.201 .049l.026 .03c.244 .276 .532 .603 .7 .797l.057 .066c.49 .573 .884 1.073 1.216 1.56c.69 1.01 1.073 1.904 1.073 2.765a2 2 0 0 1 -2 2h-5c-1.043 0 -1.344 -.453 -2.394 -2.553c-.29 -.58 -.448 -.882 -.593 -1.118l-.013 -.022l-.013 .022c-.129 .21 -.268 .472 -.5 .935l-.093 .183c-1.05 2.1 -1.351 2.553 -2.394 2.553h-5a2 2 0 0 1 -2 -2c0 -.86 .384 -1.755 1.073 -2.765a18 18 0 0 1 1.216 -1.56c.152 -.178 .482 -.553 .757 -.863l.025 -.03l-.2 -.049c-1.506 -.393 -2.758 -1.23 -2.864 -2.55l-.007 -.183c0 -2.16 2.643 -3.785 5.906 -4.74l.128 -.036l.011 -.124c.235 -2.26 1.394 -3.99 3.726 -4.095z"/>',
+  hourglass:
+    '<path transform="matrix(1.35 0 0 1.35 5.8 5.8)" d="M17 2a2 2 0 0 1 1.995 1.85l.005 .15v2a6.996 6.996 0 0 1 -3.393 6a6.994 6.994 0 0 1 3.388 5.728l.005 .272v2a2 2 0 0 1 -1.85 1.995l-.15 .005h-10a2 2 0 0 1 -1.995 -1.85l-.005 -.15v-2a6.996 6.996 0 0 1 3.393 -6a6.994 6.994 0 0 1 -3.388 -5.728l-.005 -.272v-2a2 2 0 0 1 1.85 -1.995l.15 -.005h10z"/>',
 }
 
 // The sword covers the leaf's rib, as the app's solid marks do.
@@ -350,6 +359,10 @@ const MARK_ART_BOUNDS: Record<
   heart: { top: 7.5, bottom: 37.4, left: 11.12, right: 32.88 },
   moon: { top: 9.05, bottom: 35, left: 9, right: 34.33 },
   ring: { top: 9.5, bottom: 34.5, left: 9.5, right: 34.5 },
+  banner: { top: 8.5, bottom: 35.5, left: 8.5, right: 35.5 },
+  quatrefoil: { top: 8, bottom: 36, left: 8, right: 36 },
+  meeple: { top: 9.2, bottom: 34.85, left: 8.5, right: 35.5 },
+  hourglass: { top: 8.5, bottom: 35.5, left: 12.55, right: 31.45 },
 }
 
 // A mark cropped to its drawn edges, so the shape itself, not its box, lines up with what sits
@@ -374,6 +387,10 @@ const SWORD_INSETS: Record<SiteMarkShape, { centerY: number; size: number }> = {
   heart: { centerY: 21.5, size: 14 },
   moon: { centerY: 25, size: 10 },
   ring: { centerY: 22, size: 14 },
+  banner: { centerY: 20.5, size: 14 },
+  quatrefoil: { centerY: 22, size: 15 },
+  meeple: { centerY: 21.7, size: 14 },
+  hourglass: { centerY: 22, size: 14 },
 }
 
 // The sword glyph from src/components/Sword.tsx, on a 24 unit box.
