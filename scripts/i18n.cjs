@@ -254,8 +254,11 @@ function localeIndexSource(namespaces) {
 
 function resourcesSource(locales) {
   const all = [SOURCE_LOCALE, ...locales]
-  const imports = all.map((locale) => `import ${locale} from "./${locale}"`)
-  return `${GENERATED_HEADER}${imports.join("\n")}\n\nexport const resources = { ${all.join(", ")} }\n`
+  const loaders = all.map(
+    (locale) =>
+      `${locale}: (): typeof import("./${locale}").default => require("./${locale}").default`,
+  )
+  return `${GENERATED_HEADER}\n// why: a locale's modules run only when i18next asks for that language, so launch skips the unused ones.\nexport const resources = { ${loaders.join(", ")} }\n`
 }
 
 function scaffoldFiles(namespaces) {
