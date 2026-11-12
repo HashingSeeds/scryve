@@ -756,6 +756,7 @@ function CounterSheet({
     seat.rules.counters.length + seat.rules.designations.length > 0 || !!seat.rules.customCounters
   // why: with both, dice take the bag's half of the card and trackers the other, so neither scrolls; only the dice half keeps clear of Close in its corner.
   const split = !!dice && trackers && sheet.kind === "add"
+  const closeOnLeft = closeButton.left < width / 2
   const [allDice, setAllDice] = useState(false)
   const closeRow = closeButton.size + gap
   const padding = {
@@ -897,7 +898,10 @@ function CounterSheet({
         ) : (
           <>
             {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
-            <View style={split ? $split : $optionScroll}>
+            <View
+              testID={`counter-options-seat-${seatNumber}`}
+              style={split ? [$split, closeOnLeft && $splitReversed] : $optionScroll}
+            >
               {showTrackers ? (
                 <Animated.View layout={slide} style={strip ? $iconStrip : $optionScroll}>
                   <ScrollView
@@ -1653,6 +1657,7 @@ const $optionWords: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $iconStrip: ViewStyle = { width: 2 * (16 + 2 * 4) + 8 }
 
 const $split: ViewStyle = { flex: 1, flexDirection: "row" }
+const $splitReversed: ViewStyle = { flexDirection: "row-reverse" }
 
 const $diceHalf: ViewStyle = { flex: 1, justifyContent: "center" }
 
