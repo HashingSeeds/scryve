@@ -1,6 +1,6 @@
-The meeple and hourglass marks in PlayerMark.tsx and site/src/stage/board.ts, and the hand-click in site/src/stage/hint.ts, are copied from this icon set.
+The meeple and hourglass marks in PlayerMark.tsx are copied from this icon set.
 
-Tabler Icons (https://github.com/tabler/tabler-icons): meeple (filled), hourglass (filled), hand-click
+Tabler Icons (https://github.com/tabler/tabler-icons): meeple (filled), hourglass (filled)
 
 MIT License
 
