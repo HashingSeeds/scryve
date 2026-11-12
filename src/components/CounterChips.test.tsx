@@ -411,6 +411,19 @@ describe("CounterChips", () => {
     expect(focus).toHaveBeenCalledWith(expect.anything(), "focus")
   })
 
+  it("names a custom counter on the in-seat keypad, not the system keyboard", () => {
+    const table = seat({ rules: { ...commander, customCounters: true } })
+    const view = chips(table)
+
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+    fireEvent.press(view.getByTestId("counter-option-1-custom"))
+    expect(view.getByTestId("counter-name-1")).toHaveProp("showSoftInputOnFocus", false)
+    for (const key of ["s", "t", "o", "r", "m", "delete", "m", "hide-keypad"])
+      fireEvent.press(view.getByTestId(`pokemon-key-${key}-seat-1`))
+
+    expect(table.adjustCounter).toHaveBeenCalledWith(customCounterId("Storm"), 1)
+  })
+
   it("re-reads a repeated message on web, such as retaking Monarch", () => {
     jest.useFakeTimers()
     jest.replaceProperty(Platform, "OS", "web")

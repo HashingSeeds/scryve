@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
 import { seatBagSize } from "@/components/CounterChips"
+import { CounterNameOpenContext } from "@/components/CounterNamePanel"
 import {
   FirstPlayerTabs,
   FirstPlayerTabsShownContext,
@@ -178,6 +179,9 @@ function PinnedGameBoardStage({
   )
   const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
+  const [naming, setNaming] = useState(false)
+  // why: a counter name panel covers the middle of the table, and these draw above the grid.
+  const overlays = !naming || menu.open
 
   return (
     <View testID={testID} style={$stage}>
@@ -186,10 +190,12 @@ function PinnedGameBoardStage({
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             <FirstPlayerTabsShownContext.Provider value={tabsShown}>
               <TurnSpotlightContext.Provider value={spotlight}>
-                {renderGrid(boardOrientation)}
+                <CounterNameOpenContext.Provider value={setNaming}>
+                  {renderGrid(boardOrientation)}
+                </CounterNameOpenContext.Provider>
               </TurnSpotlightContext.Provider>
             </FirstPlayerTabsShownContext.Provider>
-            {seam && !menu.open
+            {seam && !menu.open && overlays
               ? seam({
                   anchor: boardAnchor,
                   facings,
@@ -201,26 +207,28 @@ function PinnedGameBoardStage({
                 })
               : null}
             <GameMenuBackdrop open={menu.open} onClose={menu.onClose} />
-            <GameMenuCluster
-              open={menu.open}
-              anchor={boardAnchor}
-              holderAnchor={holderAnchor}
-              holderHeight={holderAngle % 180 === 0 ? height : width}
-              facingAngle={holderAngle}
-              actions={menu.actions}
-              compact={playerCount > 2}
-              signal={menu.signal}
-              statusLine={menu.statusLine}
-              onToggle={menu.onToggle}
-            />
-            {tabsShown ? (
+            {overlays ? (
+              <GameMenuCluster
+                open={menu.open}
+                anchor={boardAnchor}
+                holderAnchor={holderAnchor}
+                holderHeight={holderAngle % 180 === 0 ? height : width}
+                facingAngle={holderAngle}
+                actions={menu.actions}
+                compact={playerCount > 2}
+                signal={menu.signal}
+                statusLine={menu.statusLine}
+                onToggle={menu.onToggle}
+              />
+            ) : null}
+            {tabsShown && overlays ? (
               <BoardTabs firstPlayer={firstPlayer} roundClock={roundClock} tabs={tabs} />
             ) : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
       {toast ? (
-        <BoardToastSlot anchor={holderAnchor} hidden={menu.open}>
+        <BoardToastSlot anchor={holderAnchor} hidden={menu.open || !overlays}>
           {toast}
         </BoardToastSlot>
       ) : null}
@@ -275,6 +283,9 @@ function LegacyGameBoardStage({
   )
   const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
+  const [naming, setNaming] = useState(false)
+  // why: a counter name panel covers the middle of the table, and these draw above the grid.
+  const overlays = !naming || menu.open
 
   return (
     <Animated.View
@@ -285,10 +296,12 @@ function LegacyGameBoardStage({
     >
       <FirstPlayerTabsShownContext.Provider value={tabsShown}>
         <TurnSpotlightContext.Provider value={spotlight}>
-          {renderGrid(boardOrientation)}
+          <CounterNameOpenContext.Provider value={setNaming}>
+            {renderGrid(boardOrientation)}
+          </CounterNameOpenContext.Provider>
         </TurnSpotlightContext.Provider>
       </FirstPlayerTabsShownContext.Provider>
-      {seam && !menu.open && rotation === 0
+      {seam && !menu.open && overlays && rotation === 0
         ? seam({
             anchor: boardAnchor,
             facings,
@@ -299,18 +312,20 @@ function LegacyGameBoardStage({
             ...seamTeams(teamBoard, playerCount, gridLayout),
           })
         : null}
-      <GameRadialMenu
-        {...menu}
-        anchor={menuAnchor}
-        boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
-        nativeFrame={boardOrientation.nativeFrame}
-        compact={playerCount > 2}
-      />
-      {tabsShown ? (
+      {overlays ? (
+        <GameRadialMenu
+          {...menu}
+          anchor={menuAnchor}
+          boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
+          nativeFrame={boardOrientation.nativeFrame}
+          compact={playerCount > 2}
+        />
+      ) : null}
+      {tabsShown && overlays ? (
         <BoardTabs firstPlayer={firstPlayer} roundClock={roundClock} tabs={tabs} />
       ) : null}
       {toast ? (
-        <BoardToastSlot anchor={menuAnchor} hidden={menu.open}>
+        <BoardToastSlot anchor={menuAnchor} hidden={menu.open || !overlays}>
           {toast}
         </BoardToastSlot>
       ) : null}

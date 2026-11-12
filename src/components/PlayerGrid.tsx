@@ -30,6 +30,7 @@ import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
 import { counterOutReason, seatTableState } from "./CounterChips"
+import { CounterNameHostContext, useCounterNameBoard } from "./CounterNamePanel"
 import type { LifeCardDice } from "./DiceSeatOverlay"
 import { FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
 import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
@@ -348,6 +349,16 @@ export function PlayerGrid({
     tabsShown,
   })
   const rows = getPlayerGridRows(cellCount, layout)
+  const safeTop = Math.max(topEdgeBand, insets.top)
+  const nameBoard = useCounterNameBoard({
+    area: { x: 0, y: topEdgeBand, width: board.width, height: board.height - topEdgeBand },
+    safe: {
+      x: insets.left,
+      y: safeTop,
+      width: board.width - insets.left - insets.right,
+      height: board.height - safeTop - insets.bottom,
+    },
+  })
   const rotationAt = (rowIndex: number, columnIndex: number) =>
     frames[rowIndex]?.[columnIndex]?.rotation ?? 0
   const playerIndexOf = new Map<string, number>(players.map(({ id }, index) => [id, index]))
@@ -687,31 +698,38 @@ export function PlayerGrid({
       }
     }
     return (
-      <View key={`team-${slot}`} testID={`player-cell-seat-${lead + 1}`} style={themed($cell)}>
-        {seatCard(
-          lead,
-          {
-            contentRotation: rotation,
-            screenEdges,
-            contentInsets,
-            menuCorner,
-            menuEdgeCenter,
-            lifeFontSizeFor: zoneLifeFontSizeFor(slot),
-            style: getScreenCornerSquaringStyle({
-              rows,
-              rowIndex,
-              columnIndex,
-              insets: Platform.OS === "web" ? insets : undefined,
-            }),
-          },
-          {
-            members: team,
-            heads: [head(lead), head(second)],
-            shared: (table?.tableRules.counters ?? []).flatMap(({ id, shared }) =>
-              shared ? [id] : [],
-            ),
-          },
-        )}
+      <View
+        key={`team-${slot}`}
+        testID={`player-cell-seat-${lead + 1}`}
+        style={themed($cell)}
+        onLayout={nameBoard.onCellLayout(`team-${slot}`, rowIndex)}
+      >
+        <CounterNameHostContext.Provider value={nameBoard.hostFor(`team-${slot}`)}>
+          {seatCard(
+            lead,
+            {
+              contentRotation: rotation,
+              screenEdges,
+              contentInsets,
+              menuCorner,
+              menuEdgeCenter,
+              lifeFontSizeFor: zoneLifeFontSizeFor(slot),
+              style: getScreenCornerSquaringStyle({
+                rows,
+                rowIndex,
+                columnIndex,
+                insets: Platform.OS === "web" ? insets : undefined,
+              }),
+            },
+            {
+              members: team,
+              heads: [head(lead), head(second)],
+              shared: (table?.tableRules.counters ?? []).flatMap(({ id, shared }) =>
+                shared ? [id] : [],
+              ),
+            },
+          )}
+        </CounterNameHostContext.Provider>
       </View>
     )
   }
@@ -745,6 +763,7 @@ export function PlayerGrid({
             key={rowIndex}
             testID={`player-grid-row-${rowIndex}`}
             style={[themed($row), { flex: rowFlexes[rowIndex] }]}
+            onLayout={nameBoard.onRowLayout(rowIndex)}
           >
             {row.map((slot, columnIndex) => {
               if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex)
@@ -780,20 +799,24 @@ export function PlayerGrid({
                   key={table?.tableRules.pokemon ? player.id : `seat-${index}`}
                   testID={`player-cell-seat-${seatNumber}`}
                   style={themed($cell)}
+                  onLayout={nameBoard.onCellLayout(`seat-${index}`, rowIndex)}
                 >
-                  {seatCard(index, {
-                    contentRotation,
-                    screenEdges,
-                    contentInsets,
-                    menuCorner,
-                    menuEdgeCenter,
-                    style: corners,
-                  })}
+                  <CounterNameHostContext.Provider value={nameBoard.hostFor(`seat-${index}`)}>
+                    {seatCard(index, {
+                      contentRotation,
+                      screenEdges,
+                      contentInsets,
+                      menuCorner,
+                      menuEdgeCenter,
+                      style: corners,
+                    })}
+                  </CounterNameHostContext.Provider>
                 </View>
               )
             })}
           </View>
         ))}
+        {nameBoard.panels}
       </Animated.View>
     </View>
   )

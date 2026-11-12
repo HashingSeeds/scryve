@@ -18,6 +18,7 @@ import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { CounterNameSlot } from "./CounterNamePanel"
 import { DiceBagGlyph, DieFace } from "./DiceGlyph"
 import type { SeatDiceBag } from "./DiceSeatOverlay"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
@@ -642,7 +643,31 @@ export const CounterChips = memo(function CounterChips({
           </BoardPressable>
         </View>
       ) : null}
-      {sheet ? (
+      {sheet?.kind === "name" && Platform.OS !== "web" ? (
+        <CounterNameSlot
+          cardSize={cardSize}
+          request={{
+            seatNumber,
+            color,
+            compact,
+            rotation: contentRotation,
+            close: {
+              left: fromLeft ? bagAt.left : frameWidth - bagAt.right - bagSize,
+              top: frameHeight - bagAt.bottom - bagSize,
+              size: bagSize,
+              glyph: compact ? 13 : 15,
+              slop: bagSlop,
+            },
+            taken: seat.rules.counters.flatMap(({ id }) => customCounterNameOf(id) ?? []),
+            onAdd: (name) => {
+              seat.adjustCounter(customCounterId(name), 1)
+              rememberCounterName(name)
+              setSheet(null)
+            },
+            onClose: () => setSheet(null),
+          }}
+        />
+      ) : sheet ? (
         <CounterSheet
           sheet={sheet}
           seat={seat}
