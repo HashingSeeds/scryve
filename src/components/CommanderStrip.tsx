@@ -681,7 +681,7 @@ const OWN_OPACITY = 0.72
 // why: a mark's art fills about 55% of its box, so the box outgrows the cell for the art to match the discs beside it.
 const OWN_MARK_SCALE = 1.6
 const NEAR_LETHAL_MARGIN = 5
-const FILLED_COUNT_CONTRAST = 3
+const FILLED_COUNT_CONTRAST = 4.5
 const GROW_FROM = 0.35
 const GROWN_START_SCALE = 0.6
 const FADED_OPACITY = 0.3

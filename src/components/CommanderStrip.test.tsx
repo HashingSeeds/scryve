@@ -190,6 +190,10 @@ describe("CommanderStrip", () => {
       incoming: { [bo]: 19 },
     })
     expect(count(pale, bo, "19")).toHaveStyle({ color: "#000000" })
+    pale.unmount()
+
+    const dark = renderStrip({ foreground: "#000000", incoming: { [bo]: 19 } })
+    expect(count(dark, bo, "19")).toHaveStyle({ color: "#FFFFFF" })
   })
 
   it("tiers an attacker's total at half of lethal and within five of it", () => {
