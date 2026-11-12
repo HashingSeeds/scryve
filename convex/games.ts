@@ -505,6 +505,18 @@ const lobbyTeammate = (game: Doc<"games">, players: Doc<"gamePlayers">[], seat: 
 const seatTeams = (game: Doc<"games">, seats: number[]) =>
   game.variant === TWO_HEADED_GIANT ? pairedTeams([...seats].sort((a, b) => a - b)) : []
 
+const localTeamSeats = (
+  groups: string[][] | undefined,
+  players: { localId: string; seat: number }[],
+) =>
+  groups?.every((group) => group.length === 2)
+    ? groups.map((group) =>
+        group.flatMap(
+          (localId) => players.find((player) => player.localId === localId)?.seat ?? [],
+        ),
+      )
+    : []
+
 async function playersForGame(ctx: QueryCtx, gameId: Id<"games">) {
   const players = await ctx.db
     .query("gamePlayers")
@@ -1420,11 +1432,7 @@ export const publishLocalGame = mutation({
     for (const player of resolvePlayerAppearances(
       args.players,
       connectedMarkShapes(args.players.length),
-      (args.table?.turnGroups ?? []).map((group) =>
-        group.flatMap(
-          (localId) => args.players.find((player) => player.localId === localId)?.seat ?? [],
-        ),
-      ),
+      localTeamSeats(args.table?.turnGroups, args.players),
     )) {
       const isHost = player.localId === args.hostLocalId
       const playerId = await ctx.db.insert("gamePlayers", {

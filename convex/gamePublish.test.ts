@@ -130,6 +130,36 @@ describe("publishLocalGame", () => {
     expect(projection.players.map((player) => player.shape)).toEqual(["heart", "triangle"])
   })
 
+  it("keeps each player's own color when the turn groups are not two-player teams", async () => {
+    const t = makeConvexTest()
+    const third = {
+      localId: "local-third-player",
+      seat: 3,
+      displayName: "Third",
+      color: "#16A34A",
+      shape: "square",
+      currentLife: 40,
+    }
+    const host = await signedIn(t, "host-subject", "Host")
+    const created = await host.mutation(api.games.publishLocalGame, {
+      ...snapshotArgs({ players: [...baseSnapshot.players, third], commanderTotals: [] }),
+      table: {
+        designations: {},
+        players: {},
+        turnGroups: [["local-host-player"], ["local-guest-player", "local-third-player"]],
+      },
+    })
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: hostDevice,
+    })
+    expect(projection.players.map((player) => player.color)).toEqual([
+      "#7C3AED",
+      "#2563EB",
+      "#16A34A",
+    ])
+  })
+
   it("retries the same immutable payload idempotently and rejects a mismatched reuse", async () => {
     const t = makeConvexTest()
     const { host, created } = await published(t)
