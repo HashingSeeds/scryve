@@ -163,36 +163,8 @@ function rotateBasePoseToSide(stepsFromTopSide: number): RadialActionPose {
   }
 }
 
-const CENTER_ACTION_POSES: readonly RadialActionPose[] =
-  CENTER_ACTION_SIDE_STEPS.map(rotateBasePoseToSide)
-const EDGE_POSE_DISTANCE = 112
-const EDGE_ANCHOR_SHARE = 0.25
-const LEFT_EDGE_POSE_ANGLES = [0, 45, 90, 135, 180] as const
-
-function poseAlongAngle(angleDeg: number, order: number): RadialActionPose {
-  const angleRad = (angleDeg * Math.PI) / 180
-  return {
-    x: Math.sin(angleRad) * EDGE_POSE_DISTANCE,
-    y: -Math.cos(angleRad) * EDGE_POSE_DISTANCE,
-    rotationDeg: angleDeg / 2,
-    delayMs: order * ACTION_STAGGER_MS,
-  }
-}
-
-function mirrorPose(pose: RadialActionPose): RadialActionPose {
-  return { ...pose, x: -pose.x, rotationDeg: -pose.rotationDeg }
-}
-
-export function getRadialActionPoses(anchor: {
-  x: number
-  y: number
-}): readonly RadialActionPose[] {
-  const anchorNearLeftEdge = anchor.x < EDGE_ANCHOR_SHARE
-  const anchorNearRightEdge = anchor.x > 1 - EDGE_ANCHOR_SHARE
-  if (anchorNearLeftEdge) return LEFT_EDGE_POSE_ANGLES.map(poseAlongAngle)
-  if (anchorNearRightEdge) return LEFT_EDGE_POSE_ANGLES.map(poseAlongAngle).map(mirrorPose)
-  return CENTER_ACTION_POSES
-}
+// why: the board keeps the pentagon off its edges (getFourCardMenuJunction), so one fan fits every layout.
+const ACTION_POSES: readonly RadialActionPose[] = CENTER_ACTION_SIDE_STEPS.map(rotateBasePoseToSide)
 
 export function getRadialActionStart(pose: { x: number; y: number }): { x: number; y: number } {
   "worklet"
@@ -228,12 +200,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <GameMenuBackdrop open={open} onClose={onClose} />
-      <GameRadialFan
-        open={open}
-        anchor={anchor}
-        anchorStyle={[anchorStyle, nativeAnchorStyle]}
-        actions={actions}
-      />
+      <GameRadialFan open={open} anchorStyle={[anchorStyle, nativeAnchorStyle]} actions={actions} />
       <GameMenuAnchor
         open={open}
         anchor={anchor}
@@ -319,19 +286,16 @@ export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: ()
 
 function GameRadialFan({
   open,
-  anchor,
-  anchorStyle = percentAnchorStyle(anchor),
+  anchorStyle,
   actions,
   poseTurnMs = 0,
 }: {
   open: boolean
-  anchor: { x: number; y: number }
-  anchorStyle?: AnchorStyle
+  anchorStyle: AnchorStyle
   actions: GameMenuActions
   poseTurnMs?: number
 }) {
   const reducedMotion = useReducedMotion()
-  const poses = getRadialActionPoses(anchor)
   return (
     <>
       {actions.map((action, index) => (
@@ -339,7 +303,7 @@ function GameRadialFan({
           key={action.kind}
           action={action}
           anchorStyle={anchorStyle}
-          pose={poses[index]}
+          pose={ACTION_POSES[index]}
           reducedMotion={reducedMotion}
           open={open}
           poseTurnMs={poseTurnMs}
@@ -350,7 +314,8 @@ function GameRadialFan({
 }
 
 const FACING_TURN_MS = 260
-const CLUSTER_SIZE = 2 * (EDGE_POSE_DISTANCE + ACTION_WIDTH)
+// why: wide enough for the fan and the status line's text, and Android drops touches outside the box.
+const CLUSTER_SIZE = 456
 
 type GameMenuAnchorProps = {
   open: boolean
@@ -361,7 +326,7 @@ type GameMenuAnchorProps = {
   onToggle: () => void
 }
 
-/** why: a hardware-pinned board does not turn with the window, so the pentagon and its fan stay put through the system rotation and then turn together about the anchor to face the holder (`facingAngle`, clockwise degrees). `holderAnchor` is where the anchor sits in the holder's view and picks the side the fan opens toward. The box is large enough to contain the fan, because Android drops touches outside a parent's bounds. */
+/** why: a hardware-pinned board does not turn with the window, so the pentagon and its fan stay put through the system rotation and then turn together about the anchor to face the holder (`facingAngle`, clockwise degrees). `holderAnchor` is where the anchor sits in the holder's view and picks the side the status line opens toward. The box is large enough to contain the fan, because Android drops touches outside a parent's bounds. */
 export const GameMenuCluster = memo(function GameMenuCluster({
   holderAnchor,
   holderHeight,
@@ -397,7 +362,6 @@ export const GameMenuCluster = memo(function GameMenuCluster({
     >
       <GameRadialFan
         open={anchorProps.open}
-        anchor={holderAnchor}
         anchorStyle={$clusterCenter}
         actions={actions}
         poseTurnMs={FACING_TURN_MS}

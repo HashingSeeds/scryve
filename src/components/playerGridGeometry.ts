@@ -52,7 +52,7 @@ export function getPlayerGridMenuAnchor(
     cumulativeFlex += flex
     return topInset + (cumulativeFlex / totalRowFlex) * (1 - topInset)
   })
-  const junction = getFourCardMenuJunction(rows)
+  const junction = getFourCardMenuJunction(rows, layout)
   if (junction)
     return {
       x: junction.column / junction.columnCount,
@@ -80,12 +80,25 @@ export function getCentralMenuBoundary(
   return nearest.boundary
 }
 
-export function getFourCardMenuJunction(rows: (number | null)[][]) {
+// why: the menu fans out on every side of the pentagon, and a pinned board turns either axis toward the holder, so the corner keeps this share of the board clear on both axes.
+const MENU_EDGE_CLEARANCE = 0.25
+const clearOfEdges = (share: number) =>
+  share >= MENU_EDGE_CLEARANCE && share <= 1 - MENU_EDGE_CLEARANCE
+
+export function getFourCardMenuJunction(
+  rows: (number | null)[][],
+  layout: ReturnType<typeof getPlayerGridLayout>,
+) {
+  const flexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  const totalFlex = flexes.reduce((total, flex) => total + flex, 0)
   for (let boundary = rows.length - 1; boundary > 0; boundary -= 1) {
+    const boundaryShare = flexes.slice(0, boundary).reduce((total, flex) => total + flex, 0)
+    if (!clearOfEdges(boundaryShare / totalFlex)) continue
     const upper = rows[boundary - 1]
     const lower = rows[boundary]
     const columnCount = Math.max(upper.length, lower.length)
     for (let column = columnCount - 1; column > 0; column -= 1) {
+      if (!clearOfEdges(column / columnCount)) continue
       const fourCardsMeet = [
         upper[column - 1],
         upper[column],
@@ -160,7 +173,7 @@ export function getMenuSeamNeighbors(
   layout: ReturnType<typeof getPlayerGridLayout>,
 ): { left: SeamSide; right: SeamSide } {
   const rows = getPlayerGridRows(playerCount, layout)
-  const junction = getFourCardMenuJunction(rows)
+  const junction = getFourCardMenuJunction(rows, layout)
   const boundary = junction?.boundary ?? getCentralMenuBoundary(rows, layout)
   const anchorX = getPlayerGridMenuAnchor(playerCount, layout).x
   const neighbor = (row: (number | null)[] | undefined, side: "left" | "right") => {
@@ -328,7 +341,7 @@ export function seatFrames(input: {
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
   const totalFlex = rowFlexes.reduce((sum, flex) => sum + flex, 0)
   const rowSpace = Math.max(board.height - input.topEdgeBand - gap * (rows.length - 1), 0)
-  const menuJunction = getFourCardMenuJunction(rows)
+  const menuJunction = getFourCardMenuJunction(rows, layout)
   const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const tabRow = input.tabsShown ? (menuJunction?.boundary ?? fallbackMenuBoundary) : null
   const rowHeights = rowFlexes.map((flex) => (rowSpace * flex) / totalFlex)

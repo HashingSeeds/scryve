@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
-import { GameRadialMenu, getRadialActionPoses, type GameMenuActions } from "./GameRadialMenu"
+import { GameRadialMenu, type GameMenuActions } from "./GameRadialMenu"
 import { Icon } from "./Icon"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
@@ -246,14 +246,5 @@ describe("GameRadialMenu", () => {
     const shown = view.getByLabelText("Layout", hidden)
     expect(shown.props.tabIndex).toBeUndefined()
     expect(shown.props.accessibilityState.disabled).toBe(false)
-  })
-
-  it("poses every action toward open space when the anchor nears a screen edge", () => {
-    expect(getRadialActionPoses({ x: 0.2, y: 0.5 }).every((pose) => pose.x >= 0)).toBe(true)
-    expect(getRadialActionPoses({ x: 0.8, y: 0.5 }).every((pose) => pose.x <= 0)).toBe(true)
-    expect(getRadialActionPoses({ x: 2 / 3, y: 0.5 })).toEqual(
-      getRadialActionPoses({ x: 0.5, y: 0.5 }),
-    )
-    expect(getRadialActionPoses({ x: 0.5, y: 0.5 })).toHaveLength(5)
   })
 })
