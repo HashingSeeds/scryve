@@ -131,7 +131,7 @@ describe("CommanderStrip", () => {
       view.getByTestId(`commander-pip-seat-1-${cy}${suffix}`, { includeHiddenElements: true })
     expect(chip("")).toHaveTextContent("21")
     expect(chip("-partner")).toHaveTextContent("5")
-    expect(chip("")).toHaveStyle({ borderWidth: 2 })
+    expect(chip("")).toHaveStyle({ borderWidth: 2.5 })
     expect(chip("-partner")).toHaveStyle({ borderWidth: 1 })
     view.getByRole("button", {
       name: "Assign commander damage from Seat 1, Ada. Taken: 21 from Cy, 5 from Cy",
@@ -169,7 +169,30 @@ describe("CommanderStrip", () => {
     })
   })
 
-  it("rings an attacker orange from half of lethal and oxblood within five of it", () => {
+  it("rims an attacker from half of lethal and fills its disc with the seat's ink within five of it", () => {
+    const [, bo, cy] = players.map(({ id }) => id)
+    const count = (view: ReturnType<typeof renderStrip>, id: string, total: string) =>
+      within(
+        view.getByTestId(`commander-pip-seat-1-${id}`, { includeHiddenElements: true }),
+      ).getByText(total, { includeHiddenElements: true })
+    const view = renderStrip({ incoming: { [bo]: 12, [cy]: 17 } })
+    expect(
+      view.getByTestId(`commander-pip-seat-1-${bo}`, { includeHiddenElements: true }),
+    ).toHaveStyle({ borderWidth: 2.5, backgroundColor: "#B85535" })
+    expect(
+      view.getByTestId(`commander-pip-seat-1-${cy}`, { includeHiddenElements: true }),
+    ).toHaveStyle({ backgroundColor: "#FFFFFF" })
+    expect(count(view, cy, "17")).toHaveStyle({ color: "#3A7358" })
+    view.unmount()
+
+    const pale = renderStrip({
+      players: [players[0], { ...players[1], color: "#F2D45C" }, players[2]],
+      incoming: { [bo]: 19 },
+    })
+    expect(count(pale, bo, "19")).toHaveStyle({ color: "#41476E" })
+  })
+
+  it("tiers an attacker's total at half of lethal and within five of it", () => {
     expect([0, 10, 11, 15, 16, 21].map((total) => commanderDamageTier(total, 21))).toEqual([
       "calm",
       "calm",

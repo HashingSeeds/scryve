@@ -23,7 +23,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
-import { accessibleForeground } from "@/utils/colorContrast"
+import { accessibleForeground, contrastRatio } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -123,7 +123,7 @@ export function chipTotals(total: number, split?: readonly number[]) {
 
 export type CommanderDamageTier = "calm" | "significant" | "nearLethal"
 
-/** why: one attacker's total reads on its cell's ring alone, orange from half of lethal and oxblood within five of it, so a crowded grid gains no extra marks. */
+/** why: one attacker's total reads on its cell alone, a solid rim from half of lethal and a filled disc within five of it, both in the seat's own ink so they read on every seat color and a crowded grid gains no extra marks. */
 export function commanderDamageTier(total: number, lethal: number): CommanderDamageTier {
   if (total >= lethal - NEAR_LETHAL_MARGIN) return "nearLethal"
   if (total >= Math.ceil(lethal / 2)) return "significant"
@@ -351,7 +351,8 @@ export const CommanderStrip = memo(function CommanderStrip({
                     const restOpacity = sourceShown ? FADED_OPACITY : total === 0 ? IDLE_OPACITY : 1
                     const tier = commanderDamageTier(total, lethal)
                     const restBorder =
-                      tier === "calm" ? overlayTint(foreground, RIM_ALPHA) : TIER_RING[tier]
+                      tier === "calm" ? overlayTint(foreground, RIM_ALPHA) : foreground
+                    const filled = tier === "nearLethal"
                     const count = (
                       <Text
                         testID={
@@ -364,7 +365,13 @@ export const CommanderStrip = memo(function CommanderStrip({
                         maxFontSizeMultiplier={1}
                         style={[
                           themed(compact ? $compactCount : $count),
-                          { color: ink },
+                          {
+                            color: !filled
+                              ? ink
+                              : contrastRatio(player.color, foreground) >= FILLED_COUNT_CONTRAST
+                                ? player.color
+                                : cardColor,
+                          },
                           total > 99 && (compact ? $compactThreeDigits : $threeDigits),
                           glyphRotation,
                         ]}
@@ -386,7 +393,7 @@ export const CommanderStrip = memo(function CommanderStrip({
                         rest={{ opacity: restOpacity, border: restBorder }}
                         attacked={
                           attacking
-                            ? { opacity: 1, border: tier === "calm" ? foreground : restBorder }
+                            ? { opacity: 1, border: foreground }
                             : attackerId
                               ? { opacity: FADED_OPACITY, border: restBorder }
                               : { opacity: restOpacity, border: restBorder }
@@ -394,7 +401,7 @@ export const CommanderStrip = memo(function CommanderStrip({
                         style={[
                           themed($disc),
                           size,
-                          { backgroundColor: player.color },
+                          { backgroundColor: filled ? foreground : player.color },
                           tier !== "calm" && $tierDisc,
                         ]}
                       >
@@ -636,7 +643,7 @@ const $disc: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $tierDisc: ViewStyle = { borderWidth: 2 }
+const $tierDisc: ViewStyle = { borderWidth: 2.5 }
 
 const $count: ThemedStyle<TextStyle> = () => ({
   fontSize: 16,
@@ -674,7 +681,7 @@ const OWN_OPACITY = 0.72
 // why: a mark's art fills about 55% of its box, so the box outgrows the cell for the art to match the discs beside it.
 const OWN_MARK_SCALE = 1.6
 const NEAR_LETHAL_MARGIN = 5
-const TIER_RING = { significant: "#FF8A1F", nearLethal: "#8E1B2C" } as const
+const FILLED_COUNT_CONTRAST = 3
 const GROW_FROM = 0.35
 const GROWN_START_SCALE = 0.6
 const FADED_OPACITY = 0.3
