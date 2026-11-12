@@ -216,6 +216,14 @@ const board = {
     // A round ring with a hole in the middle, the player mark's shape.
     ring: "ring",
     circle: "circle",
+    // A hanging cloth banner with a notched bottom, the player mark's shape.
+    banner: "banner",
+    // A four-lobed shape like a four-leaf clover, the player mark's shape.
+    quatrefoil: "quatrefoil",
+    // The little wooden person piece from board games, the player mark's shape.
+    meeple: "meeple",
+    // A sand timer, the player mark's shape.
+    hourglass: "hourglass",
     crown: "crown",
     flame: "flame",
     bolt: "bolt",

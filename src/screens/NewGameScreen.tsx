@@ -105,6 +105,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 
 import {
+  LOCAL_MARK_SHAPES,
   PLAYER_MARK_SHAPES,
   PRO_MARK_SHAPES,
   resolveAppearance,
@@ -916,7 +917,7 @@ function NewGameForm({
             preferred: current[index],
             taken: next.slice(0, index),
             seat: index + 1,
-            shapes: confirmedFree ? undefined : [...PLAYER_MARK_SHAPES, ...PRO_MARK_SHAPES],
+            shapes: confirmedFree ? undefined : [...LOCAL_MARK_SHAPES, ...PRO_MARK_SHAPES],
           })
         return next
       })

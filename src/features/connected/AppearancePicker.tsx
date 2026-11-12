@@ -10,7 +10,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import {
   PLAYER_COLOR_CHOICES,
-  PLAYER_MARK_SHAPES,
+  LOCAL_MARK_SHAPES,
   type PlayerAppearance,
   type PlayerMarkShape,
   type ProMarkShape,
@@ -23,7 +23,7 @@ function colorSlug(color: string) {
 export function AppearancePicker({
   value,
   taken = [],
-  shapes = PLAYER_MARK_SHAPES,
+  shapes = LOCAL_MARK_SHAPES,
   proShapes = [],
   proLocked = false,
   foil = false,

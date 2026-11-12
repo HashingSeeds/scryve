@@ -115,6 +115,21 @@ describe("publishLocalGame", () => {
     ])
   })
 
+  it("trades marks installed builds cannot draw for hosted marks", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await published(t, {
+      players: baseSnapshot.players.map((player, index) => ({
+        ...player,
+        shape: index === 0 ? "meeple" : "hourglass",
+      })),
+    })
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: hostDevice,
+    })
+    expect(projection.players.map((player) => player.shape)).toEqual(["heart", "triangle"])
+  })
+
   it("retries the same immutable payload idempotently and rejects a mismatched reuse", async () => {
     const t = makeConvexTest()
     const { host, created } = await published(t)
