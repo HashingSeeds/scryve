@@ -142,6 +142,7 @@ export default {
     shapePro: "{{shape}}, Scryve Pro",
     opensPro: "Scryve Pro 열기",
     pro: "Pro",
+    teamColorInTeams: "팀 색상은 팀 목록에서 설정합니다",
     shapes: {
       heart: "나뭇잎",
       triangle: "로제트",

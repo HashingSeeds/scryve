@@ -69,6 +69,7 @@ export default {
     gameLabel: "게임",
     teams: "팀",
     teamPlayer: "{{name}}, 팀 {{team}}",
+    teamColor: "팀 {{team}} 색상",
     teamSwapHint: "두 플레이어를 탭하여 서로 바꾸세요",
     teamSwapPicked: "바꿀 상대를 탭하세요",
     teamLife: "팀 생명점",

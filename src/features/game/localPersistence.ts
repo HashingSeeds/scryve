@@ -17,6 +17,7 @@ import {
   localGameAccount,
   MAX_COMMANDER_DAMAGE,
   retainedLogOrder,
+  teamSeats,
   validatePlayerNames,
 } from "./domain"
 import { gameShape } from "./gameShape"
@@ -1004,10 +1005,15 @@ export class LocalGameRepository {
     const names = validatePlayerNames(players.map((player) => player.name))
     if (!names.valid)
       throw new Error(names.errors.find(Boolean) ?? translate("board:playerNames.invalid"))
+    const color = (index: number) => {
+      const team = teamSeats(game).find((seats) => seats.includes(index))
+      const shared = team?.every((seat) => players[seat].color === players[index].color)
+      return !team || shared ? players[index].color : game.players[index].color
+    }
     const nextPlayers = game.players.map((player, index) => ({
       ...player,
       name: names.names[index],
-      color: players[index].color,
+      color: color(index),
       shape: players[index].shape,
     }))
     this.saveActiveGame({

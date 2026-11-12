@@ -156,6 +156,7 @@ export default {
     shapePro: "{{shape}}, Scryve Pro",
     opensPro: "Scryve Pro खोलता है",
     pro: "Pro",
+    teamColorInTeams: "टीम का रंग टीमें में सेट किया जाता है",
     shapes: {
       heart: "पत्ती",
       triangle: "रोज़ेट",

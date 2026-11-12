@@ -71,6 +71,7 @@ export default {
     gameLabel: "ゲーム",
     teams: "チーム",
     teamPlayer: "{{name}}、チーム{{team}}",
+    teamColor: "チーム{{team}}の色",
     teamSwapHint: "2人をタップして入れ替え",
     teamSwapPicked: "入れ替える相手をタップしてください",
     teamLife: "チームのライフ",

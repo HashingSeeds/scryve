@@ -146,6 +146,7 @@ export default {
     shapePro: "{{shape}}、Scryve Pro",
     opensPro: "Scryve Proを開きます",
     pro: "Pro",
+    teamColorInTeams: "チームカラーは「チーム」で設定します",
     shapes: {
       heart: "葉",
       triangle: "ロゼット",

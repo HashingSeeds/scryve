@@ -78,6 +78,8 @@ const play = {
     teams: "Teams",
     // Two-Headed Giant setup: screen reader label for a player in the team list, as in "Ada, team 1".
     teamPlayer: "{{name}}, team {{team}}",
+    // Two-Headed Giant setup: screen reader label for the swatch that opens a team's color choices, as in "Team 1 color".
+    teamColor: "Team {{team}} color",
     // Two-Headed Giant setup: hint under the team list. Tapping one player and then another swaps their teams.
     teamSwapHint: "Tap two players to swap them",
     // Two-Headed Giant setup: shown after the first tap, while waiting for the second player.

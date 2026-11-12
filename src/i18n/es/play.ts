@@ -71,6 +71,7 @@ export default {
     gameLabel: "Juego",
     teams: "Equipos",
     teamPlayer: "{{name}}, equipo {{team}}",
+    teamColor: "Color del equipo {{team}}",
     teamSwapHint: "Toca dos jugadores para intercambiarlos",
     teamSwapPicked: "Ahora toca con quién intercambiar",
     teamLife: "Vidas del equipo",

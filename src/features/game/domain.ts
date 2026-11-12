@@ -212,10 +212,11 @@ export function createLocalGame(input: {
     throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
   const now = input.now ?? Date.now()
   const id = input.gameId ?? asGameId(createClientId("game", now))
+  const colorOf = (seat: number) => input.players[seat]?.color || PLAYER_COLORS[seat]
   const created: GamePlayer[] = input.players.map((player, seat) => ({
     id: asPlayerId(createClientId("player", now + seat)),
     name: validatedNames.names[seat],
-    color: player.color || PLAYER_COLORS[seat],
+    color: colorOf(input.teams?.find((team) => team.includes(seat))?.[0] ?? seat),
     shape: player.shape ?? shapeForSeat(seat + 1, PLAYER_MARK_SHAPES),
     life: player.startingLife ?? input.startingLife,
     seat,

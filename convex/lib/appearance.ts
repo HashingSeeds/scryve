@@ -118,10 +118,12 @@ export function shapeForSeat(
   return shapes[Math.abs(seat - 1) % shapes.length]
 }
 
-export function appearanceIsTaken(taken: PlayerAppearance[], candidate: PlayerAppearance) {
+export type TakenAppearance = { color?: string; shape: PlayerMarkShape }
+
+export function appearanceIsTaken(taken: TakenAppearance[], candidate: PlayerAppearance) {
   return taken.some(
     (entry) =>
-      entry.color.toUpperCase() === candidate.color.toUpperCase() ||
+      entry.color?.toUpperCase() === candidate.color.toUpperCase() ||
       entry.shape === candidate.shape,
   )
 }
@@ -133,14 +135,14 @@ export function resolveAppearance({
   shapes = LOCAL_MARK_SHAPES,
 }: {
   preferred?: Partial<PlayerAppearance>
-  taken: PlayerAppearance[]
+  taken: TakenAppearance[]
   seat: number
   shapes?: readonly PlayerMarkShape[]
 }): PlayerAppearance {
   const preferredColor = preferred?.color?.toUpperCase()
   const fallbackColor =
     PLAYER_COLOR_CHOICES[Math.abs(seat - 1) % PLAYER_COLOR_CHOICES.length].toUpperCase()
-  const usedColors = new Set(taken.map((entry) => entry.color.toUpperCase()))
+  const usedColors = new Set(taken.flatMap((entry) => entry.color?.toUpperCase() ?? []))
   const usedShapes = new Set(taken.map((entry) => entry.shape))
   const color = [preferredColor ?? fallbackColor, ...PLAYER_COLOR_CHOICES].find(
     (candidate) => !usedColors.has(candidate),
@@ -158,21 +160,26 @@ export function resolveAppearance({
 export function resolvePlayerAppearances<T extends { seat: number; color: string; shape?: string }>(
   players: T[],
   shapes: readonly PlayerMarkShape[] = LOCAL_MARK_SHAPES,
+  teams: readonly (readonly number[])[] = [],
 ) {
-  const taken: PlayerAppearance[] = []
+  const taken: (PlayerAppearance & { seat: number })[] = []
   return [...players]
     .sort((left, right) => left.seat - right.seat)
     .map((player) => {
+      const team = teams.find((seats) => seats.includes(player.seat)) ?? [player.seat]
+      const mate = taken.find(({ seat }) => team.includes(seat))
       const appearance = resolveAppearance({
         preferred: {
-          color: player.color,
+          color: mate?.color ?? player.color,
           ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
         },
-        taken,
+        taken: taken.map(({ seat, color, shape }) =>
+          team.includes(seat) ? { shape } : { color, shape },
+        ),
         seat: player.seat,
         shapes,
       })
-      taken.push(appearance)
+      taken.push({ ...appearance, seat: player.seat })
       return { ...player, ...appearance }
     })
 }

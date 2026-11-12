@@ -1,5 +1,6 @@
 import { translate } from "@/i18n/translate"
 
+import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
 import { turnGroupOf, type TurnGroups } from "../../../convex/lib/turns"
 
 type Named = { id: string; name: string }
@@ -71,4 +72,38 @@ export function teamIncoming<Id extends string, Commander>(
         if (!team.includes(from)) sum[from] = (sum[from] ?? 0) + total
     return sum
   }
+}
+
+export function opposingTeamTotals<Id extends string>(
+  teams: readonly (readonly Id[])[],
+  own: Id,
+  first: Record<Id, number>,
+  partner: Record<Id, number>,
+  armedId?: Id,
+): { first: Record<Id, number>; partner: Record<Id, number> } {
+  const stronger = (id: Id) => Math.max(first[id] ?? 0, partner[id] ?? 0)
+  const shown = { first: {} as Record<Id, number>, partner: {} as Record<Id, number> }
+  for (const team of teams) {
+    if (team.includes(own) || !team[0]) continue
+    const armed = team.find((id) => id === armedId)
+    const source = armed ?? team.reduce((best, id) => (stronger(id) > stronger(best) ? id : best))
+    const pip = armed ?? team[0]
+    shown.first[pip] = first[source] ?? 0
+    if (partner[source] !== undefined) shown.partner[pip] = partner[source]
+  }
+  return shown
+}
+
+export function teamColors(
+  leads: readonly string[],
+  chosen: readonly (string | undefined)[],
+): string[] {
+  const used = new Set(leads.flatMap((_, team) => chosen[team]?.toUpperCase() ?? []))
+  return leads.map((lead, team) => {
+    const picked = chosen[team]
+    if (picked) return picked
+    const color = [lead, ...PLAYER_COLOR_CHOICES].find((c) => !used.has(c.toUpperCase())) ?? lead
+    used.add(color.toUpperCase())
+    return color
+  })
 }

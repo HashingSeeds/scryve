@@ -170,6 +170,34 @@ describe("PlayerGrid", () => {
     expect(second.right).toBeGreaterThan(0)
   })
 
+  it("fills each team zone with its color and shows one pip per opposing team at its stronger commander", () => {
+    const colors = ["#B85636", "#39755C", "#A33A52"]
+    const seats = players(6).map((seat) => ({ ...seat, color: colors[Math.floor(seat.seat / 2)] }))
+    const ids = seats.map(({ id }) => id)
+    const totals: Record<string, number> = { [ids[2]]: 9, [ids[3]]: 14, [ids[4]]: 3 }
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid
+          players={seats}
+          teams={[ids.slice(0, 2), ids.slice(2, 4), ids.slice(4)]}
+          commanderDamage={{
+            ...idleCommanderDamage,
+            incomingFor: (to, commander) =>
+              to !== ids[0] ? {} : commander ? { [ids[4]]: 16 } : totals,
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    const [zone] = view.UNSAFE_getAllByType(LifeCard)
+    expect(zone.props.color).toBe("#B85636")
+    const { seats: pips, incoming, split, players: shown } = zone.props.commanderDamage
+    expect(pips.map(({ playerId }: { playerId: string }) => playerId)).toEqual([ids[2], ids[4]])
+    expect(incoming).toEqual({ [ids[2]]: 14, [ids[4]]: 16 })
+    expect(split).toEqual({})
+    expect(shown.find(({ id }: { id: string }) => id === ids[2]).color).toBe("#39755C")
+  })
+
   it("leaves only the opened teammate's counters reachable while their bag sheet covers the zone", () => {
     const seats = players(4)
     const rules = teamTableRules(playTableRules("mtg", "limited"))

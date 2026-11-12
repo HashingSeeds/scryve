@@ -276,7 +276,7 @@ function ConnectedLobbyContent({
     }
   }
 
-  async function saveAppearance(seat: number, draft: PlayerAppearance) {
+  async function saveAppearance(seat: number, draft: PlayerAppearance, keepColor?: boolean) {
     try {
       setSavingAppearance(true)
       setActionError(undefined)
@@ -288,6 +288,7 @@ function ConnectedLobbyContent({
         color: draft.color,
         shape: !pro ? draft.shape : isPlayerMarkShape(freeShape) ? freeShape : shapeForSeat(seat),
         proShape: pro ? draft.shape : null,
+        ...(keepColor ? { keepColor } : {}),
       })
       return true
     } catch (cause) {

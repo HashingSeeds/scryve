@@ -1,24 +1,20 @@
 import type { ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
+import { ColorChoices } from "@/components/ColorChoices"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
-import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
 import {
-  PLAYER_COLOR_CHOICES,
   LOCAL_MARK_SHAPES,
   type PlayerAppearance,
   type PlayerMarkShape,
   type ProMarkShape,
 } from "../../../convex/lib/appearance"
-
-function colorSlug(color: string) {
-  return color.replace("#", "").toLowerCase()
-}
 
 export function AppearancePicker({
   value,
@@ -28,6 +24,7 @@ export function AppearancePicker({
   proLocked = false,
   foil = false,
   onLockedPress,
+  teamColor,
   onChange,
 }: {
   value: PlayerAppearance
@@ -37,6 +34,7 @@ export function AppearancePicker({
   proLocked?: boolean
   foil?: boolean
   onLockedPress?: () => void
+  teamColor?: { onPress: () => void }
   onChange: (next: PlayerAppearance) => void
 }) {
   const { themed, theme } = useAppTheme()
@@ -91,37 +89,21 @@ export function AppearancePicker({
     <View style={themed($picker)}>
       <View style={themed($group)}>
         <Text size="xs" tone="dim" tx="connected:appearance.color" />
-        <View accessibilityRole="radiogroup" style={themed($row)}>
-          {PLAYER_COLOR_CHOICES.map((color) => {
-            const selected = color.toUpperCase() === value.color.toUpperCase()
-            const exhausted = takenColors.has(color.toUpperCase())
-            return (
-              <View key={color} style={$option}>
-                <TouchableOpacity
-                  testID={`appearance-color-${colorSlug(color)}`}
-                  accessibilityRole="radio"
-                  accessibilityLabel={translate(
-                    exhausted
-                      ? "connected:appearance.colorOptionTaken"
-                      : "connected:appearance.colorOption",
-                    { color: colorSlug(color) },
-                  )}
-                  accessibilityState={{ selected, disabled: exhausted }}
-                  disabled={exhausted}
-                  activeOpacity={0.75}
-                  style={[
-                    themed($swatch),
-                    selected && themed($selectedSwatch),
-                    exhausted && themed($exhausted),
-                  ]}
-                  onPress={() => onChange({ ...value, color })}
-                >
-                  <View style={[themed($colorDot), { backgroundColor: color }]} />
-                </TouchableOpacity>
-              </View>
-            )
-          })}
-        </View>
+        <ColorChoices
+          value={value.color}
+          taken={takenColors}
+          locked={!!teamColor}
+          onChange={(color) => onChange({ ...value, color })}
+        />
+        {teamColor ? (
+          <TextAction
+            testID="appearance-team-color"
+            tx="connected:appearance.teamColorInTeams"
+            size="xs"
+            style={$teamColor}
+            onPress={teamColor.onPress}
+          />
+        ) : null}
       </View>
       <View style={themed($group)}>
         <Text size="xs" tone="dim" tx="connected:appearance.mark" />
@@ -166,8 +148,4 @@ const $exhausted: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderStyle: "dashed",
 })
 const $locked: ViewStyle = { opacity: 0.45 }
-const $colorDot: ThemedStyle<ViewStyle> = () => ({
-  width: 28,
-  height: 28,
-  borderRadius: radius.full,
-})
+const $teamColor: ViewStyle = { alignSelf: "flex-start", minHeight: 36, justifyContent: "center" }

@@ -170,6 +170,7 @@ export default {
     shapePro: "{{shape}}, Scryve Pro",
     opensPro: "Ouvre Scryve Pro",
     pro: "Pro",
+    teamColorInTeams: "La couleur d'équipe se règle dans Équipes",
     shapes: {
       heart: "feuille",
       triangle: "rosette",
