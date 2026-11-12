@@ -59,6 +59,8 @@ export interface CounterNameRequest {
 
 export interface CounterNameHost {
   open: (request: CounterNameRequest) => void
+  /** why: the seat can resize or turn while its panel is open; this swaps in the new geometry without restarting the draft. */
+  update: (request: CounterNameRequest) => void
   close: (seatNumber: number) => void
 }
 
@@ -444,6 +446,10 @@ export function CounterNameSlot({
 }) {
   const host = useContext(CounterNameHostContext)
   const latest = useRef(request)
+  const calls = useRef({
+    onAdd: (name: string) => latest.current.onAdd(name),
+    onClose: () => latest.current.onClose(),
+  })
   useLayoutEffect(() => {
     latest.current = request
   })
@@ -451,13 +457,12 @@ export function CounterNameSlot({
   useLayoutEffect(() => {
     if (!host) return
     const opened = latest.current
-    host.open({
-      ...opened,
-      onAdd: (name) => latest.current.onAdd(name),
-      onClose: () => latest.current.onClose(),
-    })
+    host.open({ ...opened, ...calls.current })
     return () => host.close(opened.seatNumber)
   }, [host])
+  useLayoutEffect(() => {
+    host?.update({ ...request, ...calls.current })
+  })
   if (host) return null
   const card = { x: 0, y: 0, ...cardSize }
   return <CounterNamePanel request={request} seat={card} board={card} safe={card} />
@@ -537,6 +542,16 @@ export function useCounterNameBoard({ area, safe }: { area: Rect; safe: Rect }) 
           const opening = ++openings.current
           setPanels((current) => new Map(current).set(opening, { request, cell, closing: false }))
         },
+        update: (request) =>
+          setPanels((current) => {
+            for (const [opening, panel] of current) {
+              if (panel.request.seatNumber !== request.seatNumber || panel.closing) continue
+              // why: JSON drops the callbacks, which are stable, so this compares only the geometry and names.
+              if (JSON.stringify(panel.request) === JSON.stringify(request)) return current
+              return new Map(current).set(opening, { ...panel, request })
+            }
+            return current
+          }),
         close: (seatNumber) =>
           setPanels((current) => {
             const next = new Map(current)
