@@ -80,6 +80,7 @@ import {
   ROUND_CLOCK_MINUTES,
   type RoundClockSetup,
 } from "@/features/game/roundClock"
+import { teamColors } from "@/features/game/teams"
 import { TurnsChoice } from "@/features/game/TurnsChoice"
 import type {
   LocalGame,
@@ -106,6 +107,7 @@ import { useCloseOnBack } from "@/utils/useCloseOnBack"
 
 import {
   LOCAL_MARK_SHAPES,
+  PLAYER_COLOR_CHOICES,
   PLAYER_MARK_SHAPES,
   PRO_MARK_SHAPES,
   resolveAppearance,
@@ -222,6 +224,21 @@ const NEW_GAME_FIELDS = [
   "chosenClockMinutes",
 ] as const
 const VARIANT_MIN_SEATS = 4
+
+/** why: a 2HG game's teammates share a color, but each seat keeps its own so turning teams off leaves every seat distinct. */
+function ownColors(seats: PlayerAppearance[]) {
+  const used = new Set<string>()
+  return seats.map((appearance) => {
+    const color = used.has(appearance.color.toUpperCase())
+      ? (PLAYER_COLOR_CHOICES.find(
+          (choice) =>
+            !used.has(choice) && !seats.some(({ color }) => color.toUpperCase() === choice),
+        ) ?? appearance.color)
+      : appearance.color
+    used.add(color.toUpperCase())
+    return { ...appearance, color }
+  })
+}
 const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 const CLOCK_MODES = [
   { id: "off", labelTx: "play:newGame.clockOff" },
@@ -305,19 +322,21 @@ function NewGameForm({
     Array.from({ length: MAX_PLAYERS }, (_, index) => seedGame?.players[index]?.name ?? ""),
   )
   const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
-    Array.from({ length: MAX_PLAYERS }, (_, index) => ({
-      color: seedGame?.players[index]?.color ?? PLAYER_COLORS[index],
-      shape:
-        seedGame?.players[index]?.shape ??
-        shapeForSeat(index + 1, seedGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
-    })),
+    ownColors(
+      Array.from({ length: MAX_PLAYERS }, (_, index) => ({
+        color: seedGame?.players[index]?.color ?? PLAYER_COLORS[index],
+        shape:
+          seedGame?.players[index]?.shape ??
+          shapeForSeat(index + 1, seedGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
+      })),
+    ),
   )
   const auth = useAuthAccess()
   const billing = useRevenueCat()
   // why: until RevenueCat answers, a Pro player's saved marks look unpaid; trading them then would save the downgrade.
   const confirmedFree =
     (auth.isLoaded && !auth.isSignedIn) || (billing.customerInfo !== null && !billing.isCountPro)
-  const seatAppearances = useMemo(
+  const ownAppearances = useMemo(
     () => (confirmedFree ? withoutProMarks(appearances) : appearances),
     [appearances, confirmedFree],
   )
@@ -363,6 +382,20 @@ function NewGameForm({
         )
       ? teamDraft
       : pairedTeams(seatIndexes)
+  const [teamColorDraft, setTeamColorDraft] = useState<readonly (string | undefined)[]>([])
+  const [openTeam, setOpenTeam] = useState<number>()
+  const withTeamColors = (seats: PlayerAppearance[], chosen = teamColorDraft) => {
+    if (!teams) return seats
+    const colors = teamColors(
+      teams.map(([lead]) => seats[lead].color),
+      chosen,
+    )
+    return seats.map((appearance, seat) => {
+      const team = teams.findIndex((members) => members.includes(seat))
+      return team < 0 ? appearance : { ...appearance, color: colors[team] }
+    })
+  }
+  const seatAppearances = withTeamColors(ownAppearances)
   const lifeOptions = twoHeadedGiant ? teamLifePresets(format) : lifePresets(system, format)
   const claimedGame = replaying ? undefined : initialGame
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
@@ -960,14 +993,27 @@ function NewGameForm({
 
   function saveAppearance() {
     if (appearanceSeat === undefined || !appearanceDraft) return
-    const drafted = seatAppearances.map((appearance, index) =>
-      index === appearanceSeat ? appearanceDraft : appearance,
+    const drafted = ownAppearances.map((appearance, index) =>
+      index !== appearanceSeat
+        ? appearance
+        : teams
+          ? { ...appearance, shape: appearanceDraft.shape }
+          : appearanceDraft,
     )
     const next = confirmedFree ? withoutProMarks(drafted) : drafted
     setAppearances(next)
     setEdited(true)
-    savePlayers(next)
+    savePlayers(withTeamColors(next))
     closeAppearancePicker()
+  }
+
+  function chooseTeamColor(team: number, color: string) {
+    const chosen = Array.from({ length: teams?.length ?? 0 }, (_, index) =>
+      index === team ? color : teamColorDraft[index],
+    )
+    setTeamColorDraft(chosen)
+    setEdited(true)
+    savePlayers(withTeamColors(ownAppearances, chosen))
   }
 
   return (
@@ -1170,7 +1216,14 @@ function NewGameForm({
                 <TeamPicker
                   players={players}
                   teams={teams}
+                  colors={{
+                    values: teams.map(([lead]) => seatAppearances[lead].color),
+                    open: openTeam,
+                    onOpen: setOpenTeam,
+                    onChange: chooseTeamColor,
+                  }}
                   onSwap={(first, second) => {
+                    setTeamColorDraft(teams.map(([lead]) => seatAppearances[lead].color))
                     setTeamDraft(
                       teams.map((team) =>
                         team.map((seat) =>
@@ -1660,6 +1713,16 @@ function NewGameForm({
             proLocked={!billing.isCountPro}
             foil={billing.isFoil}
             onLockedPress={pro.request}
+            teamColor={
+              teams
+                ? {
+                    onPress: () => {
+                      closeAppearancePicker()
+                      setOpenTeam(teams.findIndex((members) => members.includes(appearanceSeat)))
+                    },
+                  }
+                : undefined
+            }
             onChange={setAppearanceDraft}
           />
           {pro.explaining ? <ProSignInNote onSignIn={signInForPro} /> : null}

@@ -1,4 +1,11 @@
-import { teamChoices, teamIncoming, teamName, winnerNames } from "./teams"
+import {
+  opposingTeamTotals,
+  teamChoices,
+  teamColors,
+  teamIncoming,
+  teamName,
+  winnerNames,
+} from "./teams"
 
 const players = ["Ada", "Grace", "Kim", "Lin"].map((name) => ({ id: name.toLowerCase(), name }))
 
@@ -30,5 +37,31 @@ describe("teams", () => {
     )
     expect(incoming("ada")).toEqual({ kim: 9, lin: 2 })
     expect(incoming("grace")).toEqual({ kim: 9, lin: 2 })
+  })
+
+  it("shows each opposing team as its stronger commander, or its attacker's own", () => {
+    const teams = [
+      ["ada", "grace"],
+      ["kim", "lin"],
+      ["max", "noa"],
+    ]
+    const first = { kim: 9, lin: 14, max: 3, noa: 0 }
+    const partner = { lin: 16, max: 2 }
+    expect(opposingTeamTotals(teams, "ada", first, partner)).toEqual({
+      first: { kim: 14, max: 3 },
+      partner: { kim: 16, max: 2 },
+    })
+    expect(opposingTeamTotals(teams, "grace", first, partner, "kim")).toEqual({
+      first: { kim: 9, max: 3 },
+      partner: { max: 2 },
+    })
+  })
+
+  it("keeps chosen team colors and gives every other team its lead's color unless a team holds it", () => {
+    expect(teamColors(["#B85636", "#41476E", "#39755C"], [undefined, "#B85636"])).toEqual([
+      "#41476E",
+      "#B85636",
+      "#39755C",
+    ])
   })
 })

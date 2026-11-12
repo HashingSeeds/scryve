@@ -94,4 +94,36 @@ describe("LobbyView", () => {
     )
     expect(screen.getByTestId("start-connected-game-button")).not.toBeDisabled()
   })
+
+  it("shows only your own team's color in 2HG, and saves a pick to your seat", async () => {
+    const save = jest.fn(async () => true)
+    view({
+      lobby: {
+        playerCount: 4,
+        startingLife: 60,
+        ruleset: "commander",
+        system: "mtg",
+        format: "commander",
+        variant: "twoHeadedGiant",
+        isHost: false,
+        players: [
+          seat(1, { color: "#B85636", controlledByMe: false }),
+          seat(2, { color: "#B85636", controlledByMe: true, shape: "triangle" }),
+          seat(3, { color: "#39755C", controlledByMe: false }),
+        ],
+      },
+      appearance: { saving: false, proLocked: true, foil: false, save, presentPaywall: jest.fn() },
+    })
+
+    expect(screen.queryByTestId("team-color-2")).toBeNull()
+    fireEvent.press(screen.getByTestId("edit-appearance-seat-2"))
+    expect(screen.getByTestId("appearance-color-117b9c")).toBeDisabled()
+    fireEvent.press(screen.getByTestId("appearance-team-color"))
+    expect(screen.getByTestId("team-colors-1-39755c")).toBeDisabled()
+    fireEvent.press(screen.getByTestId("team-colors-1-117b9c"))
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(2, { color: "#117B9C", shape: "triangle" }),
+    )
+    expect(screen.queryByTestId("team-colors-1")).toBeNull()
+  })
 })

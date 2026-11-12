@@ -154,6 +154,8 @@ const connected = {
     shapePro: "{{shape}}, Scryve Pro",
     opensPro: "Opens Scryve Pro",
     pro: "Pro",
+    // Two-Headed Giant: under a player's grayed-out colors. Teammates share one team color, picked in the Teams list; tapping this goes there. "Teams" is that list's heading.
+    teamColorInTeams: "Team color is set in Teams",
     shapes: {
       // A plant leaf, the player mark's shape.
       heart: "leaf",

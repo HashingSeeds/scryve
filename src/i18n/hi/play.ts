@@ -69,6 +69,7 @@ export default {
     gameLabel: "गेम",
     teams: "टीमें",
     teamPlayer: "{{name}}, टीम {{team}}",
+    teamColor: "टीम {{team}} का रंग",
     teamSwapHint: "अदला-बदली के लिए दो खिलाड़ियों पर टैप करें",
     teamSwapPicked: "अब जिससे अदला-बदली करनी है उस पर टैप करें",
     teamLife: "टीम की लाइफ़",

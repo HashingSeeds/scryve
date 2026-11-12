@@ -26,13 +26,8 @@ async function teamLobby(t: ConvexTestHarness, format = "limited") {
   return host
 }
 
-async function teamGame(
-  t: ConvexTestHarness,
-  beforeStart?: (host: Client) => Promise<void>,
-  format = "limited",
-) {
-  const host = await teamLobby(t, format)
-  const clients = [host]
+async function joinSeats(t: ConvexTestHarness) {
+  const clients = []
   for (const [index, color] of ["#2563EB", "#16A34A", "#DC2626"].entries()) {
     const client = await signedIn(t, `player-${index}`, `Player ${index}`)
     await client.mutation(api.games.claimSeat, {
@@ -44,6 +39,21 @@ async function teamGame(
     })
     clients.push(client)
   }
+  return clients
+}
+
+async function seatColors(client: Client) {
+  const { players } = await client.query(api.games.lobbyProjection, { publicId })
+  return [...players].sort((a, b) => a.seat - b.seat).map(({ color }) => color)
+}
+
+async function teamGame(
+  t: ConvexTestHarness,
+  beforeStart?: (host: Client) => Promise<void>,
+  format = "limited",
+) {
+  const host = await teamLobby(t, format)
+  const clients = [host, ...(await joinSeats(t))]
   await beforeStart?.(host)
   await host.mutation(api.games.startGame, { publicId })
   const projection = await host.query(api.games.lobbyProjection, {
@@ -151,10 +161,32 @@ describe("Two-Headed Giant", () => {
         ({ controlledByMe }) => controlledByMe,
       )?.seat
     expect(await Promise.all(clients.map(ownSeat))).toEqual([1, 3, 2, 4])
+    expect(await seatColors(clients[0])).toEqual(["#7C3AED", "#7C3AED", "#16A34A", "#16A34A"])
     expect((await lives(clients[0])).groups).toEqual([ids.slice(0, 2), ids.slice(2)])
     await expect(
       clients[1].mutation(api.games.swapLobbySeats, { publicId, first: 1, second: 2 }),
     ).rejects.toThrow()
+  })
+
+  it("gives each team one color that either head can change and no other team can take", async () => {
+    const t = makeConvexTest()
+    const host = await teamLobby(t)
+    const [teammate, rival] = await joinSeats(t)
+    expect(await seatColors(host)).toEqual(["#7C3AED", "#7C3AED", "#16A34A", "#16A34A"])
+    const recolor = (client: Client, seat: number, color: string) =>
+      client.mutation(api.games.setMyAppearance, {
+        publicId,
+        seat,
+        color,
+        shape: seat === 2 ? "triangle" : "square",
+      })
+    await recolor(teammate, 2, "#B85636")
+    expect(await seatColors(host)).toEqual(["#B85636", "#B85636", "#16A34A", "#16A34A"])
+    await expect(recolor(rival, 3, "#B85636")).rejects.toMatchObject({
+      data: { code: "appearance_taken" },
+    })
+    await host.mutation(api.games.startGame, { publicId })
+    expect(await seatColors(host)).toEqual(["#B85636", "#B85636", "#16A34A", "#16A34A"])
   })
 
   it("passes to a team hit by 11 from one commander and 10 from its partner, which puts no one out", async () => {

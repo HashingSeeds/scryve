@@ -38,7 +38,7 @@ function makeGame(
     format,
     players: Array.from({ length: count }, (_, index) => ({
       name: `P${index + 1}`,
-      color: "#000",
+      color: `#00000${index}`,
     })),
     teams,
   })
@@ -69,6 +69,9 @@ describe("Two-Headed Giant", () => {
       [b, e],
       [c, f],
     ])
+    expect(game.players.map(({ color }) => color)).toEqual(
+      ["#000000", "#000001", "#000002", "#000000", "#000001", "#000002"],
+    )
     expect(nextTurnSeat([a, d, b, e, c, f], d, () => false, game.turnGroups)).toBe(b)
     expect(teamSeats(createRematch(game))).toEqual([
       [0, 3],

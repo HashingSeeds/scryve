@@ -45,3 +45,5 @@ export function teamTableRules(rules: TableDefinition): TableDefinition {
     ),
   }
 }
+
+export const lobbyTeammateSeat = (seat: number) => (seat % 2 === 1 ? seat + 1 : seat - 1)

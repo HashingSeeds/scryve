@@ -17,6 +17,7 @@ import {
   type PlayerAppearance,
   type PlayerMarkShape,
   type ProMarkShape,
+  type TakenAppearance,
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
@@ -140,6 +141,7 @@ import {
 } from "./lib/treachery"
 import {
   isTwoHeadedGiantPlayerCount,
+  lobbyTeammateSeat,
   pairedTeams,
   TWO_HEADED_GIANT,
   TWO_HEADED_GIANT_SEATS_MESSAGE,
@@ -483,11 +485,25 @@ async function rematchProMark(ctx: MutationCtx, player: Doc<"gamePlayers">) {
     : {}
 }
 
-function takenAppearances(players: Doc<"gamePlayers">[], exceptPlayerId?: Id<"gamePlayers">) {
+function takenAppearances(
+  players: Doc<"gamePlayers">[],
+  exceptPlayerId?: Id<"gamePlayers">,
+  teammate?: Doc<"gamePlayers">,
+): TakenAppearance[] {
   return players
     .filter((player) => player._id !== exceptPlayerId)
-    .map((player) => appearanceOf(player))
+    .map((player) =>
+      player._id === teammate?._id ? { shape: appearanceOf(player).shape } : appearanceOf(player),
+    )
 }
+
+const lobbyTeammate = (game: Doc<"games">, players: Doc<"gamePlayers">[], seat: number) =>
+  game.variant === TWO_HEADED_GIANT
+    ? players.find((player) => player.seat === lobbyTeammateSeat(seat))
+    : undefined
+
+const seatTeams = (game: Doc<"games">, seats: number[]) =>
+  game.variant === TWO_HEADED_GIANT ? pairedTeams([...seats].sort((a, b) => a - b)) : []
 
 async function playersForGame(ctx: QueryCtx, gameId: Id<"games">) {
   const players = await ctx.db
@@ -1173,12 +1189,14 @@ export const claimSeat = mutation({
     while (occupied.has(seat)) seat += 1
     if (seat > game.playerCount)
       throw new ConvexError({ code: "game_full", message: "Lobby is full" })
+    const teammate = lobbyTeammate(game, players, seat)
+    const color = teammate?.color ?? args.color
     const appearance = resolveAppearance({
       preferred: {
-        ...(args.color ? { color: args.color } : {}),
+        ...(color ? { color } : {}),
         ...(args.shape ? { shape: args.shape as PlayerMarkShape } : {}),
       },
-      taken: takenAppearances(players),
+      taken: takenAppearances(players, undefined, teammate),
       seat,
       shapes: connectedMarkShapes(game.playerCount),
     })
@@ -1402,6 +1420,9 @@ export const publishLocalGame = mutation({
     for (const player of resolvePlayerAppearances(
       args.players,
       connectedMarkShapes(args.players.length),
+      (args.table?.turnGroups ?? []).map((group) =>
+        group.flatMap((localId) => args.players.find((player) => player.localId === localId)?.seat ?? []),
+      ),
     )) {
       const isHost = player.localId === args.hostLocalId
       const playerId = await ctx.db.insert("gamePlayers", {
@@ -2297,7 +2318,9 @@ export const setMyAppearance = mutation({
     await limitGameRate(ctx, "gameWrite", user._id)
     const players = await playersForGame(ctx, game._id)
     const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
-    if (appearanceIsTaken(takenAppearances(players, player._id), requested)) throw appearanceTaken()
+    const teammate = lobbyTeammate(game, players, player.seat)
+    if (appearanceIsTaken(takenAppearances(players, player._id, teammate), requested))
+      throw appearanceTaken()
     const proMark =
       typeof args.proShape === "string"
         ? { foil: undefined, ...(await requireProMark(ctx, user, args.proShape)) }
@@ -2310,6 +2333,8 @@ export const setMyAppearance = mutation({
     )
       throw appearanceTaken()
     await ctx.db.patch(player._id, { color: requested.color, shape: requested.shape, ...proMark })
+    if (teammate && teammate.color !== requested.color)
+      await ctx.db.patch(teammate._id, { color: requested.color })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return requested
   },
@@ -2399,10 +2424,39 @@ export const swapLobbySeats = mutation({
       if (player.seat === args.first) await ctx.db.patch(player._id, { seat: args.second })
       else if (player.seat === args.second) await ctx.db.patch(player._id, { seat: args.first })
     }
+    if (game.variant === TWO_HEADED_GIANT) await keepTeamColors(ctx, game, players, args)
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return null
   },
 })
+
+async function keepTeamColors(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  players: Doc<"gamePlayers">[],
+  { first, second }: { first: number; second: number },
+) {
+  const [atFirst, atSecond] = [first, second].map((seat) =>
+    players.find((player) => player.seat === seat),
+  )
+  if (atFirst && atSecond) {
+    await ctx.db.patch(atFirst._id, { color: atSecond.color })
+    await ctx.db.patch(atSecond._id, { color: atFirst.color })
+    return
+  }
+  const mover = atFirst ?? atSecond
+  if (!mover) return
+  const seat = mover === atFirst ? second : first
+  const seated = players.map((player) => (player._id === mover._id ? { ...player, seat } : player))
+  const teammate = lobbyTeammate(game, seated, seat)
+  const { color } = resolveAppearance({
+    preferred: { color: teammate?.color ?? mover.color, shape: appearanceOf(mover).shape },
+    taken: takenAppearances(seated, mover._id, teammate),
+    seat,
+    shapes: connectedMarkShapes(game.playerCount),
+  })
+  if (color !== mover.color) await ctx.db.patch(mover._id, { color })
+}
 
 function assertVariantSeats(variant: GameVariant, playerCount: number) {
   if (variant === "treachery" && !isTreacheryPlayerCount(playerCount))
@@ -2475,6 +2529,10 @@ export const startGame = mutation({
     for (const [index, player] of resolvePlayerAppearances(
       players.map((seat) => (decks ? seat : { ...seat, ...NO_SEAT_DECK })),
       connectedMarkShapes(players.length),
+      seatTeams(
+        game,
+        players.map(({ seat }) => seat),
+      ),
     ).entries()) {
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&

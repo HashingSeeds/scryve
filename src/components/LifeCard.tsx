@@ -105,7 +105,6 @@ import {
   seatIdentityMetrics,
   seatMarkArt,
 } from "./SeatIdentity"
-import { TeamShade } from "./TeamShade"
 import { TeamCorners, type TeamHead, type TeamSheetOwner } from "./TeamZone"
 import { Text } from "./Text"
 import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
@@ -746,15 +745,6 @@ export const LifeCard = memo(function LifeCard({
         knockStyle,
       ]}
     >
-      {team ? (
-        <TeamShade
-          colors={[team.heads[0].color, team.heads[1].color]}
-          rotation={contentRotation}
-          playerId={playerId}
-          seatNumber={seatNumber}
-          size={cardSize}
-        />
-      ) : null}
       {!team && shape && isProMarkShape(shape) && cardSize.height > 0 ? (
         <View
           testID={`pro-mark-watermark-seat-${seatNumber}`}

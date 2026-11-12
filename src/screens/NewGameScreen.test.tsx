@@ -155,6 +155,36 @@ describe("NewGameScreen", () => {
   })
   afterEach(() => jest.restoreAllMocks())
 
+  it("gives each 2HG team one color, picked from its swatch, and locks it in each player's sheet", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({
+      defaults: { ...NO_SYSTEM_SETTINGS, defaultSystem: "mtg", defaultFormat: "commander" },
+      onStartLocal,
+    })
+    fireEvent.press(view.getByTestId("game-type-2hg-commander"))
+    fireEvent.press(view.getByTestId("team-color-1"))
+    expect(view.getByTestId("team-colors-1-39755c")).toBeDisabled()
+    fireEvent.press(view.getByTestId("team-color-2"))
+    expect(view.queryByTestId("team-colors-1")).toBeNull()
+    fireEvent.press(view.getByTestId("team-colors-2-117b9c"))
+    expect(view.queryByTestId("team-colors-2")).toBeNull()
+
+    fireEvent.press(view.getByTestId("player-appearance-4"))
+    expect(view.getByTestId("appearance-color-a33a52")).toBeDisabled()
+    fireEvent.press(view.getByTestId("appearance-team-color"))
+    expect(view.queryByTestId("local-appearance-dialog")).toBeNull()
+    expect(view.getByTestId("team-colors-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("start-game-button"))
+    const [players] = onStartLocal.mock.calls[0]
+    expect(players.map(({ color }: { color: string }) => color)).toEqual([
+      "#B85636",
+      "#B85636",
+      "#117B9C",
+      "#117B9C",
+    ])
+  })
+
   it("keeps arriving games out of the setup form until requested", () => {
     const props = {
       defaults: NO_SYSTEM_SETTINGS,

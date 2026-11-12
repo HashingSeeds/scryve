@@ -152,6 +152,7 @@ export function LobbyView({
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
+  const [openTeam, setOpenTeam] = useState<number>()
   // why: on iOS the paywall can only present once the picker's modal has finished dismissing.
   const [paywall, setPaywall] = useState<"closed" | "waitingForDismiss" | "open">("closed")
 
@@ -199,6 +200,19 @@ export function LobbyView({
     if (Platform.OS === "ios") setPaywall("waitingForDismiss")
     else void presentPaywall()
   }
+
+  const lobbyTeams =
+    lobby.variant === "twoHeadedGiant"
+      ? pairedTeams(Array.from({ length: lobby.playerCount }, (_, index) => index))
+      : undefined
+  const seatAt = (index: number) => lobby.players.find((player) => player.seat === index + 1)
+  const myTeam = lobbyTeams?.findIndex((team) =>
+    team.some((index) => seatAt(index)?.controlledByMe),
+  )
+  const mySeat =
+    myTeam === undefined
+      ? undefined
+      : lobbyTeams?.[myTeam]?.map(seatAt).find((seat) => seat?.controlledByMe)
 
   async function saveAppearance() {
     if (!appearance || appearanceSeat === undefined || !appearanceDraft) return
@@ -337,9 +351,24 @@ export function LobbyView({
           ) : null}
           {decks ? decks.source(seatList) : seatList()}
         </View>
-        {lobby.variant === "twoHeadedGiant" ? (
+        {lobbyTeams ? (
           <View style={themed($section)}>
             <TeamPicker
+              colors={
+                lobbyTeams && appearance && mySeat
+                  ? {
+                      values: lobbyTeams.map((team) => team.map(seatAt).find(Boolean)?.color ?? ""),
+                      editable: (team) => team === myTeam && online && !appearance.saving,
+                      open: openTeam,
+                      onOpen: setOpenTeam,
+                      onChange: (_, color) =>
+                        void appearance.save(mySeat.seat, {
+                          color,
+                          shape: shownMarkShape(mySeat) ?? shapeForSeat(mySeat.seat),
+                        }),
+                    }
+                  : undefined
+              }
               players={Array.from({ length: lobby.playerCount }, (_, index) =>
                 lobby.players.find((player) => player.seat === index + 1),
               ).map(
@@ -350,7 +379,7 @@ export function LobbyView({
                     shape: shownMarkShape(player),
                   },
               )}
-              teams={pairedTeams(Array.from({ length: lobby.playerCount }, (_, index) => index))}
+              teams={lobbyTeams}
               onSwap={
                 onSwapSeats && online && !starting && !savingSettings
                   ? (first, second) => onSwapSeats(first + 1, second + 1)
@@ -489,6 +518,16 @@ export function LobbyView({
             proLocked={appearance.proLocked}
             foil={appearance.foil}
             onLockedPress={openPaywall}
+            teamColor={
+              lobbyTeams
+                ? {
+                    onPress: () => {
+                      setAppearanceSeat(undefined)
+                      setOpenTeam(myTeam)
+                    },
+                  }
+                : undefined
+            }
             onChange={setAppearanceDraft}
           />
           <View style={themed($dialogActions)}>

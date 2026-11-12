@@ -10,6 +10,7 @@ import { PARTNER_COMMANDER } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
+import { opposingTeamTotals } from "@/features/game/teams"
 import type {
   CommanderBoardPlayer,
   CommanderSlot,
@@ -55,7 +56,6 @@ import {
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import { panelBoxes, teamPanelCompact, teamSeatRows } from "./teamGridGeometry"
-import { teamZoneMiddle } from "./TeamShade"
 import type { TeamHead } from "./TeamZone"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 import { outReason, type OutReason, type OutState } from "../../convex/lib/outReason"
@@ -288,7 +288,7 @@ export function PlayerGrid({
   const screenInsets = useSafeAreaInsets()
   const {
     themed,
-    theme: { spacing, colors },
+    theme: { spacing },
   } = useAppTheme()
   const screenTopEdgeBand = useTopEdgeBand()
   const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
@@ -398,10 +398,12 @@ export function PlayerGrid({
         if (index !== null) seatRotations.set(index, rotationAt(rowIndex, columnIndex))
     }),
   )
-  const commanderPlayers = players.map(({ id, name, color, shape }): CommanderBoardPlayer => ({
+  const teamColor = (index: number) =>
+    players[teamIndexes.find((team) => team.includes(index))?.[0] ?? index].color
+  const commanderPlayers = players.map(({ id, name, shape }, index): CommanderBoardPlayer => ({
     id,
     name,
-    color,
+    color: teamColor(index),
     shape,
   }))
 
@@ -449,12 +451,23 @@ export function PlayerGrid({
             held: [],
           }
         : fullTable
-    const firstIncoming = commanderDamage?.incomingFor(owner.id) ?? NO_INCOMING
-    const partnerIncoming = commanderDamage?.incomingFor(owner.id, PARTNER_COMMANDER) ?? NO_INCOMING
+    const ownIncoming = {
+      first: commanderDamage?.incomingFor(owner.id) ?? NO_INCOMING,
+      partner: commanderDamage?.incomingFor(owner.id, PARTNER_COMMANDER) ?? NO_INCOMING,
+    }
+    const { first: firstIncoming, partner: partnerIncoming } = teams
+      ? opposingTeamTotals(
+          teamIndexes.map((members) => members.map((member) => players[member].id)),
+          owner.id,
+          ownIncoming.first,
+          ownIncoming.partner,
+          armedPlayer?.id,
+        )
+      : ownIncoming
     const strike = attack && armedPlayer ? attack.against(owner.id) : undefined
     const teamIds = team?.map(({ id }) => id)
     const commanderSeats = boardSeats?.seats.filter(
-      ({ playerId }) => !teamIds?.includes(playerId) || playerId === armedTeammate?.id,
+      ({ playerId }) => !teamIds || playerId in firstIncoming || playerId === armedTeammate?.id,
     )
     const sword = teamIds
       ? armedTeammate && commanderDamage
@@ -508,11 +521,7 @@ export function PlayerGrid({
         shape={owner.shape}
         foil={!teammate && isPlayerFoil?.(player)}
         life={player.life}
-        color={
-          team
-            ? teamZoneMiddle([team[0].color, team[1].color], colors.board.background)
-            : player.color
-        }
+        color={teamColor(index)}
         team={zone && { heads: zone.heads, shared: zone.shared }}
         compact={compact}
         contentRotation={contentRotation}
@@ -637,7 +646,7 @@ export function PlayerGrid({
       return {
         seatNumber: index + 1,
         name: player.name,
-        color: player.color,
+        color: teamColor(lead),
         shape: player.shape,
         foil: isPlayerFoil?.(player),
         staleSince: getStaleSince?.(player),
