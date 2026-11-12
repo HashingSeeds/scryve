@@ -100,6 +100,9 @@ describe("system definitions", () => {
       "monarch",
       "initiative",
     ])
+    expect(tableRules("fab", "cc").designations).toEqual([
+      { id: "marked", label: "Marked", exclusive: false },
+    ])
     expect(tableRules("pokemon", "standard").pokemon).toEqual({ benchSize: 5, damageStep: 10 })
     expect(tableRules("ygo", "advanced")).toEqual({ counters: [], designations: [] })
     expect(tableRules("mtg", "commander")).toBe(tableRules("mtg", "commander"))

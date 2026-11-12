@@ -41,6 +41,7 @@ import {
   customCounterId,
   customCounterName,
   customCounterNameOf,
+  holdsDesignation,
   MAX_CUSTOM_COUNTER,
   MAX_CUSTOM_COUNTER_NAME_LENGTH,
   MAX_CUSTOM_COUNTERS,
@@ -94,7 +95,9 @@ export function seatTableState(
           ...Object.fromEntries(custom.map(({ name, value }) => [customCounterId(name), value])),
         }
       : counters,
-    held: rules.designations.flatMap(({ id }) => (table.designations[id] === playerId ? [id] : [])),
+    held: rules.designations.flatMap((designation) =>
+      holdsDesignation(table, designation, playerId) ? [designation.id] : [],
+    ),
   }
 }
 
@@ -120,6 +123,7 @@ const GLYPHS: Record<string, string> = {
   commanderTax: "M6 3h12v18l-6-4-6 4zM12 7v6M9 10h6",
   monarch: "M3 19h18M4.5 15.5 3 7l5 4 4-6 4 6 5-4-1.5 8.5z",
   initiative: "M6 21V10a6 6 0 0 1 12 0v11M3 21h18M12 13v4",
+  marked: "M12 5a7 7 0 1 0 0 14 7 7 0 1 0 0-14M12 2v6M12 16v6M2 12h6M16 12h6",
   plus: "M12 5v14M5 12h14",
   close: "M6 6l12 12M18 6 6 18",
 }

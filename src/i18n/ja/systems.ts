@@ -35,6 +35,7 @@ export default {
     commanderTax: "統率者税",
     monarch: "統治者",
     initiative: "イニシアチブ",
+    marked: "マーク済み",
   },
   tableItemShort: {
     commanderTax: "税",

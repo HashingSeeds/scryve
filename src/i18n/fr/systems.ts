@@ -35,6 +35,7 @@ export default {
     commanderTax: "Taxe de commandant",
     monarch: "Monarque",
     initiative: "Initiative",
+    marked: "Marqué",
   },
   tableItemShort: {
     commanderTax: "Taxe",

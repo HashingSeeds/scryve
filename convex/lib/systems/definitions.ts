@@ -111,7 +111,12 @@ export type TableCounterDefinition = {
   readonly shared?: boolean
 }
 
-export type DesignationDefinition = { readonly id: string; readonly label: string }
+/** why: an exclusive designation (the Monarch) has one holder at the table. `exclusive: false` (Marked) lets any number of seats hold it, stored as a 1 in each seat's counters so older builds still read the table. */
+export type DesignationDefinition = {
+  readonly id: string
+  readonly label: string
+  readonly exclusive?: false
+}
 
 export type PokemonBoardDefinition = { readonly benchSize: number; readonly damageStep: number }
 
@@ -564,7 +569,10 @@ export const SYSTEMS = {
         startingValue: 20,
       },
     ],
-    table: { counters: [], designations: [] },
+    table: {
+      counters: [],
+      designations: [{ id: "marked", label: "Marked", exclusive: false }],
+    },
     variants: [],
     firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
     roundClock: { minutes: 55, endOfRoundTurns: 1 },
