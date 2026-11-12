@@ -544,7 +544,7 @@ export function PlayerGrid({
                 players: commanderPlayers,
                 seats: commanderSeats,
                 incoming: strongerCommander(firstIncoming, partnerIncoming),
-                split: partnerTotals(firstIncoming, partnerIncoming),
+                split: teams ? {} : partnerTotals(firstIncoming, partnerIncoming),
                 lethal: commanderDamage.lethal,
                 armedPlayerId: attack.armedPlayerId,
                 attackerName: armedPlayer?.name,

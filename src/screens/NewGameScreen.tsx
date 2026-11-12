@@ -382,7 +382,11 @@ function NewGameForm({
         )
       ? teamDraft
       : pairedTeams(seatIndexes)
-  const [teamColorDraft, setTeamColorDraft] = useState<readonly (string | undefined)[]>([])
+  const [teamColorDraft, setTeamColorDraft] = useState<readonly (string | undefined)[]>(() =>
+    seedGame?.variant === "twoHeadedGiant"
+      ? teamSeats(seedGame).map(([lead]) => seedGame.players[lead]?.color)
+      : [],
+  )
   const [openTeam, setOpenTeam] = useState<number>()
   const withTeamColors = (seats: PlayerAppearance[], chosen = teamColorDraft) => {
     if (!teams) return seats

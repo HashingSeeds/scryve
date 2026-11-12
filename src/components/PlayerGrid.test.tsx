@@ -182,7 +182,8 @@ describe("PlayerGrid", () => {
           teams={[ids.slice(0, 2), ids.slice(2, 4), ids.slice(4)]}
           commanderDamage={{
             ...idleCommanderDamage,
-            incomingFor: (to) => (to === ids[0] ? totals : {}),
+            incomingFor: (to, commander) =>
+              to !== ids[0] ? {} : commander ? { [ids[4]]: 16 } : totals,
           }}
           onChange={jest.fn()}
         />
@@ -190,9 +191,10 @@ describe("PlayerGrid", () => {
     )
     const [zone] = view.UNSAFE_getAllByType(LifeCard)
     expect(zone.props.color).toBe("#B85636")
-    const { seats: pips, incoming, players: shown } = zone.props.commanderDamage
+    const { seats: pips, incoming, split, players: shown } = zone.props.commanderDamage
     expect(pips.map(({ playerId }: { playerId: string }) => playerId)).toEqual([ids[2], ids[4]])
-    expect(incoming).toEqual({ [ids[2]]: 14, [ids[4]]: 3 })
+    expect(incoming).toEqual({ [ids[2]]: 14, [ids[4]]: 16 })
+    expect(split).toEqual({})
     expect(shown.find(({ id }: { id: string }) => id === ids[2]).color).toBe("#39755C")
   })
 

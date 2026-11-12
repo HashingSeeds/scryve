@@ -454,8 +454,9 @@ export const LifeCard = memo(function LifeCard({
           [armedCommanderId]: Math.max(...armedCommanders.map(({ total }) => total)),
         }
       : undefined
-  const stripSplit =
-    defending && armedCommanderId && commanderDamage
+  const stripSplit = team
+    ? undefined
+    : defending && armedCommanderId && commanderDamage
       ? { ...commanderDamage.split, [armedCommanderId]: armedCommanders.map(({ total }) => total) }
       : commanderDamage?.split
   const readoutFit = floodedBy.takeover?.fit ?? 1

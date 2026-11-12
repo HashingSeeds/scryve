@@ -400,6 +400,29 @@ describe("NewGameScreen", () => {
     expect(onStartLocal.mock.calls[0][0][0]).toMatchObject({ startingLife: 36 })
   })
 
+  it("keeps a running 2HG game's team colors when its setup reopens after a swap", () => {
+    const onSavePlayers = jest.fn()
+    const initialGame = createLocalGame({
+      players: ["Ada", "Grace", "Kim", "Lin"].map((name, seat) => ({
+        name,
+        color: seat % 2 ? "#41476E" : "#B85636",
+      })),
+      startingLife: 60,
+      system: "mtg",
+      format: "commander",
+      teams: [
+        [3, 1],
+        [2, 0],
+      ],
+    })
+    const view = setup({ initialGame, onSavePlayers })
+    fireEvent.changeText(view.getByTestId("player-name-1"), "Katherine")
+    fireEvent(view.getByTestId("player-name-1"), "blur")
+    expect(onSavePlayers.mock.calls[0][0].map(({ color }: { color: string }) => color)).toEqual(
+      initialGame.players.map(({ color }) => color),
+    )
+  })
+
   it("autosaves valid names on blur and confirmed appearances for existing players", () => {
     const onSavePlayers = jest.fn()
     const initialGame = createLocalGame({
