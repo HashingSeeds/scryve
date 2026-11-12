@@ -93,7 +93,7 @@ export function menuSpotAt(
   row: number,
   column: number,
 ): MenuSpot | undefined {
-  const junction = getFourCardMenuJunction(rows)
+  const junction = getFourCardMenuJunction(rows, layout)
   if (junction) {
     const upper = row === junction.boundary - 1
     if (!upper && row !== junction.boundary) return undefined

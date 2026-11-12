@@ -1092,6 +1092,14 @@ describe("PlayerGrid", () => {
     expect(getPlayerGridMenuAnchor(4, fourPlayerLayout)).toEqual({ x: 0.5, y: 0.5 })
   })
 
+  it("keeps the 10-player game menu one corner in from the board's edges", () => {
+    const landscape = getPlayerGridLayout({ playerCount: 10, width: 844, height: 390 })
+    const portrait = getPlayerGridLayout({ playerCount: 10, width: 390, height: 844 })
+
+    expect(getPlayerGridMenuAnchor(10, landscape)).toEqual({ x: 0.6, y: 0.5 })
+    expect(getPlayerGridMenuAnchor(10, portrait)).toEqual({ x: 0.5, y: expect.closeTo(0.6) })
+  })
+
   it("moves the game menu anchor down with a padded board top", () => {
     const layout = getPlayerGridLayout({ playerCount: 4, width: 390, height: 844 })
 
