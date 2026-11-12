@@ -17,10 +17,12 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import { DieFace } from "./DiceGlyph"
+import { overlayTint } from "./LifeControls"
+import { seatIdentityMetrics } from "./SeatIdentity"
 import { Text } from "./Text"
 
-export const DICE_CHIP_HEIGHT = 36
-export const COMPACT_DICE_CHIP_HEIGHT = 32
+// why: the outline matches the seat mark's ink, so slop carries the tap target out to the platform minimum.
+const CHIP_TARGET = 44
 const CHIP_POP_MS = 260
 const FLIGHT_SPRING = { damping: 20, stiffness: 110, mass: 1 } as const
 // why: the chip starts about as large as the result it replaces, so it reads as that result shrinking into place.
@@ -50,6 +52,8 @@ export function DiceChips({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [rowOffset, setRowOffset] = useState<Point>()
+  const { icon } = seatIdentityMetrics(compact)
+  const slop = (CHIP_TARGET - icon) / 2
   if (!chips.some(({ kind }) => kind !== "turn" && kind !== "undoPass")) return null
   const flight =
     reducedMotion === false && bloomCenterInRow && rowOffset
@@ -96,13 +100,16 @@ export function DiceChips({
               accessibilityRole="button"
               accessibilityLabel={label}
               accessibilityHint={claim ? undefined : translate("board:dice.clearsResult")}
-              hitSlop={{ top: 6, bottom: 6 }}
+              hitSlop={{ top: slop, bottom: slop }}
               onPress={() => onPress(chip)}
               style={({ pressed }) => [
                 themed(compact ? $compactChip : $chip),
-                { borderColor: foreground },
-                claim && $claim,
-                pressed && (claim ? $claimPressed : $pressed),
+                { height: icon, minWidth: icon, borderColor: foreground },
+                claim && {
+                  borderStyle: "dashed",
+                  borderColor: overlayTint(foreground, CLAIM_BORDER),
+                },
+                pressed && $pressed,
               ]}
             >
               {chip.kind !== "roll" ? (
@@ -200,8 +207,6 @@ const $chip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   alignItems: "center",
   justifyContent: "center",
   gap: spacing.xxs,
-  minHeight: DICE_CHIP_HEIGHT,
-  minWidth: DICE_CHIP_HEIGHT,
   paddingHorizontal: spacing.xs,
   borderRadius: radius.md,
   borderWidth: 1.5,
@@ -211,15 +216,12 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   alignItems: "center",
   justifyContent: "center",
   gap: spacing.xxxs,
-  minHeight: COMPACT_DICE_CHIP_HEIGHT,
-  minWidth: 28,
   paddingHorizontal: spacing.xxs,
   borderRadius: radius.md,
   borderWidth: 1.5,
 })
 const $value: ThemedStyle<TextStyle> = () => ({ fontSize: 15, lineHeight: 18 })
 const $compactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 13, lineHeight: 16 })
-// why: an empty, dashed 1st reads as the slot the badge lands in, so tapping it fills it.
-const $claim: ViewStyle = { borderStyle: "dashed", opacity: 0.6 }
-const $claimPressed: ViewStyle = { opacity: 0.4 }
+// why: an empty, dashed 1st reads as the slot the badge lands in, so tapping it fills it; only the dashes dim so the label stays readable.
+const CLAIM_BORDER = 0.6
 const $pressed: ViewStyle = { opacity: 0.72 }
