@@ -24,7 +24,6 @@ const SENTRY_DUAL_BUILD = /^@sentry\/(core|conventions)(\/|$)/
 const resolveRequest = config.resolver.resolveRequest
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "obscenity") return { type: "sourceFile", filePath: OBSCENITY_CJS_ENTRY }
-  // why: @clerk/react loads the web renderer at startup only to share it with Clerk's web UI, which native never runs.
   if (moduleName === "react-dom/client" && platform !== "web") return { type: "empty" }
   const resolve = resolveRequest ?? context.resolveRequest
   return SENTRY_DUAL_BUILD.test(moduleName)

@@ -6,7 +6,7 @@ import "intl-pluralrules"
 
 import type { Translations } from "./en"
 import type { LocaleNamespace } from "./localeNamespace"
-import { resources } from "./resources"
+import { namespaces, resources } from "./resources"
 
 const fallbackLocale = "en-US"
 
@@ -50,12 +50,11 @@ const loadLocaleOnDemand: BackendModule = {
   },
 }
 
-// why: the backend reads synchronously, so with initImmediate off the copy is ready before the first render.
 void i18n
   .use(loadLocaleOnDemand)
   .use(initReactI18next)
   .init({
-    ns: Object.keys(resources.en()),
+    ns: namespaces,
     lng: appLocale,
     fallbackLng: fallbackLocale,
     interpolation: {

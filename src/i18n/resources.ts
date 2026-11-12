@@ -1,6 +1,19 @@
 // why: `pnpm i18n:translate` overwrites this file. Edit English in src/i18n/en.
 
-// why: a locale's modules run only when i18next asks for that language, so launch skips the unused ones.
+export const namespaces = [
+  "account",
+  "board",
+  "common",
+  "connected",
+  "decks",
+  "errors",
+  "eventDisplay",
+  "events",
+  "feedback",
+  "play",
+  "systems",
+]
+
 export const resources = {
   en: (): typeof import("./en").default => require("./en").default,
   es: (): typeof import("./es").default => require("./es").default,
