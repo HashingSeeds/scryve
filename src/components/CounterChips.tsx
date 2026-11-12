@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type Ref } from "react"
-import type { Insets, TextStyle, ViewStyle } from "react-native"
+import type { Insets, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Path } from "react-native-svg"
@@ -765,11 +765,16 @@ function CounterSheet({
     paddingLeft: sheetSideInset(contentRotation, contentInsets, "left"),
     paddingRight: sheetSideInset(contentRotation, contentInsets, "right"),
   }
-  const diceWidth = split ? NARROW_DICE_WIDTH + DIVIDER_SPACE : 0
-  const trackerWidth = width - padding.paddingLeft - padding.paddingRight - diceWidth
+  const sheetWidth = width - padding.paddingLeft - padding.paddingRight
+  // why: on the smallest seats the two-up dice would crush the tracker names, so the dice shrink to one column and the trackers keep only their icons.
+  const slim = split && sheetWidth - NARROW_DICE_WIDTH - DIVIDER_SPACE < TRACKER_LABEL_MIN
+  const diceColumn = slim ? SLIM_DICE_WIDTH : NARROW_DICE_WIDTH
+  const trackerWidth = sheetWidth - (split ? diceColumn + DIVIDER_SPACE : 0)
   const oneColumn = trackerWidth / 2 < TWO_COLUMN_MIN
   const optionColumn = oneColumn ? trackerWidth : trackerWidth / 2
-  const roomForRule = optionColumn >= RULE_BUTTON_COLUMN
+  const iconOnly = slim || (split && allDice)
+  // why: icon-only trackers have no room for the rule button, so a long press opens the rule instead.
+  const roomForRule = optionColumn >= RULE_BUTTON_COLUMN && !iconOnly
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
@@ -912,7 +917,7 @@ function CounterSheet({
                           testID={`counter-option-${seatNumber}-${option.id}`}
                           id={option.id}
                           label={shortLabel ? tableItemShortLabel(option) : optionLabel}
-                          value={current}
+                          value={split && allDice ? undefined : current}
                           accessibilityLabel={
                             current > 0
                               ? translate("board:counters.editWithValue", {
@@ -930,7 +935,7 @@ function CounterSheet({
                           ruleButton={roomForRule}
                           oneColumn={oneColumn}
                           ruleTestID={`counter-rule-${seatNumber}-${option.id}`}
-                          iconOnly={split && allDice}
+                          iconOnly={iconOnly}
                           slide={slide}
                           fade={fade}
                           onPress={() => {
@@ -966,7 +971,7 @@ function CounterSheet({
                           ruleButton={roomForRule}
                           oneColumn={oneColumn}
                           ruleTestID={`designation-rule-${seatNumber}-${option.id}`}
-                          iconOnly={split && allDice}
+                          iconOnly={iconOnly}
                           slide={slide}
                           fade={fade}
                           onPress={() => {
@@ -997,7 +1002,7 @@ function CounterSheet({
                         ruleButton={roomForRule}
                         oneColumn={oneColumn}
                         ruleTestID={`counter-rule-${seatNumber}-custom`}
-                        iconOnly={split && allDice}
+                        iconOnly={iconOnly}
                         slide={slide}
                         fade={fade}
                         onPress={() => {
@@ -1021,7 +1026,7 @@ function CounterSheet({
                     split
                       ? [
                           $narrowDice,
-                          allDice ? $diceHalf : { width: NARROW_DICE_WIDTH },
+                          allDice ? $diceHalf : { width: diceColumn },
                           { paddingBottom: closeRow },
                         ]
                       : $diceHalf
@@ -1033,6 +1038,7 @@ function CounterSheet({
                     ink={ink}
                     compact={compact}
                     narrow={split}
+                    slim={slim}
                     allDice={allDice}
                     slide={slide}
                     fade={fade}
@@ -1158,6 +1164,7 @@ function DiceSection({
   ink,
   compact,
   narrow,
+  slim,
   allDice,
   slide,
   fade,
@@ -1169,6 +1176,7 @@ function DiceSection({
   ink: string
   compact?: boolean
   narrow: boolean
+  slim: boolean
   allDice: boolean
   slide?: ReturnType<typeof useCornerSlide>
   fade: boolean
@@ -1178,6 +1186,8 @@ function DiceSection({
   const { themed } = useAppTheme()
   const { openPlane } = dice
   const tools = narrow && !allDice ? QUICK_DICE.slice(0, openPlane ? -1 : undefined) : dice.tools
+  const glyph = slim ? 18 : compact ? 20 : 22
+  const toolStyle = [themed($diceTool), slim && $slimDiceTool]
   return (
     <View style={themed($diceTools)}>
       {openPlane ? (
@@ -1193,11 +1203,11 @@ function DiceSection({
               openPlane()
             }}
             style={({ pressed }) => [
-              themed($diceTool),
+              toolStyle,
               pressed && { backgroundColor: overlayTint(ink, 0.14) },
             ]}
           >
-            <PlanarGlyph face="planeswalk" size={compact ? 20 : 22} color={ink} />
+            <PlanarGlyph face="planeswalk" size={glyph} color={ink} />
           </BoardPressable>
         </Animated.View>
       ) : null}
@@ -1213,7 +1223,8 @@ function DiceSection({
             tool={tool}
             dice={dice}
             ink={ink}
-            compact={compact}
+            size={slim ? 20 : compact ? 24 : 28}
+            style={toolStyle}
             onRolled={onRolled}
           />
         </Animated.View>
@@ -1228,12 +1239,12 @@ function DiceSection({
             hitSlop={4}
             onPress={onAllDice}
             style={({ pressed }) => [
-              themed($diceTool),
+              toolStyle,
               allDice && { backgroundColor: overlayTint(ink, 0.18) },
               pressed && { backgroundColor: overlayTint(ink, 0.14) },
             ]}
           >
-            <Icon icon="more" size={compact ? 20 : 22} color={ink} />
+            <Icon icon="more" size={glyph} color={ink} />
           </BoardPressable>
         </Animated.View>
       ) : null}
@@ -1246,17 +1257,18 @@ function DieButton({
   tool,
   dice,
   ink,
-  compact,
+  size,
+  style,
   onRolled,
 }: {
   seatNumber: number
   tool: DiceTool
   dice: SheetDice
   ink: string
-  compact?: boolean
+  size: number
+  style: StyleProp<ViewStyle>
   onRolled: () => void
 }) {
-  const { themed } = useAppTheme()
   const rollForSeat = () => {
     onRolled()
     dice.rollFor(tool)
@@ -1268,12 +1280,9 @@ function DieButton({
       accessibilityLabel={toolLabel(tool)}
       hitSlop={4}
       onPress={rollForSeat}
-      style={({ pressed }) => [
-        themed($diceTool),
-        pressed && { backgroundColor: overlayTint(ink, 0.14) },
-      ]}
+      style={({ pressed }) => [style, pressed && { backgroundColor: overlayTint(ink, 0.14) }]}
     >
-      <DieFace tool={tool} size={compact ? 24 : 28} color={ink} />
+      <DieFace tool={tool} size={size} color={ink} />
     </BoardPressable>
   )
 }
@@ -1327,6 +1336,7 @@ function SheetOption({
   fade,
   onPress,
 }: {
+  /** why: false when the column has no room for the rule button; a long press opens the rule instead. */
   ruleButton: boolean
   iconOnly?: boolean
   oneColumn?: boolean
@@ -1367,19 +1377,31 @@ function SheetOption({
           if (nativeEvent.actionName === "longpress") rule?.onPress()
           else if (nativeEvent.actionName === "activate") onPress()
         }}
-        onLongPress={rule && !ruleButton && !iconOnly ? rule.onPress : undefined}
+        onLongPress={rule && !ruleButton ? rule.onPress : undefined}
         onPress={onPress}
         style={({ pressed }) => [
           themed($option),
-          (!ruleButton || iconOnly) && themed($tightOption),
-          !(rule && ruleButton && !iconOnly) && $optionFill,
+          !ruleButton && themed($tightOption),
+          !(rule && ruleButton) && $optionFill,
           pressed && { backgroundColor: overlayTint(ink, 0.14) },
         ]}
       >
         <Animated.View layout={slide}>
           <TableGlyph id={id} size={16} color={ink} />
         </Animated.View>
-        {iconOnly ? null : (
+        {iconOnly ? (
+          <>
+            {value ? (
+              <Text
+                text={String(value)}
+                weight="bold"
+                size="xs"
+                style={[themed($optionValue), { color: ink }]}
+              />
+            ) : null}
+            {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
+          </>
+        ) : (
           <Animated.View entering={fadeIn} exiting={fadeOut} style={themed($optionWords)}>
             {value ? (
               <Text
@@ -1403,7 +1425,7 @@ function SheetOption({
           </Animated.View>
         )}
       </BoardPressable>
-      {rule && ruleButton && !iconOnly ? (
+      {rule && ruleButton ? (
         <Animated.View entering={fadeIn} exiting={fadeOut}>
           <BoardPressable
             testID={ruleTestID}
@@ -1630,6 +1652,10 @@ const $diceHalf: ViewStyle = { flex: 1, justifyContent: "center" }
 const $narrowDice: ViewStyle = { justifyContent: "center" }
 
 const NARROW_DICE_WIDTH = 84
+const SLIM_DICE_TOOL_SIZE = 32
+const SLIM_DICE_WIDTH = SLIM_DICE_TOOL_SIZE
+// why: below this a tracker name wraps a letter or two per line.
+const TRACKER_LABEL_MIN = 72
 const DIVIDER_SPACE = 2 * 8 + 1.5
 // why: matches the life calculator, the card's other sheet, so both open and close alike.
 const SHEET_FADE_MS = 160
@@ -1639,6 +1665,7 @@ const $sideDividerSlot: ViewStyle = { marginHorizontal: 8, marginVertical: 12 }
 const $sideDivider: ViewStyle = { flex: 1, width: 1.5, borderRadius: radius.full, opacity: 0.3 }
 
 const DICE_TOOL_SIZE = 40
+const $slimDiceTool: ViewStyle = { minWidth: SLIM_DICE_TOOL_SIZE, minHeight: SLIM_DICE_TOOL_SIZE }
 // why: a tight tracker row pads its icon by 4, which lands the icon where the life − and + ink.
 const SHEET_SIDE = 14
 

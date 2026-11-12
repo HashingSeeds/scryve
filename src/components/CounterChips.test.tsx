@@ -319,6 +319,25 @@ describe("CounterChips", () => {
     })
   })
 
+  it("keeps a ten-seat bag's trackers as icons with their counts, and their rules on a long press", () => {
+    const openRule = jest.fn()
+    const view = chips(
+      seat({ counters: { poison: 3 }, tableItemRules: { commanderTax: "903.8" }, openRule }),
+      {
+        compact: true,
+        contentRotation: 90,
+        cardSize: { width: 193, height: 166 },
+        dice: { tools: ["d4", "d6", "d20", "coin"] as const, rollFor: jest.fn() },
+      },
+    )
+    fireEvent.press(view.getByTestId("seat-bag-seat-1"))
+
+    expect(view.getByTestId("counter-option-1-poison")).toHaveTextContent("3")
+    expect(view.queryByTestId("counter-option-1-poison-label")).toBeNull()
+    fireEvent(view.getByTestId("counter-option-1-commanderTax"), "longPress")
+    expect(openRule).toHaveBeenCalledWith("903.8")
+  })
+
   it("speaks every counter change and a newly taken designation, but not a lost one", () => {
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility")
     announce.mockClear()
