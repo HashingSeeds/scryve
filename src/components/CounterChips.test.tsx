@@ -338,6 +338,26 @@ describe("CounterChips", () => {
     expect(openRule).toHaveBeenCalledWith("903.8")
   })
 
+  it("keeps counts on the trackers beside every die, and gives a ten-seat bag's dice the whole sheet", () => {
+    const dice = { tools: ["d4", "d6", "d20", "coin"] as const, rollFor: jest.fn() }
+    const roomy = chips(seat({ counters: { poison: 3 } }), { dice })
+    fireEvent.press(roomy.getByTestId("seat-bag-seat-1"))
+    fireEvent.press(roomy.getByTestId("bag-more-dice-seat-1"))
+    expect(roomy.getByTestId("counter-option-1-poison")).toHaveTextContent("3")
+    roomy.unmount()
+
+    const crowded = chips(seat({ counters: { poison: 3 } }), {
+      compact: true,
+      contentRotation: 90,
+      cardSize: { width: 193, height: 166 },
+      dice,
+    })
+    fireEvent.press(crowded.getByTestId("seat-bag-seat-1"))
+    fireEvent.press(crowded.getByTestId("bag-more-dice-seat-1"))
+    expect(crowded.queryByTestId("counter-option-1-poison")).toBeNull()
+    expect(crowded.getByTestId("bag-tool-d4-seat-1")).toBeTruthy()
+  })
+
   it("speaks every counter change and a newly taken designation, but not a lost one", () => {
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility")
     announce.mockClear()

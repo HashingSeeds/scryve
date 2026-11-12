@@ -771,7 +771,10 @@ function CounterSheet({
   const trackerWidth = sheetWidth - (split ? diceColumn + DIVIDER_SPACE : 0)
   const oneColumn = trackerWidth / 2 < TWO_COLUMN_MIN
   const optionColumn = oneColumn ? trackerWidth : trackerWidth / 2
-  const iconOnly = slim || (split && allDice)
+  const strip = split && allDice && !slim
+  const iconOnly = slim || strip
+  // why: beside the trackers, every die on a slim sheet runs off the card, so the dice take the whole sheet and the lit more button is the way back.
+  const showTrackers = trackers && !(slim && allDice)
   const roomForRule = optionColumn >= RULE_BUTTON_COLUMN && !iconOnly
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
@@ -895,8 +898,8 @@ function CounterSheet({
           <>
             {/* why: six Commander options outgrow the shortest compact seats; scrolling keeps every option and Close reachable. */}
             <View style={split ? $split : $optionScroll}>
-              {trackers ? (
-                <Animated.View layout={slide} style={split && allDice ? $iconStrip : $optionScroll}>
+              {showTrackers ? (
+                <Animated.View layout={slide} style={strip ? $iconStrip : $optionScroll}>
                   <ScrollView
                     style={$optionScroll}
                     contentContainerStyle={[$optionScrollContent, themed($options)]}
@@ -915,7 +918,7 @@ function CounterSheet({
                           testID={`counter-option-${seatNumber}-${option.id}`}
                           id={option.id}
                           label={shortLabel ? tableItemShortLabel(option) : optionLabel}
-                          value={split && allDice ? undefined : current}
+                          value={current}
                           accessibilityLabel={
                             current > 0
                               ? translate("board:counters.editWithValue", {
@@ -932,6 +935,7 @@ function CounterSheet({
                           rule={rule}
                           ruleButton={roomForRule}
                           oneColumn={oneColumn}
+                          stacked={strip}
                           ruleTestID={`counter-rule-${seatNumber}-${option.id}`}
                           iconOnly={iconOnly}
                           slide={slide}
@@ -968,6 +972,7 @@ function CounterSheet({
                           rule={optionRule(option.id)}
                           ruleButton={roomForRule}
                           oneColumn={oneColumn}
+                          stacked={strip}
                           ruleTestID={`designation-rule-${seatNumber}-${option.id}`}
                           iconOnly={iconOnly}
                           slide={slide}
@@ -999,6 +1004,7 @@ function CounterSheet({
                         ink={ink}
                         ruleButton={roomForRule}
                         oneColumn={oneColumn}
+                        stacked={strip}
                         ruleTestID={`counter-rule-${seatNumber}-custom`}
                         iconOnly={iconOnly}
                         slide={slide}
@@ -1012,7 +1018,7 @@ function CounterSheet({
                   </ScrollView>
                 </Animated.View>
               ) : null}
-              {split ? (
+              {split && showTrackers ? (
                 <Animated.View layout={slide} pointerEvents="none" style={$sideDividerSlot}>
                   <View style={[$sideDivider, { backgroundColor: ink }]} />
                 </Animated.View>
@@ -1329,6 +1335,7 @@ function SheetOption({
   ruleButton,
   ruleTestID,
   iconOnly,
+  stacked,
   oneColumn,
   slide,
   fade,
@@ -1336,6 +1343,7 @@ function SheetOption({
 }: {
   ruleButton: boolean
   iconOnly?: boolean
+  stacked?: boolean
   oneColumn?: boolean
   slide?: ReturnType<typeof useCornerSlide>
   fade?: boolean
@@ -1379,6 +1387,7 @@ function SheetOption({
         style={({ pressed }) => [
           themed($option),
           !ruleButton && themed($tightOption),
+          stacked && $stackedOption,
           !(rule && ruleButton) && $optionFill,
           pressed && { backgroundColor: overlayTint(ink, 0.14) },
         ]}
@@ -1623,6 +1632,8 @@ const $options: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $optionCell: ViewStyle = { flexDirection: "row", width: "50%" }
 
+const $stackedOption: ViewStyle = { flexDirection: "column", justifyContent: "center", gap: 0 }
+
 const $oneColumnCell: ViewStyle = { width: "100%" }
 
 // why: a one-column bag on a crowded corner seat leaves about 42pt for a name, so a 20-character custom name needs three lines at 9pt to read in full.
@@ -1639,7 +1650,6 @@ const $optionWords: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 
-/** why: with every die out, the trackers keep only their icons, two to a row, as a way back. */
 const $iconStrip: ViewStyle = { width: 2 * (16 + 2 * 4) + 8 }
 
 const $split: ViewStyle = { flex: 1, flexDirection: "row" }
