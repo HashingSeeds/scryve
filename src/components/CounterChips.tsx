@@ -766,14 +766,12 @@ function CounterSheet({
     paddingRight: sheetSideInset(contentRotation, contentInsets, "right"),
   }
   const sheetWidth = width - padding.paddingLeft - padding.paddingRight
-  // why: on the smallest seats the two-up dice would crush the tracker names, so the dice shrink to one column and the trackers keep only their icons.
   const slim = split && sheetWidth - NARROW_DICE_WIDTH - DIVIDER_SPACE < TRACKER_LABEL_MIN
   const diceColumn = slim ? SLIM_DICE_WIDTH : NARROW_DICE_WIDTH
   const trackerWidth = sheetWidth - (split ? diceColumn + DIVIDER_SPACE : 0)
   const oneColumn = trackerWidth / 2 < TWO_COLUMN_MIN
   const optionColumn = oneColumn ? trackerWidth : trackerWidth / 2
   const iconOnly = slim || (split && allDice)
-  // why: icon-only trackers have no room for the rule button, so a long press opens the rule instead.
   const roomForRule = optionColumn >= RULE_BUTTON_COLUMN && !iconOnly
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
@@ -1336,7 +1334,6 @@ function SheetOption({
   fade,
   onPress,
 }: {
-  /** why: false when the column has no room for the rule button; a long press opens the rule instead. */
   ruleButton: boolean
   iconOnly?: boolean
   oneColumn?: boolean
