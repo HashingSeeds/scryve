@@ -35,6 +35,7 @@ import {
   lanRejectionMessage,
   lanRoundId,
   lanSeatsReady,
+  lanTableItems,
   parseGuestMessage,
   parseHostMessage,
   releaseLanSeat,
@@ -89,6 +90,7 @@ export interface LanSessionState {
   hostEditsAnySeat?: boolean
   turns?: boolean
   logs?: boolean
+  hostTableItems?: readonly string[]
   log?: { publicId: string; events: ConnectedLogEvent[]; more: boolean }
   error?: string
 }
@@ -405,6 +407,7 @@ export class LanSession {
             editsAnySeat: true,
             turns: true,
             log: true,
+            tableItems: lanTableItems(game.setup),
           })
           return this.publish(admitted.game)
         }
@@ -631,6 +634,7 @@ export class LanSession {
         hostEditsAnySeat: message.editsAnySeat === true,
         turns: message.turns === true,
         logs: message.log === true,
+        hostTableItems: message.tableItems,
       })
     }
     if (message.type === "log") {

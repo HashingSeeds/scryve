@@ -39,6 +39,7 @@ import {
   startingValueRange,
   systemDefinition,
   tableRules,
+  type TableDefinition,
 } from "../../../convex/lib/systems"
 import {
   matchesValidator,
@@ -188,6 +189,8 @@ export type LanHostMessage =
       turns?: boolean
       /** why: a host from before the game log ignores a guest's log request, so guests offer the log only when the welcome says so. */
       log?: boolean
+      /** why: a host applies table actions with its own rules, so guests offer only the counters and designations it lists. */
+      tableItems?: readonly string[]
     }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
@@ -196,6 +199,34 @@ export type LanHostMessage =
   | { type: "nack"; operationId: string; code?: string; message: string }
   | { type: "pong"; at: number; hostAt: number }
   | ({ type: "log" } & LanLogPage)
+
+export function lanTableItems({ system, format }: Pick<LanSetup, "system" | "format">) {
+  const { counters, designations } = tableRules(system, format)
+  return [...counters, ...designations].map(({ id }) => id)
+}
+
+// why: frozen at the items every host knew before welcomes listed them; it must never grow.
+const LEGACY_TABLE_ITEMS: readonly string[] = [
+  "poison",
+  "energy",
+  "experience",
+  "commanderTax",
+  "monarch",
+  "initiative",
+]
+
+export function hostTableRules(
+  rules: TableDefinition,
+  hostItems: readonly string[] = LEGACY_TABLE_ITEMS,
+): TableDefinition {
+  const known = new Set(hostItems)
+  const counters = rules.counters.filter(({ id }) => known.has(id))
+  const designations = rules.designations.filter(({ id }) => known.has(id))
+  return counters.length === rules.counters.length &&
+    designations.length === rules.designations.length
+    ? rules
+    : { ...rules, counters, designations }
+}
 
 export const lanRoundId = (game: Pick<LanLobby, "id" | "round">) => `${game.id}-${game.round}`
 
@@ -917,6 +948,11 @@ export function parseHostMessage(line: string): LanHostMessage | null {
       ...(value.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(value.turns === true ? { turns: true } : {}),
       ...(value.log === true ? { log: true } : {}),
+      ...(Array.isArray(value.tableItems)
+        ? {
+            tableItems: value.tableItems.filter((item): item is string => typeof item === "string"),
+          }
+        : {}),
     }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {

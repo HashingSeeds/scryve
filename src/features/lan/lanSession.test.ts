@@ -8,6 +8,7 @@ import { archiveLanGame, hashSeatPassToken } from "./lanArchive"
 import { HOSTED_GAME_KEY, saveLanName, savedHostedGame } from "./lanAvailability"
 import {
   createLanGame,
+  hostTableRules,
   LAN_PROTOCOL,
   lanLobbyOf,
   lanProjection,
@@ -24,7 +25,9 @@ import {
 } from "./lanSession"
 import { connectLan, hostLan, type LanConnection, type LanPeerHandlers } from "./lanTransport"
 import { onSeatClaim, pendingSeatClaims, setNearbyOwner } from "./nearbyAccount"
+import { tableRules } from "../../../convex/lib/systems"
 import type { PendingLifeAction } from "../connected/model"
+import type { PlaySystemId } from "../game/playSystems"
 
 jest.mock("./lanTransport", () => ({
   hostLan: jest.fn(),
@@ -208,6 +211,7 @@ describe("nearby host", () => {
       editsAnySeat: true,
       turns: true,
       log: true,
+      tableItems: expect.any(Array),
     })
   })
 
@@ -417,6 +421,7 @@ describe("nearby host", () => {
       editsAnySeat: true,
       turns: true,
       log: true,
+      tableItems: expect.any(Array),
     })
     bob.send({ type: "op", event: claim("claim-operation-0001", attacker) })
     void session.writes.send({
@@ -650,6 +655,32 @@ describe("nearby guest", () => {
 
     expect(lobbyReader).toHaveBeenCalledTimes(2)
     act(() => lanSession.leave())
+  })
+
+  it("offers only the table items every host knows when its host lists none", async () => {
+    const { session } = await guest()
+    const offered = (system: PlaySystemId, format: string) =>
+      hostTableRules(tableRules(system, format), session.getState().hostTableItems).counters
+
+    expect(offered("riftbound", "constructed")).toEqual([])
+    expect(offered("mtg", "commander")).toContainEqual(expect.objectContaining({ id: "poison" }))
+    session.leave()
+  })
+
+  it("offers Riftbound XP once a host that applies it welcomes the guest", async () => {
+    const riftbound = { ...setup, system: "riftbound", format: "constructed" } as const
+    await new LanSession().host(riftbound)
+    const joined = socket()
+    joined.send({ type: "join", protocol: LAN_PROTOCOL, name: "Alice", systems: ["riftbound"] })
+    const welcome = joined.sent.find((message) => message.type === "welcome")
+    expect(welcome).toMatchObject({ tableItems: ["xp"] })
+
+    const { session, host } = await guest()
+    host()?.onMessage(welcome!)
+    expect(
+      hostTableRules(tableRules("riftbound", "constructed"), session.getState().hostTableItems),
+    ).toEqual(tableRules("riftbound", "constructed"))
+    session.leave()
   })
 
   it("offers partners only when its host's welcome says it keeps them apart", async () => {

@@ -607,6 +607,11 @@ describe("nearby messages", () => {
     expect(() => op({ ...claim, commander: 2 })).toThrow("not an op")
     expect(welcome({ partners: true })).toEqual({ type: "welcome", pass: unused, partners: true })
     expect(welcome({})).toEqual({ type: "welcome", pass: unused })
+    expect(welcome({ tableItems: ["xp", 3] })).toEqual({
+      type: "welcome",
+      pass: unused,
+      tableItems: ["xp"],
+    })
   })
 
   it("reads an ack's claim status when the host sends one, and an older host's ack without it", () => {
