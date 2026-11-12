@@ -120,7 +120,7 @@ export function TeamPicker({
                 )
               })}
             </View>
-            {teamColors && color && open ? (
+            {teamColors && color && open && (teamColors.editable?.(index) ?? true) ? (
               <ColorChoices
                 testID={`team-colors-${index + 1}`}
                 value={color}

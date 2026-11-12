@@ -216,7 +216,9 @@ export function LobbyView({
 
   async function saveAppearance() {
     if (!appearance || appearanceSeat === undefined || !appearanceDraft) return
-    if (await appearance.save(appearanceSeat, appearanceDraft)) setAppearanceSeat(undefined)
+    const teamColor = lobbyTeams && seatAt(appearanceSeat - 1)?.color
+    const saved = teamColor ? { ...appearanceDraft, color: teamColor } : appearanceDraft
+    if (await appearance.save(appearanceSeat, saved)) setAppearanceSeat(undefined)
   }
 
   async function confirmExit() {
