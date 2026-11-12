@@ -3134,6 +3134,55 @@ describe("connected table actions", () => {
     ).not.toHaveProperty("burned")
   })
 
+  it("hides Asleep from clients that predate it, and their writes keep it", async () => {
+    const t = makeConvexTest()
+    const game = await pokemonGame(t)
+    const send = (operationId: string, action: TableAction) =>
+      game.host.mutation(api.games.tableAction, tableArgs(game.publicId, operationId, action))
+    const pokemonId = "pikachu-0001"
+    const set = (condition: "asleep" | "poisoned"): TableAction => ({
+      kind: "pokemon.conditionChanged",
+      playerId: game.hostPlayerId,
+      pokemonId,
+      condition,
+      on: true,
+    })
+    await send("table-operation-0001", {
+      kind: "pokemon.placed",
+      playerId: game.hostPlayerId,
+      pokemonId,
+      slot: "active",
+      card: { name: "Pikachu", hp: 60, prizes: 1 },
+    })
+    await send("table-operation-0002", set("asleep"))
+    const active = async (tableVersion: number) =>
+      (
+        await game.joiner.query(api.games.lobbyProjection, {
+          publicId: game.publicId,
+          tableVersion,
+        })
+      ).table?.players[game.hostPlayerId].pokemon?.active
+    expect(await active(5)).not.toHaveProperty("asleep")
+
+    // why: a version 5 client can only send Poisoned, Burned and Checkup, so these are its writes.
+    await send("table-operation-0003", set("poisoned"))
+    await send("table-operation-0004", {
+      kind: "pokemon.checkedUp",
+      playerId: game.hostPlayerId,
+      pokemonId,
+    })
+    const pikachu = {
+      id: pokemonId,
+      name: "Pikachu",
+      hp: 60,
+      prizes: 1,
+      damage: 10,
+      poisoned: true,
+    }
+    expect(await active(5)).toEqual(pikachu)
+    expect(await active(TABLE_VERSION)).toEqual({ ...pikachu, asleep: true })
+  })
+
   it("carries a local game's table into the connected game under the new seat ids", async () => {
     const t = makeConvexTest()
     const host = await signedIn(t, "publish-host", "Host")

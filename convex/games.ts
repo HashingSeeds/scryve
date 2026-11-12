@@ -112,7 +112,7 @@ import {
   isValidTableSnapshot,
   remapTableState,
   seatTable,
-  TABLE_VERSION,
+  MODES_TABLE_VERSION,
   TURN_TABLE_VERSION,
   tableActionIdentity,
   tableForVersion,
@@ -2149,7 +2149,7 @@ export const lobbyProjection = query({
       ...(decidedOutcome ? { treacheryOutcome: decidedOutcome } : {}),
       ...(hasTable(gameTableRules(game)) ||
       ((game.turn || game.turnGroups) && (args.tableVersion ?? 1) >= TURN_TABLE_VERSION) ||
-      (game.modes && (args.tableVersion ?? 1) >= TABLE_VERSION)
+      (game.modes && (args.tableVersion ?? 1) >= MODES_TABLE_VERSION)
         ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
         : {}),
     }

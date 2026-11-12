@@ -44,6 +44,7 @@ import {
 import {
   matchesValidator,
   TABLE_VERSION,
+  MODES_TABLE_VERSION,
   TURN_TABLE_VERSION,
   tableActionValidator,
   tableForVersion,
@@ -655,7 +656,7 @@ export function lanProjection(
     ...(memory &&
     (hasTable(rules) ||
       ((memory.turn || memory.turnGroups) && tableVersion >= TURN_TABLE_VERSION) ||
-      (memory.modes && tableVersion >= TABLE_VERSION))
+      (memory.modes && tableVersion >= MODES_TABLE_VERSION))
       ? {
           table: tableForVersion(
             {

@@ -50,6 +50,7 @@ function sheet(props: Partial<PokemonSheetProps> = {}) {
         onMakeActive={jest.fn()}
         onKnockOut={jest.fn()}
         onRemove={jest.fn()}
+        onCondition={jest.fn()}
         onClose={jest.fn()}
         {...props}
       />
@@ -186,6 +187,34 @@ describe("PokemonSheet", () => {
     expect(screen.getByTestId("pokemon-prizes-3-seat-1").props.accessibilityState).toMatchObject({
       checked: true,
     })
+  })
+
+  it("toggles Special Conditions on the Active only", () => {
+    const onCondition = jest.fn()
+    const pokemon = {
+      id: "active-001",
+      name: "Pikachu",
+      hp: 60,
+      prizes: 1,
+      damage: 0,
+      asleep: true,
+    }
+    const { rerender } = render(
+      sheet({ mode: { kind: "edit", pokemon, slot: "active" }, onCondition }),
+    )
+    expect(
+      screen.getByTestId("pokemon-sheet-asleep-seat-1").props.accessibilityState,
+    ).toMatchObject({
+      checked: true,
+    })
+    fireEvent.press(screen.getByTestId("pokemon-sheet-asleep-seat-1"))
+    fireEvent.press(screen.getByTestId("pokemon-sheet-poisoned-seat-1"))
+    expect(onCondition.mock.calls).toEqual([
+      ["active-001", "asleep", false],
+      ["active-001", "poisoned", true],
+    ])
+    rerender(sheet({ mode: { kind: "edit", pokemon, slot: "bench" }, onCondition }))
+    expect(screen.queryByTestId("pokemon-sheet-asleep-seat-1")).toBeNull()
   })
 
   it("moves focus to the search field when Look up opens it", () => {

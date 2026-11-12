@@ -33,7 +33,10 @@ import { usePokemonDeck } from "./usePokemonDeck"
 import {
   pokemonPrizeValue,
   remainingHp,
+  ROTATION_CONDITIONS,
+  STACKED_CONDITIONS,
   type PokemonCard,
+  type PokemonCondition,
   type PokemonInPlay,
   type PokemonSlot,
 } from "../../../convex/lib/table"
@@ -65,6 +68,7 @@ export interface PokemonSheetProps {
   onMakeActive: (pokemonId: string) => void
   onKnockOut: (pokemonId: string) => void
   onRemove: (pokemonId: string) => void
+  onCondition: (pokemonId: string, condition: PokemonCondition, on: boolean) => void
   onClose: () => void
 }
 
@@ -109,6 +113,7 @@ export function PokemonSheet({
   onMakeActive,
   onKnockOut,
   onRemove,
+  onCondition,
   onClose,
 }: PokemonSheetProps) {
   const { themed } = useAppTheme()
@@ -659,6 +664,32 @@ export function PokemonSheet({
                       </BoardPressable>
                     ))}
                   </View>
+                  {mode.slot === "active"
+                    ? [ROTATION_CONDITIONS, STACKED_CONDITIONS].map((conditions) => (
+                        <View key={conditions[0]} style={themed($row)}>
+                          {conditions.map((condition) => {
+                            const on = editing[condition] === true
+                            return (
+                              <BoardPressable
+                                key={condition}
+                                testID={`pokemon-sheet-${condition}-seat-${seatNumber}`}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: on }}
+                                onPress={() => onCondition(editing.id, condition, !on)}
+                                style={[themed($action), button, on && { backgroundColor: ink }]}
+                              >
+                                <Text
+                                  tx={`board:pokemon.condition.${condition}`}
+                                  size="xxs"
+                                  weight="medium"
+                                  style={on ? onInk : inkStyle}
+                                />
+                              </BoardPressable>
+                            )
+                          })}
+                        </View>
+                      ))
+                    : null}
                   <View style={themed($row)}>
                     {mode.slot === "bench" ? (
                       <BoardPressable

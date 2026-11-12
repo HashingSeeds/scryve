@@ -318,6 +318,14 @@ const board = {
     damageCaption: "{{damage}} damage · {{hp}} HP",
     damageCounted: "damage · no card",
     switch: { switchIn: "Switch in", makeActive: "Make Active" },
+    // Pokémon TCG Special Conditions on the Active Pokémon, shown on its card and as toggles in its edit sheet.
+    condition: {
+      asleep: "Asleep",
+      confused: "Confused",
+      paralyzed: "Paralyzed",
+      poisoned: "Poisoned",
+      burned: "Burned",
+    },
     switchLabel: {
       switchIn: "Switch in, {{name}} becomes Active",
       makeActive: "Make Active, {{name}} becomes Active",

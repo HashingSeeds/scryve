@@ -90,6 +90,9 @@ describe("Planechase and Archenemy games", () => {
       expect(older.table?.modes).toBeUndefined()
       expect(older.table?.turn).toBeDefined()
     }
+    expect(
+      (await host.query(api.games.lobbyProjection, { publicId, tableVersion: 5 })).table?.modes,
+    ).toBeDefined()
   })
 
   it("syncs scheme reveals and planar rolls through Convex, a roll from any seat its device holds", async () => {

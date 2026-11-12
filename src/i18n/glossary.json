@@ -42,7 +42,8 @@
       "nearby": "cercana (partidas cercanas); permission: dispositivos cercanos",
       "layout": "diseño",
       "sign in": "iniciar sesión",
-      "device": "dispositivo (the phone or tablet the app runs on; never teléfono for \"device\")"
+      "device": "dispositivo (the phone or tablet the app runs on; never teléfono for \"device\")",
+      "Pokémon Special Conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)": "Dormido, Quemado, Confundido, Paralizado, Envenenado"
     }
   },
   "fr": {
@@ -80,7 +81,8 @@
       "host (the player)": "hôte; to host: héberger",
       "lobby": "salon (never lobby)",
       "sign in": "se connecter (noun: connexion). Joining a game is rejoindre, and connecting to one is connexion en cours…; never a bare Connexion for those.",
-      "username": "nom d'utilisateur (never pseudo)"
+      "username": "nom d'utilisateur (never pseudo)",
+      "Pokémon Special Conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)": "Endormi, Brûlé, Confus, Paralysé, Empoisonné"
     }
   },
   "hi": {
@@ -131,7 +133,8 @@
       "format": "फ़ॉर्मैट",
       "card faces front / back": "सामने / पीछे",
       "the Play tab": "खेलें टैब",
-      "Wi-Fi": "Wi-Fi, in Latin script"
+      "Wi-Fi": "Wi-Fi, in Latin script",
+      "Pokémon Special Conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)": "स्लीप, बर्न, कन्फ़्यूज़्ड, पैरालाइज़्ड, पॉइज़न्ड"
     }
   },
   "ja": {
@@ -172,7 +175,8 @@
       "nearby": "近く (Android setting: 付近のデバイス). Never ニアバイ.",
       "seat": "席",
       "sign in / sign out": "サインイン / サインアウト",
-      "device": "デバイス"
+      "device": "デバイス",
+      "Pokémon Special Conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)": "ねむり, やけど, こんらん, マヒ, どく"
     }
   },
   "ko": {
@@ -213,7 +217,8 @@
       "nearby": "근처 (근처 기기)",
       "discard (changes)": "폐기; Cancel stays 취소",
       "sign in": "로그인",
-      "device": "기기"
+      "device": "기기",
+      "Pokémon Special Conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)": "잠듦, 화상, 혼란, 마비, 독"
     }
   }
 }

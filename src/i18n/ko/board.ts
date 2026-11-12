@@ -318,6 +318,13 @@ export default {
       switchIn: "교체",
       makeActive: "배틀 포켓몬으로 지정",
     },
+    condition: {
+      asleep: "잠듦",
+      confused: "혼란",
+      paralyzed: "마비",
+      poisoned: "독",
+      burned: "화상",
+    },
     switchLabel: {
       switchIn: "교체, {{name}}이(가) 배틀 포켓몬이 됩니다",
       makeActive: "배틀 포켓몬으로 지정, {{name}}이(가) 배틀 포켓몬이 됩니다",

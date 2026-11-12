@@ -11,6 +11,7 @@ import {
   tableActionValidator,
   tableForVersion,
   tableStateValidator,
+  type PokemonCondition,
   type TableAction,
   type TableState,
 } from "./table"
@@ -354,7 +355,7 @@ describe("Pokémon conditions", () => {
       card: pidgey,
     },
   ]
-  const condition = (pokemonId: string, which: "poisoned" | "burned", on = true): TableAction => ({
+  const condition = (pokemonId: string, which: PokemonCondition, on = true): TableAction => ({
     kind: "pokemon.conditionChanged",
     playerId: "me",
     pokemonId,
@@ -451,6 +452,52 @@ describe("Pokémon conditions", () => {
     expect(pokemonBoardOf(removed.table, "me").active).toBeUndefined()
   })
 
+  it("keeps one of Asleep, Confused and Paralyzed, beside Poisoned and Burned", () => {
+    const asleep = run(sick, condition("active-001", "asleep"))!.table
+    const paralyzed = run(asleep, condition("active-001", "paralyzed"))!.table
+    expect(pokemonBoardOf(paralyzed, "me").active).toEqual({
+      ...pidgey,
+      id: "active-001",
+      damage: 0,
+      poisoned: true,
+      burned: true,
+      paralyzed: true,
+    })
+    expect(run(paralyzed, condition("active-001", "asleep", false))!.table).toBe(paralyzed)
+    const cured = run(paralyzed, condition("active-001", "poisoned", false))!.table
+    expect(pokemonBoardOf(cured, "me").active).toMatchObject({ burned: true, paralyzed: true })
+    expect(pokemonBoardOf(run(paralyzed, checkup("heads"))!.table, "me").active).toMatchObject({
+      damage: 30,
+      poisoned: true,
+      paralyzed: true,
+    })
+  })
+
+  it("clears every condition when the Pokémon retreats or evolves", () => {
+    const confused = run(sick, condition("active-001", "confused"))!.table
+    const switched = run(confused, {
+      kind: "pokemon.switched",
+      playerId: "me",
+      pokemonId: "bench-0001",
+    })!.table
+    expect(pokemonBoardOf(switched, "me").bench).toEqual([
+      { ...pidgey, id: "active-001", damage: 0 },
+    ])
+    const evolved = run(confused, {
+      kind: "pokemon.updated",
+      playerId: "me",
+      pokemonId: "active-001",
+      card: { name: "Pidgeotto", hp: 80, prizes: 1 },
+    })!.table
+    expect(pokemonBoardOf(evolved, "me").active).toEqual({
+      name: "Pidgeotto",
+      hp: 80,
+      prizes: 1,
+      id: "active-001",
+      damage: 0,
+    })
+  })
+
   it("puts 10 on Poisoned and 20 on Burned at Checkup, and only heads cures the Burn", () => {
     const tails = run(sick, checkup("tails"))!.table
     expect(pokemonBoardOf(tails, "me").active).toMatchObject({
@@ -511,6 +558,18 @@ describe("Pokémon conditions", () => {
       },
     }
     expect(isValidTableSnapshot(benchBurned, pokemon, players)).toBe(false)
+    const twoTurned = {
+      ...stored,
+      players: {
+        me: {
+          pokemon: {
+            active: { ...pidgey, id: "active-001", damage: 0, asleep: true, confused: true },
+            bench: [],
+          },
+        },
+      },
+    }
+    expect(isValidTableSnapshot(twoTurned, pokemon, players)).toBe(false)
   })
 })
 
