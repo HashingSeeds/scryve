@@ -217,6 +217,15 @@ describe("PokemonSheet", () => {
     expect(screen.queryByTestId("pokemon-sheet-asleep-seat-1")).toBeNull()
   })
 
+  it("offers only Poisoned and Burned to a guest whose nearby host predates the turned conditions", () => {
+    const pokemon = { id: "active-001", name: "Pikachu", hp: 60, prizes: 1, damage: 0 }
+    render(sheet({ mode: { kind: "edit", pokemon, slot: "active" }, turnedConditions: false }))
+    for (const condition of ["asleep", "confused", "paralyzed"])
+      expect(screen.queryByTestId(`pokemon-sheet-${condition}-seat-1`)).toBeNull()
+    for (const condition of ["poisoned", "burned"])
+      expect(screen.getByTestId(`pokemon-sheet-${condition}-seat-1`)).toBeTruthy()
+  })
+
   it("moves focus to the search field when Look up opens it", () => {
     const pokemon = { id: "active-001", name: "Pikachu", hp: 60, prizes: 1, damage: 0 }
     render(sheet({ mode: { kind: "edit", pokemon, slot: "active" } }))

@@ -91,6 +91,7 @@ export interface LanSessionState {
   turns?: boolean
   logs?: boolean
   hostTableItems?: readonly string[]
+  turnedConditions?: boolean
   log?: { publicId: string; events: ConnectedLogEvent[]; more: boolean }
   error?: string
 }
@@ -408,6 +409,7 @@ export class LanSession {
             turns: true,
             log: true,
             tableItems: lanTableItems(game.setup),
+            turnedConditions: true,
           })
           return this.publish(admitted.game)
         }
@@ -635,6 +637,7 @@ export class LanSession {
         turns: message.turns === true,
         logs: message.log === true,
         hostTableItems: message.tableItems,
+        turnedConditions: message.turnedConditions === true,
       })
     }
     if (message.type === "log") {

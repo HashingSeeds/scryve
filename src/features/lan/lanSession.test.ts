@@ -212,6 +212,7 @@ describe("nearby host", () => {
       turns: true,
       log: true,
       tableItems: expect.any(Array),
+      turnedConditions: true,
     })
   })
 
@@ -422,6 +423,7 @@ describe("nearby host", () => {
       turns: true,
       log: true,
       tableItems: expect.any(Array),
+      turnedConditions: true,
     })
     bob.send({ type: "op", event: claim("claim-operation-0001", attacker) })
     void session.writes.send({

@@ -929,6 +929,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             table.removePokemon(playerId, pokemonId)
             setSheet(null)
           }}
+          turnedConditions={table.turnedConditions !== false}
           onCondition={(pokemonId, condition, on) =>
             table.setPokemonCondition(playerId, pokemonId, condition, on)
           }

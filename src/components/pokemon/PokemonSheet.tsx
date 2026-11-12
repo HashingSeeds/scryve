@@ -69,6 +69,8 @@ export interface PokemonSheetProps {
   onKnockOut: (pokemonId: string) => void
   onRemove: (pokemonId: string) => void
   onCondition: (pokemonId: string, condition: PokemonCondition, on: boolean) => void
+  /** why: a nearby host from before Asleep, Confused and Paralyzed rejects them, so its guests see only Poisoned and Burned. */
+  turnedConditions?: boolean
   onClose: () => void
 }
 
@@ -114,6 +116,7 @@ export function PokemonSheet({
   onKnockOut,
   onRemove,
   onCondition,
+  turnedConditions = true,
   onClose,
 }: PokemonSheetProps) {
   const { themed } = useAppTheme()
@@ -665,7 +668,10 @@ export function PokemonSheet({
                     ))}
                   </View>
                   {mode.slot === "active"
-                    ? [ROTATION_CONDITIONS, STACKED_CONDITIONS].map((conditions) => (
+                    ? (turnedConditions
+                        ? [ROTATION_CONDITIONS, STACKED_CONDITIONS]
+                        : [STACKED_CONDITIONS]
+                      ).map((conditions) => (
                         <View key={conditions[0]} style={themed($row)}>
                           {conditions.map((condition) => {
                             const on = editing[condition] === true

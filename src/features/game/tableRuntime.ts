@@ -55,6 +55,8 @@ export interface TableActions {
 export interface TableRuntime extends TableActions {
   table: TableState
   tableRules: TableRules
+  /** why: a nearby host from before Asleep, Confused and Paralyzed rejects them, so its guests get false and don't offer them. */
+  turnedConditions?: boolean
 }
 
 export interface TableSource {

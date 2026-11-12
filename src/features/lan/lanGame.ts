@@ -192,6 +192,8 @@ export type LanHostMessage =
       log?: boolean
       /** why: a host applies table actions with its own rules, so guests offer only the counters and designations it lists. */
       tableItems?: readonly string[]
+      /** why: a host from before Asleep, Confused and Paralyzed rejects them, so guests offer those only when the welcome says so. */
+      turnedConditions?: true
     }
   | { type: "rejected"; reason: string }
   | { type: "outdated" }
@@ -954,6 +956,7 @@ export function parseHostMessage(line: string): LanHostMessage | null {
             tableItems: value.tableItems.filter((item): item is string => typeof item === "string"),
           }
         : {}),
+      ...(value.turnedConditions === true ? { turnedConditions: true } : {}),
     }
   if (value.type === "game") return { type: "outdated" }
   if (value.type === "state") {
