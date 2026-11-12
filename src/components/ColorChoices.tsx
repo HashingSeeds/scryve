@@ -35,7 +35,7 @@ export function ColorChoices({
     >
       {PLAYER_COLOR_CHOICES.map((color) => {
         const selected = color.toUpperCase() === value.toUpperCase()
-        const exhausted = taken.has(color.toUpperCase())
+        const exhausted = !locked && taken.has(color.toUpperCase())
         return (
           <View key={color} style={inline ? $inlineOption : $option}>
             <TouchableOpacity

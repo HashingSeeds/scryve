@@ -1421,7 +1421,9 @@ export const publishLocalGame = mutation({
       args.players,
       connectedMarkShapes(args.players.length),
       (args.table?.turnGroups ?? []).map((group) =>
-        group.flatMap((localId) => args.players.find((player) => player.localId === localId)?.seat ?? []),
+        group.flatMap(
+          (localId) => args.players.find((player) => player.localId === localId)?.seat ?? [],
+        ),
       ),
     )) {
       const isHost = player.localId === args.hostLocalId

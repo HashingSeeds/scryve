@@ -173,7 +173,9 @@ export function resolvePlayerAppearances<T extends { seat: number; color: string
           color: mate?.color ?? player.color,
           ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
         },
-        taken: taken.map(({ seat, color, shape }) => (team.includes(seat) ? { shape } : { color, shape })),
+        taken: taken.map(({ seat, color, shape }) =>
+          team.includes(seat) ? { shape } : { color, shape },
+        ),
         seat: player.seat,
         shapes,
       })
