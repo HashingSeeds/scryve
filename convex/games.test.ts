@@ -3164,7 +3164,6 @@ describe("connected table actions", () => {
       ).table?.players[game.hostPlayerId].pokemon?.active
     expect(await active(5)).not.toHaveProperty("asleep")
 
-    // why: a version 5 client can only send Poisoned, Burned and Checkup, so these are its writes.
     await send("table-operation-0003", set("poisoned"))
     await send("table-operation-0004", {
       kind: "pokemon.checkedUp",
