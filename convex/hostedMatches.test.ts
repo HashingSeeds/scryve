@@ -95,6 +95,10 @@ describe("a match in a hosted game", () => {
 
     await game.hostWins(game.publicId, 2)
     const second = rematch(2).publicId
+    expect((await game.board(second)).match).not.toHaveProperty("canEnd")
+    expect(
+      (await game.host.query(api.games.lobbyProjection, { publicId: second })).match,
+    ).toMatchObject({ canEnd: true })
     await expect(
       game.joiner.mutation(api.games.endMatch, { publicId: second, seats: drawn }),
     ).rejects.toThrow()

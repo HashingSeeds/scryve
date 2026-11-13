@@ -2039,21 +2039,33 @@ const connectedOperation = v.union(
   }),
 )
 
-async function matchProjection(ctx: QueryCtx, game: Doc<"games">) {
+async function matchProjection(
+  ctx: QueryCtx,
+  game: Doc<"games">,
+  viewer: { isHost: boolean; eventCount: number },
+) {
   const match = game.matchId ? await ctx.db.get(game.matchId) : null
+  if (match?.source !== "connected")
+    return { bestOf: game.matchBestOf, gameNumber: game.matchGameNumber ?? 1 }
+  const scored = match.seats.some((seat) => (seat.gamesWon ?? 0) + (seat.gamesDrawn ?? 0) > 0)
+  const betweenGames =
+    game.status === "finished" || (game.status === "active" && viewer.eventCount === 0)
   return {
-    bestOf: game.matchBestOf,
+    bestOf: match.bestOf,
     gameNumber: game.matchGameNumber ?? 1,
-    ...(match?.source === "connected"
-      ? {
-          status: match.status,
-          seats: match.seats.map((seat) => ({
-            seat: seat.seat,
-            gamesWon: seat.gamesWon ?? 0,
-            gamesDrawn: seat.gamesDrawn ?? 0,
-            ...(seat.outcome ? { outcome: seat.outcome } : {}),
-          })),
-        }
+    status: match.status,
+    seats: match.seats.map((seat) => ({
+      seat: seat.seat,
+      gamesWon: seat.gamesWon ?? 0,
+      gamesDrawn: seat.gamesDrawn ?? 0,
+      ...(seat.outcome ? { outcome: seat.outcome } : {}),
+    })),
+    ...(viewer.isHost &&
+    match.status === "active" &&
+    scored &&
+    betweenGames &&
+    match.gameIds.at(-1) === game._id
+      ? { canEnd: true }
       : {}),
   }
 }
@@ -2127,7 +2139,9 @@ export const lobbyProjection = query({
       ...(game.lifeEditing === "anyone" ? { lifeEditing: game.lifeEditing } : {}),
       isHost,
       ...(game.rematchPublicId ? { rematchPublicId: game.rematchPublicId } : {}),
-      ...(game.matchBestOf ? { match: await matchProjection(ctx, game) } : {}),
+      ...(game.matchBestOf
+        ? { match: await matchProjection(ctx, game, { isHost, eventCount }) }
+        : {}),
       eventSequence: eventCount,
       ...(args.operation
         ? { operationStatus: await statusForOperation(ctx, game, user, eventCount, args.operation) }
