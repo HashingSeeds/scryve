@@ -437,7 +437,6 @@ type HostedGame = Pick<
   "_id" | "publicId" | "hostUserId" | "system" | "format" | "matchId" | "matchGameNumber"
 >
 
-/** why: a hosted match is scored from the games the host finishes, so it opens with the first game, takes that game's unique id and holds only who sits where. */
 export async function openHostedMatch(
   ctx: MutationCtx,
   game: HostedGame,
