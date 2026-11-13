@@ -85,6 +85,26 @@ describe("a match in a hosted game", () => {
     ])
   })
 
+  it("offers the host a way to end the match after a game finished without a result", async () => {
+    const game = await matchGame(makeConvexTest())
+    await game.host.mutation(api.games.finishGame, {
+      publicId: game.publicId,
+      rematch: rematch(2),
+    })
+    const second = rematch(2).publicId
+    expect(
+      (await game.host.query(api.games.lobbyProjection, { publicId: second })).match,
+    ).toMatchObject({ gameNumber: 2, canEnd: true })
+    await game.host.mutation(api.games.endMatch, {
+      publicId: second,
+      seats: [
+        { seat: 1, outcome: "draw" },
+        { seat: 2, outcome: "draw" },
+      ],
+    })
+    expect((await game.board(second)).match).toMatchObject({ gameNumber: 1, status: "active" })
+  })
+
   it("lets only the host call the match early, once a game has finished", async () => {
     const game = await matchGame(makeConvexTest())
     const drawn = [

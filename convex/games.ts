@@ -2047,7 +2047,7 @@ async function matchProjection(
   const match = game.matchId ? await ctx.db.get(game.matchId) : null
   if (match?.source !== "connected")
     return { bestOf: game.matchBestOf, gameNumber: game.matchGameNumber ?? 1 }
-  const scored = match.seats.some((seat) => (seat.gamesWon ?? 0) + (seat.gamesDrawn ?? 0) > 0)
+  const hasFinishedGame = game.status === "finished" || (game.matchGameNumber ?? 1) > 1
   const betweenGames =
     game.status === "finished" || (game.status === "active" && viewer.eventCount === 0)
   return {
@@ -2062,7 +2062,7 @@ async function matchProjection(
     })),
     ...(viewer.isHost &&
     match.status === "active" &&
-    scored &&
+    hasFinishedGame &&
     betweenGames &&
     match.gameIds.at(-1) === game._id
       ? { canEnd: true }
