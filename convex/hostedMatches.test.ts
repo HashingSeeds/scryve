@@ -174,4 +174,52 @@ describe("a match in a hosted game", () => {
       game.host.mutation(api.games.endMatch, { publicId: rematch(3).publicId, seats: drawn }),
     ).rejects.toMatchObject({ data: { code: "match_game_in_progress" } })
   })
+
+  it("continues a local match that was connected mid-way, from its score", async () => {
+    const t = makeConvexTest()
+    const host = await signedIn(t, "carry-host", "Host")
+    const publish = (match: { gameNumber: number; gamesWon: number }) =>
+      host.mutation(api.games.publishLocalGame, {
+        operationId: `publish-match-operation-${match.gameNumber}${match.gamesWon}`,
+        publicId: `carried-match-game-${match.gameNumber}${match.gamesWon}`,
+        ruleset: "standard",
+        startingLife: 20,
+        inviteToken: "c".repeat(43),
+        manualCodeCandidates: ["CAR234"],
+        hostLocalId: "local-a",
+        players: [
+          { localId: "local-a", seat: 1, displayName: "Ada", color: "#7C3AED", currentLife: 20 },
+          { localId: "local-b", seat: 2, displayName: "Grace", color: "#2563EB", currentLife: 20 },
+        ],
+        match: {
+          bestOf: 3,
+          gameNumber: match.gameNumber,
+          gamesDrawn: 0,
+          seats: [
+            { seat: 1, gamesWon: match.gamesWon },
+            { seat: 2, gamesWon: 0 },
+          ],
+        },
+      })
+    await expect(publish({ gameNumber: 2, gamesWon: 2 })).rejects.toThrow("match score")
+
+    const { publicId, players } = await publish({ gameNumber: 2, gamesWon: 1 })
+    expect((await host.query(api.games.lobbyProjection, { publicId })).match).toMatchObject({
+      gameNumber: 2,
+      seats: [{ gamesWon: 1 }, { gamesWon: 0 }],
+      canEnd: true,
+    })
+
+    await host.mutation(api.games.finishGame, {
+      publicId,
+      result: { kind: "win", winnerPlayerIds: [players[0].playerId] },
+    })
+    expect((await host.query(api.games.lobbyProjection, { publicId })).match).toMatchObject({
+      status: "finished",
+      seats: [
+        { gamesWon: 2, outcome: "win" },
+        { gamesWon: 0, outcome: "loss" },
+      ],
+    })
+  })
 })
