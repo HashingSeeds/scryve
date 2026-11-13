@@ -328,6 +328,9 @@ describe("connected log", () => {
     ]
     expect(gameLog(players, connectedLogInputs(undone, GAME, undefined).events)).toEqual([])
     expect(connectedLogUndo(undone, players, GAME, undefined, { turns: true })).toBeUndefined()
+    expect(
+      connectedLogUndo(undone.slice(2), players, GAME, undefined, { turns: true }),
+    ).toBeUndefined()
   })
 
   it("takes back this account's pass while the table holds it, and leaves it alone with turns hidden", () => {

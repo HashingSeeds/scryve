@@ -808,6 +808,36 @@ describe("engine parity: submitCommanderDamage", () => {
     await game.expectSameState()
   })
 
+  it("lets an undo the defender declined be sent again", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const claim = (operationId: string, delta: number, undoOf?: string) =>
+      game.write("host", {
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        delta,
+        commanderLimit: 999,
+        ...(undoOf ? { undoOf } : {}),
+        ...sent(operationId),
+      })
+    const resolve = (operationId: string, decision: "confirmed" | "declined") =>
+      game.write("joiner", {
+        kind: "commander.resolve",
+        decision,
+        ...sent(operationId, JOINER_DEVICE),
+      })
+
+    await claim("claim-redo-00000001", 7)
+    await resolve("claim-redo-00000001", "confirmed")
+    await claim("claim-redo-00000002", -7, "claim-redo-00000001")
+    await resolve("claim-redo-00000002", "declined")
+    expect(await claim("claim-redo-00000003", -7, "claim-redo-00000001")).toMatchObject({
+      ok: true,
+      ack: { status: "pending" },
+    })
+    await game.expectSameState()
+  })
+
   it("declines a pre-999 build's claim that would pull a total past 99 back down", async () => {
     const game = await parityGame(makeConvexTest(), { ...commander, lifeEditing: "anyone" })
     const claim = (operationId: string, delta: number, commanderLimit?: number) =>

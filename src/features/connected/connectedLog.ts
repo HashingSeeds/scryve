@@ -302,7 +302,9 @@ export function connectedLogUndo(
     // why: the authority takes back a claim only for the person who made it, and on an owner-only table the confirmed row belongs to the defender.
     const myClaims = new Set(
       events.flatMap((event) =>
-        event.kind === "commanderDamage.claimed" && event.mine ? [event.operationId] : [],
+        event.kind === "commanderDamage.claimed" && event.mine && !event.undoOf
+          ? [event.operationId]
+          : [],
       ),
     )
     const changes = row.operationIds.flatMap((operationId): CommanderUndo[] => {
