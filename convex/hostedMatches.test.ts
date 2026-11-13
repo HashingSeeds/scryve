@@ -99,6 +99,9 @@ describe("a match in a hosted game", () => {
       game.joiner.mutation(api.games.endMatch, { publicId: second, seats: drawn }),
     ).rejects.toThrow()
     await expect(
+      game.host.mutation(api.games.endMatch, { publicId: game.publicId, seats: drawn }),
+    ).rejects.toMatchObject({ data: { code: "match_moved_on" } })
+    await expect(
       game.host.mutation(api.games.endMatch, { publicId: second, seats: drawn }),
     ).rejects.toThrow("most game wins")
 

@@ -3122,6 +3122,12 @@ export const endMatch = mutation({
     const user = await requireHost(ctx, game)
     if (game.mode !== "connected" || !game.matchId)
       throw new ConvexError({ code: "match_not_found", message: "Match not found" })
+    const match = await ctx.db.get(game.matchId)
+    if (match?.source === "connected" && match.gameIds.at(-1) !== game._id)
+      throw new ConvexError({
+        code: "match_moved_on",
+        message: "End the match from its latest game",
+      })
     // why: the table agreed the match is over, so a game still open is dropped, as it is on a local board.
     if (game.status === "active")
       await terminalizeGame(ctx, game, "abandoned", "host_abandoned", user._id)

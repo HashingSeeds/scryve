@@ -584,7 +584,11 @@ export async function endHostedMatch(
       message: "Finish a game before ending the match",
     })
   const chosen = new Map(outcomes.map(({ seat, outcome }) => [seat, outcome]))
-  if (chosen.size !== outcomes.length || match.seats.some((seat) => !chosen.has(seat.seat)))
+  if (
+    chosen.size !== outcomes.length ||
+    chosen.size !== match.seats.length ||
+    match.seats.some((seat) => !chosen.has(seat.seat))
+  )
     throw new Error("A match result needs every seat exactly once")
   const result = match.seats.map((seat) => chosen.get(seat.seat)!)
   assertGameScores(
