@@ -331,6 +331,15 @@ describe("connected log", () => {
     expect(
       connectedLogUndo(undone.slice(2), players, GAME, undefined, { turns: true }),
     ).toBeUndefined()
+    expect(
+      connectedLogUndo(
+        [life("op-mine-tap-0001", "ada", -1, 1_000, { mine: true }), ...undone.slice(2)],
+        players,
+        GAME,
+        undefined,
+        { turns: true },
+      ),
+    ).toMatchObject({ kind: "life", changes: [{ operationId: "op-mine-tap-0001" }] })
   })
 
   it("takes back this account's pass while the table holds it, and leaves it alone with turns hidden", () => {

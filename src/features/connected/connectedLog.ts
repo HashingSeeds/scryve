@@ -273,7 +273,16 @@ export function connectedLogUndo(
     localCounterLog(inputs.counters),
     positionOf,
   )
-  const row = rows.find(({ operationIds }) => operationIds.some((id) => mine.has(id)))
+  // why: an undo whose original is outside the loaded page stays in the log as a row, and it must not stand in front of an older change that can still be taken back.
+  const undoClaims = new Set(
+    events.flatMap(({ kind, undoOf, operationId }) =>
+      kind === "commanderDamage.claimed" && undoOf ? [operationId] : [],
+    ),
+  )
+  const isUndo = (id: string) => undoClaims.has(mine.get(id)?.claimOperationId ?? "")
+  const row = rows.find(
+    ({ operationIds }) => operationIds.some((id) => mine.has(id)) && !operationIds.some(isUndo),
+  )
   const pass = turn?.previous ? mine.get(turn.operationId) : undefined
   const ownPass =
     turns &&
