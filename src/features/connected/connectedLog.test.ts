@@ -340,6 +340,17 @@ describe("connected log", () => {
         { turns: true },
       ),
     ).toMatchObject({ kind: "life", changes: [{ operationId: "op-mine-tap-0001" }] })
+    const sameBurst = [
+      claimed("op-claim-000003", { mine: true }),
+      confirmed("op-claim-000003", 2, { mine: true }),
+      ...undone.slice(2),
+    ]
+    expect(connectedLogUndo(sameBurst, players, GAME, undefined, { turns: true })).toEqual({
+      kind: "commander",
+      changes: [
+        { claimOperationId: "op-claim-000003", fromPlayerId: "bo", toPlayerId: "ada", delta: 2 },
+      ],
+    })
   })
 
   it("takes back this account's pass while the table holds it, and leaves it alone with turns hidden", () => {
