@@ -2,6 +2,7 @@ import { randomUUID as secureRandomUUID } from "expo-crypto"
 
 import { translate } from "@/i18n/translate"
 
+import { COMMANDER_SLOTS, commanderDamageKey, writeLocalGame } from "./localEngine"
 import {
   isSeatOrder,
   playerGridLayoutForCount,
@@ -477,19 +478,15 @@ export const teamSeats = (game: Pick<LocalGame, "players" | "variant" | "turnGro
     team.map((playerId) => game.players.findIndex(({ id }) => id === playerId)),
   )
 
-export const COMMANDER_SLOTS: readonly CommanderSlot[] = [undefined, PARTNER_COMMANDER]
+export { COMMANDER_SLOTS, commanderDamageKey }
+
+// why: the old local rules stay for a week as the fallback an update can switch back to. Remove with the legacy branches after 2026-11-20.
+export const localRules = { engine: true }
 
 export const clampedCommanderDelta = (total: number, delta: number) =>
   Math.max(0, Math.min(MAX_COMMANDER_DAMAGE, total + delta)) - total
 
 /** why: the partner's key keeps its marker before the `>`, so builds that split a key on `>` find no seat named `id#1` and skip it instead of misreading it. */
-export const commanderDamageKey = (
-  fromPlayerId: PlayerId,
-  toPlayerId: PlayerId,
-  commander?: CommanderSlot,
-): string =>
-  commander ? `${fromPlayerId}#${commander}>${toPlayerId}` : `${fromPlayerId}>${toPlayerId}`
-
 export function commanderDamageBetween(
   game: LocalGame,
   fromPlayerId: PlayerId,
@@ -605,6 +602,7 @@ export function applyLocalTableAction(
   context: { operationId: string; now: number },
 ): LocalGame {
   if (game.status !== "active") return game
+  if (localRules.engine) return engineTableAction(game, action, context)
   if (isTurnAction(action)) {
     const turn = applyTurnAction(game.turn, action, {
       ...context,
@@ -619,6 +617,100 @@ export function applyLocalTableAction(
   return applied === game
     ? game
     : withLogged(startTurnOnChange(applied, context.now), context.operationId)
+}
+
+function engineTableAction(
+  game: LocalGame,
+  action: TableAction,
+  context: { operationId: string; now: number },
+): LocalGame {
+  const outcome = writeLocalGame(
+    game,
+    { kind: "table", action, operationId: context.operationId },
+    context.now,
+  )
+  if (!outcome) return game
+  const counted =
+    outcome.table && outcome.table !== game.table
+      ? countedChange(game.table ?? EMPTY_TABLE, outcome.table, action)
+      : undefined
+  const { table: _table, ...rest } = game
+  const changed = withTurn(
+    {
+      ...rest,
+      ...(outcome.table ? { table: outcome.table } : {}),
+      players: outcome.players,
+      ...(counted?.delta
+        ? {
+            counterLog: [
+              ...(game.counterLog ?? []),
+              {
+                ...counted,
+                operationId: context.operationId,
+                playerId: action.playerId as PlayerId,
+                at: context.now,
+              },
+            ].slice(-MAX_COUNTER_LOG),
+          }
+        : {}),
+    },
+    outcome.turn,
+    context.now,
+  )
+  if (
+    outcome.table === game.table &&
+    outcome.players === game.players &&
+    changed.turn === game.turn
+  )
+    return game
+  return withLogged(
+    { ...changed, updatedAt: Math.max(game.updatedAt, context.now) },
+    context.operationId,
+  )
+}
+
+function engineEvent(game: LocalGame, event: CompensatableEvent): LocalGame {
+  const sent = {
+    operationId: event.operationId,
+    delta: event.delta,
+    ...(event.compensatesOperationId ? { undoOf: event.compensatesOperationId } : {}),
+  }
+  const outcome = writeLocalGame(
+    game,
+    event.type === "life.changed"
+      ? { kind: "life", playerId: event.playerId, ...sent }
+      : {
+          kind: "commander.claim",
+          commanderLimit: MAX_COMMANDER_DAMAGE,
+          fromPlayerId: event.fromPlayerId,
+          toPlayerId: event.toPlayerId,
+          ...(event.commander ? { commander: event.commander } : {}),
+          ...sent,
+        },
+    event.clientCreatedAt,
+  )
+  if (!outcome) return game
+  const { table: _table, ...rest } = game
+  return withTurn(
+    {
+      ...rest,
+      ...(outcome.table ? { table: outcome.table } : {}),
+      players: outcome.players,
+      ...(event.type === "commanderDamage.assigned" && outcome.total !== undefined
+        ? {
+            commanderDamage: {
+              ...game.commanderDamage,
+              [commanderDamageKey(event.fromPlayerId, event.toPlayerId, event.commander)]:
+                outcome.total,
+            },
+          }
+        : {}),
+      events: [...game.events, event],
+      updatedAt: Math.max(game.updatedAt, event.clientCreatedAt),
+    },
+    outcome.turn,
+    event.clientCreatedAt,
+  )
 }
 
 function withLogged(game: LocalGame, operationId: string): LocalGame {
@@ -783,6 +875,7 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
     return game
   }
   if (game.status !== "active") return game
+  if (localRules.engine && isCompensatable(event)) return engineEvent(game, event)
 
   if (event.type === "life.changed") {
     if (!isLifeDelta(event.delta)) return game

@@ -35,16 +35,17 @@ function makeContext(actor = "local") {
     actorId: asActorId(actor),
     deviceId: asDeviceId("device"),
     now: () => ++now,
-    operationId: () => asOperationId(`op-${++sequence}`),
+    operationId: () => asOperationId(`operation-test-000-${++sequence}`),
   }
   return context
 }
 
-function makeGame(count = 2, startingLife = 20) {
+function makeGame(count = 2, startingLife = 20, format?: "commander") {
   return createLocalGame({
     gameId: asGameId("game"),
     now: 1,
     startingLife,
+    ...(format ? { system: "mtg", format } : {}),
     players: Array.from({ length: count }, (_, i) => ({ name: `Player ${i + 1}`, color: "#000" })),
   })
 }
@@ -194,7 +195,7 @@ describe("local game domain", () => {
       delta: 5,
       actorId: asActorId("actor"),
       deviceId: asDeviceId("device"),
-      operationId: asOperationId("same"),
+      operationId: asOperationId("operation-same-0001"),
       clientCreatedAt: 2,
     }
     const once = reduceGameEvent(game, event)
@@ -237,7 +238,7 @@ describe("local game domain", () => {
     // why: beta builds with #923's card undo arrow stored undos of a seat's change even after another seat changed.
     const seatUndo: GameEvent = {
       type: "life.changed",
-      operationId: asOperationId("op-seat-undo"),
+      operationId: asOperationId("operation-test-000-seat-undo"),
       gameId: game.id,
       actorId: context.actorId,
       deviceId: context.deviceId,
@@ -369,7 +370,7 @@ describe("commander damage", () => {
   })
 
   it("moves the counter and the life total in one event", () => {
-    const game = assign(makeGame(4, 40), 0, 1, 7)
+    const game = assign(makeGame(4, 40, "commander"), 0, 1, 7)
     expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(7)
     expect(game.players[1].life).toBe(33)
     expect(game.players[0].life).toBe(40)
@@ -377,7 +378,7 @@ describe("commander damage", () => {
   })
 
   it("accumulates from the same commander and keeps sources separate", () => {
-    let game = makeGame(4, 40)
+    let game = makeGame(4, 40, "commander")
     game = assign(game, 0, 1, 7)
     game = assign(game, 0, 1, 6)
     game = assign(game, 2, 1, 4)
@@ -387,7 +388,7 @@ describe("commander damage", () => {
   })
 
   it("reports incoming damage keyed by the commander that dealt it", () => {
-    let game = makeGame(3, 40)
+    let game = makeGame(3, 40, "commander")
     game = assign(game, 0, 1, 5)
     const incoming = incomingCommanderDamage(game, game.players[1].id)
     expect(incoming[game.players[0].id]).toBe(5)
@@ -396,7 +397,7 @@ describe("commander damage", () => {
   })
 
   it("clamps at zero and records only the delta that lands", () => {
-    let game = makeGame(2, 40)
+    let game = makeGame(2, 40, "commander")
     game = assign(game, 0, 1, 3)
     game = assign(game, 0, 1, -10)
     expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(0)
@@ -404,7 +405,7 @@ describe("commander damage", () => {
   })
 
   it("clamps at the maximum", () => {
-    let game = makeGame(2, 40)
+    let game = makeGame(2, 40, "commander")
     game = assign(game, 0, 1, MAX_COMMANDER_DAMAGE + 20)
     expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(
       MAX_COMMANDER_DAMAGE,
@@ -415,14 +416,14 @@ describe("commander damage", () => {
   })
 
   it("rejects self-assignment, zero, and fractional deltas", () => {
-    const game = makeGame(2, 40)
+    const game = makeGame(2, 40, "commander")
     expect(assign(game, 0, 0, 5)).toBe(game)
     expect(assign(game, 0, 1, 0)).toBe(game)
     expect(assign(game, 0, 1, 1.5)).toBe(game)
   })
 
   it("undoes the counter and the life together", () => {
-    let game = assign(makeGame(4, 40), 0, 1, 7)
+    let game = assign(makeGame(4, 40, "commander"), 0, 1, 7)
     expect(canUndo(game, sharedContext.actorId)).toBe(true)
     game = applyGameCommand(game, { type: "life.undo" }, sharedContext)
     expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(0)
@@ -431,7 +432,7 @@ describe("commander damage", () => {
   })
 
   it("undoes commander damage and life changes in the order they happened", () => {
-    let game = makeGame(4, 40)
+    let game = makeGame(4, 40, "commander")
     game = assign(game, 0, 1, 7)
     game = applyGameCommand(
       game,
@@ -447,16 +448,19 @@ describe("commander damage", () => {
   })
 
   it("refuses to compensate the same assignment twice", () => {
-    let game = assign(makeGame(2, 40), 0, 1, 7)
+    let game = assign(makeGame(2, 40, "commander"), 0, 1, 7)
     const undo = commandToEvent(game, { type: "life.undo" }, sharedContext)
     expect(undo).not.toBeNull()
     game = reduceGameEvent(game, undo as GameEvent)
-    const duplicate = { ...(undo as GameEvent), operationId: asOperationId("op-duplicate") }
+    const duplicate = {
+      ...(undo as GameEvent),
+      operationId: asOperationId("operation-test-000-duplicate"),
+    }
     expect(reduceGameEvent(game, duplicate)).toBe(game)
   })
 
   const commanderGame = (count: number, life: number, format = "commander"): LocalGame => ({
-    ...makeGame(count, life),
+    ...makeGame(count, life, "commander"),
     system: "mtg",
     format,
   })

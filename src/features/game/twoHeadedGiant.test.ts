@@ -19,7 +19,7 @@ const context: CommandContext = {
   actorId: asActorId("local"),
   deviceId: asDeviceId("device"),
   now: () => 100,
-  operationId: () => asOperationId(`op-${++sequence}`),
+  operationId: () => asOperationId(`operation-test-000-${++sequence}`),
 }
 
 function makeGame(
@@ -51,7 +51,7 @@ function poison(game: LocalGame, seat: number, delta: number) {
   return applyLocalTableAction(
     game,
     { kind: "counter.changed", playerId: game.players[seat].id, counterId: "poison", delta },
-    { operationId: `poison-${++sequence}`, now: 2 },
+    { operationId: `operation-0000-poison-${++sequence}`, now: 2 },
   )
 }
 

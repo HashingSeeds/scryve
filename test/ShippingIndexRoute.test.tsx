@@ -647,7 +647,7 @@ describe("shipping index route", () => {
         actorId: asActorId("local"),
         deviceId: asDeviceId("device"),
         now: () => Date.now(),
-        operationId: () => asOperationId("op-1"),
+        operationId: () => asOperationId("operation-test-0001"),
       },
     )
     localGameRepository.saveActiveGame({

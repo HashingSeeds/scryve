@@ -330,7 +330,7 @@ describe("JoinConnectedScreen", () => {
         actorId: asActorId("local"),
         deviceId: asDeviceId("device"),
         now: () => Date.now(),
-        operationId: () => asOperationId("op-1"),
+        operationId: () => asOperationId("operation-test-000-1"),
       },
     )
     localGameRepository.saveActiveGame(started)

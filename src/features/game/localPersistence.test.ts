@@ -125,7 +125,7 @@ describe("LocalGameRepository", () => {
 
   it("updates players on the latest board and keeps events and commander damage", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
-    const original = makeGame()
+    const original = { ...makeGame(), system: "mtg" as const, format: "commander" }
     const current = applyGameCommand(
       original,
       {
@@ -306,7 +306,7 @@ describe("LocalGameRepository", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     let game = tap(makeGame())
     const turn = {
-      operationId: "turn-operation-00001",
+      operationId: "operation-0000-turn-operation-00001",
       playerId: game.players[0].id,
       number: 1,
       at: 2,
