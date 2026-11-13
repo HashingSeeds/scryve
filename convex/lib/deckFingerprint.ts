@@ -1,3 +1,5 @@
+import { integration } from "./integrations"
+
 type FingerprintCard = {
   game?: string
   identityNamespace?: string
@@ -11,15 +13,6 @@ type FingerprintCard = {
   quantity: number
 }
 
-const DEFAULT_NAMESPACES: Record<string, string> = {
-  mtg: "scryfall-oracle",
-  yugioh: "ygoprodeck-card",
-  pokemon: "tcgdex-card",
-  lorcana: "lorcanajson-card",
-  fab: "fab-cube-card",
-  riftbound: "riftbound-card",
-}
-
 export function canonicalDecklist(cards: readonly FingerprintCard[]) {
   const quantities = new Map<string, number>()
   for (const card of cards) {
@@ -27,7 +20,7 @@ export function canonicalDecklist(cards: readonly FingerprintCard[]) {
     const identity = card.cardId ?? card.oracleId
     const key = JSON.stringify([
       game,
-      card.identityNamespace ?? DEFAULT_NAMESPACES[game] ?? game,
+      card.identityNamespace ?? integration(game)?.identityNamespace ?? game,
       identity ?? [
         "unresolved",
         (card.originalReference ?? card.name)

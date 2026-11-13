@@ -424,6 +424,29 @@ it("settles a device copy onto the live deck that already has its key", async ()
   expect(await t.run(async (ctx) => ctx.db.query("decks").collect())).toHaveLength(1)
 })
 
+it("recognises an unchanged Yu-Gi-Oh device copy whose cards carry no namespace", async () => {
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  const cards = [{ name: "Dark Magician", cardId: "46986414", quantity: 3 }]
+  const deckId = await actor.mutation(api.decks.create, {
+    name: "Spellcasters",
+    format: "advanced",
+    game: "ygo",
+    deckKey: "deck-key",
+  })
+  await actor.mutation(api.decks.saveVersion, { deckId, cards })
+  const copy = await actor.mutation(api.decks.importGuest, {
+    localId: "00000000-0000-4000-8000-000000000002",
+    localUpdatedAt: 7,
+    deckKey: "deck-key",
+    name: "Spellcasters",
+    format: "advanced",
+    game: "ygo",
+    cards,
+  })
+  expect(copy).toEqual({ status: "already_imported", deckId, localUpdatedAt: 7 })
+})
+
 it("rejects another account's version even when archived", async () => {
   const t = makeConvexTest()
   const { deckId, versionId } = await deck(t)
