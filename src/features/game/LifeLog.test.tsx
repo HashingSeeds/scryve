@@ -33,7 +33,7 @@ const context: CommandContext = {
   actorId: asActorId("local"),
   deviceId: asDeviceId("device"),
   now: () => 100 + sequence,
-  operationId: () => asOperationId(`op-${++sequence}`),
+  operationId: () => asOperationId(`operation-test-000-${++sequence}`),
 }
 
 describe("life log", () => {

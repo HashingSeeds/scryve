@@ -18,7 +18,7 @@ const context: CommandContext = {
   actorId: asActorId("local"),
   deviceId: asDeviceId("device"),
   now: () => 100,
-  operationId: () => asOperationId(`op-${++sequence}`),
+  operationId: () => asOperationId(`operation-test-000-${++sequence}`),
 }
 
 const makeGame = (count = 4) =>
@@ -62,7 +62,7 @@ describe("Riftbound 2v2", () => {
     const next = applyLocalTableAction(
       game,
       { kind: "counter.changed", playerId: game.players[0].id, counterId: "xp", delta: 3 },
-      { operationId: "xp-1", now: 2 },
+      { operationId: "operation-0000-xp-1", now: 2 },
     )
     expect(ids(next).map((id) => next.table?.players[id]?.counters?.xp ?? 0)).toEqual([3, 0, 0, 0])
   })

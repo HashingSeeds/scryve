@@ -21,7 +21,7 @@ function play(commands: GameCommand[], times: number[]) {
       actorId: asActorId("local"),
       deviceId: asDeviceId("device"),
       now: () => times[index],
-      operationId: () => asOperationId(`op-${++sequence}`),
+      operationId: () => asOperationId(`operation-test-000-${++sequence}`),
     })
   })
   return game

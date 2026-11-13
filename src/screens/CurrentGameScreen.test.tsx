@@ -233,7 +233,7 @@ describe("CurrentGameScreen", () => {
   })
 
   it("keeps the first-player offer through Pokémon setup and withdraws it at the first point of play", () => {
-    const context = { operationId: "op-1", now: 2 }
+    const context = { operationId: "operation-test-000-1", now: 2 }
     const mtg = createLocalGame({
       players: [
         { name: "Ada", color: "#41476E" },

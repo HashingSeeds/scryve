@@ -18,11 +18,11 @@ const context: CommandContext = {
   actorId: actor,
   deviceId: asDeviceId("device"),
   now: () => clock,
-  operationId: () => asOperationId(`op-${++sequence}`),
+  operationId: () => asOperationId(`operation-test-000-${++sequence}`),
 }
 const at = (now: number) => {
   clock = now
-  return { operationId: `op-${++sequence}`, now }
+  return { operationId: `operation-test-000-${++sequence}`, now }
 }
 
 function game() {
@@ -36,7 +36,10 @@ function game() {
       { name: "Bo", color: "#111" },
     ],
   })
-  return withFirstTurn(created, created.players[0].id, { operationId: "turn-1", now: 500 })
+  return withFirstTurn(created, created.players[0].id, {
+    operationId: "operation-0000-turn-1",
+    now: 500,
+  })
 }
 
 const table = (current: LocalGame, action: TableAction, now: number) =>
