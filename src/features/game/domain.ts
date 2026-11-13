@@ -303,7 +303,7 @@ export const localTeams = (game: Pick<LocalGame, "variant" | "turnGroups">) =>
 const sharesLife = (game: LocalGame, playerId: PlayerId, other: PlayerId) =>
   turnGroupOf(localTeams(game), playerId).includes(other)
 
-function newMatch(bestOf: MatchBestOf, seatCount: number, now: number): LocalGameMatch {
+export function newMatch(bestOf: MatchBestOf, seatCount: number, now?: number): LocalGameMatch {
   return {
     id: createClientId("match", now),
     bestOf,

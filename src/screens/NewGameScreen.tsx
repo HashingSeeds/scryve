@@ -519,7 +519,7 @@ function NewGameForm({
   const matchBestOf = matchOn
     ? (chosenBestOf ?? (isCommanderFormat(system, format) || playerCount > 2 ? 1 : 3))
     : undefined
-  const matchOffered = cloudMode || (!connectedMode && !localGame)
+  const matchOffered = connectedMode || !localGame
   const clockMinutes = chosenClockMinutes ?? defaultRoundClockMinutes(system, matchBestOf)
   const clockSetup: RoundClockSetup | undefined =
     clockMode === "off"
@@ -723,7 +723,13 @@ function NewGameForm({
       return
     }
     if (nearbyMode)
-      onNearby?.({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...gameSetup })
+      onNearby?.({
+        playerCount,
+        startingLife,
+        ruleset: format ?? NO_PLAY_SYSTEM,
+        ...gameSetup,
+        ...(matchBestOf ? { matchBestOf } : {}),
+      })
     else if (connectedMode)
       connected?.host({
         playerCount,

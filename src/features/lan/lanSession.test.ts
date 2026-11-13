@@ -606,6 +606,40 @@ describe("nearby host", () => {
   })
 })
 
+describe("a nearby match", () => {
+  it("refuses to end once the next round is in play", async () => {
+    jest.mocked(archiveLanGame).mockImplementation((game, result) =>
+      jest.requireActual<typeof import("./lanArchive")>("./lanArchive").lanLocalGame(game, {
+        result,
+      }),
+    )
+    const session = new LanSession()
+    await session.host({ ...setup, playerCount: 2, matchBestOf: 3 })
+    const alice = socket()
+    alice.send({ type: "join", protocol: LAN_PROTOCOL, name: "Alice" })
+    jest.advanceTimersByTime(50)
+    session.start()
+    jest.advanceTimersByTime(50)
+    await session.writes.finish({ kind: "win", winnerPlayerIds: [alice.pass().key] })
+    session.start()
+    jest.advanceTimersByTime(50)
+    expect(session.getState().projection?.match).toMatchObject({ gameNumber: 2, canEnd: true })
+
+    alice.send({
+      type: "op",
+      event: lifeEvent("life-operation-match-1", alice.pass().key, -1, roundOf(session)),
+    })
+    jest.advanceTimersByTime(50)
+    await expect(
+      session.endMatch([
+        { seat: 1, outcome: "loss" },
+        { seat: 2, outcome: "win" },
+      ]),
+    ).rejects.toThrow()
+    expect(session.getState().projection?.match).toMatchObject({ gameNumber: 2 })
+  })
+})
+
 describe("nearby guest", () => {
   async function guest(session = new LanSession()) {
     const sent: unknown[] = []

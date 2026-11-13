@@ -9,9 +9,10 @@ import {
   asOperationId,
   asPlayerId,
   commanderDamageKey,
+  completedMatchResult,
 } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
-import type { GameEvent, LocalGame, SeatPassHashes } from "@/features/game/types"
+import type { GameEvent, LocalGame, LocalGameMatch, SeatPassHashes } from "@/features/game/types"
 
 import {
   lanProjection,
@@ -26,6 +27,14 @@ import { commanderField } from "../../../convex/lib/gameRules"
 /** why: must match `convex/lib/seatPass.ts`, which checks each guest's claim; no test runs both sides. */
 export const hashSeatPassToken = async (token: string) =>
   (await digestStringAsync(CryptoDigestAlgorithm.SHA256, token)).toLowerCase()
+
+/** why: History and the cloud read a match from each game's own copy of it, without the seat keys only the host needs. */
+function archivedMatch(game: LanGame, finished: LocalGame): LocalGameMatch | undefined {
+  if (!game.match) return undefined
+  const { seatKeys: _seatKeys, ...match } = game.match
+  const result = completedMatchResult({ ...finished, match })
+  return result ? { ...match, result } : match
+}
 
 export function lanLocalGame(
   game: LanGame,
@@ -72,7 +81,7 @@ export function lanLocalGame(
   )
   const { table } = lanProjection(game, game.hostKey)
   const hostDeck = game.seats.find((seat) => seat.key === game.hostKey)?.deck
-  return {
+  const finished: LocalGame = {
     schemaVersion: 1,
     id,
     status: "finished",
@@ -121,6 +130,8 @@ export function lanLocalGame(
       : {}),
     ...(seatPassHashes && Object.keys(seatPassHashes).length > 0 ? { seatPassHashes } : {}),
   }
+  const match = archivedMatch(game, finished)
+  return match ? { ...finished, match } : finished
 }
 
 export function archiveLanGame(
@@ -134,5 +145,7 @@ export function archiveLanGame(
     const hash = passHashes.get(key)
     if (hash && key !== game.hostKey) seatPassHashes[asPlayerId(key)] = hash
   }
-  return localGameRepository.archiveGame(lanLocalGame(game, { result, ownerId, seatPassHashes }))
+  const finished = lanLocalGame(game, { result, ownerId, seatPassHashes })
+  localGameRepository.archiveGame(finished)
+  return finished
 }

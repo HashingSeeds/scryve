@@ -1,10 +1,13 @@
+import { lanLocalGame } from "./lanArchive"
 import {
   admitLanGuest,
   applyLanWrite,
   createLanGame,
+  endLanMatch,
   endLanRound,
   LAN_PROTOCOL,
   lanLobbyOf,
+  lanMatchAfter,
   lanLog,
   mergeLanLog,
   lanProjection,
@@ -984,5 +987,78 @@ describe("nearby Riftbound 2v2", () => {
     expect(parseLanSetup({ ...commander, playerCount: 4, variant: "twoVsTwo" })).not.toHaveProperty(
       "variant",
     )
+  })
+})
+
+describe("a nearby match", () => {
+  const hostWins = (game: LanGame) => {
+    const finished = lanLocalGame(game, { result: { kind: "win", winnerPlayerIds: ["host"] } })
+    return {
+      finished,
+      next: { ...endLanRound(game, "finished", NOW), match: lanMatchAfter(game.match!, finished) },
+    }
+  }
+
+  it("carries the score between rounds, shows it to every seat and ends on enough wins", () => {
+    const first = started({ ...commander, matchBestOf: 3 })
+    expect(lanProjection(first, "guest").match).toEqual({
+      bestOf: 3,
+      gameNumber: 1,
+      seats: [
+        { seat: 1, gamesWon: 0, gamesDrawn: 0 },
+        { seat: 2, gamesWon: 0, gamesDrawn: 0 },
+      ],
+    })
+
+    const one = hostWins(first)
+    expect(one.finished.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
+    expect(one.finished.match?.result).toBeUndefined()
+    expect(lanProjection(one.next, "guest").match).toMatchObject({
+      gameNumber: 1,
+      seats: [{ gamesWon: 1 }, { gamesWon: 0 }],
+    })
+    const second = startLanRound(one.next, NOW)
+    expect(second.match?.id).toBe(first.match?.id)
+    expect(lanProjection(second, "guest").match).toMatchObject({
+      gameNumber: 2,
+      seats: [{ gamesWon: 1 }, { gamesWon: 0 }],
+    })
+    expect(lanProjection(second, "guest").match).not.toHaveProperty("canEnd")
+    expect(lanProjection(second, "host").match).toMatchObject({ canEnd: true })
+    const touched = write(
+      second,
+      "host",
+      op({
+        type: "life.changed",
+        gameId: "game-2",
+        operationId: "operation-match-life-1",
+        playerId: "host",
+        delta: -1,
+      }),
+    ).next
+    expect(lanProjection(touched, "host").match).not.toHaveProperty("canEnd")
+
+    const two = hostWins(touched)
+    expect(two.finished.match).toMatchObject({
+      gameNumber: 2,
+      wins: [1, 0],
+      result: { outcomes: ["win", "loss"] },
+    })
+    const fresh = startLanRound(two.next, NOW)
+    expect(fresh.match?.id).not.toBe(first.match?.id)
+    expect(fresh.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
+  })
+
+  it("keeps the host's best-of through the setup the lobby route parses", () => {
+    const sent = JSON.parse(JSON.stringify({ ...commander, matchBestOf: 3 }))
+    expect(parseLanSetup(sent)).toMatchObject({ matchBestOf: 3 })
+    expect(parseLanSetup({ ...commander, matchBestOf: 4 })).not.toHaveProperty("matchBestOf")
+  })
+
+  it("starts over when the host calls it early or the seats change", () => {
+    const second = startLanRound(hostWins(started({ ...commander, matchBestOf: 3 })).next, NOW)
+    expect(endLanMatch(second, NOW).match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
+    const swapped = startLanRound(swapLanSeats(hostWins(second).next, 1, 2), NOW)
+    expect(swapped.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
   })
 })
