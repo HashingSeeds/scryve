@@ -782,6 +782,9 @@ export class LanSession {
   endMatch = async (seats: readonly { seat: number; outcome: MatchSeatOutcome }[]) => {
     const game = this.game
     if (this.state.role !== "host" || !game?.match) return
+    // why: a guest can change life while the host is choosing the result, and a round in play belongs to the match it started in.
+    if (!lanProjection(game, game.hostKey).match?.canEnd)
+      throw new Error(translate("board:matchEnd.failed"))
     const outcomes = game.seats.map(
       ({ seat }) => seats.find((chosen) => chosen.seat === seat)?.outcome ?? "draw",
     )
