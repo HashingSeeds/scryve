@@ -31,7 +31,11 @@ import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
-import { MAX_GAMES_PER_MATCH, type MatchBestOf } from "../../../convex/lib/matchResults"
+import {
+  isMatchBestOf,
+  MAX_GAMES_PER_MATCH,
+  type MatchBestOf,
+} from "../../../convex/lib/matchResults"
 import { outReason } from "../../../convex/lib/outReason"
 import { clientSeesSeats } from "../../../convex/lib/policy"
 import {
@@ -469,7 +473,8 @@ function matchProjection(game: LanGame, viewerKey: string, eventSequence: number
   return {
     match: {
       bestOf: match.bestOf,
-      gameNumber: match.gameNumber,
+      // why: finishing a game already moves the match on to the next one, and the finished board still shows the game just played.
+      gameNumber: match.gameNumber - (game.status === "finished" && !match.result ? 1 : 0),
       seats: game.seats.map((seat, index) => ({
         seat: seat.seat,
         gamesWon: match.wins[index] ?? 0,
@@ -803,6 +808,7 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     layout,
     variant,
     modeSetup,
+    matchBestOf,
   } = value
   if (
     !Number.isInteger(playerCount) ||
@@ -821,6 +827,7 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     lifeStep,
     ruleset,
     ...(isPlayerGridLayoutVariant(layout) ? { layout } : {}),
+    ...(isMatchBestOf(matchBestOf) ? { matchBestOf } : {}),
   }
   if (system === undefined) return setup
   if (

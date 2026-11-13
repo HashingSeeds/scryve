@@ -1013,6 +1013,10 @@ describe("a nearby match", () => {
     const one = hostWins(first)
     expect(one.finished.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
     expect(one.finished.match?.result).toBeUndefined()
+    expect(lanProjection(one.next, "guest").match).toMatchObject({
+      gameNumber: 1,
+      seats: [{ gamesWon: 1 }, { gamesWon: 0 }],
+    })
     const second = startLanRound(one.next, NOW)
     expect(second.match?.id).toBe(first.match?.id)
     expect(lanProjection(second, "guest").match).toMatchObject({
@@ -1043,6 +1047,12 @@ describe("a nearby match", () => {
     const fresh = startLanRound(two.next, NOW)
     expect(fresh.match?.id).not.toBe(first.match?.id)
     expect(fresh.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
+  })
+
+  it("keeps the host's best-of through the setup the lobby route parses", () => {
+    const sent = JSON.parse(JSON.stringify({ ...commander, matchBestOf: 3 }))
+    expect(parseLanSetup(sent)).toMatchObject({ matchBestOf: 3 })
+    expect(parseLanSetup({ ...commander, matchBestOf: 4 })).not.toHaveProperty("matchBestOf")
   })
 
   it("starts over when the host calls it early or the seats change", () => {
