@@ -17,11 +17,15 @@ import { Text } from "../Text"
 
 const LETTERS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"] as const
 const DIGITS = ["123", "456", "789"] as const
+const DIGIT_ROW = "1234567890"
 const SYMBOLS = ["-", "'", ".", ":", "é", "&", "♀", "♂"] as const
 
 export const KEY_HEIGHT = 40
 export const COMPACT_KEY_HEIGHT = 32
-const ROW_GAP = spacing.xxs + 1
+/** why: a thumb-sized key, the size the system keyboard's keys hit. */
+export const FULL_KEY_SIZE = 44
+export const KEY_GAP = spacing.xxs
+export const ROW_GAP = spacing.xxs + 1
 
 export function tallestKeypadHeight(compact?: boolean) {
   const rows = DIGITS.length + 2
@@ -44,6 +48,7 @@ export function PokemonKeypad({
   digitsOnly,
   capitalize,
   compact,
+  full,
   onType,
   onDelete,
   onDone,
@@ -54,6 +59,10 @@ export function PokemonKeypad({
   /** why: prize values read the name's case ("ex" vs "EX"), so letters can't all come out uppercase. */
   capitalize: boolean
   compact?: boolean
+  /**
+   * why: the counter name panel opts into 44pt keys whose gaps also take touches, a numbers layer no taller than the letters, and a bottom row that leaves `clearance` (an x range across the keypad's `width`) free for the panel's Close.
+   */
+  full?: { width: number; clearance?: { start: number; end: number } }
   onType: (text: string) => void
   onDelete: () => void
   onDone: () => void
@@ -109,87 +118,115 @@ export function PokemonKeypad({
     wide: true,
     onPress: onDone,
   }
-  const rows: Key[][] = digits
-    ? [
-        ...DIGITS.map((row) => [...row].map(typed)),
-        ...(digitsOnly ? [] : [SYMBOLS.map(typed)]),
-        [
-          digitsOnly
-            ? done
-            : {
-                id: "letters",
-                label: translate("board:keypad.lettersKey"),
-                accessibilityLabel: translate("board:keypad.letters"),
+  const lettersKey: Key = {
+    id: "letters",
+    label: translate("board:keypad.lettersKey"),
+    accessibilityLabel: translate("board:keypad.letters"),
+    wide: true,
+    onPress: () => setDigitsChosen(false),
+  }
+  const space: Key = {
+    id: "space",
+    label: translate("board:keypad.spaceKey"),
+    accessibilityLabel: translate("board:keypad.space"),
+    wide: true,
+    onPress: () => onType(" "),
+  }
+  const rows: Key[][] =
+    full && digits && !digitsOnly
+      ? [[...DIGIT_ROW].map(typed), [...SYMBOLS.map(typed), del], [lettersKey, space, done]]
+      : digits
+        ? [
+            ...DIGITS.map((row) => [...row].map(typed)),
+            ...(digitsOnly ? [] : [SYMBOLS.map(typed)]),
+            [digitsOnly ? done : lettersKey, typed("0"), del],
+          ]
+        : [
+            ...LETTERS.map((row, index) =>
+              index === LETTERS.length - 1
+                ? [shiftKey, ...[...row].map(typed), del]
+                : [...row].map(typed),
+            ),
+            [
+              {
+                id: "numbers",
+                label: "123",
+                accessibilityLabel: translate("board:keypad.numbers"),
                 wide: true,
-                onPress: () => setDigitsChosen(false),
+                onPress: () => setDigitsChosen(true),
               },
-          typed("0"),
-          del,
-        ],
-      ]
-    : [
-        ...LETTERS.map((row, index) =>
-          index === LETTERS.length - 1
-            ? [shiftKey, ...[...row].map(typed), del]
-            : [...row].map(typed),
-        ),
-        [
-          {
-            id: "numbers",
-            label: "123",
-            accessibilityLabel: translate("board:keypad.numbers"),
-            wide: true,
-            onPress: () => setDigitsChosen(true),
-          },
-          {
-            id: "space",
-            label: translate("board:keypad.spaceKey"),
-            accessibilityLabel: translate("board:keypad.space"),
-            wide: true,
-            onPress: () => onType(" "),
-          },
-          done,
-        ],
-      ]
+              space,
+              done,
+            ],
+          ]
+  const keyHeight = full ? FULL_KEY_SIZE : compact ? COMPACT_KEY_HEIGHT : KEY_HEIGHT
+  const slop = full
+    ? { top: ROW_GAP / 2, bottom: ROW_GAP / 2, left: KEY_GAP / 2, right: KEY_GAP / 2 }
+    : undefined
+  const keyButton = (key: Key) => (
+    <BoardPressable
+      key={key.id}
+      testID={`pokemon-key-${key.id}-seat-${seatNumber}`}
+      accessibilityRole="button"
+      accessibilityLabel={key.accessibilityLabel}
+      accessibilityState={key.active === undefined ? undefined : { selected: key.active }}
+      hitSlop={slop}
+      onPress={() => {
+        if (reduceMotion === false && localGameRepository.hapticsEnabled())
+          void Haptics.selectionAsync().catch(() => undefined)
+        key.onPress()
+      }}
+      style={({ pressed: down }) => [
+        keyStyle,
+        key.wide && !digits && $wide,
+        (down || key.active) && pressed,
+      ]}
+    >
+      {key.icon ?? (
+        <Text
+          text={key.label}
+          size={key.wide && !digits ? "xxs" : "xs"}
+          weight="medium"
+          style={[inkStyle, $label]}
+        />
+      )}
+    </BoardPressable>
+  )
 
   return (
     <View testID={`pokemon-keypad-seat-${seatNumber}`} style={$keypad}>
       {rows.map((row, index) => (
-        <View
-          key={index}
-          style={[themed($row), { height: compact ? COMPACT_KEY_HEIGHT : KEY_HEIGHT }]}
-        >
-          {row.map((key) => (
-            <BoardPressable
-              key={key.id}
-              testID={`pokemon-key-${key.id}-seat-${seatNumber}`}
-              accessibilityRole="button"
-              accessibilityLabel={key.accessibilityLabel}
-              accessibilityState={key.active === undefined ? undefined : { selected: key.active }}
-              onPress={() => {
-                if (reduceMotion === false && localGameRepository.hapticsEnabled())
-                  void Haptics.selectionAsync().catch(() => undefined)
-                key.onPress()
-              }}
-              style={({ pressed: down }) => [
-                keyStyle,
-                key.wide && !digits && $wide,
-                (down || key.active) && pressed,
-              ]}
-            >
-              {key.icon ?? (
-                <Text
-                  text={key.label}
-                  size={key.wide && !digits ? "xxs" : "xs"}
-                  weight="medium"
-                  style={[inkStyle, $label]}
-                />
-              )}
-            </BoardPressable>
-          ))}
+        <View key={index} style={[themed($row), { height: keyHeight }]}>
+          {index === rows.length - 1 && full?.clearance
+            ? aroundClearance(row, { width: full.width, clearance: full.clearance }, keyButton)
+            : row.map(keyButton)}
         </View>
       ))}
     </View>
+  )
+}
+
+/**
+ * why: Close stays where the dice bag was, which can fall anywhere along the bottom row, so the row's keys split around it. Each key goes to the side its evenly spaced center falls on, and each side's keys share that side.
+ */
+function aroundClearance(
+  row: readonly Key[],
+  { width, clearance }: { width: number; clearance: { start: number; end: number } },
+  keyButton: (key: Key) => ReactElement,
+) {
+  const middle = (clearance.start + clearance.end) / 2
+  const before = row.filter((_, index) => ((index + 0.5) / row.length) * width < middle)
+  const after = row.slice(before.length)
+  return (
+    <>
+      {before.length ? (
+        <View style={[$clearanceSide, { width: Math.max(0, clearance.start - KEY_GAP) }]}>
+          {before.map(keyButton)}
+        </View>
+      ) : null}
+      <View style={{ width: before.length ? clearance.end - clearance.start : clearance.end }} />
+      {after.length ? <View style={[$clearanceSide, $fill]}>{after.map(keyButton)}</View> : null}
+    </>
   )
 }
 
@@ -228,6 +265,8 @@ export function KeyIcon({
 }
 
 const $wide: ViewStyle = { flex: 2 }
+const $fill: ViewStyle = { flex: 1 }
+const $clearanceSide: ViewStyle = { flexDirection: "row", gap: KEY_GAP }
 const $label: TextStyle = { textAlign: "center" }
 // why: beside the form on a short seat, the number layer is taller than the seat, so rows give up height instead of spilling over the header.
 const $keypad: ViewStyle = { gap: ROW_GAP, flexShrink: 1 }
