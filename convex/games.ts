@@ -3115,27 +3115,33 @@ export const endMatch = mutation({
         outcome: v.union(v.literal("win"), v.literal("loss"), v.literal("draw")),
       }),
     ),
-    rematch: v.optional(rematchRequest),
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    const user = await requireHost(ctx, game)
-    if (game.mode !== "connected" || !game.matchId)
+    await requireHost(ctx, game)
+    const match = game.mode === "connected" && game.matchId ? await ctx.db.get(game.matchId) : null
+    if (match?.source !== "connected")
       throw new ConvexError({ code: "match_not_found", message: "Match not found" })
-    const match = await ctx.db.get(game.matchId)
-    if (match?.source === "connected" && match.gameIds.at(-1) !== game._id)
+    if (match.gameIds.at(-1) !== game._id)
       throw new ConvexError({
         code: "match_moved_on",
         message: "End the match from its latest game",
       })
-    // why: the table agreed the match is over, so a game still open is dropped, as it is on a local board.
-    if (game.status === "active")
-      await terminalizeGame(ctx, game, "abandoned", "host_abandoned", user._id)
-    await endHostedMatch(ctx, game.matchId, args.seats)
-    const rematchPublicId = args.rematch
-      ? await startRematch(ctx, game, user._id, args.rematch)
-      : null
-    return { publicId: game.publicId, ...(rematchPublicId ? { rematchPublicId } : {}) }
+    if (game.status !== "active") {
+      await endHostedMatch(ctx, match._id, args.seats)
+      return { publicId: game.publicId }
+    }
+    const players = await playersForGame(ctx, game._id)
+    if (totalEventCount(game, players) > 0)
+      throw new ConvexError({
+        code: "match_game_in_progress",
+        message: "Finish this game before ending the match",
+      })
+    // why: the next game is already on every board, so it stays and opens the next match instead of being thrown away.
+    await ctx.db.patch(match._id, { gameIds: match.gameIds.slice(0, -1) })
+    await endHostedMatch(ctx, match._id, args.seats)
+    await openHostedMatch(ctx, game, players, match.bestOf)
+    return { publicId: game.publicId }
   },
 })
 

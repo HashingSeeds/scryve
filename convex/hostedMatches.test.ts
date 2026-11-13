@@ -113,8 +113,38 @@ describe("a match in a hosted game", () => {
       ],
     })
     expect(await game.board(second)).toMatchObject({
-      status: "abandoned",
-      match: { status: "finished", seats: [{ gamesWon: 1, outcome: "win" }, { outcome: "loss" }] },
+      status: "active",
+      match: { gameNumber: 1, status: "active", seats: [{ gamesWon: 0 }, { gamesWon: 0 }] },
     })
+    const history = await game.host.query(api.history.entries, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(history.page.map((entry) => entry.kind === "game" && entry.match)).toEqual([
+      expect.objectContaining({ status: "finished", outcome: "win" }),
+    ])
+
+    await game.host.mutation(api.games.changeLife, {
+      publicId: second,
+      playerId: (await game.board(second)).players[0].playerId,
+      operationId: "operation-match-life-1",
+      delta: -1,
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+    })
+    await game.hostWins(second, 3)
+    await expect(
+      game.host.mutation(api.games.endMatch, { publicId: rematch(3).publicId, seats: drawn }),
+    ).rejects.toThrow("most game wins")
+    await game.host.mutation(api.games.changeLife, {
+      publicId: rematch(3).publicId,
+      playerId: (await game.board(rematch(3).publicId)).players[0].playerId,
+      operationId: "operation-match-life-2",
+      delta: -1,
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+    })
+    await expect(
+      game.host.mutation(api.games.endMatch, { publicId: rematch(3).publicId, seats: drawn }),
+    ).rejects.toMatchObject({ data: { code: "match_game_in_progress" } })
   })
 })
