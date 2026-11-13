@@ -397,6 +397,43 @@ describe("nearby rounds on the shared engine", () => {
     ])
   })
 
+  it("takes a confirmed claim back once when its undo names it", () => {
+    const claim = (operationId: string, delta: number, undo = {}) =>
+      op({
+        type: "commanderDamage.submitted",
+        operationId,
+        fromPlayerId: "host",
+        toPlayerId: "guest",
+        delta,
+        commanderLimit: 999,
+        ...undo,
+      })
+    const confirm = (operationId: string, claimOperationId: string) =>
+      op({
+        type: "commanderDamage.resolved",
+        operationId,
+        claimOperationId,
+        toPlayerId: "guest",
+        accepted: true,
+      })
+    const undone = [
+      claim("claim-operation-001", 7),
+      confirm("resolve-operation-1", "claim-operation-001"),
+      claim("claim-operation-002", -7, { undoOf: "claim-operation-001" }),
+      confirm("resolve-operation-2", "claim-operation-002"),
+    ].reduce(
+      (game, event) =>
+        write(game, event.type === "commanderDamage.resolved" ? "guest" : "host", event).next,
+      started(),
+    )
+
+    expect(lifeOf(undone, "host", "guest")).toBe(40)
+    expect(
+      write(undone, "host", claim("claim-operation-003", -7, { undoOf: "claim-operation-001" }))
+        .result,
+    ).toMatchObject({ ok: false, error: { code: "invalid_undo" } })
+  })
+
   it("declines a pre-999 guest's claim that would pull a total past 99 back down", () => {
     const claim = (operationId: string, delta: number, marker = {}) =>
       op({
