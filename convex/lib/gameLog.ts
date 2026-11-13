@@ -1,4 +1,5 @@
 import type { GameEventRecord } from "./gameEngine"
+import { commanderField, type CommanderSlot } from "./gameRules"
 import type { TableAction } from "./table"
 
 export interface ConnectedLogEvent {
@@ -7,6 +8,8 @@ export interface ConnectedLogEvent {
   kind: string
   delta?: number
   fromPlayerId?: string
+  commander?: CommanderSlot
+  claimOperationId?: string
   clientCreatedAt: number
   action?: TableAction
   undoOf?: string
@@ -37,6 +40,8 @@ export function connectedLogEvent(event: GameEventRecord, viewer: string): Conne
     kind: event.kind,
     ...(event.delta === undefined ? {} : { delta: event.delta }),
     ...(event.fromPlayerId === undefined ? {} : { fromPlayerId: event.fromPlayerId }),
+    ...commanderField(event.commander),
+    ...(event.claimOperationId === undefined ? {} : { claimOperationId: event.claimOperationId }),
     clientCreatedAt: event.clientCreatedAt,
     ...(action ? { action } : {}),
     ...(event.undoOfOperationId === undefined ? {} : { undoOf: event.undoOfOperationId }),

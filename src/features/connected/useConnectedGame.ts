@@ -115,6 +115,7 @@ export function sendQueuedAction(
       operationId: event.operationId,
       delta: event.delta,
       ...(event.commanderLimit === undefined ? {} : { commanderLimit: event.commanderLimit }),
+      ...(event.undoOf ? { undoOf: event.undoOf } : {}),
       deviceId: event.deviceId,
       clientCreatedAt: event.clientCreatedAt,
       ...sent,

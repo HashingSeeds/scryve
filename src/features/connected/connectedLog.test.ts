@@ -206,6 +206,10 @@ describe("connected log", () => {
     expect(connectedLogEvents([], [claim], GAME)).toEqual([])
     expect(connectedLogEvents([], [claim], GAME, true)).toEqual([
       expect.objectContaining({
+        operationId: "op-claim-ada-bo-1",
+        kind: "commanderDamage.claimed",
+      }),
+      expect.objectContaining({
         operationId: "op-claim-ada-bo-1_confirmed",
         kind: "commanderDamage.confirmed",
         playerId: "bo",
@@ -281,6 +285,49 @@ describe("connected log", () => {
     expect(
       connectedLogUndo([...events, commander], players, GAME, undefined, { turns: true }),
     ).toBeUndefined()
+  })
+
+  it("takes back commander damage this account claimed, and hides it once taken back", () => {
+    const claimed = (operationId: string, extra: Partial<ConnectedLogEvent> = {}) =>
+      ({
+        operationId,
+        playerId: "ada",
+        kind: "commanderDamage.claimed",
+        clientCreatedAt: 10_000,
+        ...extra,
+      }) satisfies ConnectedLogEvent
+    const confirmed = (claimOperationId: string, delta: number, extra = {}) =>
+      ({
+        operationId: `${claimOperationId}_confirmed`,
+        playerId: "ada",
+        kind: "commanderDamage.confirmed",
+        delta,
+        fromPlayerId: "bo",
+        claimOperationId,
+        clientCreatedAt: 10_000,
+        ...extra,
+      }) satisfies ConnectedLogEvent
+    const theirs = [claimed("op-claim-000001"), confirmed("op-claim-000001", 5, { mine: true })]
+    expect(connectedLogUndo(theirs, players, GAME, undefined, { turns: true })).toBeUndefined()
+
+    const mine = [
+      claimed("op-claim-000001", { mine: true }),
+      confirmed("op-claim-000001", 5, { mine: true }),
+    ]
+    expect(connectedLogUndo(mine, players, GAME, undefined, { turns: true })).toEqual({
+      kind: "commander",
+      changes: [
+        { claimOperationId: "op-claim-000001", fromPlayerId: "bo", toPlayerId: "ada", delta: 5 },
+      ],
+    })
+
+    const undone = [
+      ...mine,
+      claimed("op-claim-000002", { mine: true, undoOf: "op-claim-000001" }),
+      confirmed("op-claim-000002", -5, { mine: true }),
+    ]
+    expect(gameLog(players, connectedLogInputs(undone, GAME, undefined).events)).toEqual([])
+    expect(connectedLogUndo(undone, players, GAME, undefined, { turns: true })).toBeUndefined()
   })
 
   it("takes back this account's pass while the table holds it, and leaves it alone with turns hidden", () => {

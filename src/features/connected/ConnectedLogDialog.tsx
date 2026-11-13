@@ -38,6 +38,7 @@ export const ConnectedLogContext = createContext<
       lives: Readonly<Record<string, number>>
       undoLife: ConnectedGameRuntime["undoLife"]
       undoTable: ConnectedGameRuntime["undoTable"]
+      undoCommander: ConnectedGameRuntime["undoCommander"]
     }
   | undefined
 >(undefined)
@@ -170,6 +171,7 @@ function ConnectedLog({
       onUndo={() => {
         if (undo?.kind === "turn") onUndoTurn(undo.playerId, undo.turnOperationId)
         else if (undo?.kind === "counter") context?.undoTable(undo.changes)
+        else if (undo?.kind === "commander") context?.undoCommander(undo.changes)
         else if (undo) context?.undoLife(undo.changes)
       }}
       onClose={onClose}

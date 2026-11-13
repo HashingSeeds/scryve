@@ -2794,6 +2794,7 @@ export const submitCommanderDamage = mutation({
     operationId: v.string(),
     delta: v.number(),
     commanderLimit: v.optional(v.number()),
+    undoOf: v.optional(v.string()),
     deviceId: v.string(),
     clientCreatedAt: v.number(),
     tappedAt: v.optional(v.number()),

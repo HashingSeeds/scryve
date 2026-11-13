@@ -92,6 +92,7 @@ export interface CommanderDamageSubmittedEvent {
   commander?: typeof PARTNER_COMMANDER
   delta: number
   commanderLimit?: number
+  undoOf?: OperationId
   actorId: ActorId
   deviceId: DeviceId
   clientCreatedAt: number

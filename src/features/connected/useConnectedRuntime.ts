@@ -11,6 +11,7 @@ import { translate } from "@/i18n/translate"
 import { captureGame } from "@/utils/analytics"
 import { recordReviewCompletion } from "@/utils/storeReview"
 
+import type { CommanderUndo } from "./connectedLog"
 import type {
   ConnectedCommanderDamageChange,
   ConnectedCommanderDamageClaim,
@@ -39,6 +40,7 @@ interface ConnectedGameRuntimeBase extends TableRuntime {
   changeLife: (playerId: string, delta: LifeDelta) => void
   undoLife: (changes: readonly { operationId: string; playerId: string; delta: number }[]) => void
   undoTable: (changes: readonly { operationId: string; action: TableAction }[]) => void
+  undoCommander: (changes: readonly CommanderUndo[]) => void
   submitCommanderDamage: (
     fromPlayerId: string,
     changes: readonly ConnectedCommanderDamageChange[],
@@ -211,6 +213,7 @@ export function useConnectedRuntime(
       changeLife: controller.changeLife,
       undoLife: controller.undoLife,
       undoTable: controller.undoTable,
+      undoCommander: controller.undoCommander,
       submitCommanderDamage: controller.submitCommanderDamage,
       resolveCommanderDamageClaim: controller.resolveCommanderDamage,
       finish: controller.finish,
