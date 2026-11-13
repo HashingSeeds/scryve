@@ -64,6 +64,17 @@ describe("table counters and designations", () => {
     ).toBeNull()
   })
 
+  it("keeps Riftbound XP on the player who gained it and accepts it in a snapshot", () => {
+    const rules = tableRules("riftbound", "constructed")
+    const gained = run(
+      EMPTY_TABLE,
+      { kind: "counter.changed", playerId: "me", counterId: "xp", delta: 3 },
+      { rules },
+    )!.table
+    expect(gained.players).toEqual({ me: { counters: { xp: 3 } } })
+    expect(isValidTableSnapshot(gained, rules, new Set(["me", "them"]))).toBe(true)
+  })
+
   it("moves a designation from its holder when another player takes it", () => {
     const taken = run(
       EMPTY_TABLE,

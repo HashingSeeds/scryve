@@ -108,6 +108,13 @@ describe("system definitions", () => {
     expect(tableRules("mtg", "commander")).toBe(tableRules("mtg", "commander"))
   })
 
+  it("gives each Riftbound player their own XP total with no losing value", () => {
+    expect(tableRules("riftbound", "constructed")).toEqual({
+      counters: [{ id: "xp", label: "XP", step: 1, max: 99 }],
+      designations: [],
+    })
+  })
+
   it("keeps each default format inside its system", () => {
     for (const system of SYSTEM_IDS) {
       const { deck, play } = SYSTEMS[system].defaultFormat

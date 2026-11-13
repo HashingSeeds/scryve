@@ -1,13 +1,16 @@
+import { useMemo } from "react"
+
 import {
   useConnectedRuntime,
   useConnectedSession,
   type ConnectedGameRuntime,
 } from "@/features/connected/useConnectedRuntime"
 
+import { hostTableRules } from "./lanGame"
 import { lanSession, useLanSession } from "./lanSession"
 
 export function useLanGame(): ConnectedGameRuntime {
-  const { projection, seatKey, status, role } = useLanSession()
+  const { projection, seatKey, status, role, hostTableItems } = useLanSession()
   const session = useConnectedSession({
     publicId: projection?.publicId ?? "nearby",
     ownerId: seatKey ?? "nearby",
@@ -17,7 +20,7 @@ export function useLanGame(): ConnectedGameRuntime {
     latency: lanSession.latency,
   })
   const reachable = role === "host" || status === "connected"
-  return useConnectedRuntime(session, {
+  const runtime = useConnectedRuntime(session, {
     remote: projection,
     environment: {
       isAuthenticated: true,
@@ -27,4 +30,9 @@ export function useLanGame(): ConnectedGameRuntime {
       remoteReady: reachable && Boolean(projection),
     },
   })
+  return useMemo(() => {
+    if (role !== "guest") return runtime
+    const tableRules = hostTableRules(runtime.tableRules, hostTableItems)
+    return tableRules === runtime.tableRules ? runtime : { ...runtime, tableRules }
+  }, [runtime, role, hostTableItems])
 }
