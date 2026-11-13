@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import type { ConnectedGameStatus } from "@/features/connected/model"
+import type { ConnectedGameStatus, ConnectedMatch } from "@/features/connected/model"
 import { SyncLatency } from "@/features/connected/syncLatency"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
@@ -96,6 +96,7 @@ export type MockConnectedRuntime = TableRuntime & {
     isHost: boolean
     layout?: PlayerGridLayoutVariant
     rematchPublicId?: string
+    match?: ConnectedMatch
     eventSequence: number
     serverUpdatedAt: number
     recentOperationIds: string[]
