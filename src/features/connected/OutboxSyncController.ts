@@ -21,6 +21,7 @@ import { translate } from "@/i18n/translate"
 import { convexErrorMessage } from "@/utils/convexError"
 import { emitTelemetry, type TelemetryWriteKind } from "@/utils/telemetry"
 
+import type { CommanderUndo } from "./connectedLog"
 import type {
   ConnectionStatus,
   ConnectedCommanderDamageChange,
@@ -469,6 +470,37 @@ export class OutboxSyncController {
       canAct: (playerId) =>
         projection.lifeEditing === "anyone" || playerOf(playerId)?.controlledByMe === true,
     }
+  }
+
+  undoCommander = (changes: readonly CommanderUndo[]) => {
+    this.changeError = undefined
+    for (const change of changes) {
+      const now = this.now()
+      const queued = this.outbox.enqueue({
+        schemaVersion: 1,
+        event: {
+          type: "commanderDamage.submitted",
+          operationId: asOperationId(createClientId("commander", now)),
+          gameId: asGameId(this.options.publicId),
+          fromPlayerId: asPlayerId(change.fromPlayerId),
+          toPlayerId: asPlayerId(change.toPlayerId),
+          ...(change.commander ? { commander: change.commander } : {}),
+          delta: -change.delta,
+          commanderLimit: MAX_COMMANDER_DAMAGE,
+          undoOf: asOperationId(change.claimOperationId),
+          actorId: asActorId(this.options.ownerId),
+          deviceId: this.options.deviceId,
+          clientCreatedAt: now,
+        },
+        queuedAt: now,
+        attempts: 0,
+      })
+      if (!queued) {
+        this.changeError = translate("connected:outbox.queueFull")
+        break
+      }
+    }
+    this.publish()
   }
 
   undoTable = (changes: readonly { operationId: string; action: TableAction }[]) => {

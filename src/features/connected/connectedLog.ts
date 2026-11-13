@@ -9,6 +9,7 @@ import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "@/fea
 
 import { compareQueued, type PendingLifeAction } from "./model"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
+import { commanderField, type PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import {
   customCounterId,
   loggedCounterId,
@@ -62,10 +63,19 @@ export function connectedLogEvents(
       return [
         {
           ...base,
+          kind: "commanderDamage.claimed",
+          playerId: event.toPlayerId,
+          ...(event.undoOf ? { undoOf: event.undoOf } : {}),
+          mine: true,
+        },
+        {
+          ...base,
           operationId: confirmation,
           kind: "commanderDamage.confirmed",
           playerId: event.toPlayerId,
           fromPlayerId: event.fromPlayerId,
+          ...commanderField(event.commander),
+          claimOperationId: event.operationId,
           delta: event.delta,
           mine: true,
         },
@@ -89,6 +99,7 @@ export function connectedLogInputs(
   table: CounterTable = {},
 ) {
   const game = asGameId(gameId)
+  const undoneClaimOf = commanderUndoLookup(events)
   const lifeEvents = events.flatMap((event): GameEvent[] => {
     if (event.delta === undefined) return []
     const base = {
@@ -115,7 +126,9 @@ export function connectedLogInputs(
           type: "commanderDamage.assigned",
           fromPlayerId: asPlayerId(event.fromPlayerId),
           toPlayerId: asPlayerId(event.playerId),
+          ...commanderField(event.commander),
           delta: event.delta,
+          ...undoneClaimOf(event),
         },
       ]
     return []
@@ -206,7 +219,39 @@ function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): 
   return entries.reverse()
 }
 
+export interface CommanderUndo {
+  claimOperationId: string
+  fromPlayerId: string
+  toPlayerId: string
+  commander?: typeof PARTNER_COMMANDER
+  delta: number
+}
+
+/** why: an undo names the claim it takes back on its claimed event, while the log draws confirmed events, so each confirmed undo is matched to the confirmed row of the claim it names. */
+function commanderUndoLookup(events: readonly ConnectedLogEvent[]) {
+  const claimed = new Map(
+    events.flatMap((event) =>
+      event.kind === "commanderDamage.claimed" && event.undoOf
+        ? [[event.operationId, event.undoOf] as const]
+        : [],
+    ),
+  )
+  const confirmed = new Map(
+    events.flatMap((event) =>
+      event.kind === "commanderDamage.confirmed" && event.claimOperationId
+        ? [[event.claimOperationId, event.operationId] as const]
+        : [],
+    ),
+  )
+  return (event: ConnectedLogEvent) => {
+    const claim = event.claimOperationId && claimed.get(event.claimOperationId)
+    const row = claim ? confirmed.get(claim) : undefined
+    return row ? { compensatesOperationId: asOperationId(row) } : {}
+  }
+}
+
 export type ConnectedLogUndo =
+  | { kind: "commander"; changes: CommanderUndo[] }
   | { kind: "life"; changes: { operationId: string; playerId: string; delta: number }[] }
   | { kind: "counter"; changes: { operationId: string; action: TableAction }[] }
   | { kind: "turn"; playerId: string; turnOperationId: string }
@@ -228,7 +273,15 @@ export function connectedLogUndo(
     localCounterLog(inputs.counters),
     positionOf,
   )
-  const row = rows.find(({ operationIds }) => operationIds.some((id) => mine.has(id)))
+  const undoClaims = new Set(
+    events.flatMap(({ kind, undoOf, operationId }) =>
+      kind === "commanderDamage.claimed" && undoOf ? [operationId] : [],
+    ),
+  )
+  const isUndo = (id: string) => undoClaims.has(mine.get(id)?.claimOperationId ?? "")
+  const row = rows.find(({ operationIds }) =>
+    operationIds.some((id) => mine.has(id) && !isUndo(id)),
+  )
   const pass = turn?.previous ? mine.get(turn.operationId) : undefined
   const ownPass =
     turns &&
@@ -253,7 +306,33 @@ export function connectedLogUndo(
         return [{ operationId, action: { ...action, delta: -delta } }]
       }),
     }
-  if (row.fromPlayerId) return undefined
+  if (row.fromPlayerId) {
+    // why: the authority takes back a claim only for the person who made it, and on an owner-only table the confirmed row belongs to the defender.
+    const myClaims = new Set(
+      events.flatMap((event) =>
+        event.kind === "commanderDamage.claimed" && event.mine && !event.undoOf
+          ? [event.operationId]
+          : [],
+      ),
+    )
+    const claims = row.operationIds.filter((id) => !isUndo(id))
+    const changes = claims.flatMap((operationId): CommanderUndo[] => {
+      const event = mine.get(operationId)
+      const claim = event?.claimOperationId
+      return event?.delta && event.fromPlayerId && claim && myClaims.has(claim)
+        ? [
+            {
+              claimOperationId: claim,
+              fromPlayerId: event.fromPlayerId,
+              toPlayerId: event.playerId,
+              ...commanderField(event.commander),
+              delta: event.delta,
+            },
+          ]
+        : []
+    })
+    return changes.length === claims.length ? { kind: "commander", changes } : undefined
+  }
   return {
     kind: "life",
     changes: row.operationIds.flatMap((operationId) => {

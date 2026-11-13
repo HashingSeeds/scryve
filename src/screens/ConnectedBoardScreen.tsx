@@ -507,10 +507,10 @@ export function ConnectedBoardWithRuntime({
         : undefined,
     [cloud, publicId, pending, lifeTeams],
   )
-  const { undoLife, undoTable } = runtime
+  const { undoLife, undoTable, undoCommander } = runtime
   const logContext = useMemo(
-    () => ({ pending, lives, undoLife, undoTable }),
-    [pending, lives, undoLife, undoTable],
+    () => ({ pending, lives, undoLife, undoTable, undoCommander }),
+    [pending, lives, undoLife, undoTable, undoCommander],
   )
   const tableState = useStructurallyStable(runtime.table)
   const {

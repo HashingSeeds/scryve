@@ -521,6 +521,7 @@ function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined
       ...commanderField(event.commander),
       delta: event.delta,
       ...(event.commanderLimit === undefined ? {} : { commanderLimit: event.commanderLimit }),
+      ...(event.undoOf ? { undoOf: event.undoOf } : {}),
       ...sent,
     }
   return {
@@ -842,6 +843,7 @@ function parseEvent(value: unknown): ConnectedActionEvent | null {
       ...commanderField(value.commander),
       delta: value.delta,
       ...(isCount(value.commanderLimit) ? { commanderLimit: value.commanderLimit } : {}),
+      ...(isId(value.undoOf) ? { undoOf: asOperationId(value.undoOf) } : {}),
     }
   if (
     value.type === "commanderDamage.resolved" &&
@@ -990,6 +992,7 @@ function parseLogEvent(value: unknown): ConnectedLogEvent | null {
   if (!isRecord(value)) return null
   const { operationId, playerId, kind, delta, fromPlayerId, clientCreatedAt, action, undoOf } =
     value
+  const { commander, claimOperationId } = value
   if (!isId(operationId) || !isId(playerId) || !isId(kind) || !isCount(clientCreatedAt)) return null
   return {
     operationId,
@@ -997,6 +1000,8 @@ function parseLogEvent(value: unknown): ConnectedLogEvent | null {
     kind,
     ...(isWhole(delta) ? { delta } : {}),
     ...(isId(fromPlayerId) ? { fromPlayerId } : {}),
+    ...(isCommanderSlot(commander) ? commanderField(commander) : {}),
+    ...(isId(claimOperationId) ? { claimOperationId } : {}),
     clientCreatedAt,
     ...(matchesValidator(tableActionValidator, action) ? { action } : {}),
     ...(isId(undoOf) ? { undoOf } : {}),

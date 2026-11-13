@@ -63,8 +63,13 @@ const memoryStore = (game: MemoryGame): GameStore => ({
   game,
   seat: (id) => game.seats.get(id),
   event: (operationId) => game.events.get(operationId),
+  // why: a commander damage undo the defender declined moved nothing, so the change it named can still be taken back.
   undoneBy: (operationId) =>
-    [...game.events.values()].find((event) => event.undoOfOperationId === operationId),
+    [...game.events.values()].find(
+      (event) =>
+        event.undoOfOperationId === operationId &&
+        game.claims.get(event.operationId)?.status !== "declined",
+    ),
   claim: (operationId) => game.claims.get(operationId),
   pendingClaims: () => [...game.claims.values()].filter((claim) => claim.status === "pending"),
   pairTotal: (pair) => game.pairs.get(pairKey(pair))?.total ?? 0,

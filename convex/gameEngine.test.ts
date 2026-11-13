@@ -139,6 +139,7 @@ async function parityGame(
                   ...(write.commanderLimit === undefined
                     ? {}
                     : { commanderLimit: write.commanderLimit }),
+                  ...(write.undoOf ? { undoOf: write.undoOf } : {}),
                 })
               : await client.mutation(
                   write.decision === "confirmed"
@@ -772,6 +773,67 @@ describe("engine parity: submitCommanderDamage", () => {
     expect(await game.write("host", claim("claim-past-99-0004", 1))).toMatchObject({
       ok: true,
       ack: { status: "declined" },
+    })
+    await game.expectSameState()
+  })
+
+  it("takes a claim back once, and only for the person who made it", async () => {
+    const game = await parityGame(makeConvexTest(), { ...commander, lifeEditing: "anyone" })
+    const claim = (operationId: string, delta: number, undoOf?: string) =>
+      ({
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        delta,
+        commanderLimit: 999,
+        ...(undoOf ? { undoOf } : {}),
+        ...sent(operationId),
+      }) as const
+
+    await game.write("host", claim("claim-undo-00000001", 7))
+    await game.write("host", claim("claim-undo-00000002", 4))
+    expect(
+      await game.write("joiner", claim("claim-undo-00000003", -7, "claim-undo-00000001")),
+    ).toMatchObject({ ok: false, error: { code: "invalid_undo" } })
+    expect(
+      await game.write("host", claim("claim-undo-00000004", -6, "claim-undo-00000001")),
+    ).toMatchObject({ ok: false, error: { code: "invalid_undo" } })
+    expect(
+      await game.write("host", claim("claim-undo-00000005", -7, "claim-undo-00000001")),
+    ).toMatchObject({ ok: true, ack: { status: "confirmed", total: 4 } })
+    await game.write("host", claim("claim-undo-00000005", -7, "claim-undo-00000001"))
+    expect(
+      await game.write("host", claim("claim-undo-00000006", -7, "claim-undo-00000001")),
+    ).toMatchObject({ ok: false, error: { code: "invalid_undo" } })
+    await game.expectSameState()
+  })
+
+  it("lets an undo the defender declined be sent again", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
+    const claim = (operationId: string, delta: number, undoOf?: string) =>
+      game.write("host", {
+        kind: "commander.claim",
+        fromPlayerId: game.hostSeat,
+        toPlayerId: game.joinerSeat,
+        delta,
+        commanderLimit: 999,
+        ...(undoOf ? { undoOf } : {}),
+        ...sent(operationId),
+      })
+    const resolve = (operationId: string, decision: "confirmed" | "declined") =>
+      game.write("joiner", {
+        kind: "commander.resolve",
+        decision,
+        ...sent(operationId, JOINER_DEVICE),
+      })
+
+    await claim("claim-redo-00000001", 7)
+    await resolve("claim-redo-00000001", "confirmed")
+    await claim("claim-redo-00000002", -7, "claim-redo-00000001")
+    await resolve("claim-redo-00000002", "declined")
+    expect(await claim("claim-redo-00000003", -7, "claim-redo-00000001")).toMatchObject({
+      ok: true,
+      ack: { status: "pending" },
     })
     await game.expectSameState()
   })

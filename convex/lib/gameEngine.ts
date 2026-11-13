@@ -203,6 +203,7 @@ export type GameWrite =
       commander?: number
       delta: number
       commanderLimit?: number
+      undoOf?: string
     })
   | (WriteRequest & {
       kind: "commander.resolve"
@@ -306,6 +307,7 @@ export function rejectRequest(write: GameWrite): EngineError | null {
     return (write.undoOf === undefined ? null : checkOperationId(write.undoOf)) ?? checkWrite(write)
   if (write.kind === "commander.claim")
     return (
+      (write.undoOf === undefined ? null : checkOperationId(write.undoOf)) ??
       (isCommanderDamageDelta(write.delta)
         ? null
         : rejected(
@@ -804,6 +806,7 @@ export function submitClaim(
   target: EngineSeat,
   request: CommanderClaimRequest,
   now: number,
+  undoOf?: string,
 ): GameChange[] {
   const declined = status === "declined"
   const event = {
@@ -841,6 +844,8 @@ export function submitClaim(
         kind: "commanderDamage.claimed",
         actorUserId: request.actorUserId,
         deviceId: request.deviceId,
+        // why: a declined undo moved nothing, so the change it named can still be taken back.
+        ...(undoOf === undefined || declined ? {} : { undoOfOperationId: undoOf }),
       },
     },
   ]
@@ -887,8 +892,22 @@ function* writeClaim(
       ? acknowledged({ operationId, deduplicated: true, status: existing.status })
       : failed(MISMATCH)
   if (yield* read(store.event(operationId))) return failed(MISMATCH)
-  yield* admitNewWrite(store)
   const pair: CommanderPair = { fromPlayerId: source.id, toPlayerId: target.id, commander }
+  if (write.undoOf !== undefined) {
+    const undone = yield* read(store.claim(write.undoOf))
+    const claimed = yield* read(store.event(write.undoOf))
+    if (
+      undone?.status !== "confirmed" ||
+      !isSamePair(undone, pair) ||
+      undone.actorUserId !== actor.userId ||
+      undone.delta !== -write.delta ||
+      claimed?.undoOfOperationId !== undefined
+    )
+      return failed(writeError("invalid_undo", "Only your own commander damage can be taken back"))
+    if (yield* read(store.undoneBy(write.undoOf)))
+      return failed(writeError("invalid_undo", "This change was already taken back"))
+  }
+  yield* admitNewWrite(store)
   const total = yield* read(store.pairTotal(pair))
   const pending = yield* read(store.pendingClaims())
   const status = commanderClaimOutcome({
@@ -900,7 +919,7 @@ function* writeClaim(
   })
   if (status === "declined" && (yield* read(store.event(declinedClaimOperationId(operationId)))))
     return failed(MISMATCH)
-  const submitted = submitClaim(pair, status, target, request, now)
+  const submitted = submitClaim(pair, status, target, request, now, write.undoOf)
   if (status === "declined" || store.game.lifeEditing !== "anyone") {
     yield* read(store.apply(submitted))
     return acknowledged({ operationId, deduplicated: false, status })

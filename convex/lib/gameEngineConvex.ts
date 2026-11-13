@@ -183,13 +183,17 @@ export async function writeCloudGame(
       return seat?.gameId === game._id ? { ...seat, id: seat._id } : undefined
     },
     event: async (operationId) => (await eventDoc(operationId)) ?? undefined,
-    undoneBy: async (operationId) =>
-      (await ctx.db
+    // why: a commander damage undo the defender declined moved nothing, so the change it named can still be taken back.
+    undoneBy: async (operationId) => {
+      const undos = ctx.db
         .query("gameEvents")
         .withIndex("by_game_and_undo_of", (q) =>
           q.eq("gameId", game._id).eq("undoOfOperationId", operationId),
         )
-        .first()) ?? undefined,
+      for await (const undo of undos)
+        if ((await claimDoc(undo.operationId))?.status !== "declined") return undo
+      return undefined
+    },
     claim: async (operationId) => (await claimDoc(operationId)) ?? undefined,
     pendingClaims: () =>
       ctx.db

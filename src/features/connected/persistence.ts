@@ -151,6 +151,7 @@ function parseCommanderDamageEvent(
     ...(value.commander ? { commander: value.commander } : {}),
     delta: value.delta,
     ...(typeof value.commanderLimit === "number" ? { commanderLimit: value.commanderLimit } : {}),
+    ...(typeof value.undoOf === "string" ? { undoOf: asOperationId(value.undoOf) } : {}),
     actorId: asActorId(value.actorId),
     deviceId: asDeviceId(value.deviceId),
     clientCreatedAt: value.clientCreatedAt,
