@@ -140,6 +140,7 @@ export default defineSchema({
     rematchOfGameId: v.optional(v.id("games")),
     matchId: v.optional(v.id("matches")),
     matchGameNumber: v.optional(v.number()),
+    matchBestOf: v.optional(v.union(v.literal(1), v.literal(3), v.literal(5))),
     // Reserved for a future event stream without enabling connected mutations in Phase 2.
     // Legacy event-count base. New life writes never patch this shared row.
     eventSequence: v.optional(v.number()),

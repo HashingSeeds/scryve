@@ -55,7 +55,11 @@ import {
   MAX_LIFE_DELTA,
   PARTNER_COMMANDER,
 } from "../../../convex/lib/gameRules"
-import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
+import {
+  decidedMatchOutcomes,
+  MAX_GAMES_PER_MATCH,
+  type MatchBestOf,
+} from "../../../convex/lib/matchResults"
 import {
   commanderOutState,
   outReason,
@@ -327,10 +331,8 @@ export function completedMatchResult(
   game: Pick<LocalGame, "players" | "match" | "result">,
 ): LocalMatchResult | undefined {
   if (!game.match) return undefined
-  const { wins } = matchScoreAfter(game)
-  const winner = wins.findIndex((count) => count >= winsNeeded(game.match!.bestOf))
-  if (winner === -1) return undefined
-  return { outcomes: wins.map((_, seat) => (seat === winner ? "win" : "loss")) }
+  const outcomes = decidedMatchOutcomes(matchScoreAfter(game).wins, game.match.bestOf)
+  return outcomes && { outcomes }
 }
 
 export function drawsLabel(draws: number) {
