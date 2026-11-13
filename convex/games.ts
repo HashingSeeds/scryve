@@ -61,6 +61,7 @@ import {
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { playerGridLayoutValidator } from "./lib/layouts"
+import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "./lib/matchResults"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
 import { HIDDEN_DECK_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
@@ -878,7 +879,7 @@ async function terminalizeGame(
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players)
     await ctx.db.patch(player._id, { resumable: false, ...(decks ? {} : NO_SEAT_DECK) })
-  if (hostedMatchId) await scoreHostedMatch(ctx, game, { discarded: !recordsHistory })
+  if (hostedMatchId) await scoreHostedMatch(ctx, game, summary, { discarded: !recordsHistory })
   return summary
 }
 
@@ -1305,6 +1306,39 @@ function assertSnapshotPlayers(players: Infer<typeof localSnapshotPlayer>[]) {
   return { localIds, seats }
 }
 
+function carriedMatchScore(
+  match: {
+    bestOf: MatchBestOf
+    gameNumber: number
+    gamesDrawn: number
+    seats: { seat: number; gamesWon: number }[]
+  },
+  seats: ReadonlySet<number>,
+) {
+  const gamesWon = new Map(match.seats.map(({ seat, gamesWon }) => [seat, gamesWon]))
+  const played = match.gameNumber - 1
+  if (
+    !Number.isInteger(match.gameNumber) ||
+    match.gameNumber < 1 ||
+    match.gameNumber > MAX_GAMES_PER_MATCH ||
+    !Number.isInteger(match.gamesDrawn) ||
+    match.gamesDrawn < 0 ||
+    match.gamesDrawn > played ||
+    gamesWon.size !== match.seats.length ||
+    gamesWon.size !== seats.size ||
+    match.seats.some(
+      ({ seat, gamesWon: won }) =>
+        !seats.has(seat) ||
+        !Number.isInteger(won) ||
+        won < 0 ||
+        won > played ||
+        won >= winsNeeded(match.bestOf),
+    )
+  )
+    throw new Error("The match score does not fit this game")
+  return { gameNumber: match.gameNumber, gamesDrawn: match.gamesDrawn, gamesWon }
+}
+
 export const publishLocalGame = mutation({
   args: {
     operationId: v.string(),
@@ -1333,6 +1367,15 @@ export const publishLocalGame = mutation({
     layout: v.optional(playerGridLayoutValidator),
     // why: kept out of the receipt key, so a retry after the host updates the app still matches its first publish.
     editsAnySeat: v.optional(v.boolean()),
+    variant: v.optional(gameVariantValidator),
+    match: v.optional(
+      v.object({
+        bestOf: bestOfValidator,
+        gameNumber: v.number(),
+        gamesDrawn: v.number(),
+        seats: v.array(v.object({ seat: v.number(), gamesWon: v.number() })),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1365,6 +1408,16 @@ export const publishLocalGame = mutation({
       throw new Error("Too many commander damage totals")
     if (args.table && !isValidTableSnapshot(args.table, tableRules(gameSystem, format), localIds))
       throw new Error("Table state does not fit this game")
+    if (args.variant !== undefined) {
+      if (
+        !isTeamVariant(args.variant) ||
+        !systemDefinition(gameSystem)?.variants.includes(args.variant) ||
+        !args.table?.turnGroups
+      )
+        throw new Error("Only a team game with its teams can keep its variant")
+      assertVariantSeats(args.variant, args.players.length)
+    }
+    const carried = args.match && carriedMatchScore(args.match, seats)
     const requestKey = JSON.stringify([
       args.publicId,
       args.system ?? null,
@@ -1388,6 +1441,8 @@ export const publishLocalGame = mutation({
       // why: appended only when sent, so receipts written before tables existed keep their key.
       ...(args.table ? [canonicalJson(args.table)] : []),
       ...(args.layout ? [args.layout] : []),
+      ...(args.variant ? [args.variant] : []),
+      ...(args.match ? [canonicalJson(args.match)] : []),
     ])
     const receipt = await ctx.db
       .query("gamePublishReceipts")
@@ -1429,6 +1484,7 @@ export const publishLocalGame = mutation({
       game: gameSystem,
       system: gameSystem,
       ...(format ? { format } : {}),
+      ...(args.variant ? { variant: args.variant } : {}),
       ...(args.layout ? { layout: args.layout } : {}),
       ...(args.editsAnySeat ? { lifeEditing: "anyone" as const } : {}),
       createdAt: now,
@@ -1491,6 +1547,14 @@ export const publishLocalGame = mutation({
         updatedAt: now,
       })
     }
+    if (args.match && carried)
+      await openHostedMatch(
+        ctx,
+        (await ctx.db.get(gameId))!,
+        await playersForGame(ctx, gameId),
+        args.match.bestOf,
+        carried,
+      )
     const invitationId = await ctx.db.insert("invitations", {
       gameId,
       token: args.inviteToken,
@@ -3050,7 +3114,18 @@ async function startRematch(
       ...modeGameFields(started, now, `archenemy_${request.publicId}`),
     })
   }
-  if (isTeamVariant(game.variant)) await ctx.db.patch(gameId, { turnGroups: pairedTeams(seatIds) })
+  if (isTeamVariant(game.variant)) {
+    // why: a connected local game can team seats that are not neighbors, and a rematch keeps the same teammates.
+    const nextIdOf = new Map<string, Id<"gamePlayers">>(
+      [...players]
+        .sort((left, right) => left.seat - right.seat)
+        .map((player, index) => [player._id, seatIds[index]]),
+    )
+    const kept = finished.turnGroups?.map((group) => group.flatMap((id) => nextIdOf.get(id) ?? []))
+    await ctx.db.patch(gameId, {
+      turnGroups: kept && kept.flat().length === seatIds.length ? kept : pairedTeams(seatIds),
+    })
+  }
   if (finished.matchBestOf && !(await continueHostedMatch(ctx, finished, game)))
     await openHostedMatch(ctx, game, players, finished.matchBestOf)
   if (players.some((player) => player.userId === undefined)) {

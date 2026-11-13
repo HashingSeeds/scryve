@@ -14,6 +14,7 @@ import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_SNAPSHOT_LIFE } from "../../../convex/lib/gameRules"
 import { isSystemId } from "../../../convex/lib/systems"
 import { isValidTableSnapshot, type TableState } from "../../../convex/lib/table"
+import { isTeamVariant } from "../../../convex/lib/teamVariants"
 
 type FinishedGameArgs = FunctionArgs<typeof api.games.publishFinishedLocalGame>
 type MatchFinishArgs = FunctionArgs<typeof api.matches.finishScryveMatch>
@@ -146,6 +147,7 @@ export function buildLocalGameSnapshot({
   )
   const commanderTotals = commanderTotalsFor(game, seatsByPlayerId)
   const table = tableFor(game)
+  const match = game.match
   return {
     operationId,
     publicId,
@@ -170,6 +172,19 @@ export function buildLocalGameSnapshot({
     table,
     layout: game.layout || undefined,
     editsAnySeat: true,
+    variant: isTeamVariant(game.variant) && table?.turnGroups ? game.variant : undefined,
+    match:
+      match && !match.result
+        ? {
+            bestOf: match.bestOf,
+            gameNumber: match.gameNumber,
+            gamesDrawn: match.draws,
+            seats: ordered.map((player, index) => ({
+              seat: index + 1,
+              gamesWon: match.wins[game.players.indexOf(player)] ?? 0,
+            })),
+          }
+        : undefined,
   }
 }
 

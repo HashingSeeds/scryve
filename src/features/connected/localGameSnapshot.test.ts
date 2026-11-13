@@ -44,6 +44,37 @@ describe("buildLocalGameSnapshot", () => {
     expect(JSON.stringify(snapshot)).not.toMatch(/firstChooserSeat|firstPlayerOffered/)
   })
 
+  it("carries an undecided match's score by server seat", () => {
+    const game = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#00FF00" },
+      ],
+      startingLife: 20,
+      match: { bestOf: 3 },
+    })
+    const second: LocalGame = {
+      ...game,
+      match: { ...game.match!, gameNumber: 2, wins: [0, 1], draws: 0 },
+    }
+    const snapshot = (played: LocalGame) =>
+      buildLocalGameSnapshot({ game: played, hostPlayerId: played.players[0].id, ...identifiers })
+
+    expect(snapshot(second).match).toEqual({
+      bestOf: 3,
+      gameNumber: 2,
+      gamesDrawn: 0,
+      seats: [
+        { seat: 1, gamesWon: 0 },
+        { seat: 2, gamesWon: 1 },
+      ],
+    })
+    expect(
+      snapshot({ ...second, match: { ...second.match!, result: { outcomes: ["loss", "win"] } } })
+        .match,
+    ).toBeUndefined()
+  })
+
   it("rebases zero-based local seats onto the server's one-based seats", () => {
     const game = createLocalGame({
       players: [

@@ -3182,6 +3182,69 @@ describe("connected table actions", () => {
     expect(await active(TABLE_VERSION)).toEqual({ ...pikachu, asleep: true })
   })
 
+  it("keeps a local team game's variant and teams when it is connected", async () => {
+    const t = makeConvexTest()
+    const host = await signedIn(t, "publish-team-host", "Host")
+    const base = {
+      operationId: "publish-team-operation",
+      publicId: "publish-team-game-12345",
+      system: "mtg",
+      format: "standard",
+      ruleset: "standard",
+      startingLife: 30,
+      inviteToken: token,
+      manualCodeCandidates: ["TEM234"],
+      hostLocalId: "local-a",
+      players: ["a", "b", "c", "d"].map((letter, index) => ({
+        localId: `local-${letter}`,
+        seat: index + 1,
+        displayName: `Player ${letter}`,
+        color: "#7C3AED",
+        currentLife: index % 2 === 0 ? 27 : 30,
+      })),
+      variant: "twoHeadedGiant" as const,
+    }
+    await expect(host.mutation(api.games.publishLocalGame, base)).rejects.toThrow("team game")
+    const table = {
+      designations: {},
+      players: {},
+      turnGroups: [
+        ["local-a", "local-c"],
+        ["local-b", "local-d"],
+      ],
+    }
+    const { publicId, players } = await host.mutation(api.games.publishLocalGame, {
+      ...base,
+      table,
+    })
+    await host.mutation(
+      api.games.changeLife,
+      lifeArgs(publicId, players[0].playerId, "operation-team-life-1", -2),
+    )
+    const board = await host.query(api.games.lobbyProjection, {
+      publicId,
+      tableVersion: TABLE_VERSION,
+    })
+    expect(board.variant).toBe("twoHeadedGiant")
+    expect(board.players.map(({ currentLife }) => currentLife)).toEqual([25, 30, 25, 30])
+
+    const rematch = {
+      publicId: "publish-team-rematch-123",
+      inviteToken: "m".repeat(43),
+      manualCodeCandidates: ["TRM234"],
+    }
+    await host.mutation(api.games.finishGame, { publicId, rematch })
+    const next = await host.query(api.games.lobbyProjection, {
+      publicId: rematch.publicId,
+      tableVersion: TABLE_VERSION,
+    })
+    const seatOf = new Map(next.players.map(({ playerId, seat }) => [playerId as string, seat]))
+    expect(next.table?.turnGroups?.map((group) => group.map((id) => seatOf.get(id)))).toEqual([
+      [1, 3],
+      [2, 4],
+    ])
+  })
+
   it("carries a local game's table into the connected game under the new seat ids", async () => {
     const t = makeConvexTest()
     const host = await signedIn(t, "publish-host", "Host")
