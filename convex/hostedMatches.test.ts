@@ -44,8 +44,11 @@ describe("a match in a hosted game", () => {
   afterEach(() => jest.useRealTimers())
 
   it("carries the score into each rematch and ends when a seat wins enough games", async () => {
-    const game = await matchGame(makeConvexTest())
+    const t = makeConvexTest()
+    const game = await matchGame(t)
     expect((await game.board(game.publicId)).match).toMatchObject({ bestOf: 3, gameNumber: 1 })
+    const matches = await t.run((ctx) => ctx.db.query("matches").collect())
+    expect(matches.map(({ publicId }) => publicId)).toEqual([game.publicId])
 
     await game.hostWins(game.publicId, 2)
     expect((await game.board(rematch(2).publicId)).match).toMatchObject({
