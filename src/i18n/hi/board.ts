@@ -328,6 +328,13 @@ export default {
       switchIn: "अंदर लाएँ",
       makeActive: "ऐक्टिव बनाएँ",
     },
+    condition: {
+      asleep: "स्लीप",
+      confused: "कन्फ़्यूज़्ड",
+      paralyzed: "पैरालाइज़्ड",
+      poisoned: "पॉइज़न्ड",
+      burned: "बर्न",
+    },
     switchLabel: {
       switchIn: "स्विच इन करें, {{name}} ऐक्टिव बन जाता है",
       makeActive: "ऐक्टिव बनाएँ, {{name}} ऐक्टिव बन जाता है",

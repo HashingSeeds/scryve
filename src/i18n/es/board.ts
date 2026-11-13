@@ -342,6 +342,13 @@ export default {
       switchIn: "Cambiar",
       makeActive: "Hacer Activo",
     },
+    condition: {
+      asleep: "Dormido",
+      confused: "Confundido",
+      paralyzed: "Paralizado",
+      poisoned: "Envenenado",
+      burned: "Quemado",
+    },
     switchLabel: {
       switchIn: "Cambiar, {{name}} pasa a ser el Pokémon Activo",
       makeActive: "Hacer Activo, {{name}} pasa a ser el Pokémon Activo",

@@ -340,6 +340,13 @@ export default {
       switchIn: "Faire entrer",
       makeActive: "Mettre Actif",
     },
+    condition: {
+      asleep: "Endormi",
+      confused: "Confus",
+      paralyzed: "Paralysé",
+      poisoned: "Empoisonné",
+      burned: "Brûlé",
+    },
     switchLabel: {
       switchIn: "Échanger, {{name}} devient Actif",
       makeActive: "Mettre Actif, {{name}} devient Actif",

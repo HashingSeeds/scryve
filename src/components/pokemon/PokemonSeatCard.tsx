@@ -47,6 +47,7 @@ import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
 import {
   findPokemon,
+  POKEMON_CONDITIONS,
   pokemonBoardOf,
   type PokemonInPlay,
   type PokemonSlot,
@@ -928,6 +929,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             table.removePokemon(playerId, pokemonId)
             setSheet(null)
           }}
+          turnedConditions={table.turnedConditions !== false}
+          onCondition={(pokemonId, condition, on) =>
+            table.setPokemonCondition(playerId, pokemonId, condition, on)
+          }
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -982,6 +987,9 @@ function PokemonHero({
   const unit = translate(cardless ? "board:pokemon.unit.damage" : "board:pokemon.unit.hp")
   const name = pokemonName(pokemon)
   const slotLabel = bench ? translate("board:pokemon.benchSlot", { name }) : name
+  const conditions = POKEMON_CONDITIONS.filter((condition) => pokemon[condition]).map((condition) =>
+    translate(`board:pokemon.condition.${condition}`),
+  )
   const onInk = accessibleForeground(ink)
   const recentDelta = useRecentDeltaValue(pokemon.damage)
   const longPressHandled = useRef<number | null>(null)
@@ -1199,6 +1207,16 @@ function PokemonHero({
             </BoardPressable>
           ) : null}
         </View>
+        {conditions.length > 0 ? (
+          <Text
+            testID={`pokemon-conditions-seat-${seatNumber}`}
+            text={conditions.join(" · ")}
+            size="xxs"
+            weight="bold"
+            numberOfLines={1}
+            style={{ color: ink }}
+          />
+        ) : null}
         {bench ? (
           <DrainBar ink={ink} restartKey={bench.restartKey} seatNumber={seatNumber} />
         ) : null}

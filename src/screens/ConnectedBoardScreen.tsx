@@ -384,6 +384,7 @@ interface ConnectedBoardRuntimeProps {
   logFeed?: ConnectedLogFeed
   partners?: boolean
   turns?: boolean
+  turnedConditions?: boolean
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
   roleRevealOnline?: boolean
@@ -454,6 +455,7 @@ export function ConnectedBoardWithRuntime({
   logFeed = cloud ? CloudLogFeed : undefined,
   partners = cloud,
   turns = cloud,
+  turnedConditions = true,
   awayPlayerIds,
   onRevealRole,
   roleRevealOnline = false,
@@ -536,6 +538,7 @@ export function ConnectedBoardWithRuntime({
     (): TableRuntime => ({
       table: tableState,
       tableRules,
+      turnedConditions,
       adjustCounter,
       takeDesignation,
       releaseDesignation,
@@ -558,6 +561,7 @@ export function ConnectedBoardWithRuntime({
     [
       tableState,
       tableRules,
+      turnedConditions,
       adjustCounter,
       takeDesignation,
       releaseDesignation,

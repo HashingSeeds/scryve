@@ -27,9 +27,10 @@ export const POKEMON_HP_FACET = "hp"
 export const POISON_CHECKUP_DAMAGE = 10
 export const BURN_CHECKUP_DAMAGE = 20
 /** why: an older install's strict parser drops a table with any field it does not know, so each client gets only the fields of the version it sends. */
-export const TABLE_VERSION = 5
+export const TABLE_VERSION = 6
 export const TURN_TABLE_VERSION = 3
 export const CUSTOM_COUNTER_TABLE_VERSION = 4
+export const MODES_TABLE_VERSION = 5
 export const CUSTOM_COUNTER_PREFIX = "custom:"
 export const MAX_CUSTOM_COUNTERS = 4
 export const MAX_CUSTOM_COUNTER_NAME_LENGTH = 20
@@ -48,7 +49,13 @@ export const pokemonCardValidator = v.object({
   prizes: v.number(),
 })
 
-export const pokemonConditionValidator = v.union(v.literal("poisoned"), v.literal("burned"))
+export const pokemonConditionValidator = v.union(
+  v.literal("poisoned"),
+  v.literal("burned"),
+  v.literal("asleep"),
+  v.literal("confused"),
+  v.literal("paralyzed"),
+)
 
 export const coinValidator = v.union(v.literal("heads"), v.literal("tails"))
 
@@ -57,6 +64,9 @@ export const pokemonValidator = pokemonCardValidator.extend({
   damage: v.number(),
   poisoned: v.optional(v.boolean()),
   burned: v.optional(v.boolean()),
+  asleep: v.optional(v.boolean()),
+  confused: v.optional(v.boolean()),
+  paralyzed: v.optional(v.boolean()),
 })
 
 export const pokemonKnockoutValidator = v.object({
@@ -170,6 +180,20 @@ export const tableActionValidator = v.union(
 export type PokemonSlot = Infer<typeof pokemonSlotValidator>
 export type PokemonCard = Infer<typeof pokemonCardValidator>
 export type PokemonCondition = Infer<typeof pokemonConditionValidator>
+/** why: these turn the card, so a Pokémon holds at most one; Poisoned and Burned stack beside it. */
+export const ROTATION_CONDITIONS = [
+  "asleep",
+  "confused",
+  "paralyzed",
+] as const satisfies readonly PokemonCondition[]
+export const STACKED_CONDITIONS = [
+  "poisoned",
+  "burned",
+] as const satisfies readonly PokemonCondition[]
+export const POKEMON_CONDITIONS = [
+  ...ROTATION_CONDITIONS,
+  ...STACKED_CONDITIONS,
+] as const satisfies readonly PokemonCondition[]
 export type Coin = Infer<typeof coinValidator>
 export type PokemonInPlay = Infer<typeof pokemonValidator>
 export type PokemonKnockout = Infer<typeof pokemonKnockoutValidator>
@@ -426,17 +450,26 @@ function withoutPokemon(board: PokemonBoard, pokemonId: string): PokemonBoard {
 function withConditions(
   pokemon: PokemonInPlay,
   conditions: Partial<Record<PokemonCondition, boolean>>,
+  kept: readonly PokemonCondition[] = POKEMON_CONDITIONS,
 ): PokemonInPlay {
-  const { poisoned: _poisoned, burned: _burned, ...rest } = pokemon
+  const {
+    poisoned: _poisoned,
+    burned: _burned,
+    asleep: _asleep,
+    confused: _confused,
+    paralyzed: _paralyzed,
+    ...rest
+  } = pokemon
   return {
     ...rest,
-    ...(conditions.poisoned ? { poisoned: true } : {}),
-    ...(conditions.burned ? { burned: true } : {}),
+    ...Object.fromEntries(
+      kept.filter((condition) => conditions[condition]).map((condition) => [condition, true]),
+    ),
   }
 }
 
 function isConditioned(pokemon: PokemonInPlay) {
-  return pokemon.poisoned === true || pokemon.burned === true
+  return POKEMON_CONDITIONS.some((condition) => pokemon[condition] === true)
 }
 
 function replacePokemon(board: PokemonBoard, next: PokemonInPlay): PokemonBoard {
@@ -657,7 +690,13 @@ export function applyTableAction(
   if (action.kind === "pokemon.conditionChanged") {
     if (slot !== "active") return null
     if ((pokemon[action.condition] === true) === action.on) return unchanged
-    const active = withConditions(pokemon, { ...pokemon, [action.condition]: action.on })
+    const rotation =
+      action.on && ROTATION_CONDITIONS.some((condition) => condition === action.condition)
+    const active = withConditions(pokemon, {
+      ...pokemon,
+      ...(rotation ? { asleep: false, confused: false, paralyzed: false } : {}),
+      [action.condition]: action.on,
+    })
     return { table: withBoard(table, action.playerId, { ...board, active }), life: [] }
   }
 
@@ -671,7 +710,7 @@ export function applyTableAction(
       return knockOut(table, action.playerId, board, found, action.takerPlayerId, context)
     const active = withConditions(
       { ...pokemon, damage },
-      { poisoned: pokemon.poisoned, burned: pokemon.burned && action.coin !== "heads" },
+      { ...pokemon, burned: pokemon.burned && action.coin !== "heads" },
     )
     return { table: withBoard(table, action.playerId, { ...board, active }), life: [] }
   }
@@ -712,7 +751,8 @@ function isValidPokemon(pokemon: PokemonInPlay) {
   return (
     POKEMON_ID.test(pokemon.id) &&
     isValidCard(pokemon) &&
-    isWholeNumber(pokemon.damage, 0, MAX_POKEMON_DAMAGE)
+    isWholeNumber(pokemon.damage, 0, MAX_POKEMON_DAMAGE) &&
+    ROTATION_CONDITIONS.filter((condition) => pokemon[condition] === true).length <= 1
   )
 }
 
@@ -826,27 +866,29 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
 
 export function tableForVersion(table: TableState, tableVersion = 1): TableState {
   if (tableVersion >= TABLE_VERSION) return table
-  const { modes: _modes, turn, turnGroups, ...beforeTurns } = table
+  const { modes, turn, turnGroups, ...beforeTurns } = table
   const turns = tableVersion >= TURN_TABLE_VERSION
   const counters = tableVersion >= CUSTOM_COUNTER_TABLE_VERSION
+  const conditions = tableVersion >= 2 ? (["poisoned", "burned"] as const) : []
   return {
     ...(turn && turns ? { turn } : {}),
     ...(turnGroups && turns ? { turnGroups } : {}),
+    ...(modes && tableVersion >= MODES_TABLE_VERSION ? { modes } : {}),
     ...beforeTurns,
     players: Object.fromEntries(
       Object.entries(table.players).map(([playerId, { customCounters, ...older }]) => {
         const player = counters && customCounters ? { ...older, customCounters } : older
         const board = player.pokemon
-        if (!board || tableVersion >= 2) return [playerId, player]
+        if (!board) return [playerId, player]
         const { active, lastKnockout, ...rest } = board
         const pokemon: PokemonBoard = {
           ...rest,
-          ...(active ? { active: withConditions(active, {}) } : {}),
+          ...(active ? { active: withConditions(active, active, conditions) } : {}),
           ...(lastKnockout
             ? {
                 lastKnockout: {
                   ...lastKnockout,
-                  pokemon: withConditions(lastKnockout.pokemon, {}),
+                  pokemon: withConditions(lastKnockout.pokemon, lastKnockout.pokemon, conditions),
                 },
               }
             : {}),

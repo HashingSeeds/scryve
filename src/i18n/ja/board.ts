@@ -319,6 +319,13 @@ export default {
       switchIn: "入れ替える",
       makeActive: "バトルポケモンにする",
     },
+    condition: {
+      asleep: "ねむり",
+      confused: "こんらん",
+      paralyzed: "マヒ",
+      poisoned: "どく",
+      burned: "やけど",
+    },
     switchLabel: {
       switchIn: "入れ替える、{{name}}がバトルポケモンになります",
       makeActive: "バトルポケモンにする、{{name}}がバトルポケモンになります",
