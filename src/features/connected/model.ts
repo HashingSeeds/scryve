@@ -17,6 +17,7 @@ import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
+import { isMatchBestOf, type MatchBestOf } from "../../../convex/lib/matchResults"
 import {
   matchesValidator,
   parseTableState,
@@ -143,6 +144,7 @@ export interface ConnectedProjection {
   lifeEditing?: "anyone"
   treacheryOutcome?: TreacheryOutcome<string>
   rematchPublicId?: string
+  match?: ConnectedMatch
   eventSequence: number
   serverUpdatedAt: number
   lastChange?: LastChange
@@ -153,6 +155,14 @@ export interface ConnectedProjection {
   /** Only the host sees this, and only while the invite is still usable. */
   invitation?: { token: string; manualCode: string; expiresAt: number }
   players: ConnectedPlayerProjection[]
+}
+
+export interface ConnectedMatch {
+  bestOf: MatchBestOf
+  gameNumber: number
+  seats: { seat: number; gamesWon: number; gamesDrawn: number }[]
+  /** why: only the server knows whether the host may call the match, so an older server never offers it. */
+  canEnd?: true
 }
 
 export type ConnectedOperationStatus =
@@ -391,6 +401,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     ...(typeof value.rematchPublicId === "string" && value.rematchPublicId
       ? { rematchPublicId: value.rematchPublicId }
       : {}),
+    ...matchOf(value.match),
     eventSequence: value.eventSequence,
     serverUpdatedAt: value.serverUpdatedAt,
     ...lastChangeOf(value.lastChange),
@@ -401,6 +412,27 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     ...(table ? { table } : {}),
     ...(invitation ? { invitation } : {}),
     players,
+  }
+}
+
+function matchOf(value: unknown): { match?: ConnectedMatch } {
+  if (!isRecord(value) || !isMatchBestOf(value.bestOf) || !Number.isInteger(value.gameNumber))
+    return {}
+  const seats = (Array.isArray(value.seats) ? value.seats : []).flatMap((seat: unknown) =>
+    isRecord(seat) &&
+    typeof seat.seat === "number" &&
+    typeof seat.gamesWon === "number" &&
+    typeof seat.gamesDrawn === "number"
+      ? [{ seat: seat.seat, gamesWon: seat.gamesWon, gamesDrawn: seat.gamesDrawn }]
+      : [],
+  )
+  return {
+    match: {
+      bestOf: value.bestOf,
+      gameNumber: Number(value.gameNumber),
+      seats,
+      ...(value.canEnd === true ? { canEnd: true as const } : {}),
+    },
   }
 }
 

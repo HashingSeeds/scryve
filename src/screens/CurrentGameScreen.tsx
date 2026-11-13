@@ -39,6 +39,7 @@ import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import { localGameRepository, type LocalGameRepository } from "@/features/game/localPersistence"
+import { MatchScoreDialog } from "@/features/game/MatchScoreDialog"
 import { playCommanderLethal } from "@/features/game/playSystems"
 import { RoundClockDialog } from "@/features/game/RoundClockDialog"
 import { teamIncoming, teamName } from "@/features/game/teams"
@@ -665,30 +666,17 @@ export function CurrentGameScreen({
       ) : null}
 
       {matchOpen && match ? (
-        <DialogCard
-          visible
+        <MatchScoreDialog
+          bestOf={match.bestOf}
+          gameNumber={match.gameNumber}
+          seats={runtime.game.players.map((player, seat) => ({
+            id: player.id,
+            name: player.name,
+            wins: match.wins[seat],
+          }))}
+          draws={match.draws}
           onClose={() => setMatchOpen(false)}
-          backdropTestID="match-backdrop"
-          backdropAccessibilityLabel={translate("board:match.closeScore")}
-          dialogTestID="match-dialog"
-          accessibilityViewIsModal
         >
-          <Text
-            tx="board:match.scoreTitle"
-            txOptions={{ bestOf: match.bestOf, number: match.gameNumber }}
-            preset="subheading"
-          />
-          <View style={themed($matchScore)}>
-            {runtime.game.players.map((player, seat) => (
-              <View key={player.id} style={themed($matchScoreRow)}>
-                <Text text={player.name} numberOfLines={1} style={themed($matchScoreName)} />
-                <Text text={String(match.wins[seat])} weight="medium" />
-              </View>
-            ))}
-            {match.draws ? (
-              <Text size="xs" text={drawsLabel(match.draws)} style={themed($dialogText)} />
-            ) : null}
-          </View>
           {isMatchInProgress(runtime.game) ? (
             <Button
               testID="end-match-button"
@@ -711,7 +699,7 @@ export function CurrentGameScreen({
             />
           )}
           <Button tx="common:close" style={themed($menuItem)} onPress={() => setMatchOpen(false)} />
-        </DialogCard>
+        </MatchScoreDialog>
       ) : null}
 
       {matchPrompt?.match && !sideboardSheet.shown ? (
@@ -840,10 +828,3 @@ const $sideboardFirst: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
-const $matchScore: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $matchScoreRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  justifyContent: "space-between",
-  gap: spacing.sm,
-})
-const $matchScoreName: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })

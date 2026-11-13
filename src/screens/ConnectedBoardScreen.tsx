@@ -13,6 +13,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, AppState, Platform, ScrollView, Share, View } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useMutation } from "convex/react"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -69,11 +70,14 @@ import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/Tr
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
+import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
-import { asPlayerId } from "@/features/game/domain"
+import { asPlayerId, matchContextLabel } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
+import { MatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import { localGameRepository } from "@/features/game/localPersistence"
+import { MatchScoreDialog } from "@/features/game/MatchScoreDialog"
 import { defaultConnectedLayout, playerGridLayoutForCount } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
@@ -98,7 +102,7 @@ import {
   useTurnsEnabled,
 } from "@/features/game/TurnDialog"
 import { PASS_UNDO_MS } from "@/features/game/turnTab"
-import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
+import type { CommanderSlot, GamePlayer, MatchSeatOutcome, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
@@ -299,10 +303,13 @@ type ConnectedBoardReadyProps = {
   partners: boolean
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
+  onEndMatch?: EndMatch
   roleRevealOnline: boolean
   turns: boolean
   logFeed?: ConnectedLogFeed
 }
+
+type EndMatch = (seats: { seat: number; outcome: MatchSeatOutcome }[]) => Promise<unknown>
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
 
@@ -387,6 +394,7 @@ interface ConnectedBoardRuntimeProps {
   turnedConditions?: boolean
   awayPlayerIds?: readonly string[]
   onRevealRole?: () => Promise<unknown>
+  onEndMatch?: EndMatch
   roleRevealOnline?: boolean
 }
 
@@ -394,6 +402,7 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
   const runtime = useConnectedGame(props.publicId, props.ownerId)
   const reveal = useMutation(api.games.revealMyRole)
   const leaveGame = useMutation(api.games.leaveMyGame)
+  const endMatch = useMutation(api.games.endMatch)
   const online = useConvexOnline()
   const { publicId, onLeave } = props
   const onRevealRole = useCallback(
@@ -411,6 +420,7 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
       {...props}
       runtime={runtime}
       onRevealRole={onRevealRole}
+      onEndMatch={(seats) => endMatch({ publicId, seats })}
       roleRevealOnline={online}
       onLeave={onLeave ? leave : undefined}
     />
@@ -458,6 +468,7 @@ export function ConnectedBoardWithRuntime({
   turnedConditions = true,
   awayPlayerIds,
   onRevealRole,
+  onEndMatch,
   roleRevealOnline = false,
   runtime,
   peerLatency,
@@ -656,6 +667,7 @@ export function ConnectedBoardWithRuntime({
                 partners={partners}
                 awayPlayerIds={awayPlayerIds}
                 onRevealRole={onRevealRole}
+                onEndMatch={onEndMatch}
                 roleRevealOnline={roleRevealOnline}
                 turns={turns}
                 logFeed={logFeed}
@@ -691,6 +703,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   partners,
   awayPlayerIds = [],
   onRevealRole,
+  onEndMatch,
   roleRevealOnline,
   turns,
   logFeed,
@@ -699,7 +712,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
+  const insets = useSafeAreaInsets()
   const [statusOpen, setStatusOpen] = useState(false)
+  const [matchOpen, setMatchOpen] = useState(false)
+  const [matchEnding, setMatchEnding] = useState<"choosing" | "sending">()
+  const [matchEndError, setMatchEndError] = useState<string>()
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -932,6 +949,42 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     }
   }
 
+  const match = game.match
+  const matchSeats = game.players.map((player) => {
+    const scored = match?.seats.find(({ seat }) => seat === player.seat)
+    return {
+      id: player.playerId,
+      seat: player.seat,
+      name: player.displayName,
+      color: player.color,
+      shape: shownMarkShape(player),
+      wins: scored?.gamesWon ?? 0,
+      out: view.out.includes(player.playerId),
+    }
+  })
+  const matchDraws = match?.seats[0]?.gamesDrawn ?? 0
+  const matchLine = match
+    ? matchContextLabel({
+        match: {
+          gameNumber: match.gameNumber,
+          wins: matchSeats.map(({ wins }) => wins),
+          draws: matchDraws,
+        },
+      })
+    : undefined
+  async function endMatch(outcomes: MatchSeatOutcome[]) {
+    if (!onEndMatch) return
+    setMatchEnding("sending")
+    setMatchEndError(undefined)
+    try {
+      await onEndMatch(matchSeats.map(({ seat }, index) => ({ seat, outcome: outcomes[index] })))
+      setMatchEnding(undefined)
+    } catch (cause) {
+      setMatchEndError(convexErrorMessage(cause, translate("board:matchEnd.failed")))
+      setMatchEnding("choosing")
+    }
+  }
+
   function leaveAbandonedGame() {
     setAbandonedOpen(false)
     if (onGameAbandoned) onGameAbandoned()
@@ -1018,7 +1071,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     statusLine:
       syncStatusText && syncSignal.kind !== "live"
         ? { text: syncStatusText, tone: syncSignal.kind, onPress: () => setStatusOpen(true) }
-        : undefined,
+        : match && matchLine
+          ? {
+              text: translate("board:match.statusLine", {
+                context: matchLine,
+                bestOf: match.bestOf,
+              }),
+              tone: "caughtUp",
+              onPress: () => setMatchOpen(true),
+            }
+          : undefined,
     accountEntry,
     onRules,
     onDecks,
@@ -1166,7 +1228,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     inviteDialogOpen ||
     inviteAfterActions ||
     Boolean(inviteSheet.shown) ||
-    abandonedOpen
+    abandonedOpen ||
+    matchOpen ||
+    matchEnding !== undefined
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
     seat: player.seat,
@@ -1490,6 +1554,60 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           origin={menuDialogOrigin}
           onReveal={onRevealRole}
           onClose={() => setRoleOpen(false)}
+        />
+      ) : null}
+
+      {match && matchLine && !menuOpen ? (
+        <BoardContextLabels
+          match={{
+            line: matchLine,
+            accessibilityLabel: translate("board:match.contextLabel", {
+              context: matchLine,
+              bestOf: match.bestOf,
+            }),
+          }}
+          top={insets.top}
+          bottom={insets.bottom}
+        />
+      ) : null}
+
+      {matchOpen && match ? (
+        <MatchScoreDialog
+          bestOf={match.bestOf}
+          gameNumber={match.gameNumber}
+          seats={matchSeats}
+          draws={matchDraws}
+          onClose={() => setMatchOpen(false)}
+        >
+          {game.isHost && onEndMatch ? (
+            <Button
+              testID="end-match-button"
+              tx="board:matchEnd.end"
+              disabled={!match.canEnd}
+              accessibilityHint={translate("board:match.endHint")}
+              onPress={() => {
+                setMatchOpen(false)
+                setMatchEndError(undefined)
+                setMatchEnding("choosing")
+              }}
+            />
+          ) : null}
+          <Button tx="common:close" onPress={() => setMatchOpen(false)} />
+        </MatchScoreDialog>
+      ) : null}
+
+      {matchEnding && match ? (
+        <MatchEndDialog
+          score={{
+            bestOf: match.bestOf,
+            seats: matchSeats,
+            draws: matchDraws,
+            lastGameDrawn: false,
+          }}
+          failure={matchEndError}
+          busy={matchEnding === "sending"}
+          onClose={() => setMatchEnding(undefined)}
+          onEnd={(outcomes) => void endMatch(outcomes)}
         />
       ) : null}
 
