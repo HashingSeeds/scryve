@@ -31,6 +31,7 @@ import {
   isPlayerGridLayoutVariant,
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
+import { MAX_GAMES_PER_MATCH, type MatchBestOf } from "../../../convex/lib/matchResults"
 import { outReason } from "../../../convex/lib/outReason"
 import { clientSeesSeats } from "../../../convex/lib/policy"
 import {
@@ -88,8 +89,11 @@ import {
   MAX_PLAYER_NAME_LENGTH,
   MAX_PLAYERS,
   wellFormedPlayerName,
+  matchScoreAfter,
+  newMatch,
 } from "../game/domain"
 import { isPlaySystemId, playSystemFormats, type PlaySystemId } from "../game/playSystems"
+import type { LocalGame, LocalGameMatch } from "../game/types"
 
 // why: guests and hosts from before the shared game engine speak a different protocol, so each side turns the other away with a clear reason.
 export const LAN_PROTOCOL = 2
@@ -106,6 +110,13 @@ export interface LanSetup {
   layout?: PlayerGridLayoutVariant
   variant?: GameVariant
   modeSetup?: ModeSetup
+  /** why: only the host scores the match, so guests never read this from the setup they are sent. */
+  matchBestOf?: MatchBestOf
+}
+
+/** why: the score is kept by seat position, so it only holds while the same players sit in the same seats. */
+export interface LanMatch extends LocalGameMatch {
+  seatKeys: readonly string[]
 }
 
 export interface LanSeatDeck {
@@ -146,6 +157,7 @@ export interface LanGame extends LanLobby {
   seatLimits?: Readonly<Record<string, number>>
   roles?: Readonly<Record<string, LanDealtRole>>
   memory?: MemoryGame
+  match?: LanMatch
   recentOperationIds: string[]
   startedAt?: number
   updatedAt: number
@@ -417,6 +429,59 @@ export function startingLifeFor(setup: LanSetup, deck: LanSeatDeck | undefined) 
     : setup.startingLife
 }
 
+function lanMatchFor({ setup, seats, match }: LanGame, now: number): LanMatch | undefined {
+  if (!setup.matchBestOf) return undefined
+  const seatKeys = seats.map(({ key }) => key)
+  const continues =
+    match &&
+    !match.result &&
+    match.bestOf === setup.matchBestOf &&
+    match.gameNumber <= MAX_GAMES_PER_MATCH &&
+    match.seatKeys.join() === seatKeys.join()
+  return continues ? match : { ...newMatch(setup.matchBestOf, seatKeys.length, now), seatKeys }
+}
+
+export function lanMatchAfter(match: LanMatch, finished: LocalGame): LanMatch {
+  const result = finished.match?.result
+  const score = matchScoreAfter({ ...finished, match })
+  return result
+    ? { ...match, ...score, result }
+    : { ...match, ...score, gameNumber: match.gameNumber + 1 }
+}
+
+export function endLanMatch(game: LanGame, now: number): LanGame {
+  const { setup, seats } = game
+  if (!setup.matchBestOf) return game
+  return {
+    ...game,
+    match: {
+      ...newMatch(setup.matchBestOf, seats.length, now),
+      seatKeys: seats.map(({ key }) => key),
+    },
+    updatedAt: now,
+  }
+}
+
+function matchProjection(game: LanGame, viewerKey: string, eventSequence: number) {
+  const { match } = game
+  if (!match) return {}
+  const untouched = game.status === "active" && eventSequence === 0
+  return {
+    match: {
+      bestOf: match.bestOf,
+      gameNumber: match.gameNumber,
+      seats: game.seats.map((seat, index) => ({
+        seat: seat.seat,
+        gamesWon: match.wins[index] ?? 0,
+        gamesDrawn: match.draws,
+      })),
+      ...(viewerKey === game.hostKey && untouched && match.gameNumber > 1 && !match.result
+        ? { canEnd: true as const }
+        : {}),
+    },
+  }
+}
+
 export function startLanRound(game: LanGame, now: number, random = Math.random): LanGame {
   const { setup } = game
   const { roles: _lastRound, ...rest } = game
@@ -433,9 +498,11 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
     game.seats.map((seat) => seat.key),
     random,
   )
+  const match = lanMatchFor(game, now)
   return {
     ...rest,
     ...(roles ? { roles } : {}),
+    ...(match ? { match } : {}),
     status: "active",
     round: game.round + 1,
     recentOperationIds: [],
@@ -620,6 +687,7 @@ export function lanProjection(
       ? dealt
       : { roleRevealed: false }
   }
+  const eventSequence = seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0)
   const projection: ConnectedProjection = {
     schemaVersion: 1,
     publicId: lanRoundId(game),
@@ -635,7 +703,8 @@ export function lanProjection(
     ...(setup.modeSetup ? { modeSetup: setup.modeSetup } : {}),
     isHost: viewerKey === game.hostKey,
     ...(memory?.lifeEditing === "anyone" ? { lifeEditing: "anyone" as const } : {}),
-    eventSequence: seatsOf.reduce((total, seat) => total + (seat.eventCount ?? 0), 0),
+    ...matchProjection(game, viewerKey, eventSequence),
+    eventSequence,
     serverUpdatedAt: game.updatedAt,
     // why: a viewer only reconciles its own pending changes, and every id is bytes the host base64-encodes in JS for every guest on every broadcast.
     recentOperationIds: game.recentOperationIds.filter(

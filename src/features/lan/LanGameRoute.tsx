@@ -42,6 +42,7 @@ export default function LanGameRoute() {
       logFeed={role === "host" || logs === true ? NearbyLogFeed : undefined}
       awayPlayerIds={awayPlayerIds}
       onRevealRole={lanSession.revealRole}
+      onEndMatch={role === "host" ? lanSession.endMatch : undefined}
       roleRevealOnline={role === "host" || status === "connected"}
       peerLatency={role === "host" ? lanSession.peerLatency : undefined}
       onGameEnded={backToLobby}

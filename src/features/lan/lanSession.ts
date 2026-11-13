@@ -12,7 +12,9 @@ import {
 } from "@/features/connected/syncLatency"
 import type { ConnectedWrites } from "@/features/connected/useConnectedRuntime"
 import { createClientId, wellFormedPlayerName } from "@/features/game/domain"
+import { localGameRepository } from "@/features/game/localPersistence"
 import { PLAY_SYSTEM_IDS } from "@/features/game/playSystems"
+import type { MatchSeatOutcome } from "@/features/game/types"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { translate } from "@/i18n/translate"
 import { load, remove, save } from "@/utils/storage"
@@ -24,7 +26,9 @@ import {
   admitLanGuest,
   applyLanWrite,
   createLanGame,
+  endLanMatch,
   endLanRound,
+  lanMatchAfter,
   LAN_MAX_SEATS,
   LAN_PROTOCOL,
   lanLobbyOf,
@@ -775,6 +779,17 @@ export class LanSession {
     )
   }
 
+  endMatch = async (seats: readonly { seat: number; outcome: MatchSeatOutcome }[]) => {
+    const game = this.game
+    if (this.state.role !== "host" || !game?.match) return
+    const outcomes = game.seats.map(
+      ({ seat }) => seats.find((chosen) => chosen.seat === seat)?.outcome ?? "draw",
+    )
+    if (!localGameRepository.finishMatch(game.match.id, outcomes))
+      throw new Error(translate("board:matchEnd.noFinishedGame"))
+    this.publish(endLanMatch(game, Date.now()))
+  }
+
   async finish(result?: ConnectedGameResult) {
     const { game: started, session } = this
     if (this.state.role !== "host" || started?.status !== "active") return
@@ -787,8 +802,9 @@ export class LanSession {
     if (session !== this.session || game?.status !== "active" || game.round !== started.round)
       return
     const now = Date.now()
-    archiveLanGame({ ...game, updatedAt: now }, result, hashes, this.roundOwner)
-    this.publish(endLanRound(game, "finished", now))
+    const finished = archiveLanGame({ ...game, updatedAt: now }, result, hashes, this.roundOwner)
+    const ended = endLanRound(game, "finished", now)
+    this.publish(game.match ? { ...ended, match: lanMatchAfter(game.match, finished) } : ended)
     clearTimeout(this.flushTimer)
     this.flush()
   }
