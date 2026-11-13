@@ -233,6 +233,8 @@ export default {
     failed: "Impossible de connecter cette partie.",
     twoHeadedGiant:
       "Les parties de Géant à deux têtes ne peuvent pas encore être connectées. Lancez-en une nouvelle pour jouer sur plusieurs appareils.",
+    twoVsTwo:
+      "Les parties 2v2 ne peuvent pas encore être connectées. Lancez-en une nouvelle pour jouer sur plusieurs appareils.",
   },
   invite: {
     label: "Inviter",

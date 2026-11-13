@@ -75,6 +75,7 @@ export default {
     teamLife: "팀 생명점",
     twoHeadedGiant: "투헤디드 자이언트",
     twoHeadedGiantCommander: "2HG 커맨더",
+    twoVsTwo: "2v2",
     formatLabel: "포맷",
     joinWithCode: "코드로 참가",
     resumeHostedGame: "만든 게임 이어하기",

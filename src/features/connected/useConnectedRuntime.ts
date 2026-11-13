@@ -29,7 +29,8 @@ import {
 import { ConnectedGameRepository } from "./persistence"
 import { SyncLatency } from "./syncLatency"
 import { EMPTY_TABLE, type TableAction } from "../../../convex/lib/table"
-import { teamTableRules, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
+import { isTeamVariant } from "../../../convex/lib/teamVariants"
+import { teamTableRules } from "../../../convex/lib/twoHeadedGiant"
 
 interface ConnectedGameRuntimeBase extends TableRuntime {
   pending: PendingLifeAction[]
@@ -200,7 +201,7 @@ export function useConnectedRuntime(
     const runtime = {
       ...controller.table,
       table: projection?.table ?? EMPTY_TABLE,
-      tableRules: projection?.variant === TWO_HEADED_GIANT ? teamTableRules(seatRules) : seatRules,
+      tableRules: isTeamVariant(projection?.variant) ? teamTableRules(seatRules) : seatRules,
       pending: snapshot.pending,
       failed: snapshot.failed,
       connectionStatus: snapshot.connectionStatus,

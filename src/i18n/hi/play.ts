@@ -75,6 +75,7 @@ export default {
     teamLife: "टीम की लाइफ़",
     twoHeadedGiant: "Two-Headed Giant",
     twoHeadedGiantCommander: "2HG Commander",
+    twoVsTwo: "2v2",
     formatLabel: "फ़ॉर्मैट",
     joinWithCode: "कोड से शामिल हों",
     resumeHostedGame: "होस्ट किया गया गेम फिर शुरू करें",

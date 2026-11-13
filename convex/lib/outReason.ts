@@ -42,9 +42,10 @@ export function outReason<Id extends string>(
   const team = turnGroupOf(state.groups, playerId) as readonly Id[]
   const lethal = teamCommanderLethal(state, team)
   if (lethal) return lethal
-  const seats = { ...state, commanderDamage: undefined }
+  // why: in a race, a teammate holding the team's shared total is not an opponent who reached the goal.
   for (const seat of team) {
-    const reason = seatOutReason(seats, seat)
+    const lives = state.lives.filter(({ playerId: id }) => id === seat || !team.includes(id))
+    const reason = seatOutReason({ ...state, commanderDamage: undefined, lives }, seat)
     if (reason) return reason
   }
   return undefined

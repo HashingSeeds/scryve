@@ -77,6 +77,7 @@ export default {
     teamLife: "Vidas del equipo",
     twoHeadedGiant: "Two-Headed Giant",
     twoHeadedGiantCommander: "Commander 2HG",
+    twoVsTwo: "2v2",
     formatLabel: "Formato",
     joinWithCode: "Unirse con código",
     resumeHostedGame: "Reanudar partida creada",

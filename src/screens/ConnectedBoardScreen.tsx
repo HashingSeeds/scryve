@@ -119,8 +119,8 @@ import { useStructurallyStable } from "@/utils/useStructurallyStable"
 import { api } from "../../convex/_generated/api"
 import { shownMarkShape } from "../../convex/lib/appearance"
 import type { SystemId } from "../../convex/lib/systems"
+import { isTeamVariant } from "../../convex/lib/teamVariants"
 import { nextTurnSeat, sharesTurn, turnGroupOf, turnLead } from "../../convex/lib/turns"
-import { TWO_HEADED_GIANT } from "../../convex/lib/twoHeadedGiant"
 
 type ConnectedBoardScreenProps = {
   publicId: string
@@ -725,7 +725,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const turnGroups = table?.table.turnGroups
   const tablePlayers = table?.table.players
   const tableCounters = table?.tableRules.counters
-  const sharesCounters = game.variant === TWO_HEADED_GIANT
+  const sharesCounters = isTeamVariant(game.variant)
   const counterTable = useMemo(
     () => ({
       players: tablePlayers,
@@ -1286,7 +1286,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           seats={logSeats}
           turn={table?.table.turn}
           groups={turnGroups}
-          sharedLife={game.variant === TWO_HEADED_GIANT}
+          sharedLife={isTeamVariant(game.variant)}
           modes={boardModes.log.map(modeLogRow)}
           counterTable={counterTable}
           turnsShown={tabOn}

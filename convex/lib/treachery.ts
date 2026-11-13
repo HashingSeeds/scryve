@@ -5,6 +5,7 @@ export const gameVariantValidator = v.union(
   v.literal("treachery"),
   v.literal("archenemy"),
   v.literal("twoHeadedGiant"),
+  v.literal("twoVsTwo"),
 )
 export type GameVariant = Infer<typeof gameVariantValidator>
 

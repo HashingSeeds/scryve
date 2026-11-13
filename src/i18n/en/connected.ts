@@ -225,6 +225,7 @@ const connected = {
     failed: "Could not connect this game.",
     twoHeadedGiant:
       "Two-Headed Giant games can't be connected yet. Start a new one to play on devices.",
+    twoVsTwo: "2v2 games can't be connected yet. Start a new one to play on devices.",
   },
   invite: {
     label: "Invite",

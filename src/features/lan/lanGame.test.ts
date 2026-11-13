@@ -917,3 +917,35 @@ describe("nearby Planechase and Archenemy", () => {
     )
   })
 })
+
+describe("nearby Riftbound 2v2", () => {
+  const twoVsTwo: LanSetup = {
+    playerCount: 4,
+    startingLife: 0,
+    lifeStep: 1,
+    ruleset: "constructed",
+    system: "riftbound",
+    format: "constructed",
+    variant: "twoVsTwo",
+  }
+  const joinFrom = (key: string, variants: string[]) =>
+    admitLanGuest(
+      lobby(twoVsTwo),
+      tokens,
+      { ...join(key), systems: ["riftbound"], variants },
+      { key, token: `token-${key}` },
+    )
+
+  it("turns away a guest whose build predates it, and keeps it to Riftbound at 4 seats", () => {
+    expect(joinFrom("old", ["treachery", "archenemy", "twoHeadedGiant"])).toEqual({
+      rejected: "Update Scryve to join this game.",
+    })
+    expect(joinFrom("new", ["twoVsTwo"])).not.toHaveProperty("rejected")
+    expect(setLanPlayerCount(lobby(twoVsTwo), 6).setup.playerCount).toBe(4)
+    expect(parseLanSetup(twoVsTwo)).toEqual(twoVsTwo)
+    expect(parseLanSetup({ ...twoVsTwo, playerCount: 6 })).not.toHaveProperty("variant")
+    expect(parseLanSetup({ ...commander, playerCount: 4, variant: "twoVsTwo" })).not.toHaveProperty(
+      "variant",
+    )
+  })
+})

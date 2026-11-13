@@ -62,6 +62,7 @@ import {
   systemPlaysModeSetup,
   type ModeSetup,
 } from "../../../convex/lib/tableModes"
+import { isTeamPlayerCount, isTeamVariant } from "../../../convex/lib/teamVariants"
 import {
   dealTreacheryRoles,
   isTreacheryPlayerCount,
@@ -69,11 +70,7 @@ import {
   type GameVariant,
   type TreacheryRole,
 } from "../../../convex/lib/treachery"
-import {
-  isTwoHeadedGiantPlayerCount,
-  pairedTeams,
-  TWO_HEADED_GIANT,
-} from "../../../convex/lib/twoHeadedGiant"
+import { pairedTeams } from "../../../convex/lib/twoHeadedGiant"
 import { projectionOutState } from "../connected/boardView"
 import {
   CONNECTED_RECENT_OPERATION_LIMIT,
@@ -237,7 +234,8 @@ export const connectedSeatCount = (game: Pick<LanLobby, "seats">) =>
   game.seats.filter((seat) => seat.connected).length
 
 const fitsVariant = ({ variant, playerCount }: LanSetup, count = playerCount) =>
-  variant !== "treachery" || isTreacheryPlayerCount(count)
+  (variant !== "treachery" || isTreacheryPlayerCount(count)) &&
+  (!isTeamVariant(variant) || isTeamPlayerCount(variant, count))
 
 export const lanSeatsReady = (game: Pick<LanLobby, "seats" | "setup">) =>
   game.seats.length === game.setup.playerCount &&
@@ -447,9 +445,9 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
       status: "active",
       system: setup.system,
       format: setup.format,
-      // why: neighboring seats form the Two-Headed Giant teams, as on Convex.
-      ...(setup.variant === TWO_HEADED_GIANT
-        ? { variant: TWO_HEADED_GIANT, turnGroups: pairedTeams(game.seats.map(({ key }) => key)) }
+      // why: neighboring seats form the teams, as on Convex.
+      ...(isTeamVariant(setup.variant)
+        ? { variant: setup.variant, turnGroups: pairedTeams(game.seats.map(({ key }) => key)) }
         : {}),
       ...(game.seats.every((seat) => seat.editsAnySeat) ? { lifeEditing: "anyone" as const } : {}),
       designations: {},
@@ -463,7 +461,7 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
             currentLife:
               started.archenemyId === seat.key
                 ? ARCHENEMY_LIFE
-                : setup.variant === TWO_HEADED_GIANT
+                : isTeamVariant(setup.variant)
                   ? setup.startingLife
                   : startingLifeFor(setup, seat.deck),
             eventCount: 0,
@@ -764,7 +762,7 @@ export function parseLanSetup(value: unknown): LanSetup | null {
   const offered =
     (variant === "treachery" ||
       variant === "archenemy" ||
-      (variant === TWO_HEADED_GIANT && isTwoHeadedGiantPlayerCount(setup.playerCount))) &&
+      (isTeamVariant(variant) && isTeamPlayerCount(variant, setup.playerCount))) &&
     systemDefinition(system)?.variants.includes(variant)
       ? variant
       : undefined

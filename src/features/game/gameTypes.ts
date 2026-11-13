@@ -31,6 +31,7 @@ const FEATURED: readonly GameType[] = [
   { id: "lorcana-core", system: "lorcana", format: "core" },
   { id: "fab-cc", system: "fab", format: "cc" },
   { id: "riftbound-constructed", system: "riftbound", format: "constructed" },
+  { id: "riftbound-2v2", system: "riftbound", format: "constructed", variant: "twoVsTwo" },
   { id: "none" },
 ]
 
@@ -58,6 +59,7 @@ export function gameTypeId(
   if (!system || !format) return "none"
   if (variant === "treachery" || variant === "archenemy") return variant
   if (variant === "twoHeadedGiant") return format === "commander" ? "2hg-commander" : "2hg"
+  if (variant === "twoVsTwo") return `${system}-2v2`
   return featuredFormat(system, format)?.id ?? `${system}-${format}`
 }
 
@@ -150,6 +152,7 @@ export function gameTypeLabel(type: GameType) {
         ? "play:newGame.twoHeadedGiantCommander"
         : "play:newGame.twoHeadedGiant",
     )
+  if (type.variant === "twoVsTwo") return translate("play:newGame.twoVsTwo")
   if (!type.system) return translate("systems:noSystem")
   return playFormatLabel(type.system, type.format)
 }

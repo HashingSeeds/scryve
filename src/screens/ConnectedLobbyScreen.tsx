@@ -33,6 +33,7 @@ import {
   shownMarkShape,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
+import { isTeamVariant } from "../../convex/lib/teamVariants"
 
 export function ConnectedLobbyScreen({
   publicId,
@@ -354,7 +355,7 @@ function ConnectedLobbyContent({
       onChangePlayerCount={(playerCount) => void changeSettings({ playerCount })}
       onChangeDeckRequired={(deckRequired) => void changeSettings({ deckRequired })}
       onSwapSeats={
-        lobby.isHost && lobby.variant === "twoHeadedGiant"
+        lobby.isHost && isTeamVariant(lobby.variant)
           ? (first, second) => void changeSettings({ swap: { first, second } })
           : undefined
       }

@@ -61,6 +61,7 @@ import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
 import { matchesValidator, parseTableState, type TableState } from "../../../convex/lib/table"
 import { isValidModes, modeSetupValidator } from "../../../convex/lib/tableModes"
+import { TWO_VS_TWO } from "../../../convex/lib/teamVariants"
 import { isValidTurn, isValidTurnGroups } from "../../../convex/lib/turns"
 import { isValidTeams, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
@@ -484,10 +485,9 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const modeSetup = matchesValidator(modeSetupValidator, value.modeSetup)
     ? value.modeSetup
     : undefined
-  const teams =
-    value.variant === TWO_HEADED_GIANT && isValidTeams(turnGroups, playerIds)
-      ? turnGroups
-      : undefined
+  const teamVariant =
+    value.variant === TWO_HEADED_GIANT || value.variant === TWO_VS_TWO ? value.variant : undefined
+  const teams = teamVariant && isValidTeams(turnGroups, playerIds) ? turnGroups : undefined
   const counterLog = parseCounterLog(value.counterLog, playerIds)
   return {
     schemaVersion: 1,
@@ -527,7 +527,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(turn ? { turn } : {}),
     ...(turnLog ? { turnLog } : {}),
     ...(turnGroups ? { turnGroups } : {}),
-    ...(teams ? { variant: TWO_HEADED_GIANT } : {}),
+    ...(teams ? { variant: teamVariant } : {}),
     ...(counterLog ? { counterLog } : {}),
     ...(modeSetup ? { modeSetup } : {}),
     ...(Array.isArray(value.logOrder)

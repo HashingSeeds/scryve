@@ -13,6 +13,7 @@ import {
   systemPlaysModeSetup,
   type ModeSetup,
 } from "../../../convex/lib/tableModes"
+import { isTwoVsTwoPlayerCount, TWO_VS_TWO } from "../../../convex/lib/teamVariants"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
 import { isTwoHeadedGiantPlayerCount } from "../../../convex/lib/twoHeadedGiant"
 
@@ -86,6 +87,9 @@ function parseLocalSetup(value: unknown): LocalSetup | undefined {
       : {}),
     ...(isPositiveInteger(value.lifeStep) ? { lifeStep: value.lifeStep } : {}),
     ...(isSeatTeams(value.teams) ? { teams: value.teams } : {}),
+    ...(isSeatTeams(value.teams) && value.teamVariant === TWO_VS_TWO
+      ? { teamVariant: TWO_VS_TWO }
+      : {}),
     ...(modeSetup ? { modeSetup } : {}),
     ...(isRecord(value.match) && isMatchBestOf(value.match.bestOf)
       ? { match: { bestOf: value.match.bestOf } }
@@ -133,6 +137,7 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     !(
       (value.variant === "treachery" && isTreacheryPlayerCount(value.playerCount)) ||
       (value.variant === "twoHeadedGiant" && isTwoHeadedGiantPlayerCount(value.playerCount)) ||
+      (value.variant === TWO_VS_TWO && isTwoVsTwoPlayerCount(value.playerCount)) ||
       value.variant === "archenemy"
     )
   )
@@ -147,12 +152,15 @@ function parseConnectedSetup(value: unknown): ConnectedSetup | undefined {
     ...(system && typeof value.format === "string" ? { system, format: value.format } : {}),
     ...(value.variant === "treachery" ||
     value.variant === "twoHeadedGiant" ||
+    value.variant === TWO_VS_TWO ||
     value.variant === "archenemy"
       ? { variant: value.variant }
       : {}),
     ...(modeSetup ? { modeSetup } : {}),
     layout: playerGridLayoutForCount(
-      value.variant === "twoHeadedGiant" ? value.playerCount / 2 : value.playerCount,
+      value.variant === "twoHeadedGiant" || value.variant === TWO_VS_TWO
+        ? value.playerCount / 2
+        : value.playerCount,
       value.layout,
     ),
     lifeStep: value.lifeStep,
