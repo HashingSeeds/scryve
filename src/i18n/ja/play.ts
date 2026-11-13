@@ -77,6 +77,7 @@ export default {
     teamLife: "チームのライフ",
     twoHeadedGiant: "ツー・ヘッデッド・ジャイアント",
     twoHeadedGiantCommander: "2HG統率者",
+    twoVsTwo: "2v2",
     formatLabel: "フォーマット",
     joinWithCode: "コードで参加",
     resumeHostedGame: "ホストしたゲームを再開",

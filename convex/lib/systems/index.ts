@@ -9,6 +9,7 @@ import {
   type SystemId,
   type TableDefinition,
 } from "./definitions"
+import type { GameVariant } from "../treachery"
 
 export * from "./definitions"
 
@@ -94,6 +95,16 @@ export function hasCommandZone(system: unknown, format: string | undefined): boo
 
 export function lowerLeads({ goal, defaultValue }: CounterDefinition) {
   return goal.kind === "race" && goal.to < defaultValue
+}
+
+/** why: win detection reads the counter's goal, so a variant that moves it swaps the goal here and nowhere else. */
+export function variantCounter<Counter extends CounterDefinition | undefined>(
+  counter: Counter,
+  system: unknown,
+  variant: GameVariant | undefined,
+): Counter {
+  const goal = variant && systemDefinition(system)?.variantGoals?.[variant]
+  return counter && goal ? { ...counter, goal } : counter
 }
 
 export function startingValueRange(system: unknown) {

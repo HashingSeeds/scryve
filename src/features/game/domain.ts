@@ -62,7 +62,12 @@ import {
   type OutState,
 } from "../../../convex/lib/outReason"
 import { MAX_PLAYERS, MIN_PLAYERS } from "../../../convex/lib/policy"
-import { attachesDecks, flooredLifeDelta, startingValueRange } from "../../../convex/lib/systems"
+import {
+  attachesDecks,
+  flooredLifeDelta,
+  startingValueRange,
+  variantCounter,
+} from "../../../convex/lib/systems"
 import {
   applyTableAction,
   customCounterId,
@@ -85,6 +90,12 @@ import {
   type ModeSetup,
 } from "../../../convex/lib/tableModes"
 import {
+  isTeamPlayerCount,
+  isTeamVariant,
+  teamSeatsMessage,
+  type TeamVariant,
+} from "../../../convex/lib/teamVariants"
+import {
   applyTurnAction,
   isTurnAction,
   startedByChange,
@@ -92,13 +103,7 @@ import {
   turnLead,
   type Turn,
 } from "../../../convex/lib/turns"
-import {
-  isTwoHeadedGiantPlayerCount,
-  isValidTeams,
-  teamTableRules,
-  TWO_HEADED_GIANT,
-  TWO_HEADED_GIANT_SEATS_MESSAGE,
-} from "../../../convex/lib/twoHeadedGiant"
+import { isValidTeams, teamTableRules, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export {
   isCommanderDamageDelta,
@@ -186,6 +191,8 @@ export function createLocalGame(input: {
   clock?: RoundClockSetup
   modeSetup?: ModeSetup
   teams?: readonly (readonly number[])[]
+  /** why: setups saved before 2v2 carry teams and no variant, and they are Two-Headed Giant. */
+  teamVariant?: TeamVariant
 }): LocalGame {
   const system = isPlaySystemId(input.system) ? input.system : undefined
   const format = system ? playSystemFormat(system, input.format) : undefined
@@ -208,8 +215,9 @@ export function createLocalGame(input: {
     throw new Error(validatedNames.errors.find(Boolean) ?? "Enter valid player names.")
   }
 
-  if (input.teams && !isTwoHeadedGiantPlayerCount(input.players.length))
-    throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
+  const teamVariant = input.teamVariant ?? TWO_HEADED_GIANT
+  if (input.teams && !isTeamPlayerCount(teamVariant, input.players.length))
+    throw new Error(teamSeatsMessage(teamVariant))
   const now = input.now ?? Date.now()
   const id = input.gameId ?? asGameId(createClientId("game", now))
   const colorOf = (seat: number) => input.players[seat]?.color || PLAYER_COLORS[seat]
@@ -268,20 +276,24 @@ export function createLocalGame(input: {
     ...(started.archenemyId
       ? { firstPlayerId: asPlayerId(started.archenemyId), firstPlayerOffered: true as const }
       : {}),
-    ...teamsFor(players, input.teams),
+    ...teamsFor(players, teamVariant, input.teams),
   }
 }
 
-function teamsFor(players: readonly GamePlayer[], seats?: readonly (readonly number[])[]) {
+function teamsFor(
+  players: readonly GamePlayer[],
+  variant: TeamVariant,
+  seats?: readonly (readonly number[])[],
+) {
   if (!seats) return {}
   const turnGroups = seats.map((team) => team.flatMap((seat) => players[seat]?.id ?? []))
   if (!isValidTeams(turnGroups, new Set(players.map(({ id }) => id))))
-    throw new Error(TWO_HEADED_GIANT_SEATS_MESSAGE)
-  return { variant: TWO_HEADED_GIANT, turnGroups }
+    throw new Error(teamSeatsMessage(variant))
+  return { variant, turnGroups }
 }
 
 export const localTeams = (game: Pick<LocalGame, "variant" | "turnGroups">) =>
-  game.variant === TWO_HEADED_GIANT ? game.turnGroups : undefined
+  isTeamVariant(game.variant) ? game.turnGroups : undefined
 
 const sharesLife = (game: LocalGame, playerId: PlayerId, other: PlayerId) =>
   turnGroupOf(localTeams(game), playerId).includes(other)
@@ -446,7 +458,9 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
     ...(game.match ? { match: { bestOf: game.match.bestOf } } : {}),
     ...(game.clock ? { clock: game.clock.setup } : {}),
     ...(game.modeSetup ? { modeSetup: rematchModeSetup(game, game.modeSetup) } : {}),
-    ...(localTeams(game) ? { teams: teamSeats(game) } : {}),
+    ...(localTeams(game) && isTeamVariant(game.variant)
+      ? { teams: teamSeats(game), teamVariant: game.variant }
+      : {}),
   })
 }
 
@@ -501,7 +515,7 @@ export function incomingCommanderDamage(
 export function localOutState(game: LocalGame): OutState<PlayerId> {
   return {
     ...(localTeams(game) ? { sharedFate: true as const } : {}),
-    counter: playSystemRules(game.system).counter,
+    counter: variantCounter(playSystemRules(game.system).counter, game.system, game.variant),
     tableRules: localTableRules(game),
     table: game.table,
     lives: game.players.map(({ id, life }) => ({ playerId: id, life })),
@@ -528,7 +542,7 @@ export function localOutReason(game: LocalGame, playerId: PlayerId) {
 
 export function localTableRules(game: Pick<LocalGame, "system" | "format" | "variant">) {
   const rules = playTableRules(game.system, game.format)
-  return game.variant === TWO_HEADED_GIANT ? teamTableRules(rules) : rules
+  return isTeamVariant(game.variant) ? teamTableRules(rules) : rules
 }
 
 const MAX_TURN_LOG = 400

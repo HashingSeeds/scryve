@@ -90,6 +90,8 @@ const play = {
     twoHeadedGiant: "Two-Headed Giant",
     // Game type name for Two-Headed Giant played with Commander decks. Short.
     twoHeadedGiantCommander: "2HG Commander",
+    // Game type name for Riftbound 2v2, two teams of two sharing one point total. Keep "2v2".
+    twoVsTwo: "2v2",
     formatLabel: "Format",
     joinWithCode: "Join with code",
     resumeHostedGame: "Resume hosted game",

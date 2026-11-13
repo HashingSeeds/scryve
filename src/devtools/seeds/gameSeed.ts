@@ -32,8 +32,10 @@ import type { LocalGame } from "@/features/game/types"
 
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { systemDefinition } from "../../../convex/lib/systems"
 import type { TableAction } from "../../../convex/lib/table"
 import { isValidModeSetup } from "../../../convex/lib/tableModes"
+import { TWO_VS_TWO } from "../../../convex/lib/teamVariants"
 import { isValidTurnGroups } from "../../../convex/lib/turns"
 import { defaultTeamLife } from "../../../convex/lib/twoHeadedGiant"
 
@@ -90,6 +92,8 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   const teams = list(params.teams).map((entry) =>
     entry.split("+").map((value) => integer("teams seat", value) - 1),
   )
+  // why: Riftbound teams play 2v2, a race from the usual start; other systems keep Two-Headed Giant's team life.
+  const twoVsTwo = teams.length > 0 && systemDefinition(system)?.variants.includes(TWO_VS_TWO)
   let game: LocalGame
   try {
     game = createLocalGame({
@@ -101,14 +105,14 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       startingLife:
         params.start !== undefined
           ? integer("start", params.start)
-          : teams.length > 0
+          : teams.length > 0 && !twoVsTwo
             ? defaultTeamLife(format)
             : defaultStartingLife(system, format, playerCount),
       system,
       format,
       layout,
       ...modeSetupOf(params, playerCount),
-      ...(teams.length > 0 ? { teams } : {}),
+      ...(teams.length > 0 ? { teams, ...(twoVsTwo ? { teamVariant: TWO_VS_TWO } : {}) } : {}),
     })
   } catch (error) {
     throw new SeedError(error instanceof Error ? error.message : String(error))

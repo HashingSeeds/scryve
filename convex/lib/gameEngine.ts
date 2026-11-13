@@ -26,7 +26,7 @@ import {
 import type { GameWriteErrorCode } from "./gameWriteErrors"
 import { nameFailsGate } from "./nameFilter"
 import { commanderOutState, outReason, type CommanderTotal, type OutState } from "./outReason"
-import { systemDefinition, tableRules } from "./systems"
+import { systemDefinition, tableRules, variantCounter } from "./systems"
 import {
   applyTableAction,
   normalizedTableAction,
@@ -42,9 +42,10 @@ import {
   type TableState,
 } from "./table"
 import { isModeAction } from "./tableModes"
+import { isTeamVariant } from "./teamVariants"
 import type { GameVariant } from "./treachery"
 import { isTurnAction, nextTurnSeat, startedByChange, type Turn } from "./turns"
-import { teammatesOf, teamTableRules, TWO_HEADED_GIANT } from "./twoHeadedGiant"
+import { teammatesOf, teamTableRules } from "./twoHeadedGiant"
 import type { Doc } from "../_generated/dataModel"
 
 export interface EngineError {
@@ -654,11 +655,11 @@ function* passOrder(store: GameStore): GameSteps<(from: string) => string | unde
   const totals = yield* read(store.commanderTotals())
   const { game } = store
   const rules = tableRules(game.system, game.format)
-  const twoHeadedGiant = game.variant === TWO_HEADED_GIANT
+  const teams = isTeamVariant(game.variant)
   const state: OutState = {
-    ...(twoHeadedGiant ? { sharedFate: true as const } : {}),
-    counter: systemDefinition(game.system)?.counter,
-    tableRules: twoHeadedGiant ? teamTableRules(rules) : rules,
+    ...(teams ? { sharedFate: true as const } : {}),
+    counter: variantCounter(systemDefinition(game.system)?.counter, game.system, game.variant),
+    tableRules: teams ? teamTableRules(rules) : rules,
     table: {
       designations: game.designations,
       players: Object.fromEntries(seats.map((seat) => [seat.id, seatTable(seat)])),
@@ -718,7 +719,7 @@ function* writeTable(
 
 /** why: older projections read a life per seat, so a team's shared life and poison are written to both heads. */
 function* withSharedTeam(store: GameStore): GameSteps<GameStore> {
-  const teams = store.game.variant === TWO_HEADED_GIANT ? store.game.turnGroups : undefined
+  const teams = isTeamVariant(store.game.variant) ? store.game.turnGroups : undefined
   if (!teams) return store
   const seats = new Map<string, EngineSeat>()
   for (const id of teams.flat()) {

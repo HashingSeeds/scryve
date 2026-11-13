@@ -126,10 +126,10 @@ import {
   systemDefinition,
 } from "../../convex/lib/systems"
 import { ARCHENEMY_MIN_SEATS, type ModeSetup } from "../../convex/lib/tableModes"
+import { isTeamPlayerCount, isTeamVariant, TWO_VS_TWO } from "../../convex/lib/teamVariants"
 import { isTreacheryPlayerCount, type GameVariant } from "../../convex/lib/treachery"
 import {
   defaultTeamLife,
-  isTwoHeadedGiantPlayerCount,
   isValidTeams,
   pairedTeams,
   teamLifePresets,
@@ -363,7 +363,7 @@ function NewGameForm({
   )
   const [modeChoices, setModeChoices] = useState(() => modeChoicesOf(seedModes))
   const [teamsChosen, setTeamsChosen] = useState(
-    lobby?.variant === "twoHeadedGiant" || seedGame?.variant === "twoHeadedGiant",
+    isTeamVariant(lobby?.variant) || isTeamVariant(seedGame?.variant),
   )
   const [teamDraft, setTeamDraft] = useState<readonly (readonly number[])[]>(() =>
     seedGame ? teamSeats(seedGame) : [],
@@ -371,10 +371,11 @@ function NewGameForm({
   const [lifeStep, setLifeStep] = useState(
     seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
-  const teamsAvailable = Boolean(systemDefinition(system)?.variants.includes("twoHeadedGiant"))
-  const twoHeadedGiant = teamsAvailable && teamsChosen
+  const teamVariant = systemDefinition(system)?.variants.find(isTeamVariant)
+  const teamPlay = teamsChosen ? teamVariant : undefined
+  const twoHeadedGiant = teamPlay === "twoHeadedGiant"
   const seatIndexes = Array.from({ length: playerCount }, (_, index) => index)
-  const teams = !twoHeadedGiant
+  const teams = !teamPlay
     ? undefined
     : isValidTeams(
           teamDraft.map((team) => team.map(String)),
@@ -383,7 +384,7 @@ function NewGameForm({
       ? teamDraft
       : pairedTeams(seatIndexes)
   const [teamColorDraft, setTeamColorDraft] = useState<readonly (string | undefined)[]>(() =>
-    seedGame?.variant === "twoHeadedGiant"
+    isTeamVariant(seedGame?.variant)
       ? teamSeats(seedGame).map(([lead]) => seedGame.players[lead]?.color)
       : [],
   )
@@ -467,9 +468,7 @@ function NewGameForm({
     ? "treachery"
     : archenemy
       ? "archenemy"
-      : twoHeadedGiant
-        ? "twoHeadedGiant"
-        : undefined
+      : teamPlay
   const draft = {
     system,
     format,
@@ -537,7 +536,9 @@ function NewGameForm({
     ...(system && format ? { system, format } : {}),
     ...(variant ? { variant } : {}),
     ...(modeSetup ? { modeSetup } : {}),
-    ...(teams && !connectedMode ? { teams } : {}),
+    ...(teams && !connectedMode
+      ? { teams, ...(teamPlay === TWO_VS_TWO ? { teamVariant: teamPlay } : {}) }
+      : {}),
   }
   const gameTabs = useMemo(
     () =>
@@ -814,23 +815,24 @@ function NewGameForm({
 
   function chooseGameType(type: GameType) {
     const nextTreachery = type.variant === "treachery"
-    const nextTeams = type.variant === "twoHeadedGiant"
+    const nextTeams = isTeamVariant(type.variant)
     const nextCount =
       (nextTreachery && !isTreacheryPlayerCount(playerCount)) ||
-      (nextTeams && !isTwoHeadedGiantPlayerCount(playerCount))
+      (isTeamVariant(type.variant) && !isTeamPlayerCount(type.variant, playerCount))
         ? VARIANT_MIN_SEATS
         : type.variant === "archenemy" && playerCount < ARCHENEMY_MIN_SEATS
           ? ARCHENEMY_MIN_SEATS
           : playerCount
-    const defaultLife = nextTeams
-      ? defaultTeamLife(type.format)
-      : defaultStartingLife(type.system, type.format, nextCount)
+    const defaultLife =
+      type.variant === "twoHeadedGiant"
+        ? defaultTeamLife(type.format)
+        : defaultStartingLife(type.system, type.format, nextCount)
     if (type.system !== system) {
       setSystem(type.system)
       setStartingLife(defaultLife)
       setLifeStep(playSystemRules(type.system).counter.tapStep)
     } else if (
-      twoHeadedGiant !== nextTeams ||
+      Boolean(teamPlay) !== nextTeams ||
       startingLife === defaultStartingLife(system, format, playerCount) ||
       (twoHeadedGiant && startingLife === defaultTeamLife(format))
     )
@@ -1090,8 +1092,8 @@ function NewGameForm({
                     ? (count) => !isTreacheryPlayerCount(count)
                     : archenemy
                       ? (count) => count < ARCHENEMY_MIN_SEATS
-                      : twoHeadedGiant
-                        ? (count) => !isTwoHeadedGiantPlayerCount(count)
+                      : teamPlay
+                        ? (count) => !isTeamPlayerCount(teamPlay, count)
                         : undefined
                 }
                 onSelect={(value) => {

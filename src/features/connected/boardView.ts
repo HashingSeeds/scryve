@@ -11,7 +11,9 @@ import {
   standingWinners,
   type OutState,
 } from "../../../convex/lib/outReason"
-import { teamTableRules, TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
+import { variantCounter } from "../../../convex/lib/systems"
+import { isTeamVariant } from "../../../convex/lib/teamVariants"
+import { teamTableRules } from "../../../convex/lib/twoHeadedGiant"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
 
@@ -53,11 +55,11 @@ export function connectedOutState(
   lives: OutState["lives"],
 ): OutState {
   const rules = playTableRules(system, format)
-  const twoHeadedGiant = variant === TWO_HEADED_GIANT
+  const teams = isTeamVariant(variant)
   return {
-    ...(twoHeadedGiant ? { sharedFate: true as const } : {}),
-    counter: playSystemRules(system).counter,
-    tableRules: twoHeadedGiant ? teamTableRules(rules) : rules,
+    ...(teams ? { sharedFate: true as const } : {}),
+    counter: variantCounter(playSystemRules(system).counter, system, variant),
+    tableRules: teams ? teamTableRules(rules) : rules,
     table,
     lives,
     commanderDamage: commanderOutState(
@@ -77,7 +79,7 @@ export const connectedTeams = ({
   variant,
   table,
 }: Pick<ConnectedProjection, "variant" | "table">) =>
-  variant === TWO_HEADED_GIANT ? table?.turnGroups : undefined
+  isTeamVariant(variant) ? table?.turnGroups : undefined
 
 export function projectionOutState(projection: ConnectedProjection) {
   return connectedOutState(

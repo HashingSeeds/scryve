@@ -370,7 +370,8 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       : {}),
     ...(value.variant === "treachery" ||
     value.variant === "archenemy" ||
-    value.variant === "twoHeadedGiant"
+    value.variant === "twoHeadedGiant" ||
+    value.variant === "twoVsTwo"
       ? { variant: value.variant }
       : {}),
     ...(matchesValidator(modeSetupValidator, value.modeSetup)

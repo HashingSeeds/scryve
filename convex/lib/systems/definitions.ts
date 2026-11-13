@@ -150,6 +150,8 @@ export type SystemDefinition = {
   readonly formats: readonly FormatDefinition[]
   readonly table: TableDefinition
   readonly variants: readonly GameVariant[]
+  /** why: a mode of play can move the finish line, as Riftbound 2v2 races to 11 (Core Rules 491.3). */
+  readonly variantGoals?: { readonly [Variant in GameVariant]?: CounterGoal }
   readonly planechase?: true
   readonly firstPlayer: FirstPlayerDefinition
   readonly roundClock: RoundClockDefinition
@@ -640,7 +642,8 @@ export const SYSTEMS = {
       },
     ],
     table: { counters: [{ id: "xp", label: "XP", step: 1, max: 99 }], designations: [] },
-    variants: [],
+    variants: ["twoVsTwo"],
+    variantGoals: { twoVsTwo: { kind: "race", to: 11 } },
     firstPlayer: { die: "d6", winnerChooses: true, twoPlayerCoinFlip: false },
     roundClock: { minutes: 50, endOfRoundTurns: 3 },
     deckAnalysis: false,

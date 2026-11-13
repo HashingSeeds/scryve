@@ -227,6 +227,8 @@ export default {
     failed: "No se pudo conectar esta partida.",
     twoHeadedGiant:
       "Las partidas de Gigante de dos cabezas aún no se pueden conectar. Empieza una nueva para jugar en dispositivos.",
+    twoVsTwo:
+      "Las partidas 2v2 aún no se pueden conectar. Crea una nueva para jugar en dispositivos.",
   },
   invite: {
     label: "Invitar",

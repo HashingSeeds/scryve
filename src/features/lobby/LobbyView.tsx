@@ -53,8 +53,9 @@ import {
 } from "../../../convex/lib/appearance"
 import { clientSeesSeats, MAX_PLAYERS, MIN_PLAYERS } from "../../../convex/lib/policy"
 import { attachesDecks } from "../../../convex/lib/systems"
+import { isTeamPlayerCount, isTeamVariant } from "../../../convex/lib/teamVariants"
 import { isTreacheryPlayerCount, type GameVariant } from "../../../convex/lib/treachery"
-import { isTwoHeadedGiantPlayerCount, pairedTeams } from "../../../convex/lib/twoHeadedGiant"
+import { pairedTeams } from "../../../convex/lib/twoHeadedGiant"
 
 export interface LobbyViewLobby {
   playerCount: number
@@ -201,10 +202,9 @@ export function LobbyView({
     else void presentPaywall()
   }
 
-  const lobbyTeams =
-    lobby.variant === "twoHeadedGiant"
-      ? pairedTeams(Array.from({ length: lobby.playerCount }, (_, index) => index))
-      : undefined
+  const lobbyTeams = isTeamVariant(lobby.variant)
+    ? pairedTeams(Array.from({ length: lobby.playerCount }, (_, index) => index))
+    : undefined
   const seatAt = (index: number) => lobby.players.find((player) => player.seat === index + 1)
   const myTeam = lobbyTeams?.findIndex((team) =>
     team.some((index) => seatAt(index)?.controlledByMe),
@@ -310,7 +310,7 @@ export function LobbyView({
                     starting ||
                     lobby.players.some((player) => player.seat > count) ||
                     (lobby.variant === "treachery" && !isTreacheryPlayerCount(count)) ||
-                    (lobby.variant === "twoHeadedGiant" && !isTwoHeadedGiantPlayerCount(count)),
+                    (isTeamVariant(lobby.variant) && !isTeamPlayerCount(lobby.variant, count)),
                 }))}
                 onSelect={(count) => onChangePlayerCount(Number(count))}
               />

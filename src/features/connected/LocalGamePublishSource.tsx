@@ -10,6 +10,7 @@ import type { LocalConnectFeed } from "@/screens/NewGameScreen"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../../convex/_generated/api"
+import { TWO_VS_TWO } from "../../../convex/lib/teamVariants"
 import { TWO_HEADED_GIANT } from "../../../convex/lib/twoHeadedGiant"
 
 export interface PublishedGame {
@@ -35,9 +36,13 @@ export function LocalGamePublishSource({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
-  // why: publishing carries no variant, so a published game would lose its shared life; connected 2HG starts from the lobby.
+  // why: publishing carries no variant, so a published game would lose its shared life; connected team games start from the lobby.
   const blocked =
-    game.variant === TWO_HEADED_GIANT ? translate("connected:publish.twoHeadedGiant") : undefined
+    game.variant === TWO_HEADED_GIANT
+      ? translate("connected:publish.twoHeadedGiant")
+      : game.variant === TWO_VS_TWO
+        ? translate("connected:publish.twoVsTwo")
+        : undefined
 
   const publish = useCallback(
     async (hostPlayerId: PlayerId) => {

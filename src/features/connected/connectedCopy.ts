@@ -74,7 +74,7 @@ export function lobbyDetail(
   variant?: string,
 ) {
   const resolvedSystem = storedPlaySystem(system)
-  if (variant === "twoHeadedGiant" && resolvedSystem)
+  if ((variant === "twoHeadedGiant" || variant === "twoVsTwo") && resolvedSystem)
     return [
       gameTypeLabel({ id: variant, system: resolvedSystem, format: format || ruleset, variant }),
       counterValueLabel(resolvedSystem, startingLife),

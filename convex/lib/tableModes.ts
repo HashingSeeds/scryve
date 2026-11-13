@@ -97,6 +97,7 @@ export const CLIENT_VARIANTS: readonly string[] = [
   "treachery",
   "archenemy",
   "twoHeadedGiant",
+  "twoVsTwo",
   PLANECHASE_CAPABILITY,
 ]
 export const ARCHENEMY_LIFE = 40
