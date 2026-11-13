@@ -3114,7 +3114,18 @@ async function startRematch(
       ...modeGameFields(started, now, `archenemy_${request.publicId}`),
     })
   }
-  if (isTeamVariant(game.variant)) await ctx.db.patch(gameId, { turnGroups: pairedTeams(seatIds) })
+  if (isTeamVariant(game.variant)) {
+    // why: a connected local game can team seats that are not neighbors, and a rematch keeps the same teammates.
+    const nextIdOf = new Map<string, Id<"gamePlayers">>(
+      [...players]
+        .sort((left, right) => left.seat - right.seat)
+        .map((player, index) => [player._id, seatIds[index]]),
+    )
+    const kept = finished.turnGroups?.map((group) => group.flatMap((id) => nextIdOf.get(id) ?? []))
+    await ctx.db.patch(gameId, {
+      turnGroups: kept && kept.flat().length === seatIds.length ? kept : pairedTeams(seatIds),
+    })
+  }
   if (finished.matchBestOf && !(await continueHostedMatch(ctx, finished, game)))
     await openHostedMatch(ctx, game, players, finished.matchBestOf)
   if (players.some((player) => player.userId === undefined)) {
