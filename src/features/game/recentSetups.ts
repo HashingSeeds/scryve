@@ -4,7 +4,7 @@ import { isPlaySystemId, playSystemFormat, type PlaySystemId } from "./playSyste
 import { isRoundClockSetup } from "./roundClock"
 import { isSystemVisible } from "./systemVisibility"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
-import { isMatchBestOf } from "../../../convex/lib/matchResults"
+import { isMatchBestOf, type MatchBestOf } from "../../../convex/lib/matchResults"
 import { systemDefinition } from "../../../convex/lib/systems"
 import { matchesValidator } from "../../../convex/lib/table"
 import {
@@ -31,6 +31,7 @@ export interface ConnectedSetup {
   modeSetup?: ModeSetup
   layout: PlayerGridLayoutVariant
   lifeStep: number
+  matchBestOf?: MatchBestOf
 }
 
 export type RecentSetup = { savedAt: number } & (

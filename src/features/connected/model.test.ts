@@ -38,6 +38,25 @@ describe("connected projection parsing", () => {
     expect(projection?.format).toBeUndefined()
   })
 
+  it("reads a match score, and plays on without one it cannot read", () => {
+    const match = {
+      bestOf: 3,
+      gameNumber: 2,
+      status: "active",
+      seats: [{ seat: 1, gamesWon: 1, gamesDrawn: 0 }],
+      canEnd: true,
+    }
+    expect(toConnectedProjection({ ...legacyProjection, match })?.match).toEqual({
+      bestOf: 3,
+      gameNumber: 2,
+      seats: [{ seat: 1, gamesWon: 1, gamesDrawn: 0 }],
+      canEnd: true,
+    })
+    const unreadable = toConnectedProjection({ ...legacyProjection, match: { bestOf: 4 } })
+    expect(unreadable).not.toBeNull()
+    expect(unreadable?.match).toBeUndefined()
+  })
+
   it("keeps legacy projections valid and normalizes missing commander fields", () => {
     const projection = toConnectedProjection(legacyProjection)
     expect(projection?.publicId).toBe("game-public")

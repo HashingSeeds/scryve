@@ -15,7 +15,8 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { assertGameScores } from "../../../convex/lib/matchResults"
+import type { PlayerMarkShape } from "../../../convex/lib/appearance"
+import { assertGameScores, type MatchBestOf } from "../../../convex/lib/matchResults"
 
 const OUTCOMES = ["win", "loss", "draw"] as const satisfies readonly MatchSeatOutcome[]
 
@@ -61,17 +62,53 @@ function gameScoresErrorMessage(cause: unknown) {
   return cause instanceof Error ? cause.message : translate("board:matchEnd.failed")
 }
 
-function drawForRemaining(game: LocalGame): MatchSeatOutcome[] {
-  return game.players.map((player) => (localOutReason(game, player.id) ? "loss" : "draw"))
+export interface MatchEndSeat {
+  id: string
+  name: string
+  color: string
+  shape?: PlayerMarkShape
+  wins: number
+  out: boolean
+}
+
+export interface MatchEndScore {
+  bestOf: MatchBestOf
+  seats: readonly MatchEndSeat[]
+  draws: number
+  lastGameDrawn: boolean
+}
+
+function drawForRemaining(seats: readonly MatchEndSeat[]): MatchSeatOutcome[] {
+  return seats.map(({ out }) => (out ? "loss" : "draw"))
+}
+
+function defaultOutcomes({ seats, lastGameDrawn }: MatchEndScore): MatchSeatOutcome[] {
+  const most = Math.max(...seats.map(({ wins }) => wins))
+  const leaders = seats.filter(({ wins }) => wins === most)
+  if (!lastGameDrawn && most > 0 && leaders.length === 1)
+    return seats.map(({ wins }) => (wins === most ? "win" : "loss"))
+  return drawForRemaining(seats)
+}
+
+function localMatchScore(game: LocalGame): MatchEndScore {
+  const score = matchScoreAfter(game)
+  return {
+    bestOf: game.match?.bestOf ?? 1,
+    seats: game.players.map((player, seat) => ({
+      id: player.id,
+      name: player.name,
+      color: player.color,
+      shape: player.shape,
+      wins: score.wins[seat],
+      out: Boolean(localOutReason(game, player.id)),
+    })),
+    draws: score.draws,
+    lastGameDrawn: game.result?.kind === "draw",
+  }
 }
 
 export function defaultMatchOutcomes(game: LocalGame): MatchSeatOutcome[] {
-  const { wins } = matchScoreAfter(game)
-  const most = Math.max(...wins)
-  const leaders = wins.filter((count) => count === most)
-  if (game.result?.kind !== "draw" && most > 0 && leaders.length === 1)
-    return wins.map((count) => (count === most ? "win" : "loss"))
-  return drawForRemaining(game)
+  return defaultOutcomes(localMatchScore(game))
 }
 
 export function LocalMatchEndDialog({
@@ -83,11 +120,26 @@ export function LocalMatchEndDialog({
   onClose: () => void
   onEnd: (outcomes: MatchSeatOutcome[]) => void
 }) {
+  return <MatchEndDialog score={localMatchScore(game)} onClose={onClose} onEnd={onEnd} />
+}
+
+export function MatchEndDialog({
+  score,
+  failure,
+  busy,
+  onClose,
+  onEnd,
+}: {
+  score: MatchEndScore
+  failure?: string
+  busy?: boolean
+  onClose: () => void
+  onEnd: (outcomes: MatchSeatOutcome[]) => void
+}) {
   const { themed } = useAppTheme()
-  const match = game.match
-  const [outcomes, setOutcomes] = useState(() => defaultMatchOutcomes(game))
+  const [outcomes, setOutcomes] = useState(() => defaultOutcomes(score))
   const [error, setError] = useState<string>()
-  const score = matchScoreAfter(game)
+  const shownError = error ?? failure
   const segments = OUTCOMES.map((id) => ({ id, label: translate(`board:matchEnd.outcome.${id}`) }))
 
   function choose(seat: number, outcome: MatchSeatOutcome) {
@@ -97,19 +149,18 @@ export function LocalMatchEndDialog({
 
   function drawRemaining() {
     setError(undefined)
-    setOutcomes(drawForRemaining(game))
+    setOutcomes(drawForRemaining(score.seats))
   }
 
   function confirm() {
-    if (!match) return
     try {
       assertGameScores(
         outcomes.map((outcome, seat) => ({
           outcome,
-          gamesWon: score.wins[seat],
+          gamesWon: score.seats[seat].wins,
           gamesDrawn: score.draws,
         })),
-        match.bestOf,
+        score.bestOf,
       )
       onEnd(outcomes)
     } catch (cause) {
@@ -132,7 +183,7 @@ export function LocalMatchEndDialog({
         style={themed($sheetScroll)}
         contentContainerStyle={themed([$sheetScrollContent, $seats])}
       >
-        {game.players.map((player, seat) => (
+        {score.seats.map((player, seat) => (
           <View key={player.id} style={themed($seat)}>
             <View style={themed($seatName)}>
               <PlayerMark
@@ -142,7 +193,7 @@ export function LocalMatchEndDialog({
                 size={24}
               />
               <Text text={player.name} numberOfLines={1} style={themed($name)} />
-              <Text text={String(score.wins[seat])} size="xs" tone="dim" />
+              <Text text={String(player.wins)} size="xs" tone="dim" />
             </View>
             <View style={themed($seatOutcome)}>
               <SegmentedControl
@@ -165,13 +216,14 @@ export function LocalMatchEndDialog({
         accessibilityHint={translate("board:matchEnd.drawRemainingHint")}
         onPress={drawRemaining}
       />
-      {error ? <AlertNote text={error} /> : null}
+      {shownError ? <AlertNote text={shownError} /> : null}
       <View style={themed($dialogActions)}>
         <Button tx="common:cancel" style={themed($dialogAction)} onPress={onClose} />
         <Button
           testID="confirm-end-match-button"
           tx="board:matchEnd.end"
           preset="primary"
+          disabled={busy}
           style={themed($dialogAction)}
           onPress={confirm}
         />

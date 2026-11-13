@@ -130,6 +130,7 @@ export const mockClaimableSeats = jest.fn(
 export const mockSyncUser = jest.fn(async () => "user")
 export const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
+export const mockEndMatch = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockAbandon = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockUpdateLobbySettings = jest.fn(async () => undefined)
 export const mockSetAppearance = jest.fn(async () => ({ color: "#41476E", shape: "square" }))
@@ -264,6 +265,7 @@ export function resetConnectedHarness() {
   mockStart.mockReset().mockResolvedValue({ publicId: "game-public" })
   mockLeave.mockReset().mockResolvedValue({ publicId: "game-public", left: true })
   mockAbandon.mockReset().mockResolvedValue({ publicId: "game-public" })
+  mockEndMatch.mockReset().mockResolvedValue({ publicId: "game-public" })
   mockUpdateLobbySettings.mockReset().mockResolvedValue(undefined)
   mockSetAppearance.mockReset().mockResolvedValue({ color: "#41476E", shape: "square" })
   mockSelectDeck.mockReset().mockResolvedValue(undefined)
@@ -329,6 +331,7 @@ export function createConvexReactMock() {
       if (name.includes("claimSeat")) return mockClaimSeat
       if (name.includes("startGame")) return mockStart
       if (name.includes("leaveMyGame")) return mockLeave
+      if (name.includes("endMatch")) return mockEndMatch
       if (name.includes("abandonGame")) return mockAbandon
       if (name.includes("updateLobbySettings")) return mockUpdateLobbySettings
       if (name.includes("setMyAppearance")) return mockSetAppearance
@@ -389,6 +392,7 @@ const connectedApi = {
     claimableSeats: "games.claimableSeats",
     startGame: "games.startGame",
     leaveMyGame: "games.leaveMyGame",
+    endMatch: "games.endMatch",
     abandonGame: "games.abandonGame",
     updateLobbySettings: "games.updateLobbySettings",
     setMyAppearance: "games.setMyAppearance",

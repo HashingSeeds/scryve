@@ -17,6 +17,7 @@ import {
   mockChangeLife,
   mockUndoLife,
   mockDismissFailed,
+  mockEndMatch,
   mockFinish,
   mockLeave,
   mockRuntimeAbandon,
@@ -632,6 +633,45 @@ describe("ConnectedBoardScreen", () => {
     } finally {
       jest.useRealTimers()
     }
+  })
+
+  it("shows the match score and lets the host call the match between games", async () => {
+    const match = {
+      bestOf: 3 as const,
+      gameNumber: 2,
+      seats: connectedHarness.runtime.projection.players.map(({ seat }, index) => ({
+        seat,
+        gamesWon: index === 0 ? 1 : 0,
+        gamesDrawn: 0,
+      })),
+    }
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, isHost: true, match },
+    }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("game-menu-status-line"))
+    expect(screen.getByText("Best of 3 · Game 2")).toBeTruthy()
+    expect(screen.getByTestId("end-match-button").props.accessibilityState.disabled).toBe(true)
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, match: { ...match, canEnd: true } },
+    }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    fireEvent.press(screen.getByTestId("end-match-button"))
+    fireEvent.press(screen.getByTestId("confirm-end-match-button"))
+    await waitFor(() =>
+      expect(mockEndMatch).toHaveBeenCalledWith({
+        publicId: "game-public",
+        seats: match.seats.map(({ seat }, index) => ({
+          seat,
+          outcome: index === 0 ? "win" : "loss",
+        })),
+      }),
+    )
+    await waitFor(() => expect(screen.queryByTestId("end-match-dialog")).toBeNull())
   })
 
   it("follows the table to its rematch instead of the summary", () => {

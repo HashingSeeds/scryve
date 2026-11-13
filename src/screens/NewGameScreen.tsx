@@ -519,6 +519,7 @@ function NewGameForm({
   const matchBestOf = matchOn
     ? (chosenBestOf ?? (isCommanderFormat(system, format) || playerCount > 2 ? 1 : 3))
     : undefined
+  const matchOffered = cloudMode || (!connectedMode && !localGame)
   const clockMinutes = chosenClockMinutes ?? defaultRoundClockMinutes(system, matchBestOf)
   const clockSetup: RoundClockSetup | undefined =
     clockMode === "off"
@@ -554,7 +555,7 @@ function NewGameForm({
     [connectedMode, defaults.defaultFormat, defaults.defaultSystem, recentSetups],
   )
   const optionsSummary = [
-    ...(!connectedMode && !localGame && matchBestOf
+    ...(matchOffered && matchBestOf
       ? [translate("play:newGame.bestOfCount", { bestOf: matchBestOf })]
       : []),
     ...(!connectedMode && !localGame && clockSetup
@@ -729,6 +730,7 @@ function NewGameForm({
         startingLife,
         ruleset: format ?? NO_PLAY_SYSTEM,
         ...gameSetup,
+        ...(matchBestOf ? { matchBestOf } : {}),
       })
     else await startLocal()
   }
@@ -1481,7 +1483,7 @@ function NewGameForm({
           style={themed($sheetScroll)}
           contentContainerStyle={themed([$sheetScrollContent, $statusDetails])}
         >
-          {!connectedMode && !localGame ? (
+          {matchOffered ? (
             <View style={themed($section)}>
               <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />
               <SegmentedControl

@@ -345,7 +345,9 @@ export function matchScoreLabel(score: { wins: number[]; draws: number }) {
     : `${score.wins.join("-")} · ${drawsLabel(score.draws)}`
 }
 
-export function matchContextLabel(game: Pick<LocalGame, "match">) {
+export function matchContextLabel(game: {
+  match?: Pick<LocalGameMatch, "gameNumber" | "wins" | "draws">
+}) {
   const match = game.match
   if (!match) return undefined
   return translate("board:match.context", {
