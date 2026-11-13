@@ -8,7 +8,13 @@ import { assertDeckKey, assertDeckFingerprint, pinnedDeck } from "./lib/deckKeys
 import { limitResultRate } from "./lib/deckRateLimits"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { assertGameSystem } from "./lib/integrations"
-import { assertGameScores, MAX_GAMES_PER_MATCH, type MatchBestOf } from "./lib/matchResults"
+import {
+  assertGameScores,
+  decidedMatchOutcomes,
+  MAX_GAMES_PER_MATCH,
+  type MatchBestOf,
+  type MatchOutcome,
+} from "./lib/matchResults"
 import { assertDeckLabel, deckLabelValidator } from "./lib/opponentDecks"
 import {
   assertDeckName,
@@ -30,7 +36,7 @@ const outcomeValidator = v.union(
   v.literal("unknown"),
 )
 
-const bestOfValidator = v.union(v.literal(1), v.literal(3), v.literal(5))
+export const bestOfValidator = v.union(v.literal(1), v.literal(3), v.literal(5))
 
 const seatResultFields = {
   seat: v.number(),
@@ -425,3 +431,168 @@ export const finishScryveMatch = mutation({
     return { matchId: match._id }
   },
 })
+
+type HostedGame = Pick<
+  Doc<"games">,
+  "_id" | "publicId" | "hostUserId" | "system" | "format" | "matchId" | "matchGameNumber"
+>
+
+export async function openHostedMatch(
+  ctx: MutationCtx,
+  game: HostedGame,
+  players: readonly Pick<Doc<"gamePlayers">, "seat" | "displayName" | "userId">[],
+  bestOf: MatchBestOf,
+) {
+  const now = Date.now()
+  const matchId = await ctx.db.insert("matches", {
+    publicId: game.publicId,
+    ...(game.hostUserId ? { ownerUserId: game.hostUserId } : {}),
+    source: "connected",
+    status: "active",
+    bestOf,
+    ...(game.system ? { system: game.system } : {}),
+    ...(game.format ? { format: game.format } : {}),
+    seats: [...players]
+      .sort((left, right) => left.seat - right.seat)
+      .map((player) => ({
+        seat: player.seat,
+        displayName: player.displayName,
+        ...(player.userId ? { userId: player.userId } : {}),
+      })),
+    gameIds: [game._id],
+    createdAt: now,
+    updatedAt: now,
+  })
+  await ctx.db.patch(game._id, { matchBestOf: bestOf, matchId, matchGameNumber: 1 })
+}
+
+export async function continueHostedMatch(
+  ctx: MutationCtx,
+  finished: HostedGame,
+  next: HostedGame,
+) {
+  const match = finished.matchId ? await ctx.db.get(finished.matchId) : null
+  if (match?.source !== "connected" || match.status !== "active") return false
+  await ctx.db.patch(match._id, { gameIds: [...match.gameIds, next._id], updatedAt: Date.now() })
+  await ctx.db.patch(next._id, {
+    matchBestOf: match.bestOf,
+    matchId: match._id,
+    matchGameNumber: (finished.matchGameNumber ?? 0) + 1,
+  })
+  return true
+}
+
+export async function hostedMatchIsFull(ctx: MutationCtx, game: HostedGame) {
+  const match = game.matchId ? await ctx.db.get(game.matchId) : null
+  return (
+    match?.source === "connected" &&
+    match.status === "active" &&
+    match.gameIds.length >= MAX_GAMES_PER_MATCH
+  )
+}
+
+async function finishedSummaries(ctx: MutationCtx, match: ScryveMatch) {
+  const summaries = await Promise.all(
+    match.gameIds.map((gameId) =>
+      ctx.db
+        .query("gameSummaries")
+        .withIndex("by_game", (q) => q.eq("gameId", gameId))
+        .unique(),
+    ),
+  )
+  return summaries.flatMap((summary) =>
+    summary && (summary.terminalStatus ?? "finished") === "finished" ? [summary] : [],
+  )
+}
+
+async function finishHostedMatch(
+  ctx: MutationCtx,
+  match: ScryveMatch,
+  seats: MatchSeat[],
+  outcomes: readonly MatchOutcome[],
+  last: Doc<"gameSummaries">,
+) {
+  await ctx.db.patch(match._id, {
+    status: "finished",
+    finishedAt: last.finishedAt,
+    updatedAt: Date.now(),
+    seats: seats.map((seat, index) => {
+      const player = last.players.find((candidate) => candidate.seat === seat.seat)
+      return {
+        ...seat,
+        outcome: outcomes[index],
+        ...(player?.deckId ? { deckId: player.deckId } : {}),
+        ...(player?.deckVersionId ? { deckVersionId: player.deckVersionId } : {}),
+        ...(player?.deckNameAtFinish ? { deckName: player.deckNameAtFinish } : {}),
+        ...(player?.deckKey ? { deckKey: player.deckKey } : {}),
+        ...(player?.deckFingerprint ? { deckFingerprint: player.deckFingerprint } : {}),
+        ...(player?.deckLabel ? { deckLabel: player.deckLabel } : {}),
+      }
+    }),
+  })
+  await recordMatchResult(ctx, (await ctx.db.get(match._id))!)
+}
+
+/** why: every way a hosted game ends passes through here, so the match score never depends on which screen ended the game. */
+export async function scoreHostedMatch(
+  ctx: MutationCtx,
+  game: HostedGame,
+  ended: { discarded: boolean },
+) {
+  const found = game.matchId ? await ctx.db.get(game.matchId) : null
+  if (found?.source !== "connected" || found.status !== "active") return
+  const match = ended.discarded
+    ? { ...found, gameIds: found.gameIds.filter((gameId) => gameId !== game._id) }
+    : found
+  const finished = await finishedSummaries(ctx, match)
+  const draws = finished.filter((summary) => summary.resultKind === "draw").length
+  const seats = match.seats.map((seat) => ({
+    ...seat,
+    gamesWon: finished.filter((summary) =>
+      summary.players.some((player) => player.seat === seat.seat && player.outcome === "win"),
+    ).length,
+    gamesDrawn: draws,
+  }))
+  const outcomes = decidedMatchOutcomes(
+    seats.map((seat) => seat.gamesWon),
+    match.bestOf,
+  )
+  const last = finished.at(-1)
+  if (outcomes && last) return await finishHostedMatch(ctx, match, seats, outcomes, last)
+  await ctx.db.patch(match._id, {
+    seats,
+    gameIds: match.gameIds,
+    updatedAt: Date.now(),
+    ...(finished.length === 0 ? { status: "abandoned" as const } : {}),
+  })
+}
+
+export async function endHostedMatch(
+  ctx: MutationCtx,
+  matchId: Id<"matches">,
+  outcomes: readonly { seat: number; outcome: "win" | "loss" | "draw" }[],
+) {
+  const match = await ctx.db.get(matchId)
+  if (match?.source !== "connected")
+    throw new ConvexError({ code: "match_not_found", message: "Match not found" })
+  if (match.status === "finished") return
+  const last = (await finishedSummaries(ctx, match)).at(-1)
+  if (match.status !== "active" || !last)
+    throw new ConvexError({
+      code: "match_needs_game",
+      message: "Finish a game before ending the match",
+    })
+  const chosen = new Map(outcomes.map(({ seat, outcome }) => [seat, outcome]))
+  if (
+    chosen.size !== outcomes.length ||
+    chosen.size !== match.seats.length ||
+    match.seats.some((seat) => !chosen.has(seat.seat))
+  )
+    throw new Error("A match result needs every seat exactly once")
+  const result = match.seats.map((seat) => chosen.get(seat.seat)!)
+  assertGameScores(
+    match.seats.map((seat, index) => ({ ...seat, outcome: result[index] })),
+    match.bestOf,
+  )
+  await finishHostedMatch(ctx, match, match.seats, result, last)
+}

@@ -141,7 +141,16 @@ import {
   type GameVariant,
 } from "./lib/treachery"
 import { lobbyTeammateSeat, pairedTeams } from "./lib/twoHeadedGiant"
-import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
+import {
+  bestOfValidator,
+  continueHostedMatch,
+  endHostedMatch,
+  hostedMatchIsFull,
+  linkPublishedGameToMatch,
+  openHostedMatch,
+  publishedMatchValidator,
+  scoreHostedMatch,
+} from "./matches"
 
 const MAX_PLAYERS_PER_GAME_READ = MAX_PLAYERS + 1
 const MAX_COMMANDER_DAMAGE_ROWS = MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_GAME_READ - 1) * 2
@@ -770,6 +779,8 @@ async function terminalizeGame(
           : "loss"
   const now = Date.now()
   const finishedAt = options.finishedAt ?? now
+  const hostedMatchId = game.mode === "connected" ? game.matchId : undefined
+  const matchId = options.matchId ?? hostedMatchId
   const decks = attachesDecks(gameDeckRules(game)[0])
   const summaryPlayers = await Promise.all(
     players
@@ -833,7 +844,7 @@ async function terminalizeGame(
     ...(options.firstPlayerId ? { firstPlayerId: options.firstPlayerId } : {}),
     resultKind: result.kind,
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
-    ...(options.matchId ? { matchId: options.matchId } : {}),
+    ...(matchId ? { matchId } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
     ...(game.variant ? { variant: game.variant } : {}),
   })
@@ -858,7 +869,7 @@ async function terminalizeGame(
       ...(options.historySource ? { source: options.historySource } : {}),
       gameId: game._id,
       summaryId,
-      ...(options.matchId ? { matchId: options.matchId } : {}),
+      ...(matchId ? { matchId } : {}),
       finishedAt,
       outcome,
     })
@@ -867,6 +878,7 @@ async function terminalizeGame(
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players)
     await ctx.db.patch(player._id, { resumable: false, ...(decks ? {} : NO_SEAT_DECK) })
+  if (hostedMatchId) await scoreHostedMatch(ctx, game, { discarded: !recordsHistory })
   return summary
 }
 
@@ -890,6 +902,7 @@ export const createLobby = mutation({
     modeSetup: v.optional(modeSetupValidator),
     layout: v.optional(playerGridLayoutValidator),
     editsAnySeat: v.optional(v.boolean()),
+    matchBestOf: v.optional(bestOfValidator),
     inviteToken: v.string(),
     manualCodeCandidates: v.array(v.string()),
     hostDisplayName: v.string(),
@@ -974,6 +987,7 @@ export const createLobby = mutation({
       ...(args.variant ? { variant: args.variant } : {}),
       ...(args.modeSetup ? { modeSetup: args.modeSetup } : {}),
       ...(args.layout ? { layout: args.layout } : {}),
+      ...(args.matchBestOf ? { matchBestOf: args.matchBestOf } : {}),
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,
@@ -2025,6 +2039,37 @@ const connectedOperation = v.union(
   }),
 )
 
+async function matchProjection(
+  ctx: QueryCtx,
+  game: Doc<"games">,
+  viewer: { isHost: boolean; eventCount: number },
+) {
+  const match = game.matchId ? await ctx.db.get(game.matchId) : null
+  if (match?.source !== "connected")
+    return { bestOf: game.matchBestOf, gameNumber: game.matchGameNumber ?? 1 }
+  const hasFinishedGame = game.status === "finished" || (game.matchGameNumber ?? 1) > 1
+  const betweenGames =
+    game.status === "finished" || (game.status === "active" && viewer.eventCount === 0)
+  return {
+    bestOf: match.bestOf,
+    gameNumber: game.matchGameNumber ?? 1,
+    status: match.status,
+    seats: match.seats.map((seat) => ({
+      seat: seat.seat,
+      gamesWon: seat.gamesWon ?? 0,
+      gamesDrawn: seat.gamesDrawn ?? 0,
+      ...(seat.outcome ? { outcome: seat.outcome } : {}),
+    })),
+    ...(viewer.isHost &&
+    match.status === "active" &&
+    hasFinishedGame &&
+    betweenGames &&
+    match.gameIds.at(-1) === game._id
+      ? { canEnd: true }
+      : {}),
+  }
+}
+
 export const lobbyProjection = query({
   args: {
     publicId: v.string(),
@@ -2094,6 +2139,9 @@ export const lobbyProjection = query({
       ...(game.lifeEditing === "anyone" ? { lifeEditing: game.lifeEditing } : {}),
       isHost,
       ...(game.rematchPublicId ? { rematchPublicId: game.rematchPublicId } : {}),
+      ...(game.matchBestOf
+        ? { match: await matchProjection(ctx, game, { isHost, eventCount }) }
+        : {}),
       eventSequence: eventCount,
       ...(args.operation
         ? { operationStatus: await statusForOperation(ctx, game, user, eventCount, args.operation) }
@@ -2570,6 +2618,7 @@ export const startGame = mutation({
         ...roles?.[index],
       })
     }
+    if (game.matchBestOf) await openHostedMatch(ctx, game, players, game.matchBestOf)
     return { publicId: game.publicId }
   },
 })
@@ -2896,6 +2945,7 @@ async function startRematch(
   assertManualCodeCandidates(request.manualCodeCandidates)
   const players = await playersForGame(ctx, finished._id)
   if (players.some((player) => player.deletedAt !== undefined)) return null
+  if (await hostedMatchIsFull(ctx, finished)) return null
   const userIds = [...new Set(players.flatMap((player) => player.userId ?? []))]
   for (const [index, userId] of userIds.entries()) {
     for (const otherUserId of userIds.slice(index + 1)) {
@@ -3001,6 +3051,8 @@ async function startRematch(
     })
   }
   if (isTeamVariant(game.variant)) await ctx.db.patch(gameId, { turnGroups: pairedTeams(seatIds) })
+  if (finished.matchBestOf && !(await continueHostedMatch(ctx, finished, game)))
+    await openHostedMatch(ctx, game, players, finished.matchBestOf)
   if (players.some((player) => player.userId === undefined)) {
     const manualCode = await allocateInvite(ctx, request.inviteToken, request.manualCodeCandidates)
     const invitationId = await ctx.db.insert("invitations", {
@@ -3065,6 +3117,45 @@ export const finishGame = mutation({
       finishedAt: summary.finishedAt,
       ...(rematchPublicId ? { rematchPublicId } : {}),
     }
+  },
+})
+
+export const endMatch = mutation({
+  args: {
+    publicId: v.string(),
+    seats: v.array(
+      v.object({
+        seat: v.number(),
+        outcome: v.union(v.literal("win"), v.literal("loss"), v.literal("draw")),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    await requireHost(ctx, game)
+    const match = game.mode === "connected" && game.matchId ? await ctx.db.get(game.matchId) : null
+    if (match?.source !== "connected")
+      throw new ConvexError({ code: "match_not_found", message: "Match not found" })
+    if (match.gameIds.at(-1) !== game._id)
+      throw new ConvexError({
+        code: "match_moved_on",
+        message: "End the match from its latest game",
+      })
+    if (game.status !== "active") {
+      await endHostedMatch(ctx, match._id, args.seats)
+      return { publicId: game.publicId }
+    }
+    const players = await playersForGame(ctx, game._id)
+    if (totalEventCount(game, players) > 0)
+      throw new ConvexError({
+        code: "match_game_in_progress",
+        message: "Finish this game before ending the match",
+      })
+    // why: the next game is already on every board, so it stays and opens the next match instead of being thrown away.
+    await ctx.db.patch(match._id, { gameIds: match.gameIds.slice(0, -1) })
+    await endHostedMatch(ctx, match._id, args.seats)
+    await openHostedMatch(ctx, game, players, match.bestOf)
+    return { publicId: game.publicId }
   },
 })
 

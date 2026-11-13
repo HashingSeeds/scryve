@@ -12,6 +12,12 @@ export function winsNeeded(bestOf: MatchBestOf) {
   return Math.ceil(bestOf / 2)
 }
 
+export function decidedMatchOutcomes(wins: readonly number[], bestOf: MatchBestOf) {
+  const winner = wins.findIndex((count) => count >= winsNeeded(bestOf))
+  if (winner === -1) return undefined
+  return wins.map((_, seat) => (seat === winner ? ("win" as const) : ("loss" as const)))
+}
+
 export function assertGameScores(
   seats: readonly { gamesWon?: number; gamesDrawn?: number; outcome: MatchOutcome }[],
   bestOf: MatchBestOf,
