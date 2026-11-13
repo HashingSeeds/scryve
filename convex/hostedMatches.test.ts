@@ -11,7 +11,8 @@ async function matchGame(t: ConvexTestHarness) {
   const host = await signedIn(t, "match-host", "Host")
   const joiner = await signedIn(t, "match-joiner", "Joiner")
   const { publicId } = await host.mutation(api.games.createLobby, {
-    publicId: "match-game-public-id-1",
+    // why: the longest id a game may have, so a match id that shortened it would no longer equal it.
+    publicId: `${"m".repeat(62)}01`,
     playerCount: 2,
     startingLife: 20,
     ruleset: "standard",
