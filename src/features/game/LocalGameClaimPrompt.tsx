@@ -10,7 +10,7 @@ import { PlayerMark } from "@/components/PlayerMark"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { appLocale } from "@/i18n"
+import { formatConjunction, formatDate, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { entryPlayerNames, localHistoryEntry } from "@/screens/historyEntries"
 import { useAppTheme } from "@/theme/context"
@@ -54,18 +54,22 @@ function resultLabel(unit: ClaimUnit) {
   const entry = localHistoryEntry(game)
   if (entry.outcome === "draw") return translate("board:claim.draw")
   return entry.winnerNames?.length
-    ? translate("board:claim.wonBy", { names: entry.winnerNames.join(" & ") })
+    ? translate("board:claim.wonBy", { names: formatConjunction(entry.winnerNames) })
     : translate("board:claim.noResult")
 }
 
 function whenLabel(timestamp: number) {
-  const date = new Date(timestamp)
-  return `${date.toLocaleDateString(appLocale, { month: "short", day: "numeric" })} ${date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })}`
+  return formatDate(timestamp, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
 }
 
 function detailLine(unit: ClaimUnit) {
   const game = latestGame(unit)
-  return [resultLabel(unit), whenLabel(game.finishedAt), localHistoryEntry(game).format].join(" · ")
+  return joinParts([resultLabel(unit), whenLabel(game.finishedAt), localHistoryEntry(game).format])
 }
 
 function gameCount(units: readonly ClaimUnit[]) {
@@ -186,7 +190,7 @@ function ClaimPicker({
         {candidates.map((unit) => {
           const selected = !excluded.includes(unit.id)
           const game = latestGame(unit)
-          const names = entryPlayerNames(localHistoryEntry(game)).join(" · ")
+          const names = joinParts(entryPlayerNames(localHistoryEntry(game)))
           const meSeat = meSeats[unit.id]
           return (
             <View key={unit.id} style={themed($game)}>

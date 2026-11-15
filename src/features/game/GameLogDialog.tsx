@@ -14,6 +14,7 @@ import { PlayerMark } from "@/components/PlayerMark"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { relativeTime } from "@/features/connected/connectedCopy"
+import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -160,7 +161,7 @@ export function GameLogDialog({
       const name = seat?.name ?? ""
       const custom = customCounterNameOf(item.counterId)
       const counter = custom ?? tableItemLabel({ id: item.counterId, label: item.counterId })
-      const delta = signed(item.delta)
+      const delta = formatSigned(item.delta)
       return (
         <View
           testID={`game-log-counter-${item.id}`}
@@ -186,14 +187,14 @@ export function GameLogDialog({
               <Text text={name} weight="medium" numberOfLines={1} style={$name} />
               <Text text={delta} weight="semiBold" style={[$number, { color: colors.text }]} />
               <Text text="→" style={{ color: colors.textDim }} />
-              <Text text={String(item.value)} weight="semiBold" style={$number} />
+              <Text text={item.value} weight="semiBold" style={$number} />
             </View>
             <View style={themed($detail)}>
               {custom === undefined ? (
                 <TableGlyph id={item.counterId} size={COUNTER_GLYPH} color={colors.textDim} />
               ) : null}
               <Text
-                text={`${counter} · ${relativeTime(item.at, openedAt)}`}
+                text={joinParts([counter, relativeTime(item.at, openedAt)])}
                 size="xxs"
                 numberOfLines={1}
                 style={[$shrink, { color: colors.textDim }]}
@@ -207,7 +208,7 @@ export function GameLogDialog({
     const source = item.fromPlayerId ? seats.get(item.fromPlayerId) : undefined
     const name = (sharedLife ? teamName(players, groups, item.playerId) : seat?.name) ?? ""
     const head = sharedLife && !source ? seat : undefined
-    const delta = signed(item.delta)
+    const delta = formatSigned(item.delta)
     const when = relativeTime(item.at, openedAt)
     return (
       <View
@@ -242,7 +243,7 @@ export function GameLogDialog({
               style={[$number, { color: item.delta < 0 ? colors.error : colors.success }]}
             />
             <Text text="→" style={{ color: colors.textDim }} />
-            <Text text={String(item.life)} weight="semiBold" style={$number} />
+            <Text text={item.life} weight="semiBold" style={$number} />
           </View>
           <View style={themed($detail)}>
             {source ? (
@@ -255,7 +256,9 @@ export function GameLogDialog({
                   size={SOURCE_MARK}
                 />
                 <Text
-                  text={`${translate("board:log.commanderFrom", { name: source.name })} ·`}
+                  text={withTrailingSeparator(
+                    translate("board:log.commanderFrom", { name: source.name }),
+                  )}
                   size="xxs"
                   numberOfLines={1}
                   style={[$shrink, { color: colors.textDim }]}
@@ -263,7 +266,7 @@ export function GameLogDialog({
               </>
             ) : head ? (
               <Text
-                text={`${translate("board:log.by", { name: head.name })} ·`}
+                text={withTrailingSeparator(translate("board:log.by", { name: head.name }))}
                 size="xxs"
                 numberOfLines={1}
                 style={[$shrink, { color: colors.textDim }]}
@@ -324,9 +327,8 @@ export function GameLogDialog({
   )
 }
 
-function signed(delta: number) {
-  return `${delta < 0 ? "−" : "+"}${Math.abs(delta)}`
-}
+// why: the label shrinks to fit while the time beside it stays whole, so they are separate Texts.
+const withTrailingSeparator = (label: string) => label + translate("common:separator").trimEnd()
 
 const MARK = 32
 const COUNTER_GLYPH = 12

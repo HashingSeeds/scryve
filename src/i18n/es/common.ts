@@ -15,6 +15,9 @@ export default {
   save: "Guardar",
   tryAgain: "Intentar de nuevo",
   undo: "Deshacer",
+  separator: " · ",
+  listSeparator: ", ",
+  listAnd: " y ",
   emptyState: {
     heading: "Aún no hay nada aquí",
     content: "No se encontraron datos. Prueba a actualizar o a reiniciar la app.",

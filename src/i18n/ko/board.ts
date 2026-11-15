@@ -571,6 +571,8 @@ export default {
     title: "플레인체이스",
     plane: "차원",
     phenomenon: "현상",
+    planeNamed: "플레인: {{name}}",
+    phenomenonNamed: "현상: {{name}}",
     ownCards: "내 차원 덱",
     roll: "굴리기",
     nextCost: "다음 굴림: {{cost}}",
@@ -596,6 +598,7 @@ export default {
   scheme: {
     title: "아크에너미",
     archenemy: "아크에너미",
+    archenemyPlate: "아크에너미: {{label}}",
     setInMotion: "음모 발동",
     due: "음모 대기",
     schemes: "음모",

@@ -12,6 +12,7 @@ import { CloudGlyph } from "@/features/decks/CloudGlyph"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
+import { formatList, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -117,7 +118,7 @@ function DeckOption({
   const copy = (accessible: boolean) => (
     <View
       accessible={accessible}
-      accessibilityLabel={accessible ? [accessibilityLabel ?? name, detail].join(", ") : undefined}
+      accessibilityLabel={accessible ? formatList([accessibilityLabel ?? name, detail]) : undefined}
       style={$optionCopy}
     >
       <View style={$optionName}>
@@ -320,15 +321,13 @@ export function LobbySeatList({
                     numberOfLines={2}
                     style={themed(deckReady ? $seatDetail : $seatPending)}
                     text={
-                      [
+                      joinParts([
                         seat.controlledByMe ? translate("connected:seats.you") : undefined,
                         chosenDeck?.name ?? chosenShared?.name,
                         chosenVersion
                           ? versionLabel(chosenVersion, latestVersionNumber)
                           : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") ||
+                      ]) ||
                       translate(
                         deckReady ? "connected:seats.deckSelected" : "connected:seats.noDeck",
                       )

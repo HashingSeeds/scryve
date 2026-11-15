@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
+import { formatNumber, formatOrMore } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -69,7 +70,7 @@ export function OptionGrid({
             key={option}
             compact
             testID={`${testID}-${option}`}
-            text={String(option)}
+            text={formatNumber(option)}
             selected={draft === undefined && option === value}
             disabled={isDisabled?.(option)}
             style={[
@@ -100,7 +101,7 @@ export function OptionGrid({
           <ChoiceButton
             compact
             testID={`${testID}-custom`}
-            text={customValue === undefined ? undefined : String(customValue)}
+            text={customValue === undefined ? undefined : formatNumber(customValue)}
             accessibilityLabel={
               customValue === undefined ? translate("common:optionGrid.other") : undefined
             }
@@ -118,7 +119,7 @@ export function OptionGrid({
           <ChoiceButton
             compact
             testID={`${testID}-more`}
-            text={`${more[0]}+`}
+            text={formatOrMore(more[0])}
             selected={false}
             accessibilityLabel={translate("common:optionGrid.more", { label, from: more[0] })}
             style={[themed($cell), $moreRowCell]}

@@ -94,17 +94,17 @@ function ContextLine({
       style={themed([$text, $line])}
     >
       {match?.line}
-      {match && view ? " · " : null}
+      {match && view ? translate("common:separator") : null}
       {view?.kind === "time" ? (
         <Text size="xxs" weight="semiBold" style={themed($text)} tx="board:clock.time" />
       ) : null}
-      {view?.kind === "time" && clockText ? " · " : null}
+      {view?.kind === "time" && clockText ? translate("common:separator") : null}
       {clockText ? (
         <Text size="xxs" weight={urgent ? "semiBold" : "medium"} style={themed($text)}>
           {clockText}
         </Text>
       ) : null}
-      {paused ? ` · ${translate("board:clock.paused")}` : null}
+      {paused ? translate("common:separator") + translate("board:clock.paused") : null}
     </Text>
   )
   if (!onPress) return line

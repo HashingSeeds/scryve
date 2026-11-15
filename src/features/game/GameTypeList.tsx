@@ -6,6 +6,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { Icon } from "@/components/Icon"
 import { Text } from "@/components/Text"
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -80,7 +81,7 @@ function FormatsDisclosure({
     <Button
       testID={`game-type-more-${system}`}
       text={label}
-      accessibilityLabel={`${label}, ${more}`}
+      accessibilityLabel={formatList([label, more])}
       accessibilityState={{ expanded }}
       style={themed($disclosure)}
       textStyle={themed($disclosureText)}

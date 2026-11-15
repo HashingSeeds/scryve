@@ -159,7 +159,7 @@ describe("game summary", () => {
     expect(screen.getByText("Seat 2")).toBeTruthy()
     expect(screen.queryByText("Seat 0")).toBeNull()
     expect(screen.getByText("3")).toBeTruthy()
-    expect(screen.getByText("-17 from start")).toBeTruthy()
+    expect(screen.getByText("−17 from start")).toBeTruthy()
     expect(screen.getByText("unchanged")).toBeTruthy()
     expect(screen.getByText("No life changes were recorded.")).toBeTruthy()
     expect(screen.getByTestId("summary-timeline-toggle").props.accessibilityState.disabled).toBe(
@@ -178,11 +178,11 @@ describe("game summary", () => {
     renderLocal(localGame({ events: [lifeChange(1, { delta: -2 })] }))
 
     expect(screen.getByText("Life changes · 1")).toBeTruthy()
-    expect(screen.queryByText("-2")).toBeNull()
+    expect(screen.queryByText("−2")).toBeNull()
 
     fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
 
-    expect(screen.getByText("-2")).toBeTruthy()
+    expect(screen.getByText("−2")).toBeTruthy()
   })
 
   it("marks undo entries once the timeline is open", () => {
@@ -282,7 +282,7 @@ describe("game summary", () => {
     expect(screen.getAllByText("unchanged")).toHaveLength(2)
     screen.unmount()
     render36(33)
-    expect(screen.getByText("-3 from start")).toBeTruthy()
+    expect(screen.getByText("−3 from start")).toBeTruthy()
   })
 
   it.each([
@@ -370,7 +370,7 @@ describe("game summary", () => {
     fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
 
     expect(changes).toHaveLength(1)
-    expect(screen.getByText("-3")).toBeTruthy()
+    expect(screen.getByText("−3")).toBeTruthy()
   })
 
   it("waits for a connected summary before claiming the game is missing", () => {

@@ -318,6 +318,7 @@ export default {
       table: "테이블 변경을 동기화하지 못했습니다",
       confirmCommanderDamage: "커맨더 피해 확인을 동기화하지 못했습니다",
       declineCommanderDamage: "커맨더 피해 거절을 동기화하지 못했습니다",
+      withReason: "{{action}}: {{reason}}",
     },
     menu: {
       players: "플레이어",

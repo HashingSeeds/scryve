@@ -111,7 +111,7 @@ describe("LifeEditor", () => {
     expect(view.getByTestId("life-editor-ticks-seat-1").children).toHaveLength(41)
     fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 300, pageY: 100 } })
     fireEvent(slider, "responderMove", { nativeEvent: { pageX: 230, pageY: 100 } })
-    expect(view.getByTestId("life-editor-balloon-seat-1")).toHaveTextContent("-7")
+    expect(view.getByTestId("life-editor-balloon-seat-1")).toHaveTextContent("−7")
     expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("33")
     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1)
     fireEvent(slider, "responderMove", { nativeEvent: { pageX: 227, pageY: 100 } })

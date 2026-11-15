@@ -351,6 +351,8 @@ const connected = {
       table: "A table change could not sync",
       confirmCommanderDamage: "Confirming commander damage could not sync",
       declineCommanderDamage: "Declining commander damage could not sync",
+      // A change that could not sync, then why. {{action}} is one of the lines above; {{reason}} comes from the server.
+      withReason: "{{action}}: {{reason}}",
     },
     menu: {
       players: "Players",

@@ -1,4 +1,6 @@
 import type { DeckCard } from "@/features/decks/deckCards"
+import { formatSigned } from "@/i18n/format"
+import { translate } from "@/i18n/translate"
 
 import { canonicalDecklist } from "../../../convex/lib/deckFingerprint"
 
@@ -20,5 +22,8 @@ export function cardChanges(current: readonly DeckCard[], previous: readonly Dec
 }
 
 export function formatCardChange(change: ReturnType<typeof cardChanges>[number]) {
-  return `${change.quantity > 0 ? "+" : "−"}${Math.abs(change.quantity)} ${change.name}`
+  return translate("decks:stats.cardChange", {
+    change: formatSigned(change.quantity),
+    card: change.name,
+  })
 }

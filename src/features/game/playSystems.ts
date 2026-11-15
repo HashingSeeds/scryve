@@ -168,9 +168,7 @@ export function counterDeltaFromStartLabel(
       ? translate("systems:noneTaken")
       : translate("systems:taken", { amount: taken })
   }
-  return delta === 0
-    ? translate("systems:even")
-    : translate("systems:fromStart", { delta: `${delta > 0 ? "+" : ""}${delta}` })
+  return delta === 0 ? translate("systems:even") : translate("systems:fromStart", { delta })
 }
 
 function hasOwnKey<Table extends object>(

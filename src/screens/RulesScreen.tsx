@@ -503,6 +503,7 @@ function RulePeek({
               size="xs"
               weight="medium"
               style={$flex}
+              // eslint-disable-next-line no-restricted-syntax -- why: the rules and their numbering are published in English only, so this line is quoted as written.
               text={`${found.section.id}. ${found.section.title}`}
             />
             <Pressable accessibilityRole="link" hitSlop={8} onPress={() => onOpen(id)}>
@@ -515,6 +516,7 @@ function RulePeek({
               size="xs"
               tone="dim"
               numberOfLines={4}
+              // eslint-disable-next-line no-restricted-syntax -- why: the rules and their numbering are published in English only, so this line is quoted as written.
               text={`${rule.id} ${rule.text}`}
             />
           ))}

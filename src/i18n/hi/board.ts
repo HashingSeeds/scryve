@@ -592,6 +592,8 @@ export default {
     title: "Planechase",
     plane: "प्लेन",
     phenomenon: "फ़ेनोमेनन",
+    planeNamed: "प्लेन: {{name}}",
+    phenomenonNamed: "फ़ेनोमेनन: {{name}}",
     ownCards: "आपका प्लेनर डेक",
     roll: "रोल करें",
     nextCost: "अगला रोल: {{cost}}",
@@ -617,6 +619,7 @@ export default {
   scheme: {
     title: "Archenemy",
     archenemy: "आर्चएनिमी",
+    archenemyPlate: "आर्कएनिमी: {{label}}",
     setInMotion: "स्कीम सेट इन मोशन करें",
     due: "स्कीम बाकी है",
     schemes: "स्कीम",

@@ -13,6 +13,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { LOCAL_KEYS, syncStatsEnabled } from "@/features/game/localPersistence"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -351,13 +352,11 @@ export function CardScanner({
   const last = added[0]
   const failedCount = added.filter((card) => card.state === "failed").length
   const retryingCount = added.filter((card) => card.state === "retrying").length
-  const addedSummary = [
+  const addedSummary = joinParts([
     translate("decks:cardScan.addedCount", { count: added.length - failedCount - retryingCount }),
     retryingCount ? translate("decks:cardScan.retryingCount", { count: retryingCount }) : "",
     failedCount ? translate("decks:cardScan.failedCount", { count: failedCount }) : "",
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
   const scanning = Boolean(permission?.granted) && !fixing && !landCount && !closing && !reviewing
 
   return (
@@ -453,7 +452,7 @@ export function CardScanner({
                   disabled={landCount.count <= landCount.inDeck}
                   onPress={() => setLandCount({ ...landCount, count: landCount.count - 1 })}
                 />
-                <Text weight="medium" testID="card-scan-land-count" text={`${landCount.count}`} />
+                <Text weight="medium" testID="card-scan-land-count" text={landCount.count} />
                 <Button
                   text="+"
                   accessibilityLabel={translate("decks:cardRow.increase", {

@@ -1,5 +1,5 @@
 import * as Localization from "expo-localization"
-import i18n from "i18next"
+import i18n, { type FormatFunction } from "i18next"
 
 /**
  * why: every number, date, and list a person reads goes through here, so digits, separators,
@@ -7,6 +7,8 @@ import i18n from "i18next"
  * Intl.ListFormat, Intl.RelativeTimeFormat, and formatToParts, and on iOS it ignores
  * `signDisplay`, `calendar`, and `numberingSystem` options, so this file avoids them.
  */
+
+export const PSEUDO_LOCALE = "en-XA"
 
 const MINUS = "\u2212"
 const FIRST_STRONG_ISOLATE = "\u2068"
@@ -19,6 +21,17 @@ const numberFormats = new Map<string, Intl.NumberFormat>()
 const dateFormats = new Map<string, Intl.DateTimeFormat>()
 
 const locale = () => i18n.language || "en-US"
+
+// why: in the pseudo-locale a formatted number shows in other digits on every platform (Hermes on iOS ignores -u-nu), so an ASCII digit on screen marks a number that skipped this file.
+function pseudoDigits(text: string) {
+  if (locale() !== PSEUDO_LOCALE) return text
+  return text.replace(/[0-9]/g, (digit) => String.fromCharCode(0x0660 + Number(digit)))
+}
+
+// why: month and weekday names come from Intl, not a translation, so the pseudo-locale brackets them like translated text.
+function pseudoDate(text: string) {
+  return locale() === PSEUDO_LOCALE ? `\u27e6${pseudoDigits(text)}\u27e7` : text
+}
 const isRightToLeft = () => i18n.dir(locale()) === "rtl"
 
 function numberFormat(options: Intl.NumberFormatOptions) {
@@ -62,7 +75,7 @@ const withMinusSign = (text: string) => text.replace("-", MINUS)
 
 export function formatNumber(value: number, options: Intl.NumberFormatOptions = {}) {
   const useGrouping = options.useGrouping ?? Math.abs(value) >= GROUPING_FROM
-  return withMinusSign(numberFormat({ ...options, useGrouping }).format(value))
+  return pseudoDigits(withMinusSign(numberFormat({ ...options, useGrouping }).format(value)))
 }
 
 export function formatSigned(value: number) {
@@ -71,7 +84,7 @@ export function formatSigned(value: number) {
 }
 
 export function formatPercent(ratio: number) {
-  return numberFormat({ style: "percent", maximumFractionDigits: 0 }).format(ratio)
+  return pseudoDigits(numberFormat({ style: "percent", maximumFractionDigits: 0 }).format(ratio))
 }
 
 export function formatRecord(...counts: readonly number[]) {
@@ -86,6 +99,18 @@ export function formatOrMore(value: number) {
   return leftToRight(`${formatNumber(value)}+`)
 }
 
+export function formatDuration(totalSeconds: number) {
+  const seconds = Math.abs(totalSeconds)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor(seconds / 60) - hours * 60
+  const pad = (value: number) => formatNumber(value, { minimumIntegerDigits: 2 })
+  const clock =
+    hours > 0
+      ? `${formatNumber(hours)}:${pad(minutes)}:${pad(seconds % 60)}`
+      : `${formatNumber(minutes)}:${pad(seconds % 60)}`
+  return leftToRight(totalSeconds < 0 ? `${MINUS}${clock}` : clock)
+}
+
 export function formatEquation(...parts: readonly (number | string)[]) {
   return leftToRight(
     parts.map((part) => (typeof part === "number" ? formatNumber(part) : part)).join(" "),
@@ -93,11 +118,11 @@ export function formatEquation(...parts: readonly (number | string)[]) {
 }
 
 export function formatDate(date: Date | number, options: Intl.DateTimeFormatOptions = {}) {
-  return dateFormat(options).format(date)
+  return pseudoDate(dateFormat(options).format(date))
 }
 
 export function formatTime(date: Date | number) {
-  return dateFormat({ hour: "numeric", minute: "2-digit" }).format(date)
+  return pseudoDate(dateFormat({ hour: "numeric", minute: "2-digit" }).format(date))
 }
 
 type Part = string | number | false | null | undefined
@@ -110,6 +135,12 @@ export function formatList(parts: readonly Part[]) {
   return present(parts).join(i18n.t("common:listSeparator"))
 }
 
+export function formatConjunction(parts: readonly Part[]) {
+  const items = present(parts)
+  if (items.length < 2) return items.join("")
+  return `${items.slice(0, -1).join(i18n.t("common:listSeparator"))}${i18n.t("common:listAnd")}${items.at(-1)}`
+}
+
 function present(parts: readonly Part[]) {
   return parts.flatMap((part) => {
     if (part === false || part === null || part === undefined || part === "") return []
@@ -118,7 +149,7 @@ function present(parts: readonly Part[]) {
 }
 
 /** why: i18next runs every interpolated value through this, so no string can print a raw number. `{{delta, signed}}` and `{{share, percent}}` pick those formats. */
-export function formatInterpolation(value: unknown, format: string | undefined) {
+export const formatInterpolation: FormatFunction = (value, format) => {
   if (typeof value === "number") {
     if (format === "signed") return isolate(formatSigned(value))
     if (format === "percent") return isolate(formatPercent(value))

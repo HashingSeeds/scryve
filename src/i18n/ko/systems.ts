@@ -32,6 +32,9 @@ export default {
   },
   tableItem: {
     poison: "독",
+    energy: "에너지",
+    experience: "경험",
+    xp: "XP",
     commanderTax: "커맨더 세금",
     monarch: "모나크",
     initiative: "이니셔티브",
@@ -115,5 +118,5 @@ export default {
   noneTaken: "가져간 프라이즈 없음",
   taken: "프라이즈 {{amount}}장 가져감",
   even: "변동 없음",
-  fromStart: "시작 대비 {{delta}}",
+  fromStart: "시작 대비 {{delta, signed}}",
 } satisfies LocaleNamespace

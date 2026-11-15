@@ -617,6 +617,8 @@ export default {
     title: "Planechase",
     plane: "Plano",
     phenomenon: "Fenómeno",
+    planeNamed: "Plano: {{name}}",
+    phenomenonNamed: "Fenómeno: {{name}}",
     ownCards: "Tu mazo planar",
     roll: "Lanzar",
     nextCost: "Próximo lanzamiento: {{cost}}",
@@ -642,6 +644,7 @@ export default {
   scheme: {
     title: "Archenemy",
     archenemy: "Archenemy",
+    archenemyPlate: "Archienemigo: {{label}}",
     setInMotion: "Poner en marcha una maquinación",
     due: "Maquinación pendiente",
     schemes: "Maquinaciones",

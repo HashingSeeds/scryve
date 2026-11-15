@@ -48,7 +48,7 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
   helperTx?: TextProps["tx"]
   helperTxOptions?: TextProps["txOptions"]
   HelperTextProps?: TextProps
-  placeholder?: TextProps["text"]
+  placeholder?: string
   placeholderTx?: TextProps["tx"]
   placeholderTxOptions?: TextProps["txOptions"]
   style?: StyleProp<TextStyle>
@@ -168,7 +168,10 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
         <Text preset="formLabel" size="xs" {...LabelTextProps} style={themed($labelStyles)}>
           {labelContent}
           {optional ? (
-            <Text size="xs" tone="dim" text={` ${translate("common:optional")}`} />
+            <>
+              {" "}
+              <Text size="xs" tone="dim" text={translate("common:optional")} />
+            </>
           ) : null}
         </Text>
       )}

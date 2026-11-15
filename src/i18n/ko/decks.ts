@@ -3,13 +3,16 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   cardCount_other: "카드 {{count}}장",
+  importProblemLine: "“{{line}}”",
+  cardQuantity: "{{quantity}}× {{card}}",
   saving: "저장 중…",
   deleting: "삭제 중…",
   hiddenNameWarning: '다른 플레이어에게는 "{{hiddenName}}"(이)가 대신 표시됩니다.',
   numberedVersion: "버전 {{number}}",
+  currentVersion: "현재",
   record: {
     noGames: "아직 게임 없음",
-    winRate: "{{games}} 중 {{percent}}%",
+    winRate: "{{games}} 중 {{percent}}",
   },
   stats: {
     title: "덱 통계",
@@ -32,6 +35,7 @@ export default {
     sources: "출처",
     current: "현재",
     moreChanges: "{{count}}개 더 보기",
+    cardChange: "{{change}} {{card}}",
     notTracked: "기록 없음",
     dateSpan: "{{first}}~{{last}}",
     players_other: "{{count}}명",
@@ -48,7 +52,7 @@ export default {
     signIn: "로그인하여 덱 통계를 확인하세요",
     viewStats: "덱 통계 보기",
     onDeviceLabel: "{{name}}, 이 기기에만 저장됨",
-    limited: "최근 200개 결과를 기준으로 한 분석입니다.",
+    limited: "최근 결과 {{count}}개를 기준으로 분석합니다.",
     compareList: "목록",
     compareWith: "비교 대상",
     winLetter: "승",
@@ -407,7 +411,7 @@ export default {
       serious: "뜨거움",
       critical: "매우 뜨거움",
       noRectangles: "사각형 없음",
-      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      rectangle: "{{aspect}} · {{share}} · {{verdict}}",
       accepted: "카드",
       shape: "모양",
       position: "중앙 벗어남",
@@ -617,6 +621,8 @@ export default {
     deleteBody: "이 기기에서 덱이 삭제됩니다.",
   },
   addDeck: {
+    importedNote: "{{source}}에서 가져옴\n{{url}}",
+    importedNoteBy: "{{source}}에서 가져옴 (제작: {{author}})\n{{url}}",
     modeBrowse: "둘러보기",
     modeImport: "가져오기",
     modeBuild: "만들기",

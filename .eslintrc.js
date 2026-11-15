@@ -195,7 +195,9 @@ module.exports = {
       excludedFiles: [
         "**/*.test.{ts,tsx}",
         "src/devtools/**",
+        "src/devtools/seeds/**",
         "src/app/dev/**",
+        "src/features/game/localPersistence.ts",
         "src/i18n/format.ts",
       ],
       rules: {

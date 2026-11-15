@@ -19,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated"
 
 import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -228,13 +229,13 @@ export const CommanderStrip = memo(function CommanderStrip({
   })
   if (attackOnly && !attackerId && !sourceShown) return null
   const attackerName = players.find(({ id }) => id === attackerId)?.name
-  const sources = dealt
-    .flatMap((player) =>
+  const sources = formatList(
+    dealt.flatMap((player) =>
       chips(player.id).map((amount) =>
         translate("board:commander.amountFrom", { amount, name: player.name }),
       ),
-    )
-    .join(", ")
+    ),
+  )
   const finishing = source?.active
 
   return (
@@ -360,7 +361,7 @@ export const CommanderStrip = memo(function CommanderStrip({
                             ? `commander-total-seat-${seatNumber}${partner ? "-partner" : ""}`
                             : undefined
                         }
-                        text={String(total)}
+                        text={total}
                         weight="bold"
                         maxFontSizeMultiplier={1}
                         style={[

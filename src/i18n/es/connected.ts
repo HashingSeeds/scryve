@@ -343,6 +343,7 @@ export default {
       table: "No se pudo sincronizar un cambio en la mesa",
       confirmCommanderDamage: "No se pudo sincronizar la confirmación del daño de comandante",
       declineCommanderDamage: "No se pudo sincronizar el rechazo del daño de comandante",
+      withReason: "{{action}}: {{reason}}",
     },
     menu: {
       players: "Jugadores",

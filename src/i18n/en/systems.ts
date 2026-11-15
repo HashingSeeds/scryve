@@ -30,6 +30,12 @@ const systems = {
   },
   tableItem: {
     poison: "Poison",
+    // Magic: energy counters a player gains and spends. Use Magic's official term.
+    energy: "Energy",
+    // Magic: experience counters a player gains. Use Magic's official term.
+    experience: "Experience",
+    // Riftbound: experience points a player earns. Use Riftbound's official term or abbreviation.
+    xp: "XP",
     commanderTax: "Commander tax",
     monarch: "Monarch",
     initiative: "Initiative",
@@ -137,7 +143,7 @@ const systems = {
   taken: "{{amount}} prizes taken",
   // A counter back at its starting value: unchanged, not a tie.
   even: "unchanged",
-  fromStart: "{{delta}} from start",
+  fromStart: "{{delta, signed}} from start",
 }
 
 export default systems

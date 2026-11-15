@@ -51,7 +51,8 @@ import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { isSystemVisible } from "@/features/game/systemVisibility"
-import { appLocale, type TxKeyPath } from "@/i18n"
+import { type TxKeyPath } from "@/i18n"
+import { formatDate, formatNumber, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -136,10 +137,21 @@ type ImportDraft = DeckEdits<ImportedDeckCard> & {
   problems: ImportProblem[]
 }
 
-function attributionLabel(attribution: { sourceName: string; author?: string }, separator: string) {
+function attributionLabel(attribution: { sourceName: string; author?: string }) {
+  return joinParts([attribution.sourceName, attribution.author])
+}
+
+function importedNote(attribution: { sourceName: string; author?: string; sourceUrl: string }) {
   return attribution.author
-    ? `${attribution.sourceName}${separator}${attribution.author}`
-    : attribution.sourceName
+    ? translate("decks:addDeck.importedNoteBy", {
+        source: attribution.sourceName,
+        author: attribution.author,
+        url: attribution.sourceUrl,
+      })
+    : translate("decks:addDeck.importedNote", {
+        source: attribution.sourceName,
+        url: attribution.sourceUrl,
+      })
 }
 
 function sameOrigin(draft: ImportDraft | undefined, origin: ImportOrigin | undefined) {
@@ -269,15 +281,18 @@ function normalizeImportedCards(cards: ImportedDeckCard[], game: string, format:
   return { cards: [...cardsByPrinting.values()] }
 }
 
+function releaseYear(releaseDate: string | undefined) {
+  const year = Number(releaseDate?.slice(0, 4))
+  return Number.isInteger(year) && year > 0 ? formatNumber(year) : undefined
+}
+
 function preconDetail(deck: PreconstructedDeck) {
-  return ["Wizards", deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
-    .filter(Boolean)
-    .join(" · ")
+  return joinParts(["Wizards", deck.code?.toUpperCase(), releaseYear(deck.releaseDate)])
 }
 
 function preconSource(deck: PreconstructedDeck) {
   return (
-    [deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)].filter(Boolean).join(" ") || undefined
+    [deck.code?.toUpperCase(), releaseYear(deck.releaseDate)].filter(Boolean).join(" ") || undefined
   )
 }
 
@@ -308,19 +323,17 @@ function catalogSourceLabel(deck: CatalogDeck) {
 }
 
 function catalogDeckDetail(deck: CatalogDeck) {
-  return [
+  return joinParts([
     catalogSourceLabel(deck),
     deck.publishedAt === undefined
       ? undefined
-      : new Date(deck.publishedAt).toLocaleDateString(appLocale, {
+      : formatDate(deck.publishedAt, {
           year: "numeric",
           month: "short",
           day: "numeric",
           timeZone: "UTC",
         }),
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
 }
 
 export type AddDeckProps = {
@@ -861,7 +874,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
       game: importDraft.game,
       ...(attribution
         ? {
-            note: `Imported from ${attributionLabel(attribution, " by ")}\n${attribution.sourceUrl}`,
+            note: importedNote(attribution),
           }
         : {}),
       cards: importDraft.cards,
@@ -942,7 +955,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
               })
             : translate("decks:addDeck.viewOn", { source: attribution.sourceName })
         }
-        text={attributionLabel(attribution, " · ")}
+        text={attributionLabel(attribution)}
         size="xs"
         style={$importAttribution}
         onPress={() =>

@@ -4,6 +4,7 @@ import type { ViewStyle } from "react-native"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { Text } from "@/components/Text"
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -98,14 +99,14 @@ export function deckIssueText(issue: DeckIssue, labels: IssueLabels) {
     case "domain":
       return translate("decks:issues.domain", {
         card: issue.name,
-        domains: issue.domains.join(", "),
-        identity: issue.identity.join(", "),
+        domains: formatList(issue.domains),
+        identity: formatList(issue.identity),
       })
     case "champion":
       return issue.champion.length > 0
         ? translate("decks:issues.champion", {
             card: issue.name,
-            champion: issue.champion.join(", "),
+            champion: formatList(issue.champion),
           })
         : translate("decks:issues.championUnit", { card: issue.name })
     case "signatureCount":

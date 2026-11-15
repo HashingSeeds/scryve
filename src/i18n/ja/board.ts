@@ -569,6 +569,8 @@ export default {
     title: "プレインチェイス",
     plane: "プレイン",
     phenomenon: "現象",
+    planeNamed: "プレイン: {{name}}",
+    phenomenonNamed: "フェノメノン: {{name}}",
     ownCards: "自分のプレインデッキ",
     roll: "振る",
     nextCost: "次の1回: {{cost}}",
@@ -594,6 +596,7 @@ export default {
   scheme: {
     title: "アーチエネミー",
     archenemy: "アーチエネミー",
+    archenemyPlate: "アーチエネミー: {{label}}",
     setInMotion: "策略を発動する",
     due: "策略待ち",
     schemes: "策略",

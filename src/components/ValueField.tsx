@@ -69,7 +69,7 @@ export function ValueField({
     <View style={[themed($field), disabled && $dimmed]}>
       <Animated.View pointerEvents="none" style={[$readout, $pulse]}>
         <Text
-          text={String(value)}
+          text={value}
           maxFontSizeMultiplier={1.2}
           numberOfLines={1}
           accessibilityLabel={translate("common:valueField.readoutLabel", { label, value })}

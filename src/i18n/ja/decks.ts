@@ -3,13 +3,16 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   cardCount_other: "{{count}}枚",
+  importProblemLine: "「{{line}}」",
+  cardQuantity: "{{quantity}}× {{card}}",
   saving: "保存中…",
   deleting: "削除中…",
   hiddenNameWarning: "他のプレイヤーには代わりに「{{hiddenName}}」と表示されます。",
   numberedVersion: "バージョン{{number}}",
+  currentVersion: "現在",
   record: {
     noGames: "対戦記録なし",
-    winRate: "{{games}}中{{percent}}%",
+    winRate: "{{games}}中 {{percent}}",
   },
   stats: {
     title: "デッキ統計",
@@ -32,6 +35,7 @@ export default {
     sources: "記録元",
     current: "現在",
     moreChanges: "他{{count}}件",
+    cardChange: "{{change}} {{card}}",
     notTracked: "未記録",
     dateSpan: "{{first}}〜{{last}}",
     players_other: "{{count}}人",
@@ -48,7 +52,7 @@ export default {
     signIn: "サインインしてデッキの統計を見る",
     viewStats: "デッキ統計を見る",
     onDeviceLabel: "{{name}}、この端末のみ",
-    limited: "内訳は直近200件の結果が対象です。",
+    limited: "内訳は直近{{count}}件の結果が対象です。",
     compareList: "リスト",
     compareWith: "比較対象",
     winLetter: "勝",
@@ -413,7 +417,7 @@ export default {
       serious: "熱い",
       critical: "非常に熱い",
       noRectangles: "矩形なし",
-      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      rectangle: "{{aspect}} · {{share}} · {{verdict}}",
       accepted: "カード",
       shape: "形状",
       position: "中心外れ",
@@ -627,6 +631,8 @@ export default {
     deleteBody: "このデバイスからデッキを削除します。",
   },
   addDeck: {
+    importedNote: "{{source}}からインポート\n{{url}}",
+    importedNoteBy: "{{source}}から{{author}}さんのデッキをインポート\n{{url}}",
     modeBrowse: "探す",
     modeImport: "インポート",
     modeBuild: "作成",

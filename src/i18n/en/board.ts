@@ -614,6 +614,9 @@ const board = {
     // A plane card the players are on. As in "Plane: Eloren Wilds".
     plane: "Plane",
     phenomenon: "Phenomenon",
+    // Screen reader label for the plane plate on the board, as in "Plane: Eloren Wilds".
+    planeNamed: "Plane: {{name}}",
+    phenomenonNamed: "Phenomenon: {{name}}",
     ownCards: "Your planar deck",
     // Button that rolls the planar die.
     roll: "Roll",
@@ -646,6 +649,8 @@ const board = {
   scheme: {
     title: "Archenemy",
     archenemy: "Archenemy",
+    // Screen reader label for the scheme plate on the board, as in "Archenemy: Scheme due".
+    archenemyPlate: "Archenemy: {{label}}",
     // Button the archenemy taps at the start of their main phase to reveal the top scheme.
     setInMotion: "Set a scheme in motion",
     // Short plate text on the board when the archenemy still has to reveal a scheme this turn.

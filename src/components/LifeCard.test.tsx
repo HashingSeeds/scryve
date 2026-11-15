@@ -201,7 +201,7 @@ describe("LifeCard", () => {
     expect(view.getByText("+2")).toBeTruthy()
 
     view.rerender(seat(19))
-    expect(view.getByText("-1")).toBeTruthy()
+    expect(view.getByText("−1")).toBeTruthy()
     act(() => jest.advanceTimersByTime(1800))
     expect(view.getByText("+")).toBeTruthy()
     expect(view.getByText("−")).toBeTruthy()
@@ -234,14 +234,14 @@ describe("LifeCard", () => {
       nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 200 } },
     })
     view.rerender(seat("game-1-seat-1", 12, { poison: 2 }))
-    expect(view.getByText("-28")).toBeTruthy()
+    expect(view.getByText("−28")).toBeTruthy()
     fireEvent.press(view.getByTestId("seat-bag-seat-1"))
     expect(view.getByTestId("counter-sheet-seat-1")).toBeTruthy()
 
     view.rerender(seat("game-2-seat-1", 40, {}))
 
     expect(view.queryByText("+28")).toBeNull()
-    expect(view.queryByText("-28")).toBeNull()
+    expect(view.queryByText("−28")).toBeNull()
     expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
     expect(view.queryByTestId("counter-chip-1-poison")).toBeNull()
     expect(view.getByText("+")).toBeTruthy()
@@ -1692,7 +1692,7 @@ describe("LifeCard", () => {
       nativeEvent: { layout: { width: 360, height: 240 } },
     })
     view.rerender(yugiohCard(7000))
-    const delta = within(view.getByTestId("life-seat-1--1000")).getByText("-1000")
+    const delta = within(view.getByTestId("life-seat-1--1000")).getByText("−1000")
     const plus = within(view.getByTestId("life-seat-1-1000")).getByText("+")
     expect(StyleSheet.flatten(delta.props.style).fontSize).toBeLessThan(
       StyleSheet.flatten(plus.props.style).fontSize,

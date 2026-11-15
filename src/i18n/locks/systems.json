@@ -22,6 +22,9 @@
   "startingValueRange.fab": "abaab277fce8",
   "startingValueRange.riftbound": "d0a64427d0fb",
   "tableItem.poison": "cf2685b85d9f",
+  "tableItem.energy": "fc91c2cc951d",
+  "tableItem.experience": "7e2dda50cbd7",
+  "tableItem.xp": "e2d96aa5f120",
   "tableItem.commanderTax": "6243cc784a96",
   "tableItem.monarch": "40d93f81a51a",
   "tableItem.initiative": "0b45517cf810",
@@ -84,5 +87,5 @@
   "noneTaken": "f4d4849dffb0",
   "taken": "24dddc1be012",
   "even": "b5e4361a2512",
-  "fromStart": "9ca3e68cda8d"
+  "fromStart": "77d2f69186d4"
 }

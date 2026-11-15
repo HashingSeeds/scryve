@@ -32,6 +32,9 @@ export default {
   },
   tableItem: {
     poison: "Veneno",
+    energy: "Energía",
+    experience: "Experiencia",
+    xp: "XP",
     commanderTax: "Impuesto de comandante",
     monarch: "Monarca",
     initiative: "Iniciativa",
@@ -143,5 +146,5 @@ export default {
   noneTaken: "ninguna carta de Premio tomada",
   taken: "{{amount}} cartas de Premio tomadas",
   even: "sin cambios",
-  fromStart: "{{delta}} desde el inicio",
+  fromStart: "{{delta, signed}} desde el inicio",
 } satisfies LocaleNamespace

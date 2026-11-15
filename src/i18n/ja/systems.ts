@@ -32,6 +32,9 @@ export default {
   },
   tableItem: {
     poison: "毒",
+    energy: "エネルギー",
+    experience: "経験カウンター",
+    xp: "XP",
     commanderTax: "統率者税",
     monarch: "統治者",
     initiative: "イニシアチブ",
@@ -115,5 +118,5 @@ export default {
   noneTaken: "サイドをとっていません",
   taken: "サイドを{{amount}}枚とりました",
   even: "変更なし",
-  fromStart: "開始時から{{delta}}",
+  fromStart: "開始時から{{delta, signed}}",
 } satisfies LocaleNamespace

@@ -13,7 +13,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { cardCountLabel } from "./deckCopy"
+import { cardCountLabel, versionNameToStore } from "./deckCopy"
 
 export type VersionsRow<Id extends string = string> = {
   id: Id
@@ -89,7 +89,7 @@ export function DeckVersionsDialogs<Id extends string>({
         notesLocked={rename.notesLocked}
         busy={busy}
         error={error}
-        onSubmit={onRename}
+        onSubmit={(draft) => onRename({ ...draft, name: versionNameToStore(draft.name) })}
         {...(onDelete ? { onDelete } : {})}
         visible={visible}
         onClose={onClose}

@@ -11,6 +11,7 @@ import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
+import { formatRatio, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -61,7 +62,7 @@ function DeckCountLabel({ access }: { access?: CloudAccess }) {
         size="md"
         maxFontSizeMultiplier={1.5}
         tone="dim"
-        text={`${capacity.used}/${capacity.limit}`}
+        text={formatRatio(capacity.used, capacity.limit)}
       />
     </TouchableOpacity>
   )
@@ -287,12 +288,12 @@ function DeckChoices({
               size="meta"
               tone="dim"
               numberOfLines={1}
-              text={[
+              text={joinParts([
                 deckFormatLabel(deck.game ?? DEFAULT_DECK_GAME, deck.format),
                 deck.cardQuantity
                   ? cardCountLabel(deck.cardQuantity)
                   : translate("decks:shelf.emptyList"),
-              ].join(" · ")}
+              ])}
             />
           </TouchableOpacity>
         ))}

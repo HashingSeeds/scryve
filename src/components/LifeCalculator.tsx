@@ -7,6 +7,7 @@ import Svg, { Circle, Rect } from "react-native-svg"
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { LifeLog, type LifeLogStep } from "@/features/game/LifeLog"
 import type { PlaySystemId } from "@/features/game/playSystems"
+import { formatEquation, formatList, formatNumber, formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -29,7 +30,7 @@ import {
   MENU_CLEARANCE,
   rotatedLayerStyle,
 } from "./pokemon/pokemonCardLayout"
-import { DELETE_PATHS, KeyIcon } from "./pokemon/PokemonKeypad"
+import { DELETE_PATHS, digitKeyLabel, KeyIcon } from "./pokemon/PokemonKeypad"
 import { Text } from "./Text"
 import { flooredLifeDelta } from "../../convex/lib/systems"
 
@@ -138,14 +139,19 @@ export function LifeCalculator({
       key={label}
       testID={`life-calculator-key-${label === "⌫" ? "delete" : label}-seat-${seatNumber}`}
       accessibilityRole="button"
-      accessibilityLabel={label === "⌫" ? translate("common:delete") : label}
+      accessibilityLabel={label === "⌫" ? translate("common:delete") : digitKeyLabel(label)}
       onPress={() => press(label)}
       style={({ pressed }) => [$key, { backgroundColor: overlayTint(ink, pressed ? 0.36 : 0.18) }]}
     >
       {label === "⌫" ? (
         <KeyIcon paths={DELETE_PATHS} color={ink} size={beside ? 18 : 22} />
       ) : (
-        <Text text={label} weight="medium" size={beside ? "xs" : "sm"} style={inkText} />
+        <Text
+          text={digitKeyLabel(label)}
+          weight="medium"
+          size={beside ? "xs" : "sm"}
+          style={inkText}
+        />
       )}
     </BoardPressable>
   )
@@ -167,6 +173,7 @@ export function LifeCalculator({
   const actionSpecs = [
     {
       id: "damage",
+      // eslint-disable-next-line no-restricted-syntax -- why: beside the number, a lone minus labels the damage button as an icon.
       label: beside ? "−" : translate("board:calculator.damage"),
       accessibilityLabel: translate("board:calculator.subtractFrom", { amount, name: playerName }),
       delta: -amount,
@@ -181,6 +188,7 @@ export function LifeCalculator({
     },
     {
       id: "gain",
+      // eslint-disable-next-line no-restricted-syntax -- why: beside the number, a lone plus labels the gain button as an icon.
       label: beside ? "+" : translate("board:calculator.gain"),
       accessibilityLabel: translate("board:calculator.addTo", { amount, name: playerName }),
       delta: amount,
@@ -239,7 +247,7 @@ export function LifeCalculator({
     <View style={beside ? undefined : $centered}>
       <Text
         testID={`life-calculator-value-seat-${seatNumber}`}
-        text={entry || String(life)}
+        text={entry ? amount : life}
         accessibilityLiveRegion="polite"
         numberOfLines={1}
         style={[
@@ -327,11 +335,7 @@ export function LifeCalculator({
 }
 
 function previewText(damaged: number, gained: number) {
-  return `− → ${damaged} · + → ${gained}`
-}
-
-function signed(delta: number) {
-  return `${delta < 0 ? "−" : "+"}${Math.abs(delta)}`
+  return joinParts([formatEquation("−", "→", damaged), formatEquation("+", "→", gained)])
 }
 
 // why: the newest total is the big number above, so the trail ends on the change that reached it until a typed amount takes that number's place.
@@ -358,14 +362,14 @@ function LifeTrail({
   const charWidth =
     TRAIL_CHAR_WIDTH * Math.min(useWindowDimensions().fontScale, TRAIL_MAX_FONT_SCALE)
   if (steps.length < 2) return null
-  const total = String(steps[steps.length - 1].life)
-  const label = steps
-    .map(({ delta, life }) =>
+  const total = formatNumber(steps[steps.length - 1].life)
+  const label = formatList(
+    steps.map(({ delta, life }) =>
       delta === undefined
-        ? `${life}`
-        : translate("board:calculator.logStep", { delta: signed(delta), life }),
-    )
-    .join(", ")
+        ? formatNumber(life)
+        : translate("board:calculator.logStep", { delta: formatSigned(delta), life }),
+    ),
+  )
   const cap = beside
     ? TRAIL_STEPS.beside
     : width >= TRAIL_WIDE
@@ -381,7 +385,9 @@ function LifeTrail({
       .slice(changes.length - count)
       .reduce(
         (sum, { delta, from }) =>
-          sum + (`${from}`.length + signed(delta).length) * charWidth + TRAIL_GAP * 2,
+          sum +
+          (formatNumber(from).length + formatSigned(delta).length) * charWidth +
+          TRAIL_GAP * 2,
         (count < changes.length ? charWidth + TRAIL_GAP : 0) +
           (showTotal ? total.length * charWidth : 0),
       ) <= width
@@ -410,8 +416,8 @@ function LifeTrail({
       {count > 0 && count < changes.length ? item("…", $trailTotal) : null}
       {shown.map(({ id, delta, from }) => (
         <Fragment key={id}>
-          {item(String(from), $trailTotal)}
-          {item(signed(delta), { ...$trailText, color: delta < 0 ? damage : gain }, true)}
+          {item(formatNumber(from), $trailTotal)}
+          {item(formatSigned(delta), { ...$trailText, color: delta < 0 ? damage : gain }, true)}
         </Fragment>
       ))}
       {showTotal && width > 0 ? item(total, $trailText) : null}

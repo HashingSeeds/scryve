@@ -45,7 +45,7 @@ export function MatchScoreDialog({
         {seats.map((seat) => (
           <View key={seat.id} style={themed($row)}>
             <Text text={seat.name} numberOfLines={1} style={themed($name)} />
-            <Text text={String(seat.wins)} weight="medium" />
+            <Text text={seat.wins} weight="medium" />
           </View>
         ))}
         {draws ? <Text size="xs" text={drawsLabel(draws)} style={themed($dialogText)} /> : null}

@@ -15,6 +15,9 @@ export default {
   save: "保存",
   tryAgain: "もう一度試す",
   undo: "元に戻す",
+  separator: " · ",
+  listSeparator: "、",
+  listAnd: "、",
   emptyState: {
     heading: "まだ何もありません",
     content: "データが見つかりません。更新するか、アプリを再読み込みしてください。",

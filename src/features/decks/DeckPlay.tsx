@@ -9,6 +9,7 @@ import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { statsDate } from "@/features/stats/DeckStatsParts"
+import { formatList, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -264,7 +265,7 @@ function Results({
               <Text
                 size="meta"
                 tone="dim"
-                text={[statsDate(result.finishedAt), sourceLabel(result.source)].join(" · ")}
+                text={joinParts([statsDate(result.finishedAt), sourceLabel(result.source)])}
               />
             </View>
           </View>
@@ -305,7 +306,7 @@ export function opponentsText(opponents: Result["opponents"]) {
         : (opponent.deckName ?? opponent.name)) || [],
   )
   return names.length
-    ? translate("decks:play.versus", { opponents: names.join(", ") })
+    ? translate("decks:play.versus", { opponents: formatList(names) })
     : translate("decks:stats.opponentsMissing")
 }
 

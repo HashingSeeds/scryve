@@ -2,6 +2,7 @@ import type { ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
 import { Text } from "@/components/Text"
+import { formatList } from "@/i18n/format"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -22,7 +23,7 @@ export function ConnectedGameRow({
     <TouchableOpacity
       testID={`resume-connected-${game.publicId}`}
       accessibilityRole="button"
-      accessibilityLabel={`${resumeTitle(game)}, ${resumeDetail(game, now)}`}
+      accessibilityLabel={formatList([resumeTitle(game), resumeDetail(game, now)])}
       activeOpacity={0.75}
       style={themed($row)}
       onPress={onPress}

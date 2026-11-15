@@ -1,3 +1,4 @@
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import { cardSection, printingKey, type DeckCard } from "./deckCards"
@@ -216,7 +217,7 @@ export function getCommanderWarnings<T extends DeckCard>(
   }
   if (conflicts.length > 0) {
     const names = [...new Set(conflicts)]
-    const shown = names.slice(0, 3).join(", ")
+    const shown = formatList(names.slice(0, 3))
     warnings.push(
       names.length > 3
         ? translate("decks:commander.colorIdentityConflictMore", {

@@ -252,7 +252,7 @@ describe("PokemonSeatCard", () => {
     fireEvent.press(hero.getByText("−"))
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("270")
     expect(screen.getByText("60 damage · 330 HP")).toBeTruthy()
-    expect(hero.getByText("-10")).toBeTruthy()
+    expect(hero.getByText("−10")).toBeTruthy()
 
     fireEvent.press(hero.getByText("+"))
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("280")
@@ -271,7 +271,7 @@ describe("PokemonSeatCard", () => {
     for (let tap = 0; tap < 3; tap++)
       fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
     const fontSize = (text: string) => StyleSheet.flatten(hero.getByText(text).props.style).fontSize
-    expect(fontSize("-30")).toBeLessThan(fontSize("+"))
+    expect(fontSize("−30")).toBeLessThan(fontSize("+"))
   })
 
   it("knocks out on lethal damage, scores the opponent's prizes, and Undo puts it all back", () => {

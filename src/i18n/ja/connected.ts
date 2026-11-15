@@ -324,6 +324,7 @@ export default {
       table: "テーブルの変更を同期できませんでした",
       confirmCommanderDamage: "統率者ダメージの承認を同期できませんでした",
       declineCommanderDamage: "統率者ダメージの拒否を同期できませんでした",
+      withReason: "{{action}}:{{reason}}",
     },
     menu: {
       players: "プレイヤー",

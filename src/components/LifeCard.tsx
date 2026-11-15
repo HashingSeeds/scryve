@@ -21,6 +21,7 @@ import Animated, {
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { CommanderBoardPlayer, LifeDelta, PlayerId } from "@/features/game/types"
+import { formatEquation, formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -180,6 +181,13 @@ export interface LifeCardProps {
 }
 
 /** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. PlayerGrid rebuilds plain props (insets, styles, commander data) each render, so they compare by content, and it keeps every callback's identity stable. */
+// why: the commander's share is colored, so the equation splits after its first number while its isolates still wrap both parts.
+function splitAttackEquation({ from, commander }: { from: number; commander: number }) {
+  const equation = formatEquation(from, "−", commander)
+  const split = equation.indexOf(formatNumber(from)) + formatNumber(from).length
+  return [equation.slice(0, split), equation.slice(split)] as const
+}
+
 export const LifeCard = memo(function LifeCard({
   playerId,
   playerName,
@@ -326,6 +334,7 @@ export const LifeCard = memo(function LifeCard({
   if (attackParts) lastAttack.current = attackParts
   const shownAttack = attackParts ?? lastAttack.current
   const attackLine = shownAttack ? `${shownAttack.from} − ${shownAttack.commander}` : ""
+  const attackEquation = shownAttack ? splitAttackEquation(shownAttack) : ["", ""]
   const stacked = stackedReadout(resolvedLifeFontSize, shownDigits, attackLine.length)
   const lifeRise = lifeInk(resolvedLifeFontSize, shownDigits).y
   const stack = useSharedValue(0)
@@ -705,7 +714,7 @@ export const LifeCard = memo(function LifeCard({
   const lifeTotal = (...style: StyleProp<TextStyle>[]) => (
     <Text
       testID={`life-total-seat-${seatNumber}`}
-      text={String(shownLife)}
+      text={shownLife}
       weight={lifeLanded ? "normal" : "bold"}
       accessible
       accessibilityLabel={translate("board:counters.seatItem", {
@@ -820,7 +829,7 @@ export const LifeCard = memo(function LifeCard({
                 ) : null}
                 <Text
                   testID={`life-out-amount-seat-${seatNumber}`}
-                  text={String(out.amount)}
+                  text={out.amount}
                   weight="bold"
                   accessible={false}
                   maxFontSizeMultiplier={1}
@@ -847,9 +856,9 @@ export const LifeCard = memo(function LifeCard({
                     numberOfLines={1}
                     style={[$outAmount, { color: foreground }]}
                   >
-                    {String(shownAttack.from)}
+                    {attackEquation[0]}
                     <Text
-                      text={` − ${shownAttack.commander}`}
+                      text={attackEquation[1]}
                       weight="bold"
                       maxFontSizeMultiplier={1}
                       style={[$outAmount, $hurtInk, { color: DAMAGE_INK }]}

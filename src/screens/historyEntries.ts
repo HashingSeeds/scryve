@@ -11,7 +11,8 @@ import {
 } from "@/features/game/playSystems"
 import { winnerNames as teamWinnerNames } from "@/features/game/teams"
 import type { LocalGameMatch, LocalGameSummary } from "@/features/game/types"
-import { appLocale, type TxKeyPath } from "@/i18n"
+import { type TxKeyPath } from "@/i18n"
+import { formatDate, formatRecord } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 export type HistorySource = "local" | "connected" | "manual"
@@ -99,7 +100,9 @@ export function manualMatchScore(seats: readonly ManualMatchSeat[]) {
     .filter((seat) => !seat.mine)
     .reduce((sum, seat) => sum + (seat.gamesWon ?? 0), 0)
   const draws = mine.gamesDrawn ?? 0
-  return draws > 0 ? `${mine.gamesWon}-${losses}-${draws}` : `${mine.gamesWon}-${losses}`
+  return draws > 0
+    ? formatRecord(mine.gamesWon, losses, draws)
+    : formatRecord(mine.gamesWon, losses)
 }
 
 export function manualHistoryEntry(match: {
@@ -162,7 +165,7 @@ function localOutcome(game: LocalGameSummary, winnerNames: string[]): HistoryOut
 function scryveMatchScore(wins: number[], draws: number, mine: number) {
   if (mine === -1) return matchScoreLabel({ wins, draws })
   const losses = wins.reduce((sum, count, seat) => (seat === mine ? sum : sum + count), 0)
-  return draws > 0 ? `${wins[mine]}-${losses}-${draws}` : `${wins[mine]}-${losses}`
+  return draws > 0 ? formatRecord(wins[mine], losses, draws) : formatRecord(wins[mine], losses)
 }
 
 function localMatchRef(game: LocalGameSummary, match: LocalGameMatch): HistoryMatchRef {
@@ -318,8 +321,8 @@ function runningScore(games: HistoryEntry[]) {
   for (const game of games) counts[game.outcome] += 1
   if (counts.win + counts.loss + counts.draw === 0) return undefined
   return counts.draw > 0
-    ? `${counts.win}-${counts.loss}-${counts.draw}`
-    : `${counts.win}-${counts.loss}`
+    ? formatRecord(counts.win, counts.loss, counts.draw)
+    : formatRecord(counts.win, counts.loss)
 }
 
 function matchGroupEntry(publicId: string, games: HistoryEntry[]): HistoryEntry {
@@ -605,8 +608,8 @@ export function dayLabel(timestamp: number, now: number) {
   if (daysAgo <= 0) return translate("play:history.today")
   if (daysAgo === 1) return translate("play:history.yesterday")
   const date = new Date(timestamp)
-  if (daysAgo < 7) return date.toLocaleDateString(appLocale, { weekday: "long" })
-  return date.toLocaleDateString(appLocale, {
+  if (daysAgo < 7) return formatDate(date, { weekday: "long" })
+  return formatDate(date, {
     month: "long",
     day: "numeric",
     ...(date.getFullYear() === new Date(now).getFullYear() ? {} : { year: "numeric" }),

@@ -35,7 +35,7 @@ export interface ListItemProps extends TouchableOpacityProps {
   /**
    * Text to display if not using `tx` or nested components.
    */
-  text?: TextProps["text"]
+  text?: string
   /**
    * Text which is looked up via i18n.
    */

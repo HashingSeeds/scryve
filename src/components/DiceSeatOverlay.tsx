@@ -308,7 +308,7 @@ function Result({
       <>
         {label(toolLabel(view.die))}
         <Text
-          text={String(tumble.face ?? view.value)}
+          text={tumble.face ?? view.value}
           weight="medium"
           maxFontSizeMultiplier={1.2}
           style={[themed(compact ? $compactValue : $value), text]}
@@ -371,7 +371,7 @@ function Result({
         <FlippingCoin flip={tumble.flip} foreground={foreground} compact={compact} />
       ) : (
         <Text
-          text={tumble.face === undefined ? rollValueLabel(view.roll) : String(tumble.face)}
+          text={tumble.face === undefined ? rollValueLabel(view.roll) : tumble.face}
           weight="medium"
           maxFontSizeMultiplier={1.2}
           style={[themed(compact ? $compactValue : $value), text]}

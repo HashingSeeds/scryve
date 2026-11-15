@@ -234,6 +234,7 @@
   "board.failedAction.table": "f888589566d5",
   "board.failedAction.confirmCommanderDamage": "6f365c9dc176",
   "board.failedAction.declineCommanderDamage": "522429b7e786",
+  "board.failedAction.withReason": "c3a426b22081",
   "board.menu.players": "24f48dcea9ed",
   "board.menu.history": "6ac949b966d0",
   "board.menu.end": "d5b5d1b1803e",

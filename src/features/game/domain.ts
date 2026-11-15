@@ -1,5 +1,6 @@
 import { randomUUID as secureRandomUUID } from "expo-crypto"
 
+import { formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import { COMMANDER_SLOTS, commanderDamageKey, writeLocalGame } from "./localEngine"
@@ -340,9 +341,7 @@ export function drawsLabel(draws: number) {
 }
 
 export function matchScoreLabel(score: { wins: number[]; draws: number }) {
-  return score.draws === 0
-    ? score.wins.join("-")
-    : `${score.wins.join("-")} · ${drawsLabel(score.draws)}`
+  return joinParts([formatRecord(...score.wins), score.draws !== 0 && drawsLabel(score.draws)])
 }
 
 export function matchContextLabel(game: {

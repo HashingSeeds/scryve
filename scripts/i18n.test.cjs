@@ -92,6 +92,52 @@ test("rejects translations that drop, rename, or miss placeholders and plural fo
   )
 })
 
+test("rejects numbers typed into copy for languages that write their own digits", () => {
+  const seats = translationUnits({
+    seats_one: "{{count}} seat",
+    seats_other: "{{count}} seats",
+    bestOf: "Best of 3",
+  })
+  assert.deepEqual(
+    validateUnit(
+      seats.get("seats"),
+      {
+        seats_zero: "لا مقاعد",
+        seats_one: "مقعد واحد",
+        seats_two: "2 مقعدين",
+        seats_few: "{{count}} مقاعد",
+        seats_many: "{{count}} مقعدًا",
+        seats_other: "{{count}} مقعد",
+      },
+      "ar",
+    ),
+    ["seats_two: typed the number 2; use a placeholder"],
+  )
+  assert.deepEqual(validateUnit(seats.get("seats"), { seats_other: "{{count}}席" }, "ja"), [])
+  assert.deepEqual(validateUnit(seats.get("bestOf"), { bestOf: "الأفضل من ٣" }, "ar"), [])
+  assert.deepEqual(validateUnit(seats.get("bestOf"), { bestOf: "الأفضل من 5" }, "ar"), [
+    "bestOf: typed the number 5; use a placeholder",
+  ])
+  assert.deepEqual(validateUnit(seats.get("bestOf"), { bestOf: "Al mejor de 5" }, "es"), [])
+})
+
+test("treats a formatted placeholder such as {{delta, signed}} as its own placeholder", () => {
+  const unit = translationUnits({ fromStart: "{{delta, signed}} from start" }).get("fromStart")
+  assert.deepEqual(validateUnit(unit, { fromStart: "{{delta, signed}} desde el inicio" }, "es"), [])
+  assert.deepEqual(validateUnit(unit, { fromStart: "{{delta}} desde el inicio" }, "es"), [
+    "fromStart: dropped {{delta,signed}}",
+    "fromStart: introduced {{delta}}",
+  ])
+})
+
+test("lets plural forms say one in words but keeps {{count}} in the other form", () => {
+  const seats = translationUnits({ seats_one: "{{count}} seat", seats_other: "{{count}} seats" })
+  assert.deepEqual(
+    validateUnit(seats.get("seats"), { seats_one: "un asiento", seats_other: "asientos" }, "fr"),
+    ["seats_many: missing translation", "seats_other: dropped {{count}}"],
+  )
+})
+
 test("flags keys that i18next would resolve to built-in object properties", () => {
   assert.deepEqual(
     prototypeKeys({ "life.valueOf": "x", "life.valueOutOf": "y", "toString": "z" }),

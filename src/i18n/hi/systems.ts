@@ -32,6 +32,9 @@ export default {
   },
   tableItem: {
     poison: "पॉइज़न",
+    energy: "एनर्जी",
+    experience: "एक्सपीरियंस",
+    xp: "XP",
     commanderTax: "कमांडर टैक्स",
     monarch: "मोनार्क",
     initiative: "इनिशिएटिव",
@@ -129,5 +132,5 @@ export default {
   noneTaken: "अभी तक कोई प्राइज़ कार्ड नहीं लिया",
   taken: "{{amount}} प्राइज़ कार्ड लिए",
   even: "कोई बदलाव नहीं",
-  fromStart: "शुरुआत से {{delta}}",
+  fromStart: "शुरुआत से {{delta, signed}}",
 } satisfies LocaleNamespace

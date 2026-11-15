@@ -12,7 +12,7 @@ import { Switch } from "@/components/Toggle/Switch"
 import type { BugScreenshot } from "@/features/feedback/bugReport"
 import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
 import type { FeedbackThread } from "@/features/feedback/status"
-import { appLocale } from "@/i18n"
+import { formatDate, formatTime, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -255,13 +255,11 @@ function Message({
 }) {
   const { themed } = useAppTheme()
   const mine = from === "player"
-  const meta = [
+  const meta = joinParts([
     translate(mine ? "feedback:thread.you" : "feedback:thread.team"),
     at === undefined ? undefined : messageTime(at),
     status ? translate(`feedback:thread.${status}`) : undefined,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
   return (
     <View style={[themed($message), mine ? themed($mine) : themed($theirs)]}>
       {screenshotUri ? (
@@ -305,10 +303,8 @@ function AccountStatus({
 }
 
 function messageTime(at: number) {
-  const date = new Date(at)
-  const time = date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })
-  if (date.toDateString() === new Date().toDateString()) return time
-  return `${date.toLocaleDateString(appLocale, { month: "short", day: "numeric" })} ${time}`
+  if (new Date(at).toDateString() === new Date().toDateString()) return formatTime(at)
+  return formatDate(at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
 function ComposerButton({

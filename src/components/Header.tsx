@@ -49,7 +49,7 @@ export interface HeaderProps {
    * Left action text to display if not using `leftTx`.
    * Can be used with `onLeftPress`. Overrides `leftIcon`.
    */
-  leftText?: TextProps["text"]
+  leftText?: string
   /**
    * Left action text text which is looked up via i18n.
    * Can be used with `onLeftPress`. Overrides `leftIcon`.
@@ -69,7 +69,7 @@ export interface HeaderProps {
    * Right action text to display if not using `rightTx`.
    * Can be used with `onRightPress`. Overrides `rightIcon`.
    */
-  rightText?: TextProps["text"]
+  rightText?: string
   /**
    * Right action text text which is looked up via i18n.
    * Can be used with `onRightPress`. Overrides `rightIcon`.
@@ -90,7 +90,7 @@ interface HeaderActionProps {
   backgroundColor?: string
   icon?: IconTypes
   iconColor?: string
-  text?: TextProps["text"]
+  text?: string
   tx?: TextProps["tx"]
   txOptions?: TextProps["txOptions"]
   onPress?: TouchableOpacityProps["onPress"]

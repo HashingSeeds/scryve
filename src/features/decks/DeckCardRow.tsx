@@ -47,7 +47,10 @@ export function DeckCardRow({
     <View style={themed($card)}>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel={`${card.quantity}× ${card.name}`}
+        accessibilityLabel={translate("decks:cardQuantity", {
+          quantity: card.quantity,
+          card: card.name,
+        })}
         testID={testID ?? `deck-card-row-${printingKey(card)}`}
         style={themed($cardLink)}
         onPress={() => onFocus(card)}
@@ -116,7 +119,7 @@ export function DeckCardRow({
               <Text text="−" style={themed($action)} />
             )}
           </TouchableOpacity>
-          <Text size="sm" text={String(card.quantity)} style={$quantity} />
+          <Text size="sm" text={card.quantity} style={$quantity} />
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={translate("decks:cardRow.increase", { card: card.name })}

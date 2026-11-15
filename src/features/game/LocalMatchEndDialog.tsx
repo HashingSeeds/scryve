@@ -193,7 +193,7 @@ export function MatchEndDialog({
                 size={24}
               />
               <Text text={player.name} numberOfLines={1} style={themed($name)} />
-              <Text text={String(player.wins)} size="xs" tone="dim" />
+              <Text text={player.wins} size="xs" tone="dim" />
             </View>
             <View style={themed($seatOutcome)}>
               <SegmentedControl

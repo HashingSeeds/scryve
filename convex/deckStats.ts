@@ -6,6 +6,7 @@ import { query, type QueryCtx } from "./_generated/server"
 import { maskSummaryPlayersForViewer } from "./games"
 import { requireUser } from "./lib/auth"
 import { assertDeckKey } from "./lib/deckKeys"
+import { BREAKDOWN_SCAN } from "./lib/deckStatsLimits"
 import { blockedUserIdsFor, publicUsernameFor } from "./lib/moderation"
 import { HIDDEN_DECK_NAME, HIDDEN_PLAYER_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
@@ -18,7 +19,6 @@ import {
 import { boundedPaginationOptions } from "./lib/pagination"
 import { resultDeckKey } from "./lib/results"
 
-export const BREAKDOWN_SCAN = 200
 const MAX_LISTS = 50
 const MAX_DECK_TOTALS = 1000
 const GAMES_PAGE_ROWS = 100

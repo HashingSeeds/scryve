@@ -331,7 +331,12 @@ function FieldLabel({
   return (
     <Text preset="formLabel" size="xs" style={style}>
       {translate(tx, txOptions)}
-      {optional ? <Text size="xs" tone="dim" text={` ${translate("common:optional")}`} /> : null}
+      {optional ? (
+        <>
+          {" "}
+          <Text size="xs" tone="dim" tx="common:optional" />
+        </>
+      ) : null}
     </Text>
   )
 }

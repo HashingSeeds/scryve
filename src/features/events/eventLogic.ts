@@ -2,6 +2,7 @@ import { PLAYER_COLORS, wellFormedPlayerName } from "@/features/game/domain"
 import { defaultStartingLife, isPlaySystemId, playFormatLabel } from "@/features/game/playSystems"
 import type { LocalSetup } from "@/features/game/recentSetups"
 import { ROUND_CLOCK_MINUTES, type RoundClockSetup } from "@/features/game/roundClock"
+import { formatList, formatNumber, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { convexErrorCode } from "@/utils/convexError"
 
@@ -23,13 +24,14 @@ type EventSummary = Pick<EventView, "system" | "format" | "structure" | "status"
 }
 
 export function eventMeta(event: EventSummary) {
-  return [
+  return joinParts([
     playFormatLabel(event.system, event.format),
     translate(`events:structure.${event.structure}`),
-    ...(event.structure === "swiss" && event.bestOf && event.bestOf > 1
-      ? [translate("events:bestOf", { bestOf: event.bestOf })]
-      : []),
-  ].join(" · ")
+    event.structure === "swiss" &&
+      event.bestOf &&
+      event.bestOf > 1 &&
+      translate("events:bestOf", { bestOf: event.bestOf }),
+  ])
 }
 
 export const eventStatusText = (event: EventSummary) =>
@@ -93,7 +95,7 @@ export function resultText(view: EventView, table: EventTableView) {
             name: playerName(view, table.playerIds[result.winnerSeat] ?? ""),
           })
     case "match":
-      return [...result.gamesWon, ...(result.gamesDrawn > 0 ? [result.gamesDrawn] : [])].join("-")
+      return formatRecord(...result.gamesWon, ...(result.gamesDrawn > 0 ? [result.gamesDrawn] : []))
   }
 }
 
@@ -103,7 +105,7 @@ export function myResultText(view: EventView, table: EventTableView) {
   if (result?.kind !== "match" || seat < 0) return resultText(view, table)
   const mine = result.gamesWon[seat] ?? 0
   const theirs = Math.max(0, ...result.gamesWon.filter((_, index) => index !== seat))
-  const score = [mine, theirs, ...(result.gamesDrawn > 0 ? [result.gamesDrawn] : [])].join("-")
+  const score = formatRecord(mine, theirs, ...(result.gamesDrawn > 0 ? [result.gamesDrawn] : []))
   const outcome = mine > theirs ? "won" : mine < theirs ? "lost" : "drew"
   return translate(`events:result.${outcome}`, { score })
 }
@@ -122,7 +124,7 @@ export function tablePlayers(view: EventView, table: EventTableView) {
   const names = table.playerIds.map((id) => playerName(view, id))
   return names.length === 2
     ? translate("events:versus", { first: names[0], second: names[1] })
-    : names.join(", ")
+    : formatList(names)
 }
 
 export function remainingMs(clock: EventClock, now: number) {
@@ -166,7 +168,8 @@ export function matchSetupFor(view: EventView, table: EventTableView, now: numbe
 export const firstTiebreaker = (system: string): Tiebreaker | undefined =>
   isPlaySystemId(system) ? eventRules(system).tiebreakers[0] : undefined
 
-export const percent = (value: number) => `${(value * 100).toFixed(1)}%`
+export const percent = (value: number) =>
+  formatNumber(value, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 const ERROR_TEXT: Record<EventErrorCode | "rate_limited", () => string> = {
   name_rejected: () => translate("events:errors.nameRejected"),

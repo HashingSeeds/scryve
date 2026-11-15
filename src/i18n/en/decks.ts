@@ -1,13 +1,20 @@
 const decks = {
   cardCount_one: "{{count}} card",
   cardCount_other: "{{count}} cards",
+  // A pasted deck list line the import could not read, shown in quotes. Use your language's quotation marks.
+  importProblemLine: '"{{line}}"',
+  // A deck list row read aloud, as in "4× Lightning Bolt".
+  cardQuantity: "{{quantity}}× {{card}}",
   saving: "Saving…",
   deleting: "Deleting…",
   hiddenNameWarning: 'Other players will see "{{hiddenName}}" instead.',
   numberedVersion: "Version {{number}}",
+  // The name of a deck's newest version until the player renames it.
+  currentVersion: "Current",
   record: {
     noGames: "No games yet",
-    winRate: "{{percent}}% of {{games}}",
+    // {{percent}} is a formatted win rate such as "53%".
+    winRate: "{{percent}} of {{games}}",
   },
   stats: {
     title: "Deck stats",
@@ -33,6 +40,8 @@ const decks = {
     sources: "Source",
     current: "Current",
     moreChanges: "{{count}} more",
+    // A card added or cut between lists, as in "+2 Lightning Bolt". {{change}} is a signed count.
+    cardChange: "{{change}} {{card}}",
     notTracked: "Not tracked",
     dateSpan: "{{first}} to {{last}}",
     players_one: "{{count}} player",
@@ -50,7 +59,7 @@ const decks = {
     signIn: "Sign in to see deck stats",
     viewStats: "View deck stats",
     onDeviceLabel: "{{name}}, on this device",
-    limited: "Breakdowns cover the latest 200 results.",
+    limited: "Breakdowns cover the latest {{count}} results.",
     compareList: "List",
     compareWith: "Compared with",
     winLetter: "W",
@@ -472,8 +481,8 @@ const decks = {
       serious: "hot",
       critical: "very hot",
       noRectangles: "No rectangles",
-      // One detected rectangle: width over height, its size as a percent of the frame, then a verdict word below.
-      rectangle: "{{aspect}} · {{share}}% · {{verdict}}",
+      // One detected rectangle: width over height, its size as a formatted percent of the frame such as "40%", then a verdict word below.
+      rectangle: "{{aspect}} · {{share}} · {{verdict}}",
       // A rectangle the scanner accepted as the card.
       accepted: "card",
       // Rejected because its shape is not a card's.
@@ -723,6 +732,9 @@ const decks = {
     deleteBody: "This removes the deck from this device.",
   },
   addDeck: {
+    // Saved as the note on a deck imported from a website. {{source}} is the site, {{author}} the deck's author, {{url}} the deck's address on its own line.
+    importedNote: "Imported from {{source}}\n{{url}}",
+    importedNoteBy: "Imported from {{source}} by {{author}}\n{{url}}",
     modeBrowse: "Browse",
     modeImport: "Import",
     modeBuild: "Build",

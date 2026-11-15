@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 
-import { appLocale } from "@/i18n"
+import { formatSigned } from "@/i18n/format"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 
@@ -49,7 +49,7 @@ export function fittingSteps(
 }
 
 export function stepLabel(step: number) {
-  return `${step < 0 ? "−" : "+"}${Math.abs(step).toLocaleString(appLocale)}`
+  return formatSigned(step)
 }
 
 export function StepChips({

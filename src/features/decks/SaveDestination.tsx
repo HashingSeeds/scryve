@@ -8,6 +8,7 @@ import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -139,7 +140,7 @@ function Option({
       <Pressable
         testID={testID}
         accessibilityRole="radio"
-        accessibilityLabel={`${title}, ${detail}`}
+        accessibilityLabel={formatList([title, detail])}
         accessibilityState={{ checked: selected, disabled: Boolean(disabled) }}
         aria-checked={selected}
         disabled={disabled}

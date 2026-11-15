@@ -8,7 +8,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import type { ProSubscriptionManagement } from "@/features/billing/RevenueCatContext"
-import { appLocale } from "@/i18n"
+import { formatDate, formatTime } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -88,7 +88,7 @@ export function DeleteAccountScreen({
         {deletionStatus === null ? (
           <View style={themed($stepList)}>
             {DELETION_STEPS.map((step, index) => (
-              <Step key={step} number={String(index + 1)} step={step} />
+              <Step key={step} number={index + 1} step={step} />
             ))}
           </View>
         ) : null}
@@ -279,17 +279,12 @@ function DeletionStatusPanel({
 }
 
 function formatDeletionUpdate(timestamp: number) {
-  const date = new Date(timestamp)
-  const day = date.toLocaleDateString(appLocale, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-  const time = date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })
+  const day = formatDate(timestamp, { month: "short", day: "numeric", year: "numeric" })
+  const time = formatTime(timestamp)
   return translate("account:deleteAccount.receipt.lastUpdated", { day, time })
 }
 
-function Step({ number, step }: { number: string; step: (typeof DELETION_STEPS)[number] }) {
+function Step({ number, step }: { number: number; step: (typeof DELETION_STEPS)[number] }) {
   const { themed } = useAppTheme()
   return (
     <View style={themed($step)}>

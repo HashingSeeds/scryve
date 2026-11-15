@@ -15,6 +15,9 @@ export default {
   save: "सहेजें",
   tryAgain: "फिर कोशिश करें",
   undo: "पूर्ववत करें",
+  separator: " · ",
+  listSeparator: ", ",
+  listAnd: " और ",
   emptyState: {
     heading: "यहाँ अभी कुछ नहीं है",
     content: "कोई डेटा नहीं मिला। रीफ़्रेश करें या ऐप फिर से लोड करें।",

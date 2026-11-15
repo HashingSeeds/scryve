@@ -351,6 +351,7 @@ export default {
       confirmCommanderDamage:
         "La confirmation des blessures de commandant n'a pas pu être synchronisée",
       declineCommanderDamage: "Le refus des blessures de commandant n'a pas pu être synchronisé",
+      withReason: "{{action}} : {{reason}}",
     },
     menu: {
       players: "Joueurs",

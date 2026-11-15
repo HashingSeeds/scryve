@@ -19,6 +19,7 @@ import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
 import { counterValueLabel } from "@/features/game/playSystems"
 import type { TableKnockout, TableRuntime } from "@/features/game/tableRuntime"
 import type { LifeDelta } from "@/features/game/types"
+import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -1020,9 +1021,7 @@ function PokemonHero({
           {zones.map(({ direction, glyph, align }) => {
             const delta = (cardless ? direction : -direction) * step
             const showingDelta = direction * recentReadout > 0
-            const feedback = showingDelta
-              ? `${recentReadout > 0 ? "+" : "-"}${Math.abs(recentReadout)}`
-              : glyph
+            const feedback = showingDelta ? formatSigned(recentReadout) : glyph
             return (
               <BoardPressable
                 key={delta}
@@ -1099,7 +1098,7 @@ function PokemonHero({
           />
           <Text
             testID={`pokemon-hp-seat-${seatNumber}`}
-            text={String(reveal?.damage === pokemon.damage ? reveal.hp : readout)}
+            text={reveal?.damage === pokemon.damage ? reveal.hp : readout}
             accessible
             accessibilityLabel={
               cardless
@@ -1210,7 +1209,7 @@ function PokemonHero({
         {conditions.length > 0 ? (
           <Text
             testID={`pokemon-conditions-seat-${seatNumber}`}
-            text={conditions.join(" · ")}
+            text={joinParts(conditions)}
             size="xxs"
             weight="bold"
             numberOfLines={1}
@@ -1295,7 +1294,7 @@ function DamageReveal({
   return (
     <Animated.View testID="pokemon-damage-reveal" pointerEvents="none" style={[$reveal, rise]}>
       <Text
-        text={`−${damage}`}
+        text={formatSigned(-damage)}
         weight="bold"
         maxFontSizeMultiplier={1.3}
         style={{ fontSize: fontSize * 0.36, color: ink }}
@@ -1411,7 +1410,7 @@ function BenchChip({
         />
         <Text
           testID={`pokemon-bench-hp-${pokemon.id}`}
-          text={String(readout)}
+          text={readout}
           weight="bold"
           allowFontScaling={false}
           numberOfLines={1}

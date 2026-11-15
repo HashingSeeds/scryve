@@ -21,6 +21,7 @@ import { LIFE_BURST_MS } from "@/features/game/LifeLog"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
+import { formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -194,10 +195,6 @@ function bumpStyle(
   return { transform: [{ translateY: towardTop ? -distance : distance }] }
 }
 
-function deltaText(delta: number) {
-  return delta > 0 ? `+${delta}` : `-${Math.abs(delta)}`
-}
-
 export function lifeControlTestId(seatNumber: number, delta: LifeDelta) {
   return `life-seat-${seatNumber}-${delta}`
 }
@@ -301,7 +298,7 @@ export function LifeControls({
           const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
           const zoneEdge = sideways ? sidewaysZoneEdge(pinsToTopEdge) : edge
           const showingDelta = direction * recentDelta > 0
-          const feedback = showingDelta ? deltaText(recentDelta) : glyph
+          const feedback = showingDelta ? formatSigned(recentDelta) : glyph
           const deltaSize = showingDelta
             ? getDeltaFontSizeThatFits({
                 text: feedback,

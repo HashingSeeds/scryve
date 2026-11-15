@@ -9,7 +9,7 @@ import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorCode } from "@/utils/convexError"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
 
-import { deckVersionLabel } from "./deckCopy"
+import { storedVersionName } from "./deckCopy"
 import { getDeckSyncController, isDeckSyncEnabled, type DeckSyncSnapshot } from "./decksSync"
 import { useDeckMetadataWrites } from "./decksSyncWrites"
 import { useDeckVersionWrites } from "./decksVersionWrites"
@@ -120,7 +120,7 @@ async function accountCopy(convex: ConvexReactClient, deckId: Id<"decks">) {
   const versions: NewGuestDeckVersion[] = await Promise.all(
     detail.versions.map(async (version) => ({
       number: version.versionNumber,
-      name: deckVersionLabel(version, version.versionNumber),
+      name: storedVersionName(version, version.versionNumber),
       ...(version.note ? { note: version.note } : {}),
       cards:
         version._id === latestId

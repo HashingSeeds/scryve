@@ -20,6 +20,7 @@ import {
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import type { TxKeyPath } from "@/i18n"
+import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -56,10 +57,6 @@ const OUTCOME_BADGES = {
   },
 } as const satisfies Record<SummaryOutcome, { labelTx: TxKeyPath; accessibilityTx: TxKeyPath }>
 
-function signed(delta: number) {
-  return `${delta > 0 ? "+" : ""}${delta}`
-}
-
 function StandingRow({
   player,
   rank,
@@ -86,14 +83,12 @@ function StandingRow({
     seatStartingLife === undefined
       ? undefined
       : counterDeltaFromStartLabel(system, player.life, seatStartingLife)
-  const detail = [
+  const detail = joinParts([
     player.team,
     player.username ? `@${player.username}` : undefined,
     player.deckLabel,
     player.deleted ? translate("play:summary.deletedPlayer") : undefined,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
   const value = counterValueLabel(system, player.life)
   const rowLabel = showOutcome
     ? translate("play:summary.standingWithOutcome", {
@@ -112,7 +107,7 @@ function StandingRow({
         </View>
       ) : (
         <View style={themed($badge)}>
-          <Text size="xxs" tone="dim" text={String(rank)} />
+          <Text size="xxs" tone="dim" text={rank} />
         </View>
       )}
       <View style={$styles.flex1}>
@@ -125,7 +120,7 @@ function StandingRow({
         />
       </View>
       <View style={themed($lifeColumn)}>
-        <Text size="lg" weight="bold" text={String(player.life)} />
+        <Text size="lg" weight="bold" text={player.life} />
         {changeFromStart === undefined ? null : (
           <Text size="xxs" tone="dim" text={changeFromStart} />
         )}
@@ -284,14 +279,12 @@ export function GameSummaryScreen({
           <Text
             size="xs"
             tone="dim"
-            text={[
+            text={joinParts([
               finishedOnLabel(model.finishedAt),
               model.source === "local"
                 ? translate("play:summary.local")
                 : translate("play:summary.connected"),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+            ])}
           />
           <Text size="xs" tone="dim" text={metaLine(model)} />
           {model.terminalReason ? <Text size="xs" tone="dim" text={model.terminalReason} /> : null}
@@ -415,7 +408,7 @@ export function GameSummaryScreen({
                       size="xs"
                       weight="medium"
                       style={{ color: change.delta < 0 ? theme.colors.error : theme.colors.text }}
-                      text={signed(change.delta)}
+                      text={formatSigned(change.delta)}
                     />
                   </View>
                 )

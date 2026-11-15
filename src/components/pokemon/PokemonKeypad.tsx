@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics"
 import Svg, { Path } from "react-native-svg"
 
 import { localGameRepository } from "@/features/game/localPersistence"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
@@ -26,6 +27,10 @@ export const COMPACT_KEY_HEIGHT = 32
 export const FULL_KEY_SIZE = 44
 export const KEY_GAP = spacing.xxs
 export const ROW_GAP = spacing.xxs + 1
+
+// why: a number key shows the language's digit but types an ASCII one, which Number() and the stored value read.
+export const digitKeyLabel = (key: string) =>
+  key.replace(/\d/g, (digit) => formatNumber(Number(digit)))
 
 export function tallestKeypadHeight(compact?: boolean) {
   const rows = DIGITS.length + 2
@@ -86,8 +91,8 @@ export function PokemonKeypad({
     const text = upper ? char : char.toLowerCase()
     return {
       id: char.toLowerCase(),
-      label: text,
-      accessibilityLabel: char,
+      label: digitsOnly ? digitKeyLabel(text) : text,
+      accessibilityLabel: digitsOnly ? digitKeyLabel(char) : char,
       onPress: () => {
         onType(text)
         setShift(undefined)

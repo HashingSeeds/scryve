@@ -6,6 +6,7 @@ import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -146,9 +147,11 @@ function SupportRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[translate(tx), badge, detailTx ? translate(detailTx) : undefined]
-        .filter(Boolean)
-        .join(", ")}
+      accessibilityLabel={formatList([
+        translate(tx),
+        badge,
+        detailTx ? translate(detailTx) : undefined,
+      ])}
       onPress={onPress}
       style={({ pressed }) => [themed($row), pressed && $pressed]}
     >

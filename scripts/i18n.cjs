@@ -24,7 +24,7 @@ const LOCALES = {
 const GLOSSARY_PATH = path.join(I18N_DIR, "glossary.json")
 
 const PLURAL_SUFFIX = /^(.*)_(zero|one|two|few|many|other)$/
-const PLACEHOLDER = /{{\s*([\w.]+)\s*}}|<\/?([\w-]+)\s*\/?>/g
+const PLACEHOLDER = /{{\s*([\w.]+)(?:\s*,\s*\w+)?\s*}}|<\/?([\w-]+)\s*\/?>/g
 
 const NON_LATIN_LOCALES = new Set(["hi", "ja", "ko"])
 const LITERAL_TEXT = /{{[^}]*}}|<[^>]*>|https?:\/\/\S+|\S+@\S+|@\w+|「[^」]*」|"[^"]*"|“[^”]*”/g
@@ -47,7 +47,10 @@ Rules:
 - Product vocabulary, translate consistently: "local game" is a game on one shared device; "connected game" is players on their own phones; "cloud" means synced through Scryve's servers; "nearby" means phones on the same Wi-Fi; "seat" is a player's place at the table; "host" is the player who created a connected game.
 - A "match" is a best-of-N set of games; a "game" is one game. {{bestOf}} is the total number of games (3 means best of three), never the wins needed.
 - "Abandon" ends a game or lobby for everyone with no result. "Leave" removes only you. "End game" finishes with a result. "Cancel" closes a dialog. Never give two of these the same word.
-- Keep the " · " separator, ellipsis characters, and abbreviations like "5m ago" equally compact.
+- Keep ellipsis characters, and keep short labels as compact as the English.
+- Never add a digit the English does not have: the app formats every number in the reader's own digits, so numbers come only from placeholders such as {{count}}. A plural form may say its number in words ("one seat", "two seats") instead of {{count}}; the "other" form always keeps {{count}}.
+- Write whole words, not single letters: no W/L/D for wins, losses, and draws, and no "m" or "h" for minutes and hours, unless your language truly abbreviates them that way on phone screens.
+- Leave the text inside {{ }} exactly as it is: never translate, reorder, or quote it.
 - Each entry has a "context" key path that tells you where the string appears. Use it as context; never translate it.
 - Some entries have a "note" from the English author about meaning or where the string appears. Follow it; never translate it.
 - Each entry lists "slots". Return one translation per slot id. A slot with a "form" is a CLDR plural category: write the grammatically correct form for it, using the English plural forms as reference.
@@ -183,18 +186,52 @@ function placeholders(text) {
   return new Set([...text.matchAll(PLACEHOLDER)].map((match) => match[0].replace(/\s+/g, "")))
 }
 
+const DIGIT_RUN = /\p{Nd}+/gu
+
+// why: Unicode lays each script's digits 0 to 9 in a row, so a digit's value is its distance from that row's zero.
+function digitValue(char) {
+  let zero = char.codePointAt(0)
+  while (/\p{Nd}/u.test(String.fromCodePoint(zero - 1))) zero -= 1
+  return (char.codePointAt(0) - zero) % 10
+}
+
+function numbersIn(text) {
+  return (text.replace(LITERAL_TEXT, " ").match(DIGIT_RUN) ?? []).map((run) =>
+    [...run].map(digitValue).join(""),
+  )
+}
+
+// why: the app writes numbers in the phone region's digits (Arabic-Indic in Saudi Arabia), so a digit typed into the copy would stand out in Latin.
+function writesOwnDigits(locale) {
+  const { language, region } = new Intl.Locale(locale).maximize()
+  return new Intl.NumberFormat(`${language}-${region}`).resolvedOptions().numberingSystem !== "latn"
+}
+
+// why: plural forms such as "one" may say the number in words; "other" and plain strings must print it.
+function mayDropCount(unit, key) {
+  return unit.plural && !key.endsWith("_other")
+}
+
 function validateUnit(unit, translatedFlat, locale) {
-  const english = new Set(Object.values(unit.english).flatMap((text) => [...placeholders(text)]))
-  const required = [...english].filter((token) => token !== "{{count}}")
+  const englishTexts = Object.values(unit.english)
+  const english = new Set(englishTexts.flatMap((text) => [...placeholders(text)]))
+  const englishNumbers = new Set(englishTexts.flatMap(numbersIn))
   return requiredKeys(unit, locale).flatMap((key) => {
     const text = translatedFlat[key]
     if (typeof text !== "string" || !text.trim()) return [`${key}: missing translation`]
     const found = placeholders(text)
+    const required = [...english].filter(
+      (token) => token !== "{{count}}" || !mayDropCount(unit, key),
+    )
     const missing = required.filter((token) => !found.has(token))
     const unknown = [...found].filter((token) => !english.has(token))
+    const typedNumbers = writesOwnDigits(locale)
+      ? numbersIn(text).filter((number) => !englishNumbers.has(number))
+      : []
     return [
       ...missing.map((token) => `${key}: dropped ${token}`),
       ...unknown.map((token) => `${key}: introduced ${token}`),
+      ...typedNumbers.map((number) => `${key}: typed the number ${number}; use a placeholder`),
       ...((text.match(/"/g) ?? []).length % 2 ? [`${key}: has an unmatched quote`] : []),
       ...scriptProblems(text, locale).map((problem) => `${key}: ${problem}`),
     ]

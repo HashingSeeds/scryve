@@ -24,6 +24,7 @@ import {
 import type { PushKind } from "@/features/notifications/prefs"
 import { copyDebugInfo, readAppInfo } from "@/features/updates/appInfo"
 import { AppUpdateStatus } from "@/features/updates/AppUpdateStatus"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -40,7 +41,7 @@ type CopyStatus = "idle" | "copied" | "failed"
 function defaultGameLabel({ defaultSystem, defaultFormat }: LocalSettings) {
   if (!defaultSystem) return translate("systems:noSystem")
   const system = playSystemShortLabel(defaultSystem)
-  return defaultFormat ? `${playFormatLabel(defaultSystem, defaultFormat)} · ${system}` : system
+  return defaultFormat ? joinParts([playFormatLabel(defaultSystem, defaultFormat), system]) : system
 }
 
 function versionSummary() {

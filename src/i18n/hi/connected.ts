@@ -334,6 +334,7 @@ export default {
       table: "टेबल का बदलाव सिंक नहीं हो सका",
       confirmCommanderDamage: "कमांडर डैमेज की पुष्टि सिंक नहीं हो सकी",
       declineCommanderDamage: "कमांडर डैमेज अस्वीकार करना सिंक नहीं हो सका",
+      withReason: "{{action}}: {{reason}}",
     },
     menu: {
       players: "खिलाड़ी",

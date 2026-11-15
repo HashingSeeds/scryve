@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/NumberLane"
 import { Sheet } from "@/components/Sheet"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
+import { formatNumber, formatOrMore, formatPercent } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -144,14 +145,19 @@ export function DeckAnalysisPanel({
               tone="dim"
               style={$tabular}
               tx="decks:analysis.average"
-              txOptions={{ value: analysis.averageManaValue.toFixed(2) }}
+              txOptions={{
+                value: formatNumber(analysis.averageManaValue, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }),
+              }}
             />
           }
         />
         <View style={themed($curve)} testID="deck-analysis-curve">
           {analysis.curve.map((count, value) => (
             <View key={value} style={themed($column)}>
-              <Text size="xxs" tone="dim" style={$tabular} text={count > 0 ? String(count) : ""} />
+              <Text size="xxs" tone="dim" style={$tabular} text={count > 0 ? count : ""} />
               <View
                 style={[
                   themed($bar),
@@ -162,7 +168,7 @@ export function DeckAnalysisPanel({
                 size="xxs"
                 tone="dim"
                 style={$tabular}
-                text={value === CURVE_BUCKETS - 1 ? `${value}+` : String(value)}
+                text={value === CURVE_BUCKETS - 1 ? formatOrMore(value) : value}
               />
             </View>
           ))}
@@ -178,7 +184,7 @@ export function DeckAnalysisPanel({
                   lands: analysis.lands,
                   modal: analysis.modalLands,
                 })
-              : String(analysis.lands)
+              : formatNumber(analysis.lands)
           }
           testID="deck-analysis-lands"
         />
@@ -191,12 +197,12 @@ export function DeckAnalysisPanel({
         ) : null}
         <Line
           label={translate("decks:analysis.ramp")}
-          value={String(analysis.ramp)}
+          value={formatNumber(analysis.ramp)}
           testID="deck-analysis-ramp"
         />
         <Line
           label={translate("decks:analysis.cheapDraw")}
-          value={String(analysis.cheapDraw)}
+          value={formatNumber(analysis.cheapDraw)}
           testID="deck-analysis-cheap-draw"
         />
       </View>
@@ -214,8 +220,8 @@ export function DeckAnalysisPanel({
                 <View style={[$dot, { backgroundColor: MANA_DOT[color] }]} />
                 <Text size="sm" tx={`decks:analysis.color.${color}`} />
               </View>
-              <Text size="sm" style={[$cell, $tabular]} text={String(pips)} />
-              <Text size="sm" style={[$cell, $tabular]} text={String(sources)} />
+              <Text size="sm" style={[$cell, $tabular]} text={pips} />
+              <Text size="sm" style={[$cell, $tabular]} text={sources} />
             </View>
           ))}
         </View>
@@ -276,7 +282,7 @@ function Odds({ cells }: { cells: { label: string; chance: number }[] }) {
       {cells.map(({ label, chance }) => (
         <View key={label} style={$flex}>
           <Text size="xxs" tone="dim" text={label} />
-          <Text size="sm" weight="medium" style={$tabular} text={`${Math.round(chance * 100)}%`} />
+          <Text size="sm" weight="medium" style={$tabular} text={formatPercent(chance)} />
         </View>
       ))}
     </View>

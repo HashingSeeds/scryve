@@ -76,6 +76,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
+import { formatList, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -159,13 +160,11 @@ function DeckDetailPlaceholder({
   const { themed, theme } = useAppTheme()
   const loadingGameLabel = summary ? (deckGame(summary.game)?.shortLabel ?? summary.game) : null
   const loadingMetadata = summary
-    ? [
+    ? joinParts([
         loadingGameLabel,
         deckFormatLabel(summary.game, summary.format),
         summary.cardQuantity !== undefined ? cardCountLabel(summary.cardQuantity) : undefined,
-      ]
-        .filter(Boolean)
-        .join(" · ")
+      ])
     : null
   const loadingSections = summary ? localizedDeckSections(summary.game, summary.format) : []
   const statusText =
@@ -1042,12 +1041,10 @@ function DeckDetailContent({
             versions={view.versionRows.map((row) => ({
               id: row._id,
               label: versionTitle(row, latestVersionNumber),
-              detail: [
+              detail: joinParts([
                 "updatedAt" in row ? statsDate(row.updatedAt) : undefined,
                 cardCountLabel(row.cardQuantity),
-              ]
-                .filter(Boolean)
-                .join(" · "),
+              ]),
               record: row.record && allRecord(row.record),
             }))}
             bringingId={bringingId}
@@ -1181,10 +1178,8 @@ function DeckDetailContent({
               <Text
                 size="sm"
                 text={
-                  failedCardEdit.action.cards
-                    .slice(0, 3)
-                    .map((card) => card.name)
-                    .join(", ") || translate("decks:conflict.noCards")
+                  formatList(failedCardEdit.action.cards.slice(0, 3).map((card) => card.name)) ||
+                  translate("decks:conflict.noCards")
                 }
                 numberOfLines={2}
               />

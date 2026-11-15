@@ -43,6 +43,7 @@ import {
 } from "@/features/stats/DeckStatsParts"
 import { fingerprintsToRead, labelLists } from "@/features/stats/listLabels"
 import { useListCards } from "@/features/stats/useListCards"
+import { formatList, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -50,6 +51,7 @@ import { captureAnalytics } from "@/utils/analytics"
 
 import { api } from "../../convex/_generated/api"
 import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
+import { BREAKDOWN_SCAN } from "../../convex/lib/deckStatsLimits"
 
 type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void }
 
@@ -198,9 +200,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
             <Text
               size="xs"
               tone="dim"
-              text={[deckGame(game)?.shortLabel ?? game, deckFormatLabel(game, format)]
-                .filter(Boolean)
-                .join(" · ")}
+              text={joinParts([deckGame(game)?.shortLabel ?? game, deckFormatLabel(game, format)])}
             />
             {empty ? (
               <View style={$hero}>
@@ -213,12 +213,10 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 <View style={$hero}>
                   <Text testID="stats-headline" text={rate.text} style={[$headline, $numbers]} />
                   <Text
-                    text={[
+                    text={joinParts([
                       rate.tooFew ? undefined : recordText(record),
                       translate("decks:stats.gameCount", { count: record.games }),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    ])}
                     style={$numbers}
                   />
                   {manualMatches || connectedMatches ? (
@@ -226,7 +224,11 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                       size="xs"
                       tone="dim"
                       text={translate("decks:stats.matchesRecord", {
-                        record: `${(manualMatches?.wins ?? 0) + (connectedMatches?.wins ?? 0)}-${(manualMatches?.losses ?? 0) + (connectedMatches?.losses ?? 0)}-${(manualMatches?.draws ?? 0) + (connectedMatches?.draws ?? 0)}`,
+                        record: formatRecord(
+                          (manualMatches?.wins ?? 0) + (connectedMatches?.wins ?? 0),
+                          (manualMatches?.losses ?? 0) + (connectedMatches?.losses ?? 0),
+                          (manualMatches?.draws ?? 0) + (connectedMatches?.draws ?? 0),
+                        ),
                       })}
                     />
                   ) : null}
@@ -255,7 +257,12 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                   ) : null}
                 </View>
                 {!summary.scannedAll ? (
-                  <Text size="xs" tone="dim" tx="decks:stats.limited" />
+                  <Text
+                    size="xs"
+                    tone="dim"
+                    tx="decks:stats.limited"
+                    txOptions={{ count: BREAKDOWN_SCAN }}
+                  />
                 ) : null}
                 {lists.length ? (
                   <>
@@ -403,7 +410,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 style={themed($section)}
                 label={
                   filter
-                    ? `${translate("decks:stats.games")} · ${filter.label}`
+                    ? joinParts([translate("decks:stats.games"), filter.label])
                     : translate("decks:stats.games")
                 }
                 action={
@@ -476,23 +483,23 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                 <Text
                   size="sm"
                   weight="medium"
-                  text={[
+                  text={joinParts([
                     statsDate(item.finishedAt),
                     item.podSize === null
                       ? translate("decks:stats.unknownPod")
                       : translate("decks:stats.players", { count: item.podSize }),
-                  ].join(" · ")}
+                  ])}
                 />
                 <Text
                   size="meta"
                   tone="dim"
                   text={
                     item.opponents.length
-                      ? item.opponents
-                          .map((opponent) =>
-                            [opponent.name, opponent.deckName].filter(Boolean).join(" · "),
-                          )
-                          .join(", ")
+                      ? formatList(
+                          item.opponents.map((opponent) =>
+                            joinParts([opponent.name, opponent.deckName]),
+                          ),
+                        )
                       : translate("decks:stats.opponentsMissing")
                   }
                 />
