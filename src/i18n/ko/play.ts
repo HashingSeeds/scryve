@@ -42,6 +42,13 @@ export default {
     lifeAndTurns: "턴 포함",
     chessClock: "체스 시계",
   },
+  firstPlayerChoice: {
+    label: "선공",
+    off: "끄기",
+    roll: "주사위",
+    flip: "동전",
+    pick: "직접 정하기",
+  },
   whatYouPlay: {
     heading: "어떤 게임을 하시나요?",
     changeLater: "설정에서 변경할 수 있습니다.",

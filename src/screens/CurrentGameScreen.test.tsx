@@ -56,6 +56,11 @@ function turnsOn() {
   return repository
 }
 
+function firstPlayerBy(mode: "roll" | "pick", system?: string, repository = turnsOff()) {
+  repository.saveFirstPlayerMode(system, mode)
+  return repository
+}
+
 function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat") {
   for (const card of view.queryAllByTestId(new RegExp(`^${prefix}-\\d+$`)))
     fireEvent(card, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 400 } } })
@@ -200,22 +205,24 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-log-undo").props.accessibilityState.disabled).toBe(true)
   })
 
-  it("offers the first-player roll only while the game is fresh, and its chip leaves on the first life change", () => {
+  it("leaves the board alone when setup turns first player off", () => {
+    const view = renderGame(game(), turnsOff())
+    layoutSeats(view)
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.queryByTestId("dice-chip-1-claim")).toBeNull()
+  })
+
+  it("rolls for everyone from any seat when setup picks Roll, and its chip leaves on the first life change", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
     const initial = game()
-    const repository = turnsOff()
+    const repository = firstPlayerBy("roll")
     const view = renderGame(initial, repository)
     layoutSeats(view)
-    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
-      "Roll for who goes first",
-    )
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("first-player-tab")).toBeNull()
-    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Roll for who goes first")
 
-    fireEvent.press(view.getByTestId("first-player-tab"))
-    expect(view.queryByTestId("first-player-tab")).toBeNull()
+    fireEvent.press(view.getByTestId("dice-seat-2"))
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
     expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     expect(view.queryByTestId("dice-chip-2-first")).toBeNull()
@@ -223,16 +230,41 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-seat-2-1"))
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     expect(view.queryByTestId("dice-chip-1-first")).toBeNull()
-    expect(view.queryByTestId("first-player-tab")).toBeNull()
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
 
-    const inProgress = renderGame({
-      ...game(),
-      players: game().players.map((p, i) => ({ ...p, life: i ? 2 : 1 })),
-    })
-    expect(inProgress.queryByTestId("first-player-tab")).toBeNull()
+    const inProgress = renderGame(
+      { ...game(), players: game().players.map((p, i) => ({ ...p, life: i ? 2 : 1 })) },
+      repository,
+    )
+    expect(inProgress.queryByTestId("dice-seat-1")).toBeNull()
   })
 
-  it("keeps the first-player offer through Pokémon setup and withdraws it at the first point of play", () => {
+  it("marks the tapped seat first when setup picks We pick", () => {
+    const initial = game()
+    const repository = firstPlayerBy("pick")
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Mark Ada as going first")
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent("Going first?")
+
+    fireEvent.press(view.getByTestId("dice-seat-2"))
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
+    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[1].id)
+  })
+
+  it("starts turns on the picked seat when Turns is on", () => {
+    const initial = game()
+    const repository = firstPlayerBy("pick", undefined, turnsOn())
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    expect(view.queryByTestId("dice-chip-1-claim")).toBeNull()
+
+    fireEvent.press(view.getByTestId("dice-seat-2"))
+    expect(repository.loadActiveGame()?.turn).toMatchObject({ playerId: initial.players[1].id })
+    expect(view.getByTestId("turn-chip-2")).toBeTruthy()
+  })
+  it("keeps the first-player offer through Pokémon setup and withdraws it once play has begun", () => {
     const context = { operationId: "operation-test-000-1", now: 2 }
     const mtg = createLocalGame({
       players: [
@@ -249,7 +281,9 @@ describe("CurrentGameScreen", () => {
       context,
     )
     expect(withPoison).not.toBe(mtg)
-    expect(renderGame(withPoison).queryByTestId("first-player-tab")).toBeNull()
+    expect(
+      renderGame(withPoison, firstPlayerBy("roll", "mtg")).queryByTestId("dice-seat-1"),
+    ).toBeNull()
 
     const pokemon = game(2, "pokemon")
     const placed = applyLocalTableAction(
@@ -264,41 +298,33 @@ describe("CurrentGameScreen", () => {
       context,
     )
     expect(placed).not.toBe(pokemon)
-    const view = renderGame(placed)
-    expect(view.getByTestId("first-player-tab")).toBeTruthy()
-    fireEvent.press(view.getByTestId("pokemon-damage-seat-1-10"))
-    expect(view.queryByTestId("first-player-tab")).toBeNull()
-    fireEvent.press(view.getByTestId("pokemon-damage-seat-1--10"))
-    expect(view.queryByTestId("first-player-tab")).toBeNull()
+    const view = renderGame(placed, firstPlayerBy("roll", "pokemon"))
+    layoutSeats(view, "pokemon-card-seat")
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip for who goes first")
   })
-
   it("remembers a used offer and a rematch's loser across a reopen", () => {
-    const repository = new LocalGameRepository(new MemoryStorage())
+    const repository = firstPlayerBy("roll")
     repository.saveActiveGame(game())
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
-    const first = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={repository.loadActiveGame()!}
-          repository={repository}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    fireEvent.press(first.getByTestId("first-player-tab"))
+    const open = () =>
+      render(
+        <ThemeProvider initialContext="light">
+          <CurrentGameScreen
+            initialGame={repository.loadActiveGame()!}
+            repository={repository}
+            onViewSummary={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+    const first = open()
+    layoutSeats(first)
+    fireEvent.press(first.getByTestId("dice-seat-1"))
     first.unmount()
 
-    const reopened = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={repository.loadActiveGame()!}
-          repository={repository}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    expect(reopened.queryByTestId("first-player-tab")).toBeNull()
+    const reopened = open()
+    layoutSeats(reopened)
+    expect(reopened.queryByTestId("dice-seat-1")).toBeNull()
     fireEvent.press(reopened.getByTestId("life-seat-1-1"))
     fireEvent.press(reopened.getByTestId("game-menu-button"))
     fireEvent.press(reopened.getByTestId("end-game-button"))
@@ -306,20 +332,10 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(reopened.getByTestId("confirm-end-game-button"))
     reopened.unmount()
 
-    const rematch = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={repository.loadActiveGame()!}
-          repository={repository}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    expect(rematch.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
-      "Grace lost the last game. Choose who goes first",
-    )
+    const rematch = open()
+    layoutSeats(rematch)
+    expect(rematch.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
   })
-
   it("opens the plane from any seat's bag, even where the seam has no room for it", () => {
     const initial = createLocalGame({
       players: ["Ada", "Grace", "Katherine", "Dorothy"].map((name) => ({ name, color: "#41476E" })),
@@ -409,22 +425,6 @@ describe("CurrentGameScreen", () => {
       .loadActiveGame()
       ?.table?.modes?.log?.findLast((entry) => entry.kind === "rolled")
     expect(rolled).toMatchObject({ kind: "rolled", playerId: dorothy })
-  })
-
-  it("lets a seat claim first from its empty 1st, which closes the offer everywhere", () => {
-    const initial = game()
-    const repository = turnsOff()
-    const view = renderGame(initial, repository)
-    layoutSeats(view)
-    expect(view.getByTestId("dice-chip-1-claim").props.accessibilityLabel).toBe(
-      "Mark Ada as going first",
-    )
-
-    fireEvent.press(view.getByTestId("dice-chip-2-claim"))
-    expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
-    expect(view.queryByTestId("dice-chip-1-claim")).toBeNull()
-    expect(view.queryByTestId("first-player-tab")).toBeNull()
-    expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[1].id)
   })
 
   it("frames and chips every seat of a shared turn, and passes group to group", () => {
@@ -555,26 +555,23 @@ describe("CurrentGameScreen", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
     const initial = game()
-    const repository = turnsOff()
+    const repository = firstPlayerBy("roll")
     const view = renderGame(initial, repository)
     layoutSeats(view)
-    fireEvent.press(view.getByTestId("first-player-tab"))
+    fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(repository.loadActiveGame()?.firstPlayerId).toBe(initial.players[0].id)
     fireEvent.press(view.getByTestId("dice-chip-1-first"))
     expect(repository.loadActiveGame()?.firstPlayerId).toBeUndefined()
   })
-
   it("flips a coin for Pokémon and lets the winner choose first or second", () => {
     jest.spyOn(Math, "random").mockReturnValue(0.5)
     const initial = game(2, "pokemon")
-    const repository = turnsOff()
+    const repository = firstPlayerBy("roll", "pokemon")
     const view = renderGame(initial, repository)
     layoutSeats(view, "pokemon-card-seat")
-    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
-      "Flip for who goes first",
-    )
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip for who goes first")
 
-    fireEvent.press(view.getByTestId("first-player-tab"))
+    fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the flip/)
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
 
@@ -584,34 +581,56 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
   })
-
   it("rolls off for first when Pokémon has more than two players", () => {
-    const view = renderGame(game(3, "pokemon"))
+    const view = renderGame(game(3, "pokemon"), firstPlayerBy("roll", "pokemon"))
     layoutSeats(view, "pokemon-card-seat")
-    expect(view.getByTestId("first-player-tab").props.accessibilityLabel).toBe(
-      "Roll for who goes first",
-    )
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Roll for who goes first")
   })
-
   it("hands a rematch's first choice to the player who lost", () => {
-    const view = renderGame(game(), turnsOff())
+    const repository = turnsOff()
+    const view = renderGame(game(), repository)
+    layoutSeats(view)
     fireEvent.press(view.getByTestId("life-seat-1-1"))
-    expect(view.queryByTestId("first-player-tab")).toBeNull()
+    act(() => repository.saveFirstPlayerMode(undefined, "roll"))
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("end-game-button"))
     fireEvent.press(view.getByTestId("end-game-winner-0"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     layoutSeats(view)
 
-    const badge = view.getByTestId("first-player-tab")
-    expect(badge.props.accessibilityLabel).toBe("Grace lost the last game. Choose who goes first")
-
-    fireEvent.press(badge)
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
     fireEvent.press(view.getByTestId("dice-go-first"))
     expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
   })
 
+  it("withdraws the loser's choice when setup turns first player off", () => {
+    const repository = turnsOff()
+    const view = renderGame(game(), repository)
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    act(() => repository.saveFirstPlayerMode(undefined, "roll"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    layoutSeats(view)
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
+
+    act(() => repository.saveFirstPlayerMode(undefined, "off"))
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+  })
+
+  it("leaves a rematch alone when setup turns first player off", () => {
+    const view = renderGame(game(), turnsOff())
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    layoutSeats(view)
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
+  })
   it("offers Connect instead of End on a fresh board", () => {
     const view = render(
       <ThemeProvider initialContext="light">

@@ -32,22 +32,22 @@ describe("CurrentGameScreen round clock", () => {
   it("shows the clock to both ends of the table and walks the end-of-round turns", () => {
     const { view, repository, game } = mountTimedGame()
     expect(repository.loadActiveGame()?.clock).toEqual(game.clock)
-    expect(view.getByTestId("match-context")).toHaveTextContent(/^\d+:\d{2}$/)
+    expect(view.getByTestId("round-clock-tab")).toHaveTextContent(/^\d+:\d{2}$/)
     expect(
-      view.getByTestId("match-context-top", { includeHiddenElements: true }),
+      view.getByTestId("round-clock-tab-mirror", { includeHiddenElements: true }),
     ).toHaveTextContent(/^\d+:\d{2}$/)
 
-    fireEvent.press(view.getByTestId("match-context-button"))
+    fireEvent.press(view.getByTestId("round-clock-tab"))
     fireEvent.press(view.getByTestId("round-clock-call"))
-    expect(view.getByTestId("match-context")).toHaveTextContent("Time · Finish turn")
+    expect(view.getByTestId("round-clock-tab").props.accessibilityLabel).toBe("Finish turn")
 
     fireEvent.press(view.getByTestId("round-clock-next"))
     fireEvent.press(view.getByTestId("round-clock-bonus"))
-    expect(view.getByTestId("match-context")).toHaveTextContent("Time · Turn 1 of 7")
+    expect(view.getByTestId("round-clock-tab").props.accessibilityLabel).toBe("Turn 1 of 7")
     expect(repository.loadActiveGame()?.clock).toMatchObject({ turn: 1, bonusTurns: 2 })
 
     fireEvent.press(view.getByTestId("round-clock-off"))
-    expect(view.queryByTestId("match-context")).toBeNull()
+    expect(view.queryByTestId("round-clock-tab")).toBeNull()
     expect(repository.loadActiveGame()?.clock).toBeUndefined()
   })
 })

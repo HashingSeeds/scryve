@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
-import type { FirstPlayerOffer } from "@/components/FirstPlayerTabs"
 import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
 import { SeatArrangement } from "@/components/SeatArrangement"
@@ -17,7 +16,12 @@ import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import type { AttackChange } from "@/features/game/commanderAttack"
-import { CLAIM_CHIP, systemDice, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
+import {
+  CLAIM_CHIP,
+  type DiceSeatChip,
+  type DiceSeatView,
+  type TurnChipState,
+} from "@/features/game/dice"
 import {
   canContinueMatch,
   drawsLabel,
@@ -31,6 +35,7 @@ import {
   matchContextLabel,
   matchScoreAfter,
 } from "@/features/game/domain"
+import { firstPlayerFlips, useFirstPlayerMode } from "@/features/game/FirstPlayerChoice"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import type { BoardSize } from "@/features/game/GameBoardStage"
 import { GameLogDialog } from "@/features/game/GameLogDialog"
@@ -256,6 +261,7 @@ export function CurrentGameScreen({
     if (playBegun) diceGameStarted()
   }, [playBegun, diceGameStarted])
   const firstPlayerUsed = runtime.game.firstPlayerOffered === true
+  const [firstPlayerMode] = useFirstPlayerMode(turnsStore, system)
   const loserSeat = runtime.game.firstChooserSeat
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
   const { ask: diceAsk, die, flip: diceFlip, rollOff: diceRollOff } = dice
@@ -265,42 +271,23 @@ export function CurrentGameScreen({
     (): LifeLogSource => ({ kind: "local", events, ...(teams ? { teams: teams } : {}) }),
     [events, teams],
   )
-  const firstPlayer = useMemo<FirstPlayerOffer | undefined>(() => {
-    if (playBegun || firstPlayerUsed) return undefined
-    const offer = (run: () => void) => () => {
-      markFirstPlayerUsed()
-      run()
-    }
-    if (loser && loserSeat !== undefined)
-      return {
-        glyph: { seatNumber: loserSeat + 1, shape: loser.shape, color: loser.color },
-        accessibilityLabel: translate("board:firstPlayer.loserChooses", { name: loser.name }),
-        onPress: offer(() => diceAsk(loser.id, "loss")),
-      }
-    if (systemDice(system).twoPlayerCoinFlip && playerCount === 2)
-      return {
-        glyph: { tool: "coin" },
-        accessibilityLabel: translate("board:firstPlayer.flip"),
-        onPress: offer(diceFlip),
-      }
-    return {
-      glyph: { tool: die },
-      accessibilityLabel: translate("board:firstPlayer.roll"),
-      onPress: offer(diceRollOff),
-    }
-  }, [
-    diceAsk,
-    diceFlip,
-    die,
-    diceRollOff,
-    firstPlayerUsed,
-    loser,
-    loserSeat,
-    markFirstPlayerUsed,
-    playBegun,
-    playerCount,
-    system,
-  ])
+  const firstPlayerOpen = firstPlayerMode !== "off" && !playBegun && !firstPlayerUsed
+  // why: after a loss the loser picks, whichever way setup settles the first game. Asking again on every open keeps the choice across a reopen.
+  const loserAsk =
+    firstPlayerOpen && loser && dice.grid.seatFor(loser) === undefined ? loser.id : undefined
+  useEffect(() => {
+    if (loserAsk) diceAsk(loserAsk, "loss")
+  }, [diceAsk, loserAsk])
+  const firstPlayerOff = firstPlayerMode === "off" && !firstPlayerUsed
+  useEffect(() => {
+    if (firstPlayerOff) diceGameStarted()
+  }, [diceGameStarted, firstPlayerOff])
+  const firstPlayerOffer: DiceSeatView | undefined =
+    !firstPlayerOpen || loser
+      ? undefined
+      : firstPlayerMode === "pick"
+        ? { kind: "pickOffer" }
+        : { kind: "rollOffer", tool: firstPlayerFlips(system, playerCount) ? "coin" : die }
   const turn = runtime.game.turn
   const active = runtime.game.status === "active"
   const turnsOn = turnsEnabled && active
@@ -386,10 +373,23 @@ export function CurrentGameScreen({
     return { slot: slot === undefined || slot < 0 ? index : slot }
   }
 
-  const claiming = !!firstPlayer || (turnsOn && !turn)
+  const claiming = turnsOn && !turn && !firstPlayerOffer
   const seatGrid = {
     ...dice.grid,
     bag: bagWithPlane(dice.grid.bag, boardModes),
+    seatFor: (player: GamePlayer) => dice.grid.seatFor(player) ?? firstPlayerOffer,
+    onPressSeat: (player: GamePlayer) => {
+      if (!firstPlayerOffer || dice.grid.seatFor(player)) return dice.grid.onPressSeat(player)
+      markFirstPlayerUsed()
+      if (firstPlayerOffer.kind === "rollOffer")
+        return firstPlayerOffer.tool === "coin" ? diceFlip() : diceRollOff()
+      if (turnsOn && !turn) setTurn(player.id, player.id)
+      dice.grid.onPressChip(player, CLAIM_CHIP)
+    },
+    onChoose: (player: GamePlayer, order: "first" | "second") => {
+      markFirstPlayerUsed()
+      dice.grid.onChoose(player, order)
+    },
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
@@ -500,7 +500,6 @@ export function CurrentGameScreen({
         <GameBoard
           chrome={chrome}
           onBoardSizeChange={setBoardSize}
-          firstPlayer={firstPlayer}
           roundClock={clock && active ? { clock, system, onPress: openClock } : undefined}
           turns={
             turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
@@ -567,7 +566,7 @@ export function CurrentGameScreen({
           )}
         />
       </LifeLogContext.Provider>
-      {(match || (clock && firstPlayer)) && !menuOpen ? (
+      {match && !menuOpen ? (
         <BoardContextLabels
           match={
             match && matchLine
@@ -580,7 +579,6 @@ export function CurrentGameScreen({
                 }
               : undefined
           }
-          clock={firstPlayer ? clock : undefined}
           system={system}
           top={insets.top}
           bottom={insets.bottom}

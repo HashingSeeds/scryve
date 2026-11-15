@@ -12,7 +12,7 @@ import type {
   LifeCardMenuEdge,
 } from "./playerCardTypes"
 
-export const FIRST_PLAYER_TAB = { length: 52, depth: 40 } as const
+export const EDGE_TAB = { length: 52, depth: 40 } as const
 
 export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
   0: { top: "top", right: "right", bottom: "bottom", left: "left" },
@@ -443,9 +443,9 @@ function seatTabCorners(
     .flatMap((side) =>
       [bottom, top].flatMap((rowEdge): LifeCardCorner[] =>
         rowEdge === seam
-          ? [{ edge: side, side: seam, size: FIRST_PLAYER_TAB.depth }]
+          ? [{ edge: side, side: seam, size: EDGE_TAB.depth }]
           : rowEdge === side
-            ? [{ edge: seam, side, size: FIRST_PLAYER_TAB.length / 2 }]
+            ? [{ edge: seam, side, size: EDGE_TAB.length / 2 }]
             : [],
       ),
     )

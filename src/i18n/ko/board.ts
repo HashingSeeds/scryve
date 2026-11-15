@@ -92,10 +92,12 @@ export default {
     nextGame: "다음 게임",
   },
   firstPlayer: {
-    loserChooses: "{{name}}님이 지난 게임에서 패배했습니다. 선공을 정하세요",
     flip: "코인을 던져 선공 정하기",
     roll: "주사위를 굴려 선공 정하기",
     claim: "{{name}} 님을 선공으로 표시하세요",
+    rollPrompt: "선공 정하기",
+    flipPrompt: "동전 던지기",
+    pickPrompt: "누가 선공입니까?",
   },
   layout: {
     balanced: "균형",

@@ -94,10 +94,12 @@ export default {
     nextGame: "Siguiente partida",
   },
   firstPlayer: {
-    loserChooses: "{{name}} perdió la última partida. Elige quién juega primero",
     flip: "Lanzar moneda para decidir quién juega primero",
     roll: "Tirar dado para decidir quién juega primero",
     claim: "Marcar a {{name}} como quien juega primero",
+    rollPrompt: "Tira para ver quién juega primero",
+    flipPrompt: "Lanza para ver quién juega primero",
+    pickPrompt: "¿Juega primero?",
   },
   layout: {
     balanced: "Equilibrado",

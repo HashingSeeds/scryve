@@ -94,10 +94,12 @@ export default {
     nextGame: "Partie suivante",
   },
   firstPlayer: {
-    loserChooses: "{{name}} a perdu la dernière partie. Choisissez qui joue en premier",
     flip: "Pile ou face pour jouer en premier",
     roll: "Lancer pour jouer en premier",
     claim: "Désigner {{name}} comme premier joueur",
+    rollPrompt: "Tirer au sort le premier joueur",
+    flipPrompt: "Pile ou face pour commencer",
+    pickPrompt: "Qui commence ?",
   },
   layout: {
     balanced: "Équilibrée",

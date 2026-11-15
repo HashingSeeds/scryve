@@ -54,6 +54,8 @@ export type DiceSeatView =
   | { kind: "flip" }
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
+  | { kind: "rollOffer"; tool: Die | "coin" }
+  | { kind: "pickOffer" }
 
 export interface TurnChipState {
   turn: Turn
@@ -76,6 +78,9 @@ export type DiceSeatChip =
   | { kind: "undoPass"; onUndo: () => void }
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
+
+export const FIRST_PLAYER_MODES = ["off", "roll", "pick"] as const
+export type FirstPlayerMode = (typeof FIRST_PLAYER_MODES)[number]
 
 export const EMPTY_DICE: DiceState = { results: {}, first: null }
 export const DIE_SIDES: Record<BagDie, number> = {

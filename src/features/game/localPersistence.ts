@@ -3,6 +3,7 @@ import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { storage as mmkvStorage } from "@/utils/storage"
 import { recordReviewCompletion } from "@/utils/storeReview"
 
+import type { FirstPlayerMode } from "./dice"
 import {
   accountForSystem,
   asActorId,
@@ -111,6 +112,7 @@ export interface LocalSettings {
   syncStats?: boolean
   turnTab?: true
   chessMinutes?: ChessBankMinutes
+  firstPlayer?: Partial<Record<string, Exclude<FirstPlayerMode, "off">>>
 }
 
 export const COMMANDER_SEATS = 4
@@ -629,8 +631,21 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(typeof migrated.syncStats === "boolean" ? { syncStats: migrated.syncStats } : {}),
     ...(migrated.turnTab === true ? { turnTab: true } : {}),
     ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
+    ...parseFirstPlayerModes(migrated.firstPlayer),
   }
 }
+
+function parseFirstPlayerModes(value: unknown): Pick<LocalSettings, "firstPlayer"> {
+  if (!isRecord(value)) return {}
+  const modes = Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, "roll" | "pick"] => entry[1] === "roll" || entry[1] === "pick",
+    ),
+  )
+  return Object.keys(modes).length > 0 ? { firstPlayer: modes } : {}
+}
+
+const firstPlayerKey = (system: string | undefined) => system ?? "none"
 
 // why: Brawl preferences saved before Brawl had its own default stored Magic's 20, which would otherwise read as a custom value and stop following format changes.
 function migrateBrawlStartingLife(settings: LocalSettings): LocalSettings {
@@ -862,6 +877,17 @@ export class LocalGameRepository {
   saveChessMinutes(minutes: ChessBankMinutes | undefined): void {
     const { chessMinutes: _chessMinutes, ...rest } = this.loadSettings()
     this.saveSettings({ ...rest, ...(minutes ? { chessMinutes: minutes } : {}) })
+  }
+
+  firstPlayerMode(system: string | undefined): FirstPlayerMode {
+    return this.loadSettings().firstPlayer?.[firstPlayerKey(system)] ?? "off"
+  }
+
+  saveFirstPlayerMode(system: string | undefined, mode: FirstPlayerMode): void {
+    const { firstPlayer, ...rest } = this.loadSettings()
+    const { [firstPlayerKey(system)]: _previous, ...others } = firstPlayer ?? {}
+    const modes = mode === "off" ? others : { ...others, [firstPlayerKey(system)]: mode }
+    this.saveSettings({ ...rest, ...(Object.keys(modes).length > 0 ? { firstPlayer: modes } : {}) })
   }
 
   passLabelShown(): boolean {

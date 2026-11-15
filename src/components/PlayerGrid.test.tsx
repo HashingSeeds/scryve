@@ -12,7 +12,7 @@ import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
-import { FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
+import { EdgeTabsShownContext } from "./EdgeTabs"
 import { LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import {
@@ -35,7 +35,7 @@ import {
   PlayerGrid,
   type PlayerGridProps,
 } from "./PlayerGrid"
-import { FIRST_PLAYER_TAB } from "./playerGridGeometry"
+import { EDGE_TAB } from "./playerGridGeometry"
 import type { OutState } from "../../convex/lib/outReason"
 import { EMPTY_TABLE, type TableState } from "../../convex/lib/table"
 import { teamTableRules } from "../../convex/lib/twoHeadedGiant"
@@ -818,9 +818,9 @@ describe("PlayerGrid", () => {
   it("steps a seat's mark past the first-player tab beside it while the tabs show", () => {
     const grid = (tabsShown: boolean) => (
       <ThemeProvider initialContext="dark">
-        <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+        <EdgeTabsShownContext.Provider value={tabsShown}>
           <PlayerGrid players={players(4)} onChange={jest.fn()} />
-        </FirstPlayerTabsShownContext.Provider>
+        </EdgeTabsShownContext.Provider>
       </ThemeProvider>
     )
     const view = render(grid(false))
@@ -830,7 +830,7 @@ describe("PlayerGrid", () => {
     const resting = markFromSeam()
 
     view.rerender(grid(true))
-    expect(markFromSeam()).toBe(resting + FIRST_PLAYER_TAB.length / 2)
+    expect(markFromSeam()).toBe(resting + EDGE_TAB.length / 2)
     view.rerender(grid(false))
     expect(markFromSeam()).toBe(resting)
   })
@@ -839,7 +839,7 @@ describe("PlayerGrid", () => {
     const seats = players(6)
     const grid = (tabsShown: boolean) => (
       <ThemeProvider initialContext="dark">
-        <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+        <EdgeTabsShownContext.Provider value={tabsShown}>
           <PlayerGrid
             players={seats}
             teams={[
@@ -849,7 +849,7 @@ describe("PlayerGrid", () => {
             ]}
             onChange={jest.fn()}
           />
-        </FirstPlayerTabsShownContext.Provider>
+        </EdgeTabsShownContext.Provider>
       </ThemeProvider>
     )
     const view = render(grid(false))
@@ -863,7 +863,7 @@ describe("PlayerGrid", () => {
     const resting = fromSides()
 
     view.rerender(grid(true))
-    expect(fromSides()).toEqual(resting.map((offset) => offset + FIRST_PLAYER_TAB.depth))
+    expect(fromSides()).toEqual(resting.map((offset) => offset + EDGE_TAB.depth))
   })
 
   it("squares only the corners that meet the device's rounded screen corners", () => {

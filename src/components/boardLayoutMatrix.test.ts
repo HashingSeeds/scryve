@@ -15,7 +15,7 @@ import {
 import {
   boardInsetsFor,
   CONTENT_EDGES,
-  FIRST_PLAYER_TAB,
+  EDGE_TAB,
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   seatFrames,
@@ -195,13 +195,13 @@ function boardObstacles(
       : []),
     ...(tabsAt === null
       ? []
-      : [0, board.width - FIRST_PLAYER_TAB.depth].map((x) => ({
+      : [0, board.width - EDGE_TAB.depth].map((x) => ({
           what: "first-player tab",
           rect: {
             x,
-            y: tabsAt - FIRST_PLAYER_TAB.length / 2,
-            width: FIRST_PLAYER_TAB.depth,
-            height: FIRST_PLAYER_TAB.length,
+            y: tabsAt - EDGE_TAB.length / 2,
+            width: EDGE_TAB.depth,
+            height: EDGE_TAB.length,
           },
         }))),
     {

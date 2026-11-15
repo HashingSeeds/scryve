@@ -93,10 +93,12 @@ export default {
     nextGame: "次のゲーム",
   },
   firstPlayer: {
-    loserChooses: "{{name}}さんが前のゲームに負けました。先攻を選んでください",
     flip: "コイントスで先攻を決める",
     roll: "ダイスで先攻を決める",
     claim: "{{name}}を先攻にする",
+    rollPrompt: "先攻を決める",
+    flipPrompt: "コインで先攻を決める",
+    pickPrompt: "先攻はどっち?",
   },
   layout: {
     balanced: "バランス",

@@ -27,6 +27,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { DieFace } from "./DiceGlyph"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { Text } from "./Text"
 
@@ -119,6 +120,13 @@ function Bloom({
     covers && !scrim && { backgroundColor: color },
     scrim && themed($scrim),
   ]
+  const frame =
+    view?.kind === "pickOffer" ? (
+      <View
+        pointerEvents="none"
+        style={[themed(compact ? $compactFrame : $frame), { borderColor: foreground }]}
+      />
+    ) : null
   const content =
     view && covers && !scrim ? (
       <View style={[themed($content), rotationStyle, dim && $dim]}>
@@ -153,6 +161,7 @@ function Bloom({
           onPress={dice.onPress}
           style={overlayStyle}
         >
+          {frame}
           {content}
         </BoardPressable>
       )}
@@ -308,6 +317,26 @@ function Result({
       </>
     )
   if (view.kind === "waiting") return null
+  if (view.kind === "rollOffer")
+    return (
+      <>
+        <DieFace tool={view.tool} size={compact ? 40 : 56} color={foreground} />
+        {label(
+          translate(
+            view.tool === "coin" ? "board:firstPlayer.flipPrompt" : "board:firstPlayer.rollPrompt",
+          ),
+        )}
+      </>
+    )
+  if (view.kind === "pickOffer")
+    return (
+      <Text
+        text={translate("board:firstPlayer.pickPrompt")}
+        weight="bold"
+        maxFontSizeMultiplier={1.2}
+        style={[themed($compactHeadline), text]}
+      />
+    )
   if (view.kind === "flip")
     return (
       <>
@@ -370,10 +399,14 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView) {
   if (view?.kind === "flip") return translate("board:dice.flippingForFirst")
   if (view?.kind === "first")
     return translate(`board:dice.firstLabel.${view.status}`, { name: playerName })
+  if (view?.kind === "rollOffer")
+    return translate(view.tool === "coin" ? "board:firstPlayer.flip" : "board:firstPlayer.roll")
+  if (view?.kind === "pickOffer") return translate("board:firstPlayer.claim", { name: playerName })
   return undefined
 }
 
 function hint(view: DiceSeatView) {
+  if (view.kind === "rollOffer" || view.kind === "pickOffer") return undefined
   return view.kind === "first" ||
     (view.kind === "rolloff" && (view.status === "won" || view.status === "lost"))
     ? translate("board:menu.closeDice")
@@ -399,6 +432,20 @@ const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxxs,
+})
+const $frame: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+  ...StyleSheet.absoluteFill,
+  margin: spacing.sm,
+  borderRadius: radius.xxl,
+  borderWidth: 2,
+  borderStyle: "dashed",
+})
+const $compactFrame: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+  ...StyleSheet.absoluteFill,
+  margin: spacing.xs,
+  borderRadius: radius.xl,
+  borderWidth: 2,
+  borderStyle: "dashed",
 })
 const $dim: ViewStyle = { opacity: 0.45 }
 const $value: ThemedStyle<TextStyle> = () => ({ fontSize: 64, lineHeight: 70 })
