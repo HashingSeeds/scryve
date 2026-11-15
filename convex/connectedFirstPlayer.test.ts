@@ -41,7 +41,10 @@ async function start(host: Awaited<ReturnType<typeof signedIn>>) {
 
 describe("first player in a cloud game", () => {
   beforeEach(() => jest.useFakeTimers())
-  afterEach(() => jest.useRealTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
 
   it("rolls once for every device, and the first roll stands", async () => {
     const t = makeConvexTest()
@@ -123,7 +126,10 @@ describe("first player in a cloud game", () => {
 
 describe("mulligans in a cloud game", () => {
   beforeEach(() => jest.useFakeTimers())
-  afterEach(() => jest.useRealTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
 
   it("keeps the seat owner's mulligans once and records the kept hand on their deck", async () => {
     const t = makeConvexTest()
