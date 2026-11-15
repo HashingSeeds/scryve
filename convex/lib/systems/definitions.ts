@@ -204,6 +204,7 @@ export type SystemDefinition = {
   readonly variantGoals?: { readonly [Variant in GameVariant]?: CounterGoal }
   readonly planechase?: true
   readonly firstPlayer: FirstPlayerDefinition
+  readonly mulligan?: { readonly handSize: number }
   readonly roundClock: RoundClockDefinition
   readonly deckAnalysis: boolean
   readonly resultTracking: boolean
@@ -374,6 +375,7 @@ export const SYSTEMS = {
     variants: ["treachery", "archenemy", "twoHeadedGiant"],
     planechase: true,
     firstPlayer: { die: "d20", winnerChooses: false, twoPlayerCoinFlip: false },
+    mulligan: { handSize: 7 },
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },
     deckAnalysis: true,
     resultTracking: true,

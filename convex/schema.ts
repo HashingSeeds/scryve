@@ -6,6 +6,7 @@ import { eventClock, eventPoints, eventTableResult } from "./lib/events/validato
 import { feedbackFix, feedbackKind } from "./lib/feedback"
 import { lifeEditingValidator } from "./lib/gameRules"
 import { playerGridLayoutValidator } from "./lib/layouts"
+import { freeMulligansValidator } from "./lib/mulligans"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { customCounterValidator, pokemonBoardValidator } from "./lib/table"
 import { modeSetupValidator, tableModesValidator } from "./lib/tableModes"
@@ -149,6 +150,7 @@ export default defineSchema({
     turnGroups: v.optional(turnGroupsValidator),
     modeSetup: v.optional(modeSetupValidator),
     modes: v.optional(tableModesValidator),
+    freeMulligans: v.optional(freeMulligansValidator),
   })
     .index("by_public_id", ["publicId"])
     .index("by_host_status", ["hostUserId", "status"])
@@ -198,6 +200,7 @@ export default defineSchema({
     role: v.optional(treacheryRoleValidator),
     roleRevealed: v.optional(v.boolean()),
     seatPassHash: v.optional(v.string()),
+    mulligans: v.optional(v.number()),
   })
     .index("by_game", ["gameId"])
     .index("by_game_seat", ["gameId", "seat"])
@@ -343,8 +346,10 @@ export default defineSchema({
         shape: v.optional(v.string()),
         finalLife: v.number(),
         deletedAt: v.optional(v.number()),
+        mulligans: v.optional(v.number()),
       }),
     ),
+    freeMulligans: v.optional(freeMulligansValidator),
     resultKind: v.optional(v.union(v.literal("win"), v.literal("draw"), v.literal("unknown"))),
     winnerPlayerIds: v.optional(v.array(v.id("gamePlayers"))),
     matchId: v.optional(v.id("matches")),
@@ -653,6 +658,8 @@ export default defineSchema({
 
   deckResults: defineTable({
     wentFirst: v.optional(v.boolean()),
+    mulligans: v.optional(v.number()),
+    keptHand: v.optional(v.number()),
     resultId: v.string(),
     userId: v.id("users"),
     deckKey: v.optional(v.string()),

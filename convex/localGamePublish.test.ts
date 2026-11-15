@@ -291,3 +291,56 @@ it("keeps a game whose first player is outside it, without a first player", asyn
   expect(summary).not.toBeNull()
   expect(summary!.firstPlayerId).toBeUndefined()
 })
+
+it.each([
+  ["first", 2, 6],
+  ["none", 2, 5],
+  ["all", 3, 7],
+] as const)(
+  "records the deck seat's mulligans under the %s-free rule (%i taken, kept %i)",
+  async (freeMulligans, mulligans, keptHand) => {
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
+    const args = finishedGame({ freeMulligans })
+    args.players[0] = { ...args.players[0], me: true, deckKey: "burn", mulligans }
+    args.players[1] = { ...args.players[1], mulligans: 1 }
+    const ack = await owner.mutation(api.games.publishFinishedLocalGame, args)
+    await t.run(async (ctx) => {
+      const summary = (await ctx.db.get(ack.summaryId))!
+      expect(summary.freeMulligans).toBe(freeMulligans)
+      expect(summary.players.map((player) => player.mulligans)).toEqual([mulligans, undefined])
+      expect(await ctx.db.query("deckResults").collect()).toEqual([
+        expect.objectContaining({ mulligans, keptHand }),
+      ])
+    })
+  },
+)
+
+it.each([
+  ["no free rule", finishedGame(), 1],
+  ["more mulligans than cards", finishedGame({ freeMulligans: "none" }), 8],
+  [
+    "a game without mulligans",
+    finishedGame({
+      system: "pokemon",
+      format: "standard",
+      ruleset: "standard",
+      startingLife: 6,
+      freeMulligans: "none",
+    }),
+    1,
+  ],
+] as const)("drops mulligans sent with %s", async (_, base, mulligans) => {
+  const t = makeConvexTest()
+  const owner = await signedIn(t, "owner", "Owner")
+  const args = { ...base, players: [...base.players] }
+  args.players[0] = { ...args.players[0], me: true, deckKey: "burn", mulligans }
+  const ack = await owner.mutation(api.games.publishFinishedLocalGame, args)
+  await t.run(async (ctx) => {
+    const summary = (await ctx.db.get(ack.summaryId))!
+    expect(summary.freeMulligans).toBeUndefined()
+    expect(summary.players[0].mulligans).toBeUndefined()
+    const [result] = await ctx.db.query("deckResults").collect()
+    expect(result?.mulligans).toBeUndefined()
+  })
+})

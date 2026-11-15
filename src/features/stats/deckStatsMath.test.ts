@@ -15,6 +15,8 @@ const slice = (overrides: Partial<StatsSlice> = {}): StatsSlice => ({
   fingerprint: "a",
   podSize: 4,
   wentFirst: null,
+  keptHand: null,
+  mulligans: null,
   games: 8,
   wins: 4,
   losses: 4,
