@@ -77,7 +77,7 @@ import { localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
 import { formatList, joinParts } from "@/i18n/format"
-import { translate } from "@/i18n/translate"
+import { translate, translateForStorage } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -1465,7 +1465,11 @@ function DeckDetailContent({
         }
         rename={
           activeVersionSummary && {
-            name: deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber),
+            name: deckVersionLabel(
+              activeVersionSummary,
+              activeVersionSummary.versionNumber,
+              translateForStorage,
+            ),
             note: activeVersionSummary.note ?? "",
             notesLocked: !view.premium,
           }

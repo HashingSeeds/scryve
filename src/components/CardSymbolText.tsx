@@ -96,11 +96,13 @@ const RIFTBOUND_DOMAINS: Partial<Record<string, Coin>> = {
   order: { fill: "#F2C94C", face: "sun" },
 }
 
+const coinAmount = (text: string) => (/^\d+$/.test(text) ? Number(text) : text)
+
 function riftboundSymbol(token: string): CardSymbol | undefined {
   if (isCoinText(token))
     return {
       layers: coinLayers({ fill: GENERIC_FILL, face: token }),
-      label: translate("decks:cardSymbols.energyAmount", { amount: token }),
+      label: translate("decks:cardSymbols.energyAmount", { amount: coinAmount(token) }),
     }
   if (token === "might")
     return { layers: line("sword", "#E8743B"), label: translate("decks:cardSymbols.might") }
@@ -129,7 +131,7 @@ function magicMana(part: string): { coin: Coin; label: string } | undefined {
   if (isCoinText(part)) {
     return {
       coin: { fill: GENERIC_FILL, face: part },
-      label: translate("decks:cardSymbols.generic", { amount: part }),
+      label: translate("decks:cardSymbols.generic", { amount: coinAmount(part) }),
     }
   }
   const symbol = MAGIC_SYMBOLS[part]

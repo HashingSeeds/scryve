@@ -1,5 +1,4 @@
 import systems from "@/i18n/en/systems"
-import { formatOrMore } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import { deckFormatLabel, deckFormats, deckSections } from "../../../convex/lib/deckGames"
@@ -233,17 +232,17 @@ export function localizedDeckSections(game: string, format: string): readonly De
   return sections
 }
 
-const BLURB_VALUES: Partial<Record<string, () => Record<string, number | string>>> = {
-  "mtg.commander": () => ({ cards: 100 }),
-  "mtg.brawl": () => ({ cards: 60 }),
-  "fab.cc": () => ({ cards: formatOrMore(60), copies: 3 }),
-  "fab.blitz": () => ({ cards: 40 }),
-  "riftbound.constructed": () => ({ cards: 40, copies: 3 }),
+const BLURB_VALUES: Partial<Record<string, Record<string, number>>> = {
+  "mtg.commander": { cards: 100 },
+  "mtg.brawl": { cards: 60 },
+  "fab.cc": { cards: 60, copies: 3 },
+  "fab.blitz": { cards: 40 },
+  "riftbound.constructed": { cards: 40, copies: 3 },
 }
 
 function formatBlurb(system: PlaySystemId, id: string, blurb: string): string {
   return hasOwnKey(systems.formatBlurb, system) && hasOwnKey(systems.formatBlurb[system], id)
-    ? translate(`systems:formatBlurb.${system}.${id}`, BLURB_VALUES[`${system}.${id}`]?.())
+    ? translate(`systems:formatBlurb.${system}.${id}`, BLURB_VALUES[`${system}.${id}`])
     : blurb
 }
 

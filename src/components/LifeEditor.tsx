@@ -14,7 +14,7 @@ import Animated, {
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
-import { formatSigned } from "@/i18n/format"
+import { formatNumber, formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -196,7 +196,7 @@ export function LifeEditor({
     height: editorHeight,
     compact,
     sourceFontSize,
-    digits: String(life).length,
+    digits: formatNumber(life).length,
     header: headerPosition,
   })
   const valueLineHeight = getLifeLineHeight(valueFontSize)

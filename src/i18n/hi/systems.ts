@@ -87,7 +87,7 @@ export default {
       constructed: "बाकी सब",
     },
     fab: {
-      cc: "{{cards}} कार्ड, {{copies}} कॉपी",
+      cc: "{{cards, orMore}} कार्ड, {{copies}} कॉपी",
       blitz: "यंग हीरो, {{cards}} कार्ड",
       silverAge: "कॉमन और रेयर",
       ll: "लेजेंड की अनुमति",

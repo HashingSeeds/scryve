@@ -1,5 +1,6 @@
 import { i18n } from "@/i18n"
 import { PSEUDO_LOCALE } from "@/i18n/format"
+import { translateForStorage } from "@/i18n/translate"
 
 import { deckVersionLabel, recordSummary, storedVersionName } from "./deckCopy"
 
@@ -22,6 +23,7 @@ it("translates only the server's default version name, and saves unnamed version
   try {
     expect(deckVersionLabel({ versionNumber: 3 }, 4)).toBe("\u27e6Version \u0663\u27e7")
     expect(storedVersionName({ versionNumber: 3 }, 4)).toBe("Version 3")
+    expect(deckVersionLabel({ versionNumber: 3 }, 4, translateForStorage)).toBe("Version 3")
   } finally {
     await i18n.changeLanguage("en-US")
   }

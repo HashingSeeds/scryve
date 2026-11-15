@@ -87,7 +87,7 @@ export default {
       constructed: "그 외 전부",
     },
     fab: {
-      cc: "{{cards}}장, 카드당 {{copies}}장까지",
+      cc: "{{cards, orMore}}장, 동일 카드 {{copies}}장까지",
       blitz: "젊은 영웅, {{cards}}장",
       silverAge: "커먼과 레어",
       ll: "레전드 허용",

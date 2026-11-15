@@ -96,7 +96,7 @@ const systems = {
     },
     fab: {
       // {{cards}} is a minimum deck size such as "60+". {{copies}} is the most copies of one card.
-      cc: "{{cards}} cards, {{copies}} copies",
+      cc: "{{cards, orMore}} cards, {{copies}} copies",
       blitz: "Young hero, {{cards}} cards",
       silverAge: "Commons and rares",
       ll: "Legends allowed",

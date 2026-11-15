@@ -42,12 +42,12 @@ export function storedVersionName(
 export function deckVersionLabel(
   version: { name?: string; versionNumber: number },
   latestVersionNumber: number,
+  write = translate,
 ) {
   const name = versionLabel(version, latestVersionNumber)
-  if (name === undefined)
-    return translate("decks:numberedVersion", { number: version.versionNumber })
+  if (name === undefined) return write("decks:numberedVersion", { number: version.versionNumber })
   return name === DEFAULT_VERSION_NAME && version.versionNumber === 1
-    ? translate("decks:currentVersion")
+    ? write("decks:currentVersion")
     : name
 }
 

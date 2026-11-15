@@ -88,7 +88,7 @@ export default {
       constructed: "Tout le reste",
     },
     fab: {
-      cc: "{{cards}} cartes, {{copies}} exemplaires",
+      cc: "{{cards, orMore}} cartes, {{copies}} exemplaires",
       blitz: "Héros jeune, {{cards}} cartes",
       silverAge: "Communes et rares",
       ll: "Légendes autorisées",

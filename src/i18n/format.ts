@@ -168,6 +168,7 @@ export const formatInterpolation: FormatFunction = (value, format) => {
   if (typeof value === "number") {
     if (format === "signed") return isolate(formatSigned(value))
     if (format === "percent") return isolate(formatPercent(value))
+    if (format === "orMore") return isolate(formatOrMore(value))
     return isolate(formatNumber(value))
   }
   if (typeof value === "string") return isolate(value)

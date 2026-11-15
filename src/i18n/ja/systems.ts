@@ -87,7 +87,7 @@ export default {
       constructed: "その他すべて",
     },
     fab: {
-      cc: "{{cards}}枚、同名カード{{copies}}枚まで",
+      cc: "{{cards, orMore}}枚、同名カード{{copies}}枚まで",
       blitz: "若者ヒーロー、{{cards}}枚",
       silverAge: "コモンとレアのみ",
       ll: "リビングレジェンド可",

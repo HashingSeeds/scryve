@@ -59,7 +59,7 @@ import { localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
 import { joinParts } from "@/i18n/format"
-import { translate } from "@/i18n/translate"
+import { translate, translateForStorage } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -606,7 +606,11 @@ export function GuestDeckDetailScreen({
         }
         rename={
           active && {
-            name: deckVersionLabel({ ...active, versionNumber: active.number }, active.number),
+            name: deckVersionLabel(
+              { ...active, versionNumber: active.number },
+              active.number,
+              translateForStorage,
+            ),
             note: active.note ?? "",
             notesLocked: !pro,
           }
