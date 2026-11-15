@@ -60,6 +60,15 @@ export default {
       riftbound: "Mazo principal",
     },
   },
+  cardFilter: {
+    type: "Tipo de carta",
+    supertype: "Supertipo",
+    subtype: "Subtipos",
+    manaValue: "Valor de maná",
+    keyword: "Palabras clave",
+    power: "Fuerza",
+    toughness: "Resistencia",
+  },
   formatBlurb: {
     mtg: {
       commander: "100 cartas, singleton",

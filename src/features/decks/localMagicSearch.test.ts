@@ -1,7 +1,7 @@
 import { cardNameIndex } from "./cardNameMatch"
 import { localMagicSearch, type MagicSearch, parseMagicCards } from "./localMagicSearch"
 
-const card = (name: string, fields: Record<string, string> = {}) => ({
+const card = (name: string, fields: Record<string, unknown> = {}) => ({
   scryfallId: name,
   oracleId: name,
   name,
@@ -33,7 +33,7 @@ const search = (text: string, filters: Partial<MagicSearch> = {}) => {
     commander: false,
     colors: [],
     colorMatch: "exact",
-    keywords: [],
+    filters: {},
     ...filters,
   })
   return found && { named: found.named.map((c) => c.name), found: found.found.map((c) => c.name) }
@@ -80,11 +80,78 @@ test.each([
 
 test("colorless and keyword filters narrow the cards, and one letter beside a filter is dropped", () => {
   expect(search("d", { colors: ["C"] })?.found).toEqual(["Dragon Mirror", "Dragon's Hoard"])
-  expect(search("dragon", { keywords: ["Flying"] })?.found).toEqual([
+  expect(search("dragon", { filters: { keyword: ["Flying"] } })?.found).toEqual([
     "Ancient Copper Dragon",
     "Dragonlord Atarka",
     "Shivan Dragon",
   ])
+})
+
+const typed = parseMagicCards(
+  JSON.stringify({
+    version: "2",
+    cards: [
+      card("Goblin Guide", {
+        typeLine: "Creature — Goblin Scout",
+        manaValue: 1,
+        power: "2",
+        toughness: "2",
+        legalFormats: ["modern", "legacy"],
+      }),
+      card("Grave Titan", {
+        typeLine: "Creature — Giant",
+        manaValue: 6,
+        power: "6",
+        toughness: "6",
+        legalFormats: ["modern"],
+      }),
+      card("Gisela, Blade of Goldnight", {
+        typeLine: "Legendary Creature — Angel",
+        manaValue: 7,
+        power: "5",
+        toughness: "5",
+        legalFormats: ["commander"],
+      }),
+      card("Gitaxian Probe", { typeLine: "Sorcery", manaValue: 1, legalFormats: ["legacy"] }),
+    ],
+  }),
+)
+const searchTyped = (search: Partial<MagicSearch>) =>
+  localMagicSearch(typed, undefined, {
+    text: "",
+    commander: false,
+    colors: [],
+    colorMatch: "exact",
+    filters: {},
+    ...search,
+  })?.found.map((c) => c.name)
+
+test.each<[string, Partial<MagicSearch>, string[]]>([
+  [
+    "creatures or sorceries",
+    { filters: { type: ["Creature", "Sorcery"] } },
+    ["Gisela, Blade of Goldnight", "Gitaxian Probe", "Goblin Guide", "Grave Titan"],
+  ],
+  ["legendary", { filters: { supertype: ["Legendary"] } }, ["Gisela, Blade of Goldnight"]],
+  ["a subtype", { filters: { subtype: ["Goblin"] } }, ["Goblin Guide"]],
+  [
+    "mana value 1 or 7+",
+    { filters: { manaValue: ["1", "7+"] } },
+    ["Gisela, Blade of Goldnight", "Gitaxian Probe", "Goblin Guide"],
+  ],
+  ["power 6 skips cards without power", { filters: { power: ["6"] } }, ["Grave Titan"]],
+  [
+    "toughness 5+",
+    { filters: { toughness: ["5+"] } },
+    ["Gisela, Blade of Goldnight", "Grave Titan"],
+  ],
+  ["legal in Legacy", { text: "g", legalIn: "legacy" }, ["Gitaxian Probe", "Goblin Guide"]],
+])("filters the card file by %s", (_name, search, expected) => {
+  expect(searchTyped(search)).toEqual(expected)
+})
+
+test("a card file without legal formats leaves a legality search to Scryfall", () => {
+  expect(search("dragon", { legalIn: "modern" })).toBeUndefined()
 })
 
 test.each([
@@ -103,7 +170,7 @@ test("leaves every search to Scryfall until the card file loads", () => {
       commander: false,
       colors: [],
       colorMatch: "exact",
-      keywords: [],
+      filters: {},
     }),
   ).toBeUndefined()
 })

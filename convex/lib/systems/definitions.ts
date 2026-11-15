@@ -141,6 +141,47 @@ export type RoundClockDefinition = {
   readonly slowPlayTurns?: number
 }
 
+/**
+ * why: a game declares what its card search can filter; the adapter for its card catalog
+ * reads each filter's field from a card and turns picked options into the catalog's query.
+ * `options: "cards"` lists the values cards carry, most common first. An option like "7+"
+ * matches that number or more.
+ */
+export type CardFilterDefinition = {
+  readonly id: string
+  readonly label: string
+  readonly match: "any" | "all"
+  readonly options: readonly string[] | "cards"
+}
+
+const NUMBER_OPTIONS = ["0", "1", "2", "3", "4", "5", "6", "7+"] as const
+
+export const MAGIC_CARD_FILTERS = [
+  {
+    id: "type",
+    label: "Card type",
+    match: "any",
+    options: [
+      "Creature",
+      "Instant",
+      "Sorcery",
+      "Artifact",
+      "Enchantment",
+      "Planeswalker",
+      "Land",
+      "Battle",
+    ],
+  },
+  { id: "supertype", label: "Supertype", match: "all", options: ["Legendary", "Basic", "Snow"] },
+  { id: "subtype", label: "Subtypes", match: "any", options: "cards" },
+  { id: "manaValue", label: "Mana value", match: "any", options: NUMBER_OPTIONS },
+  { id: "keyword", label: "Keywords", match: "all", options: "cards" },
+  { id: "power", label: "Power", match: "any", options: NUMBER_OPTIONS },
+  { id: "toughness", label: "Toughness", match: "any", options: NUMBER_OPTIONS },
+] as const satisfies readonly CardFilterDefinition[]
+
+export type MagicCardFilterId = (typeof MAGIC_CARD_FILTERS)[number]["id"]
+
 export type SystemDefinition = {
   readonly label: string
   readonly shortLabel: string
@@ -158,6 +199,7 @@ export type SystemDefinition = {
   readonly deckAnalysis: boolean
   readonly resultTracking: boolean
   readonly integration: IntegrationDefinition
+  readonly cardFilters?: readonly CardFilterDefinition[]
 }
 
 function available<const Provider extends string>(provider: Provider, note?: string) {
@@ -326,6 +368,7 @@ export const SYSTEMS = {
     roundClock: { minutes: 50, endOfRoundTurns: 5, slowPlayTurns: 2 },
     deckAnalysis: true,
     resultTracking: true,
+    cardFilters: MAGIC_CARD_FILTERS,
     integration: {
       identityNamespace: "scryfall-oracle",
       capabilities: {

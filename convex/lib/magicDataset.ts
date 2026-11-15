@@ -2,7 +2,25 @@ import { type CardReference, normalizeScryfallCard, objectRecord } from "./scryf
 
 export const MAGIC_DATASET_URL = "https://ygo-images.scryve.sow.care/datasets/mtg/cards.json"
 
-export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRulesUpdatedAt">
+/** why: the filter fields live only in the dataset, so Convex's stored card shape is unchanged. */
+export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRulesUpdatedAt"> & {
+  manaValue?: number
+  toughness?: string
+  /** why: absent means a file built before legality shipped, so search asks Scryfall instead of finding no legal cards. */
+  legalFormats?: string[]
+}
+
+/** why: Scryve's Magic formats that Scryfall tracks legality for, under the same ids. */
+export const LEGALITY_FORMATS = [
+  "commander",
+  "standard",
+  "pioneer",
+  "modern",
+  "legacy",
+  "vintage",
+  "pauper",
+  "brawl",
+] as const
 
 export type MagicDataset = { version: string; cards: MagicDatasetCard[] }
 
@@ -90,7 +108,21 @@ export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
     faceDetails,
     ...rest
   } = card
-  return faceDetails === undefined
-    ? rest
-    : { ...rest, faceDetails: faceDetailsWithoutOracleText(faceDetails) }
+  const firstFace = Array.isArray(raw.card_faces) ? objectRecord(raw.card_faces[0]) : null
+  const toughness = [firstFace?.toughness, raw.toughness].find(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  )
+  const legalities = objectRecord(raw.legalities)
+  const legalFormats = LEGALITY_FORMATS.filter(
+    (format) => legalities?.[format] === "legal" || legalities?.[format] === "restricted",
+  )
+  return {
+    ...rest,
+    ...(faceDetails === undefined
+      ? {}
+      : { faceDetails: faceDetailsWithoutOracleText(faceDetails) }),
+    ...(typeof raw.cmc === "number" ? { manaValue: raw.cmc } : {}),
+    ...(toughness ? { toughness } : {}),
+    legalFormats,
+  }
 }

@@ -60,6 +60,15 @@ export default {
       riftbound: "मेन डेक",
     },
   },
+  cardFilter: {
+    type: "कार्ड टाइप",
+    supertype: "सुपरटाइप",
+    subtype: "सबटाइप",
+    manaValue: "मैना वैल्यू",
+    keyword: "कीवर्ड",
+    power: "पावर",
+    toughness: "टफ़नेस",
+  },
   formatBlurb: {
     mtg: {
       commander: "100 कार्ड, सिंगलटन",

@@ -60,6 +60,15 @@ export default {
       riftbound: "메인 덱",
     },
   },
+  cardFilter: {
+    type: "카드 유형",
+    supertype: "상위 유형",
+    subtype: "하위 유형",
+    manaValue: "마나 값",
+    keyword: "키워드",
+    power: "공격력",
+    toughness: "방어력",
+  },
   formatBlurb: {
     mtg: {
       commander: "100장, 싱글턴",
