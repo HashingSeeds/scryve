@@ -51,6 +51,7 @@ import {
 import {
   FirstPlayerChoice,
   FreeMulligansChoice,
+  useFirstPlayerMode,
   useFreeMulligans,
 } from "@/features/game/FirstPlayerChoice"
 import { GameTabs } from "@/features/game/GameTabs"
@@ -63,7 +64,11 @@ import {
 } from "@/features/game/gameTypes"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
-import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
+import {
+  localGameRepository,
+  type LocalGameAccountInput,
+  type LocalSettings,
+} from "@/features/game/localPersistence"
 import {
   defaultConnectedLayout,
   playerGridLayoutForCount,
@@ -601,6 +606,8 @@ function NewGameForm({
     deckLife === undefined &&
     account?.decks === undefined
   const tracksMulligans = !connectedMode && !teamPlay && mulliganHandSize(system) !== undefined
+  const cloudMulligans = cloudMode && !teamPlay && mulliganHandSize(system) !== undefined
+  const [firstPlayerMode] = useFirstPlayerMode(localGameRepository, system)
   const [freeMulligans, setFreeMulligans] = useFreeMulligans(system, format, playerCount)
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
@@ -746,6 +753,8 @@ function NewGameForm({
         ruleset: format ?? NO_PLAY_SYSTEM,
         ...gameSetup,
         ...(matchBestOf ? { matchBestOf } : {}),
+        ...(firstPlayerMode === "off" ? {} : { firstPlayerMode }),
+        ...(cloudMulligans ? { freeMulligans } : {}),
       })
     else await startLocal()
   }
@@ -1134,9 +1143,10 @@ function NewGameForm({
                 />
               ) : null}
               <TurnsChoice />
-              {connectedMode ? null : (
-                <FirstPlayerChoice system={system} playerCount={playerCount} />
-              )}
+              {nearbyMode ? null : <FirstPlayerChoice system={system} playerCount={playerCount} />}
+              {cloudMulligans ? (
+                <FreeMulligansChoice rule={freeMulligans} onChange={setFreeMulligans} />
+              ) : null}
               {planechaseAvailable ? (
                 <ModeSetupFields
                   choices={modeChoices}

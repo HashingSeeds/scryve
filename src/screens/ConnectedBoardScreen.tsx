@@ -71,8 +71,18 @@ import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connecte
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
 import { BoardContextLabels } from "@/features/game/BoardContextLabels"
-import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
+import {
+  CLAIM_CHIP,
+  MULLIGAN_RULE,
+  mulliganStep,
+  systemDice,
+  type DiceSeatChip,
+  type DiceSeatView,
+  type MulliganAction,
+  type TurnChipState,
+} from "@/features/game/dice"
 import { asPlayerId, matchContextLabel } from "@/features/game/domain"
+import { firstPlayerFlips } from "@/features/game/FirstPlayerChoice"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { MatchEndDialog } from "@/features/game/LocalMatchEndDialog"
@@ -121,7 +131,9 @@ import { useStoreReview } from "@/utils/useStoreReview"
 import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
 import { api } from "../../convex/_generated/api"
+import type { Id } from "../../convex/_generated/dataModel"
 import { shownMarkShape } from "../../convex/lib/appearance"
+import { mulliganHandSize } from "../../convex/lib/mulligans"
 import type { SystemId } from "../../convex/lib/systems"
 import { isTeamVariant } from "../../convex/lib/teamVariants"
 import { nextTurnSeat, sharesTurn, turnGroupOf, turnLead } from "../../convex/lib/turns"
@@ -307,6 +319,13 @@ type ConnectedBoardReadyProps = {
   roleRevealOnline: boolean
   turns: boolean
   logFeed?: ConnectedLogFeed
+  pregame?: PregameActions
+}
+
+export interface PregameActions {
+  rollFirst: () => void
+  chooseFirst: (playerId: string) => void
+  keepHand: (seat: number, mulligans: number) => void
 }
 
 type EndMatch = (seats: { seat: number; outcome: MatchSeatOutcome }[]) => Promise<unknown>
@@ -396,6 +415,7 @@ interface ConnectedBoardRuntimeProps {
   onRevealRole?: () => Promise<unknown>
   onEndMatch?: EndMatch
   roleRevealOnline?: boolean
+  pregame?: PregameActions
 }
 
 function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
@@ -403,6 +423,9 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
   const reveal = useMutation(api.games.revealMyRole)
   const leaveGame = useMutation(api.games.leaveMyGame)
   const endMatch = useMutation(api.games.endMatch)
+  const rollFirst = useMutation(api.games.rollFirstPlayer)
+  const chooseFirst = useMutation(api.games.chooseFirstPlayer)
+  const keepHand = useMutation(api.games.keepHand)
   const online = useConvexOnline()
   const { publicId, onLeave } = props
   const onRevealRole = useCallback(
@@ -415,10 +438,23 @@ function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
     removeResumeEntryEverywhere(publicId)
     onLeave?.()
   }, [leaveGame, onLeave, online, publicId])
+  const pregame = useMemo(
+    (): PregameActions => ({
+      rollFirst: () => void rollFirst({ publicId }).catch(() => undefined),
+      chooseFirst: (playerId) =>
+        void chooseFirst({ publicId, playerId: playerId as Id<"gamePlayers"> }).catch(
+          () => undefined,
+        ),
+      keepHand: (seat, mulligans) =>
+        void keepHand({ publicId, seat, mulligans }).catch(() => undefined),
+    }),
+    [chooseFirst, keepHand, publicId, rollFirst],
+  )
   return (
     <ConnectedBoardWithRuntime
       {...props}
       runtime={runtime}
+      pregame={pregame}
       onRevealRole={onRevealRole}
       onEndMatch={(seats) => endMatch({ publicId, seats })}
       roleRevealOnline={online}
@@ -470,6 +506,7 @@ export function ConnectedBoardWithRuntime({
   onRevealRole,
   onEndMatch,
   roleRevealOnline = false,
+  pregame,
   runtime,
   peerLatency,
 }: ConnectedBoardRuntimeProps & {
@@ -671,6 +708,7 @@ export function ConnectedBoardWithRuntime({
                 roleRevealOnline={roleRevealOnline}
                 turns={turns}
                 logFeed={logFeed}
+                pregame={pregame}
               />
             </ConnectedLogContext.Provider>
             <SyncStatsOverlay latency={runtime.latency} peers={peerLatency} />
@@ -707,6 +745,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   roleRevealOnline,
   turns,
   logFeed,
+  pregame,
 }: ConnectedBoardReadyProps) {
   const {
     themed,
@@ -1160,9 +1199,103 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
+  const handSize = mulliganHandSize(system)
+  const { firstPlayer } = game
+  const firstPlayerId = firstPlayer?.playerId
+  const pregameOpen = active && !game.played && pregame !== undefined
+  const chooser = pregameOpen && !firstPlayerId ? firstPlayer?.chooser : undefined
+  const seatsInOrder = [...game.players].sort((left, right) => left.seat - right.seat)
+  const firstPlayerOffer: DiceSeatView | undefined =
+    pregameOpen && firstPlayer?.mode && !firstPlayerId && !chooser
+      ? firstPlayer.mode === "pick"
+        ? { kind: "pickOffer" }
+        : {
+            kind: "rollOffer",
+            tool: firstPlayerFlips(system, seatsInOrder.length) ? "coin" : systemDice(system).die,
+          }
+      : undefined
+  const rollsShown = useRollsShown(pregameOpen ? firstPlayer?.rolls : undefined)
+  const mulliganSeat =
+    pregameOpen &&
+    game.freeMulligans &&
+    handSize !== undefined &&
+    !isTeamVariant(game.variant) &&
+    !(firstPlayer?.mode && !firstPlayerId)
+      ? seatsInOrder.find(
+          (seat) =>
+            controlled.has(seat.playerId) && seat.deckVersionId && seat.mulligans === undefined,
+        )
+      : undefined
+  const draftKey = `${publicId}:${mulliganSeat?.playerId ?? ""}`
+  const [mulliganDraft, setMulliganDraft] = useState<{
+    key: string
+    taken: number
+    help: boolean
+    skipped: boolean
+  }>()
+  const mulligan =
+    mulliganDraft?.key === draftKey
+      ? mulliganDraft
+      : { key: draftKey, taken: 0, help: false, skipped: false }
+  function pregameView(playerId: string): DiceSeatView | undefined {
+    const rolls = rollsShown ? firstPlayer?.rolls : undefined
+    const rolled = rolls?.[playerId]
+    if (rolled !== undefined) {
+      const winner = firstPlayerId ?? firstPlayer?.chooser?.playerId
+      return {
+        kind: "rolloff",
+        die: systemDice(system).die,
+        value: rolled,
+        attempt: 1,
+        status: playerId !== winner ? "lost" : firstPlayerId ? "won" : "chooses",
+      }
+    }
+    if (firstPlayerOffer) return firstPlayerOffer
+    if (chooser)
+      return chooser.playerId === playerId && controlled.has(playerId)
+        ? { kind: "choice", reason: chooser.reason }
+        : { kind: "waiting" }
+    if (playerId !== mulliganSeat?.playerId || mulligan.skipped || !game.freeMulligans) return
+    return handSize === undefined
+      ? undefined
+      : mulliganStep(mulligan.taken, game.freeMulligans, handSize, mulligan.help)
+  }
+  const autoTurn = useRef<string>(undefined)
+  useEffect(() => {
+    if (!turnsOn || turn || !firstPlayerId || !controlled.has(firstPlayerId)) return
+    if (autoTurn.current === firstPlayerId) return
+    autoTurn.current = firstPlayerId
+    table?.setTurn(firstPlayerId, firstPlayerId)
+  }, [controlled, firstPlayerId, table, turn, turnsOn])
+  const firstPending = !!firstPlayerOffer || !!chooser
   const seatGrid = {
     ...dice.grid,
     bag: bagWithPlane(dice.grid.bag, boardModes),
+    seatFor: (player: GamePlayer) => dice.grid.seatFor(player) ?? pregameView(player.id),
+    onPressSeat: (player: GamePlayer) => {
+      if (!firstPlayerOffer || dice.grid.seatFor(player)) return dice.grid.onPressSeat(player)
+      if (firstPlayerOffer.kind === "rollOffer") return pregame?.rollFirst()
+      pregame?.chooseFirst(player.id)
+    },
+    onChoose: (player: GamePlayer, order: "first" | "second") => {
+      if (!chooser) return dice.grid.onChoose(player, order)
+      const index = seatsInOrder.findIndex((seat) => seat.playerId === player.id)
+      const next = seatsInOrder[(index + 1) % seatsInOrder.length]
+      pregame?.chooseFirst(order === "first" ? player.id : (next?.playerId ?? player.id))
+    },
+    onMulligan: (action: MulliganAction) => {
+      if (action === "keep")
+        return mulliganSeat && pregame?.keepHand(mulliganSeat.seat, mulligan.taken)
+      if (action === "rule") return system && onRules?.(system, MULLIGAN_RULE)
+      setMulliganDraft({
+        ...mulligan,
+        ...(action === "mulligan" && handSize !== undefined
+          ? { taken: Math.min(handSize, mulligan.taken + 1) }
+          : {}),
+        ...(action === "skip" ? { skipped: true } : {}),
+        ...(action === "help" || action === "close" ? { help: action === "help" } : {}),
+      })
+    },
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
@@ -1190,13 +1323,18 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             },
           },
         ]
-      return turnsOn && !turn && controlled.has(player.id) ? [...chips, CLAIM_CHIP] : [...chips]
+      const first: DiceSeatChip[] =
+        pregameOpen && player.id === firstPlayerId && !rollsShown ? [{ kind: "first" }] : []
+      return turnsOn && !turn && !firstPending && controlled.has(player.id)
+        ? [...chips, ...first, CLAIM_CHIP]
+        : [...chips, ...first]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
       if (chip.kind === "claim") {
         if (!turn) table?.setTurn(player.id, player.id)
         return
       }
+      if (chip.kind === "first") return
       dice.grid.onPressChip(player, chip)
     },
   }
@@ -1999,3 +2137,18 @@ const $failure: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   borderColor: colors.error,
   borderRadius: radius.xl,
 })
+
+const ROLLS_SHOWN_MS = 2500
+
+/** why: every device sees the server's roll arrive, and each shows it for a moment before the 1st chip. */
+function useRollsShown(rolls: Readonly<Record<string, number>> | undefined) {
+  const key = rolls ? JSON.stringify(rolls) : undefined
+  const [shown, setShown] = useState<string>()
+  useEffect(() => {
+    if (!key) return
+    setShown(key)
+    const timer = setTimeout(() => setShown(undefined), ROLLS_SHOWN_MS)
+    return () => clearTimeout(timer)
+  }, [key])
+  return key !== undefined && shown === key
+}

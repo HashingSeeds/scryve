@@ -23,6 +23,7 @@ export interface ConnectedBoardView extends Omit<
 > {
   players: ConnectedBoardSeat[]
   finalEventSequence?: number
+  played: boolean
 }
 
 export function connectedBoardView(projection: ConnectedDisplayProjection): ConnectedBoardView {
@@ -39,6 +40,7 @@ export function connectedBoardView(projection: ConnectedDisplayProjection): Conn
       ({ currentLife: _currentLife, pendingDelta: _pendingDelta, ...seat }) => seat,
     ),
     ...(projection.status === "finished" ? { finalEventSequence: eventSequence } : {}),
+    played: eventSequence > 0,
   }
 }
 

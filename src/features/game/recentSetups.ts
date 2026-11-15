@@ -5,6 +5,7 @@ import { isRoundClockSetup } from "./roundClock"
 import { isSystemVisible } from "./systemVisibility"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, type MatchBestOf } from "../../../convex/lib/matchResults"
+import type { FreeMulligans } from "../../../convex/lib/mulligans"
 import { systemDefinition } from "../../../convex/lib/systems"
 import { matchesValidator } from "../../../convex/lib/table"
 import {
@@ -32,6 +33,8 @@ export interface ConnectedSetup {
   layout: PlayerGridLayoutVariant
   lifeStep: number
   matchBestOf?: MatchBestOf
+  firstPlayerMode?: "roll" | "pick"
+  freeMulligans?: FreeMulligans
 }
 
 export type RecentSetup = { savedAt: number } & (
