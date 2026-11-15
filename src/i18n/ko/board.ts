@@ -99,6 +99,23 @@ export default {
     flipPrompt: "동전 던지기",
     pickPrompt: "누가 선공입니까?",
   },
+  mulligan: {
+    keepQuestion: "{{count}}장으로 킵할까요?",
+    freeLine: "무료, {{hand}}장 드로",
+    bottomLine: "{{hand}}장 드로, {{count}}장 바닥",
+    mulligan: "멀리건",
+    keep: "킵",
+    skip: "건너뛰기",
+    help: "멀리건 방법",
+    steps: "덱을 섞고 {{hand}}장을 드로합니다. 멀리건마다 1장을 덱 바닥에 둡니다.",
+    rule: {
+      none: "무료 멀리건 없음",
+      first: "첫 멀리건 무료",
+      all: "모든 멀리건 무료",
+    },
+    fullRule: "전체 규칙",
+    done: "완료",
+  },
   layout: {
     balanced: "균형",
     topFocus: "상단 강조",

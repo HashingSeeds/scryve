@@ -48,7 +48,11 @@ import {
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
-import { FirstPlayerChoice } from "@/features/game/FirstPlayerChoice"
+import {
+  FirstPlayerChoice,
+  FreeMulligansChoice,
+  useFreeMulligans,
+} from "@/features/game/FirstPlayerChoice"
 import { GameTabs } from "@/features/game/GameTabs"
 import {
   gameTypeDetail,
@@ -118,6 +122,7 @@ import {
 } from "../../convex/lib/appearance"
 import { isCommanderFormat } from "../../convex/lib/gameRules"
 import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
+import { mulliganHandSize } from "../../convex/lib/mulligans"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
 import {
   attachesDecks,
@@ -595,6 +600,8 @@ function NewGameForm({
     !deck?.sharedToken &&
     deckLife === undefined &&
     account?.decks === undefined
+  const tracksMulligans = !connectedMode && !teamPlay && mulliganHandSize(system) !== undefined
+  const [freeMulligans, setFreeMulligans] = useFreeMulligans(system, format, playerCount)
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account
@@ -607,11 +614,12 @@ function NewGameForm({
                   deckKey: deck.deckKey,
                   deckFingerprint: deck.deckFingerprint,
                   deckName: deck.name,
+                  ...(tracksMulligans ? { freeMulligans } : {}),
                 }
               : {}),
           }
         : undefined,
-    [account, deck, effectiveMeSeat],
+    [account, deck, effectiveMeSeat, freeMulligans, tracksMulligans],
   )
   // why: decks load after mount, and each step below needs the previous one rendered: the format filters the deck list, and only a claimed seat can hold a deck.
   const wantedDeckId = useRef(initialDeckId)
@@ -1325,6 +1333,17 @@ function NewGameForm({
                       onSelect={(id) => {
                         setEdited(true)
                         void chooseDeck(id)
+                      }}
+                    />
+                  ) : null}
+                  {deck && tracksMulligans && effectiveMeSeat !== undefined ? (
+                    <FreeMulligansChoice
+                      rule={freeMulligans}
+                      onChange={(rule) => {
+                        setEdited(true)
+                        setFreeMulligans(rule)
+                        if (accountInput)
+                          savePlayers(seatAppearances, { ...accountInput, freeMulligans: rule })
                       }}
                     />
                   ) : null}

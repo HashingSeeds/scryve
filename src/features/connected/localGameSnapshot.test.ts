@@ -217,7 +217,7 @@ describe("buildLocalGameSnapshot", () => {
 })
 
 describe("buildFinishedLocalGameSnapshot", () => {
-  it("marks the account's seat and deck and references winners by local id", () => {
+  it("marks the account's seat, deck and mulligans and references winners by local id", () => {
     const game = commanderGame()
     const snapshot = buildFinishedLocalGameSnapshot({
       schemaVersion: 1,
@@ -239,10 +239,13 @@ describe("buildFinishedLocalGameSnapshot", () => {
         deckKey: "key",
         deckFingerprint: `v1:${"b".repeat(64)}`,
         deckName: "Burn",
+        freeMulligans: "first",
+        mulligans: 2,
       },
     })
     expect(snapshot).toMatchObject({
       publicId: game.id,
+      freeMulligans: "first",
       retriesThrottled: true,
       system: "mtg",
       format: "commander",
@@ -265,8 +268,10 @@ describe("buildFinishedLocalGameSnapshot", () => {
       deckKey: "key",
       deckFingerprint: `v1:${"b".repeat(64)}`,
       deckName: "Burn",
+      mulligans: 2,
     })
     expect(snapshot.players[0].deckKey).toBeUndefined()
+    expect(snapshot.players[0].mulligans).toBeUndefined()
     expect(snapshot.players[2].deckVersionId).toBeUndefined()
   })
 

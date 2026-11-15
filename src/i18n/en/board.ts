@@ -92,6 +92,30 @@ const board = {
     // Short, on each player's card before the game: tap the card of the player who goes first.
     pickPrompt: "Going first?",
   },
+  // Magic only. Before the game, on the card of the player whose deck is tracked: they redraw their opening hand (a "mulligan") until they keep one.
+  mulligan: {
+    // A question with two answers below it: "Mulligan" or "Keep". {{count}} is the number of cards they would keep.
+    keepQuestion: "Keep {{count}}?",
+    // Shorthand players say at the table: draw a new hand of {{hand}} cards; this one cost no card.
+    freeLine: "Free, draw {{hand}}",
+    // Shorthand: draw {{hand}} cards, then put {{count}} of them on the bottom of the deck.
+    bottomLine: "Draw {{hand}}, bottom {{count}}",
+    mulligan: "Mulligan",
+    keep: "Keep",
+    // Don't record a mulligan this game.
+    skip: "Skip",
+    help: "How mulligans work",
+    steps: "Shuffle, draw {{hand}}. Bottom 1 card per mulligan.",
+    // The group's house rule, chosen in game setup.
+    rule: {
+      none: "No free mulligans",
+      first: "First mulligan free",
+      all: "Every mulligan free",
+    },
+    // Opens the official rule text.
+    fullRule: "Full rule",
+    done: "Done",
+  },
   layout: {
     balanced: "Balanced",
     topFocus: "Top focus",

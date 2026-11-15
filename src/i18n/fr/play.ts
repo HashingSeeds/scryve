@@ -50,6 +50,12 @@ export default {
     flip: "Pile ou face",
     pick: "Au choix",
   },
+  freeMulligans: {
+    label: "Mulligans gratuits",
+    none: "Aucun",
+    first: "Le premier",
+    all: "Tous",
+  },
   whatYouPlay: {
     heading: "À quoi jouez-vous ?",
     changeLater: "Vous pouvez modifier cela dans les Réglages.",

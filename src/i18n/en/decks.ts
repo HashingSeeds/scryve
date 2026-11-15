@@ -24,6 +24,11 @@ const decks = {
     wentFirst: "Went first",
     notFirst: "Not first",
     turnOrderNotTracked: "Turn order not tracked",
+    // Stats grouped by how many cards the player kept in their opening hand after mulligans.
+    openingHand: "Opening hand",
+    keptHand: "Kept {{count}}",
+    // {{value}} is an average with one decimal, as in "0.4 mulligans per game".
+    mulligansPerGame: "{{value}} mulligans per game",
     podSize: "Pod size",
     sources: "Source",
     current: "Current",

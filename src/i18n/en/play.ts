@@ -53,6 +53,13 @@ const play = {
     // The players agree on who goes first themselves, then tap that player's card.
     pick: "We pick",
   },
+  // Game setup, Magic only, shown under the player's deck: the group's house rule for how many mulligans (redrawing the opening hand) cost no card.
+  freeMulligans: {
+    label: "Free mulligans",
+    none: "None",
+    first: "First",
+    all: "All",
+  },
   whatYouPlay: {
     heading: "What do you play?",
     changeLater: "You can change this in Settings.",

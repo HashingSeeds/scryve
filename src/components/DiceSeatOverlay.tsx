@@ -20,7 +20,9 @@ import {
   type DiceSeatChip,
   type DiceSeatView,
   type DiceTool,
+  type MulliganAction,
 } from "@/features/game/dice"
+import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -38,6 +40,7 @@ export interface LifeCardDice {
   bag?: SeatDiceBag
   onChoose?: (order: "first" | "second") => void
   onPressChip?: (chip: DiceSeatChip) => void
+  onMulligan?: (action: MulliganAction) => void
 }
 
 export interface SeatDiceBag {
@@ -99,7 +102,8 @@ function Bloom({
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
   const animate = reducedMotion === false && !!view && !scrim
-  const interactive = view?.kind !== "waiting" && view?.kind !== "choice"
+  const holdsControls = view?.kind === "choice" || view?.kind === "mulligan"
+  const interactive = view?.kind !== "waiting" && !holdsControls
   const tumble = useTumble(animate ? view : undefined)
 
   const arrive = useSharedValue(animate ? 0 : 1)
@@ -136,7 +140,9 @@ function Bloom({
           foreground={foreground}
           compact={compact}
           tumble={tumble}
+          color={color}
           onChoose={dice.onChoose}
+          onMulligan={dice.onMulligan}
         />
       </View>
     ) : null
@@ -147,7 +153,7 @@ function Bloom({
       pointerEvents="box-none"
       style={[$layer, animate && arriveStyle]}
     >
-      {view?.kind === "choice" ? (
+      {holdsControls ? (
         <View testID={`dice-seat-${seatNumber}`} accessible={false} style={overlayStyle}>
           {content}
         </View>
@@ -232,14 +238,18 @@ function Result({
   foreground,
   compact,
   tumble,
+  color,
   onChoose,
+  onMulligan,
 }: {
   view: DiceSeatView
   playerName: string
   foreground: string
   compact?: boolean
   tumble: Tumble
+  color: string
   onChoose?: (order: "first" | "second") => void
+  onMulligan?: (action: MulliganAction) => void
 }) {
   const { themed } = useAppTheme()
   const text = { color: foreground }
@@ -316,6 +326,16 @@ function Result({
                   : null}
       </>
     )
+  if (view.kind === "mulligan")
+    return (
+      <Mulligan
+        view={view}
+        foreground={foreground}
+        background={color}
+        compact={compact}
+        onAction={onMulligan}
+      />
+    )
   if (view.kind === "waiting") return null
   if (view.kind === "rollOffer")
     return (
@@ -360,6 +380,115 @@ function Result({
     </>
   )
 }
+
+function Mulligan({
+  view,
+  foreground,
+  background,
+  compact,
+  onAction,
+}: {
+  view: Extract<DiceSeatView, { kind: "mulligan" }>
+  foreground: string
+  background: string
+  compact?: boolean
+  onAction?: (action: MulliganAction) => void
+}) {
+  const { themed } = useAppTheme()
+  const text = { color: foreground }
+  const button = (action: MulliganAction, tx: TxKeyPath, filled?: boolean) => (
+    <BoardPressable
+      key={action}
+      testID={`mulligan-${action}`}
+      accessibilityRole="button"
+      accessibilityLabel={translate(tx)}
+      onPress={() => onAction?.(action)}
+      style={({ pressed }) => [
+        themed(compact ? $compactOption : $option),
+        { borderColor: foreground },
+        filled && { backgroundColor: foreground },
+        pressed && $pressed,
+      ]}
+    >
+      <Text
+        tx={tx}
+        weight="bold"
+        size={compact ? "xxs" : "xs"}
+        maxFontSizeMultiplier={1.2}
+        style={{ color: filled ? background : foreground }}
+      />
+    </BoardPressable>
+  )
+  const link = (action: MulliganAction, label: string, a11y?: string) => (
+    <BoardPressable
+      key={action}
+      testID={`mulligan-${action}`}
+      accessibilityRole="button"
+      accessibilityLabel={a11y ?? label}
+      hitSlop={8}
+      onPress={() => onAction?.(action)}
+      style={({ pressed }) => [themed($link), pressed && $pressed]}
+    >
+      <Text text={label} size="xs" maxFontSizeMultiplier={1.2} style={[text, $faint]} />
+    </BoardPressable>
+  )
+  const small = (value: string) => (
+    <Text text={value} size="xs" maxFontSizeMultiplier={1.2} style={[text, $centered]} />
+  )
+  if (view.help)
+    return (
+      <>
+        {small(translate("board:mulligan.steps", { hand: view.handSize }))}
+        <Text
+          text={translate(`board:mulligan.rule.${view.free}`)}
+          weight="bold"
+          size="xs"
+          maxFontSizeMultiplier={1.2}
+          style={text}
+        />
+        <View style={themed($options)}>
+          {link(RULE_LINK.action, translate(RULE_LINK.tx))}
+          {button(DONE_BUTTON.action, DONE_BUTTON.tx)}
+        </View>
+      </>
+    )
+  return (
+    <>
+      <Text
+        text={translate("board:mulligan.keepQuestion", { count: view.keeps })}
+        weight="bold"
+        maxFontSizeMultiplier={1.2}
+        style={[themed($compactHeadline), text]}
+      />
+      {view.last
+        ? small(
+            view.last.free
+              ? translate("board:mulligan.freeLine", { hand: view.handSize })
+              : translate("board:mulligan.bottomLine", {
+                  hand: view.handSize,
+                  count: view.last.bottom,
+                }),
+          )
+        : null}
+      <View style={themed($options)}>
+        {MULLIGAN_BUTTONS.map(({ action, tx, filled }) => button(action, tx, filled))}
+      </View>
+      <View style={themed($options)}>
+        {link(SKIP_LINK.action, translate(SKIP_LINK.tx))}
+        {link(HELP_LINK.action, HELP_LINK.glyph, translate(HELP_LINK.tx))}
+      </View>
+    </>
+  )
+}
+
+const MULLIGAN_BUTTONS = [
+  { action: "mulligan", tx: "board:mulligan.mulligan", filled: false },
+  { action: "keep", tx: "board:mulligan.keep", filled: true },
+] as const
+const DONE_BUTTON = { action: "close", tx: "board:mulligan.done" } as const
+const RULE_LINK = { action: "rule", tx: "board:mulligan.fullRule" } as const
+const SKIP_LINK = { action: "skip", tx: "board:mulligan.skip" } as const
+const HELP_LINK = { action: "help", tx: "board:mulligan.help", glyph: "?" } as const
 
 function FlippingCoin({
   flip,
@@ -472,4 +601,11 @@ const $compactOption: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   justifyContent: "center",
 })
 const $pressed: ViewStyle = { opacity: 0.72 }
+const $link: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 32,
+  paddingHorizontal: spacing.xs,
+  justifyContent: "center",
+})
+const $faint: TextStyle = { opacity: 0.8 }
+const $centered: TextStyle = { textAlign: "center" }
 const $coin: ViewStyle = { borderWidth: 3 }

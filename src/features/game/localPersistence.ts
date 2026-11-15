@@ -57,6 +57,13 @@ import type {
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
+import {
+  defaultFreeMulligans,
+  FREE_MULLIGANS,
+  isMulliganCount,
+  mulliganHandSize,
+  type FreeMulligans,
+} from "../../../convex/lib/mulligans"
 import { MAX_PLAYERS, MIN_PLAYERS, SEATS_BEFORE_CLIENT_LIMIT } from "../../../convex/lib/policy"
 import { isSeatPassHash } from "../../../convex/lib/seatPass"
 import { startingValueRange } from "../../../convex/lib/systems"
@@ -113,6 +120,7 @@ export interface LocalSettings {
   turnTab?: true
   chessMinutes?: ChessBankMinutes
   firstPlayer?: Partial<Record<string, Exclude<FirstPlayerMode, "off">>>
+  freeMulligans?: Partial<Record<string, FreeMulligans>>
 }
 
 export const COMMANDER_SEATS = 4
@@ -369,8 +377,17 @@ function parseAccount(value: unknown, system: unknown): LocalGameAccount | undef
       ? { deckFingerprint: value.deckFingerprint }
       : {}),
     ...(typeof value.deckName === "string" ? { deckName: value.deckName } : {}),
+    ...(isFreeMulligans(value.freeMulligans) ? { freeMulligans: value.freeMulligans } : {}),
+    ...(isFreeMulligans(value.freeMulligans) &&
+    typeof value.mulligans === "number" &&
+    isMulliganCount(value.mulligans, value.freeMulligans, mulliganHandSize(system) ?? 0)
+      ? { mulligans: value.mulligans }
+      : {}),
   })
 }
+
+const isFreeMulligans = (value: unknown): value is FreeMulligans =>
+  FREE_MULLIGANS.some((rule) => rule === value)
 
 const MATCH_OUTCOMES: readonly MatchSeatOutcome[] = ["win", "loss", "draw"]
 
@@ -632,8 +649,22 @@ function parseSettings(value: unknown): LocalSettings | null {
     ...(migrated.turnTab === true ? { turnTab: true } : {}),
     ...(isChessBankMinutes(migrated.chessMinutes) ? { chessMinutes: migrated.chessMinutes } : {}),
     ...parseFirstPlayerModes(migrated.firstPlayer),
+    ...parseFreeMulligans(migrated.freeMulligans),
   }
 }
+
+function parseFreeMulligans(value: unknown): Pick<LocalSettings, "freeMulligans"> {
+  if (!isRecord(value)) return {}
+  const rules = Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, FreeMulligans] =>
+      isFreeMulligans(entry[1]),
+    ),
+  )
+  return Object.keys(rules).length > 0 ? { freeMulligans: rules } : {}
+}
+
+const freeMulligansKey = (system: string | undefined, format: string | undefined) =>
+  `${system ?? "none"}:${format ?? ""}`
 
 function parseFirstPlayerModes(value: unknown): Pick<LocalSettings, "firstPlayer"> {
   if (!isRecord(value)) return {}
@@ -890,6 +921,29 @@ export class LocalGameRepository {
     this.saveSettings({ ...rest, ...(Object.keys(modes).length > 0 ? { firstPlayer: modes } : {}) })
   }
 
+  freeMulligans(
+    system: string | undefined,
+    format: string | undefined,
+    playerCount: number,
+  ): FreeMulligans {
+    return (
+      this.loadSettings().freeMulligans?.[freeMulligansKey(system, format)] ??
+      defaultFreeMulligans(system, format, playerCount)
+    )
+  }
+
+  saveFreeMulligans(
+    system: string | undefined,
+    format: string | undefined,
+    rule: FreeMulligans,
+  ): void {
+    const { freeMulligans, ...rest } = this.loadSettings()
+    this.saveSettings({
+      ...rest,
+      freeMulligans: { ...freeMulligans, [freeMulligansKey(system, format)]: rule },
+    })
+  }
+
   passLabelShown(): boolean {
     return this.turnPasses() < PASS_LABEL_PASSES
   }
@@ -1042,11 +1096,23 @@ export class LocalGameRepository {
       color: color(index),
       shape: players[index].shape,
     }))
+    const nextAccount =
+      account && accountForSystem(game.system, localGameAccount(nextPlayers, account))
+    const kept = game.account?.mulligans
     this.saveActiveGame({
       ...game,
       players: nextPlayers,
-      ...(account
-        ? { account: accountForSystem(game.system, localGameAccount(nextPlayers, account)) }
+      ...(nextAccount
+        ? {
+            account:
+              kept !== undefined &&
+              nextAccount.freeMulligans &&
+              nextAccount.mePlayerId === game.account?.mePlayerId &&
+              nextAccount.deckVersionId === game.account?.deckVersionId &&
+              nextAccount.deckKey === game.account?.deckKey
+                ? { ...nextAccount, mulligans: kept }
+                : nextAccount,
+          }
         : {}),
       updatedAt: Date.now(),
     })

@@ -100,6 +100,23 @@ export default {
     flipPrompt: "コインで先攻を決める",
     pickPrompt: "先攻はどっち?",
   },
+  mulligan: {
+    keepQuestion: "{{count}}枚でキープしますか?",
+    freeLine: "フリー、{{hand}}枚引く",
+    bottomLine: "{{hand}}枚引いて{{count}}枚を下に",
+    mulligan: "マリガン",
+    keep: "キープ",
+    skip: "スキップ",
+    help: "マリガンのルール",
+    steps: "シャッフルして{{hand}}枚引きます。マリガンごとに1枚をライブラリーの下に置きます。",
+    rule: {
+      none: "フリー・マリガンなし",
+      first: "最初のマリガンはフリー",
+      all: "すべてのマリガンがフリー",
+    },
+    fullRule: "ルール全文",
+    done: "完了",
+  },
   layout: {
     balanced: "バランス",
     topFocus: "上重視",

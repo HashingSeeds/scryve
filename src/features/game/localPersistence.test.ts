@@ -427,6 +427,38 @@ describe("LocalGameRepository", () => {
     expect(repository.firstPlayerMode("lorcana")).toBe("pick")
   })
 
+  it("keeps a kept hand through a setup edit to the same seat and deck, and drops it for another deck", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const account = {
+      ownerId: "owner",
+      meSeat: 0,
+      deckKey: "burn",
+      freeMulligans: "first" as const,
+    }
+    const created = createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      account,
+      now: 1,
+    })
+    repository.saveActiveGame({ ...created, account: { ...created.account!, mulligans: 2 } })
+    const players = created.players.map(({ name, color, shape }) => ({ name, color, shape }))
+
+    repository.updateActivePlayers(created.id, players, { ...account, freeMulligans: "all" })
+    expect(repository.loadActiveGame()?.account).toMatchObject({
+      freeMulligans: "all",
+      mulligans: 2,
+    })
+
+    repository.updateActivePlayers(created.id, players, { ...account, deckKey: "elves" })
+    expect(repository.loadActiveGame()?.account?.mulligans).toBeUndefined()
+  })
+
   it("asks what you play only on a fresh install", () => {
     const fresh = new LocalGameRepository(new MemoryStorage())
     expect(fresh.loadSettings().askWhatYouPlay).toBe(true)

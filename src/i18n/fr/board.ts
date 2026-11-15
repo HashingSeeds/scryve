@@ -101,6 +101,23 @@ export default {
     flipPrompt: "Pile ou face pour commencer",
     pickPrompt: "Qui commence ?",
   },
+  mulligan: {
+    keepQuestion: "Garder {{count}} cartes ?",
+    freeLine: "Gratuit, piochez {{hand}}",
+    bottomLine: "Piochez {{hand}}, mettez {{count}} au fond",
+    mulligan: "Mulligan",
+    keep: "Garder",
+    skip: "Passer",
+    help: "Fonctionnement du mulligan",
+    steps: "Mélangez, piochez {{hand}}. Mettez 1 carte au fond par mulligan.",
+    rule: {
+      none: "Aucun mulligan gratuit",
+      first: "Premier mulligan gratuit",
+      all: "Tous les mulligans gratuits",
+    },
+    fullRule: "Règle complète",
+    done: "Terminé",
+  },
   layout: {
     balanced: "Équilibrée",
     topFocus: "Focus haut",

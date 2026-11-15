@@ -20,6 +20,7 @@ import {
   CLAIM_CHIP,
   type DiceSeatChip,
   type DiceSeatView,
+  type MulliganAction,
   type TurnChipState,
 } from "@/features/game/dice"
 import {
@@ -75,6 +76,12 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
 
+import {
+  keptHandSize,
+  maxMulligans,
+  mulliganHandSize,
+  type FreeMulligans,
+} from "../../convex/lib/mulligans"
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
 import { nextTurnSeat, sharesTurn } from "../../convex/lib/turns"
@@ -147,6 +154,12 @@ export function CurrentGameScreen({
   const [chessMinutes] = useChessMinutes(turnsStore)
   const chessAppliedTo = useRef<string>(undefined)
   const [turnOpen, setTurnOpen] = useState(false)
+  const [mulliganDraft, setMulliganDraft] = useState<{
+    gameId: string
+    taken: number
+    help: boolean
+    skipped: boolean
+  }>()
   const [passUndo, setPassUndo] = useState<{ operationId: string; passerId: string }>()
   const [logOpen, setLogOpen] = useState(false)
   const openLog = useCallback(() => setLogOpen(true), [])
@@ -373,11 +386,45 @@ export function CurrentGameScreen({
     return { slot: slot === undefined || slot < 0 ? index : slot }
   }
 
+  const handSize = mulliganHandSize(system)
+  const { account } = runtime.game
+  const mulligan =
+    mulliganDraft?.gameId === runtime.game.id
+      ? mulliganDraft
+      : { gameId: runtime.game.id, taken: 0, help: false, skipped: false }
+  const mulliganSeat =
+    handSize !== undefined &&
+    account?.freeMulligans &&
+    account.mulligans === undefined &&
+    !teams &&
+    !playBegun &&
+    !mulligan.skipped
+      ? account.mePlayerId
+      : undefined
+  const mulliganView: DiceSeatView | undefined =
+    mulliganSeat && handSize !== undefined && account?.freeMulligans
+      ? mulliganStep(mulligan.taken, account.freeMulligans, handSize, mulligan.help)
+      : undefined
   const claiming = turnsOn && !turn && !firstPlayerOffer
   const seatGrid = {
     ...dice.grid,
     bag: bagWithPlane(dice.grid.bag, boardModes),
-    seatFor: (player: GamePlayer) => dice.grid.seatFor(player) ?? firstPlayerOffer,
+    seatFor: (player: GamePlayer) =>
+      dice.grid.seatFor(player) ??
+      firstPlayerOffer ??
+      (player.id === mulliganSeat ? mulliganView : undefined),
+    onMulligan: (action: MulliganAction) => {
+      if (action === "keep") return runtime.keepHand(mulligan.taken)
+      if (action === "rule") return system && onRules?.(system, MULLIGAN_RULE)
+      setMulliganDraft({
+        ...mulligan,
+        ...(action === "mulligan" && handSize !== undefined && account?.freeMulligans
+          ? { taken: Math.min(maxMulligans(account.freeMulligans, handSize), mulligan.taken + 1) }
+          : {}),
+        ...(action === "skip" ? { skipped: true } : {}),
+        ...(action === "help" || action === "close" ? { help: action === "help" } : {}),
+      })
+    },
     onPressSeat: (player: GamePlayer) => {
       if (!firstPlayerOffer || dice.grid.seatFor(player)) return dice.grid.onPressSeat(player)
       markFirstPlayerUsed()
@@ -826,3 +873,25 @@ const $sideboardFirst: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
+
+const MULLIGAN_RULE = "103.5"
+
+function mulliganStep(
+  taken: number,
+  free: FreeMulligans,
+  handSize: number,
+  help: boolean,
+): DiceSeatView {
+  const keeps = keptHandSize(taken, free, handSize)
+  const before = keptHandSize(taken - 1, free, handSize)
+  return {
+    kind: "mulligan",
+    handSize,
+    keeps,
+    free,
+    help,
+    ...(taken > 0
+      ? { last: keeps === before ? { free: true } : { free: false, bottom: handSize - keeps } }
+      : {}),
+  }
+}
