@@ -24,10 +24,11 @@ const TARGETS = {
   "android:production": { profile: "production", output: "android-prod.aab" },
 }
 
-const USAGE = `Usage: pnpm <target> [--build] [--upload] [--nas] [--ship] [--build-path <path>] [--off-main]
+const USAGE = `Usage: pnpm <target> [--build] [--upload] [--nas] [--ship] [--build-path <path>] [--off-main] [--fresh] [--all-archs]
 Targets: ${Object.keys(TARGETS).join(", ")}`
 
 // Reads `<target> [flags]`. No flag builds, --upload (EAS) and --nas (`builds put`) send the artifact after a build only with --build, --ship builds then uploads, --build-path moves the artifact for every step, and --off-main builds a production artifact without a version commit.
+// --fresh and --all-archs turn off the shortcuts a plain development build takes (see localPlan).
 function parseArgs(args) {
   let parsed
   try {
@@ -41,6 +42,8 @@ function parseArgs(args) {
         nas: { type: "boolean" },
         "build-path": { type: "string" },
         "off-main": { type: "boolean" },
+        fresh: { type: "boolean" },
+        "all-archs": { type: "boolean" },
       },
     })
   } catch (error) {
@@ -56,17 +59,65 @@ function parseArgs(args) {
   if (upload && target === "ios:profile")
     throw new Error("ios:profile is not an EAS build, so it cannot --upload. Use --nas.")
   const nas = Boolean(values.nas)
+  // why: a plain development build may hold one architecture (see localPlan), so one that leaves this machine is always rebuilt.
+  const development = TARGETS[target].profile === "development"
   return {
     target,
-    build: Boolean(values.build || values.ship || !(upload || nas)),
+    build: Boolean(values.build || values.ship || development || !(upload || nas)),
     upload,
     nas,
     offMain,
+    fresh: Boolean(values.fresh),
+    allArchs: Boolean(values["all-archs"]),
     // why: pnpm runs scripts from the repo root, so a path typed in a subdirectory resolves against INIT_CWD.
     buildPath: values["build-path"]
       ? path.resolve(process.env.INIT_CWD ?? process.cwd(), values["build-path"])
       : path.join(root, "build", TARGETS[target].output),
   }
+}
+
+// Each build architecture matching the machine's own simulator or emulator.
+const ARCHITECTURES = {
+  arm64: { ios: "arm64", android: "arm64-v8a" },
+  x64: { ios: "x86_64", android: "x86_64" },
+}
+
+// A plain development build stays on this machine, so it first looks for a build `builds` already has
+// with the same fingerprint (--fresh skips that), and otherwise compiles only this machine's
+// architecture, about half the work (--all-archs builds every one, as for a physical Android device).
+// Builds for CI, --nas or --upload reach other machines and keep every architecture.
+// why: eas.json's profile env beats the shell's, so the architecture goes in as a Gradle system
+// property and an xcodebuild argument, which both outrank it.
+function localPlan({ target, upload, nas, fresh, allArchs }, env = process.env, arch = os.arch()) {
+  if (TARGETS[target].profile !== "development" || upload || nas || env.CI) return { reuse: false, env: {} }
+  const [platform] = target.split(":")
+  const name = allArchs ? undefined : ARCHITECTURES[arch]?.[platform]
+  const join = (current, extra) => [current, extra].filter(Boolean).join(" ")
+  const archEnv = !name
+    ? {}
+    : platform === "android"
+      ? { GRADLE_OPTS: join(env.GRADLE_OPTS, `-Dorg.gradle.project.reactNativeArchitectures=${name}`) }
+      : { GYM_XCARGS: join(env.GYM_XCARGS, `ARCHS=${name}`) }
+  return { reuse: !fresh && !allArchs, env: archEnv }
+}
+
+// Copies the build `builds get` finds for the current fingerprint (CI's attested builds of main
+// first, then the NAS) to buildPath. False when `builds` is not installed or finds none.
+function reuseBuild({ target, buildPath }) {
+  const { status, stdout, error } = spawnSync("builds", ["get", ...easArgs(target), "--fingerprint", "current"], {
+    cwd: root,
+    stdio: ["ignore", "pipe", "inherit"],
+    encoding: "utf8",
+  })
+  if (error?.code === "ENOENT") return false
+  if (error || status !== 0) {
+    console.error("Building instead.")
+    return false
+  }
+  const found = stdout.trim().split("\n").at(-1)
+  fs.copyFileSync(found, buildPath)
+  console.log(`Reused ${found} for this fingerprint. Pass --fresh to build anyway.`)
+  return true
 }
 
 function easArgs(target) {
@@ -134,6 +185,8 @@ function main() {
     const offMainVersion = production && options.offMain ? settleOffMainVersion() : undefined
     if (production && !options.offMain) settleVersion()
     fs.mkdirSync(path.dirname(options.buildPath), { recursive: true })
+    const local = localPlan(options)
+    if (local.reuse && reuseBuild(options)) return
     run(buildCommand(options), {
       ...process.env,
       // why: EAS defaults to the OS temp dir, a RAM tmpfs on some Linux machines that a 4 GB build fills or OOMs.
@@ -142,6 +195,7 @@ function main() {
         path.join(os.homedir(), ".cache", "eas-build-local", crypto.randomUUID()),
       ...buildEnv(options),
       ...(offMainVersion ? { SCRYVE_APP_VERSION: offMainVersion } : {}),
+      ...local.env,
     })
   }
   if (options.upload) run(uploadCommand(options), process.env)
@@ -157,4 +211,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { TARGETS, buildCommand, nasCommand, parseArgs, uploadCommand }
+module.exports = { TARGETS, buildCommand, localPlan, nasCommand, parseArgs, uploadCommand }
