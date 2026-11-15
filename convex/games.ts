@@ -2889,7 +2889,7 @@ export const keepHand = mutation({
       !game.freeMulligans ||
       handSize === undefined ||
       !(player.deckVersionId || player.deckKey) ||
-      !isMulliganCount(args.mulligans, handSize)
+      !isMulliganCount(args.mulligans, game.freeMulligans, handSize)
     )
       throw gameWriteError("game_not_active", "This seat doesn't track mulligans")
     if (player.mulligans !== undefined) return
