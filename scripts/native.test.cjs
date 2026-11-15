@@ -2,7 +2,7 @@ const assert = require("node:assert/strict")
 const path = require("node:path")
 const { test } = require("node:test")
 
-const { buildCommand, nasCommand, parseArgs, uploadCommand } = require("./native.cjs")
+const { buildCommand, localPlan, nasCommand, parseArgs, uploadCommand } = require("./native.cjs")
 
 const root = path.join(__dirname, "..")
 
@@ -13,6 +13,8 @@ test("a bare target builds into build/", () => {
     upload: false,
     nas: false,
     offMain: false,
+    fresh: false,
+    allArchs: false,
     buildPath: path.join(root, "build", "ios-preview.ipa"),
   })
 })
@@ -74,4 +76,25 @@ test("ios:profile builds with Xcode under the preview environment and never goes
 test("--off-main is only for production builds", () => {
   assert.equal(parseArgs(["ios:production", "--off-main"]).offMain, true)
   assert.throws(() => parseArgs(["ios:preview", "--off-main"]), /only applies to production/)
+})
+
+test("a plain development build reuses a matching build, else compiles only this machine's architecture", () => {
+  const plan = (args, env = {}, arch = "x64") => localPlan(parseArgs(args), env, arch)
+  assert.deepEqual(plan(["android:development"], { GRADLE_OPTS: "-Xmx1g" }), {
+    reuse: true,
+    env: { GRADLE_OPTS: "-Xmx1g -Dorg.gradle.project.reactNativeArchitectures=x86_64" },
+  })
+  assert.deepEqual(plan(["ios:development:sim", "--fresh"], {}, "arm64"), {
+    reuse: false,
+    env: { GYM_XCARGS: "ARCHS=arm64" },
+  })
+  assert.deepEqual(plan(["android:development", "--all-archs"]), { reuse: true, env: {} })
+})
+
+test("development builds that reach other machines keep every architecture", () => {
+  const none = { reuse: false, env: {} }
+  assert.deepEqual(localPlan(parseArgs(["ios:development:sim"]), { CI: "true" }, "arm64"), none)
+  assert.deepEqual(localPlan(parseArgs(["android:development", "--build", "--nas"]), {}, "x64"), none)
+  assert.deepEqual(localPlan(parseArgs(["ios:development"]), {}, "arm64"), none)
+  assert.deepEqual(localPlan(parseArgs(["android:preview"]), {}, "x64"), none)
 })
