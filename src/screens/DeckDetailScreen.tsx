@@ -30,6 +30,7 @@ import {
   cardCountLabel,
   deckVersionLabel,
   recordText,
+  storedVersionName,
   versionTitle,
 } from "@/features/decks/deckCopy"
 import {
@@ -1465,7 +1466,7 @@ function DeckDetailContent({
         }
         rename={
           activeVersionSummary && {
-            name: deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber),
+            name: storedVersionName(activeVersionSummary, activeVersionSummary.versionNumber),
             note: activeVersionSummary.note ?? "",
             notesLocked: !view.premium,
           }

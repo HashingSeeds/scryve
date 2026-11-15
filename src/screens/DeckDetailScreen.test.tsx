@@ -9,6 +9,7 @@ import { loadMatchSwaps } from "@/features/decks/matchSideboard"
 import { loadAccountDraft } from "@/features/decks/savedDeckDrafts"
 import { createLocalGame, createNextMatchGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { i18n } from "@/i18n"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
 
@@ -1942,6 +1943,33 @@ describe("DeckDetailScreen", () => {
         note: "New note",
       }),
     )
+  })
+
+  it("keeps a player's own version name that matches the translated default", async () => {
+    const actuelle = { ...mainVersion, name: "Actuelle" }
+    mockDetail.value = {
+      ...loadedDetail,
+      versions: [actuelle, sideboardVersion],
+      version: actuelle,
+    }
+    await i18n.changeLanguage("fr-FR")
+    try {
+      const view = renderDetail()
+      fireEvent.press(view.getByTestId("deck-mode-build"))
+      fireEvent.press(view.getByTestId("deck-version-button"))
+      fireEvent.press(view.getByTestId("rename-version-button"))
+      fireEvent.changeText(view.getByTestId("version-note-input"), "New note")
+      fireEvent.press(view.getByTestId("version-submit"))
+      await waitFor(() =>
+        expect(mockUpdateVersion).toHaveBeenCalledWith({
+          versionId: "version-main",
+          name: "Actuelle",
+          note: "New note",
+        }),
+      )
+    } finally {
+      await i18n.changeLanguage("en-US")
+    }
   })
 
   it("deletes the selected version from the version editor behind a confirmation", async () => {

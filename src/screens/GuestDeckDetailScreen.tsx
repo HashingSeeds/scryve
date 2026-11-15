@@ -19,7 +19,12 @@ import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { countCardChanges } from "@/features/decks/deckBuild"
 import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
-import { cardCountLabel, deckVersionLabel, versionTitle } from "@/features/decks/deckCopy"
+import {
+  cardCountLabel,
+  deckVersionLabel,
+  storedVersionName,
+  versionTitle,
+} from "@/features/decks/deckCopy"
 import { canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
 import {
   useLocalDeckDraft,
@@ -606,7 +611,7 @@ export function GuestDeckDetailScreen({
         }
         rename={
           active && {
-            name: deckVersionLabel({ ...active, versionNumber: active.number }, active.number),
+            name: storedVersionName({ ...active, versionNumber: active.number }, active.number),
             note: active.note ?? "",
             notesLocked: !pro,
           }

@@ -13,7 +13,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { cardCountLabel, versionNameToStore } from "./deckCopy"
+import { cardCountLabel, versionNameLabel } from "./deckCopy"
 
 export type VersionsRow<Id extends string = string> = {
   id: Id
@@ -79,23 +79,27 @@ export function DeckVersionsDialogs<Id extends string>({
         onDismissed={onDismissed}
       />
     )
-  if (dialog === "renameVersion" && rename)
+  if (dialog === "renameVersion" && rename) {
+    const shownName = versionNameLabel(rename.name)
     return (
       <DeckVersionDialog
         title={translate("decks:detail.versionDetails")}
         submitLabel={translate("common:save")}
-        initialName={rename.name}
+        initialName={shownName}
         initialNote={rename.note}
         notesLocked={rename.notesLocked}
         busy={busy}
         error={error}
-        onSubmit={(draft) => onRename({ ...draft, name: versionNameToStore(draft.name) })}
+        onSubmit={(draft) =>
+          onRename(draft.name === shownName ? { ...draft, name: rename.name } : draft)
+        }
         {...(onDelete ? { onDelete } : {})}
         visible={visible}
         onClose={onClose}
         onDismissed={onDismissed}
       />
     )
+  }
   if (dialog === "versions")
     return (
       <Sheet

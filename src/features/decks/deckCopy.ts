@@ -39,17 +39,15 @@ export function storedVersionName(
 }
 
 // why: the server names a new deck's first version "Current" in English, and that name is stored, not translated.
+export function versionNameLabel(name: string) {
+  return name === DEFAULT_VERSION_NAME ? translate("decks:currentVersion") : name
+}
+
 export function deckVersionLabel(
   version: { name?: string; versionNumber: number },
   latestVersionNumber: number,
 ) {
-  const name = storedVersionName(version, latestVersionNumber)
-  return name === DEFAULT_VERSION_NAME ? translate("decks:currentVersion") : name
-}
-
-// why: the rename field shows the default name translated, and saving it unchanged must keep the stored default.
-export function versionNameToStore(name: string) {
-  return name === translate("decks:currentVersion") ? DEFAULT_VERSION_NAME : name
+  return versionNameLabel(storedVersionName(version, latestVersionNumber))
 }
 
 export function versionTitle(
