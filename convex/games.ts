@@ -851,7 +851,9 @@ async function terminalizeGame(
     eventCount: totalEventCount(game, players),
     finishedAt,
     players: summaryPlayers,
-    ...(options.firstPlayerId ? { firstPlayerId: options.firstPlayerId } : {}),
+    ...((options.firstPlayerId ?? game.firstPlayerId)
+      ? { firstPlayerId: options.firstPlayerId ?? game.firstPlayerId }
+      : {}),
     ...(game.freeMulligans ? { freeMulligans: game.freeMulligans } : {}),
     resultKind: result.kind,
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
@@ -2838,15 +2840,13 @@ export const rollFirstPlayer = mutation({
 })
 
 function rollOff(seats: readonly Id<"gamePlayers">[], sides: number) {
-  const rolls: Record<string, number> = {}
-  let pool = [...seats]
-  for (let round = 0; pool.length > 0 && round < 20; round += 1) {
-    for (const seat of pool) rolls[seat] = Math.floor(Math.random() * sides) + 1
-    const high = Math.max(...seats.map((seat) => rolls[seat]))
-    const tied = seats.filter((seat) => rolls[seat] === high)
-    pool = tied.length > 1 ? tied : []
+  for (;;) {
+    const rolls = Object.fromEntries(
+      seats.map((seat) => [seat, Math.floor(Math.random() * sides) + 1]),
+    )
+    const high = Math.max(...Object.values(rolls))
+    if (Object.values(rolls).filter((roll) => roll === high).length === 1) return rolls
   }
-  return rolls
 }
 
 export const chooseFirstPlayer = mutation({
@@ -3316,17 +3316,7 @@ export const finishGame = mutation({
     if (game.status !== "active")
       throw gameWriteError("game_not_active", "Only an active game can be finished")
     const result = args.result ?? { kind: "unknown" as const }
-    const summary = await terminalizeGame(
-      ctx,
-      game,
-      "finished",
-      "host_finished",
-      user._id,
-      result,
-      {
-        ...(game.firstPlayerId ? { firstPlayerId: game.firstPlayerId } : {}),
-      },
-    )
+    const summary = await terminalizeGame(ctx, game, "finished", "host_finished", user._id, result)
     const losers =
       result.kind === "win"
         ? summary.players.filter((player) => !result.winnerPlayerIds.includes(player.playerId))
