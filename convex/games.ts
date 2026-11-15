@@ -1697,7 +1697,7 @@ export const publishFinishedLocalGame = mutation({
       args.freeMulligans &&
       handSize !== undefined &&
       me?.mulligans !== undefined &&
-      isMulliganCount(me.mulligans, handSize)
+      isMulliganCount(me.mulligans, args.freeMulligans, handSize)
         ? me.mulligans
         : undefined
     if (me?.deckKey !== undefined) assertDeckKey(me.deckKey)

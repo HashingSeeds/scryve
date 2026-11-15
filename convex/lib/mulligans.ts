@@ -13,8 +13,13 @@ export const FREE_MULLIGANS = ["none", "first", "all"] as const satisfies readon
 
 export const mulliganHandSize = (system: unknown) => systemDefinition(system)?.mulligan?.handSize
 
-export const isMulliganCount = (count: number, handSize: number) =>
-  Number.isInteger(count) && count >= 0 && count <= handSize
+const FREE_FOREVER_LIMIT = 99
+
+export const maxMulligans = (free: FreeMulligans, handSize: number) =>
+  free === "all" ? FREE_FOREVER_LIMIT : handSize + (free === "first" ? 1 : 0)
+
+export const isMulliganCount = (count: number, free: FreeMulligans, handSize: number) =>
+  Number.isInteger(count) && count >= 0 && count <= maxMulligans(free, handSize)
 
 export function keptHandSize(mulligans: number, free: FreeMulligans, handSize: number) {
   const paid = free === "all" ? 0 : Math.max(0, mulligans - (free === "first" ? 1 : 0))
