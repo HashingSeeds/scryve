@@ -5,6 +5,7 @@ import { initReactI18next } from "react-i18next"
 import "intl-pluralrules"
 
 import type { Translations } from "./en"
+import { formatInterpolation } from "./format"
 import type { LocaleNamespace } from "./localeNamespace"
 import { namespaces, resources } from "./resources"
 
@@ -59,6 +60,8 @@ void i18n
     fallbackLng: fallbackLocale,
     interpolation: {
       escapeValue: false,
+      alwaysFormat: true,
+      format: formatInterpolation,
     },
     initImmediate: false,
   })

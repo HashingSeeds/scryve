@@ -171,6 +171,9 @@ jest.mock("react-native-safe-area-context", () => ({
 jest.mock("expo-localization", () => ({
   ...jest.requireActual("expo-localization"),
   getLocales: () => [{ languageTag: "en-US", textDirection: "ltr" }],
+  getCalendars: () => [
+    { calendar: "gregory", timeZone: "UTC", uses24hourClock: false, firstWeekday: 1 },
+  ],
 }))
 
 jest.mock("expo-haptics", () => ({

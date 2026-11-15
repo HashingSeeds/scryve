@@ -12,6 +12,10 @@ const common = {
   save: "Save",
   tryAgain: "Try again",
   undo: "Undo",
+  // Joins short facts on one line, as in "Magic · 40 life · 4 players". Keep the spaces your language uses around it.
+  separator: " · ",
+  // Joins names in a list, as in "Ada, Ben, Cy". Use your language's list comma and spacing.
+  listSeparator: ", ",
   emptyState: {
     heading: "Nothing here yet",
     content: "No data found. Try refreshing or reloading the app.",
