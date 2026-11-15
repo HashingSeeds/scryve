@@ -135,23 +135,27 @@ test.each<[string, Partial<MagicSearch>, string[]]>([
   ["legendary", { filters: { supertype: ["Legendary"] } }, ["Gisela, Blade of Goldnight"]],
   ["a subtype", { filters: { subtype: ["Goblin"] } }, ["Goblin Guide"]],
   [
-    "mana value 1 or 7+",
-    { filters: { manaValue: ["1", "7+"] } },
-    ["Gisela, Blade of Goldnight", "Gitaxian Probe", "Goblin Guide"],
-  ],
-  ["power 6 skips cards without power", { filters: { power: ["6"] } }, ["Grave Titan"]],
-  [
-    "toughness 5+",
-    { filters: { toughness: ["5+"] } },
+    "mana value 6 to 7",
+    { filters: { manaValue: [">=6", "<=7"] } },
     ["Gisela, Blade of Goldnight", "Grave Titan"],
   ],
-  ["legal in Legacy", { text: "g", legalIn: "legacy" }, ["Gitaxian Probe", "Goblin Guide"]],
+  ["power 6 or more skips cards without power", { filters: { power: [">=6"] } }, ["Grave Titan"]],
+  [
+    "toughness 5 or more",
+    { filters: { toughness: [">=5"] } },
+    ["Gisela, Blade of Goldnight", "Grave Titan"],
+  ],
+  [
+    "legal in Legacy",
+    { text: "g", filters: { format: ["legacy"] } },
+    ["Gitaxian Probe", "Goblin Guide"],
+  ],
 ])("filters the card file by %s", (_name, search, expected) => {
   expect(searchTyped(search)).toEqual(expected)
 })
 
 test("a card file without legal formats leaves a legality search to Scryfall", () => {
-  expect(search("dragon", { legalIn: "modern" })).toBeUndefined()
+  expect(search("dragon", { filters: { format: ["modern"] } })).toBeUndefined()
 })
 
 test.each([

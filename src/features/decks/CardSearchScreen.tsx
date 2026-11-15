@@ -55,7 +55,6 @@ import {
   matchesCardFilters,
   pickedCount,
   scryfallFilterTerms,
-  togglePicked,
   type CardFilterState,
 } from "./cardFilters"
 import { searchCardNames } from "./cardNameMatch"
@@ -83,7 +82,6 @@ import { useCardNameIndex } from "./useCardNameIndex"
 import { useMagicCards } from "./useMagicCards"
 import { api } from "../../../convex/_generated/api"
 import { deckFormatLabel } from "../../../convex/lib/deckGames"
-import { LEGALITY_FORMATS } from "../../../convex/lib/magicDataset"
 import {
   isSystemId,
   MAGIC_CARD_FILTERS,
@@ -109,14 +107,12 @@ export function scryfallQuery({
   colors,
   colorMatch,
   filters,
-  legalIn,
 }: {
   text: string
   commander: boolean
   colors: string[]
   colorMatch: ColorMatch
   filters: CardFilterState
-  legalIn?: string
 }) {
   const identity = colors.includes("C")
     ? "id:c"
@@ -124,12 +120,14 @@ export function scryfallQuery({
       ? `id${COLOR_MATCH_OPERATOR[colorMatch]}${colors.join("").toLowerCase()}`
       : ""
   const terms = [
-    commander ? "is:commander f:commander" : "",
-    commander && identity && !colors.includes("C")
-      ? `(${identity} or o:"choose a color")`
-      : identity,
-    ...scryfallFilterTerms(MAGIC_CARD_FILTERS, filters),
-    legalIn && !(commander && legalIn === "commander") ? `f:${legalIn}` : "",
+    ...new Set([
+      commander ? "is:commander" : "",
+      commander ? "f:commander" : "",
+      commander && identity && !colors.includes("C")
+        ? `(${identity} or o:"choose a color")`
+        : identity,
+      ...scryfallFilterTerms(MAGIC_CARD_FILTERS, filters),
+    ]),
   ].filter(Boolean)
   if (!terms.length) return text
   const words = commander ? text.slice(0, 80).replace(/[()"]/g, " ").trim() : text
@@ -252,17 +250,27 @@ export function CardSearch({
   const [colorFilters, setColorFilters] = useState<string[]>(startingFilters.colors)
   const [colorMatch, setColorMatch] = useState(startingFilters.colorMatch)
   const cardFilters = filtersCards ? (systemDefinition(game)?.cardFilters ?? []) : []
-  const [picked, setPicked] = useState<CardFilterState>({})
-  const pickedFilters = pickedCount(picked)
+  // why: a deck's search starts on cards its format allows; looking up rules searches every card.
+  const [startingPicked] = useState<CardFilterState>(() => ({
+    format:
+      !lookup &&
+      cardFilters.some(
+        (filter) =>
+          filter.id === "format" &&
+          Array.isArray(filter.options) &&
+          filter.options.includes(format),
+      )
+        ? [format]
+        : [],
+  }))
+  const [picked, setPicked] = useState(startingPicked)
+  const pickedFilters = pickedCount(cardFilters, picked)
   const needsKeywords = (picked.keyword?.length ?? 0) > 0
-  const legalFormat =
-    filtersCards && LEGALITY_FORMATS.some((id) => id === format) ? format : undefined
-  const [legalOnly, setLegalOnly] = useState(true)
-  const legalIn = legalOnly ? legalFormat : undefined
   const [filtersOpen, setFiltersOpen] = useState(false)
   const pickedColors = colorFilters.length > 0 && colorFilters !== startingFilters.colors
   const searchRequested =
-    query.trim().length >= 2 || (filtersCards && (pickedColors || pickedFilters > 0))
+    query.trim().length >= 2 ||
+    (filtersCards && (pickedColors || (picked !== startingPicked && pickedFilters > 0)))
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
@@ -279,8 +287,9 @@ export function CardSearch({
   /** why: cached and fetched details lack mana value, toughness and legality, so the card file answers for them when it has the card. */
   function matchesFilters(name: string, details?: FocusedCardDetails) {
     const known = magicCards?.byName.get(name)
-    if (legalIn && known?.legalFormats && !known.legalFormats.includes(legalIn)) return false
-    if (!matchesCardFilters(known ?? details ?? {}, cardFilters, picked)) return false
+    // why: a card whose legality the device doesn't know stays in; Scryfall checked it, or the card file predates legality.
+    const checked = known?.legalFormats ? picked : { ...picked, format: [] }
+    if (!matchesCardFilters(known ?? details ?? {}, cardFilters, checked)) return false
     return matchesPickedColors(details)
   }
 
@@ -387,7 +396,6 @@ export function CardSearch({
             colors: colorFilters,
             colorMatch,
             filters: picked,
-            legalIn,
           })
         : undefined
     const remoteQuery = scryfallQuery({
@@ -396,7 +404,6 @@ export function CardSearch({
       colors: colorFilters,
       colorMatch,
       filters: picked,
-      legalIn,
     })
     const answered =
       local && (local.named.length || local.found.length || remoteQuery.length < 2)
@@ -494,7 +501,6 @@ export function CardSearch({
     colorFilters,
     colorMatch,
     picked,
-    legalIn,
     searchRequested,
     searchAttempt,
     searchError?.retryAfterMs,
@@ -630,7 +636,7 @@ export function CardSearch({
   const rankedResults = (nameResults ?? []).filter(
     (card) =>
       "scryfallId" in card &&
-      (!legalIn || magicCards?.byName.get(card.name)?.legalFormats?.includes(legalIn) === true) &&
+      (!picked.format?.length || magicCards?.byName.get(card.name)?.legalFormats !== undefined) &&
       matchesFilters(card.name, card),
   )
   const rankedNames = new Set(rankedResults.map((card) => card.name))
@@ -740,8 +746,7 @@ export function CardSearch({
                 count={
                   colorFilters.length +
                   pickedFilters +
-                  (colorMatch !== startingFilters.colorMatch ? 1 : 0) +
-                  (legalFormat && !legalOnly ? 1 : 0)
+                  (colorMatch !== startingFilters.colorMatch ? 1 : 0)
                 }
                 onPress={() => setFiltersOpen(true)}
               />
@@ -984,16 +989,6 @@ export function CardSearch({
             contentContainerStyle={themed([$sheetScrollContent, $filterBody])}
             keyboardShouldPersistTaps="handled"
           >
-            {legalFormat ? (
-              <FilterGroup heading={translate("decks:cardSearch.legalIn")}>
-                <FilterPill
-                  testID="card-filter-legal"
-                  label={deckFormatLabel(game, legalFormat)}
-                  selected={legalOnly}
-                  onPress={() => setLegalOnly((current) => !current)}
-                />
-              </FilterGroup>
-            ) : null}
             <FilterGroup heading={translate("decks:cardSearch.colors")}>
               {SEARCH_COLORS.map((color) => (
                 <FilterPill
@@ -1025,13 +1020,18 @@ export function CardSearch({
                 options={
                   filter.options === "cards"
                     ? magicCards
-                      ? cardOptions(magicCards.cards, filter.id, legalIn)
+                      ? cardOptions(magicCards.cards, filter.id, picked.format ?? [])
                       : []
-                    : filter.options
+                    : filter.options === "range"
+                      ? []
+                      : filter.options
+                }
+                optionLabel={
+                  filter.id === "format" ? (option) => deckFormatLabel(game, option) : undefined
                 }
                 picked={picked[filter.id] ?? []}
-                onToggle={(option) =>
-                  setPicked((current) => togglePicked(current, filter.id, option))
+                onChange={(options) =>
+                  setPicked((current) => ({ ...current, [filter.id]: options }))
                 }
               />
             ))}
@@ -1042,8 +1042,7 @@ export function CardSearch({
               tx="decks:cardSearch.clearAll"
               onPress={() => {
                 setColorFilters([])
-                setPicked({})
-                setLegalOnly(true)
+                setPicked(startingPicked)
                 setColorMatch(startingFilters.colorMatch)
               }}
             />

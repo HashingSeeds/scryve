@@ -61,6 +61,7 @@ export default {
     },
   },
   cardFilter: {
+    format: "Légal en",
     type: "Type de carte",
     supertype: "Supertype",
     subtype: "Sous-types",

@@ -19,22 +19,16 @@ test("subtypes come most common first and count only cards legal in the format",
     card("G", "Creature — Goblin", ["legacy"]),
     card("H", "Creature — Goblin Rogue", ["legacy"]),
   ]
-  expect(cardOptions(cards, "subtype", "modern")).toEqual(["Elf", "Goblin", "Druid", "Warrior"])
-  expect(cardOptions(cards, "subtype", undefined)).toEqual([
-    "Goblin",
-    "Elf",
-    "Druid",
-    "Rogue",
-    "Warrior",
-  ])
+  expect(cardOptions(cards, "subtype", ["modern"])).toEqual(["Elf", "Goblin", "Druid", "Warrior"])
+  expect(cardOptions(cards, "subtype", [])).toEqual(["Goblin", "Elf", "Druid", "Rogue", "Warrior"])
 })
 
 test("a card file without legal formats counts every card", () => {
   const cards = ["A", "B", "C"].map((name) => card(name, "Artifact — Equipment"))
-  expect(cardOptions(cards, "subtype", "modern")).toEqual(["Equipment"])
+  expect(cardOptions(cards, "subtype", ["modern"])).toEqual(["Equipment"])
 })
 
 test("cards without keywords add no blank keyword", () => {
   const cards = ["A", "B", "C"].map((name) => ({ ...card(name, "Sorcery"), keywords: "" }))
-  expect(cardOptions(cards, "keyword", undefined)).toEqual([])
+  expect(cardOptions(cards, "keyword", [])).toEqual([])
 })

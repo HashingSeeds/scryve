@@ -144,19 +144,28 @@ export type RoundClockDefinition = {
 /**
  * why: a game declares what its card search can filter; the adapter for its card catalog
  * reads each filter's field from a card and turns picked options into the catalog's query.
- * `options: "cards"` lists the values cards carry, most common first. An option like "7+"
- * matches that number or more.
+ * `options: "cards"` lists the values cards carry, most common first. A range filter takes
+ * a minimum and a maximum number instead of options.
  */
-export type CardFilterDefinition = {
-  readonly id: string
-  readonly label: string
-  readonly match: "any" | "all"
-  readonly options: readonly string[] | "cards"
-}
+export type CardFilterDefinition = { readonly id: string; readonly label: string } & (
+  | { readonly match: "any" | "all"; readonly options: readonly string[] | "cards" }
+  | { readonly options: "range" }
+)
 
-const NUMBER_OPTIONS = ["0", "1", "2", "3", "4", "5", "6", "7+"] as const
+/** why: Scryve's Magic formats that Scryfall tracks legality for, under the same ids. */
+export const LEGALITY_FORMATS = [
+  "commander",
+  "standard",
+  "pioneer",
+  "modern",
+  "legacy",
+  "vintage",
+  "pauper",
+  "brawl",
+] as const
 
 export const MAGIC_CARD_FILTERS = [
+  { id: "format", label: "Legal in", match: "all", options: LEGALITY_FORMATS },
   {
     id: "type",
     label: "Card type",
@@ -174,10 +183,10 @@ export const MAGIC_CARD_FILTERS = [
   },
   { id: "supertype", label: "Supertype", match: "all", options: ["Legendary", "Basic", "Snow"] },
   { id: "subtype", label: "Subtypes", match: "any", options: "cards" },
-  { id: "manaValue", label: "Mana value", match: "any", options: NUMBER_OPTIONS },
+  { id: "manaValue", label: "Mana value", options: "range" },
+  { id: "power", label: "Power", options: "range" },
+  { id: "toughness", label: "Toughness", options: "range" },
   { id: "keyword", label: "Keywords", match: "all", options: "cards" },
-  { id: "power", label: "Power", match: "any", options: NUMBER_OPTIONS },
-  { id: "toughness", label: "Toughness", match: "any", options: NUMBER_OPTIONS },
 ] as const satisfies readonly CardFilterDefinition[]
 
 export type MagicCardFilterId = (typeof MAGIC_CARD_FILTERS)[number]["id"]

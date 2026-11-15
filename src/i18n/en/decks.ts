@@ -399,8 +399,12 @@ const decks = {
     exactColors: "Exactly",
     // Placeholder over a card filter's options; {{filter}} is the filter's name in lowercase, e.g. "keywords".
     searchFilter: "Search {{filter}}",
-    // Heading over a toggle, named for the deck's format, that keeps only cards legal in it.
-    legalIn: "Legal in",
+    // Placeholders in the two number fields beside a card stat like mana value or power.
+    min: "Min",
+    max: "Max",
+    // Screen reader labels for those fields; {{filter}} is the stat's name in lowercase, e.g. "power".
+    minimum: "Minimum {{filter}}",
+    maximum: "Maximum {{filter}}",
     clearAll: "Clear all",
     checkFailed: "Could not check all cards in this deck.",
     searchFailed: "Could not search cards. Check your connection and try again.",

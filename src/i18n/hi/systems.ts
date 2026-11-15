@@ -61,6 +61,7 @@ export default {
     },
   },
   cardFilter: {
+    format: "इनमें मान्य",
     type: "कार्ड टाइप",
     supertype: "सुपरटाइप",
     subtype: "सबटाइप",

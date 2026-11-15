@@ -241,7 +241,7 @@ it("searches within the commander's colors until the player clears them", async 
       />
     </ThemeProvider>,
   )
-  expect(view.getByLabelText("Filters (2)")).toBeTruthy()
+  expect(view.getByLabelText("Filters (3)")).toBeTruthy()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).not.toHaveBeenCalled()
   fireEvent.changeText(view.getByTestId("card-search-input"), "bolt")
@@ -298,7 +298,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   fireEvent.press(view.getByTestId("card-focus-close"))
   expect(view.queryByTestId("card-focus-dialog")).toBeNull()
   expect(view.getByTestId("card-search-input").props.value).toBe("ar")
-  expect(view.getByLabelText("Filters (1)")).toBeTruthy()
+  expect(view.getByLabelText("Filters (2)")).toBeTruthy()
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
   fireEvent.press(view.getByLabelText("Preview Baral as commander"))
   await act(async () => {})
@@ -422,13 +422,14 @@ it("trusts Scryfall's commander results for a filter the device can't check", as
   const view = chooser([])
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
+  fireEvent.changeText(view.getByTestId("card-filter-manaValue-min"), "2")
+  fireEvent.changeText(view.getByTestId("card-filter-manaValue-max"), "2")
   fireEvent.press(view.getByLabelText("Dismiss commander filters"))
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
     deviceId: expect.any(String),
     game: "mtg",
-    query: "is:commander f:commander mv=2",
+    query: "is:commander f:commander mv>=2 mv<=2",
   })
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
 })
@@ -606,21 +607,29 @@ it.each<[string, Partial<typeof filters>, string]>([
     'is:commander f:commander kw:"Flying" kw:"Ward"',
   ],
   [
-    "any of the picked types, every picked supertype, and mana value ranges",
+    "any of the picked types, every picked supertype, and a mana value range",
     {
       filters: {
         type: ["Creature", "Artifact"],
         supertype: ["Legendary"],
-        manaValue: ["2", "7+"],
+        manaValue: [">=2", "<=4"],
       },
     },
-    '(t:"Creature" or t:"Artifact") t:"Legendary" (mv=2 or mv>=7)',
+    '(t:"Creature" or t:"Artifact") t:"Legendary" mv>=2 mv<=4',
   ],
-  ["power and toughness", { filters: { power: ["4"], toughness: ["5+"] } }, "pow=4 tou>=5"],
-  ["legal in the deck's format", { text: "bolt", legalIn: "modern" }, "(bolt) f:modern"],
+  [
+    "a minimum power and a maximum toughness",
+    { filters: { power: [">=4"], toughness: ["<=5"] } },
+    "pow>=4 tou<=5",
+  ],
+  [
+    "every picked format",
+    { text: "bolt", filters: { format: ["modern", "legacy"] } },
+    "(bolt) f:modern f:legacy",
+  ],
   [
     "a commander pick, legal once",
-    { text: "ar", commander: true, legalIn: "commander" },
+    { text: "ar", commander: true, filters: { format: ["commander"] } },
     "(ar) is:commander f:commander",
   ],
   [
@@ -787,7 +796,7 @@ describe("with the device's Magic card file", () => {
   })
 })
 
-it("keeps searches legal in the deck's format until the player turns it off", async () => {
+it("starts a deck's search on its format and lets the player pick other formats or none", async () => {
   jest.useFakeTimers()
   mockAction.mockResolvedValue([])
   const view = render(
@@ -795,25 +804,23 @@ it("keeps searches legal in the deck's format until the player turns it off", as
       <CardSearchScreen game="mtg" format="modern" onAdd={jest.fn()} onClose={jest.fn()} />
     </ThemeProvider>,
   )
+  const lastQuery = async () => {
+    await act(async () => jest.advanceTimersByTime(400))
+    return mockAction.mock.lastCall?.[1].query
+  }
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  expect(view.getByTestId("card-filter-legal").props.accessibilityState.selected).toBe(true)
+  expect(view.getByTestId("card-filter-format-modern").props.accessibilityState.selected).toBe(true)
+  expect(view.getByText("Pauper")).toBeTruthy()
   fireEvent.press(view.getByTestId("card-filter-type-Creature"))
-  await act(async () => jest.advanceTimersByTime(400))
-  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
-    deviceId: expect.any(String),
-    game: "mtg",
-    query: 't:"Creature" f:modern',
-  })
-  fireEvent.press(view.getByTestId("card-filter-legal"))
+  expect(await lastQuery()).toBe('f:modern t:"Creature"')
+  fireEvent.press(view.getByTestId("card-filter-format-legacy"))
+  expect(await lastQuery()).toBe('f:modern f:legacy t:"Creature"')
+  fireEvent.press(view.getByTestId("card-filter-format-modern"))
+  fireEvent.press(view.getByTestId("card-filter-format-legacy"))
   fireEvent.press(view.getByText("Done"))
-  expect(view.getByLabelText("Filters (2)")).toBeTruthy()
-  await act(async () => jest.advanceTimersByTime(400))
-  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
-    deviceId: expect.any(String),
-    game: "mtg",
-    query: 't:"Creature"',
-  })
+  expect(view.getByLabelText("Filters (1)")).toBeTruthy()
+  expect(await lastQuery()).toBe('t:"Creature"')
 })
 
 it("looks cards up without a deck: no adding, and a tapped card opens its sheet", async () => {
@@ -830,6 +837,10 @@ it("looks cards up without a deck: no adding, and a tapped card opens its sheet"
   await act(async () => jest.advanceTimersByTime(400))
   jest.useRealTimers()
   expect(view.queryByLabelText("Add Baral to deck")).toBeNull()
+  expect(mockAction).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ query: "baral" }),
+  )
   fireEvent.press(view.getByLabelText("Show Baral"))
   await waitFor(() => expect(view.getByTestId("card-focus-image")).toBeTruthy())
   expect(view.queryByTestId("set-commander")).toBeNull()
