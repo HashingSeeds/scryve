@@ -600,7 +600,7 @@ function NewGameForm({
     !deck?.sharedToken &&
     deckLife === undefined &&
     account?.decks === undefined
-  const tracksMulligans = !connectedMode && mulliganHandSize(system) !== undefined
+  const tracksMulligans = !connectedMode && !teamPlay && mulliganHandSize(system) !== undefined
   const [freeMulligans, setFreeMulligans] = useFreeMulligans(system, format, playerCount)
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
@@ -1340,6 +1340,7 @@ function NewGameForm({
                     <FreeMulligansChoice
                       rule={freeMulligans}
                       onChange={(rule) => {
+                        setEdited(true)
                         setFreeMulligans(rule)
                         if (accountInput)
                           savePlayers(seatAppearances, { ...accountInput, freeMulligans: rule })

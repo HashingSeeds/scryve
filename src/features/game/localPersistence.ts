@@ -1096,11 +1096,23 @@ export class LocalGameRepository {
       color: color(index),
       shape: players[index].shape,
     }))
+    const nextAccount =
+      account && accountForSystem(game.system, localGameAccount(nextPlayers, account))
+    const kept = game.account?.mulligans
     this.saveActiveGame({
       ...game,
       players: nextPlayers,
-      ...(account
-        ? { account: accountForSystem(game.system, localGameAccount(nextPlayers, account)) }
+      ...(nextAccount
+        ? {
+            account:
+              kept !== undefined &&
+              nextAccount.freeMulligans &&
+              nextAccount.mePlayerId === game.account?.mePlayerId &&
+              nextAccount.deckVersionId === game.account?.deckVersionId &&
+              nextAccount.deckKey === game.account?.deckKey
+                ? { ...nextAccount, mulligans: kept }
+                : nextAccount,
+          }
         : {}),
       updatedAt: Date.now(),
     })
