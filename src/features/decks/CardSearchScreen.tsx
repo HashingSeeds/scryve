@@ -281,6 +281,10 @@ export function CardSearch({
     const known = magicCards?.byName.get(name)
     if (legalIn && known?.legalFormats && !known.legalFormats.includes(legalIn)) return false
     if (!matchesCardFilters(known ?? details ?? {}, cardFilters, picked)) return false
+    return matchesPickedColors(details)
+  }
+
+  function matchesPickedColors(details?: FocusedCardDetails) {
     const canChooseColor = choosingCommander && details?.commanderEligibility === "color-choice"
     return matchesColors(details?.colorIdentity, colorFilters, colorMatch, canChooseColor)
   }
@@ -622,18 +626,19 @@ export function CardSearch({
     setCandidate(undefined)
   }
 
+  // why: name matches skip the Scryfall query, so a card whose legality the device can't confirm stays out; Scryfall lists it if it is legal.
   const rankedResults = (nameResults ?? []).filter(
-    (card) => "scryfallId" in card && matchesFilters(card.name, card),
+    (card) =>
+      "scryfallId" in card &&
+      (!legalIn || magicCards?.byName.get(card.name)?.legalFormats?.includes(legalIn) === true) &&
+      matchesFilters(card.name, card),
   )
   const rankedNames = new Set(rankedResults.map((card) => card.name))
   const catalogResults = results
     ? [...rankedResults, ...results.filter((card) => !rankedNames.has(card.name))].filter(
         (card) =>
           !choosingCommander ||
-          ("scryfallId" in card &&
-            eligible(card) &&
-            matchesFilters(card.name, card) &&
-            !inDeck(card)),
+          ("scryfallId" in card && eligible(card) && matchesPickedColors(card) && !inDeck(card)),
       )
     : undefined
   const eligibleCommanders = choosingCommander

@@ -8,7 +8,7 @@ const card = (name: string, typeLine: string, legalFormats?: string[]) => ({
   ...(legalFormats ? { legalFormats } : {}),
 })
 
-test("subtypes come most common first, skip rare ones, and count only cards legal in the format", () => {
+test("subtypes come most common first and count only cards legal in the format", () => {
   const cards = [
     card("A", "Creature — Elf Druid", ["modern"]),
     card("B", "Creature — Elf Warrior", ["modern"]),
@@ -19,8 +19,14 @@ test("subtypes come most common first, skip rare ones, and count only cards lega
     card("G", "Creature — Goblin", ["legacy"]),
     card("H", "Creature — Goblin Rogue", ["legacy"]),
   ]
-  expect(cardOptions(cards, "subtype", "modern")).toEqual(["Elf"])
-  expect(cardOptions(cards, "subtype", undefined)).toEqual(["Goblin", "Elf"])
+  expect(cardOptions(cards, "subtype", "modern")).toEqual(["Elf", "Goblin", "Druid", "Warrior"])
+  expect(cardOptions(cards, "subtype", undefined)).toEqual([
+    "Goblin",
+    "Elf",
+    "Druid",
+    "Rogue",
+    "Warrior",
+  ])
 })
 
 test("a card file without legal formats counts every card", () => {

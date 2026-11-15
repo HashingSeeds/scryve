@@ -13,8 +13,6 @@ type FilterField<Card> = {
   query: (option: string) => string
 }
 
-const MIN_CARDS_PER_OPTION = 3
-
 const quoted = (value: string) => `"${value.replace(/["\\]/g, "")}"`
 
 function typeLineWords(typeLine: string | undefined, part: "types" | "subtypes") {
@@ -123,7 +121,6 @@ export function cardOptions(
     for (const option of new Set(value)) counts.set(option, (counts.get(option) ?? 0) + 1)
   }
   const options = [...counts]
-    .filter(([, count]) => count >= MIN_CARDS_PER_OPTION)
     .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
     .map(([option]) => option)
   const byKey = optionCache.get(cards) ?? new Map<string, readonly string[]>()

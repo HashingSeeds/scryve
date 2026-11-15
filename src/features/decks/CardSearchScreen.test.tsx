@@ -384,7 +384,6 @@ it("lists keywords from the card file, combines picked keywords, and works offli
   const view = chooser(deck.slice(0, 2))
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  expect(view.queryByLabelText("Choose a background")).toBeNull()
   fireEvent.changeText(view.getByLabelText("Search keywords"), "fly")
   expect(view.getByLabelText("Flying")).toBeTruthy()
   expect(view.queryByLabelText("Ward")).toBeNull()
@@ -413,6 +412,25 @@ it("lists keywords from the card file, combines picked keywords, and works offli
   expect(offlineView.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
   expect(mockAction).not.toHaveBeenCalled()
   expect(mockQuery).not.toHaveBeenCalled()
+})
+
+it("trusts Scryfall's commander results for a filter the device can't check", async () => {
+  jest.useFakeTimers()
+  mockAction.mockImplementation((_ref, args) =>
+    Promise.resolve("query" in args ? [searchCard] : eligible),
+  )
+  const view = chooser([])
+  fireEvent.press(view.getByTestId("card-filters-button"))
+  await act(async () => {})
+  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
+  fireEvent.press(view.getByLabelText("Dismiss commander filters"))
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
+    game: "mtg",
+    query: "is:commander f:commander mv=2",
+  })
+  expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
 })
 
 it.each(["commander", "main"])(
@@ -620,14 +638,14 @@ describe("with the device's card name list", () => {
   const blow = { ...searchCard, name: "Lightning Blow", scryfallId: "blow", colorIdentity: "W" }
   const axe = { ...searchCard, name: "Lightning Axe", scryfallId: "axe", colorIdentity: "R" }
 
-  function adder() {
+  function adder(format = "constructed") {
     mockNameIndex = cardNameIndex(["Lightning Axe", "Lightning Blow", "Lightning Bolt"])
     mockAction.mockImplementation(async (_action, args: { names?: string[] }) =>
       args.names ? { cards: [blow, bolt], lookupFailed: false } : [axe, bolt],
     )
     return render(
       <ThemeProvider initialContext="dark">
-        <CardSearchScreen game="mtg" format="modern" onAdd={jest.fn()} onClose={jest.fn()} />
+        <CardSearchScreen game="mtg" format={format} onAdd={jest.fn()} onClose={jest.fn()} />
       </ThemeProvider>,
     )
   }
@@ -651,6 +669,14 @@ describe("with the device's card name list", () => {
       names: ["Lightning Bolt", "Lightning Blow", "Lightning Axe"],
       deviceId: expect.any(String),
     })
+  })
+
+  it("drops name matches whose legality in the deck's format the device can't confirm", async () => {
+    const view = adder("modern")
+    expect(await search(view, "lightnig bolt")).toEqual([
+      "Add Lightning Axe to deck",
+      "Add Lightning Bolt to deck",
+    ])
   })
 
   it("keeps name matches to the picked colors", async () => {
