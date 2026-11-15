@@ -265,12 +265,17 @@ export function CardSearch({
   }))
   const [picked, setPicked] = useState(startingPicked)
   const pickedFilters = pickedCount(cardFilters, picked)
+  const changedFilters = cardFilters.some(({ id }) => {
+    const options = picked[id] ?? []
+    const starting = startingPicked[id] ?? []
+    return options.length !== starting.length || options.some((o) => !starting.includes(o))
+  })
   const needsKeywords = (picked.keyword?.length ?? 0) > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
   const pickedColors = colorFilters.length > 0 && colorFilters !== startingFilters.colors
   const searchRequested =
     query.trim().length >= 2 ||
-    (filtersCards && (pickedColors || (picked !== startingPicked && pickedFilters > 0)))
+    (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0)))
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
