@@ -1457,15 +1457,13 @@ describe("ConnectedBoardScreen before play", () => {
     expect(pregame.chooseFirst).toHaveBeenCalledWith("player-2")
   })
 
-  it("asks only the loser's own device to choose, and going second hands first to the next seat", () => {
+  it("asks only the loser's own device to choose, leaves other seats playable, and going second hands first to the next seat", () => {
     const pregame = actions()
     withGame({ firstPlayer: { mode: "roll", chooser: { playerId: "player-1", reason: "loss" } } })
     render(themed(<PregameBoard pregame={pregame} />))
     layout()
     expect(screen.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
-    expect(screen.getByTestId("dice-seat-1").props.accessibilityLabel).toBe(
-      "Waiting for the choice",
-    )
+    expect(screen.queryByTestId("dice-seat-1")).toBeNull()
     fireEvent.press(screen.getByTestId("dice-go-second"))
     expect(pregame.chooseFirst).toHaveBeenCalledWith("player-2")
   })

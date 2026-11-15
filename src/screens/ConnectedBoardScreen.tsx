@@ -1251,10 +1251,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       }
     }
     if (firstPlayerOffer) return firstPlayerOffer
+    // why: a chooser on an app from before first player never answers, so other seats stay playable and the first change starts the game.
     if (chooser)
       return chooser.playerId === playerId && controlled.has(playerId)
         ? { kind: "choice", reason: chooser.reason }
-        : { kind: "waiting" }
+        : undefined
     if (playerId !== mulliganSeat?.playerId || mulligan.skipped || !game.freeMulligans) return
     return handSize === undefined
       ? undefined
