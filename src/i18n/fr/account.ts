@@ -80,7 +80,9 @@ export default {
       feedbackReplies: "Réponses aux commentaires",
       feedbackRepliesHelper: "Les réponses s'affichent toujours dans Vos commentaires",
       renewalReminders: "Rappels de renouvellement",
-      renewalRemindersHelper: "3 jours avant le renouvellement de votre abonnement",
+      renewalRemindersHelper_one: "{{count}} jour avant le renouvellement de votre abonnement",
+      renewalRemindersHelper_many: "{{count}} de jours avant le renouvellement de votre abonnement",
+      renewalRemindersHelper_other: "{{count}} jours avant le renouvellement de votre abonnement",
       channel: "Réponses et rappels",
       feedbackReplyPreview: "Nouvelle réponse à votre commentaire",
       blockedTitle: "Les notifications sont désactivées",
@@ -292,7 +294,11 @@ export default {
       "Scryve Pro est lié à un compte. Connectez-vous pour obtenir Pro ou utiliser votre Pro existant.",
     renewalPrompt: {
       title: "Vous prévenir avant le renouvellement ?",
-      body: "Recevez une notification 3 jours avant votre prochain paiement annuel.",
+      body_one: "Recevez une notification {{count}} jour avant votre prochain prélèvement annuel.",
+      body_many:
+        "Recevez une notification {{count}} de jours avant votre prochain prélèvement annuel.",
+      body_other:
+        "Recevez une notification {{count}} jours avant votre prochain prélèvement annuel.",
       notNow: "Plus tard",
       remind: "Me prévenir",
     },
@@ -334,7 +340,7 @@ export default {
   foil: {
     pageTitle: "Scryve Foil Supporter",
     title: "Foil Supporter",
-    price: "500 US$/an",
+    price: "{{amount}} US$/an",
     description:
       "Les mêmes fonctionnalités Pro. Soutien facultatif à Scryve. Renouvelé chaque année jusqu'à annulation.",
     signInPrompt: "Connectez-vous pour lier Foil à votre compte Scryve.",
@@ -350,7 +356,7 @@ export default {
   },
   updates: {
     downloading: "Téléchargement de la mise à jour…",
-    downloadingProgress: "Téléchargement de la mise à jour {{percent}} %",
+    downloadingProgress: "Téléchargement de la mise à jour {{progress, percent}}",
     ready: "Mise à jour prête",
     cancelReady: "Fermer",
     restart: "Redémarrer",

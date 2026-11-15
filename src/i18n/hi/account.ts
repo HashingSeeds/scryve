@@ -80,7 +80,8 @@ export default {
       feedbackReplies: "फ़ीडबैक के जवाब",
       feedbackRepliesHelper: "जवाब हमेशा आपके फ़ीडबैक में दिखाई देते हैं",
       renewalReminders: "नवीनीकरण रिमाइंडर",
-      renewalRemindersHelper: "आपकी सदस्यता के नवीनीकरण से 3 दिन पहले",
+      renewalRemindersHelper_one: "आपकी सदस्यता नवीनीकृत होने से {{count}} दिन पहले",
+      renewalRemindersHelper_other: "आपकी सदस्यता नवीनीकृत होने से {{count}} दिन पहले",
       channel: "जवाब और रिमाइंडर",
       feedbackReplyPreview: "आपके फ़ीडबैक पर नया जवाब",
       blockedTitle: "नोटिफ़िकेशन बंद हैं",
@@ -288,7 +289,8 @@ export default {
       "Scryve Pro एक खाते से जुड़ा है। Pro पाने या अपना मौजूदा Pro इस्तेमाल करने के लिए साइन इन करें।",
     renewalPrompt: {
       title: "नवीनीकरण से पहले याद दिलाएँ?",
-      body: "आपके अगले वार्षिक शुल्क से 3 दिन पहले नोटिफ़िकेशन पाएँ।",
+      body_one: "आपके अगले वार्षिक भुगतान से {{count}} दिन पहले सूचना पाएँ।",
+      body_other: "आपके अगले वार्षिक भुगतान से {{count}} दिन पहले सूचना पाएँ।",
       notNow: "अभी नहीं",
       remind: "मुझे याद दिलाएँ",
     },
@@ -329,7 +331,7 @@ export default {
   foil: {
     pageTitle: "Scryve Foil Supporter",
     title: "Foil Supporter",
-    price: "US$500/वर्ष",
+    price: "US${{amount}}/वर्ष",
     description:
       "वही Pro सुविधाएँ। Scryve के लिए वैकल्पिक सहयोग। रद्द होने तक हर साल रिन्यू होता है।",
     signInPrompt: "Foil को अपने Scryve खाते से जोड़ने के लिए साइन इन करें।",
@@ -345,7 +347,7 @@ export default {
   },
   updates: {
     downloading: "अपडेट डाउनलोड हो रहा है…",
-    downloadingProgress: "अपडेट डाउनलोड हो रहा है {{percent}}%",
+    downloadingProgress: "अपडेट डाउनलोड हो रहा है {{progress, percent}}",
     ready: "अपडेट तैयार है",
     cancelReady: "बंद करें",
     restart: "रीस्टार्ट करें",

@@ -1,6 +1,7 @@
 import type { FunctionArgs } from "convex/server"
 
 import type { TxKeyPath } from "@/i18n"
+import { formatRecord } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import type { api } from "../../../convex/_generated/api"
@@ -117,7 +118,7 @@ function parseCount(
   if (value.trim() === "") return { ok: true, value: 0 }
   const count = Number(value)
   if (!Number.isInteger(count) || count < 0 || count > max)
-    return { ok: false, error: translate(COUNT_RANGE_TX[field], { max }) }
+    return { ok: false, error: translate(COUNT_RANGE_TX[field], { min: 0, max }) }
   return { ok: true, value: count }
 }
 
@@ -180,7 +181,7 @@ export function buildManualMatchArgs(
   )
     return {
       ok: false,
-      error: translate("play:recordMatch.error.roundRange", { max: MAX_ROUND_NUMBER }),
+      error: translate("play:recordMatch.error.roundRange", { min: 1, max: MAX_ROUND_NUMBER }),
     }
 
   let me: RecordManualMatchArgs["me"] = {
@@ -212,7 +213,9 @@ export function buildManualMatchArgs(
     if (expected !== draft.outcome)
       return {
         ok: false,
-        error: translate(SCORE_OUTCOME_TX[expected], { wins: wins.value, losses: losses.value }),
+        error: translate(SCORE_OUTCOME_TX[expected], {
+          record: formatRecord(wins.value, losses.value),
+        }),
       }
     me = { ...me, gamesWon: wins.value, gamesDrawn: draws.value }
     opponents[0] = { ...opponents[0], gamesWon: losses.value, gamesDrawn: draws.value }

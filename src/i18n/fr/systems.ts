@@ -22,13 +22,14 @@ export default {
     riftbound: "points",
   },
   startingValueRange: {
-    none: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
-    mtg: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
-    ygo: "Les Life Points de départ doivent être un nombre entier de 1 à {{max}}.",
-    pokemon: "Les cartes Récompense de départ doivent être un nombre entier de 1 à {{max}}.",
-    lorcana: "Le Lore de départ doit être un nombre entier de 0 à {{max}}.",
-    fab: "Les points de vie de départ doivent être un nombre entier de 1 à {{max}}.",
-    riftbound: "Les points de départ doivent être un nombre entier de 0 à {{max}}.",
+    none: "Les points de vie de départ doivent être un nombre entier de {{min}} à {{max}}.",
+    mtg: "Les points de vie de départ doivent être un nombre entier de {{min}} à {{max}}.",
+    ygo: "Les Life Points de départ doivent être un nombre entier de {{min}} à {{max}}.",
+    pokemon:
+      "Le nombre de cartes Récompense de départ doit être un nombre entier de {{min}} à {{max}}.",
+    lorcana: "Le Lore de départ doit être un nombre entier de {{min}} à {{max}}.",
+    fab: "Les points de vie de départ doivent être un nombre entier de {{min}} à {{max}}.",
+    riftbound: "Les points de départ doivent être un nombre entier de {{min}} à {{max}}.",
   },
   tableItem: {
     poison: "Poison",
@@ -75,26 +76,26 @@ export default {
   },
   formatBlurb: {
     mtg: {
-      commander: "100 cartes, singleton",
+      commander: "{{cards}} cartes, singleton",
       standard: "Éditions récentes",
       pioneer: "Depuis Retour sur Ravnica",
       modern: "Depuis la 8e édition",
       legacy: "Presque toutes les éditions",
       vintage: "Liste des cartes restreintes",
       pauper: "Communes uniquement",
-      brawl: "60 cartes, singleton",
+      brawl: "{{cards}} cartes, singleton",
       limited: "Draft et scellé",
       constructed: "Tout le reste",
     },
     fab: {
-      cc: "60+ cartes, 3 exemplaires",
-      blitz: "Héros jeune, 40 cartes",
+      cc: "{{cards}} cartes, {{copies}} exemplaires",
+      blitz: "Héros jeune, {{cards}} cartes",
       silverAge: "Communes et rares",
       ll: "Légendes autorisées",
       upf: "Multijoueur",
     },
     riftbound: {
-      constructed: "40 cartes, 3 exemplaires",
+      constructed: "{{cards}} cartes, {{copies}} exemplaires",
     },
   },
   counterValue: {

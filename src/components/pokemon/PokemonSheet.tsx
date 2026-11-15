@@ -11,7 +11,7 @@ import {
 } from "react-native"
 
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
-import { formatList, formatSigned } from "@/i18n/format"
+import { formatCopies, formatList, formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -300,7 +300,7 @@ export function PokemonSheet({
     ...deckHits.map(({ cardId, name, copies }) => ({
       cardId,
       name,
-      detail: [pokemonPrintingLabel(cardId), `×${copies}`].filter(Boolean).join(" "),
+      detail: [pokemonPrintingLabel(cardId), formatCopies(copies)].filter(Boolean).join(" "),
     })),
     ...(hits ?? [])
       .filter(({ cardId }) => !inDeck.has(cardId))

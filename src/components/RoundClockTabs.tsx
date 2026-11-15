@@ -7,6 +7,7 @@ import Svg, { Circle, Path } from "react-native-svg"
 import type { PlaySystemId } from "@/features/game/playSystems"
 import { formatRemaining, roundClockText, type RoundClock } from "@/features/game/roundClock"
 import { useRoundClockView } from "@/features/game/useRoundClockView"
+import { formatRatio } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -42,7 +43,7 @@ export const RoundClockTabs = memo(function RoundClockTabs({
   const called = view.kind === "time"
   const text = called
     ? view.turns > 0
-      ? `${Math.min(view.turn, view.turns)}/${view.turns}`
+      ? formatRatio(Math.min(view.turn, view.turns), view.turns)
       : translate("board:clock.time")
     : view.kind === "remaining"
       ? formatRemaining(view.ms)

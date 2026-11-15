@@ -82,7 +82,7 @@ export default {
       "La cola sin conexión de cambios pendientes está llena. Vuelve a conectarte y sincroniza antes de hacer más cambios.",
     undoPartial:
       "La cola sin conexión se llenó a mitad de este deshacer, así que solo se guardó una parte. Vuelve a conectarte y sincroniza, luego deshaz el resto.",
-    commanderDamageRange: "Los cambios de daño de comandante deben estar entre 1 y {{max}}.",
+    commanderDamageRange: "Los cambios de daño de comandante deben estar entre {{min}} y {{max}}.",
     commanderSelfDamage: "Un comandante no puede dañarse a sí mismo",
     commanderClaimDeclined:
       "No se añadieron {{delta}} de daño de comandante a {{name}}. Si aún no ha respondido a tu última solicitud, vuelve a enviarla cuando lo haga.",
@@ -245,7 +245,7 @@ export default {
     header: "Invitación",
     title: "Invitación no válida",
     message:
-      "Esta invitación de Scryve está mal formada o incompleta. Pide al anfitrión un enlace nuevo o escribe el código de 6 caracteres.",
+      "Esta invitación de Scryve está mal formada o incompleta. Pide un enlace nuevo al anfitrión o escribe el código de {{length}} caracteres.",
     enterCode: "Introducir un código manualmente",
     openPlay: "Ir a Jugar",
   },
@@ -291,8 +291,12 @@ export default {
     close: "Cerrar acciones de jugador",
     thanks: "Gracias, ya quedó registrado",
     reportPlayer: "Reportar a {{name}}",
-    reportExplanation:
-      "Al denunciar, también bloqueas de inmediato a este jugador. Dejarás de ver su nombre de usuario y no volverás a compartir partida con él. Revisamos cada denuncia en un plazo de 24 horas.",
+    reportExplanation_one:
+      "Al denunciar, también bloqueas de inmediato a este jugador. Dejarás de ver su nombre de usuario y no volverás a compartir partida con él. Revisamos cada denuncia en un plazo de {{count}} hora.",
+    reportExplanation_many:
+      "Al denunciar, también bloqueas de inmediato a este jugador. Dejarás de ver su nombre de usuario y no volverás a compartir partida con él. Revisamos cada denuncia en un plazo de {{count}} horas.",
+    reportExplanation_other:
+      "Al denunciar, también bloqueas de inmediato a este jugador. Dejarás de ver su nombre de usuario y no volverás a compartir partida con él. Revisamos cada denuncia en un plazo de {{count}} horas.",
     reasons: {
       offensiveUsername: "Nombre de usuario ofensivo",
       harassment: "Acoso o abuso",
@@ -445,7 +449,7 @@ export default {
     title: "Escanear invitación",
     body: "Usa el escáner del teléfono para encontrar un código QR de invitación de Scryve de confianza. El reconocimiento se hace en el teléfono y no se guarda ninguna imagen.",
     webUnavailable:
-      "El escaneo de QR con la cámara está disponible en la app de iOS y Android. Introduce el código de 6 caracteres.",
+      "El escaneo de códigos QR con la cámara está disponible en la app para iOS y Android. Escribe el código de {{length}} caracteres.",
     nativeUnavailable:
       "El escáner QR nativo no está disponible en este teléfono. Escribe el código de invitación manualmente.",
     untrusted:
@@ -469,12 +473,12 @@ export default {
     invitedTitle: "Unirse a la sala de la invitación",
     codeTitle: "Unirse con código",
     invitedBody: "Únete a tus amigos con esta invitación.",
-    codeBody: "Escribe el código de 6 caracteres del anfitrión.",
+    codeBody: "Escribe el código de {{length}} caracteres del anfitrión.",
     invalidInvite: "La invitación no es válida, expiró o fue revocada",
     localGameActive:
       "Termina o anula tu partida local activa antes de unirte a una partida conectada.",
     invalidCode: "Introduce un código de invitación válido.",
-    invalidManualCode: "Introduce un código de invitación válido de 6 caracteres.",
+    invalidManualCode: "Escribe un código de invitación válido de {{length}} caracteres.",
     seatTaken: "Acaban de ocupar ese asiento. Elige otro asiento.",
     failed: "No se pudo unir a la sala",
     scan: "Escanear código QR",

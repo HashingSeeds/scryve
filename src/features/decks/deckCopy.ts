@@ -1,5 +1,5 @@
 import { formatPercent, formatRecord } from "@/i18n/format"
-import { translate } from "@/i18n/translate"
+import { translate, translateForStorage } from "@/i18n/translate"
 
 import { DEFAULT_VERSION_NAME, versionLabel } from "../../../convex/lib/deckVersions"
 import {
@@ -28,26 +28,28 @@ export function cardCountLabel(quantity: number) {
   return translate("decks:cardCount", { count: quantity })
 }
 
+// why: a guest deck needs a name for every version, and it keeps that name after the language changes.
 export function storedVersionName(
   version: { name?: string; versionNumber: number },
   latestVersionNumber: number,
 ) {
   return (
     versionLabel(version, latestVersionNumber) ??
-    translate("decks:numberedVersion", { number: version.versionNumber })
+    translateForStorage("decks:numberedVersion", { number: version.versionNumber })
   )
 }
 
-// why: the server names a new deck's first version "Current" in English, and that name is stored, not translated.
-export function versionNameLabel(name: string) {
-  return name === DEFAULT_VERSION_NAME ? translate("decks:currentVersion") : name
-}
-
+// why: the server names a new deck's first version "Current" in English and stores it, so only that generated name is translated.
 export function deckVersionLabel(
   version: { name?: string; versionNumber: number },
   latestVersionNumber: number,
 ) {
-  return versionNameLabel(storedVersionName(version, latestVersionNumber))
+  const name = versionLabel(version, latestVersionNumber)
+  if (name === undefined)
+    return translate("decks:numberedVersion", { number: version.versionNumber })
+  return name === DEFAULT_VERSION_NAME && version.versionNumber === 1
+    ? translate("decks:currentVersion")
+    : name
 }
 
 export function versionTitle(
@@ -85,5 +87,5 @@ export function recordSummary(record: DeckRecord | undefined) {
   if (record.games === 0) return translate("decks:record.noGames")
   const rate = honestRate(record)
   if (rate.tooFew) return rate.text
-  return translate("decks:record.winRate", { percent: rate.text, games: rate.games })
+  return translate("decks:record.winRate", { rate: rate.percent / 100, games: rate.games })
 }

@@ -9,7 +9,7 @@ import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { statsDate } from "@/features/stats/DeckStatsParts"
-import { formatList, joinParts } from "@/i18n/format"
+import { formatList, formatSum, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -145,14 +145,14 @@ function ThisMatch({ pool, swaps, onSideboard, onReset }: PlayMatch) {
             <Text
               key={`in-${line.key}`}
               style={themed($swappedIn)}
-              text={translate("decks:play.swappedIn", { count: line.quantity, card: line.name })}
+              text={translate("decks:play.swapped", { count: line.quantity, card: line.name })}
             />
           ))}
           {swaps.out.map((line) => (
             <Text
               key={`out-${line.key}`}
               tone="dim"
-              text={translate("decks:play.swappedOut", { count: line.quantity, card: line.name })}
+              text={translate("decks:play.swapped", { count: -line.quantity, card: line.name })}
             />
           ))}
           <Text size="xs" tone="dim" tx="decks:play.resetsNote" style={themed($note)} />
@@ -302,7 +302,7 @@ export function opponentsText(opponents: Result["opponents"]) {
   const names = opponents.flatMap(
     (opponent) =>
       (opponent.identity?.length
-        ? opponent.identity.map((card) => card.name).join(" + ")
+        ? formatSum(opponent.identity.map((card) => card.name))
         : (opponent.deckName ?? opponent.name)) || [],
   )
   return names.length

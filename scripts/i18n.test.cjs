@@ -12,6 +12,7 @@ const {
   staleUnits,
   orphanKeys,
   validateUnit,
+  englishProblems,
 } = require("./i18n.cjs")
 
 const namespace = {
@@ -130,12 +131,48 @@ test("treats a formatted placeholder such as {{delta, signed}} as its own placeh
   ])
 })
 
-test("lets plural forms say one in words but keeps {{count}} in the other form", () => {
+test("lets a plural form say its number in words only when it covers one number", () => {
   const seats = translationUnits({ seats_one: "{{count}} seat", seats_other: "{{count}} seats" })
+  const unit = seats.get("seats")
+  assert.deepEqual(validateUnit(unit, { seats_one: "one seat", seats_other: "seats" }, "en"), [
+    "seats_other: dropped {{count}}",
+  ])
   assert.deepEqual(
-    validateUnit(seats.get("seats"), { seats_one: "un asiento", seats_other: "asientos" }, "fr"),
-    ["seats_many: missing translation", "seats_other: dropped {{count}}"],
+    validateUnit(
+      unit,
+      { seats_one: "un siège", seats_many: "{{count}} sièges", seats_other: "{{count}} sièges" },
+      "fr",
+    ),
+    ["seats_one: dropped {{count}}"],
   )
+  assert.deepEqual(
+    validateUnit(
+      unit,
+      {
+        seats_zero: "لا مقاعد",
+        seats_one: "مقعد واحد",
+        seats_two: "مقعدان",
+        seats_few: "مقاعد",
+        seats_many: "{{count}} مقعدًا",
+        seats_other: "{{count}} مقعد",
+      },
+      "ar",
+    ),
+    ["seats_few: dropped {{count}}"],
+  )
+})
+
+test("rejects numbers and hand-built signs in English copy", () => {
+  assert.deepEqual(englishProblems("last", "Last 7 days"), [
+    "last: has the number 7; pass it as a placeholder",
+  ])
+  assert.deepEqual(englishProblems("dice", "Roll a d20 for 2HG or 2v2"), [])
+  assert.deepEqual(englishProblems("hint", 'Use lines like "1 Sol Ring"'), [])
+  assert.deepEqual(englishProblems("badge", "+{{cost}} or {{rate}}%"), [
+    'badge: "+{{" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}',
+    'badge: "}}%" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}',
+  ])
+  assert.deepEqual(englishProblems("badge", "{{cost, signed}} · {{share, percent}}"), [])
 })
 
 test("flags keys that i18next would resolve to built-in object properties", () => {

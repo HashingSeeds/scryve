@@ -82,6 +82,7 @@
       "lobby": "salon (never lobby)",
       "sign in": "se connecter (noun: connexion). Joining a game is rejoindre, and connecting to one is connexion en cours…; never a bare Connexion for those.",
       "username": "nom d'utilisateur (never pseudo)",
+      "Planechase plane (the card)": "Plan (Plan : {{name}}; never Plane)",
       "Pokémon Special Conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)": "Endormi, Brûlé, Confus, Paralysé, Empoisonné"
     }
   },

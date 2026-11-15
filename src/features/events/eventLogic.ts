@@ -171,9 +171,12 @@ export const firstTiebreaker = (system: string): Tiebreaker | undefined =>
 export const percent = (value: number) =>
   formatNumber(value, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
+// why: matches MAX_OPEN_EVENTS in convex/events.ts, which the server error reports only as text.
+const MAX_OPEN_EVENTS = 5
+
 const ERROR_TEXT: Record<EventErrorCode | "rate_limited", () => string> = {
   name_rejected: () => translate("events:errors.nameRejected"),
-  event_limit: () => translate("events:errors.eventLimit"),
+  event_limit: () => translate("events:errors.eventLimit", { count: MAX_OPEN_EVENTS }),
   event_finished: () => translate("events:errors.eventFinished"),
   event_full: () => translate("events:errors.eventFull"),
   results_missing: () => translate("events:errors.resultsMissing"),

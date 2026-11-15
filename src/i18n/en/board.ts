@@ -19,13 +19,12 @@ const board = {
     rollResult: "{{name}}, {{tool}}, {{value}}",
     rolledGoFirstOrSecond: "{{name}} rolled {{value}}. Go first or second",
     tieRollAgain: "Tie at {{value}}, {{names}}. Rolling again",
-    nameSeparator: " and ",
     goesFirst: "{{name}} goes first",
     wonFlipGoFirstOrSecond: "{{name}} won the flip. Go first or second",
     goFirstOrSecond: "{{name}}, go first or second",
     choseSecond: "{{name}} chose second",
     clearsResult: "Clears this result",
-    // Tiny badge on the player who goes first.
+    // Tiny badge on the player who goes first: the ordinal "first", as short as your language allows. Where the region writes its own digits, use a word, never a digit.
     firstShort: "1st",
     settlesResult: "Settles this result",
     goesFirstQuestion: "Goes first?",
@@ -145,15 +144,15 @@ const board = {
     close: "Close round clock",
     overtimeLeft: "{{time}} of overtime left",
     nextTurn: "Next turn",
-    minusMinute: "−1 min",
-    plusMinute: "+1 min",
+    // Button that adds or removes minutes, as in "+1 min".
+    adjustMinutes: "{{minutes, signed}} min",
     removeMinute: "Remove a minute",
     addMinute: "Add a minute",
     resume: "Resume",
     pause: "Pause",
     callTime: "Call time",
-    bonusTurns_one: "+{{count}} turn",
-    bonusTurns_other: "+{{count}} turns",
+    bonusTurns_one: "{{count, signed}} turn",
+    bonusTurns_other: "{{count, signed}} turns",
     turnOff: "Turn off",
     tied: {
       none: "Tied on life",
@@ -196,8 +195,8 @@ const board = {
     // Ends the whole best-of-N match, not one game.
     end: "End match",
     scoreErrors: {
-      gamesWonRange: "Games won must be 0–{{max}} in a best of {{bestOf}}",
-      gamesDrawnRange: "Games drawn must be 0–{{max}}",
+      gamesWonRange: "Games won must be {{min}}–{{max}} in a best of {{bestOf}}",
+      gamesDrawnRange: "Games drawn must be {{min}}–{{max}}",
       tooManyWins: "A best of {{bestOf}} cannot have {{wins}} wins",
       partialScore: "Enter games won for every seat or leave the score blank",
       oneWinner: "A match can only have one winner",
@@ -623,7 +622,7 @@ const board = {
     // Mana the next planar die roll costs this turn, as in "Next roll: 2".
     nextCost: "Next roll: {{cost}}",
     // Short cost badge on the die button, as in "+2" mana for the next roll.
-    costBadge: "+{{cost}}",
+    costBadge: "{{cost, signed}}",
     free: "Free",
     reset: "Reset cost",
     planeswalk: "Planeswalk",

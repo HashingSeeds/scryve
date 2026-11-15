@@ -6,6 +6,7 @@ import { CardImage } from "@/components/CardImage"
 import { NUMBER_LANE_WIDTH, SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
+import { formatCopies } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -131,7 +132,7 @@ export function DeckCardRow({
           </TouchableOpacity>
         </View>
       ) : (
-        <TrailingNumber value={`${card.quantity}×`} tone="dim" />
+        <TrailingNumber value={formatCopies(card.quantity)} tone="dim" />
       )}
     </View>
   )

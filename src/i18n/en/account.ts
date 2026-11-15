@@ -80,7 +80,8 @@ const account = {
       feedbackReplies: "Feedback replies",
       feedbackRepliesHelper: "Replies always show up in Your feedback",
       renewalReminders: "Renewal reminders",
-      renewalRemindersHelper: "3 days before your subscription renews",
+      renewalRemindersHelper_one: "{{count}} day before your subscription renews",
+      renewalRemindersHelper_other: "{{count}} days before your subscription renews",
       // Android's name for Scryve's notification channel, shown in system settings.
       channel: "Replies and reminders",
       // Shown on the lock screen instead of a feedback reply when the player hides notification previews.
@@ -293,7 +294,8 @@ const account = {
     // Asked right after someone buys a yearly plan.
     renewalPrompt: {
       title: "Remind you before it renews?",
-      body: "Get a notification 3 days before your next yearly charge.",
+      body_one: "Get a notification {{count}} day before your next yearly charge.",
+      body_other: "Get a notification {{count}} days before your next yearly charge.",
       notNow: "Not now",
       remind: "Remind me",
     },
@@ -334,7 +336,8 @@ const account = {
   foil: {
     pageTitle: "Scryve Foil Supporter",
     title: "Foil Supporter",
-    price: "US$500/year",
+    // {{amount}} is the yearly price in US dollars. Place the US$ mark where your language writes it.
+    price: "US${{amount}}/year",
     description:
       "The same Pro features. Optional support for Scryve. Renews yearly until canceled.",
     signInPrompt: "Sign in to link Foil to your Scryve account.",
@@ -350,7 +353,7 @@ const account = {
   },
   updates: {
     downloading: "Downloading update…",
-    downloadingProgress: "Downloading update {{percent}}%",
+    downloadingProgress: "Downloading update {{progress, percent}}",
     ready: "Update ready",
     // Accessibility label for tapping outside the update-ready sheet. It does not cancel the update.
     cancelReady: "Close",

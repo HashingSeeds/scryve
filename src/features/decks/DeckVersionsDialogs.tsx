@@ -13,7 +13,9 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { cardCountLabel, versionNameLabel } from "./deckCopy"
+import { cardCountLabel } from "./deckCopy"
+
+export type DeckVersionRename = { name?: string; note: string }
 
 export type VersionsRow<Id extends string = string> = {
   id: Id
@@ -57,7 +59,8 @@ export function DeckVersionsDialogs<Id extends string>({
   onNew?: () => void
   onCreate: (draft: DeckVersionDraft) => void
   onManage?: () => void
-  onRename: (draft: DeckVersionDraft) => void
+  // why: the name field shows a translated label, so an untouched field must not save that label as the version's name.
+  onRename: (rename: DeckVersionRename) => void
   onDelete?: () => void
   onConfirmDelete: () => void
   visible: boolean
@@ -79,27 +82,23 @@ export function DeckVersionsDialogs<Id extends string>({
         onDismissed={onDismissed}
       />
     )
-  if (dialog === "renameVersion" && rename) {
-    const shownName = versionNameLabel(rename.name)
+  if (dialog === "renameVersion" && rename)
     return (
       <DeckVersionDialog
         title={translate("decks:detail.versionDetails")}
         submitLabel={translate("common:save")}
-        initialName={shownName}
+        initialName={rename.name}
         initialNote={rename.note}
         notesLocked={rename.notesLocked}
         busy={busy}
         error={error}
-        onSubmit={(draft) =>
-          onRename(draft.name === shownName ? { ...draft, name: rename.name } : draft)
-        }
+        onSubmit={({ name, note }) => onRename(name === rename.name ? { note } : { name, note })}
         {...(onDelete ? { onDelete } : {})}
         visible={visible}
         onClose={onClose}
         onDismissed={onDismissed}
       />
     )
-  }
   if (dialog === "versions")
     return (
       <Sheet

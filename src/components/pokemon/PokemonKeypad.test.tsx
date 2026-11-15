@@ -3,18 +3,20 @@ import * as Haptics from "expo-haptics"
 import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { localGameRepository } from "@/features/game/localPersistence"
+import { i18n } from "@/i18n"
+import { PSEUDO_LOCALE } from "@/i18n/format"
 import { ThemeProvider } from "@/theme/context"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { PokemonKeypad } from "./PokemonKeypad"
 
-function renderKeypad(onType = jest.fn()) {
+function renderKeypad(onType = jest.fn(), digitsOnly = false) {
   render(
     <ThemeProvider initialContext="dark">
       <PokemonKeypad
         seatNumber={1}
         ink="#FFFFFF"
-        digitsOnly={false}
+        digitsOnly={digitsOnly}
         capitalize={false}
         onType={onType}
         onDelete={jest.fn()}
@@ -74,4 +76,16 @@ it("types punctuation from the keypad's number layer", () => {
   const onType = renderKeypad()
   press("h", "o", "numbers", "-", "letters", "shift", "o", "h")
   expect(onType.mock.calls.map(([text]) => text).join("")).toBe("ho-Oh")
+})
+
+it("shows the language's digits but types ASCII ones", async () => {
+  await i18n.changeLanguage(PSEUDO_LOCALE)
+  try {
+    const onType = renderKeypad(jest.fn(), true)
+    press("1", "2")
+    expect(screen.getByText("\u0661")).toBeTruthy()
+    expect(onType.mock.calls.map(([text]) => text).join("")).toBe("12")
+  } finally {
+    await i18n.changeLanguage("en-US")
+  }
 })

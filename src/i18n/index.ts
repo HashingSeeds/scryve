@@ -5,7 +5,7 @@ import { initReactI18next } from "react-i18next"
 import "intl-pluralrules"
 
 import type { Translations } from "./en"
-import { formatInterpolation, PSEUDO_LOCALE } from "./format"
+import { formatInterpolation, isPseudoLocale } from "./format"
 import type { LocaleNamespace } from "./localeNamespace"
 import { namespaces, resources } from "./resources"
 
@@ -51,11 +51,10 @@ const loadLocaleOnDemand: BackendModule = {
   },
 }
 
-// why: EXPO_PUBLIC_LOCALE=en-XA brackets every translated string, so on screen any unbracketed text skipped i18n.
 const pseudoLocaleBrackets: PostProcessorModule = {
   type: "postProcessor",
   name: "pseudoLocale",
-  process: (value: string) => (i18n.language === PSEUDO_LOCALE ? `\u27e6${value}\u27e7` : value),
+  process: (value: string) => (isPseudoLocale() ? `\u27e6${value}\u27e7` : value),
 }
 
 void i18n

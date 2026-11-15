@@ -19,6 +19,16 @@ describe("convexErrorMessage", () => {
     }
   })
 
+  it("recognizes a server message with numbers and formats them", () => {
+    const cause = new ConvexError({
+      code: "invalid_life_delta",
+      message: "Life delta must be a non-zero whole number from -999999 to 999999",
+    })
+    expect(convexErrorMessage(cause, "fallback")).toBe(
+      "Life delta must be a non-zero whole number from −999,999 to 999,999",
+    )
+  })
+
   it("shows the server message for an unknown code or a changed message", () => {
     expect(
       convexErrorMessage(new ConvexError({ code: "new_code", message: "Brand new" }), "fallback"),

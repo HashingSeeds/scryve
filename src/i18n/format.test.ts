@@ -9,6 +9,7 @@ import {
   joinParts,
   PSEUDO_LOCALE,
 } from "./format"
+import { translateForStorage } from "./translate"
 
 import { i18n } from "."
 
@@ -59,6 +60,8 @@ describe("format", () => {
   it("formats every number a translation interpolates", () =>
     inLanguage("ar-SA", () => {
       expect(i18n.t("play:summary.playerCount", { count: 4 })).toBe(`${FSI}٤${PDI} لاعبين`)
+      expect(translateForStorage("play:summary.playerCount", { count: 4 })).toBe("4 لاعبين")
+      expect(i18n.t("play:summary.playerCount", { count: 5 })).toBe(`${FSI}٥${PDI} لاعبين`)
     }))
 
   it("marks translated text and formatted numbers in the pseudo-locale", () =>
@@ -66,6 +69,7 @@ describe("format", () => {
       expect(i18n.t("common:cancel")).toBe("\u27e6Cancel\u27e7")
       expect(i18n.t("play:summary.playerCount", { count: 4 })).toBe("\u27e6٤ players\u27e7")
       expect(formatSigned(-12)).toBe("\u2212١٢")
+      expect(translateForStorage("play:summary.playerCount", { count: 4 })).toBe("4 players")
       expect(formatTime(Date.UTC(1970, 0, 1, 9, 5))).toMatch(/^\u27e6[^0-9]+\u27e7$/)
     }))
 })

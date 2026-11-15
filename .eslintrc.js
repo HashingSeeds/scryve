@@ -14,7 +14,7 @@ const gameIdSelectors = [
 ]
 
 const UI_TEXT_ATTRIBUTE =
-  "/^(text|title|subtitle|label|placeholder|heading|content|message|description|helper|caption|accessibilityLabel|accessibilityHint|accessibilityValue)$/"
+  "/^(text|title|subtitle|label|placeholder|heading|content|message|description|helper|caption|accessibilityLabel|accessibilityHint|accessibilityValue|count)$/"
 
 // why: numbers, dates, signs, and joined text read wrong in other languages unless src/i18n/format.ts writes them.
 const localeSelectors = [
@@ -27,8 +27,18 @@ const localeSelectors = [
     message: "Format with @/i18n/format, which knows the app's language and calendar.",
   },
   {
-    selector: "CallExpression[callee.property.name='join'][arguments.0.value=/[·•]|, /]",
-    message: "Join UI text with joinParts or formatList from @/i18n/format.",
+    selector: "CallExpression[callee.property.name='join'][arguments.0.value=/[·•+&]|, /]",
+    message:
+      "Join UI text with joinParts, formatList, formatConjunction, or formatSum from @/i18n/format.",
+  },
+  {
+    selector: "TemplateLiteral > TemplateElement[value.raw=/×/]",
+    message: "Write a card count with formatCopies from @/i18n/format.",
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='TrailingNumber'] > JSXAttribute[name.name='value'] > JSXExpressionContainer > TemplateLiteral[expressions.length>0]",
+    message: "Pass the number to TrailingNumber, or format it with @/i18n/format.",
   },
   {
     selector: "TemplateLiteral > TemplateElement[value.raw=/ [·•] /]",

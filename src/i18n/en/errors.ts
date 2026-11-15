@@ -23,7 +23,7 @@ const errors = {
   gameNotFound: "Game not found",
   invalidCardImage: "Card image must be a public HTTPS URL",
   invalidCardName: "Card name is invalid",
-  invalidCardQuantity: "Card quantity must be 1–999",
+  invalidCardQuantity: "Card quantity must be {{min}}–{{max}}",
   invalidClientTimestamp: "Invalid client timestamp",
   invalidDeckIdentifier: "Invalid deck identifier",
   invalidDeckList: "This YDKE link is invalid",
@@ -31,7 +31,7 @@ const errors = {
   invalidDeviceId: "Invalid device identifier",
   // An invite link or code to join a connected game.
   invalidInvite: "Invite is invalid, expired, or revoked",
-  invalidLifeDelta: "Life delta must be a non-zero whole number from -999999 to 999999",
+  invalidLifeDelta: "Life delta must be a non-zero whole number from {{min}} to {{max}}",
   invalidLocalId: "Guest local ID must be a UUID",
   invalidLocalUpdatedAt: "Guest timestamp is invalid",
   invalidSyncId: "Deck ID must be a UUID or deck ID",

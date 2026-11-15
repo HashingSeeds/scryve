@@ -1,7 +1,7 @@
 import { View, type TextStyle, type ViewStyle } from "react-native"
 
 import { Text } from "@/components/Text"
-import { formatNumber, formatPercent } from "@/i18n/format"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { radius } from "@/theme/radius"
 
@@ -40,7 +40,7 @@ export function CardScanStats({ photo }: { photo: CardPhotoText }) {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               }),
-              share: formatPercent(rectangle.share),
+              share: rectangle.share,
               verdict: translate(`decks:cardScan.stats.${rectangle.rejected ?? "accepted"}`),
             })}
           />

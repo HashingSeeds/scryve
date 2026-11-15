@@ -12,7 +12,14 @@ import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
-import { analyzeDeck, CURVE_BUCKETS, type DeckAnalysis, type ManaColor } from "./deckAnalysis"
+import {
+  analyzeDeck,
+  CURVE_BUCKETS,
+  KEEPABLE_LANDS,
+  OPENING_HAND,
+  type DeckAnalysis,
+  type ManaColor,
+} from "./deckAnalysis"
 import type { DeckCard } from "./deckCards"
 import { useDeckCardDetails } from "./useDeckCardDetails"
 import { systemDefinition } from "../../../convex/lib/systems"
@@ -245,10 +252,13 @@ export function DeckAnalysisPanel({
 
       {analysis.mulligans ? (
         <View style={themed($group)} testID="deck-analysis-mulligans">
-          <SectionHeader label={translate("decks:analysis.openingHand")} />
+          <SectionHeader label={translate("decks:analysis.openingHand", KEEPABLE_LANDS)} />
           <Odds
             cells={[
-              { label: translate("decks:analysis.keepSeven"), chance: analysis.mulligans.keep },
+              {
+                label: translate("decks:analysis.keepHand", { cards: OPENING_HAND }),
+                chance: analysis.mulligans.keep,
+              },
               { label: translate("decks:analysis.mulligan"), chance: analysis.mulligans.once },
               {
                 label: translate("decks:analysis.mulliganTwice"),

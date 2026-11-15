@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import { formatNumber } from "@/i18n/format"
+import { formatConjunction, formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import type { TurnSeat } from "./turnTab"
@@ -244,7 +244,7 @@ export function rollOffAnnouncement(
       : translate("board:dice.rolloffLabel.won", { name: name(first.pool[0]), value })
   return translate("board:dice.tieRollAgain", {
     value,
-    names: first.pool.map(name).join(translate("board:dice.nameSeparator")),
+    names: formatConjunction(first.pool.map(name)),
   })
 }
 

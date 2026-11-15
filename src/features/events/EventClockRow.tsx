@@ -53,14 +53,16 @@ export function EventClockRow({
         <View style={themed($controls)}>
           <Button
             testID="clock-minus"
-            tx="events:clock.minus"
+            tx="events:clock.adjustMinutes"
+            txOptions={{ minutes: -1 }}
             disabled={busy}
             style={$control}
             onPress={() => onAction({ kind: "adjust", minutes: -1 })}
           />
           <Button
             testID="clock-plus"
-            tx="events:clock.plus"
+            tx="events:clock.adjustMinutes"
+            txOptions={{ minutes: 1 }}
             disabled={busy}
             style={$control}
             onPress={() => onAction({ kind: "adjust", minutes: 1 })}

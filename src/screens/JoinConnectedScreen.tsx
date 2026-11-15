@@ -14,7 +14,7 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
-import { normalizeManualCode } from "@/features/connected/inviteLinks"
+import { INVITE_CODE_LENGTH, normalizeManualCode } from "@/features/connected/inviteLinks"
 import { connectedProfileName } from "@/features/connected/useConnectedProfile"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { hasLocalGameStarted, MAX_PLAYERS } from "@/features/game/domain"
@@ -132,7 +132,7 @@ export function JoinConnectedScreen({
       const manualCode = token ? undefined : normalizeManualCode(code)
       if (!token && !manualCode) {
         captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "input" })
-        setError(translate("connected:join.invalidManualCode"))
+        setError(translate("connected:join.invalidManualCode", { length: INVITE_CODE_LENGTH }))
         return
       }
       failureReason = "request"
@@ -236,6 +236,7 @@ export function JoinConnectedScreen({
             size="sm"
             tone="dim"
             tx={token ? "connected:join.invitedBody" : "connected:join.codeBody"}
+            txOptions={{ length: INVITE_CODE_LENGTH }}
           />
         </View>
         {!token ? (

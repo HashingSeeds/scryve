@@ -238,14 +238,19 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                       tone="dim"
                       tx="decks:stats.chance"
                       txOptions={{
-                        rate: honestRate(chance.record).text,
+                        rate: chance.record.wins / honestRate(chance.record).games,
                         podSize: chance.podSize,
-                        percent: Math.round(chance.expected * 100),
+                        expected: chance.expected,
                       }}
                     />
                   ) : null}
                   {range ? (
-                    <Text size="xs" tone="dim" tx="decks:stats.likely" txOptions={range} />
+                    <Text
+                      size="xs"
+                      tone="dim"
+                      tx="decks:stats.likely"
+                      txOptions={{ low: range.low / 100, high: range.high / 100 }}
+                    />
                   ) : null}
                   {smallSample ? (
                     <Text

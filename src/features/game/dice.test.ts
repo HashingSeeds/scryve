@@ -59,7 +59,7 @@ describe("dice roll-off", () => {
     const tied = startRollOff(EMPTY_DICE, [ada, grace, kat], magic, d20s(18, 18, 3))
     expect(diceSeatView(tied, ada)).toMatchObject({ value: 18, attempt: 1, status: "tied" })
     expect(diceSeatView(tied, kat)).toMatchObject({ value: 3, attempt: 1, status: "out" })
-    expect(rollOffAnnouncement(tied.first, players)).toBe("Tie at 18, Ada and Grace. Rolling again")
+    expect(rollOffAnnouncement(tied.first, players)).toBe("Tie at 18, Ada & Grace. Rolling again")
     expect(settleFirst(tied)).toBe(tied)
     expect(firstPlayerSeat(tied)).toBeUndefined()
 

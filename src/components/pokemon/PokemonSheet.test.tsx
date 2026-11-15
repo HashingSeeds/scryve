@@ -248,7 +248,7 @@ describe("PokemonSheet", () => {
     render(sheet({ deck: { ownerId: "owner-1", versionId: "version-1" }, onPlace }))
     await flush()
 
-    expect(screen.getByLabelText("Charizard ex, SV3 125 ×3")).toBeTruthy()
+    expect(screen.getByLabelText("Charizard ex, SV3 125 3×")).toBeTruthy()
     expect(screen.queryByText("Rare Candy")).toBeNull()
     expect(
       new DeckVersionCacheRepository("owner-1", undefined, mockConvex.url).loadCards("version-1")

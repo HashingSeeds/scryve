@@ -80,7 +80,7 @@ export default {
       feedbackReplies: "フィードバックへの返信",
       feedbackRepliesHelper: "返信は常に「あなたのフィードバック」に表示されます",
       renewalReminders: "更新のリマインダー",
-      renewalRemindersHelper: "サブスクリプション更新の3日前",
+      renewalRemindersHelper_other: "サブスクリプションの更新の{{count}}日前",
       channel: "返信とリマインダー",
       feedbackReplyPreview: "フィードバックに新しい返信があります",
       blockedTitle: "通知がオフです",
@@ -288,7 +288,7 @@ export default {
       "Scryve Proはアカウントに紐づいています。Proをご利用になるにはサインインしてください。",
     renewalPrompt: {
       title: "更新前にお知らせしますか?",
-      body: "次の年額課金の3日前に通知を受け取れます。",
+      body_other: "次回の年額請求の{{count}}日前に通知を受け取れます。",
       notNow: "今はしない",
       remind: "通知する",
     },
@@ -328,7 +328,7 @@ export default {
   foil: {
     pageTitle: "Scryve Foil Supporter",
     title: "Foil Supporter",
-    price: "年額500米ドル",
+    price: "年額US${{amount}}",
     description: "Proと同じ機能です。Scryveへの任意のサポートです。解約するまで毎年更新されます。",
     signInPrompt: "FoilをScryveアカウントに連携するには、サインインしてください。",
     alreadyPro:
@@ -343,7 +343,7 @@ export default {
   },
   updates: {
     downloading: "アップデートをダウンロード中…",
-    downloadingProgress: "アップデートをダウンロード中 {{percent}}%",
+    downloadingProgress: "アップデートをダウンロード中 {{progress, percent}}",
     ready: "アップデート準備完了",
     cancelReady: "閉じる",
     restart: "再起動",

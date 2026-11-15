@@ -207,9 +207,42 @@ function writesOwnDigits(locale) {
   return new Intl.NumberFormat(`${language}-${region}`).resolvedOptions().numberingSystem !== "latn"
 }
 
-// why: plural forms such as "one" may say the number in words; "other" and plain strings must print it.
-function mayDropCount(unit, key) {
-  return unit.plural && !key.endsWith("_other")
+const exactPluralForms = new Map()
+
+// why: French "one" covers 0 and 1, so only a form that matches a single number may say it in words.
+function exactForms(locale) {
+  if (!exactPluralForms.has(locale)) {
+    const rules = new Intl.PluralRules(locale)
+    const counts = new Map()
+    for (let number = 0; number <= 1000; number++) {
+      const category = rules.select(number)
+      counts.set(category, (counts.get(category) ?? 0) + 1)
+    }
+    const exact = [...counts].filter(([, count]) => count === 1).map(([category]) => category)
+    exactPluralForms.set(locale, new Set(exact))
+  }
+  return exactPluralForms.get(locale)
+}
+
+function mayDropCount(unit, key, locale) {
+  if (!unit.plural) return false
+  return exactForms(locale).has(key.slice(unit.id.length + 1))
+}
+
+// why: these name things, not quantities, so the reader's digits never apply to them.
+const ENGLISH_DIGIT_TOKENS =
+  /\bd(?:4|6|8|10|12|20|100)\b|\bp(?:50|90|99)\b|\b2v2\b|\b2HG\b|\b8th Edition\b|\b1st\b|\b3 Ash Blossom\b/g
+
+function englishProblems(key, text) {
+  const digits = numbersIn(text.replace(ENGLISH_DIGIT_TOKENS, " "))
+  const signs = text.match(/[+−-]{{|}}%/g) ?? []
+  return [
+    ...digits.map((number) => `${key}: has the number ${number}; pass it as a placeholder`),
+    ...signs.map(
+      (sign) =>
+        `${key}: "${sign}" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}`,
+    ),
+  ]
 }
 
 function validateUnit(unit, translatedFlat, locale) {
@@ -221,7 +254,7 @@ function validateUnit(unit, translatedFlat, locale) {
     if (typeof text !== "string" || !text.trim()) return [`${key}: missing translation`]
     const found = placeholders(text)
     const required = [...english].filter(
-      (token) => token !== "{{count}}" || !mayDropCount(unit, key),
+      (token) => token !== "{{count}}" || !mayDropCount(unit, key, locale),
     )
     const missing = required.filter((token) => !found.has(token))
     const unknown = [...found].filter((token) => !english.has(token))
@@ -336,6 +369,8 @@ async function check() {
     const englishFlat = flatten(english[namespace])
     for (const key of prototypeKeys(englishFlat))
       problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
+    for (const [key, text] of Object.entries(englishFlat))
+      for (const problem of englishProblems(key, text)) problems.push(`en/${namespace}: ${problem}`)
     const units = namespaceUnits(english, namespace)
     const lock = readJson(lockPath(namespace), {})
     for (const locale of Object.keys(LOCALES)) {
@@ -555,4 +590,5 @@ module.exports = {
   staleUnits,
   orphanKeys,
   validateUnit,
+  englishProblems,
 }

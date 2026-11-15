@@ -23,7 +23,8 @@ import { WhatYouPlayScreen } from "@/screens/WhatYouPlayScreen"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-const STALE_GAME_MS = 24 * 60 * 60 * 1000
+const STALE_GAME_HOURS = 24
+const STALE_GAME_MS = STALE_GAME_HOURS * 60 * 60 * 1000
 
 function createPreparedGame(value: string | undefined) {
   if (!value) return undefined
@@ -176,7 +177,7 @@ export default function Index() {
       >
         <View style={themed($oldGameCopy)}>
           <Text tx="play:launch.staleTitle" preset="heading" accessibilityRole="header" />
-          <Text tx="play:launch.staleMessage" />
+          <Text tx="play:launch.staleMessage" txOptions={{ count: STALE_GAME_HOURS }} />
         </View>
         <View style={themed($oldGameActions)}>
           <Button

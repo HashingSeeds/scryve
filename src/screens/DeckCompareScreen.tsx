@@ -266,7 +266,14 @@ function ComparisonRate({ record }: { record: Parameters<typeof likelyRange>[0] 
         text={games ? formatPercent(record.wins / games) : recordText(record)}
         style={$numbers}
       />
-      {range ? <Text size="xxs" tone="dim" tx="decks:stats.likely" txOptions={range} /> : null}
+      {range ? (
+        <Text
+          size="xxs"
+          tone="dim"
+          tx="decks:stats.likely"
+          txOptions={{ low: range.low / 100, high: range.high / 100 }}
+        />
+      ) : null}
     </View>
   )
 }

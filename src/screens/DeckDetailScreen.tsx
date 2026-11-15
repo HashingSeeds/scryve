@@ -30,7 +30,6 @@ import {
   cardCountLabel,
   deckVersionLabel,
   recordText,
-  storedVersionName,
   versionTitle,
 } from "@/features/decks/deckCopy"
 import {
@@ -55,7 +54,7 @@ import {
   type DeckVersionRef,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
-import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
+import { type DeckVersionRename, DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
 import { DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
@@ -766,13 +765,13 @@ function DeckDetailContent({
     }, translate("decks:detail.createVersionFailed"))
   }
 
-  async function submitRenameVersion({ name, note }: DeckVersionDraft) {
+  async function submitRenameVersion({ name, note }: DeckVersionRename) {
     if (view.canQueueVersions && activeVersionId) {
       try {
         versionWrites.renameVersion(
           deckId,
           activeVersionId,
-          { name, note },
+          { ...(name === undefined ? {} : { name }), note },
           pinnedRevisionFor(activeVersionId) ?? versionTarget?.expectedRevision ?? 0,
         )
         setDialog("none")
@@ -783,7 +782,7 @@ function DeckDetailContent({
     }
     if (!version) return
     await run(async () => {
-      await updateVersion({ versionId: version._id, name, note })
+      await updateVersion({ versionId: version._id, ...(name === undefined ? {} : { name }), note })
       setDialog("none")
     }, translate("decks:detail.updateVersionFailed"))
   }
@@ -1466,7 +1465,7 @@ function DeckDetailContent({
         }
         rename={
           activeVersionSummary && {
-            name: storedVersionName(activeVersionSummary, activeVersionSummary.versionNumber),
+            name: deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber),
             note: activeVersionSummary.note ?? "",
             notesLocked: !view.premium,
           }

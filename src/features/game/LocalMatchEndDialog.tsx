@@ -21,14 +21,15 @@ import { assertGameScores, type MatchBestOf } from "../../../convex/lib/matchRes
 const OUTCOMES = ["win", "loss", "draw"] as const satisfies readonly MatchSeatOutcome[]
 
 /** why: assertGameScores is shared with the server and throws English; matching its exact text here keeps convex/ unchanged for installed clients. */
-const SCORE_ERRORS: readonly [RegExp, (groups: string[]) => string][] = [
+const SCORE_ERRORS: readonly [RegExp, (groups: number[]) => string][] = [
   [
-    /^Games won must be 0–(\d+) in a best of (\d+)$/,
-    ([max, bestOf]) => translate("board:matchEnd.scoreErrors.gamesWonRange", { max, bestOf }),
+    /^Games won must be (\d+)–(\d+) in a best of (\d+)$/,
+    ([min, max, bestOf]) =>
+      translate("board:matchEnd.scoreErrors.gamesWonRange", { min, max, bestOf }),
   ],
   [
-    /^Games drawn must be 0–(\d+)$/,
-    ([max]) => translate("board:matchEnd.scoreErrors.gamesDrawnRange", { max }),
+    /^Games drawn must be (\d+)–(\d+)$/,
+    ([min, max]) => translate("board:matchEnd.scoreErrors.gamesDrawnRange", { min, max }),
   ],
   [
     /^A best of (\d+) cannot have (\d+) wins$/,
@@ -57,7 +58,7 @@ function gameScoresErrorMessage(cause: unknown) {
   const message = cause instanceof Error ? cause.message : ""
   for (const [pattern, describe] of SCORE_ERRORS) {
     const match = pattern.exec(message)
-    if (match) return describe(match.slice(1))
+    if (match) return describe(match.slice(1).map(Number))
   }
   return cause instanceof Error ? cause.message : translate("board:matchEnd.failed")
 }

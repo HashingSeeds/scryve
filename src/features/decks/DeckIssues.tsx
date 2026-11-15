@@ -4,7 +4,7 @@ import type { ViewStyle } from "react-native"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { Text } from "@/components/Text"
-import { formatList } from "@/i18n/format"
+import { formatList, formatSum } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -73,7 +73,7 @@ export function deckIssueText(issue: DeckIssue, labels: IssueLabels) {
     case "size": {
       const { count: have, target, exact } = issue
       const values = {
-        sections: issue.sections.map(sectionLabel).join(" + "),
+        sections: formatSum(issue.sections.map(sectionLabel)),
         have,
         target,
         diff: Math.abs(have - target),

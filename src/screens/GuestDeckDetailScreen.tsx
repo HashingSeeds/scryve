@@ -19,19 +19,14 @@ import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { countCardChanges } from "@/features/decks/deckBuild"
 import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
-import {
-  cardCountLabel,
-  deckVersionLabel,
-  storedVersionName,
-  versionTitle,
-} from "@/features/decks/deckCopy"
+import { cardCountLabel, deckVersionLabel, versionTitle } from "@/features/decks/deckCopy"
 import { canChooseCommander, isCommanderPick } from "@/features/decks/deckDraft"
 import {
   useLocalDeckDraft,
   type LocalDeckDraft as GuestDraft,
 } from "@/features/decks/deckDraftStore"
 import { DeckPlay } from "@/features/decks/DeckPlay"
-import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
+import { type DeckVersionRename, DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
 import { DeckView, type DeckMode } from "@/features/decks/DeckView"
 import {
   addGuestDeckVersion,
@@ -353,7 +348,7 @@ export function GuestDeckDetailScreen({
       )
       setChosen(next.versions?.at(-1)?.number)
     }, translate("decks:detail.createVersionFailed"))
-  const renameVersion = (details: DeckVersionDraft) =>
+  const renameVersion = (details: DeckVersionRename) =>
     versionAction(
       () => updateGuestDeckVersion(localId, activeNumber, details),
       translate("decks:detail.updateVersionFailed"),
@@ -611,7 +606,7 @@ export function GuestDeckDetailScreen({
         }
         rename={
           active && {
-            name: storedVersionName({ ...active, versionNumber: active.number }, active.number),
+            name: deckVersionLabel({ ...active, versionNumber: active.number }, active.number),
             note: active.note ?? "",
             notesLocked: !pro,
           }

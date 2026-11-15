@@ -21,7 +21,7 @@ import {
   playSystemRules,
   playSystemShortLabel,
 } from "@/features/game/playSystems"
-import type { PushKind } from "@/features/notifications/prefs"
+import { RENEWAL_REMINDER_DAYS, type PushKind } from "@/features/notifications/prefs"
 import { copyDebugInfo, readAppInfo } from "@/features/updates/appInfo"
 import { AppUpdateStatus } from "@/features/updates/AppUpdateStatus"
 import { joinParts } from "@/i18n/format"
@@ -234,6 +234,7 @@ export function SettingsScreen({
               testID="notify-renewal-switch"
               labelTx="account:settings.notifications.renewalReminders"
               helperTx="account:settings.notifications.renewalRemindersHelper"
+              helperTxOptions={{ count: RENEWAL_REMINDER_DAYS }}
               value={notifications.renewalReminders}
               onValueChange={(on) => notifications.onChange("renewalReminders", on)}
             />

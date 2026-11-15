@@ -36,9 +36,15 @@ import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { identityLabel, SEARCH_COLORS, toggleColor } from "@/features/decks/colorMatch"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
-import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
+import {
+  cardDetailsKey,
+  cardSection,
+  MAX_CARD_COPIES,
+  printingKey,
+  type DeckCard,
+} from "@/features/decks/deckCards"
 import { deckNameWarning } from "@/features/decks/deckCopy"
-import { isCommanderPick, MAX_CARD_COPIES, type DeckEdits } from "@/features/decks/deckDraft"
+import { isCommanderPick, type DeckEdits } from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { type GuestDeckPayload } from "@/features/decks/guestDeck"
 import { ImportBuild } from "@/features/decks/ImportBuild"
@@ -53,7 +59,7 @@ import { localizedDeckSections } from "@/features/game/playSystems"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import { type TxKeyPath } from "@/i18n"
 import { formatDate, formatNumber, joinParts } from "@/i18n/format"
-import { translate } from "@/i18n/translate"
+import { translate, translateForStorage } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
@@ -143,12 +149,12 @@ function attributionLabel(attribution: { sourceName: string; author?: string }) 
 
 function importedNote(attribution: { sourceName: string; author?: string; sourceUrl: string }) {
   return attribution.author
-    ? translate("decks:addDeck.importedNoteBy", {
+    ? translateForStorage("decks:addDeck.importedNoteBy", {
         source: attribution.sourceName,
         author: attribution.author,
         url: attribution.sourceUrl,
       })
-    : translate("decks:addDeck.importedNote", {
+    : translateForStorage("decks:addDeck.importedNote", {
         source: attribution.sourceName,
         url: attribution.sourceUrl,
       })
@@ -680,7 +686,12 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
           : format
       const normalized = normalizeImportedCards(importCards(resolved.cards), game, suggestedFormat)
       if ("overflow" in normalized) {
-        setError(translate("decks:addDeck.overflowAfterMatch", { card: normalized.overflow }))
+        setError(
+          translate("decks:addDeck.overflowAfterMatch", {
+            card: normalized.overflow,
+            max: MAX_CARD_COPIES,
+          }),
+        )
         return
       }
       if (result.kind === "link") {
@@ -806,7 +817,10 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
       draft.format,
     )
     if ("overflow" in normalized)
-      return translate("decks:addDeck.overflowAfterMatch", { card: normalized.overflow })
+      return translate("decks:addDeck.overflowAfterMatch", {
+        card: normalized.overflow,
+        max: MAX_CARD_COPIES,
+      })
     editor.setDraft({ ...rest, cards: normalized.cards })
     return undefined
   }

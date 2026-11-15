@@ -481,7 +481,7 @@ export function addGuestDeckVersion(
 export function updateGuestDeckVersion(
   localId: string,
   number: number,
-  { name, note }: { name: string; note: string },
+  { name, note }: { name?: string; note: string },
 ) {
   return changeVersions(localId, (versions, updatedAt) =>
     versions.map((version) => {
@@ -489,7 +489,7 @@ export function updateGuestDeckVersion(
       const { note: _previous, ...rest } = version
       return {
         ...rest,
-        name: name.trim(),
+        ...(name === undefined ? {} : { name: name.trim() }),
         ...(note.trim() ? { note: note.trim() } : {}),
         updatedAt,
       }

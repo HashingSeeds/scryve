@@ -1,5 +1,7 @@
 export type CommanderColor = "W" | "U" | "B" | "R" | "G"
 
+export const MAX_CARD_COPIES = 999
+
 export type DeckCard = {
   game?: string
   identityNamespace?: string

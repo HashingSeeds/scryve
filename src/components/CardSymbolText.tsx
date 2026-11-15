@@ -41,6 +41,7 @@ function hybridLayers(upper: Coin, lower: Coin): Layer[] {
   ]
 }
 
+const PHYREXIAN_LIFE = 2
 const PHYREXIAN_LAYERS: Layer[] = [
   [SYMBOL_LAYERS.phyrexianDot, INK],
   [SYMBOL_LAYERS.phyrexianHeart, "#E25563"],
@@ -152,7 +153,7 @@ function magicSymbol(token: string): CardSymbol | undefined {
   if (!phyrexian) return paid
   return {
     layers: [...paid.layers, ...PHYREXIAN_LAYERS],
-    label: translate("decks:cardSymbols.orLife", { mana: paid.label }),
+    label: translate("decks:cardSymbols.orLife", { mana: paid.label, life: PHYREXIAN_LIFE }),
   }
 }
 

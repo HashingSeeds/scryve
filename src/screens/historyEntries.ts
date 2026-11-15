@@ -431,15 +431,10 @@ export const NO_FILTERS: HistoryFilters = {
 const DAY_MS = 24 * 60 * 60 * 1000
 const RANGE_DAYS: Record<Exclude<DateRange, "any" | "year">, number> = { "7d": 7, "30d": 30 }
 
-const DATE_RANGE_TX = {
-  "any": "play:history.dateRange.any",
-  "7d": "play:history.dateRange.last7Days",
-  "30d": "play:history.dateRange.last30Days",
-  "year": "play:history.dateRange.thisYear",
-} as const satisfies Record<DateRange, TxKeyPath>
-
 export function dateRangeLabel(range: DateRange) {
-  return translate(DATE_RANGE_TX[range])
+  if (range === "any") return translate("play:history.dateRange.any")
+  if (range === "year") return translate("play:history.dateRange.thisYear")
+  return translate("play:history.dateRange.lastDays", { count: RANGE_DAYS[range] })
 }
 
 const OUTCOME_TX = {

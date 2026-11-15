@@ -20,13 +20,13 @@ const systems = {
     riftbound: "points",
   },
   startingValueRange: {
-    none: "Starting life must be a whole number from 1 to {{max}}.",
-    mtg: "Starting life must be a whole number from 1 to {{max}}.",
-    ygo: "Starting Life Points must be a whole number from 1 to {{max}}.",
-    pokemon: "Starting Prize cards must be a whole number from 1 to {{max}}.",
-    lorcana: "Starting lore must be a whole number from 0 to {{max}}.",
-    fab: "Starting life must be a whole number from 1 to {{max}}.",
-    riftbound: "Starting points must be a whole number from 0 to {{max}}.",
+    none: "Starting life must be a whole number from {{min}} to {{max}}.",
+    mtg: "Starting life must be a whole number from {{min}} to {{max}}.",
+    ygo: "Starting Life Points must be a whole number from {{min}} to {{max}}.",
+    pokemon: "Starting Prize cards must be a whole number from {{min}} to {{max}}.",
+    lorcana: "Starting lore must be a whole number from {{min}} to {{max}}.",
+    fab: "Starting life must be a whole number from {{min}} to {{max}}.",
+    riftbound: "Starting points must be a whole number from {{min}} to {{max}}.",
   },
   tableItem: {
     poison: "Poison",
@@ -83,26 +83,28 @@ const systems = {
   },
   formatBlurb: {
     mtg: {
-      commander: "100 cards, singleton",
+      commander: "{{cards}} cards, singleton",
       standard: "Recent sets",
       pioneer: "Return to Ravnica forward",
       modern: "8th Edition forward",
       legacy: "Nearly every set",
       vintage: "Restricted list",
       pauper: "Commons only",
-      brawl: "60 cards, singleton",
+      brawl: "{{cards}} cards, singleton",
       limited: "Draft and sealed",
       constructed: "Anything else",
     },
     fab: {
-      cc: "60+ cards, 3 copies",
-      blitz: "Young hero, 40 cards",
+      // {{cards}} is a minimum deck size such as "60+". {{copies}} is the most copies of one card.
+      cc: "{{cards}} cards, {{copies}} copies",
+      blitz: "Young hero, {{cards}} cards",
       silverAge: "Commons and rares",
       ll: "Legends allowed",
       upf: "Multiplayer",
     },
     riftbound: {
-      constructed: "40 cards, 3 copies",
+      // {{copies}} is the most copies of one card.
+      constructed: "{{cards}} cards, {{copies}} copies",
     },
   },
   counterValue: {

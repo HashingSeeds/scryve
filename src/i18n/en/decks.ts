@@ -13,8 +13,8 @@ const decks = {
   currentVersion: "Current",
   record: {
     noGames: "No games yet",
-    // {{percent}} is a formatted win rate such as "53%".
-    winRate: "{{percent}} of {{games}}",
+    // A win rate out of a number of games, such as "53% of 17".
+    winRate: "{{rate, percent}} of {{games}}",
   },
   stats: {
     title: "Deck stats",
@@ -24,8 +24,8 @@ const decks = {
     ofGames: "of {{count}}",
     gameCount_one: "{{count}} game",
     gameCount_other: "{{count}} games",
-    chance: "{{rate}} in {{podSize}}-player games · chance {{percent}}%",
-    likely: "Likely {{low}} to {{high}}%",
+    chance: "{{rate, percent}} in {{podSize}}-player games · chance {{expected, percent}}",
+    likely: "Likely {{low, percent}} to {{high, percent}}",
     lists: "Lists",
     turnOrder: "Turn order",
     wentFirst: "Went first",
@@ -84,7 +84,7 @@ const decks = {
     legalityUnconfirmed: "Commander legality has not been confirmed for this card.",
     chooseColor: "Choose a color for this commander.",
     pairUnchecked: "Can't check this pair until your current commander's details load.",
-    copyLimit: "This change would exceed the 999-copy limit for a card entry.",
+    copyLimit: "This change would exceed the {{limit}}-copy limit for a card entry.",
     detailsMissing:
       "Some card details are missing. Deck color identity has not been fully checked.",
     duplicateCommander: "Another copy of this commander remains in the deck.",
@@ -336,8 +336,8 @@ const decks = {
     snow: "snow mana",
     // A hybrid cost paid with either kind of mana.
     either: "{{first}} or {{second}}",
-    // A Phyrexian cost paid with mana or with 2 life.
-    orLife: "{{mana}} or 2 life",
+    // A Phyrexian cost paid with mana or with life.
+    orLife: "{{mana}} or {{life}} life",
     // Riftbound: an energy cost. {{amount}} is a number.
     energyAmount: "{{amount}} energy",
     // Riftbound: a unit's combat stat.
@@ -481,8 +481,8 @@ const decks = {
       serious: "hot",
       critical: "very hot",
       noRectangles: "No rectangles",
-      // One detected rectangle: width over height, its size as a formatted percent of the frame such as "40%", then a verdict word below.
-      rectangle: "{{aspect}} · {{share}} · {{verdict}}",
+      // One detected rectangle: width over height, its share of the frame as a percent, then a verdict word below.
+      rectangle: "{{aspect}} · {{share, percent}} · {{verdict}}",
       // A rectangle the scanner accepted as the card.
       accepted: "card",
       // Rejected because its shape is not a card's.
@@ -594,10 +594,8 @@ const decks = {
     asBuilt: "Main deck as built",
     // Under "Main deck as built", e.g. "60 cards · 15 in sideboard". {{cards}} is already counted, like "60 cards".
     asBuiltDetail: "{{cards}} · {{side}} in sideboard",
-    // A card brought in from the sideboard for this match, e.g. "+2 Rest in Peace".
-    swappedIn: "+{{count}} {{card}}",
-    // A card taken out of the main deck for this match, e.g. "−2 Searing Blaze".
-    swappedOut: "−{{count}} {{card}}",
+    // A card brought in from the sideboard (+2 Rest in Peace) or taken out of the main deck (−2 Searing Blaze) for this match.
+    swapped: "{{count, signed}} {{card}}",
     resetsNote: "Resets when the match ends. Your list doesn't change.",
     // Button: undo every swap for this match and play the deck as built.
     reset: "Reset",
@@ -668,8 +666,9 @@ const decks = {
     // "On the play" means going first, with no draw on turn one.
     landDropsOnPlay: "Land drop odds on the play",
     turn: "Turn {{turn}}",
-    openingHand: "Opening hand, keeping 2 to 5 lands",
-    keepSeven: "Keep 7",
+    openingHand: "Opening hand, keeping {{min}} to {{max}} lands",
+    // Keep the opening hand of {{cards}} cards instead of taking a mulligan.
+    keepHand: "Keep {{cards}}",
     mulligan: "Mulligan",
     mulliganTwice: "Mulligan twice",
     // "Free" means it costs no card, not free of charge.
@@ -749,7 +748,7 @@ const decks = {
     loadDecksFailed: "Could not load decks",
     previewFailed: "Could not load this deck",
     overflowAfterMatch:
-      "{{card}} has more than 999 copies after matching. Correct the source and try again.",
+      "{{card}} has more than {{max}} copies after matching. Correct the source and try again.",
     linkFailed: "Could not load this deck. Try again or paste its text export.",
     resolveFailed: "Could not resolve deck list. Try again.",
     notes: "Notes",

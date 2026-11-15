@@ -248,7 +248,7 @@ export const LifeCard = memo(function LifeCard({
     stopTapTiming.current = undefined
   }, [preview])
   const shownLife = life + preview
-  const shownDigits = String(shownLife).length
+  const shownDigits = formatNumber(shownLife).length
   const fontSizeFor = (digits: number) =>
     lifeFontSizeFor?.(digits) ??
     Math.min(
@@ -333,9 +333,11 @@ export const LifeCard = memo(function LifeCard({
   const lastAttack = useRef(attackParts)
   if (attackParts) lastAttack.current = attackParts
   const shownAttack = attackParts ?? lastAttack.current
-  const attackLine = shownAttack ? `${shownAttack.from} − ${shownAttack.commander}` : ""
+  const attackChars = shownAttack
+    ? formatNumber(shownAttack.from).length + formatNumber(shownAttack.commander).length + 3
+    : 0
   const attackEquation = shownAttack ? splitAttackEquation(shownAttack) : ["", ""]
-  const stacked = stackedReadout(resolvedLifeFontSize, shownDigits, attackLine.length)
+  const stacked = stackedReadout(resolvedLifeFontSize, shownDigits, attackChars)
   const lifeRise = lifeInk(resolvedLifeFontSize, shownDigits).y
   const stack = useSharedValue(0)
   const landed = !!attackParts
@@ -370,7 +372,7 @@ export const LifeCard = memo(function LifeCard({
           digits: shownDigits,
           below: {
             ...OUT_CAUSE,
-            chars: String(out.amount).length,
+            chars: formatNumber(out.amount).length,
             lead: causeGlyphShown ? OUT_CAUSE_GLYPH + OUT_CAUSE_GAP : 0,
           },
         })

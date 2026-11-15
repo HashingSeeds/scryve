@@ -1,7 +1,10 @@
 import { ConvexError } from "convex/values"
 
+import { MAX_CARD_COPIES } from "@/features/decks/deckCards"
 import errors from "@/i18n/en/errors"
 import { translate } from "@/i18n/translate"
+
+import { MAX_LIFE_DELTA } from "../../convex/lib/gameRules"
 
 function convexErrorField(cause: unknown, field: "code" | "message") {
   if (!(cause instanceof ConvexError)) return undefined
@@ -13,8 +16,20 @@ function convexErrorField(cause: unknown, field: "code" | "message") {
 
 type ErrorKey = keyof typeof errors
 
+const ERROR_VALUES: Partial<Record<ErrorKey, Record<string, number>>> = {
+  invalidCardQuantity: { min: 1, max: MAX_CARD_COPIES },
+  invalidLifeDelta: { min: -MAX_LIFE_DELTA, max: MAX_LIFE_DELTA },
+}
+
 function isErrorKey(key: string): key is ErrorKey {
   return Object.hasOwn(errors, key)
+}
+
+function serverMessage(key: ErrorKey) {
+  const values = ERROR_VALUES[key]
+  return errors[key].replace(/{{(\w+)}}/g, (token, name: string) =>
+    values && name in values ? String(values[name]) : token,
+  )
 }
 
 export function convexErrorMessage(cause: unknown, fallback: string) {
@@ -22,7 +37,8 @@ export function convexErrorMessage(cause: unknown, fallback: string) {
   const key = convexErrorField(cause, "code")?.replace(/_([a-z])/g, (_, letter: string) =>
     letter.toUpperCase(),
   )
-  if (key && isErrorKey(key) && message === errors[key]) return translate(`errors:${key}`)
+  if (key && isErrorKey(key) && message === serverMessage(key))
+    return translate(`errors:${key}`, ERROR_VALUES[key])
   return message ?? fallback
 }
 

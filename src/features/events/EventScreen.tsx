@@ -19,7 +19,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { eventDisplayUrl } from "@/features/eventDisplay/display"
-import { formatList, formatRecord, joinParts } from "@/i18n/format"
+import { formatList, formatRatio, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -416,17 +416,21 @@ function RoundHeader({
                     ? "events:dropped"
                     : "events:noTable"
               }
+              txOptions={{ round: 1 }}
             />
           )}
         </View>
       ) : view.status === "registration" ? (
-        <Text tone="dim" tx="events:waitingToStart" />
+        <Text tone="dim" tx="events:waitingToStart" txOptions={{ round: 1 }} />
       ) : null}
       {view.isOrganizer && view.tables.length > 0 ? (
         <SectionHeader
           testID="tables"
           label={translate("events:tables")}
-          count={`${view.tables.filter((table) => table.result !== null).length}/${view.tables.length}`}
+          count={formatRatio(
+            view.tables.filter((table) => table.result !== null).length,
+            view.tables.length,
+          )}
         />
       ) : null}
     </>
@@ -685,7 +689,7 @@ function PlayerRow({
 function StandingsHeader({ view, empty }: { view: EventView; empty: boolean }) {
   const { themed } = useAppTheme()
   const tiebreaker = firstTiebreaker(view.system)
-  if (empty) return <Text tone="dim" tx="events:standings.empty" />
+  if (empty) return <Text tone="dim" tx="events:standings.empty" txOptions={{ round: 1 }} />
   return (
     <View testID="standings" style={themed($row)}>
       <Text preset="sectionLabel" style={$rank} tx="events:standings.rank" />

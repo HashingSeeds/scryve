@@ -28,7 +28,6 @@ export const FULL_KEY_SIZE = 44
 export const KEY_GAP = spacing.xxs
 export const ROW_GAP = spacing.xxs + 1
 
-// why: a number key shows the language's digit but types an ASCII one, which Number() and the stored value read.
 export const digitKeyLabel = (key: string) =>
   key.replace(/\d/g, (digit) => formatNumber(Number(digit)))
 

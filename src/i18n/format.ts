@@ -14,7 +14,6 @@ const MINUS = "\u2212"
 const FIRST_STRONG_ISOLATE = "\u2068"
 const LEFT_TO_RIGHT_ISOLATE = "\u2066"
 const POP_DIRECTIONAL_ISOLATE = "\u2069"
-// why: players write life totals such as 8000 without a separator in every language.
 const GROUPING_FROM = 10_000
 
 const numberFormats = new Map<string, Intl.NumberFormat>()
@@ -22,15 +21,17 @@ const dateFormats = new Map<string, Intl.DateTimeFormat>()
 
 const locale = () => i18n.language || "en-US"
 
+// why: a phone set to the en-XA system pseudolanguage would otherwise get brackets and Arabic digits in a release build.
+export const isPseudoLocale = () => __DEV__ && locale() === PSEUDO_LOCALE
+
 // why: in the pseudo-locale a formatted number shows in other digits on every platform (Hermes on iOS ignores -u-nu), so an ASCII digit on screen marks a number that skipped this file.
 function pseudoDigits(text: string) {
-  if (locale() !== PSEUDO_LOCALE) return text
+  if (!isPseudoLocale()) return text
   return text.replace(/[0-9]/g, (digit) => String.fromCharCode(0x0660 + Number(digit)))
 }
 
-// why: month and weekday names come from Intl, not a translation, so the pseudo-locale brackets them like translated text.
 function pseudoDate(text: string) {
-  return locale() === PSEUDO_LOCALE ? `\u27e6${pseudoDigits(text)}\u27e7` : text
+  return isPseudoLocale() ? `\u27e6${pseudoDigits(text)}\u27e7` : text
 }
 const isRightToLeft = () => i18n.dir(locale()) === "rtl"
 
@@ -45,17 +46,15 @@ function numberFormat(options: Intl.NumberFormatOptions) {
 }
 
 // why: Hermes on iOS ignores the `calendar` option but honors a -u-ca- tag, and iOS and Android default Arabic to different calendars.
-function dateLocale() {
-  const calendar = Localization.getCalendars()[0]?.calendar
-  return calendar && !locale().includes("-u-") ? `${locale()}-u-ca-${calendar}` : locale()
-}
-
 function dateFormat(options: Intl.DateTimeFormatOptions) {
-  const tag = dateLocale()
-  const key = `${tag}\u0000${JSON.stringify(options)}`
+  const { calendar, timeZone } = Localization.getCalendars()[0] ?? {}
+  const tag = calendar && !locale().includes("-u-") ? `${locale()}-u-ca-${calendar}` : locale()
+  // why: a formatter keeps the time zone it was built in, so a cached one would miss the phone changing zones.
+  const zoned = { ...(timeZone ? { timeZone } : {}), ...options }
+  const key = `${tag}\u0000${JSON.stringify(zoned)}`
   let format = dateFormats.get(key)
   if (!format) {
-    format = new Intl.DateTimeFormat(tag, options)
+    format = new Intl.DateTimeFormat(tag, zoned)
     dateFormats.set(key, format)
   }
   return format
@@ -73,9 +72,13 @@ function leftToRight(text: string) {
 
 const withMinusSign = (text: string) => text.replace("-", MINUS)
 
+const withoutNegativeZero = (value: number) => (Object.is(value, -0) ? 0 : value)
+
 export function formatNumber(value: number, options: Intl.NumberFormatOptions = {}) {
   const useGrouping = options.useGrouping ?? Math.abs(value) >= GROUPING_FROM
-  return pseudoDigits(withMinusSign(numberFormat({ ...options, useGrouping }).format(value)))
+  return pseudoDigits(
+    withMinusSign(numberFormat({ ...options, useGrouping }).format(withoutNegativeZero(value))),
+  )
 }
 
 export function formatSigned(value: number) {
@@ -84,7 +87,9 @@ export function formatSigned(value: number) {
 }
 
 export function formatPercent(ratio: number) {
-  return pseudoDigits(numberFormat({ style: "percent", maximumFractionDigits: 0 }).format(ratio))
+  return pseudoDigits(
+    withMinusSign(numberFormat({ style: "percent", maximumFractionDigits: 0 }).format(ratio)),
+  )
 }
 
 export function formatRecord(...counts: readonly number[]) {
@@ -93,6 +98,10 @@ export function formatRecord(...counts: readonly number[]) {
 
 export function formatRatio(part: number, whole: number) {
   return leftToRight(`${formatNumber(part)}/${formatNumber(whole)}`)
+}
+
+export function formatCopies(count: number) {
+  return leftToRight(`${formatNumber(count)}\u00d7`)
 }
 
 export function formatOrMore(value: number) {
@@ -127,18 +136,25 @@ export function formatTime(date: Date | number) {
 
 type Part = string | number | false | null | undefined
 
+const separator = (key: "common:separator" | "common:listSeparator" | "common:listAnd") =>
+  i18n.t(key, { applyPostProcessor: false })
+
 export function joinParts(parts: readonly Part[]) {
-  return present(parts).join(i18n.t("common:separator"))
+  return present(parts).join(separator("common:separator"))
 }
 
 export function formatList(parts: readonly Part[]) {
-  return present(parts).join(i18n.t("common:listSeparator"))
+  return present(parts).join(separator("common:listSeparator"))
 }
 
 export function formatConjunction(parts: readonly Part[]) {
   const items = present(parts)
   if (items.length < 2) return items.join("")
-  return `${items.slice(0, -1).join(i18n.t("common:listSeparator"))}${i18n.t("common:listAnd")}${items.at(-1)}`
+  return `${items.slice(0, -1).join(separator("common:listSeparator"))}${separator("common:listAnd")}${items.at(-1)}`
+}
+
+export function formatSum(parts: readonly Part[]) {
+  return present(parts).join(" + ")
 }
 
 function present(parts: readonly Part[]) {
@@ -148,7 +164,6 @@ function present(parts: readonly Part[]) {
   })
 }
 
-/** why: i18next runs every interpolated value through this, so no string can print a raw number. `{{delta, signed}}` and `{{share, percent}}` pick those formats. */
 export const formatInterpolation: FormatFunction = (value, format) => {
   if (typeof value === "number") {
     if (format === "signed") return isolate(formatSigned(value))

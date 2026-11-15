@@ -14,7 +14,7 @@ export default {
   currentVersion: "Actuelle",
   record: {
     noGames: "Aucune partie",
-    winRate: "{{percent}} sur {{games}}",
+    winRate: "{{rate, percent}} sur {{games}}",
   },
   stats: {
     title: "Statistiques du deck",
@@ -25,8 +25,9 @@ export default {
     gameCount_one: "{{count}} partie",
     gameCount_many: "{{count}} de parties",
     gameCount_other: "{{count}} parties",
-    chance: "{{rate}} dans les parties à {{podSize}} joueurs · chance {{percent}} %",
-    likely: "Probable : {{low}} à {{high}} %",
+    chance:
+      "{{rate, percent}} dans les parties à {{podSize}} joueurs · probabilité {{expected, percent}}",
+    likely: "Probable : de {{low, percent}} à {{high, percent}}",
     lists: "Listes",
     turnOrder: "Ordre de jeu",
     wentFirst: "A joué en premier",
@@ -85,7 +86,8 @@ export default {
     chooseColor: "Choisissez une couleur pour ce commandant.",
     pairUnchecked:
       "Impossible de vérifier cette paire tant que les détails de votre commandant actuel ne sont pas chargés.",
-    copyLimit: "Ce changement dépasserait la limite de 999 exemplaires par entrée de carte.",
+    copyLimit:
+      "Cette modification dépasserait la limite de {{limit}} exemplaires par entrée de carte.",
     detailsMissing:
       "Certains détails de cartes sont manquants. L’identité couleur du deck n’a pas été entièrement vérifiée.",
     duplicateCommander: "Un autre exemplaire de ce commandant reste dans le deck.",
@@ -335,7 +337,7 @@ export default {
     energy: "énergie",
     snow: "mana neigeux",
     either: "{{first}} ou {{second}}",
-    orLife: "{{mana}} ou 2 points de vie",
+    orLife: "{{mana}} ou {{life}} points de vie",
     energyAmount: "{{amount}} énergie",
     might: "Puissance",
     exhaust: "épuiser",
@@ -444,7 +446,7 @@ export default {
       serious: "chaude",
       critical: "très chaude",
       noRectangles: "Aucun rectangle",
-      rectangle: "{{aspect}} · {{share}} · {{verdict}}",
+      rectangle: "{{aspect}} · {{share, percent}} · {{verdict}}",
       accepted: "carte",
       shape: "forme",
       position: "décentré",
@@ -535,8 +537,7 @@ export default {
     thisMatch: "Ce match",
     asBuilt: "Main Deck d'origine",
     asBuiltDetail: "{{cards}} · {{side}} en Side Deck",
-    swappedIn: "+{{count}} {{card}}",
-    swappedOut: "−{{count}} {{card}}",
+    swapped: "{{count, signed}} {{card}}",
     resetsNote: "Réinitialisé à la fin du match. Votre liste ne change pas.",
     reset: "Réinitialiser",
   },
@@ -596,8 +597,8 @@ export default {
     landDrops: "Probabilités de pose de terrain",
     landDropsOnPlay: "Probabilités de pose de terrain en début de partie",
     turn: "Tour {{turn}}",
-    openingHand: "Main de départ, en gardant 2 à 5 terrains",
-    keepSeven: "Garder 7",
+    openingHand: "Main de départ, avec {{min}} à {{max}} terrains",
+    keepHand: "Garder {{cards}}",
     mulligan: "Mulligan",
     mulliganTwice: "Mulligan deux fois",
     freeMulligan: "Le premier mulligan est gratuit dans ce format.",
@@ -679,7 +680,7 @@ export default {
     loadDecksFailed: "Impossible de charger les decks",
     previewFailed: "Impossible de charger ce deck",
     overflowAfterMatch:
-      "{{card}} dépasse 999 exemplaires après la correspondance. Corrigez la source et réessayez.",
+      "{{card}} a plus de {{max}} exemplaires après la correspondance. Corrigez la source et réessayez.",
     linkFailed: "Impossible de charger ce deck. Réessayez ou collez son export texte.",
     resolveFailed: "Impossible de résoudre la liste du deck. Réessayez.",
     notes: "Notes",
