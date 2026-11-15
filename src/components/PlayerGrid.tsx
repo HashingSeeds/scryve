@@ -181,7 +181,13 @@ function seatDiceFor(
     onPressChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
       dice.onPressChip(player, chip),
     ),
-    ...(dice.onMulligan ? { onMulligan: dice.onMulligan } : {}),
+    ...(dice.onMulligan
+      ? {
+          onMulligan: stable(`dice-mulligan:${player.id}`, (action: MulliganAction) =>
+            dice.onMulligan?.(action),
+          ),
+        }
+      : {}),
   }
 }
 

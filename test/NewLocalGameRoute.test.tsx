@@ -556,6 +556,7 @@ describe("new local game route while signed in", () => {
       mePlayerId: game.players[1].id,
       deckVersionId: "v-atraxa",
       deckName: "Atraxa",
+      freeMulligans: "first",
     })
     expect(localGameRepository.loadMeSeat()).toBe(1)
   })
