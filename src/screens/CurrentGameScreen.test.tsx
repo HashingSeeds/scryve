@@ -604,6 +604,23 @@ describe("CurrentGameScreen", () => {
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
   })
 
+  it("withdraws the loser's choice when setup turns first player off", () => {
+    const repository = turnsOff()
+    const view = renderGame(game(), repository)
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    act(() => repository.saveFirstPlayerMode(undefined, "roll"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    layoutSeats(view)
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
+
+    act(() => repository.saveFirstPlayerMode(undefined, "off"))
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+  })
+
   it("leaves a rematch alone when setup turns first player off", () => {
     const view = renderGame(game(), turnsOff())
     fireEvent.press(view.getByTestId("life-seat-1-1"))

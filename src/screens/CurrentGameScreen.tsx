@@ -278,6 +278,10 @@ export function CurrentGameScreen({
   useEffect(() => {
     if (loserAsk) diceAsk(loserAsk, "loss")
   }, [diceAsk, loserAsk])
+  const firstPlayerOff = firstPlayerMode === "off" && !firstPlayerUsed
+  useEffect(() => {
+    if (firstPlayerOff) diceGameStarted()
+  }, [diceGameStarted, firstPlayerOff])
   const firstPlayerOffer: DiceSeatView | undefined =
     !firstPlayerOpen || loser
       ? undefined

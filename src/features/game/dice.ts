@@ -82,9 +82,6 @@ export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }
 export const FIRST_PLAYER_MODES = ["off", "roll", "pick"] as const
 export type FirstPlayerMode = (typeof FIRST_PLAYER_MODES)[number]
 
-export const isFirstPlayerMode = (value: unknown): value is FirstPlayerMode =>
-  FIRST_PLAYER_MODES.some((mode) => mode === value)
-
 export const EMPTY_DICE: DiceState = { results: {}, first: null }
 export const DIE_SIDES: Record<BagDie, number> = {
   d4: 4,
