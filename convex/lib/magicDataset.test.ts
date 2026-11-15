@@ -41,6 +41,28 @@ describe("magicDatasetCard", () => {
     ])
   })
 
+  it("keeps mana value, front-face toughness, and the deck formats the card is legal in", () => {
+    const result = magicDatasetCard({
+      ...card,
+      cmc: 1,
+      card_faces: [
+        { ...card.card_faces[0], toughness: "1" },
+        { ...card.card_faces[1], toughness: "1" },
+      ],
+      legalities: {
+        modern: "legal",
+        vintage: "restricted",
+        standard: "not_legal",
+        oldschool: "legal",
+      },
+    })
+    expect(result).toMatchObject({
+      manaValue: 1,
+      toughness: "1",
+      legalFormats: ["modern", "vintage"],
+    })
+  })
+
   it.each([
     { layout: "token" },
     { layout: "double_faced_token" },

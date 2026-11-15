@@ -1,0 +1,34 @@
+import { cardOptions } from "./cardFilters"
+
+const card = (name: string, typeLine: string, legalFormats?: string[]) => ({
+  scryfallId: name,
+  oracleId: name,
+  name,
+  typeLine,
+  ...(legalFormats ? { legalFormats } : {}),
+})
+
+test("subtypes come most common first, skip rare ones, and count only cards legal in the format", () => {
+  const cards = [
+    card("A", "Creature — Elf Druid", ["modern"]),
+    card("B", "Creature — Elf Warrior", ["modern"]),
+    card("C", "Creature — Elf", ["modern"]),
+    card("D", "Creature — Goblin // Creature — Goblin Elf", ["modern"]),
+    card("E", "Creature — Goblin", ["modern"]),
+    card("F", "Creature — Goblin", ["legacy"]),
+    card("G", "Creature — Goblin", ["legacy"]),
+    card("H", "Creature — Goblin Rogue", ["legacy"]),
+  ]
+  expect(cardOptions(cards, "subtype", "modern")).toEqual(["Elf"])
+  expect(cardOptions(cards, "subtype", undefined)).toEqual(["Goblin", "Elf"])
+})
+
+test("a card file without legal formats counts every card", () => {
+  const cards = ["A", "B", "C"].map((name) => card(name, "Artifact — Equipment"))
+  expect(cardOptions(cards, "subtype", "modern")).toEqual(["Equipment"])
+})
+
+test("cards without keywords add no blank keyword", () => {
+  const cards = ["A", "B", "C"].map((name) => ({ ...card(name, "Sorcery"), keywords: "" }))
+  expect(cardOptions(cards, "keyword", undefined)).toEqual([])
+})

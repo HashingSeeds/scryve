@@ -378,11 +378,8 @@ export default {
     withinColors: "Dentro de",
     allowAdditional: "Al menos",
     exactColors: "Exactamente",
-    searchKeywords: "Buscar palabras clave",
-    keywords: "Palabras clave",
-    keywordsOffline: "Abre los filtros con conexión para guardar las palabras clave.",
-    keywordsUnavailable:
-      "Las opciones de palabras clave no están disponibles. Prueba a reabrir los filtros.",
+    searchFilter: "Buscar en {{filter}}",
+    legalIn: "Legal en",
     clearAll: "Borrar todo",
     checkFailed: "No se pudieron comprobar todas las cartas de este mazo.",
     searchFailed: "No se pudo buscar cartas. Revisa tu conexión e inténtalo de nuevo.",

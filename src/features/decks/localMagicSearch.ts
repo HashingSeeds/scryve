@@ -1,3 +1,4 @@
+import { matchesCardFilters, pickedCount, type CardFilterState } from "./cardFilters"
 import { type CardNameIndex, matchKey, searchCardNames } from "./cardNameMatch"
 import { matchesColors, type ColorMatch } from "./colorMatch"
 import {
@@ -5,6 +6,7 @@ import {
   type MagicDataset,
   type MagicDatasetCard,
 } from "../../../convex/lib/magicDataset"
+import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
 export const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 export const NAME_MATCHES = 20
@@ -14,6 +16,7 @@ export type MagicCards = {
   cards: MagicDatasetCard[]
   keys: string[]
   byName: Map<string, MagicDatasetCard>
+  knowsLegality: boolean
 }
 
 export type MagicSearch = {
@@ -21,7 +24,8 @@ export type MagicSearch = {
   commander: boolean
   colors: readonly string[]
   colorMatch: ColorMatch
-  keywords: readonly string[]
+  filters: CardFilterState
+  legalIn?: string
 }
 
 function isCard(value: unknown) {
@@ -58,6 +62,7 @@ export function parseMagicCards(text: string): MagicCards {
     cards,
     keys: cards.map((card) => matchKey(card.name)),
     byName: new Map(cards.map((card) => [card.name, card])),
+    knowsLegality: cards.some((card) => card.legalFormats !== undefined),
   }
 }
 
@@ -67,7 +72,8 @@ function matchesSearch(card: MagicDatasetCard, search: MagicSearch) {
     (!search.commander ||
       ((card.commanderEligibility === "eligible" || choosesColor) &&
         card.commanderLegality === "legal")) &&
-    search.keywords.every((keyword) => card.keywords?.split("\n").includes(keyword)) &&
+    (!search.legalIn || card.legalFormats?.includes(search.legalIn) === true) &&
+    matchesCardFilters(card, MAGIC_CARD_FILTERS, search.filters) &&
     matchesColors(card.colorIdentity, search.colors, search.colorMatch, choosesColor)
   )
 }
@@ -77,9 +83,14 @@ export function localMagicSearch(
   nameIndex: CardNameIndex | undefined,
   search: MagicSearch,
 ) {
-  if (!magicCards || SCRYFALL_SYNTAX.test(search.text) || /[^\p{ASCII}]/u.test(search.text))
+  if (
+    !magicCards ||
+    (search.legalIn && !magicCards.knowsLegality) ||
+    SCRYFALL_SYNTAX.test(search.text) ||
+    /[^\p{ASCII}]/u.test(search.text)
+  )
     return undefined
-  const filtered = search.commander || search.colors.length > 0 || search.keywords.length > 0
+  const filtered = search.commander || search.colors.length > 0 || pickedCount(search.filters) > 0
   const key = matchKey(search.text)
   const words = key.length >= 2 || !filtered ? key.split(" ").filter(Boolean) : []
   if (!words.length && !filtered) return { named: [], found: [] }

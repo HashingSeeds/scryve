@@ -2,7 +2,6 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
 import { ThemeProvider } from "@/theme/context"
-import { remove } from "@/utils/storage"
 
 import { clearCardDetails, loadCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { cardNameIndex, type CardNameIndex } from "./cardNameMatch"
@@ -73,7 +72,6 @@ beforeEach(() => {
   mockNameIndex = undefined
   mockMagicCards = undefined
   clearCardDetails()
-  remove("scryve.cards.keyword-abilities.v1")
   mockDetailsAction.mockResolvedValue({
     ...eligible,
     commanderRulesUpdatedAt: new Date().toISOString(),
@@ -251,7 +249,7 @@ it("searches within the commander's colors until the player clears them", async 
   expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
     deviceId: expect.any(String),
     game: "mtg",
-    query: "(bolt) id<=ur",
+    query: "(bolt) id<=ur f:commander",
   })
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
@@ -264,7 +262,7 @@ it("searches within the commander's colors until the player clears them", async 
   expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
     deviceId: expect.any(String),
     game: "mtg",
-    query: "bolt",
+    query: "(bolt) f:commander",
   })
 })
 
@@ -355,23 +353,38 @@ it("requires the exact selected identity by default and optionally allows additi
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
 })
 
-it("fetches searchable keyword choices, combines selected keywords, and reuses the catalog offline", async () => {
+it("lists keywords from the card file, combines picked keywords, and works offline", async () => {
   jest.useFakeTimers()
+  const bird = (name: string, keywords: string) => ({
+    name,
+    scryfallId: name,
+    oracleId: name,
+    commanderEligibility: "ineligible",
+    keywords,
+  })
+  mockMagicCards = parseMagicCards(
+    JSON.stringify({
+      version: "1",
+      cards: [
+        bird("Bird A", "Flying\nWard"),
+        bird("Bird B", "Flying\nWard"),
+        bird("Bird C", "Flying\nWard"),
+        bird("Bird D", "Flying"),
+        bird("Bird E", "Choose a background"),
+      ],
+    }),
+  )
   saveCardDetails({
     talrand: { ...eligible, keywords: "Flying\nWard" },
     ring: { ...eligible, keywords: "Flying" },
   })
   mockAction.mockImplementation((_ref, args) =>
-    Promise.resolve(
-      "query" in args
-        ? [{ ...searchCard, keywords: "Flying\nWard" }]
-        : ["Flying", "Ward", "Vigilance"],
-    ),
+    Promise.resolve("query" in args ? [{ ...searchCard, keywords: "Flying\nWard" }] : []),
   )
   const view = chooser(deck.slice(0, 2))
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  expect(mockAction).toHaveBeenCalledWith(expect.anything(), { deviceId: expect.any(String) })
+  expect(view.queryByLabelText("Choose a background")).toBeNull()
   fireEvent.changeText(view.getByLabelText("Search keywords"), "fly")
   expect(view.getByLabelText("Flying")).toBeTruthy()
   expect(view.queryByLabelText("Ward")).toBeNull()
@@ -443,7 +456,7 @@ it.each(["commander", "main"])(
       query:
         section === "commander"
           ? '(baral) is:commander f:commander (id=u or o:"choose a color")'
-          : "baral",
+          : "(baral) f:commander",
     })
     expect(view.queryByText(failure.data.message)).toBeNull()
   },
@@ -544,7 +557,7 @@ const filters: Parameters<typeof scryfallQuery>[0] = {
   commander: false,
   colors: [],
   colorMatch: "exact",
-  keywords: [],
+  filters: {},
 }
 
 it.each<[string, Partial<typeof filters>, string]>([
@@ -571,8 +584,26 @@ it.each<[string, Partial<typeof filters>, string]>([
   ["colorless commanders", { commander: true, colors: ["C"] }, "is:commander f:commander id:c"],
   [
     "keywords with quotes and backslashes stripped",
-    { commander: true, keywords: ["Flying", 'W"a\\rd'] },
+    { commander: true, filters: { keyword: ["Flying", 'W"a\\rd'] } },
     'is:commander f:commander kw:"Flying" kw:"Ward"',
+  ],
+  [
+    "any of the picked types, every picked supertype, and mana value ranges",
+    {
+      filters: {
+        type: ["Creature", "Artifact"],
+        supertype: ["Legendary"],
+        manaValue: ["2", "7+"],
+      },
+    },
+    '(t:"Creature" or t:"Artifact") t:"Legendary" (mv=2 or mv>=7)',
+  ],
+  ["power and toughness", { filters: { power: ["4"], toughness: ["5+"] } }, "pow=4 tou>=5"],
+  ["legal in the deck's format", { text: "bolt", legalIn: "modern" }, "(bolt) f:modern"],
+  [
+    "a commander pick, legal once",
+    { text: "ar", commander: true, legalIn: "commander" },
+    "(ar) is:commander f:commander",
   ],
   [
     "a long commander name, cut to 80 characters without quotes or parentheses",
@@ -648,6 +679,7 @@ describe("with the device's Magic card file", () => {
     name: "Shivan Dragon",
     scryfallId: "shivan",
     colorIdentity: "R",
+    legalFormats: ["modern"],
   }
 
   async function searchFor(text: string) {
@@ -688,7 +720,7 @@ describe("with the device's Magic card file", () => {
     expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
       game: "mtg",
       deviceId: expect.any(String),
-      query: "Ancestral",
+      query: "(Ancestral) f:modern",
     })
   })
 
@@ -724,8 +756,37 @@ describe("with the device's Magic card file", () => {
     expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
       game: "mtg",
       deviceId: expect.any(String),
-      query: "t:dragon",
+      query: "(t:dragon) f:modern",
     })
+  })
+})
+
+it("keeps searches legal in the deck's format until the player turns it off", async () => {
+  jest.useFakeTimers()
+  mockAction.mockResolvedValue([])
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardSearchScreen game="mtg" format="modern" onAdd={jest.fn()} onClose={jest.fn()} />
+    </ThemeProvider>,
+  )
+  fireEvent.press(view.getByTestId("card-filters-button"))
+  await act(async () => {})
+  expect(view.getByTestId("card-filter-legal").props.accessibilityState.selected).toBe(true)
+  fireEvent.press(view.getByTestId("card-filter-type-Creature"))
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
+    game: "mtg",
+    query: 't:"Creature" f:modern',
+  })
+  fireEvent.press(view.getByTestId("card-filter-legal"))
+  fireEvent.press(view.getByText("Done"))
+  expect(view.getByLabelText("Filters (2)")).toBeTruthy()
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
+    game: "mtg",
+    query: 't:"Creature"',
   })
 })
 

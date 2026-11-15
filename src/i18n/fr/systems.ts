@@ -60,6 +60,15 @@ export default {
       riftbound: "Deck principal",
     },
   },
+  cardFilter: {
+    type: "Type de carte",
+    supertype: "Supertype",
+    subtype: "Sous-types",
+    manaValue: "Valeur de mana",
+    keyword: "Mots-clés",
+    power: "Force",
+    toughness: "Endurance",
+  },
   formatBlurb: {
     mtg: {
       commander: "100 cartes, singleton",

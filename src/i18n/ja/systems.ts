@@ -60,6 +60,15 @@ export default {
       riftbound: "メインデッキ",
     },
   },
+  cardFilter: {
+    type: "カードタイプ",
+    supertype: "特殊タイプ",
+    subtype: "サブタイプ",
+    manaValue: "マナ総量",
+    keyword: "キーワード",
+    power: "パワー",
+    toughness: "タフネス",
+  },
   formatBlurb: {
     mtg: {
       commander: "100枚、シングルトン",

@@ -10,6 +10,7 @@ import {
   SYSTEM_IDS,
   SYSTEMS,
   tableRules,
+  type CardFilterDefinition,
   type CounterDefinition,
   type DeckSection,
   type SystemId,
@@ -204,6 +205,10 @@ export function tableItemShortLabel(item: { id: string; label: string }): string
   return hasOwnKey(systems.tableItemShort, item.id)
     ? translate(`systems:tableItemShort.${item.id}`)
     : tableItemLabel(item)
+}
+
+export function cardFilterLabel({ id, label }: CardFilterDefinition): string {
+  return hasOwnKey(systems.cardFilter, id) ? translate(`systems:cardFilter.${id}`) : label
 }
 
 export function deckSectionLabel(game: string, { id, label }: DeckSection): string {

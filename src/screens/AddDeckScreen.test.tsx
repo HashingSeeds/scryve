@@ -837,7 +837,7 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByLabelText("Add Sol Ring to deck")).toBeTruthy())
     expect(mockConvexClient.action).toHaveBeenCalledWith("cards.search", {
       game: "mtg",
-      query: "Sol Ring",
+      query: "(Sol Ring) f:modern",
       deviceId: expect.any(String),
     })
     fireEvent.press(view.getByLabelText("Add Sol Ring to deck"))

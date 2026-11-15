@@ -63,6 +63,16 @@ const systems = {
       riftbound: "Main deck",
     },
   },
+  // Headings in Magic card search filters.
+  cardFilter: {
+    type: "Card type",
+    supertype: "Supertype",
+    subtype: "Subtypes",
+    manaValue: "Mana value",
+    keyword: "Keywords",
+    power: "Power",
+    toughness: "Toughness",
+  },
   formatBlurb: {
     mtg: {
       commander: "100 cards, singleton",

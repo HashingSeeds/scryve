@@ -397,10 +397,10 @@ const decks = {
     allowAdditional: "At least",
     // Segment under "Color match": cards use exactly the picked colors.
     exactColors: "Exactly",
-    searchKeywords: "Search keywords",
-    keywords: "Keywords",
-    keywordsOffline: "Open filters online to save keyword choices.",
-    keywordsUnavailable: "Keyword choices unavailable. Try reopening filters.",
+    // Placeholder over a card filter's options; {{filter}} is the filter's name in lowercase, e.g. "keywords".
+    searchFilter: "Search {{filter}}",
+    // Heading over a toggle, named for the deck's format, that keeps only cards legal in it.
+    legalIn: "Legal in",
     clearAll: "Clear all",
     checkFailed: "Could not check all cards in this deck.",
     searchFailed: "Could not search cards. Check your connection and try again.",

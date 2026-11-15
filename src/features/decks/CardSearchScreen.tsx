@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
   ActivityIndicator,
-  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -42,7 +41,6 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
-import { loadString, saveString } from "@/utils/storage"
 
 import {
   completeCardDetails,
@@ -51,6 +49,15 @@ import {
   readCardDetail,
   saveCardDetails,
 } from "./cardDetailsCache"
+import { CardFilterGroup } from "./CardFilterGroup"
+import {
+  cardOptions,
+  matchesCardFilters,
+  pickedCount,
+  scryfallFilterTerms,
+  togglePicked,
+  type CardFilterState,
+} from "./cardFilters"
 import { searchCardNames } from "./cardNameMatch"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import {
@@ -75,8 +82,11 @@ import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
 import { useMagicCards } from "./useMagicCards"
 import { api } from "../../../convex/_generated/api"
+import { deckFormatLabel } from "../../../convex/lib/deckGames"
+import { LEGALITY_FORMATS } from "../../../convex/lib/magicDataset"
 import {
   isSystemId,
+  MAGIC_CARD_FILTERS,
   picksCommander,
   systemDefinition,
   type SystemId,
@@ -98,29 +108,32 @@ export function scryfallQuery({
   commander,
   colors,
   colorMatch,
-  keywords,
+  filters,
+  legalIn,
 }: {
   text: string
   commander: boolean
   colors: string[]
   colorMatch: ColorMatch
-  keywords: string[]
+  filters: CardFilterState
+  legalIn?: string
 }) {
   const identity = colors.includes("C")
     ? "id:c"
     : colors.length
       ? `id${COLOR_MATCH_OPERATOR[colorMatch]}${colors.join("").toLowerCase()}`
       : ""
-  const filters = [
+  const terms = [
     commander ? "is:commander f:commander" : "",
     commander && identity && !colors.includes("C")
       ? `(${identity} or o:"choose a color")`
       : identity,
-    ...keywords.map((keyword) => `kw:"${keyword.replace(/["\\]/g, "")}"`),
+    ...scryfallFilterTerms(MAGIC_CARD_FILTERS, filters),
+    legalIn && !(commander && legalIn === "commander") ? `f:${legalIn}` : "",
   ].filter(Boolean)
-  if (!filters.length) return text
+  if (!terms.length) return text
   const words = commander ? text.slice(0, 80).replace(/[()"]/g, " ").trim() : text
-  return [words.length >= 2 ? `(${words})` : "", ...filters].filter(Boolean).join(" ")
+  return [words.length >= 2 ? `(${words})` : "", ...terms].filter(Boolean).join(" ")
 }
 
 type AddCard = (card: GuestDeckPayload["cards"][number]) => string | undefined
@@ -238,43 +251,18 @@ export function CardSearch({
   })
   const [colorFilters, setColorFilters] = useState<string[]>(startingFilters.colors)
   const [colorMatch, setColorMatch] = useState(startingFilters.colorMatch)
-  const [keywords, setKeywords] = useState<string[]>([])
-  const needsKeywords = keywords.length > 0
+  const cardFilters = filtersCards ? (systemDefinition(game)?.cardFilters ?? []) : []
+  const [picked, setPicked] = useState<CardFilterState>({})
+  const pickedFilters = pickedCount(picked)
+  const needsKeywords = (picked.keyword?.length ?? 0) > 0
+  const legalFormat =
+    filtersCards && LEGALITY_FORMATS.some((id) => id === format) ? format : undefined
+  const [legalOnly, setLegalOnly] = useState(true)
+  const legalIn = legalOnly ? legalFormat : undefined
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [keywordQuery, setKeywordQuery] = useState("")
-  const [keywordCatalog, setKeywordCatalog] = useState<string[]>(() => {
-    try {
-      const value: unknown = JSON.parse(loadString("scryve.cards.keyword-abilities.v1") ?? "null")
-      return Array.isArray(value)
-        ? value.filter((entry): entry is string => typeof entry === "string")
-        : []
-    } catch {
-      return []
-    }
-  })
-  const [keywordError, setKeywordError] = useState<string>()
   const pickedColors = colorFilters.length > 0 && colorFilters !== startingFilters.colors
   const searchRequested =
-    query.trim().length >= 2 || (filtersCards && (pickedColors || keywords.length > 0))
-
-  useEffect(() => {
-    if (!filtersOpen || offline || !convex) return
-    let active = true
-    setKeywordError(undefined)
-    void convex
-      .action(api.cards.keywordAbilities, { deviceId })
-      .then((catalog) => {
-        if (!active) return
-        setKeywordCatalog([...catalog].sort((a, b) => a.localeCompare(b)))
-        saveString("scryve.cards.keyword-abilities.v1", JSON.stringify(catalog))
-      })
-      .catch(() => {
-        if (active) setKeywordError(translate("decks:cardSearch.keywordsUnavailable"))
-      })
-    return () => {
-      active = false
-    }
-  }, [filtersOpen, convex, offline, deviceId])
+    query.trim().length >= 2 || (filtersCards && (pickedColors || pickedFilters > 0))
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
@@ -288,8 +276,11 @@ export function CardSearch({
     )
   }
 
-  function matchesFilters(details?: FocusedCardDetails) {
-    if (!keywords.every((keyword) => details?.keywords?.split("\n").includes(keyword))) return false
+  /** why: cached and fetched details lack mana value, toughness and legality, so the card file answers for them when it has the card. */
+  function matchesFilters(name: string, details?: FocusedCardDetails) {
+    const known = magicCards?.byName.get(name)
+    if (legalIn && known?.legalFormats && !known.legalFormats.includes(legalIn)) return false
+    if (!matchesCardFilters(known ?? details ?? {}, cardFilters, picked)) return false
     const canChooseColor = choosingCommander && details?.commanderEligibility === "color-choice"
     return matchesColors(details?.colorIdentity, colorFilters, colorMatch, canChooseColor)
   }
@@ -391,7 +382,8 @@ export function CardSearch({
             commander: choosingCommander,
             colors: colorFilters,
             colorMatch,
-            keywords,
+            filters: picked,
+            legalIn,
           })
         : undefined
     const remoteQuery = scryfallQuery({
@@ -399,7 +391,8 @@ export function CardSearch({
       commander: choosingCommander,
       colors: colorFilters,
       colorMatch,
-      keywords,
+      filters: picked,
+      legalIn,
     })
     const answered =
       local && (local.named.length || local.found.length || remoteQuery.length < 2)
@@ -496,7 +489,8 @@ export function CardSearch({
     choosingCommander,
     colorFilters,
     colorMatch,
-    keywords,
+    picked,
+    legalIn,
     searchRequested,
     searchAttempt,
     searchError?.retryAfterMs,
@@ -629,26 +623,30 @@ export function CardSearch({
   }
 
   const rankedResults = (nameResults ?? []).filter(
-    (card) => "scryfallId" in card && matchesFilters(card),
+    (card) => "scryfallId" in card && matchesFilters(card.name, card),
   )
   const rankedNames = new Set(rankedResults.map((card) => card.name))
   const catalogResults = results
     ? [...rankedResults, ...results.filter((card) => !rankedNames.has(card.name))].filter(
         (card) =>
           !choosingCommander ||
-          ("scryfallId" in card && eligible(card) && matchesFilters(card) && !inDeck(card)),
+          ("scryfallId" in card &&
+            eligible(card) &&
+            matchesFilters(card.name, card) &&
+            !inDeck(card)),
       )
     : undefined
   const eligibleCommanders = choosingCommander
     ? commanderCards?.filter((card) => {
         const cached = cachedRules[cardDetailsKey(card, game)]
-        return eligible(cached) && matchesFilters(cached)
+        return eligible(cached) && matchesFilters(card.name, cached)
       })
     : undefined
   const cachedCandidates = offlineResults?.filter(
     (entry) =>
       (!choosingCommander || !inDeck(entry.card)) &&
-      (!filtersCards || matchesFilters(cachedRules[cardDetailsKey(entry.card, game)])),
+      (!filtersCards ||
+        matchesFilters(entry.card.name, cachedRules[cardDetailsKey(entry.card, game)])),
   )
 
   const needle = query.trim().toLocaleLowerCase()
@@ -736,8 +734,9 @@ export function CardSearch({
                 testID="card-filters-button"
                 count={
                   colorFilters.length +
-                  keywords.length +
-                  (colorMatch !== startingFilters.colorMatch ? 1 : 0)
+                  pickedFilters +
+                  (colorMatch !== startingFilters.colorMatch ? 1 : 0) +
+                  (legalFormat && !legalOnly ? 1 : 0)
                 }
                 onPress={() => setFiltersOpen(true)}
               />
@@ -980,6 +979,16 @@ export function CardSearch({
             contentContainerStyle={themed([$sheetScrollContent, $filterBody])}
             keyboardShouldPersistTaps="handled"
           >
+            {legalFormat ? (
+              <FilterGroup heading={translate("decks:cardSearch.legalIn")}>
+                <FilterPill
+                  testID="card-filter-legal"
+                  label={deckFormatLabel(game, legalFormat)}
+                  selected={legalOnly}
+                  onPress={() => setLegalOnly((current) => !current)}
+                />
+              </FilterGroup>
+            ) : null}
             <FilterGroup heading={translate("decks:cardSearch.colors")}>
               {SEARCH_COLORS.map((color) => (
                 <FilterPill
@@ -1004,38 +1013,23 @@ export function CardSearch({
                 }}
               />
             </View>
-            <TextField
-              accessibilityLabel={translate("decks:cardSearch.searchKeywords")}
-              placeholderTx="decks:cardSearch.searchKeywords"
-              value={keywordQuery}
-              onChangeText={setKeywordQuery}
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-              autoCorrect={false}
-            />
-            <FilterGroup heading={translate("decks:cardSearch.keywords")}>
-              {keywordCatalog
-                .filter((keyword) => keyword.toLowerCase().includes(keywordQuery.toLowerCase()))
-                .slice(0, 40)
-                .map((keyword) => (
-                  <FilterPill
-                    key={keyword}
-                    label={keyword}
-                    selected={keywords.includes(keyword)}
-                    onPress={() =>
-                      setKeywords((current) =>
-                        current.includes(keyword)
-                          ? current.filter((value) => value !== keyword)
-                          : [...current, keyword],
-                      )
-                    }
-                  />
-                ))}
-            </FilterGroup>
-            {keywordError ? <Text text={keywordError} /> : null}
-            {offline && !keywordCatalog.length ? (
-              <Text tx="decks:cardSearch.keywordsOffline" />
-            ) : null}
+            {cardFilters.map((filter) => (
+              <CardFilterGroup
+                key={filter.id}
+                filter={filter}
+                options={
+                  filter.options === "cards"
+                    ? magicCards
+                      ? cardOptions(magicCards.cards, filter.id, legalIn)
+                      : []
+                    : filter.options
+                }
+                picked={picked[filter.id] ?? []}
+                onToggle={(option) =>
+                  setPicked((current) => togglePicked(current, filter.id, option))
+                }
+              />
+            ))}
           </ScrollView>
           <View style={themed($dialogActions)}>
             <Button
@@ -1043,7 +1037,8 @@ export function CardSearch({
               tx="decks:cardSearch.clearAll"
               onPress={() => {
                 setColorFilters([])
-                setKeywords([])
+                setPicked({})
+                setLegalOnly(true)
                 setColorMatch(startingFilters.colorMatch)
               }}
             />
