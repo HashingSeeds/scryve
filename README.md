@@ -115,7 +115,7 @@ pnpm android:production --upload --build-path ~/Downloads/app.aab
 pnpm ios:development --build --nas
 ```
 
-A plain `pnpm ios:development:sim` or `pnpm android:development` first runs `builds get` for the current fingerprint and copies a match (CI builds every main fingerprint) into `build/` instead of building. Without a match it builds only this machine's simulator or emulator architecture, about half the native compile. `--fresh` always builds, and `--all-archs` builds every architecture, as a physical Android device needs. CI, `--nas`, and `--upload` builds keep every architecture.
+A plain `pnpm ios:development:sim` or `pnpm android:development` first runs `builds get` for the current fingerprint and copies a match (CI builds every main fingerprint) into `build/` instead of building. Without a match it builds only this machine's simulator or emulator architecture, about half the native compile. `--fresh` always builds, and `--all-archs` builds every architecture, as a physical Android device needs. CI builds keep every architecture, and so do these two targets with `--nas` or `--upload`, which always rebuild them.
 
 EAS signs device builds ad hoc, and Instruments and xctrace cannot attach to those. `pnpm ios:profile` instead builds the preview app in Release with Xcode's Apple Development signing, OTA updates off, and Sentry events under `profile`. It replaces a preview install on the device. Run it on a Mac whose Xcode is signed into the team, in Terminal or after `security unlock-keychain` over SSH. To trace on a test device:
 

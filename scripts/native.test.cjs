@@ -88,13 +88,15 @@ test("a plain development build reuses a matching build, else compiles only this
     reuse: false,
     env: { GYM_XCARGS: "ARCHS=arm64" },
   })
-  assert.deepEqual(plan(["android:development", "--all-archs"]), { reuse: true, env: {} })
+  assert.deepEqual(plan(["android:development", "--all-archs"]), { reuse: false, env: {} })
 })
 
 test("development builds that reach other machines keep every architecture", () => {
   const none = { reuse: false, env: {} }
   assert.deepEqual(localPlan(parseArgs(["ios:development:sim"]), { CI: "true" }, "arm64"), none)
   assert.deepEqual(localPlan(parseArgs(["android:development", "--build", "--nas"]), {}, "x64"), none)
+  assert.equal(parseArgs(["android:development", "--nas"]).build, true)
+  assert.equal(parseArgs(["ios:development:sim", "--upload"]).build, true)
   assert.deepEqual(localPlan(parseArgs(["ios:development"]), {}, "arm64"), none)
   assert.deepEqual(localPlan(parseArgs(["android:preview"]), {}, "x64"), none)
 })

@@ -59,9 +59,11 @@ function parseArgs(args) {
   if (upload && target === "ios:profile")
     throw new Error("ios:profile is not an EAS build, so it cannot --upload. Use --nas.")
   const nas = Boolean(values.nas)
+  // why: a plain development build may hold one architecture (see localPlan), so one that leaves this machine is always rebuilt.
+  const development = TARGETS[target].profile === "development"
   return {
     target,
-    build: Boolean(values.build || values.ship || !(upload || nas)),
+    build: Boolean(values.build || values.ship || development || !(upload || nas)),
     upload,
     nas,
     offMain,
@@ -82,7 +84,7 @@ const ARCHITECTURES = {
 
 // A plain development build stays on this machine, so it first looks for a build `builds` already has
 // with the same fingerprint (--fresh skips that), and otherwise compiles only this machine's
-// architecture, about half the work (--all-archs builds both, as for a physical Android device).
+// architecture, about half the work (--all-archs builds every one, as for a physical Android device).
 // Builds for CI, --nas or --upload reach other machines and keep every architecture.
 // why: eas.json's profile env beats the shell's, so the architecture goes in as a Gradle system
 // property and an xcodebuild argument, which both outrank it.
@@ -96,7 +98,7 @@ function localPlan({ target, upload, nas, fresh, allArchs }, env = process.env, 
     : platform === "android"
       ? { GRADLE_OPTS: join(env.GRADLE_OPTS, `-Dorg.gradle.project.reactNativeArchitectures=${name}`) }
       : { GYM_XCARGS: join(env.GYM_XCARGS, `ARCHS=${name}`) }
-  return { reuse: !fresh, env: archEnv }
+  return { reuse: !fresh && !allArchs, env: archEnv }
 }
 
 // Copies the build `builds get` finds for the current fingerprint (CI's attested builds of main
