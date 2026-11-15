@@ -61,6 +61,7 @@ export default {
     },
   },
   cardFilter: {
+    format: "使用可能なフォーマット",
     type: "カードタイプ",
     supertype: "特殊タイプ",
     subtype: "サブタイプ",

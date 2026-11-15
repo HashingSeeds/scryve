@@ -65,6 +65,8 @@ const systems = {
   },
   // Headings in Magic card search filters.
   cardFilter: {
+    // Heading over the formats a searched card must be legal in.
+    format: "Legal in",
     type: "Card type",
     supertype: "Supertype",
     subtype: "Subtypes",

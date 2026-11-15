@@ -1,29 +1,62 @@
 import { useState } from "react"
-import { Keyboard } from "react-native"
+import { Keyboard, View } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 
 import { FilterGroup, FilterPill } from "@/components/FilterPill"
+import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { cardFilterLabel } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 
+import { rangeBound, toggleOption, withRangeBound, type RangeBound } from "./cardFilters"
 import type { CardFilterDefinition } from "../../../convex/lib/systems"
 
 const TOP_OPTIONS = 12
 const MATCHES_SHOWN = 40
+const RANGE_BOUNDS = [
+  { bound: ">=", placeholder: "decks:cardSearch.min", label: "decks:cardSearch.minimum" },
+  { bound: "<=", placeholder: "decks:cardSearch.max", label: "decks:cardSearch.maximum" },
+] as const satisfies readonly { bound: RangeBound; placeholder: string; label: string }[]
 
 export function CardFilterGroup({
   filter,
   options,
+  optionLabel = (option) => option,
   picked,
-  onToggle,
+  onChange,
 }: {
   filter: CardFilterDefinition
   options: readonly string[]
+  optionLabel?: (option: string) => string
   picked: readonly string[]
-  onToggle: (option: string) => void
+  onChange: (picked: readonly string[]) => void
 }) {
   const [search, setSearch] = useState("")
   const label = cardFilterLabel(filter)
+  if (filter.options === "range")
+    return (
+      <View style={$rangeRow}>
+        <Text preset="sectionLabel" style={$rangeLabel} text={label} />
+        {RANGE_BOUNDS.map(({ bound, placeholder, label: boundLabel }) => (
+          <TextField
+            key={bound}
+            testID={`card-filter-${filter.id}-${bound === ">=" ? "min" : "max"}`}
+            accessibilityLabel={translate(boundLabel, { filter: label.toLocaleLowerCase() })}
+            placeholder={translate(placeholder)}
+            value={rangeBound(picked, bound) ?? ""}
+            onChangeText={(text) => {
+              const digits = text.replace(/\D/g, "")
+              onChange(withRangeBound(picked, bound, digits ? Number(digits) : undefined))
+            }}
+            keyboardType="number-pad"
+            maxLength={2}
+            returnKeyType="done"
+            onSubmitEditing={Keyboard.dismiss}
+            containerStyle={$rangeField}
+          />
+        ))}
+      </View>
+    )
   const searchable = filter.options === "cards"
   if (!options.length && !picked.length) return null
   const needle = search.trim().toLocaleLowerCase()
@@ -60,12 +93,16 @@ export function CardFilterGroup({
           <FilterPill
             key={option}
             testID={`card-filter-${filter.id}-${option}`}
-            label={option}
+            label={optionLabel(option)}
             selected={picked.includes(option)}
-            onPress={() => onToggle(option)}
+            onPress={() => onChange(toggleOption(picked, option))}
           />
         ))}
       </FilterGroup>
     </>
   )
 }
+
+const $rangeRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
+const $rangeLabel: TextStyle = { flex: 1 }
+const $rangeField: ViewStyle = { width: 72 }

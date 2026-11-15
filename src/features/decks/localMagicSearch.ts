@@ -25,7 +25,6 @@ export type MagicSearch = {
   colors: readonly string[]
   colorMatch: ColorMatch
   filters: CardFilterState
-  legalIn?: string
 }
 
 function isCard(value: unknown) {
@@ -72,7 +71,6 @@ function matchesSearch(card: MagicDatasetCard, search: MagicSearch) {
     (!search.commander ||
       ((card.commanderEligibility === "eligible" || choosesColor) &&
         card.commanderLegality === "legal")) &&
-    (!search.legalIn || card.legalFormats?.includes(search.legalIn) === true) &&
     matchesCardFilters(card, MAGIC_CARD_FILTERS, search.filters) &&
     matchesColors(card.colorIdentity, search.colors, search.colorMatch, choosesColor)
   )
@@ -85,12 +83,15 @@ export function localMagicSearch(
 ) {
   if (
     !magicCards ||
-    (search.legalIn && !magicCards.knowsLegality) ||
+    (search.filters.format?.length && !magicCards.knowsLegality) ||
     SCRYFALL_SYNTAX.test(search.text) ||
     /[^\p{ASCII}]/u.test(search.text)
   )
     return undefined
-  const filtered = search.commander || search.colors.length > 0 || pickedCount(search.filters) > 0
+  const filtered =
+    search.commander ||
+    search.colors.length > 0 ||
+    pickedCount(MAGIC_CARD_FILTERS, search.filters) > 0
   const key = matchKey(search.text)
   const words = key.length >= 2 || !filtered ? key.split(" ").filter(Boolean) : []
   if (!words.length && !filtered) return { named: [], found: [] }

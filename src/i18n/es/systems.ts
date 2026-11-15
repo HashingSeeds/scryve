@@ -61,6 +61,7 @@ export default {
     },
   },
   cardFilter: {
+    format: "Legal en",
     type: "Tipo de carta",
     supertype: "Supertipo",
     subtype: "Subtipos",

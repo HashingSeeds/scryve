@@ -1,4 +1,5 @@
 import { type CardReference, normalizeScryfallCard, objectRecord } from "./scryfall"
+import { LEGALITY_FORMATS } from "./systems"
 
 export const MAGIC_DATASET_URL = "https://ygo-images.scryve.sow.care/datasets/mtg/cards.json"
 
@@ -9,18 +10,6 @@ export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRule
   /** why: absent means a file built before legality shipped, so search asks Scryfall instead of finding no legal cards. */
   legalFormats?: string[]
 }
-
-/** why: Scryve's Magic formats that Scryfall tracks legality for, under the same ids. */
-export const LEGALITY_FORMATS = [
-  "commander",
-  "standard",
-  "pioneer",
-  "modern",
-  "legacy",
-  "vintage",
-  "pauper",
-  "brawl",
-] as const
 
 export type MagicDataset = { version: string; cards: MagicDatasetCard[] }
 
