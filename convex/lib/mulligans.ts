@@ -11,6 +11,13 @@ export const freeMulligansValidator = v.union(
 export type FreeMulligans = Infer<typeof freeMulligansValidator>
 export const FREE_MULLIGANS = ["none", "first", "all"] as const satisfies readonly FreeMulligans[]
 
+export const firstPlayerModeValidator = v.union(v.literal("roll"), v.literal("pick"))
+export const firstChoiceReasonValidator = v.union(
+  v.literal("flip"),
+  v.literal("roll"),
+  v.literal("loss"),
+)
+
 export const mulliganHandSize = (system: unknown) => systemDefinition(system)?.mulligan?.handSize
 
 const FREE_FOREVER_LIMIT = 99

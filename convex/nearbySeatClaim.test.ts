@@ -310,3 +310,28 @@ describe("claimNearbySeat", () => {
     }
   })
 })
+
+it("records a guest's own mulligans on the deck the guest claims the seat with", async () => {
+  const t = makeConvexTest()
+  const host = await signedIn(t, "host")
+  const guest = await signedIn(t, "guest")
+  const { versionId } = await ownedDeck(guest)
+  const game = await nearbyGame()
+  await host.mutation(api.games.publishFinishedLocalGame, {
+    ...game,
+    freeMulligans: "first",
+    players: game.players.map((player) =>
+      player.localId === "seat_guest" ? { ...player, mulligans: 3 } : player,
+    ),
+  })
+  await guest.mutation(api.games.claimNearbySeat, {
+    publicId: PUBLIC_ID,
+    token: GUEST_TOKEN,
+    deckVersionId: versionId,
+  })
+  const results = await t.run((ctx) => ctx.db.query("deckResults").collect())
+  expect(results.map(({ mulligans, keptHand }) => [mulligans, keptHand])).toEqual([
+    [undefined, undefined],
+    [3, 5],
+  ])
+})
