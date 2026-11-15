@@ -389,6 +389,21 @@ function parseAccount(value: unknown, system: unknown): LocalGameAccount | undef
 const isFreeMulligans = (value: unknown): value is FreeMulligans =>
   FREE_MULLIGANS.some((rule) => rule === value)
 
+function parseNearbyMulligans(
+  value: unknown,
+  players: readonly GamePlayer[],
+): Pick<LocalGameSummary, "nearbyMulligans"> {
+  if (!isRecord(value) || !isFreeMulligans(value.free) || !isRecord(value.counts)) return {}
+  const { free, counts } = value
+  const kept = Object.fromEntries(
+    players.flatMap(({ id }) => {
+      const count = counts[id]
+      return typeof count === "number" && isMulliganCount(count, free, 99) ? [[id, count]] : []
+    }),
+  )
+  return { nearbyMulligans: { free, counts: kept } }
+}
+
 const MATCH_OUTCOMES: readonly MatchSeatOutcome[] = ["win", "loss", "draw"]
 
 function isMatchOutcome(value: unknown): value is MatchSeatOutcome {
@@ -750,6 +765,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         players.some(({ id }) => id === value.firstPlayerId)
           ? { firstPlayerId: asPlayerId(value.firstPlayerId) }
           : {}),
+        ...parseNearbyMulligans(value.nearbyMulligans, players),
         createdAt: value.createdAt,
         finishedAt: value.finishedAt,
         ...(result ? { result } : {}),
@@ -1196,6 +1212,7 @@ export class LocalGameRepository {
       players: game.players,
       eventCount: game.events.length,
       ...(game.firstPlayerId ? { firstPlayerId: game.firstPlayerId } : {}),
+      ...(game.nearbyMulligans ? { nearbyMulligans: game.nearbyMulligans } : {}),
       createdAt: game.createdAt,
       finishedAt: game.finishedAt,
       ...(game.result ? { result: game.result } : {}),

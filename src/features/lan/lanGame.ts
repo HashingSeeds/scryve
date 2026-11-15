@@ -36,6 +36,12 @@ import {
   MAX_GAMES_PER_MATCH,
   type MatchBestOf,
 } from "../../../convex/lib/matchResults"
+import {
+  FREE_MULLIGANS,
+  isMulliganCount,
+  mulliganHandSize,
+  type FreeMulligans,
+} from "../../../convex/lib/mulligans"
 import { outReason } from "../../../convex/lib/outReason"
 import { clientSeesSeats } from "../../../convex/lib/policy"
 import {
@@ -81,9 +87,11 @@ import {
   CONNECTED_RECENT_OPERATION_LIMIT,
   toConnectedProjection,
   type ConnectedActionEvent,
+  type ConnectedFirstPlayer,
   type ConnectedProjection,
 } from "../connected/model"
 import { parseLatencySummary, type SyncLatencySummary } from "../connected/syncLatency"
+import { DIE_SIDES, systemDice } from "../game/dice"
 import {
   asActorId,
   asDeviceId,
@@ -116,6 +124,8 @@ export interface LanSetup {
   modeSetup?: ModeSetup
   /** why: only the host scores the match, so guests never read this from the setup they are sent. */
   matchBestOf?: MatchBestOf
+  firstPlayerMode?: "roll" | "pick"
+  freeMulligans?: FreeMulligans
 }
 
 /** why: the score is kept by seat position, so it only holds while the same players sit in the same seats. */
@@ -165,7 +175,18 @@ export interface LanGame extends LanLobby {
   recentOperationIds: string[]
   startedAt?: number
   updatedAt: number
+  pregame?: LanPregame
+  /** why: the last round's sole loser picks who goes first next round. */
+  nextChooserKey?: string
 }
+
+export interface LanPregame {
+  firstPlayer?: ConnectedFirstPlayer
+  mulligans: Readonly<Record<string, number>>
+}
+
+export type LanPregameAction =
+  { kind: "roll" } | { kind: "choose"; playerId: string } | { kind: "keep"; mulligans: number }
 
 export interface LanSeatPass {
   key: string
@@ -189,6 +210,7 @@ export type LanGuestMessage =
   | { type: "reveal" }
   | { type: "log"; before?: string }
   | { type: "deck"; deck: LanSeatDeck | null }
+  | { type: "pregame"; action: LanPregameAction }
   | { type: "ping"; at: number }
   | { type: "stats"; stats: SyncLatencySummary }
 
@@ -504,10 +526,23 @@ export function startLanRound(game: LanGame, now: number, random = Math.random):
     random,
   )
   const match = lanMatchFor(game, now)
+  const { nextChooserKey: chooserKey, pregame: _lastPregame, ...fresh } = rest
+  const chooser = game.seats.some(({ key }) => key === chooserKey) ? chooserKey : undefined
   return {
-    ...rest,
+    ...fresh,
     ...(roles ? { roles } : {}),
     ...(match ? { match } : {}),
+    pregame: {
+      mulligans: {},
+      ...(setup.firstPlayerMode && !started.archenemyId
+        ? {
+            firstPlayer: {
+              mode: setup.firstPlayerMode,
+              ...(chooser ? { chooser: { playerId: chooser, reason: "loss" as const } } : {}),
+            },
+          }
+        : {}),
+    },
     status: "active",
     round: game.round + 1,
     recentOperationIds: [],
@@ -560,6 +595,75 @@ export function revealLanRole(game: LanGame, key: string, now: number): LanGame 
 export function endLanRound(game: LanGame, status: "finished" | "abandoned", now: number): LanGame {
   if (game.memory) game.memory.status = status
   return { ...game, status, updatedAt: now }
+}
+
+/** why: every device may tap at once, so the host applies the first and later ones change nothing, as on Convex. */
+export function applyLanPregame(
+  game: LanGame,
+  actorKey: string,
+  action: LanPregameAction,
+  now: number,
+  random = Math.random,
+): LanGame {
+  const { pregame, setup } = game
+  if (game.status !== "active" || !pregame) return game
+  const first = pregame.firstPlayer
+  const seats = game.seats.map(({ key }) => key)
+  const decided = (firstPlayer: ConnectedFirstPlayer) => ({
+    ...game,
+    pregame: { ...pregame, firstPlayer },
+    updatedAt: now,
+  })
+  if (action.kind === "keep") {
+    const handSize = mulliganHandSize(setup.system)
+    const seat = game.seats.find(({ key }) => key === actorKey)
+    if (
+      !setup.freeMulligans ||
+      handSize === undefined ||
+      !seat?.deck ||
+      pregame.mulligans[actorKey] !== undefined ||
+      !isMulliganCount(action.mulligans, setup.freeMulligans, handSize)
+    )
+      return game
+    return {
+      ...game,
+      pregame: { ...pregame, mulligans: { ...pregame.mulligans, [actorKey]: action.mulligans } },
+      updatedAt: now,
+    }
+  }
+  if (!first?.mode || first.playerId) return game
+  if (action.kind === "choose") {
+    if (!seats.includes(action.playerId)) return game
+    if (first.chooser ? first.chooser.playerId !== actorKey : first.mode !== "pick") return game
+    const { chooser: _chosen, ...rest } = first
+    return decided({ ...rest, playerId: action.playerId })
+  }
+  if (first.mode !== "roll" || first.chooser) return game
+  const rules = systemDice(setup.system)
+  if (rules.twoPlayerCoinFlip && seats.length === 2)
+    return decided({
+      ...first,
+      chooser: { playerId: seats[Math.floor(random() * 2)], reason: "flip" },
+    })
+  const rolls = rollOff(seats, DIE_SIDES[rules.die], random)
+  const winner = seats.reduce((best, seat) => (rolls[seat] > rolls[best] ? seat : best))
+  return decided({
+    ...first,
+    rolls,
+    ...(rules.winnerChooses
+      ? { chooser: { playerId: winner, reason: "roll" as const } }
+      : { playerId: winner }),
+  })
+}
+
+function rollOff(seats: readonly string[], sides: number, random: () => number) {
+  for (;;) {
+    const rolls: Record<string, number> = Object.fromEntries(
+      seats.map((seat) => [seat, Math.floor(random() * sides) + 1]),
+    )
+    const high = Math.max(...Object.values(rolls))
+    if (Object.values(rolls).filter((roll) => roll === high).length === 1) return rolls
+  }
 }
 
 function memoryWriteOf(event: ConnectedActionEvent, tappedAt: number | undefined): MemoryWrite {
@@ -708,6 +812,10 @@ export function lanProjection(
     ...(setup.modeSetup ? { modeSetup: setup.modeSetup } : {}),
     isHost: viewerKey === game.hostKey,
     ...(memory?.lifeEditing === "anyone" ? { lifeEditing: "anyone" as const } : {}),
+    ...(setup.freeMulligans && mulliganHandSize(setup.system) !== undefined
+      ? { freeMulligans: setup.freeMulligans }
+      : {}),
+    ...(game.pregame?.firstPlayer ? { firstPlayer: game.pregame.firstPlayer } : {}),
     ...matchProjection(game, viewerKey, eventSequence),
     eventSequence,
     serverUpdatedAt: game.updatedAt,
@@ -725,6 +833,9 @@ export function lanProjection(
       controlledByMe: seat.key === viewerKey,
       ...(seat.editsAnySeat ? { editsAnySeat: true } : {}),
       ...(seat.deck ? { deckVersionId: seat.deck.versionId } : {}),
+      ...(game.pregame?.mulligans[seat.key] === undefined
+        ? {}
+        : { mulligans: game.pregame.mulligans[seat.key] }),
       ...roleFor(seat.key),
     })),
     ...(commander ? { commanderDamage: commander } : {}),
@@ -809,6 +920,8 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     variant,
     modeSetup,
     matchBestOf,
+    firstPlayerMode,
+    freeMulligans,
   } = value
   if (
     !Number.isInteger(playerCount) ||
@@ -828,6 +941,9 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     ruleset,
     ...(isPlayerGridLayoutVariant(layout) ? { layout } : {}),
     ...(isMatchBestOf(matchBestOf) ? { matchBestOf } : {}),
+    ...(firstPlayerMode === "roll" || firstPlayerMode === "pick"
+      ? { firstPlayerMode: firstPlayerMode === "roll" ? ("roll" as const) : ("pick" as const) }
+      : {}),
   }
   if (system === undefined) return setup
   if (
@@ -857,7 +973,13 @@ export function parseLanSetup(value: unknown): LanSetup | null {
     format,
     ...(kept ? { variant: kept } : {}),
     ...(modes ? { modeSetup: modes } : {}),
+    ...freeMulligansOf(freeMulligans, system),
   }
+}
+
+function freeMulligansOf(value: unknown, system: PlaySystemId): Pick<LanSetup, "freeMulligans"> {
+  const rule = FREE_MULLIGANS.find((candidate) => candidate === value)
+  return rule && mulliganHandSize(system) !== undefined ? { freeMulligans: rule } : {}
 }
 
 const MAX_DECK_NAME_LENGTH = 120
@@ -961,6 +1083,15 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(isCount(value.maxSeats) ? { maxSeats: value.maxSeats } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
+  if (value.type === "pregame" && isRecord(value.action)) {
+    const { action } = value
+    if (action.kind === "roll") return { type: "pregame", action: { kind: "roll" } }
+    if (action.kind === "choose" && isId(action.playerId))
+      return { type: "pregame", action: { kind: "choose", playerId: action.playerId } }
+    if (action.kind === "keep" && isCount(action.mulligans))
+      return { type: "pregame", action: { kind: "keep", mulligans: action.mulligans } }
+    return null
+  }
   if (value.type === "log")
     return { type: "log", ...(isId(value.before) ? { before: value.before } : {}) }
   if (value.type === "ping" && isCount(value.at)) return { type: "ping", at: value.at }

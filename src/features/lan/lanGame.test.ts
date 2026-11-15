@@ -1,6 +1,7 @@
 import { lanLocalGame } from "./lanArchive"
 import {
   admitLanGuest,
+  applyLanPregame,
   applyLanWrite,
   createLanGame,
   endLanMatch,
@@ -1060,5 +1061,79 @@ describe("a nearby match", () => {
     expect(endLanMatch(second, NOW).match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
     const swapped = startLanRound(swapLanSeats(hostWins(second).next, 1, 2), NOW)
     expect(swapped.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
+  })
+})
+
+describe("first player and mulligans before a nearby round", () => {
+  const deck = { versionId: "version-1", name: "Atraxa" }
+  const rolls =
+    (...values: number[]) =>
+    () =>
+      values.shift() ?? 0
+
+  it("rolls once for every seat, and a later roll or pick changes nothing", () => {
+    const game = started({ ...commander, firstPlayerMode: "roll" })
+    expect(lanProjection(game, "guest").firstPlayer).toEqual({ mode: "roll" })
+    const rolled = applyLanPregame(game, "guest", { kind: "roll" }, NOW, rolls(0.1, 0.9))
+    expect(lanProjection(rolled, "host").firstPlayer).toEqual({
+      mode: "roll",
+      playerId: "guest",
+      rolls: { host: 3, guest: 19 },
+    })
+    expect(applyLanPregame(rolled, "host", { kind: "roll" }, NOW)).toBe(rolled)
+    expect(applyLanPregame(rolled, "host", { kind: "choose", playerId: "host" }, NOW)).toBe(rolled)
+  })
+
+  it("rerolls every seat on a tie", () => {
+    const game = started({ ...commander, firstPlayerMode: "roll" })
+    const rolled = applyLanPregame(game, "host", { kind: "roll" }, NOW, rolls(0.5, 0.5, 0.9, 0.2))
+    expect(rolled.pregame?.firstPlayer?.rolls).toEqual({ host: 19, guest: 5 })
+  })
+
+  it("takes the first pick, and next round asks only the sole loser", () => {
+    const game = started({ ...commander, firstPlayerMode: "pick" })
+    const picked = applyLanPregame(game, "guest", { kind: "choose", playerId: "host" }, NOW)
+    expect(picked.pregame?.firstPlayer?.playerId).toBe("host")
+    expect(lanLocalGame(picked, {}).firstPlayerId).toBe("host")
+
+    const next = startLanRound(
+      { ...endLanRound(picked, "finished", NOW), nextChooserKey: "guest" },
+      NOW,
+    )
+    expect(lanProjection(next, "host").firstPlayer).toEqual({
+      mode: "pick",
+      chooser: { playerId: "guest", reason: "loss" },
+    })
+    expect(applyLanPregame(next, "host", { kind: "choose", playerId: "host" }, NOW)).toBe(next)
+    const chosen = applyLanPregame(next, "guest", { kind: "choose", playerId: "host" }, NOW)
+    expect(lanProjection(chosen, "host").firstPlayer).toEqual({ mode: "pick", playerId: "host" })
+  })
+
+  it("keeps a seat's own mulligans once, only with a deck, and archives guests' for their claim", () => {
+    const setup = { ...commander, freeMulligans: "first" as const }
+    const game = startLanRound(setLanDeck(seatGuest(lobby(setup), "guest"), "guest", deck), NOW)
+    expect(applyLanPregame(game, "host", { kind: "keep", mulligans: 1 }, NOW)).toBe(game)
+    const kept = applyLanPregame(game, "guest", { kind: "keep", mulligans: 2 }, NOW)
+    expect(applyLanPregame(kept, "guest", { kind: "keep", mulligans: 0 }, NOW)).toBe(kept)
+    const projection = lanProjection(kept, "host")
+    expect(projection.freeMulligans).toBe("first")
+    expect(projection.players.map((player) => player.mulligans)).toEqual([undefined, 2])
+    expect(lanLocalGame(kept, {}).nearbyMulligans).toEqual({ free: "first", counts: { guest: 2 } })
+  })
+
+  it("carries the host's choices to guests and parses a guest's pregame message", () => {
+    expect(parseLanSetup({ ...commander, firstPlayerMode: "roll", freeMulligans: "all" })).toEqual({
+      ...commander,
+      firstPlayerMode: "roll",
+      freeMulligans: "all",
+    })
+    expect(
+      parseGuestMessage(
+        JSON.stringify({ type: "pregame", action: { kind: "keep", mulligans: 3 } }),
+      ),
+    ).toEqual({ type: "pregame", action: { kind: "keep", mulligans: 3 } })
+    expect(
+      parseGuestMessage(JSON.stringify({ type: "pregame", action: { kind: "swap" } })),
+    ).toBeNull()
   })
 })
