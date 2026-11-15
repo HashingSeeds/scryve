@@ -380,7 +380,7 @@ function parseAccount(value: unknown, system: unknown): LocalGameAccount | undef
     ...(isFreeMulligans(value.freeMulligans) ? { freeMulligans: value.freeMulligans } : {}),
     ...(isFreeMulligans(value.freeMulligans) &&
     typeof value.mulligans === "number" &&
-    isMulliganCount(value.mulligans, mulliganHandSize(system) ?? 0)
+    isMulliganCount(value.mulligans, value.freeMulligans, mulliganHandSize(system) ?? 0)
       ? { mulligans: value.mulligans }
       : {}),
   })

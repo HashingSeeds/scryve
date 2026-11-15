@@ -76,7 +76,12 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
 
-import { keptHandSize, mulliganHandSize, type FreeMulligans } from "../../convex/lib/mulligans"
+import {
+  keptHandSize,
+  maxMulligans,
+  mulliganHandSize,
+  type FreeMulligans,
+} from "../../convex/lib/mulligans"
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
 import { nextTurnSeat, sharesTurn } from "../../convex/lib/turns"
@@ -413,8 +418,8 @@ export function CurrentGameScreen({
       if (action === "rule") return system && onRules?.(system, MULLIGAN_RULE)
       setMulliganDraft({
         ...mulligan,
-        ...(action === "mulligan" && handSize !== undefined
-          ? { taken: Math.min(handSize, mulligan.taken + 1) }
+        ...(action === "mulligan" && handSize !== undefined && account?.freeMulligans
+          ? { taken: Math.min(maxMulligans(account.freeMulligans, handSize), mulligan.taken + 1) }
           : {}),
         ...(action === "skip" ? { skipped: true } : {}),
         ...(action === "help" || action === "close" ? { help: action === "help" } : {}),
