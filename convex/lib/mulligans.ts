@@ -21,7 +21,6 @@ export function keptHandSize(mulligans: number, free: FreeMulligans, handSize: n
   return Math.max(0, handSize - paid)
 }
 
-/** why: Comprehensive Rules 103.5c makes the first mulligan free in multiplayer and Brawl, and Commander's own rules do the same in any pod. */
 export function defaultFreeMulligans(
   system: unknown,
   format: string | undefined,
