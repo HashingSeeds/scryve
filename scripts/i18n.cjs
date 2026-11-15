@@ -209,7 +209,6 @@ function writesOwnDigits(locale) {
 
 const exactPluralForms = new Map()
 
-// why: French "one" covers 0 and 1, so only a form that matches a single number may say it in words.
 function exactForms(locale) {
   if (!exactPluralForms.has(locale)) {
     const rules = new Intl.PluralRules(locale)
@@ -229,7 +228,6 @@ function mayDropCount(unit, key, locale) {
   return exactForms(locale).has(key.slice(unit.id.length + 1))
 }
 
-// why: these name things, not quantities, so the reader's digits never apply to them.
 const ENGLISH_DIGIT_TOKENS =
   /\bd(?:4|6|8|10|12|20|100)\b|\bp(?:50|90|99)\b|\b2v2\b|\b2HG\b|\b8th Edition\b|\b1st\b|\b3 Ash Blossom\b/g
 

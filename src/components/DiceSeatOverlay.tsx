@@ -438,7 +438,7 @@ function Mulligan({
   if (view.help)
     return (
       <>
-        {small(translate("board:mulligan.steps", { hand: view.handSize }))}
+        {small(translate("board:mulligan.steps", { hand: view.handSize, bottom: 1 }))}
         <Text
           text={translate(`board:mulligan.rule.${view.free}`)}
           weight="bold"

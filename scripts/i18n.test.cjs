@@ -153,12 +153,12 @@ test("lets a plural form say its number in words only when it covers one number"
         seats_one: "مقعد واحد",
         seats_two: "مقعدان",
         seats_few: "مقاعد",
-        seats_many: "{{count}} مقعدًا",
+        seats_many: "مقعدًا",
         seats_other: "{{count}} مقعد",
       },
       "ar",
     ),
-    ["seats_few: dropped {{count}}"],
+    ["seats_few: dropped {{count}}", "seats_many: dropped {{count}}"],
   )
 })
 

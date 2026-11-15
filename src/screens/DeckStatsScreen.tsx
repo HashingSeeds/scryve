@@ -43,7 +43,7 @@ import {
 } from "@/features/stats/DeckStatsParts"
 import { fingerprintsToRead, labelLists } from "@/features/stats/listLabels"
 import { useListCards } from "@/features/stats/useListCards"
-import { formatList, formatRecord, joinParts } from "@/i18n/format"
+import { formatList, formatNumber, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -385,7 +385,10 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                         size="xs"
                         tone="dim"
                         text={translate("decks:stats.mulligansPerGame", {
-                          value: perGame.toFixed(1),
+                          value: formatNumber(perGame, {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          }),
                         })}
                       />
                     )}

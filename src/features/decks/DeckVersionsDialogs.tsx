@@ -59,7 +59,6 @@ export function DeckVersionsDialogs<Id extends string>({
   onNew?: () => void
   onCreate: (draft: DeckVersionDraft) => void
   onManage?: () => void
-  // why: the name field shows a translated label, so an untouched field must not save that label as the version's name.
   onRename: (rename: DeckVersionRename) => void
   onDelete?: () => void
   onConfirmDelete: () => void

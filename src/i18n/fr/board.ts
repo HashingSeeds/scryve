@@ -108,7 +108,7 @@ export default {
     keep: "Garder",
     skip: "Passer",
     help: "Fonctionnement du mulligan",
-    steps: "Mélangez, piochez {{hand}}. Mettez 1 carte au fond par mulligan.",
+    steps: "Mélangez, piochez {{hand}}. Mettez {{bottom}} carte au fond du deck par mulligan.",
     rule: {
       none: "Aucun mulligan gratuit",
       first: "Premier mulligan gratuit",

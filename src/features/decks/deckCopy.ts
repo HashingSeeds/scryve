@@ -28,7 +28,6 @@ export function cardCountLabel(quantity: number) {
   return translate("decks:cardCount", { count: quantity })
 }
 
-// why: a guest deck needs a name for every version, and it keeps that name after the language changes.
 export function storedVersionName(
   version: { name?: string; versionNumber: number },
   latestVersionNumber: number,

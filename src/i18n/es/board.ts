@@ -108,7 +108,7 @@ export default {
     keep: "Quedarme",
     skip: "Omitir",
     help: "Cómo funcionan los mulligans",
-    steps: "Baraja y roba {{hand}}. Pon 1 carta al fondo por cada mulligan.",
+    steps: "Baraja y roba {{hand}}. Pon {{bottom}} carta(s) al fondo por cada mulligan.",
     rule: {
       none: "Sin mulligans gratis",
       first: "Primer mulligan gratis",

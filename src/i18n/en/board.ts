@@ -104,7 +104,7 @@ const board = {
     // Don't record a mulligan this game.
     skip: "Skip",
     help: "How mulligans work",
-    steps: "Shuffle, draw {{hand}}. Bottom 1 card per mulligan.",
+    steps: "Shuffle, draw {{hand}}. Bottom {{bottom}} card per mulligan.",
     // The group's house rule, chosen in game setup.
     rule: {
       none: "No free mulligans",
