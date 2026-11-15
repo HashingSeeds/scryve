@@ -1488,4 +1488,33 @@ describe("ConnectedBoardScreen before play", () => {
     fireEvent.press(screen.getByTestId("mulligan-keep"))
     expect(pregame.keepHand).toHaveBeenCalledWith(1, 1)
   })
+
+  it("keeps the mulligan step while turn 1 waits on the first player, and ends it at the first change", () => {
+    const pregame = actions()
+    const waiting = {
+      playerId: "player-2",
+      number: 1,
+      startedAt: 1,
+      operationId: "turn-1",
+      waiting: true as const,
+    }
+    const deckSeat = (player: Seat) =>
+      player.playerId === "player-1" ? { ...player, deckVersionId: "deck" } : player
+    withGame(
+      {
+        freeMulligans: "none",
+        firstPlayer: { mode: "pick", playerId: "player-2" },
+        eventSequence: 1,
+        table: { designations: {}, players: {}, turn: waiting },
+      },
+      deckSeat,
+    )
+    render(themed(<PregameBoard pregame={pregame} />))
+    layout()
+    expect(screen.getByTestId("dice-seat-2")).toHaveTextContent(/^Keep 7\?/)
+
+    withGame({ eventSequence: 2 })
+    screen.rerender(themed(<PregameBoard pregame={pregame} />))
+    expect(screen.queryByTestId("dice-seat-2")).toBeNull()
+  })
 })
