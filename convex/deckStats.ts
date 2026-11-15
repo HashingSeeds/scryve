@@ -60,6 +60,8 @@ export const summary = query({
         fingerprint: string | null
         podSize: number | null
         wentFirst: boolean | null
+        keptHand: number | null
+        mulligans: number | null
         games: number
         wins: number
         losses: number
@@ -74,6 +76,8 @@ export const summary = query({
         fingerprint: result.fingerprint ?? null,
         podSize: result.podSize ?? null,
         wentFirst: result.wentFirst ?? null,
+        keptHand: result.keptHand ?? null,
+        mulligans: result.mulligans ?? null,
       } as const
       const id = JSON.stringify(slice)
       const current = slices.get(id) ?? {
@@ -142,6 +146,7 @@ export const games = query({
     fingerprint: v.optional(v.union(v.string(), v.null())),
     podSize: v.optional(v.number()),
     wentFirst: v.optional(v.union(v.boolean(), v.null())),
+    keptHand: v.optional(v.union(v.number(), v.null())),
     source: v.optional(v.union(v.literal("scryve"), v.literal("manual"))),
     paginationOpts: paginationOptsValidator,
   },
@@ -158,6 +163,9 @@ export const games = query({
           args.wentFirst === undefined
             ? true
             : q.eq(q.field("wentFirst"), args.wentFirst ?? undefined),
+          args.keptHand === undefined
+            ? true
+            : q.eq(q.field("keptHand"), args.keptHand ?? undefined),
           args.source === undefined
             ? true
             : args.source === "manual"

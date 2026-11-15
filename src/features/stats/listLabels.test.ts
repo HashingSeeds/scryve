@@ -6,6 +6,8 @@ const slice = (fingerprint: string | null, lastAt: number): StatsSlice => ({
   fingerprint,
   podSize: 4,
   wentFirst: null,
+  keptHand: null,
+  mulligans: null,
   games: 1,
   wins: 1,
   losses: 0,

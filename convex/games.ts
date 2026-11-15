@@ -63,6 +63,7 @@ import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "./lib/matchResults"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
+import { freeMulligansValidator, isMulliganCount, mulliganHandSize } from "./lib/mulligans"
 import { HIDDEN_DECK_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
   assertDeckLabel,
@@ -824,6 +825,9 @@ async function terminalizeGame(
           color: player.color,
           shape: appearanceOf(player).shape,
           finalLife: player.currentLife,
+          ...(game.freeMulligans && player.mulligans !== undefined
+            ? { mulligans: player.mulligans }
+            : {}),
         }
       }),
   )
@@ -843,6 +847,7 @@ async function terminalizeGame(
     finishedAt,
     players: summaryPlayers,
     ...(options.firstPlayerId ? { firstPlayerId: options.firstPlayerId } : {}),
+    ...(game.freeMulligans ? { freeMulligans: game.freeMulligans } : {}),
     resultKind: result.kind,
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
     ...(matchId ? { matchId } : {}),
@@ -1593,9 +1598,11 @@ export const publishFinishedLocalGame = mutation({
     finishedAt: v.number(),
     eventCount: v.number(),
     firstPlayerLocalId: v.optional(v.string()),
+    freeMulligans: v.optional(freeMulligansValidator),
     players: v.array(
       localSnapshotPlayer.extend({
         me: v.optional(v.boolean()),
+        mulligans: v.optional(v.number()),
         deckVersionId: v.optional(v.id("deckVersions")),
         deckKey: v.optional(v.string()),
         deckFingerprint: v.optional(v.string()),
@@ -1685,6 +1692,14 @@ export const publishFinishedLocalGame = mutation({
     }
     if (args.retriesThrottled === true) await limitResultRate(ctx, "localGamePublish", user._id)
     const me = meSeats[0]
+    const handSize = mulliganHandSize(gameSystem)
+    const myMulligans =
+      args.freeMulligans &&
+      handSize !== undefined &&
+      me?.mulligans !== undefined &&
+      isMulliganCount(me.mulligans, args.freeMulligans, handSize)
+        ? me.mulligans
+        : undefined
     if (me?.deckKey !== undefined) assertDeckKey(me.deckKey)
     if (me?.deckFingerprint !== undefined) assertDeckFingerprint(me.deckFingerprint)
     let myDeck: Doc<"decks"> | undefined
@@ -1747,6 +1762,7 @@ export const publishFinishedLocalGame = mutation({
       updatedAt: now,
       // why: the device counted its own events; the summary reads this base plus per-seat counts.
       eventSequence: args.eventCount,
+      ...(myMulligans !== undefined ? { freeMulligans: args.freeMulligans } : {}),
     })
     const playerIdsByLocalId = new Map<string, Id<"gamePlayers">>()
     for (const player of resolvePlayerAppearances(players, connectedMarkShapes(players.length))) {
@@ -1760,6 +1776,7 @@ export const publishFinishedLocalGame = mutation({
           : {}),
         ...(player.me ? attribution : {}),
         ...(player.seatPassHash ? { seatPassHash: player.seatPassHash } : {}),
+        ...(player.me && myMulligans !== undefined ? { mulligans: myMulligans } : {}),
         ...(deckLabel ? { deckLabel } : {}),
         displayName: assertDisplayName(player.displayName),
         color: player.color,

@@ -6,6 +6,7 @@ import {
   setDeckResultOpponents,
 } from "./deckResults"
 import type { MatchOutcome } from "./matchResults"
+import { keptHandSize, mulliganHandSize } from "./mulligans"
 import { resultOpponents, summarySeats } from "./opponentDecks"
 import { MAX_PLAYERS } from "./policy"
 import { tracksResults } from "./systems"
@@ -66,11 +67,24 @@ export async function recordPlayerResult(
     ...(summary.firstPlayerId !== undefined
       ? { wentFirst: summary.firstPlayerId === player.playerId }
       : {}),
+    ...mulliganResult(summary, player),
     deltas: { games: outcomeTally(outcome) },
     ...(player.deckId && player.deckVersionId
       ? { legacyDeckId: player.deckId, deckVersionId: player.deckVersionId }
       : {}),
   })
+}
+
+function mulliganResult(
+  summary: Doc<"gameSummaries">,
+  player: Doc<"gameSummaries">["players"][number],
+) {
+  const handSize = mulliganHandSize(summary.system ?? summary.game)
+  if (!summary.freeMulligans || handSize === undefined || player.mulligans === undefined) return {}
+  return {
+    mulligans: player.mulligans,
+    keptHand: keptHandSize(player.mulligans, summary.freeMulligans, handSize),
+  }
 }
 
 export async function recordGameResults(ctx: MutationCtx, summary: Doc<"gameSummaries">) {

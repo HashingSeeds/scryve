@@ -71,6 +71,8 @@ it("breaks a deck's results down by source, list and pod size for its owner only
         fingerprint: list(1),
         podSize: 2,
         wentFirst: null,
+        keptHand: null,
+        mulligans: null,
         games: 1,
         wins: 1,
         losses: 0,
@@ -83,6 +85,8 @@ it("breaks a deck's results down by source, list and pod size for its owner only
         fingerprint: list(1),
         podSize: 4,
         wentFirst: null,
+        keptHand: null,
+        mulligans: null,
         games: 1,
         wins: 0,
         losses: 1,
@@ -95,6 +99,8 @@ it("breaks a deck's results down by source, list and pod size for its owner only
         fingerprint: null,
         podSize: 4,
         wentFirst: null,
+        keptHand: null,
+        mulligans: null,
         games: 1,
         wins: 1,
         losses: 0,
@@ -467,4 +473,35 @@ it("separates true, false and untracked turn order slices and combines game filt
       paginationOpts: { numItems: 10, cursor: null },
     }),
   ).toMatchObject({ page: [] })
+})
+
+it("splits slices by kept hand and mulligans, and filters games by kept hand", async () => {
+  const t = makeConvexTest()
+  const actor = await signedIn(t, "owner")
+  for (const [index, mulligans] of [0, 1, undefined].entries()) {
+    const args = game(`mulligan-game-00000${index}`, { win: index === 0, finishedAt: T + index })
+    await actor.mutation(api.games.publishFinishedLocalGame, {
+      ...args,
+      ...(mulligans === undefined ? {} : { freeMulligans: "none" as const }),
+      players: args.players.map((player, seat) =>
+        seat === 0 && mulligans !== undefined ? { ...player, mulligans } : player,
+      ),
+    })
+  }
+  const summary = await actor.query(api.deckStats.summary, { deckKey: "burn" })
+  expect(
+    summary.slices.map(({ keptHand, mulligans, games }) => [keptHand, mulligans, games]),
+  ).toEqual([
+    [null, null, 1],
+    [6, 1, 1],
+    [7, 0, 1],
+  ])
+  for (const [index, keptHand] of [7, 6, null].entries()) {
+    const page = await actor.query(api.deckStats.games, {
+      deckKey: "burn",
+      keptHand,
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(page.page.map((row) => row.gamePublicId)).toEqual([`mulligan-game-00000${index}`])
+  }
 })
