@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
-import type { DiceSeatChip, DiceTool } from "@/features/game/dice"
+import type { DiceSeatChip, DiceTool, MulliganAction } from "@/features/game/dice"
 import { PARTNER_COMMANDER } from "@/features/game/domain"
 import { type PlayerGridLayoutVariant, type SeatOrder } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
@@ -93,6 +93,7 @@ export interface DiceGridBinding {
   onPressSeat: (player: GamePlayer) => void
   onChoose: (player: GamePlayer, order: "first" | "second") => void
   onPressChip: (player: GamePlayer, chip: DiceSeatChip) => void
+  onMulligan?: (action: MulliganAction) => void
   bag?: {
     tools: readonly DiceTool[]
     rollFor: (player: GamePlayer, tool: DiceTool) => void
@@ -180,6 +181,7 @@ function seatDiceFor(
     onPressChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
       dice.onPressChip(player, chip),
     ),
+    ...(dice.onMulligan ? { onMulligan: dice.onMulligan } : {}),
   }
 }
 

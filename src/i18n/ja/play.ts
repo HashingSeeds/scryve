@@ -50,6 +50,12 @@ export default {
     flip: "コイン",
     pick: "相談して決める",
   },
+  freeMulligans: {
+    label: "フリー・マリガン",
+    none: "なし",
+    first: "最初のみ",
+    all: "すべて",
+  },
   whatYouPlay: {
     heading: "何をプレイしますか?",
     changeLater: "設定でいつでも変更できます。",

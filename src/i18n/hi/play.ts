@@ -48,6 +48,12 @@ export default {
     flip: "फ़्लिप",
     pick: "हम चुनेंगे",
   },
+  freeMulligans: {
+    label: "फ़्री मुलिगन",
+    none: "कोई नहीं",
+    first: "पहला",
+    all: "सभी",
+  },
   whatYouPlay: {
     heading: "आप क्या खेलते हैं?",
     changeLater: "आप इसे सेटिंग्स में बदल सकते हैं।",

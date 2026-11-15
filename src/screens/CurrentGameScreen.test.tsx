@@ -1254,3 +1254,88 @@ it.each([false, true])(
     )
   },
 )
+
+describe("CurrentGameScreen mulligans", () => {
+  function deckGame(freeMulligans: "none" | "first" | "all" = "first") {
+    return createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      account: { ownerId: "owner", meSeat: 0, deckKey: "burn", freeMulligans },
+      now: 1,
+    })
+  }
+
+  it("asks the deck's seat to keep, counts free and paid mulligans, and records the kept hand", () => {
+    const repository = turnsOff()
+    const view = renderGame(deckGame(), repository)
+    layoutSeats(view)
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/^Keep 7\?/)
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
+
+    fireEvent.press(view.getByTestId("mulligan-mulligan"))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/^Keep 7\?Free, draw 7/)
+    fireEvent.press(view.getByTestId("mulligan-mulligan"))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/^Keep 6\?Draw 7, bottom 1/)
+
+    fireEvent.press(view.getByTestId("mulligan-keep"))
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(repository.loadActiveGame()?.account).toMatchObject({
+      freeMulligans: "first",
+      mulligans: 2,
+    })
+  })
+
+  it("explains the group's rule on the card and opens the full rule", () => {
+    const onRules = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={deckGame("all")}
+          repository={turnsOff()}
+          onRules={onRules}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("mulligan-help"))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/Every mulligan free/)
+    fireEvent.press(view.getByTestId("mulligan-rule"))
+    expect(onRules).toHaveBeenCalledWith("mtg", "103.5")
+    fireEvent.press(view.getByTestId("mulligan-close"))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/^Keep 7\?/)
+  })
+
+  it("records nothing when skipped or when play begins first", () => {
+    const skipped = turnsOff()
+    const view = renderGame(deckGame(), skipped)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("mulligan-skip"))
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(skipped.loadActiveGame()?.account?.mulligans).toBeUndefined()
+
+    const played = turnsOff()
+    const other = renderGame(deckGame(), played)
+    layoutSeats(other)
+    fireEvent.press(other.getByTestId("mulligan-mulligan"))
+    fireEvent.press(other.getByTestId("life-seat-2-1"))
+    expect(other.queryByTestId("dice-seat-1")).toBeNull()
+    expect(played.loadActiveGame()?.account?.mulligans).toBeUndefined()
+  })
+
+  it("waits for the first player roll before asking", () => {
+    const rolls = [0.9, 0.1]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const repository = firstPlayerBy("roll", "mtg")
+    const view = renderGame(deckGame(), repository)
+    layoutSeats(view)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Roll for who goes first")
+    fireEvent.press(view.getByTestId("dice-seat-2"))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/^Keep 7\?/)
+  })
+})

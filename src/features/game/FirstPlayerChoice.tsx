@@ -10,6 +10,7 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { FIRST_PLAYER_MODES, systemDice, type FirstPlayerMode } from "./dice"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
+import { FREE_MULLIGANS, type FreeMulligans } from "../../../convex/lib/mulligans"
 
 export function useFirstPlayerMode(repository: LocalGameRepository, system: string | undefined) {
   const subscribe = useCallback(
@@ -69,3 +70,54 @@ export function FirstPlayerChoice({
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flexDirection: "row", gap: spacing.xs })
 const $choice: ViewStyle = { flex: 1 }
+
+export function useFreeMulligans(
+  system: string | undefined,
+  format: string | undefined,
+  playerCount: number,
+  repository: LocalGameRepository = localGameRepository,
+) {
+  const subscribe = useCallback(
+    (listener: () => void) => repository.onSettingsChanged(listener),
+    [repository],
+  )
+  const rule = useSyncExternalStore(subscribe, () =>
+    repository.freeMulligans(system, format, playerCount),
+  )
+  const setRule = useCallback(
+    (next: FreeMulligans) => repository.saveFreeMulligans(system, format, next),
+    [repository, system, format],
+  )
+  return [rule, setRule] as const
+}
+
+export function FreeMulligansChoice({
+  rule,
+  onChange,
+}: {
+  rule: FreeMulligans
+  onChange: (rule: FreeMulligans) => void
+}) {
+  const { themed } = useAppTheme()
+  const label = translate("play:freeMulligans.label")
+  return (
+    <View style={themed($section)}>
+      <Text text={label} preset="formLabel" />
+      <View accessibilityRole="radiogroup" accessibilityLabel={label} style={themed($row)}>
+        {FREE_MULLIGANS.map((option) => (
+          <ChoiceButton
+            key={option}
+            testID={`free-mulligans-${option}`}
+            tx={`play:freeMulligans.${option}`}
+            compact
+            selected={rule === option}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: rule === option }}
+            style={$choice}
+            onPress={() => onChange(option)}
+          />
+        ))}
+      </View>
+    </View>
+  )
+}

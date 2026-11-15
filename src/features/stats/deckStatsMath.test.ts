@@ -4,6 +4,7 @@ import {
   honestRate,
   likelyRange,
   listStats,
+  mulligansPerGame,
   recordText,
   sumSlices,
   type DeckSummary,
@@ -150,4 +151,20 @@ it("combines turn order with source, pod and list filters, keeping unknown separ
   expect(sumSlices(slices, "scryve", { wentFirst: null }).games).toBe(8)
   expect(sumSlices(slices, "all", { wentFirst: null }).games).toBe(16)
   expect(sumSlices(slices).games).toBe(32)
+})
+
+it("averages mulligans over the games that tracked them and splits by kept hand", () => {
+  const slices = [
+    slice({ games: 2, keptHand: 7, mulligans: 0 }),
+    slice({ games: 1, keptHand: 6, mulligans: 2, wins: 0, losses: 1 }),
+    slice({ games: 5 }),
+  ]
+  expect(mulligansPerGame(slices)).toBeCloseTo(2 / 3)
+  expect(mulligansPerGame([slice()])).toBeUndefined()
+  expect(sumSlices(slices, "all", { keptHand: 6 })).toEqual({
+    games: 1,
+    wins: 0,
+    losses: 1,
+    draws: 0,
+  })
 })

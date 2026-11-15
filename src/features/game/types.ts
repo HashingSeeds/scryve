@@ -4,6 +4,7 @@ import type { RoundClock } from "./roundClock"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
+import type { FreeMulligans } from "../../../convex/lib/mulligans"
 import type { TableState } from "../../../convex/lib/table"
 import type { ModeSetup } from "../../../convex/lib/tableModes"
 import type { GameVariant } from "../../../convex/lib/treachery"
@@ -83,6 +84,8 @@ export interface LocalGameAccount {
   deckKey?: string
   deckFingerprint?: string
   deckName?: string
+  freeMulligans?: FreeMulligans
+  mulligans?: number
 }
 
 export type MatchSeatOutcome = "win" | "loss" | "draw"

@@ -40,6 +40,7 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary): Finished
     finishedAt: game.finishedAt,
     eventCount: game.eventCount,
     firstPlayerLocalId: game.firstPlayerId || undefined,
+    freeMulligans: game.account?.freeMulligans,
     players: ordered.map((player, index): FinishedGameArgs["players"][number] => {
       const mine = player.id === me
       return {
@@ -54,6 +55,7 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary): Finished
         deckKey: (mine && game.account?.deckKey) || undefined,
         deckFingerprint: (mine && game.account?.deckFingerprint) || undefined,
         deckName: (mine && game.account?.deckName) || undefined,
+        mulligans: mine ? game.account?.mulligans : undefined,
         seatPassHash: (!mine && game.seatPassHashes?.[player.id]) || undefined,
       }
     }),

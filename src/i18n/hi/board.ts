@@ -100,6 +100,23 @@ export default {
     flipPrompt: "पहले खेलने के लिए टॉस करें",
     pickPrompt: "कौन पहले खेलेगा?",
   },
+  mulligan: {
+    keepQuestion: "{{count}} रखें?",
+    freeLine: "फ़्री, {{hand}} ड्रॉ करें",
+    bottomLine: "{{hand}} ड्रॉ करें, {{count}} नीचे रखें",
+    mulligan: "मुलिगन",
+    keep: "रखें",
+    skip: "छोड़ें",
+    help: "मुलिगन कैसे काम करता है",
+    steps: "शफ़ल करें, {{hand}} ड्रॉ करें। हर मुलिगन पर 1 कार्ड नीचे रखें।",
+    rule: {
+      none: "कोई फ़्री मुलिगन नहीं",
+      first: "पहला मुलिगन फ़्री",
+      all: "हर मुलिगन फ़्री",
+    },
+    fullRule: "पूरा नियम",
+    done: "हो गया",
+  },
   layout: {
     balanced: "संतुलित",
     topFocus: "ऊपर फोकस",

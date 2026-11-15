@@ -23,6 +23,7 @@ import {
   likelyRange,
   listStats,
   recordText,
+  mulligansPerGame,
   sumSlices,
 } from "@/features/stats/deckStatsMath"
 import {
@@ -95,6 +96,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
     fingerprint?: string | null
     podSize?: number
     wentFirst?: boolean | null
+    keptHand?: number
     label: string
   }>()
   const [proPrompt, setProPrompt] = useState(false)
@@ -107,6 +109,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
           ...(filter?.fingerprint !== undefined ? { fingerprint: filter.fingerprint } : {}),
           ...(filter?.podSize !== undefined ? { podSize: filter.podSize } : {}),
           ...(filter?.wentFirst !== undefined ? { wentFirst: filter.wentFirst } : {}),
+          ...(filter?.keptHand !== undefined ? { keptHand: filter.keptHand } : {}),
         }
       : "skip",
     { initialNumItems: 20 },
@@ -157,6 +160,14 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
         }))
         .filter((row) => row.record.games > 0)
     : []
+  const handRows = [
+    ...new Set(
+      summary.slices.flatMap((slice) => (slice.keptHand === null ? [] : [slice.keptHand])),
+    ),
+  ]
+    .sort((a, b) => b - a)
+    .map((keptHand) => ({ keptHand, record: sumSlices(summary.slices, "all", { keptHand }) }))
+  const perGame = mulligansPerGame(summary.slices)
   const sourceRows = (["scryve", "manual"] as const).map((value) => ({
     value,
     record: exactRecord(summary.all, value),
@@ -169,6 +180,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
     ...lists.map((list) => list.record),
     ...podRows.map((row) => row.record),
     ...turnOrderRows.map((row) => row.record),
+    ...handRows.map((row) => row.record),
     ...(showSources ? sourceRows.map((row) => row.record) : []),
   ].some((row) => row.games > 0 && honestRate(row).tooFew)
   const manualMatches = summary.all?.manualMatches
@@ -335,6 +347,36 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
                         />
                       )
                     })}
+                  </>
+                ) : null}
+                {handRows.length ? (
+                  <>
+                    <SectionHeader
+                      label={translate("decks:stats.openingHand")}
+                      style={themed($section)}
+                    />
+                    {handRows.map(({ keptHand, record: handRecord }) => {
+                      const label = translate("decks:stats.keptHand", { count: keptHand })
+                      return (
+                        <StatsRow
+                          key={keptHand}
+                          testID={`stats-kept-hand-${keptHand}`}
+                          label={label}
+                          record={handRecord}
+                          onPress={() => showGames({ keptHand, label })}
+                        />
+                      )
+                    })}
+                    {perGame === undefined ? null : (
+                      <Text
+                        testID="stats-mulligans-per-game"
+                        size="xs"
+                        tone="dim"
+                        text={translate("decks:stats.mulligansPerGame", {
+                          value: perGame.toFixed(1),
+                        })}
+                      />
+                    )}
                   </>
                 ) : null}
                 {showSources ? (

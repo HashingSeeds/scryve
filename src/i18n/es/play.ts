@@ -50,6 +50,12 @@ export default {
     flip: "Lanzar moneda",
     pick: "Elegimos nosotros",
   },
+  freeMulligans: {
+    label: "Mulligans gratis",
+    none: "Ninguno",
+    first: "El primero",
+    all: "Todos",
+  },
   whatYouPlay: {
     heading: "¿A qué juegas?",
     changeLater: "Puedes cambiarlo en Ajustes.",

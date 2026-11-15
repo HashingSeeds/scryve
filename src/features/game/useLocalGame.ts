@@ -244,6 +244,17 @@ export function useLocalGame(
     if (!current.firstPlayerOffered) replaceBoard({ ...current, firstPlayerOffered: true })
   }, [replaceBoard])
 
+  const keepHand = useCallback(
+    (mulligans: number) => {
+      const current = gameRef.current
+      const account = current.account
+      if (!account?.freeMulligans || account.mulligans !== undefined || hasPlayBegun(current))
+        return
+      replaceBoard({ ...current, account: { ...account, mulligans } })
+    },
+    [replaceBoard],
+  )
+
   const setFirstPlayer = useCallback(
     (playerId: PlayerId | undefined) => {
       const current = gameRef.current
@@ -359,6 +370,7 @@ export function useLocalGame(
     restartMatchGame: restartMatchGameBoard,
     endMatch,
     markFirstPlayerUsed,
+    keepHand,
     setFirstPlayer,
     latestMatchGame,
     pendingMatchEnd: () => {

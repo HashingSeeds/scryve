@@ -101,6 +101,23 @@ export default {
     flipPrompt: "Lanza para ver quién juega primero",
     pickPrompt: "¿Juega primero?",
   },
+  mulligan: {
+    keepQuestion: "¿Te quedas con {{count}}?",
+    freeLine: "Gratis, roba {{hand}}",
+    bottomLine: "Roba {{hand}}, fondo {{count}}",
+    mulligan: "Mulligan",
+    keep: "Quedarme",
+    skip: "Omitir",
+    help: "Cómo funcionan los mulligans",
+    steps: "Baraja y roba {{hand}}. Pon 1 carta al fondo por cada mulligan.",
+    rule: {
+      none: "Sin mulligans gratis",
+      first: "Primer mulligan gratis",
+      all: "Todos los mulligans gratis",
+    },
+    fullRule: "Regla completa",
+    done: "Listo",
+  },
   layout: {
     balanced: "Equilibrado",
     topFocus: "Foco arriba",

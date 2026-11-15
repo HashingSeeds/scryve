@@ -414,6 +414,9 @@ export function localGameAccount(
     ...(me && account.deckKey ? { deckKey: account.deckKey } : {}),
     ...(me && account.deckFingerprint ? { deckFingerprint: account.deckFingerprint } : {}),
     ...(me && account.deckName ? { deckName: account.deckName } : {}),
+    ...(me && (account.deckVersionId || account.deckKey) && account.freeMulligans
+      ? { freeMulligans: account.freeMulligans }
+      : {}),
   }
 }
 

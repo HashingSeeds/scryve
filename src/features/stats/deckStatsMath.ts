@@ -12,7 +12,12 @@ export type RecordCounts = Pick<StatsSlice, "games" | "wins" | "losses" | "draws
 export function sumSlices(
   slices: readonly StatsSlice[],
   source: StatsSource = "all",
-  filter: { fingerprint?: string | null; podSize?: number | null; wentFirst?: boolean | null } = {},
+  filter: {
+    fingerprint?: string | null
+    podSize?: number | null
+    wentFirst?: boolean | null
+    keptHand?: number | null
+  } = {},
 ): RecordCounts {
   return slices.reduce(
     (total, slice) => {
@@ -20,6 +25,7 @@ export function sumSlices(
       if (filter.fingerprint !== undefined && slice.fingerprint !== filter.fingerprint) return total
       if (filter.podSize !== undefined && slice.podSize !== filter.podSize) return total
       if (filter.wentFirst !== undefined && slice.wentFirst !== filter.wentFirst) return total
+      if (filter.keptHand !== undefined && slice.keptHand !== filter.keptHand) return total
       return {
         games: total.games + slice.games,
         wins: total.wins + slice.wins,
@@ -29,6 +35,13 @@ export function sumSlices(
     },
     { games: 0, wins: 0, losses: 0, draws: 0 },
   )
+}
+
+export function mulligansPerGame(slices: readonly StatsSlice[]) {
+  const tracked = slices.filter((slice) => slice.mulligans !== null)
+  const games = tracked.reduce((total, slice) => total + slice.games, 0)
+  if (games === 0) return undefined
+  return tracked.reduce((total, slice) => total + (slice.mulligans ?? 0) * slice.games, 0) / games
 }
 
 export function exactRecord(row: DeckSummary["all"], source: StatsSource): RecordCounts {

@@ -1319,6 +1319,8 @@ describe("NewGameScreen", () => {
     fireEvent.press(screen.getByTestId("me-deck"))
     expect(screen.queryByTestId("me-deck-option-v-standard")).toBeNull()
     fireEvent.press(screen.getByTestId("me-deck-option-v-commander"))
+    expect(screen.getByTestId("free-mulligans-first").props.accessibilityState.checked).toBe(true)
+    fireEvent.press(screen.getByTestId("free-mulligans-all"))
     await act(async () => fireEvent.press(screen.getByTestId("start-game-button")))
     expect(onStartLocal).toHaveBeenCalledWith(
       expect.any(Array),
@@ -1331,6 +1333,7 @@ describe("NewGameScreen", () => {
           meSeat: 1,
           deckVersionId: "v-commander",
           deckName: "Atraxa",
+          freeMulligans: "all",
         },
       }),
     )

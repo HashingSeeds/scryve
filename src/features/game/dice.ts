@@ -4,6 +4,7 @@ import { translate } from "@/i18n/translate"
 
 import type { TurnSeat } from "./turnTab"
 import type { GamePlayer, PlayerId } from "./types"
+import type { FreeMulligans } from "../../../convex/lib/mulligans"
 import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/lib/systems"
 import type { Turn } from "../../../convex/lib/turns"
 
@@ -56,6 +57,16 @@ export type DiceSeatView =
   | { kind: "first"; status: "won" | "lost"; note?: string }
   | { kind: "rollOffer"; tool: Die | "coin" }
   | { kind: "pickOffer" }
+  | {
+      kind: "mulligan"
+      handSize: number
+      keeps: number
+      free: FreeMulligans
+      last?: { free: true } | { free: false; bottom: number }
+      help: boolean
+    }
+
+export type MulliganAction = "mulligan" | "keep" | "skip" | "help" | "rule" | "close"
 
 export interface TurnChipState {
   turn: Turn

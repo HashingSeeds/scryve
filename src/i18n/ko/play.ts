@@ -49,6 +49,12 @@ export default {
     flip: "동전",
     pick: "직접 정하기",
   },
+  freeMulligans: {
+    label: "무료 멀리건",
+    none: "없음",
+    first: "첫 번째",
+    all: "모두",
+  },
   whatYouPlay: {
     heading: "어떤 게임을 하시나요?",
     changeLater: "설정에서 변경할 수 있습니다.",
