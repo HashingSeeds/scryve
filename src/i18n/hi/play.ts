@@ -41,6 +41,13 @@ export default {
     lifeAndTurns: "टर्न",
     chessClock: "चेस क्लॉक",
   },
+  firstPlayerChoice: {
+    label: "पहला खिलाड़ी",
+    off: "बंद",
+    roll: "रोल",
+    flip: "फ़्लिप",
+    pick: "हम चुनेंगे",
+  },
   whatYouPlay: {
     heading: "आप क्या खेलते हैं?",
     changeLater: "आप इसे सेटिंग्स में बदल सकते हैं।",

@@ -43,6 +43,13 @@ export default {
     lifeAndTurns: "Tours",
     chessClock: "Horloge d'échecs",
   },
+  firstPlayerChoice: {
+    label: "Premier joueur",
+    off: "Désactivé",
+    roll: "Lancer",
+    flip: "Pile ou face",
+    pick: "Au choix",
+  },
   whatYouPlay: {
     heading: "À quoi jouez-vous ?",
     changeLater: "Vous pouvez modifier cela dans les Réglages.",

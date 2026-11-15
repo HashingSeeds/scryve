@@ -43,6 +43,13 @@ export default {
     lifeAndTurns: "Turnos",
     chessClock: "Reloj de ajedrez",
   },
+  firstPlayerChoice: {
+    label: "Jugador inicial",
+    off: "Desactivado",
+    roll: "Tirar dado",
+    flip: "Lanzar moneda",
+    pick: "Elegimos nosotros",
+  },
   whatYouPlay: {
     heading: "¿A qué juegas?",
     changeLater: "Puedes cambiarlo en Ajustes.",

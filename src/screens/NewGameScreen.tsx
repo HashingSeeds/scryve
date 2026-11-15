@@ -48,6 +48,7 @@ import {
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
+import { FirstPlayerChoice } from "@/features/game/FirstPlayerChoice"
 import { GameTabs } from "@/features/game/GameTabs"
 import {
   gameTypeDetail,
@@ -1125,6 +1126,9 @@ function NewGameForm({
                 />
               ) : null}
               <TurnsChoice />
+              {connectedMode ? null : (
+                <FirstPlayerChoice system={system} playerCount={playerCount} />
+              )}
               {planechaseAvailable ? (
                 <ModeSetupFields
                   choices={modeChoices}

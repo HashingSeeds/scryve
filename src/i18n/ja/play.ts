@@ -43,6 +43,13 @@ export default {
     lifeAndTurns: "ターン",
     chessClock: "チェスクロック",
   },
+  firstPlayerChoice: {
+    label: "先攻",
+    off: "オフ",
+    roll: "ダイス",
+    flip: "コイン",
+    pick: "相談して決める",
+  },
   whatYouPlay: {
     heading: "何をプレイしますか?",
     changeLater: "設定でいつでも変更できます。",

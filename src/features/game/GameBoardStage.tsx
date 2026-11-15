@@ -6,12 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { TurnedBoardContext } from "@/components/BoardPressable"
 import { seatBagSize } from "@/components/CounterChips"
 import { CounterNameOpenContext } from "@/components/CounterNamePanel"
-import {
-  FirstPlayerTabs,
-  FirstPlayerTabsShownContext,
-  type FirstPlayerOffer,
-  type FirstPlayerTab,
-} from "@/components/FirstPlayerTabs"
+import { EdgeTabsShownContext, type EdgeTab } from "@/components/EdgeTabs"
 import {
   ANCHOR_LOW_ON_SCREEN,
   COMPACT_MENU_BUTTON_SIZE,
@@ -57,7 +52,6 @@ export interface GameBoardStageProps {
   layoutVariant: PlayerGridLayoutVariant
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
-  firstPlayer?: FirstPlayerOffer
   roundClock?: BoardRoundClock
   turns?: BoardTurns
   seam?: (geometry: BoardSeamGeometry) => ReactNode
@@ -109,7 +103,6 @@ function PinnedGameBoardStage({
   layoutVariant,
   renderGrid,
   menu,
-  firstPlayer,
   roundClock,
   turns,
   seam,
@@ -150,7 +143,7 @@ function PinnedGameBoardStage({
     [playerCount, gridLayout],
   )
   const tabs = useMemo(
-    () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout)),
+    () => edgeTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout)),
     [boardAnchor, playerCount, gridLayout],
   )
   const facings = useMemo(
@@ -177,7 +170,7 @@ function PinnedGameBoardStage({
         : undefined,
     [pinned, width, height, fontScale, metrics.insets, holderAngle],
   )
-  const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
+  const tabsShown = !!roundClock && !menu.open
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
   const [naming, setNaming] = useState(false)
   // why: a counter name panel covers the middle of the table, and these draw above the grid.
@@ -188,13 +181,13 @@ function PinnedGameBoardStage({
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
-            <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+            <EdgeTabsShownContext.Provider value={tabsShown}>
               <TurnSpotlightContext.Provider value={spotlight}>
                 <CounterNameOpenContext.Provider value={setNaming}>
                   {renderGrid(boardOrientation)}
                 </CounterNameOpenContext.Provider>
               </TurnSpotlightContext.Provider>
-            </FirstPlayerTabsShownContext.Provider>
+            </EdgeTabsShownContext.Provider>
             {seam && !menu.open && overlays
               ? seam({
                   anchor: boardAnchor,
@@ -221,9 +214,7 @@ function PinnedGameBoardStage({
                 onToggle={menu.onToggle}
               />
             ) : null}
-            {tabsShown && overlays ? (
-              <BoardTabs firstPlayer={firstPlayer} roundClock={roundClock} tabs={tabs} />
-            ) : null}
+            {tabsShown && overlays ? <BoardTabs roundClock={roundClock} tabs={tabs} /> : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
@@ -243,7 +234,6 @@ function LegacyGameBoardStage({
   layoutVariant,
   renderGrid,
   menu,
-  firstPlayer,
   roundClock,
   turns,
   seam,
@@ -274,14 +264,14 @@ function LegacyGameBoardStage({
     [boardAnchor, rotation],
   )
   const tabs = useMemo(
-    () => firstPlayerTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
+    () => edgeTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
     [boardAnchor, playerCount, gridLayout, rotation],
   )
   const facings = useMemo(
     () => getPlayerSlotFacings(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
-  const tabsShown = (!!firstPlayer || !!roundClock) && !menu.open
+  const tabsShown = !!roundClock && !menu.open
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
   const [naming, setNaming] = useState(false)
   // why: a counter name panel covers the middle of the table, and these draw above the grid.
@@ -294,13 +284,13 @@ function LegacyGameBoardStage({
       testID={testID}
       style={$stage}
     >
-      <FirstPlayerTabsShownContext.Provider value={tabsShown}>
+      <EdgeTabsShownContext.Provider value={tabsShown}>
         <TurnSpotlightContext.Provider value={spotlight}>
           <CounterNameOpenContext.Provider value={setNaming}>
             {renderGrid(boardOrientation)}
           </CounterNameOpenContext.Provider>
         </TurnSpotlightContext.Provider>
-      </FirstPlayerTabsShownContext.Provider>
+      </EdgeTabsShownContext.Provider>
       {seam && !menu.open && overlays && rotation === 0
         ? seam({
             anchor: boardAnchor,
@@ -321,9 +311,7 @@ function LegacyGameBoardStage({
           compact={playerCount > 2}
         />
       ) : null}
-      {tabsShown && overlays ? (
-        <BoardTabs firstPlayer={firstPlayer} roundClock={roundClock} tabs={tabs} />
-      ) : null}
+      {tabsShown && overlays ? <BoardTabs roundClock={roundClock} tabs={tabs} /> : null}
       {toast ? (
         <BoardToastSlot anchor={menuAnchor} hidden={menu.open || !overlays}>
           {toast}
@@ -356,25 +344,22 @@ function useSpotlight(
 }
 
 function BoardTabs({
-  firstPlayer,
   roundClock,
   tabs,
 }: {
-  firstPlayer?: FirstPlayerOffer
   roundClock?: BoardRoundClock
-  tabs: readonly FirstPlayerTab[]
+  tabs: readonly EdgeTab[]
 }) {
-  if (firstPlayer) return <FirstPlayerTabs offer={firstPlayer} tabs={tabs} />
   if (!roundClock) return null
   return <RoundClockTabs {...roundClock} tabs={tabs} />
 }
 
 /** why: the tabs sit where the menu's row meets the board's left and right edges, clear of the camera cutout and home indicator, each turned toward the players nearest it. `rotation` turns a board drawn sideways onto the screen. */
-export function firstPlayerTabs(
+export function edgeTabs(
   boardAnchor: { x: number; y: number },
   facings: readonly number[],
   rotation = 0,
-): FirstPlayerTab[] {
+): EdgeTab[] {
   return [
     { x: 0, toward: 90 },
     { x: 1, toward: -90 },

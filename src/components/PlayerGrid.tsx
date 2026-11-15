@@ -32,7 +32,7 @@ import { commanderBoardSeats, commanderFacing, commanderReach } from "./commande
 import { counterOutReason, seatTableState } from "./CounterChips"
 import { CounterNameHostContext, useCounterNameBoard } from "./CounterNamePanel"
 import type { LifeCardDice } from "./DiceSeatOverlay"
-import { FirstPlayerTabsShownContext } from "./FirstPlayerTabs"
+import { EdgeTabsShownContext } from "./EdgeTabs"
 import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -337,7 +337,7 @@ export function PlayerGrid({
     )
   }
 
-  const tabsShown = useContext(FirstPlayerTabsShownContext)
+  const tabsShown = useContext(EdgeTabsShownContext)
   const { insets, rows: frames } = seatFrames({
     playerCount: cellCount,
     layout,

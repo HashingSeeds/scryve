@@ -43,6 +43,16 @@ const play = {
     // A chess clock: each player's time bank counts down only on their turn.
     chessClock: "Chess clock",
   },
+  // Game setup: how the table decides who goes first. The board then shows only that.
+  firstPlayerChoice: {
+    label: "First player",
+    off: "Off",
+    roll: "Roll",
+    // Two-player Pokémon and similar games flip a coin instead of rolling.
+    flip: "Flip",
+    // The players agree on who goes first themselves, then tap that player's card.
+    pick: "We pick",
+  },
   whatYouPlay: {
     heading: "What do you play?",
     changeLater: "You can change this in Settings.",

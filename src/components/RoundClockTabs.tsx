@@ -12,8 +12,8 @@ import { useAppTheme } from "@/theme/context"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { EDGE_SLIDES, edgeStyle, type FirstPlayerTab } from "./FirstPlayerTabs"
-import { FIRST_PLAYER_TAB } from "./playerGridGeometry"
+import { EDGE_SLIDES, edgeStyle, type EdgeTab } from "./EdgeTabs"
+import { EDGE_TAB } from "./playerGridGeometry"
 import { Text } from "./Text"
 
 const BORDER = 4
@@ -26,7 +26,7 @@ export const RoundClockTabs = memo(function RoundClockTabs({
   system,
   onPress,
 }: {
-  tabs: readonly FirstPlayerTab[]
+  tabs: readonly EdgeTab[]
   clock: RoundClock
   system?: PlaySystemId
   onPress: () => void
@@ -67,8 +67,8 @@ export const RoundClockTabs = memo(function RoundClockTabs({
         const primary = index === 0
         const alongSide = tab.edge === "left" || tab.edge === "right"
         const press = alongSide
-          ? { width: FIRST_PLAYER_TAB.depth - BORDER, height: FIRST_PLAYER_TAB.length - 2 * BORDER }
-          : { width: FIRST_PLAYER_TAB.length - 2 * BORDER, height: FIRST_PLAYER_TAB.depth - BORDER }
+          ? { width: EDGE_TAB.depth - BORDER, height: EDGE_TAB.length - 2 * BORDER }
+          : { width: EDGE_TAB.length - 2 * BORDER, height: EDGE_TAB.depth - BORDER }
         const face = tab.facing % 180 === 0 ? press : { width: press.height, height: press.width }
         return (
           <Animated.View
@@ -80,7 +80,7 @@ export const RoundClockTabs = memo(function RoundClockTabs({
             importantForAccessibility={primary ? "auto" : "no-hide-descendants"}
             style={[
               $tab,
-              edgeStyle(tab, FIRST_PLAYER_TAB),
+              edgeStyle(tab, EDGE_TAB),
               {
                 backgroundColor: colors.gameMenu.anchor,
                 borderColor: colors.gameMenu.anchorBorder,

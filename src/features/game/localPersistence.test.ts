@@ -405,6 +405,28 @@ describe("LocalGameRepository", () => {
     expect(set).not.toHaveBeenCalled()
   })
 
+  it("remembers first player per system, Off by default, and drops a stored value it can't read", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    expect(repository.firstPlayerMode("mtg")).toBe("off")
+
+    repository.saveFirstPlayerMode("mtg", "roll")
+    repository.saveFirstPlayerMode(undefined, "pick")
+    expect(repository.firstPlayerMode("mtg")).toBe("roll")
+    expect(repository.firstPlayerMode("pokemon")).toBe("off")
+    expect(new LocalGameRepository(storage).firstPlayerMode(undefined)).toBe("pick")
+
+    repository.saveFirstPlayerMode("mtg", "off")
+    expect(repository.firstPlayerMode("mtg")).toBe("off")
+
+    storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({ ...DEFAULT_LOCAL_SETTINGS, firstPlayer: { mtg: "coin", lorcana: "pick" } }),
+    )
+    expect(repository.firstPlayerMode("mtg")).toBe("off")
+    expect(repository.firstPlayerMode("lorcana")).toBe("pick")
+  })
+
   it("asks what you play only on a fresh install", () => {
     const fresh = new LocalGameRepository(new MemoryStorage())
     expect(fresh.loadSettings().askWhatYouPlay).toBe(true)

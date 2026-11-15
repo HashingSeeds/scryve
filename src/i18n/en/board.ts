@@ -83,10 +83,14 @@ const board = {
     nextGame: "Next game",
   },
   firstPlayer: {
-    loserChooses: "{{name}} lost the last game. Choose who goes first",
     flip: "Flip for who goes first",
     roll: "Roll for who goes first",
     claim: "Mark {{name}} as going first",
+    // Short, on each player's card before the game: tap any card to roll for everyone.
+    rollPrompt: "Roll for first",
+    flipPrompt: "Flip for first",
+    // Short, on each player's card before the game: tap the card of the player who goes first.
+    pickPrompt: "Going first?",
   },
   layout: {
     balanced: "Balanced",
