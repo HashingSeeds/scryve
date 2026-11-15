@@ -62,9 +62,9 @@ export default {
   },
   cardFilter: {
     format: "Légal en",
-    type: "Type de carte",
+    type: "Type",
     supertype: "Supertype",
-    subtype: "Sous-types",
+    subtype: "Sous-type",
     manaValue: "Valeur de mana",
     keyword: "Mots-clés",
     power: "Force",

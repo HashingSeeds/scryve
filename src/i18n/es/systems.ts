@@ -62,9 +62,9 @@ export default {
   },
   cardFilter: {
     format: "Legal en",
-    type: "Tipo de carta",
+    type: "Tipo",
     supertype: "Supertipo",
-    subtype: "Subtipos",
+    subtype: "Subtipo",
     manaValue: "Valor de maná",
     keyword: "Palabras clave",
     power: "Fuerza",

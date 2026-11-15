@@ -62,7 +62,7 @@ export default {
   },
   cardFilter: {
     format: "使用可能なフォーマット",
-    type: "カードタイプ",
+    type: "タイプ",
     supertype: "特殊タイプ",
     subtype: "サブタイプ",
     manaValue: "マナ総量",

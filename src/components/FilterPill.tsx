@@ -101,11 +101,22 @@ export function FilterButton({
   )
 }
 
-export function FilterGroup({ heading, children }: { heading: string; children: ReactNode }) {
+export function FilterGroup({
+  heading,
+  search,
+  children,
+}: {
+  heading?: string
+  search?: ReactNode
+  children: ReactNode
+}) {
   const { themed } = useAppTheme()
   return (
     <View style={themed($chipGroup)}>
-      <Text weight="bold" size="xxs" style={themed($groupHeading)} text={heading} />
+      {heading ? (
+        <Text weight="bold" size="xxs" style={themed($groupHeading)} text={heading} />
+      ) : null}
+      {search}
       <View style={themed($chipWrap)}>{children}</View>
     </View>
   )

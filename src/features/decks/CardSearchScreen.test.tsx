@@ -615,7 +615,7 @@ it.each<[string, Partial<typeof filters>, string]>([
         manaValue: [">=2", "<=4"],
       },
     },
-    '(t:"Creature" or t:"Artifact") t:"Legendary" mv>=2 mv<=4',
+    't:"Legendary" (t:"Creature" or t:"Artifact") mv>=2 mv<=4',
   ],
   [
     "a minimum power and a maximum toughness",

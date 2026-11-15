@@ -1,4 +1,4 @@
-import { cardOptions } from "./cardFilters"
+import { cardOptions, filterGroups } from "./cardFilters"
 
 const card = (name: string, typeLine: string, legalFormats?: string[]) => ({
   scryfallId: name,
@@ -31,4 +31,19 @@ test("a card file without legal formats counts every card", () => {
 test("cards without keywords add no blank keyword", () => {
   const cards = ["A", "B", "C"].map((name) => ({ ...card(name, "Sorcery"), keywords: "" }))
   expect(cardOptions(cards, "keyword", [])).toEqual([])
+})
+
+test("a grouped filter shares the heading of the filter its group names, even listed first", () => {
+  const groups = filterGroups([
+    { id: "supertype", label: "Supertype", group: "type", match: "all", options: ["Legendary"] },
+    { id: "type", label: "Type", match: "any", options: ["Creature"] },
+    { id: "manaValue", label: "Mana value", options: "range" },
+  ])
+
+  expect(
+    groups.map(({ heading, filters }) => [heading.label, filters.map(({ id }) => id)]),
+  ).toEqual([
+    ["Type", ["supertype", "type"]],
+    ["Mana value", ["manaValue"]],
+  ])
 })
