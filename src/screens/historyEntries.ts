@@ -52,7 +52,6 @@ export interface HistoryMatchRef {
 export interface HistoryEntry {
   key: string
   source: HistorySource
-  /** why: a nearby game is saved as a local one, so the row names how it was played. */
   nearby?: true
   routeId: string
   finishedAt: number
