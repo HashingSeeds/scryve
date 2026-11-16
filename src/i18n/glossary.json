@@ -209,7 +209,7 @@
       "ko": "피렉시아 마나"
     },
     "Planechase plane and phenomenon": {
-      "en": ["plane", "phenomenon"],
+      "en": ["plane", "phenomenon", "planar"],
       "es": "Planechase stays English. Plane: plano; phenomenon: fenómeno; planeswalk: caminar entre planos; planar die: dado planar",
       "fr": "Planechase plane (the card): Plan (Plan : {{name}}; never Plane). Phenomenon: Phénomène",
       "hi": "प्लेन / फ़ेनोमेनन (planeswalk: प्लेनवॉक)",
@@ -249,7 +249,15 @@
       "ko": "잠듦, 화상, 혼란, 마비, 독"
     },
     "go first / second, on the play": {
-      "en": ["go first", "goes first", "going first", "first or second", "on the play"],
+      "en": [
+        "go first",
+        "goes first",
+        "going first",
+        "first or second",
+        "on the play",
+        "go second",
+        "goes second"
+      ],
       "es": "jugar primero; {{name}} juega primero; jugar primero o segundo; on the play: jugando primero",
       "fr": "jouer en premier / en second ({{name}} joue en premier); question: Qui commence ?",
       "hi": "on the play / going first: पहले खेलते हुए; go first / second: पहले / बाद में खेलें ({{name}} पहले खेलेंगे)",
