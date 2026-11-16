@@ -6,7 +6,11 @@ import { eventClock, eventPoints, eventTableResult } from "./lib/events/validato
 import { feedbackFix, feedbackKind } from "./lib/feedback"
 import { lifeEditingValidator } from "./lib/gameRules"
 import { playerGridLayoutValidator } from "./lib/layouts"
-import { freeMulligansValidator } from "./lib/mulligans"
+import {
+  firstChoiceReasonValidator,
+  firstPlayerModeValidator,
+  freeMulligansValidator,
+} from "./lib/mulligans"
 import { deckLabelValidator, resultOpponentValidator } from "./lib/opponentDecks"
 import { customCounterValidator, pokemonBoardValidator } from "./lib/table"
 import { modeSetupValidator, tableModesValidator } from "./lib/tableModes"
@@ -151,6 +155,12 @@ export default defineSchema({
     modeSetup: v.optional(modeSetupValidator),
     modes: v.optional(tableModesValidator),
     freeMulligans: v.optional(freeMulligansValidator),
+    firstPlayerMode: v.optional(firstPlayerModeValidator),
+    firstPlayerId: v.optional(v.id("gamePlayers")),
+    firstRolls: v.optional(v.record(v.string(), v.number())),
+    firstChooser: v.optional(
+      v.object({ playerId: v.id("gamePlayers"), reason: firstChoiceReasonValidator }),
+    ),
   })
     .index("by_public_id", ["publicId"])
     .index("by_host_status", ["hostUserId", "status"])

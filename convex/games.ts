@@ -63,7 +63,12 @@ import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "./lib/matchResults"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
-import { freeMulligansValidator, isMulliganCount, mulliganHandSize } from "./lib/mulligans"
+import {
+  firstPlayerModeValidator,
+  freeMulligansValidator,
+  isMulliganCount,
+  mulliganHandSize,
+} from "./lib/mulligans"
 import { HIDDEN_DECK_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
   assertDeckLabel,
@@ -846,7 +851,9 @@ async function terminalizeGame(
     eventCount: totalEventCount(game, players),
     finishedAt,
     players: summaryPlayers,
-    ...(options.firstPlayerId ? { firstPlayerId: options.firstPlayerId } : {}),
+    ...((options.firstPlayerId ?? game.firstPlayerId)
+      ? { firstPlayerId: options.firstPlayerId ?? game.firstPlayerId }
+      : {}),
     ...(game.freeMulligans ? { freeMulligans: game.freeMulligans } : {}),
     resultKind: result.kind,
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
@@ -909,6 +916,8 @@ export const createLobby = mutation({
     layout: v.optional(playerGridLayoutValidator),
     editsAnySeat: v.optional(v.boolean()),
     matchBestOf: v.optional(bestOfValidator),
+    firstPlayerMode: v.optional(firstPlayerModeValidator),
+    freeMulligans: v.optional(freeMulligansValidator),
     inviteToken: v.string(),
     manualCodeCandidates: v.array(v.string()),
     hostDisplayName: v.string(),
@@ -994,6 +1003,10 @@ export const createLobby = mutation({
       ...(args.modeSetup ? { modeSetup: args.modeSetup } : {}),
       ...(args.layout ? { layout: args.layout } : {}),
       ...(args.matchBestOf ? { matchBestOf: args.matchBestOf } : {}),
+      ...(args.firstPlayerMode ? { firstPlayerMode: args.firstPlayerMode } : {}),
+      ...(args.freeMulligans && mulliganHandSize(gameSystem) !== undefined
+        ? { freeMulligans: args.freeMulligans }
+        : {}),
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,
@@ -1693,13 +1706,15 @@ export const publishFinishedLocalGame = mutation({
     if (args.retriesThrottled === true) await limitResultRate(ctx, "localGamePublish", user._id)
     const me = meSeats[0]
     const handSize = mulliganHandSize(gameSystem)
-    const myMulligans =
+    const mulligansOf = (player: (typeof players)[number]) =>
       args.freeMulligans &&
       handSize !== undefined &&
-      me?.mulligans !== undefined &&
-      isMulliganCount(me.mulligans, args.freeMulligans, handSize)
-        ? me.mulligans
+      (player.me || player.seatPassHash) &&
+      player.mulligans !== undefined &&
+      isMulliganCount(player.mulligans, args.freeMulligans, handSize)
+        ? player.mulligans
         : undefined
+    const tracksMulligans = players.some((player) => mulligansOf(player) !== undefined)
     if (me?.deckKey !== undefined) assertDeckKey(me.deckKey)
     if (me?.deckFingerprint !== undefined) assertDeckFingerprint(me.deckFingerprint)
     let myDeck: Doc<"decks"> | undefined
@@ -1762,7 +1777,7 @@ export const publishFinishedLocalGame = mutation({
       updatedAt: now,
       // why: the device counted its own events; the summary reads this base plus per-seat counts.
       eventSequence: args.eventCount,
-      ...(myMulligans !== undefined ? { freeMulligans: args.freeMulligans } : {}),
+      ...(tracksMulligans ? { freeMulligans: args.freeMulligans } : {}),
     })
     const playerIdsByLocalId = new Map<string, Id<"gamePlayers">>()
     for (const player of resolvePlayerAppearances(players, connectedMarkShapes(players.length))) {
@@ -1776,7 +1791,7 @@ export const publishFinishedLocalGame = mutation({
           : {}),
         ...(player.me ? attribution : {}),
         ...(player.seatPassHash ? { seatPassHash: player.seatPassHash } : {}),
-        ...(player.me && myMulligans !== undefined ? { mulligans: myMulligans } : {}),
+        ...(mulligansOf(player) !== undefined ? { mulligans: mulligansOf(player) } : {}),
         ...(deckLabel ? { deckLabel } : {}),
         displayName: assertDisplayName(player.displayName),
         color: player.color,
@@ -2218,6 +2233,17 @@ export const lobbyProjection = query({
       ...(game.modeSetup ? { modeSetup: game.modeSetup } : {}),
       ...(game.layout ? { layout: game.layout } : {}),
       ...(game.lifeEditing === "anyone" ? { lifeEditing: game.lifeEditing } : {}),
+      ...(game.freeMulligans ? { freeMulligans: game.freeMulligans } : {}),
+      ...(game.firstPlayerMode || game.firstPlayerId || game.firstChooser
+        ? {
+            firstPlayer: {
+              ...(game.firstPlayerMode ? { mode: game.firstPlayerMode } : {}),
+              ...(game.firstPlayerId ? { playerId: game.firstPlayerId } : {}),
+              ...(game.firstRolls ? { rolls: game.firstRolls } : {}),
+              ...(game.firstChooser ? { chooser: game.firstChooser } : {}),
+            },
+          }
+        : {}),
       isHost,
       ...(game.rematchPublicId ? { rematchPublicId: game.rematchPublicId } : {}),
       ...(game.matchBestOf
@@ -2263,6 +2289,7 @@ export const lobbyProjection = query({
               ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
               : {}),
             ...(p.editsAnySeat ? { editsAnySeat: true } : {}),
+            ...(p.mulligans === undefined ? {} : { mulligans: p.mulligans }),
             controlledByMe:
               (p.userId === user._id || (p.userId === undefined && isHost)) &&
               (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
@@ -2779,6 +2806,97 @@ export const updateMySeat = mutation({
   },
 })
 
+/** why: every device may tap at once, so the first call decides and later ones return what it decided. */
+export const rollFirstPlayer = mutation({
+  args: { publicId: v.string() },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    const { user } = await requireMembership(ctx, game._id)
+    await limitGameRate(ctx, "gameWrite", user._id)
+    if (game.status !== "active" || game.firstPlayerMode !== "roll")
+      throw gameWriteError("game_not_active", "This game doesn't roll for first player")
+    if (game.firstPlayerId || game.firstChooser) return
+    const seats = (await playersForGame(ctx, game._id)).map((player) => player._id)
+    const rules = systemDefinition(game.system ?? game.game)?.firstPlayer
+    if (rules?.twoPlayerCoinFlip && seats.length === 2) {
+      const winner = seats[Math.floor(Math.random() * 2)]
+      await ctx.db.patch(game._id, {
+        firstChooser: { playerId: winner, reason: "flip" },
+        updatedAt: Date.now(),
+      })
+      return
+    }
+    const sides = Number((rules?.die ?? "d20").slice(1))
+    const rolls = rollOff(seats, sides)
+    const winner = seats.reduce((best, seat) => (rolls[seat] > rolls[best] ? seat : best))
+    await ctx.db.patch(game._id, {
+      firstRolls: rolls,
+      ...(rules?.winnerChooses
+        ? { firstChooser: { playerId: winner, reason: "roll" as const } }
+        : { firstPlayerId: winner }),
+      updatedAt: Date.now(),
+    })
+  },
+})
+
+function rollOff(seats: readonly Id<"gamePlayers">[], sides: number) {
+  for (;;) {
+    const rolls = Object.fromEntries(
+      seats.map((seat) => [seat, Math.floor(Math.random() * sides) + 1]),
+    )
+    const high = Math.max(...Object.values(rolls))
+    if (Object.values(rolls).filter((roll) => roll === high).length === 1) return rolls
+  }
+}
+
+export const chooseFirstPlayer = mutation({
+  args: { publicId: v.string(), playerId: v.id("gamePlayers") },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    const { user } = await requireMembership(ctx, game._id)
+    await limitGameRate(ctx, "gameWrite", user._id)
+    if (game.status !== "active") throw gameWriteError("game_not_active", "The game isn't active")
+    if (game.firstPlayerId) return
+    const players = await playersForGame(ctx, game._id)
+    if (!players.some((seat) => seat._id === args.playerId))
+      throw new Error("That player isn't in this game")
+    const chooser =
+      game.firstChooser && players.find((seat) => seat._id === game.firstChooser!.playerId)
+    if (chooser) {
+      const decides =
+        chooser.userId === undefined ? game.hostUserId === user._id : chooser.userId === user._id
+      if (!decides)
+        throw gameWriteError("seat_owner_required", "That player chooses who goes first")
+    } else if (game.firstPlayerMode !== "pick")
+      throw gameWriteError("game_not_active", "This game doesn't pick a first player")
+    await ctx.db.patch(game._id, {
+      firstPlayerId: args.playerId,
+      firstChooser: undefined,
+      updatedAt: Date.now(),
+    })
+  },
+})
+
+export const keepHand = mutation({
+  args: { publicId: v.string(), seat: v.number(), mulligans: v.number() },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
+    const handSize = mulliganHandSize(game.system ?? game.game)
+    if (
+      game.status !== "active" ||
+      !game.freeMulligans ||
+      handSize === undefined ||
+      !(player.deckVersionId || player.deckKey) ||
+      !isMulliganCount(args.mulligans, game.freeMulligans, handSize)
+    )
+      throw gameWriteError("game_not_active", "This seat doesn't track mulligans")
+    if (player.mulligans !== undefined) return
+    await ctx.db.patch(player._id, { mulligans: args.mulligans })
+  },
+})
+
 export const labelGuestSeatDeck = mutation({
   args: {
     publicId: v.string(),
@@ -3020,6 +3138,7 @@ async function startRematch(
   finished: Doc<"games">,
   hostUserId: Id<"users">,
   request: Infer<typeof rematchRequest>,
+  loserSeat?: number,
 ) {
   assertPublicId(request.publicId)
   assertInviteToken(request.inviteToken)
@@ -3064,6 +3183,8 @@ async function startRematch(
     ...(finished.variant === undefined ? {} : { variant: finished.variant }),
     ...(finished.modeSetup === undefined ? {} : { modeSetup: finished.modeSetup }),
     ...(finished.layout === undefined ? {} : { layout: finished.layout }),
+    ...(finished.firstPlayerMode ? { firstPlayerMode: finished.firstPlayerMode } : {}),
+    ...(finished.freeMulligans ? { freeMulligans: finished.freeMulligans } : {}),
     ...lifeEditingFor(players),
     rematchOfGameId: finished._id,
     createdAt: now,
@@ -3113,6 +3234,8 @@ async function startRematch(
       ...roles?.[index],
     })
     seatIds.push(seatId)
+    if (finished.firstPlayerMode && player.seat === loserSeat)
+      await ctx.db.patch(gameId, { firstChooser: { playerId: seatId, reason: "loss" } })
   }
   if (finished.modeSetup) {
     const archenemySeat = players.find(
@@ -3192,16 +3315,20 @@ export const finishGame = mutation({
     const user = await requireHost(ctx, game)
     if (game.status !== "active")
       throw gameWriteError("game_not_active", "Only an active game can be finished")
-    const summary = await terminalizeGame(
-      ctx,
-      game,
-      "finished",
-      "host_finished",
-      user._id,
-      args.result ?? { kind: "unknown" },
-    )
+    const result = args.result ?? { kind: "unknown" as const }
+    const summary = await terminalizeGame(ctx, game, "finished", "host_finished", user._id, result)
+    const losers =
+      result.kind === "win"
+        ? summary.players.filter((player) => !result.winnerPlayerIds.includes(player.playerId))
+        : []
     const rematchPublicId = args.rematch
-      ? await startRematch(ctx, game, user._id, args.rematch)
+      ? await startRematch(
+          ctx,
+          game,
+          user._id,
+          args.rematch,
+          losers.length === 1 ? losers[0].seat : undefined,
+        )
       : null
     return {
       publicId: game.publicId,
