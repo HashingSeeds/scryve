@@ -1,5 +1,6 @@
 import type { FunctionReturnType } from "convex/server"
 
+import { formatName } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 
 import { getCommanderWarnings, type CommanderSelectionDetails } from "./commanderSelection"
@@ -22,7 +23,6 @@ import {
 } from "./deckVersionsCache"
 import type { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import { deckFormatLabel } from "../../../convex/lib/deckGames"
 
 type DeckDetail = FunctionReturnType<typeof api.decks.detail>
 type StoredCardRow = { _id?: unknown; _creationTime?: unknown; deckVersionId?: unknown }
@@ -189,8 +189,8 @@ export function resolveDeckView(input: DeckViewInput) {
           },
           {
             label: translate("decks:conflict.format"),
-            local: deckFormatLabel(failedEdit.action.game, failedEdit.action.format),
-            account: deckFormatLabel(accountMetadata.game, accountMetadata.format),
+            local: formatName(failedEdit.action.game, failedEdit.action.format),
+            account: formatName(accountMetadata.game, accountMetadata.format),
           },
           {
             label: translate("decks:conflict.notes"),

@@ -73,7 +73,7 @@ import { shareUrl } from "@/features/decks/shareLinks"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { localizedDeckSections } from "@/features/game/playSystems"
+import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
 import { formatList, joinParts } from "@/i18n/format"
@@ -86,7 +86,6 @@ import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
-import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
 import { picksCommander, tracksResults } from "../../convex/lib/systems"
 
 type DeckDialog =
@@ -158,11 +157,11 @@ function DeckDetailPlaceholder({
   failure?: { kind: "missing" | "unavailable"; retry: () => void }
 }) {
   const { themed, theme } = useAppTheme()
-  const loadingGameLabel = summary ? (deckGame(summary.game)?.shortLabel ?? summary.game) : null
+  const loadingGameLabel = summary ? gameName(summary.game) : null
   const loadingMetadata = summary
     ? joinParts([
         loadingGameLabel,
-        deckFormatLabel(summary.game, summary.format),
+        formatName(summary.game, summary.format),
         summary.cardQuantity !== undefined ? cardCountLabel(summary.cardQuantity) : undefined,
       ])
     : null
@@ -1305,7 +1304,7 @@ function DeckDetailContent({
                     size="sm"
                     tx="decks:conflict.formatLine"
                     txOptions={{
-                      format: deckFormatLabel(failedEdit.action.game, failedEdit.action.format),
+                      format: formatName(failedEdit.action.game, failedEdit.action.format),
                     }}
                   />
                   <Text

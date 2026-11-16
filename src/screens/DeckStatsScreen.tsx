@@ -16,6 +16,7 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { MIN_RATED_GAMES } from "@/features/decks/deckCopy"
 import { statsSourceLabel } from "@/features/decks/deckStatLines"
+import { formatName, gameName } from "@/features/game/playSystems"
 import {
   chanceRate,
   exactRecord,
@@ -50,7 +51,6 @@ import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
 import { api } from "../../convex/_generated/api"
-import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
 import { BREAKDOWN_SCAN } from "../../convex/lib/deckStatsLimits"
 
 type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void }
@@ -200,7 +200,7 @@ function DeckStatsContent({ access, deckKey, deckName, game, format }: Props) {
             <Text
               size="xs"
               tone="dim"
-              text={joinParts([deckGame(game)?.shortLabel ?? game, deckFormatLabel(game, format)])}
+              text={joinParts([gameName(game), formatName(game, format)])}
             />
             {empty ? (
               <View style={$hero}>

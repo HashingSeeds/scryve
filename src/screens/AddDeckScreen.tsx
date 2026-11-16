@@ -55,7 +55,7 @@ import { useCapabilityReleased } from "@/features/decks/useCapabilityReleased"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useDeckEditor } from "@/features/decks/useDeckEditor"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { localizedDeckSections } from "@/features/game/playSystems"
+import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import { type TxKeyPath } from "@/i18n"
 import { formatDate, formatNumber, joinParts } from "@/i18n/format"
@@ -70,7 +70,6 @@ import { api } from "../../convex/_generated/api"
 import {
   DECK_GAME_LIST,
   DEFAULT_DECK_GAME,
-  deckFormatLabel,
   deckFormats,
   defaultDeckFormat,
   PRECON_SOURCE,
@@ -925,7 +924,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
         text={
           preconQuery.trim() || catalogColors.length
             ? translate("decks:addDeck.noMatchesDetail")
-            : translate("decks:addDeck.noListsYet", { format: deckFormatLabel(game, format) })
+            : translate("decks:addDeck.noListsYet", { format: formatName(game, format) })
         }
       />
       <Button tx="decks:addDeck.pasteList" preset="primary" onPress={() => setMode("paste")} />
@@ -1149,7 +1148,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
               options={DECK_GAME_LIST.filter((candidate) => isSystemVisible(candidate.id)).map(
                 (candidate) => ({
                   id: candidate.id,
-                  label: candidate.shortLabel,
+                  label: gameName(candidate.id),
                 }),
               )}
               onSelect={(next) => {
@@ -1165,7 +1164,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
               value={format}
               options={deckFormats(game).map((candidate) => ({
                 id: candidate.id,
-                label: candidate.label,
+                label: formatName(game, candidate.id),
               }))}
               onSelect={(next) => {
                 if (next) chooseFormat(next)

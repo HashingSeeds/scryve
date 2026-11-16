@@ -1,7 +1,7 @@
 import systems from "@/i18n/en/systems"
 import { translate } from "@/i18n/translate"
 
-import { deckFormatLabel, deckFormats, deckSections } from "../../../convex/lib/deckGames"
+import { deckFormats, deckSections } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
   isSystemId,
@@ -146,7 +146,33 @@ export function playTableRules(value: unknown, format?: string): TableRules {
 
 export function playFormatLabel(value: unknown, format?: string): string {
   const system = playSystemId(value)
-  return deckFormatLabel(system, playSystemFormat(system, format))
+  return formatName(system, playSystemFormat(system, format))
+}
+
+export function gameName(game: string): string {
+  return hasOwnKey(systems.gameName, game) ? translate(`systems:gameName.${game}`) : game
+}
+
+export function modeDeckName({ id, name }: { id: string; name: string }): string {
+  return hasOwnKey(systems.modeDeck, id) ? translate(`systems:modeDeck.${id}`) : name
+}
+
+export function modeProductName({ id, product }: { id: string; product: string }): string {
+  const productId = id.split("-")[0]
+  return hasOwnKey(systems.modeProduct, productId)
+    ? translate(`systems:modeProduct.${productId}`)
+    : product
+}
+
+export function cardFilterOptionLabel(game: string, filterId: string, option: string): string {
+  if (filterId === "format") return formatName(game, option)
+  return hasOwnKey(systems.cardType, option) ? translate(`systems:cardType.${option}`) : option
+}
+
+export function formatName(game: string, format: string): string {
+  return hasOwnKey(systems.formatName, game) && hasOwnKey(systems.formatName[game], format)
+    ? translate(`systems:formatName.${game}.${format}`)
+    : format.charAt(0).toUpperCase() + format.slice(1)
 }
 
 export function counterValueLabel(value: unknown, count: number): string {
@@ -180,7 +206,7 @@ function hasOwnKey<Table extends object>(
 }
 
 export function playSystemShortLabel(value: unknown): string {
-  return isPlaySystemId(value) ? SYSTEMS[value].shortLabel : translate("systems:noSystem")
+  return isPlaySystemId(value) ? gameName(value) : translate("systems:noSystem")
 }
 
 export function counterHeading(value: unknown): string {
@@ -248,9 +274,9 @@ function formatBlurb(system: PlaySystemId, id: string, blurb: string): string {
 
 export function playFormatOptions(value: unknown) {
   const system = playSystemId(value)
-  return deckFormats(system).map(({ id, label, blurb }) => ({
+  return deckFormats(system).map(({ id, blurb }) => ({
     id,
-    label,
+    label: formatName(system, id),
     ...(blurb ? { detail: formatBlurb(system, id, blurb) } : {}),
   }))
 }

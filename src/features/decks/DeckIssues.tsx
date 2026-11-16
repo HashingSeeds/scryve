@@ -4,6 +4,7 @@ import type { ViewStyle } from "react-native"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { Text } from "@/components/Text"
+import { formatName } from "@/features/game/playSystems"
 import { formatList, formatSum } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -11,7 +12,6 @@ import type { ThemedStyle } from "@/theme/types"
 
 import type { DeckCard } from "./deckCards"
 import { useDeckCardDetails } from "./useDeckCardDetails"
-import { deckFormatLabel } from "../../../convex/lib/deckGames"
 import {
   deckIssues,
   readsCardDetails,
@@ -144,7 +144,7 @@ export function DeckIssues({
   if (issues.length === 0) return null
   const labels: IssueLabels = {
     section: sectionLabel,
-    format: (format) => deckFormatLabel(game, format),
+    format: (format) => formatName(game, format),
   }
   return (
     <View style={themed($issues)} testID="deck-issues">
