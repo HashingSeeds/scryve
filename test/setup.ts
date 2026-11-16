@@ -168,10 +168,21 @@ jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }))
 
-jest.mock("expo-localization", () => ({
-  ...jest.requireActual("expo-localization"),
-  getLocales: () => [{ languageTag: "en-US", textDirection: "ltr" }],
-}))
+jest.mock("expo-localization", () => {
+  const calendars = [
+    {
+      calendar: "gregory",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      uses24hourClock: false,
+      firstWeekday: 1,
+    },
+  ]
+  return {
+    ...jest.requireActual("expo-localization"),
+    getLocales: () => [{ languageTag: "en-US", textDirection: "ltr" }],
+    getCalendars: () => calendars,
+  }
+})
 
 jest.mock("expo-haptics", () => ({
   ImpactFeedbackStyle: { Light: "light" },

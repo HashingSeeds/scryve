@@ -44,6 +44,7 @@ import { LocalDeckSyncHeader } from "@/features/decks/LocalDeckSyncHeader"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import type { BackAction } from "@/features/game/useBackToBoard"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
@@ -106,9 +107,12 @@ function deckSubtitle(deck: ShelfDeck, game: string, showGame: boolean) {
     deck.versionCount && deck.versionCount > 1
       ? translate("decks:shelf.versionCount", { count: deck.versionCount })
       : null
-  return [showGame ? gameLabel : null, deckFormatLabel(game, deck.format), cards, versions]
-    .filter(Boolean)
-    .join(" · ")
+  return joinParts([
+    showGame ? gameLabel : null,
+    deckFormatLabel(game, deck.format),
+    cards,
+    versions,
+  ])
 }
 
 function deckMarkerColor(game: string, { gameMenu: { actions } }: Theme["colors"]) {

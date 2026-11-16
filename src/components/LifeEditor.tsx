@@ -14,6 +14,7 @@ import Animated, {
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
+import { formatNumber, formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -55,10 +56,6 @@ const HEADER_EDGES = {
   [-90]: { top: "left", left: "bottom", right: "top", start: "bottomLeft", end: "topLeft" },
   180: { top: "bottom", left: "right", right: "left", start: "bottomRight", end: "bottomLeft" },
 } as const
-
-function deltaLabel(delta: number) {
-  return `${delta > 0 ? "+" : ""}${delta}`
-}
 
 function lifeEditorHeaderPosition(
   rotation: LifeCardContentRotation,
@@ -199,7 +196,7 @@ export function LifeEditor({
     height: editorHeight,
     compact,
     sourceFontSize,
-    digits: String(life).length,
+    digits: formatNumber(life).length,
     header: headerPosition,
   })
   const valueLineHeight = getLifeLineHeight(valueFontSize)
@@ -385,7 +382,7 @@ export function LifeEditor({
         style={valueStyle}
       >
         <Text
-          text={String(preview)}
+          text={preview}
           weight="bold"
           accessibilityLiveRegion="polite"
           maxFontSizeMultiplier={1}
@@ -442,7 +439,7 @@ export function LifeEditor({
             >
               <Text
                 testID={`life-editor-balloon-seat-${seatNumber}`}
-                text={deltaLabel(preview - start.current.life)}
+                text={formatSigned(preview - start.current.life)}
                 weight="bold"
                 size={compact ? "xl" : "xxl"}
                 maxFontSizeMultiplier={1}
@@ -468,7 +465,7 @@ export function LifeEditor({
           accessibilityLabel={translate(`board:lifeEditor.slider.${rules.id}`, {
             name: playerName,
           })}
-          accessibilityValue={{ text: deltaLabel(preview - start.current.life) }}
+          accessibilityValue={{ text: formatSigned(preview - start.current.life) }}
           accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
           onAccessibilityAction={({ nativeEvent }) =>
             apply(nativeEvent.actionName === "increment" ? scrubStep : -scrubStep)

@@ -173,7 +173,10 @@ function PlanePlate({
     <BoardPressable
       testID="plane-plate"
       accessibilityRole="button"
-      accessibilityLabel={`${translate(planar.phenomenon ? "board:planar.phenomenon" : "board:planar.plane")}: ${name}`}
+      accessibilityLabel={translate(
+        planar.phenomenon ? "board:planar.phenomenonNamed" : "board:planar.planeNamed",
+        { name },
+      )}
       accessibilityHint={translate("board:planar.opensPlane")}
       onPress={onPress}
       style={({ pressed }) => [
@@ -251,7 +254,7 @@ function SchemePlate({
     <BoardPressable
       testID={due ? "scheme-due-plate" : "scheme-plate"}
       accessibilityRole="button"
-      accessibilityLabel={`${translate("board:scheme.archenemy")}: ${label}`}
+      accessibilityLabel={translate("board:scheme.archenemyPlate", { label })}
       accessibilityHint={translate("board:scheme.opensSchemes")}
       onPress={onPress}
       style={({ pressed }) => [
@@ -286,12 +289,7 @@ function SchemePlate({
         </View>
       ) : ongoing > 1 ? (
         <View style={[$badge, { backgroundColor: colors.gameMenu.anchor }]}>
-          <Text
-            size="xxs"
-            weight="bold"
-            style={[$badgeText, { color: ink }]}
-            text={String(ongoing)}
-          />
+          <Text size="xxs" weight="bold" style={[$badgeText, { color: ink }]} text={ongoing} />
         </View>
       ) : null}
     </BoardPressable>

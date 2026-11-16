@@ -9,6 +9,7 @@ import { tableItemLabel, tableItemShortLabel, type TableRules } from "@/features
 import { rememberCounterName, suggestedCounterNames } from "@/features/game/recentCounterNames"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import board from "@/i18n/en/board"
+import { formatList, formatNumber, formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -442,7 +443,7 @@ export const CounterChips = memo(function CounterChips({
           />
         )}
         <Text
-          text={String(item.value)}
+          text={item.value}
           weight={item.lethal ? "bold" : "medium"}
           maxFontSizeMultiplier={1.2}
           style={[themed(compact ? $compactValue : $value), { color: foreground }]}
@@ -452,7 +453,7 @@ export const CounterChips = memo(function CounterChips({
   }
   const overflowFace = (count: number) => (
     <Text
-      text={`+${count}`}
+      text={formatSigned(count)}
       weight="bold"
       maxFontSizeMultiplier={1.2}
       style={[themed(compact ? $compactValue : $value), { color: foreground }]}
@@ -530,7 +531,7 @@ export const CounterChips = memo(function CounterChips({
               const valueText =
                 counter.losesAt !== undefined
                   ? translate("board:counters.valueOutOf", { value, max: counter.losesAt })
-                  : String(value)
+                  : formatNumber(value)
               if (!editable)
                 return (
                   <View
@@ -726,7 +727,7 @@ function useAnnouncements({ rules, counters, held }: SeatTable, identity: string
     if (changes.length === 0) return
     const message = translate("board:counters.announcement", {
       identity,
-      changes: changes.join(", "),
+      changes: formatList(changes),
     })
     if (Platform.OS !== "web") return AccessibilityInfo.announceForAccessibility(message)
     // why: a live region only speaks when its text changes, so it clears first and the message lands a beat later; retaking Monarch is read again.
@@ -864,6 +865,7 @@ function CounterSheet({
                   ]}
                 >
                   <Text
+                    // eslint-disable-next-line no-restricted-syntax -- why: a lone plus or minus on a step button is an icon, not a number.
                     text={direction > 0 ? "+" : "−"}
                     style={[themed(compact ? $compactSheetGlyph : $sheetGlyph), { color: ink }]}
                   />
@@ -889,14 +891,19 @@ function CounterSheet({
                   hitSlop={8}
                   onPress={() => openRule(ruleId)}
                 >
-                  <Text text={`§${ruleId}`} size="xs" style={[$ruleLink, { color: ink }, $muted]} />
+                  <Text
+                    // eslint-disable-next-line no-restricted-syntax -- why: a Comprehensive Rules citation such as §704.5c is an identifier, not a count.
+                    text={`§${ruleId}`}
+                    size="xs"
+                    style={[$ruleLink, { color: ink }, $muted]}
+                  />
                 </BoardPressable>
               ) : null}
             </View>
             <View pointerEvents="none" style={$sheetCenter}>
               <Text
                 testID={`counter-edit-value-${seatNumber}`}
-                text={String(value)}
+                text={value}
                 maxFontSizeMultiplier={1.2}
                 style={[themed(compact ? $compactSheetValue : $sheetValue), { color: ink }]}
               />
@@ -1435,7 +1442,7 @@ function SheetOption({
           <>
             {value ? (
               <Text
-                text={String(value)}
+                text={value}
                 weight="bold"
                 size="xs"
                 style={[themed($optionValue), { color: ink }]}
@@ -1447,7 +1454,7 @@ function SheetOption({
           <Animated.View entering={fadeIn} exiting={fadeOut} style={themed($optionWords)}>
             {value ? (
               <Text
-                text={String(value)}
+                text={value}
                 weight="bold"
                 size="xs"
                 style={[themed($optionValue), { color: ink }]}

@@ -1,6 +1,6 @@
 import { gameTypeLabel } from "@/features/game/gameTypes"
 import { counterValueLabel, playFormatLabel, storedPlaySystem } from "@/features/game/playSystems"
-import { appLocale } from "@/i18n"
+import { formatDate, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 const MINUTE_MS = 60_000
@@ -35,7 +35,7 @@ export function relativeTime(timestamp: number, now: number) {
   }
   const days = Math.floor(elapsed / DAY_MS)
   if (days < 7) return translate("connected:relativeTime.days", { days })
-  return new Date(timestamp).toLocaleDateString(appLocale, { month: "short", day: "numeric" })
+  return formatDate(timestamp, { month: "short", day: "numeric" })
 }
 
 export function resumeTitle(game: ResumableGame) {
@@ -50,14 +50,12 @@ export function resumeTitle(game: ResumableGame) {
 
 export function resumeDetail(game: ResumableGame, now: number) {
   const system = storedPlaySystem(game.system)
-  return [
+  return joinParts([
     translate("connected:seatCount", { count: game.playerCount }),
     system ? playFormatLabel(system, game.format || game.ruleset) : undefined,
     game.startingLife ? counterValueLabel(system, game.startingLife) : undefined,
     relativeTime(game.updatedAt, now),
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
 }
 
 export function seatSummary(claimed: number, total: number) {
@@ -75,11 +73,11 @@ export function lobbyDetail(
 ) {
   const resolvedSystem = storedPlaySystem(system)
   if ((variant === "twoHeadedGiant" || variant === "twoVsTwo") && resolvedSystem)
-    return [
+    return joinParts([
       gameTypeLabel({ id: variant, system: resolvedSystem, format: format || ruleset, variant }),
       counterValueLabel(resolvedSystem, startingLife),
-    ].join(" · ")
-  return [
+    ])
+  return joinParts([
     counterValueLabel(resolvedSystem, startingLife),
     resolvedSystem ? playFormatLabel(resolvedSystem, format || ruleset) : undefined,
     variant === "treachery"
@@ -87,9 +85,7 @@ export function lobbyDetail(
       : variant === "archenemy"
         ? translate("board:scheme.title")
         : undefined,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
 }
 
 export function seatDetail({
@@ -106,10 +102,8 @@ export function seatDetail({
   const who = controlledByMe
     ? translate("connected:yourSeat")
     : translate("connected:seatNumber", { seat })
-  const deck = deckName
-    ? [deckName, versionName].filter(Boolean).join(" · ")
-    : translate("connected:noDeckSelected")
-  return `${who} · ${deck}`
+  const deck = deckName ? joinParts([deckName, versionName]) : translate("connected:noDeckSelected")
+  return joinParts([who, deck])
 }
 
 export type LobbyExitAction = "leave" | "abandon"

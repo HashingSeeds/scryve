@@ -109,6 +109,7 @@ import {
   type DeckChoice,
   type SelectedDeck,
 } from "@/features/stats/deckChoices"
+import { formatList, formatNumber, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -565,7 +566,7 @@ function NewGameForm({
       }),
     [connectedMode, defaults.defaultFormat, defaults.defaultSystem, recentSetups],
   )
-  const optionsSummary = [
+  const optionParts = [
     ...(matchOffered && matchBestOf
       ? [translate("play:newGame.bestOfCount", { bestOf: matchBestOf })]
       : []),
@@ -576,14 +577,15 @@ function NewGameForm({
             : translate("play:newGame.clockStopwatch"),
         ]
       : []),
-  ].join(" · ")
-  const setupSummary = [
+  ]
+  const optionsSummary = joinParts(optionParts)
+  const setupSummary = joinParts([
     connectedMode
       ? translate("play:newGame.seatsCount", { count: playerCount })
       : translate("play:summary.playerCount", { count: playerCount }),
     counterValueLabel(system, startingLife),
-    ...(optionsSummary ? [optionsSummary] : []),
-  ].join(" · ")
+    ...optionParts,
+  ])
   const matchLocked = Boolean(
     initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
   )
@@ -1167,9 +1169,10 @@ function NewGameForm({
                 <Button
                   testID="setup-change-button"
                   tx="play:newGame.moreOptions"
-                  accessibilityLabel={[translate("play:newGame.moreOptions"), optionsSummary]
-                    .filter(Boolean)
-                    .join(", ")}
+                  accessibilityLabel={formatList([
+                    translate("play:newGame.moreOptions"),
+                    optionsSummary,
+                  ])}
                   style={themed($changeButton)}
                   onPress={openOptions}
                 />
@@ -1331,13 +1334,11 @@ function NewGameForm({
                           : []),
                         ...deckChoices.map((choice) => ({
                           id: deckChoiceId(choice)!,
-                          label: [
+                          label: joinParts([
                             choice.name,
                             choice.versionLabel,
                             choice.sharedToken ? translate("decks:shared.tag") : undefined,
-                          ]
-                            .filter(Boolean)
-                            .join(" · "),
+                          ]),
                           accessory: choice.localId ? <DeviceGlyph /> : undefined,
                           accessibilityLabel: choice.localId
                             ? translate("decks:stats.onDeviceLabel", { name: choice.name })
@@ -1594,7 +1595,7 @@ function NewGameForm({
               value={String(lifeStep)}
               options={LIFE_STEP_OPTIONS.map((step) => ({
                 id: String(step),
-                label: String(step),
+                label: formatNumber(step),
               }))}
               onSelect={(value) => {
                 const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)

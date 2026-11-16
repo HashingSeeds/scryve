@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/NumberLane"
 import { Sheet } from "@/components/Sheet"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
+import { formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -58,7 +59,7 @@ export function SideboardSwapSheet({
           key={line.key}
           line={line}
           moved={moved}
-          sign={bag === "in" ? "+" : "−"}
+          direction={bag === "in" ? 1 : -1}
           detail={translate(
             bag === "in" ? "decks:sideboard.leftInSide" : "decks:sideboard.leftInMain",
             { left: line.quantity - moved, total: line.quantity },
@@ -122,13 +123,13 @@ function Section({
 function SwapRow({
   line,
   moved,
-  sign,
+  direction,
   detail,
   onStep,
 }: {
   line: SwapLine
   moved: number
-  sign: "+" | "−"
+  direction: 1 | -1
   detail: string
   onStep: (delta: number) => void
 }) {
@@ -152,7 +153,7 @@ function SwapRow({
         size="sm"
         weight="medium"
         style={[$quantity, moved ? themed($moved) : undefined]}
-        text={moved ? `${sign}${moved}` : "0"}
+        text={moved ? formatSigned(direction * moved) : 0}
       />
       <TouchableOpacity
         accessibilityRole="button"

@@ -73,6 +73,7 @@ import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { bagWithPlane, modeSeamFor, teamSeat, type SeamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -764,14 +765,14 @@ export function CurrentGameScreen({
             <Text size="xs" tx="board:match.limitReached" style={themed($dialogText)} />
           )}
           <Text
-            text={matchPrompt.players
-              .map((player, seat) =>
+            text={joinParts(
+              matchPrompt.players.map((player, seat) =>
                 translate("board:match.playerScore", {
                   name: player.name,
                   wins: matchScoreAfter(matchPrompt).wins[seat],
                 }),
-              )
-              .join(" · ")}
+              ),
+            )}
             style={themed($dialogText)}
           />
           {matchScoreAfter(matchPrompt).draws ? (

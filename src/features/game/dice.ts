@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 
+import { formatConjunction, formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import type { TurnSeat } from "./turnTab"
@@ -134,7 +135,9 @@ export function toolLabel(tool: DiceTool) {
 }
 
 export function rollValueLabel(roll: DiceRoll) {
-  return roll.tool === "coin" ? translate(`board:dice.coinFace.${roll.value}`) : String(roll.value)
+  return roll.tool === "coin"
+    ? translate(`board:dice.coinFace.${roll.value}`)
+    : formatNumber(roll.value)
 }
 
 export function rollLabel(playerName: string, roll: DiceRoll) {
@@ -241,7 +244,7 @@ export function rollOffAnnouncement(
       : translate("board:dice.rolloffLabel.won", { name: name(first.pool[0]), value })
   return translate("board:dice.tieRollAgain", {
     value,
-    names: first.pool.map(name).join(translate("board:dice.nameSeparator")),
+    names: formatConjunction(first.pool.map(name)),
   })
 }
 

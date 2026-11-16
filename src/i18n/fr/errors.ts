@@ -26,7 +26,7 @@ export default {
   gameNotFound: "Partie introuvable",
   invalidCardImage: "L'image de la carte doit être une URL HTTPS publique",
   invalidCardName: "Le nom de la carte n'est pas valide",
-  invalidCardQuantity: "La quantité de cartes doit être comprise entre 1 et 999",
+  invalidCardQuantity: "La quantité de cartes doit être comprise entre {{min}} et {{max}}",
   invalidClientTimestamp: "Horodatage du client non valide",
   invalidDeckIdentifier: "Identifiant de deck non valide",
   invalidDeckList: "Ce lien YDKE n'est pas valide",
@@ -34,7 +34,7 @@ export default {
   invalidDeviceId: "Identifiant d'appareil invalide",
   invalidInvite: "L'invitation est invalide, expirée ou révoquée",
   invalidLifeDelta:
-    "La variation de points de vie doit être un entier non nul compris entre -999999 et 999999",
+    "La variation de points de vie doit être un nombre entier non nul compris entre {{min}} et {{max}}",
   invalidLocalId: "L'ID local invité doit être un UUID",
   invalidLocalUpdatedAt: "L'horodatage invité n'est pas valide",
   invalidSyncId: "L'ID du deck doit être un UUID ou un ID de deck",

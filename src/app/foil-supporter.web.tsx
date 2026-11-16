@@ -11,6 +11,8 @@ import { FOIL_PRODUCT_ID } from "@/features/billing/config"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { translate } from "@/i18n/translate"
 
+const FOIL_YEARLY_USD = 500
+
 export default function FoilSupporterRoute() {
   const auth = useAuthAccess()
   const billing = useRevenueCat()
@@ -48,7 +50,12 @@ export default function FoilSupporterRoute() {
         }}
       >
         <View style={$content}>
-          <Text tx="account:foil.price" preset="heading" accessibilityRole="header" />
+          <Text
+            tx="account:foil.price"
+            txOptions={{ amount: FOIL_YEARLY_USD }}
+            preset="heading"
+            accessibilityRole="header"
+          />
           <Text tx="account:foil.description" />
           {!auth.isSignedIn ? (
             <>

@@ -2,7 +2,7 @@ import { ActivityIndicator, type TextStyle, View, type ViewStyle } from "react-n
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
-import { appLocale } from "@/i18n"
+import { formatDate } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -18,7 +18,7 @@ export function SubscriptionControls() {
   const entitlement = billing.customerInfo?.entitlements.all[COUNT_PRO_ENTITLEMENT_ID]
   const planName = billing.isFoil ? "Foil" : "Pro"
   const expiration = entitlement?.expirationDate
-    ? new Date(entitlement.expirationDate).toLocaleDateString(appLocale)
+    ? formatDate(new Date(entitlement.expirationDate))
     : null
   const accessStatus = billing.isLoading
     ? translate("account:billing.access.checking")

@@ -13,6 +13,7 @@ import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -215,7 +216,7 @@ export function DeckView({
               <Text
                 size="xs"
                 tone="dim"
-                text={[
+                text={joinParts([
                   deckGame(game)?.shortLabel ?? game,
                   deckFormatLabel(game, format),
                   cardsUnavailable
@@ -226,9 +227,7 @@ export function DeckView({
                           side: sideCount,
                         })
                       : cardCountLabel(mainCount),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                ])}
               />
               {building && version ? (
                 <View style={$row}>

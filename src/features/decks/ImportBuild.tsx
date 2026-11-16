@@ -13,6 +13,7 @@ import { TextField } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import { type TxKeyPath } from "@/i18n"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -201,13 +202,11 @@ export function ImportBuild({
                 size="xs"
                 tone="dim"
                 testID="import-build-summary"
-                text={[
+                text={joinParts([
                   deckFormatLabel(game, format),
                   cards ? cardCountLabel(totalQuantity(cards)) : undefined,
                   source,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                ])}
               />
               {details}
             </View>
@@ -255,7 +254,11 @@ export function ImportBuild({
                             )
                       }
                     />
-                    <Text size="meta" tone="dim" text={`"${problem.line}"`} />
+                    <Text
+                      size="meta"
+                      tone="dim"
+                      text={translate("decks:importProblemLine", { line: problem.line })}
+                    />
                   </View>
                   {guess ? (
                     <TextAction

@@ -67,7 +67,7 @@ export default {
       "保留中の変更のオフラインキューがいっぱいです。再接続して同期してから、変更を続けてください。",
     undoPartial:
       "この取り消しの途中でオフラインのキューがいっぱいになったため、一部しか保存されませんでした。再接続して同期してから、残りを取り消してください。",
-    commanderDamageRange: "統率者ダメージの変更は1～{{max}}の範囲にしてください。",
+    commanderDamageRange: "統率者ダメージの変更は{{min}}から{{max}}の範囲で指定してください。",
     commanderSelfDamage: "統率者は自分自身にダメージを与えられません",
     commanderClaimDeclined:
       "{{name}}への統率者ダメージ{{delta}}が追加されませんでした。相手がまだ前の申請に応答していない場合は、応答後にもう一度送信してください。",
@@ -226,7 +226,7 @@ export default {
     header: "招待",
     title: "無効な招待",
     message:
-      "このScryveの招待は形式が正しくないか、不完全です。ホストに新しいリンクを頼むか、6文字のコードを入力してください。",
+      "このScryveの招待は形式が正しくないか、不完全です。ホストに新しいリンクを送ってもらうか、{{length}}文字のコードを入力してください。",
     enterCode: "コードを手動で入力",
     openPlay: "プレイへ移動",
   },
@@ -272,8 +272,8 @@ export default {
     close: "プレイヤー操作を閉じる",
     thanks: "ありがとうございます。記録しました",
     reportPlayer: "{{name}}を報告",
-    reportExplanation:
-      "報告すると、このプレイヤーはすぐにブロックされます。ユーザー名は表示されなくなり、今後同じゲームの席になることもありません。報告はすべて24時間以内に確認します。",
+    reportExplanation_other:
+      "報告すると、このプレイヤーは直ちにブロックされます。ユーザー名は表示されなくなり、今後同じゲームの席に着くこともありません。報告は{{count}}時間以内にすべて確認します。",
     reasons: {
       offensiveUsername: "不適切なユーザー名",
       harassment: "嫌がらせ・暴言",
@@ -324,6 +324,7 @@ export default {
       table: "テーブルの変更を同期できませんでした",
       confirmCommanderDamage: "統率者ダメージの承認を同期できませんでした",
       declineCommanderDamage: "統率者ダメージの拒否を同期できませんでした",
+      withReason: "{{action}}:{{reason}}",
     },
     menu: {
       players: "プレイヤー",
@@ -420,7 +421,7 @@ export default {
     title: "招待をスキャン",
     body: "デバイスのスキャナーで、信頼できるScryveの招待QRコードを探します。認識はデバイス上で行われ、画像は保存されません。",
     webUnavailable:
-      "カメラでのQRスキャンはiOS・Androidアプリで利用できます。代わりに6文字のコードを入力してください。",
+      "カメラでのQRスキャンはiOSおよびAndroidアプリで利用できます。代わりに{{length}}文字のコードを入力してください。",
     nativeUnavailable:
       "このデバイスではネイティブQRスキャナーを利用できません。招待コードを手動で入力してください。",
     untrusted:
@@ -444,11 +445,11 @@ export default {
     invitedTitle: "招待されたロビーに参加",
     codeTitle: "コードで参加",
     invitedBody: "この招待で友達のゲームに参加します。",
-    codeBody: "ホストの6文字のコードを入力してください。",
+    codeBody: "ホストの{{length}}文字のコードを入力してください。",
     invalidInvite: "招待が無効か、期限切れか、取り消されています",
     localGameActive: "通信対戦に参加する前に、進行中のローカルゲームを終了または中止してください。",
     invalidCode: "有効な招待コードを入力してください。",
-    invalidManualCode: "有効な6文字の招待コードを入力してください。",
+    invalidManualCode: "有効な{{length}}文字の招待コードを入力してください。",
     seatTaken: "その席はたった今埋まりました。別の席を選んでください。",
     failed: "ロビーに参加できませんでした",
     scan: "QRコードをスキャン",

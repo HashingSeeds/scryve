@@ -8,9 +8,13 @@ import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
-import { Text } from "@/components/Text"
+import { Text, type TextProps } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
-import { InvitePayload, normalizeInvitePayload } from "@/features/connected/inviteLinks"
+import {
+  INVITE_CODE_LENGTH,
+  InvitePayload,
+  normalizeInvitePayload,
+} from "@/features/connected/inviteLinks"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -122,6 +126,7 @@ export function InviteScannerScreen({
         embedded={embedded}
         titleTx="connected:scanner.title"
         bodyTx="connected:scanner.webUnavailable"
+        bodyTxOptions={{ length: INVITE_CODE_LENGTH }}
         actions={
           <Button tx="connected:scanner.enterManually" preset="primary" onPress={onCancel} />
         }
@@ -201,12 +206,14 @@ function ScannerLayout({
   embedded,
   titleTx,
   bodyTx,
+  bodyTxOptions,
   notice,
   actions,
 }: {
   embedded?: boolean
   titleTx: TxKeyPath
   bodyTx?: TxKeyPath
+  bodyTxOptions?: TextProps["txOptions"]
   notice?: ReactNode
   actions: ReactNode
 }) {
@@ -228,7 +235,7 @@ function ScannerLayout({
             accessibilityRole="header"
             tx={titleTx}
           />
-          {bodyTx ? <Text size="sm" tone="dim" tx={bodyTx} /> : null}
+          {bodyTx ? <Text size="sm" tone="dim" tx={bodyTx} txOptions={bodyTxOptions} /> : null}
         </View>
         {notice}
       </ScrollView>

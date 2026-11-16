@@ -26,7 +26,7 @@ export default {
   gameNotFound: "गेम नहीं मिला",
   invalidCardImage: "कार्ड की छवि एक सार्वजनिक HTTPS URL होनी चाहिए",
   invalidCardName: "कार्ड का नाम अमान्य है",
-  invalidCardQuantity: "कार्ड की संख्या 1–999 होनी चाहिए",
+  invalidCardQuantity: "कार्ड की संख्या {{min}}–{{max}} के बीच होनी चाहिए",
   invalidClientTimestamp: "क्लाइंट टाइमस्टैम्प अमान्य है",
   invalidDeckIdentifier: "डेक पहचानकर्ता अमान्य है",
   invalidDeckList: "यह YDKE लिंक अमान्य है",
@@ -34,7 +34,7 @@ export default {
   invalidDeviceId: "डिवाइस आइडेंटिफ़ायर अमान्य है",
   invalidInvite: "आमंत्रण अमान्य है, समाप्त हो चुका है या रद्द कर दिया गया है",
   invalidLifeDelta:
-    "लाइफ़ में बदलाव -999999 से 999999 के बीच की शून्य के अलावा कोई पूर्ण संख्या होनी चाहिए",
+    "लाइफ़ में बदलाव {{min}} से {{max}} के बीच शून्य के अलावा कोई पूर्ण संख्या होना चाहिए",
   invalidLocalId: "गेस्ट लोकल ID एक UUID होनी चाहिए",
   invalidLocalUpdatedAt: "गेस्ट टाइमस्टैम्प अमान्य है",
   invalidSyncId: "डेक ID एक UUID या डेक ID होनी चाहिए",

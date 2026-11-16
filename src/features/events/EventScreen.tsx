@@ -19,6 +19,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { eventDisplayUrl } from "@/features/eventDisplay/display"
+import { formatList, formatRatio, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -278,12 +279,12 @@ export function EventScreen({
           <Text
             size="meta"
             tone="dim"
-            text={[
+            text={joinParts([
               eventMeta(view),
               view.status === "active"
                 ? translate("events:roundOf", { round: view.round, planned: view.plannedRounds })
                 : eventStatusText(view),
-            ].join(" · ")}
+            ])}
           />
           {view.status === "active" && view.clock ? (
             <EventClockRow
@@ -415,17 +416,21 @@ function RoundHeader({
                     ? "events:dropped"
                     : "events:noTable"
               }
+              txOptions={{ round: 1 }}
             />
           )}
         </View>
       ) : view.status === "registration" ? (
-        <Text tone="dim" tx="events:waitingToStart" />
+        <Text tone="dim" tx="events:waitingToStart" txOptions={{ round: 1 }} />
       ) : null}
       {view.isOrganizer && view.tables.length > 0 ? (
         <SectionHeader
           testID="tables"
           label={translate("events:tables")}
-          count={`${view.tables.filter((table) => table.result !== null).length}/${view.tables.length}`}
+          count={formatRatio(
+            view.tables.filter((table) => table.result !== null).length,
+            view.tables.length,
+          )}
         />
       ) : null}
     </>
@@ -463,7 +468,7 @@ function MyTable({
       <Text
         weight="medium"
         text={
-          bye ? translate("events:bye") : opponents.map((id) => playerName(view, id)).join(", ")
+          bye ? translate("events:bye") : formatList(opponents.map((id) => playerName(view, id)))
         }
       />
       {bye ? null : <Text size="xs" testID="my-table-result" text={myResultText(view, table)} />}
@@ -526,14 +531,17 @@ function TableRow({
       style={themed($row)}
       onPress={onPress}
     >
-      <Text size="xs" weight="bold" style={themed($tableNumber)} text={String(table.table)} />
+      <Text size="xs" weight="bold" style={themed($tableNumber)} text={table.table} />
       <Text style={$grow} numberOfLines={2} text={tablePlayers(view, table)} />
       <Text
         size="xs"
         tone={table.status === "open" ? "dim" : undefined}
         text={
           table.result
-            ? `${resultText(view, table)}${table.status === "reported" ? ` · ${translate("events:tableStatus.reported")}` : ""}`
+            ? joinParts([
+                resultText(view, table),
+                table.status === "reported" && translate("events:tableStatus.reported"),
+              ])
             : translate("events:tableStatus.open")
         }
       />
@@ -660,10 +668,10 @@ function PlayerRow({
         <Text
           size="xs"
           tone="dim"
-          text={[
-            ...(player.guest ? [translate("events:guest")] : []),
-            ...(player.dropped ? [translate("events:dropped")] : []),
-          ].join(" · ")}
+          text={joinParts([
+            player.guest && translate("events:guest"),
+            player.dropped && translate("events:dropped"),
+          ])}
         />
       ) : null}
       {managing ? (
@@ -681,7 +689,7 @@ function PlayerRow({
 function StandingsHeader({ view, empty }: { view: EventView; empty: boolean }) {
   const { themed } = useAppTheme()
   const tiebreaker = firstTiebreaker(view.system)
-  if (empty) return <Text tone="dim" tx="events:standings.empty" />
+  if (empty) return <Text tone="dim" tx="events:standings.empty" txOptions={{ round: 1 }} />
   return (
     <View testID="standings" style={themed($row)}>
       <Text preset="sectionLabel" style={$rank} tx="events:standings.rank" />
@@ -712,13 +720,13 @@ function StandingRow({ view, standing }: { view: EventView; standing: PlayerStan
   const tiebreaker = firstTiebreaker(view.system)
   return (
     <View testID={`standing-${standing.playerId}`} style={themed($row)}>
-      <Text size="xs" style={$rank} text={String(standing.rank)} />
+      <Text size="xs" style={$rank} text={standing.rank} />
       <Text size="xs" style={$grow} numberOfLines={1} text={playerName(view, standing.playerId)} />
       <TrailingNumber adjustsFontSizeToFit size="xs" weight="bold" value={standing.points} />
       <TrailingNumber
         adjustsFontSizeToFit
         size="xs"
-        value={`${standing.wins}-${standing.losses}-${standing.draws}`}
+        value={formatRecord(standing.wins, standing.losses, standing.draws)}
       />
       {tiebreaker ? (
         <TrailingNumber

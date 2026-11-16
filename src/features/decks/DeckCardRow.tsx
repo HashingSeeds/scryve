@@ -6,6 +6,7 @@ import { CardImage } from "@/components/CardImage"
 import { NUMBER_LANE_WIDTH, SectionHeader, TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
+import { formatCopies } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -47,7 +48,10 @@ export function DeckCardRow({
     <View style={themed($card)}>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel={`${card.quantity}× ${card.name}`}
+        accessibilityLabel={translate("decks:cardQuantity", {
+          quantity: card.quantity,
+          card: card.name,
+        })}
         testID={testID ?? `deck-card-row-${printingKey(card)}`}
         style={themed($cardLink)}
         onPress={() => onFocus(card)}
@@ -116,7 +120,7 @@ export function DeckCardRow({
               <Text text="−" style={themed($action)} />
             )}
           </TouchableOpacity>
-          <Text size="sm" text={String(card.quantity)} style={$quantity} />
+          <Text size="sm" text={card.quantity} style={$quantity} />
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={translate("decks:cardRow.increase", { card: card.name })}
@@ -128,7 +132,7 @@ export function DeckCardRow({
           </TouchableOpacity>
         </View>
       ) : (
-        <TrailingNumber value={`${card.quantity}×`} tone="dim" />
+        <TrailingNumber value={formatCopies(card.quantity)} tone="dim" />
       )}
     </View>
   )

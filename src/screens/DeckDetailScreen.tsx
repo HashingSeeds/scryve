@@ -54,7 +54,7 @@ import {
   type DeckVersionRef,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
-import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
+import { type DeckVersionRename, DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
 import { DeckModeTabs, DeckView, type DeckMode } from "@/features/decks/DeckView"
 import { useLocalDeckSync } from "@/features/decks/localDeckSync"
 import { useMatchSideboard } from "@/features/decks/matchSideboard"
@@ -76,7 +76,8 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
-import { translate } from "@/i18n/translate"
+import { formatList, joinParts } from "@/i18n/format"
+import { translate, translateForStorage } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -159,13 +160,11 @@ function DeckDetailPlaceholder({
   const { themed, theme } = useAppTheme()
   const loadingGameLabel = summary ? (deckGame(summary.game)?.shortLabel ?? summary.game) : null
   const loadingMetadata = summary
-    ? [
+    ? joinParts([
         loadingGameLabel,
         deckFormatLabel(summary.game, summary.format),
         summary.cardQuantity !== undefined ? cardCountLabel(summary.cardQuantity) : undefined,
-      ]
-        .filter(Boolean)
-        .join(" · ")
+      ])
     : null
   const loadingSections = summary ? localizedDeckSections(summary.game, summary.format) : []
   const statusText =
@@ -766,13 +765,13 @@ function DeckDetailContent({
     }, translate("decks:detail.createVersionFailed"))
   }
 
-  async function submitRenameVersion({ name, note }: DeckVersionDraft) {
+  async function submitRenameVersion({ name, note }: DeckVersionRename) {
     if (view.canQueueVersions && activeVersionId) {
       try {
         versionWrites.renameVersion(
           deckId,
           activeVersionId,
-          { name, note },
+          { ...(name === undefined ? {} : { name }), note },
           pinnedRevisionFor(activeVersionId) ?? versionTarget?.expectedRevision ?? 0,
         )
         setDialog("none")
@@ -783,7 +782,7 @@ function DeckDetailContent({
     }
     if (!version) return
     await run(async () => {
-      await updateVersion({ versionId: version._id, name, note })
+      await updateVersion({ versionId: version._id, ...(name === undefined ? {} : { name }), note })
       setDialog("none")
     }, translate("decks:detail.updateVersionFailed"))
   }
@@ -1042,12 +1041,10 @@ function DeckDetailContent({
             versions={view.versionRows.map((row) => ({
               id: row._id,
               label: versionTitle(row, latestVersionNumber),
-              detail: [
+              detail: joinParts([
                 "updatedAt" in row ? statsDate(row.updatedAt) : undefined,
                 cardCountLabel(row.cardQuantity),
-              ]
-                .filter(Boolean)
-                .join(" · "),
+              ]),
               record: row.record && allRecord(row.record),
             }))}
             bringingId={bringingId}
@@ -1181,10 +1178,8 @@ function DeckDetailContent({
               <Text
                 size="sm"
                 text={
-                  failedCardEdit.action.cards
-                    .slice(0, 3)
-                    .map((card) => card.name)
-                    .join(", ") || translate("decks:conflict.noCards")
+                  formatList(failedCardEdit.action.cards.slice(0, 3).map((card) => card.name)) ||
+                  translate("decks:conflict.noCards")
                 }
                 numberOfLines={2}
               />
@@ -1470,7 +1465,11 @@ function DeckDetailContent({
         }
         rename={
           activeVersionSummary && {
-            name: deckVersionLabel(activeVersionSummary, activeVersionSummary.versionNumber),
+            name: deckVersionLabel(
+              activeVersionSummary,
+              activeVersionSummary.versionNumber,
+              translateForStorage,
+            ),
             note: activeVersionSummary.note ?? "",
             notesLocked: !view.premium,
           }

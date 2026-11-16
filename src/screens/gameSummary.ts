@@ -14,7 +14,8 @@ import type {
   LifeChangedEvent,
   LocalGame,
 } from "@/features/game/types"
-import { appLocale, type TxKeyPath } from "@/i18n"
+import { type TxKeyPath } from "@/i18n"
+import { formatDate, formatTime, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import type { HistoryOutcome, HistorySource } from "./historyEntries"
@@ -263,23 +264,17 @@ export function playedFor(model: GameSummaryModel) {
 
 export function finishedOnLabel(finishedAt?: number) {
   if (!finishedAt) return undefined
-  const date = new Date(finishedAt)
-  const day = date.toLocaleDateString(appLocale, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-  const time = date.toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })
-  return `${day} · ${time}`
+  return joinParts([
+    formatDate(finishedAt, { month: "short", day: "numeric", year: "numeric" }),
+    formatTime(finishedAt),
+  ])
 }
 
 export function metaLine(model: GameSummaryModel) {
-  return [
+  return joinParts([
     translate("play:summary.playerCount", { count: model.players.length }),
     model.format,
     playedFor(model),
     counterChangeLabel(model.system, model.changeCount),
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
 }

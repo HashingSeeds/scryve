@@ -36,12 +36,14 @@ import {
 import { fingerprintsToRead, labelLists } from "@/features/stats/listLabels"
 import { lookupListSnapshot } from "@/features/stats/listSnapshots"
 import { useListCards } from "@/features/stats/useListCards"
+import { formatPercent, formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
 import { api } from "../../convex/_generated/api"
+import { BREAKDOWN_SCAN } from "../../convex/lib/deckStatsLimits"
 
 type Props = DeckStatsParams & { access: CloudAccess; onBack: () => void }
 
@@ -146,7 +148,9 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
   return (
     <ScrollView contentContainerStyle={themed($content)}>
       <Text text={deckName} preset="heading" />
-      {!summary.scannedAll ? <Text size="xs" tone="dim" tx="decks:stats.limited" /> : null}
+      {!summary.scannedAll ? (
+        <Text size="xs" tone="dim" tx="decks:stats.limited" txOptions={{ count: BREAKDOWN_SCAN }} />
+      ) : null}
       {left && right ? (
         <>
           <View style={themed($pickers)}>
@@ -175,8 +179,8 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
           </View>
           <CompareRow
             label={translate("decks:stats.games")}
-            left={<Text text={String(left.record.games)} style={$numbers} />}
-            right={<Text text={String(right.record.games)} style={$numbers} />}
+            left={<Text text={left.record.games} style={$numbers} />}
+            right={<Text text={right.record.games} style={$numbers} />}
           />
           <CompareRow
             label={translate("decks:stats.record")}
@@ -223,7 +227,7 @@ function CompareLists({ summary, access, deckKey, deckName }: Props & { summary:
                     style={$flex}
                   />
                   <TrailingNumber
-                    value={`${change.quantity > 0 ? "+" : "−"}${Math.abs(change.quantity)}`}
+                    value={formatSigned(change.quantity)}
                     style={themed(change.quantity > 0 ? $added : $removed)}
                   />
                 </View>
@@ -259,10 +263,17 @@ function ComparisonRate({ record }: { record: Parameters<typeof likelyRange>[0] 
   return (
     <View style={tooFew ? $few : undefined}>
       <Text
-        text={games ? `${Math.round((record.wins / games) * 100)}%` : recordText(record)}
+        text={games ? formatPercent(record.wins / games) : recordText(record)}
         style={$numbers}
       />
-      {range ? <Text size="xxs" tone="dim" tx="decks:stats.likely" txOptions={range} /> : null}
+      {range ? (
+        <Text
+          size="xxs"
+          tone="dim"
+          tx="decks:stats.likely"
+          txOptions={{ low: range.low / 100, high: range.high / 100 }}
+        />
+      ) : null}
     </View>
   )
 }

@@ -8,6 +8,7 @@ import {
   lowerLeads,
   NO_TABLE,
   SYSTEM_IDS,
+  startingValueRange,
   SYSTEMS,
   tableRules,
   type CardFilterDefinition,
@@ -168,9 +169,7 @@ export function counterDeltaFromStartLabel(
       ? translate("systems:noneTaken")
       : translate("systems:taken", { amount: taken })
   }
-  return delta === 0
-    ? translate("systems:even")
-    : translate("systems:fromStart", { delta: `${delta > 0 ? "+" : ""}${delta}` })
+  return delta === 0 ? translate("systems:even") : translate("systems:fromStart", { delta })
 }
 
 function hasOwnKey<Table extends object>(
@@ -194,7 +193,10 @@ export function counterLabel(value: unknown): string {
 
 export function startingValueRangeMessage(value: unknown): string {
   const { id, counter } = playSystemRules(value)
-  return translate(`systems:startingValueRange.${id}`, { max: counter.maxStartingValue })
+  return translate(`systems:startingValueRange.${id}`, {
+    min: startingValueRange(id).min,
+    max: counter.maxStartingValue,
+  })
 }
 
 export function tableItemLabel({ id, label }: { id: string; label: string }): string {
@@ -230,9 +232,17 @@ export function localizedDeckSections(game: string, format: string): readonly De
   return sections
 }
 
+const BLURB_VALUES: Partial<Record<string, Record<string, number>>> = {
+  "mtg.commander": { cards: 100 },
+  "mtg.brawl": { cards: 60 },
+  "fab.cc": { cards: 60, copies: 3 },
+  "fab.blitz": { cards: 40 },
+  "riftbound.constructed": { cards: 40, copies: 3 },
+}
+
 function formatBlurb(system: PlaySystemId, id: string, blurb: string): string {
   return hasOwnKey(systems.formatBlurb, system) && hasOwnKey(systems.formatBlurb[system], id)
-    ? translate(`systems:formatBlurb.${system}.${id}`)
+    ? translate(`systems:formatBlurb.${system}.${id}`, BLURB_VALUES[`${system}.${id}`])
     : blurb
 }
 

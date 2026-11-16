@@ -27,6 +27,7 @@ import { commanderNameWarning } from "@/features/decks/deckCopy"
 import { gameRules } from "@/features/rules/gameRules"
 import type { KeywordRule } from "@/features/rules/magicKeywords"
 import { loadStoredRules } from "@/features/rules/rulesSource"
+import { formatList, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -96,9 +97,9 @@ export function colorLabel(id: keyof typeof COLOR_LABEL_KEYS) {
 
 export function cardColorIdentityLabel(details: FocusedCardDetails | undefined, name: string) {
   if (details?.colorIdentity === undefined) return undefined
-  const colors = COMMANDER_COLORS.filter((color) => details.colorIdentity?.includes(color))
-    .map(colorLabel)
-    .join(", ")
+  const colors = formatList(
+    COMMANDER_COLORS.filter((color) => details.colorIdentity?.includes(color)).map(colorLabel),
+  )
   const identity =
     details.commanderEligibility === "color-choice"
       ? colors
@@ -115,13 +116,11 @@ function capitalized(value: string) {
 }
 
 function printingLine(details: FocusedCardDetails) {
-  return [
+  return joinParts([
     details.setName,
     details.collectorNumber ? `#${details.collectorNumber}` : undefined,
     details.rarity ? capitalized(details.rarity) : undefined,
-  ]
-    .filter((part): part is string => Boolean(part))
-    .join(" · ")
+  ])
 }
 
 export function CardFocusDialog({

@@ -15,6 +15,7 @@ import Head from "expo-router/head"
 
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { formatRatio, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
@@ -196,12 +197,7 @@ function EventHeader({ event, s }: { event: EventView; s: Styles }) {
           text={event.name}
           style={s.name}
         />
-        <Text
-          weight="medium"
-          numberOfLines={1}
-          text={[format, stage].filter(Boolean).join(" · ")}
-          style={s.meta}
-        />
+        <Text weight="medium" numberOfLines={1} text={joinParts([format, stage])} style={s.meta} />
       </View>
       {event.status === "registration" ? (
         <View style={s.codeRow}>
@@ -304,7 +300,7 @@ function Panel<T>({
       <View style={s.panelHeading}>
         <Text weight="bold" accessibilityRole="header" text={title} style={s.panelTitle} />
         {fit && fit.pages > 1 ? (
-          <Text weight="medium" text={`${page + 1}/${fit.pages}`} style={s.pageCount} />
+          <Text weight="medium" text={formatRatio(page + 1, fit.pages)} style={s.pageCount} />
         ) : null}
       </View>
       <View style={s.columns} onLayout={onLayout}>
@@ -341,9 +337,9 @@ function PairingsPanel({
     const names = table.playerIds.map((id) => players.get(id)?.name ?? "")
     return (
       <>
-        <Text weight="bold" text={String(table.table)} style={[s.cell, s.tableNumber]} />
+        <Text weight="bold" text={table.table} style={[s.cell, s.tableNumber]} />
         {pods ? (
-          <Text numberOfLines={2} text={names.join(" · ")} style={[s.cell, s.fill]} />
+          <Text numberOfLines={2} text={joinParts(names)} style={[s.cell, s.fill]} />
         ) : (
           <>
             <Text numberOfLines={1} text={names[0]} style={[s.cell, s.fill]} />
@@ -404,19 +400,15 @@ function StandingsPanel({
         const dropped = players.get(standing.playerId)?.dropped && s.dim
         return (
           <>
-            <Text weight="bold" text={String(standing.rank)} style={[s.cell, s.rank, dropped]} />
+            <Text weight="bold" text={standing.rank} style={[s.cell, s.rank, dropped]} />
             <Text
               numberOfLines={1}
               text={players.get(standing.playerId)?.name ?? ""}
               style={[s.cell, s.fill, dropped]}
             />
+            <Text weight="bold" text={standing.points} style={[s.cell, s.points, dropped]} />
             <Text
-              weight="bold"
-              text={String(standing.points)}
-              style={[s.cell, s.points, dropped]}
-            />
-            <Text
-              text={`${standing.wins}-${standing.losses}-${standing.draws}`}
+              text={formatRecord(standing.wins, standing.losses, standing.draws)}
               style={[s.cell, s.record, dropped]}
             />
           </>

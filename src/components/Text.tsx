@@ -4,6 +4,7 @@ import { StyleProp, Text as RNText, TextProps as RNTextProps, TextStyle } from "
 import { TOptions } from "i18next"
 
 import { isRTL, TxKeyPath } from "@/i18n"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
@@ -17,7 +18,7 @@ type Tones = keyof typeof $toneStyles
 
 export interface TextProps extends RNTextProps {
   tx?: TxKeyPath
-  text?: string
+  text?: string | number
   txOptions?: TOptions
   style?: StyleProp<TextStyle>
   preset?: Presets
@@ -43,7 +44,7 @@ export const Text = forwardRef(function Text(props: TextProps, ref: ForwardedRef
   const { themed } = useAppTheme()
 
   const i18nText = tx && translate(tx, txOptions)
-  const content = i18nText || text || children
+  const content = i18nText || (typeof text === "number" ? formatNumber(text) : text) || children
 
   const preset: Presets = props.preset ?? "default"
   const $styles: StyleProp<TextStyle> = [

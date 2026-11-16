@@ -1,3 +1,4 @@
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
@@ -108,7 +109,7 @@ export function roundClockText(view: RoundClockView) {
   if (view.kind === "remaining") return formatRemaining(view.ms)
   const turn = roundTurnText(view)
   return turn && view.overtimeMs !== undefined && !areRoundTurnsDone(view)
-    ? `${turn} · ${formatRemaining(view.overtimeMs)}`
+    ? joinParts([turn, formatRemaining(view.overtimeMs)])
     : turn
 }
 

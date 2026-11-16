@@ -1,6 +1,7 @@
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
-import { cardSection, printingKey, type DeckCard } from "./deckCards"
+import { cardSection, MAX_CARD_COPIES, printingKey, type DeckCard } from "./deckCards"
 
 export type CommanderSelectionDetails = {
   commanderEligibility?: string
@@ -160,8 +161,8 @@ export function selectCommander<T extends DeckCard>(
     merged.set(key, existing ? { ...existing, quantity: existing.quantity + card.quantity } : card)
   }
   const nextCards = [...merged.values()]
-  if (nextCards.some((card) => card.quantity > 999)) {
-    return { error: translate("decks:commander.copyLimit") }
+  if (nextCards.some((card) => card.quantity > MAX_CARD_COPIES)) {
+    return { error: translate("decks:commander.copyLimit", { limit: MAX_CARD_COPIES }) }
   }
   const commanderKey = printingKey({ ...selected, section: "commander" })
   return {
@@ -216,7 +217,7 @@ export function getCommanderWarnings<T extends DeckCard>(
   }
   if (conflicts.length > 0) {
     const names = [...new Set(conflicts)]
-    const shown = names.slice(0, 3).join(", ")
+    const shown = formatList(names.slice(0, 3))
     warnings.push(
       names.length > 3
         ? translate("decks:commander.colorIdentityConflictMore", {

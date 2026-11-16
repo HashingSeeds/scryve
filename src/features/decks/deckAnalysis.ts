@@ -15,6 +15,8 @@ type AnalysisDetails = Pick<
 
 export const CURVE_BUCKETS = 8
 const CURVE_TURNS = 5
+export const OPENING_HAND = 7
+export const KEEPABLE_LANDS = { min: 2, max: 5 }
 const SUGGESTION_SIZES = { min: 40, max: 100 }
 const BASIC_TYPES: Record<string, ManaColor> = {
   Plains: "W",
@@ -274,7 +276,10 @@ export function analyzeDeck({
             0.28 * cheapSpells
           : undefined
   const landDropCards = lands + modalLands
-  const keep = library >= 7 ? chanceOfLands(library, landDropCards, 7, 2, 5) : undefined
+  const keep =
+    library >= OPENING_HAND
+      ? chanceOfLands(library, landDropCards, OPENING_HAND, KEEPABLE_LANDS.min, KEEPABLE_LANDS.max)
+      : undefined
   const size = formatDeckSize(format)
   return {
     ...(size !== undefined && deckSize < size ? { incomplete: { count: deckSize, size } } : {}),

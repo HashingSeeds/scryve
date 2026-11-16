@@ -8,7 +8,12 @@ const site = i18n.createInstance()
 void site.init({
   lng: "en",
   resources: { en },
-  interpolation: { escapeValue: false },
+  interpolation: {
+    escapeValue: false,
+    // why: the app's formatter loads React Native, and the only named format the site's copy uses is "or more".
+    format: (value: unknown, format?: string) =>
+      format === "orMore" ? `${String(value)}+` : String(value),
+  },
   initImmediate: false,
 })
 

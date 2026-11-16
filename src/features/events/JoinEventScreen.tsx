@@ -5,7 +5,7 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import { normalizeManualCode } from "@/features/connected/inviteLinks"
+import { INVITE_CODE_LENGTH, normalizeManualCode } from "@/features/connected/inviteLinks"
 import { translate } from "@/i18n/translate"
 import { InviteScannerScreen } from "@/screens/InviteScannerScreen"
 import { useAppTheme } from "@/theme/context"
@@ -39,7 +39,7 @@ export function JoinEventScreen({
   async function join(raw: string) {
     const normalized = normalizeManualCode(raw)
     if (!normalized) {
-      setError(translate("events:join.invalidCode"))
+      setError(translate("events:join.invalidCode", { length: INVITE_CODE_LENGTH }))
       return
     }
     setBusy(true)

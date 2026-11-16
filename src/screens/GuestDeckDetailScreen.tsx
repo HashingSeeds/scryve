@@ -26,7 +26,7 @@ import {
   type LocalDeckDraft as GuestDraft,
 } from "@/features/decks/deckDraftStore"
 import { DeckPlay } from "@/features/decks/DeckPlay"
-import { DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
+import { type DeckVersionRename, DeckVersionsDialogs } from "@/features/decks/DeckVersionsDialogs"
 import { DeckView, type DeckMode } from "@/features/decks/DeckView"
 import {
   addGuestDeckVersion,
@@ -58,7 +58,8 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
 import { statsDate } from "@/features/stats/DeckStatsParts"
-import { translate } from "@/i18n/translate"
+import { joinParts } from "@/i18n/format"
+import { translate, translateForStorage } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -347,7 +348,7 @@ export function GuestDeckDetailScreen({
       )
       setChosen(next.versions?.at(-1)?.number)
     }, translate("decks:detail.createVersionFailed"))
-  const renameVersion = (details: DeckVersionDraft) =>
+  const renameVersion = (details: DeckVersionRename) =>
     versionAction(
       () => updateGuestDeckVersion(localId, activeNumber, details),
       translate("decks:detail.updateVersionFailed"),
@@ -457,9 +458,10 @@ export function GuestDeckDetailScreen({
             versions={versions.map((version) => ({
               id: String(version.number),
               label: versionTitle({ ...version, versionNumber: version.number }, latestNumber),
-              detail: [statsDate(version.updatedAt), cardCountLabel(cardQuantity(version.cards))]
-                .filter(Boolean)
-                .join(" · "),
+              detail: joinParts([
+                statsDate(version.updatedAt),
+                cardCountLabel(cardQuantity(version.cards)),
+              ]),
             }))}
             bringingId={stored ? String(guestDeckBringing(stored)) : undefined}
             bringDisabled={syncing || syncingElsewhere}
@@ -604,7 +606,11 @@ export function GuestDeckDetailScreen({
         }
         rename={
           active && {
-            name: deckVersionLabel({ ...active, versionNumber: active.number }, active.number),
+            name: deckVersionLabel(
+              { ...active, versionNumber: active.number },
+              active.number,
+              translateForStorage,
+            ),
             note: active.note ?? "",
             notesLocked: !pro,
           }

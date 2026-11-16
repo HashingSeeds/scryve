@@ -11,7 +11,8 @@ export default {
   storeScreen: "ストア画面",
   errors: {
     nameRejected: "別の名前を選んでください",
-    eventLimit: "先にイベントを1つ終了してください。同時に開催できるのは5件までです。",
+    eventLimit_other:
+      "先にイベントを1つ終了してください。同時に開催できるのは{{count}}件までです。",
     eventFinished: "このイベントは終了しました",
     eventFull: "このイベントは満員です",
     resultsMissing: "次のラウンドの前に、すべての結果を入力してください",
@@ -58,7 +59,7 @@ export default {
     scan: "QRコードをスキャン",
     join: "参加",
     joining: "参加中…",
-    invalidCode: "6文字のコードを入力してください",
+    invalidCode: "{{length}}文字のコードを入力",
     notFound: "このコードのイベントはありません",
   },
   tabs: {
@@ -70,8 +71,7 @@ export default {
   clock: {
     pause: "一時停止",
     resume: "再開",
-    minus: "−1分",
-    plus: "+1分",
+    adjustMinutes: "{{minutes, signed}}分",
     paused: "一時停止中",
     timeUp: "時間切れ",
   },
@@ -115,7 +115,7 @@ export default {
   },
   myTable: "あなたのテーブル",
   noTable: "このラウンドはテーブルがありません",
-  waitingToStart: "ラウンド1を待っています",
+  waitingToStart: "第{{round}}ラウンドを待っています",
   report: "結果を報告",
   changeReport: "結果を変更",
   confirm: "結果を確認",
@@ -177,7 +177,7 @@ export default {
     player: "プレイヤー",
     points: "勝点",
     record: "勝-敗-分",
-    empty: "順位はラウンド1の後に表示されます",
+    empty: "順位は第{{round}}ラウンド後に表示されます",
   },
   tiebreaker: {
     opponentMatchWin: "OMW",

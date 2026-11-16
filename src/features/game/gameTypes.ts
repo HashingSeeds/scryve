@@ -1,3 +1,4 @@
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import {
@@ -164,5 +165,5 @@ export function gameTypeDetail(type: GameType, seats: number) {
       ? defaultTeamLife(type.format)
       : defaultStartingLife(type.system, type.format, seats),
   )
-  return type.system ? `${playSystemShortLabel(type.system)} · ${life}` : life
+  return type.system ? joinParts([playSystemShortLabel(type.system), life]) : life
 }

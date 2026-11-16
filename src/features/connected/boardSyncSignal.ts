@@ -3,6 +3,7 @@ import { AccessibilityInfo } from "react-native"
 
 import type { GameMenuSignal } from "@/components/GameRadialMenu"
 import type { TxKeyPath } from "@/i18n"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import type { ConnectionStatus } from "./model"
@@ -132,7 +133,7 @@ export function boardSyncMenuSignal(signal: BoardSyncSignal): GameMenuSignal | u
     signal.kind === "attention"
       ? "!"
       : (signal.kind === "offline" || signal.kind === "catchingUp") && signal.unsent > 0
-        ? String(signal.unsent)
+        ? formatNumber(signal.unsent)
         : undefined
   return { tone: signal.kind, badge, accessibilityText: boardSyncAccessibilityText(signal) }
 }

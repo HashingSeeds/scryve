@@ -3,7 +3,8 @@ import Constants from "expo-constants"
 import { normalizeHttpsOrigin } from "@/utils/httpsOrigin"
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43,128}$/
-const CODE_PATTERN = /^[A-Z0-9]{6}$/
+export const INVITE_CODE_LENGTH = 6
+const CODE_PATTERN = new RegExp(`^[A-Z0-9]{${INVITE_CODE_LENGTH}}$`)
 
 export type InvitePayload = { kind: "token"; token: string } | { kind: "code"; code: string }
 
@@ -50,7 +51,7 @@ export function normalizeInvitePayload(
     if (!isCustomScheme && !isTrustedHttps) return null
     if (url.username || url.password || url.search || url.hash) return null
     if (isCustomScheme) {
-      const codeMatch = url.pathname.match(/^\/([A-Za-z0-9]{6})$/)
+      const codeMatch = url.pathname.match(new RegExp(`^/([A-Za-z0-9]{${INVITE_CODE_LENGTH}})$`))
       if (codeMatch) {
         const pathCode = normalizeManualCode(codeMatch[1])
         return pathCode ? { kind: "code", code: pathCode } : null

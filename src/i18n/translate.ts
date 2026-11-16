@@ -42,3 +42,8 @@ export function translate(key: TxKeyPath, options?: TOptions): string {
   }
   return result
 }
+
+// why: saved text outlives the language it was written in, so it must not carry bidi isolates, native digits, or pseudo-locale brackets.
+export function translateForStorage(key: TxKeyPath, options?: TOptions) {
+  return i18n.t(key, { ...options, forStorage: true, applyPostProcessor: false })
+}

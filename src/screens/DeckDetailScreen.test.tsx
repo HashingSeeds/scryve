@@ -1928,7 +1928,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByLabelText("Version details")).toBe(view.getByTestId("rename-version-button"))
   })
 
-  it("keeps an older default-named version's default name when only its note is saved", async () => {
+  it("leaves the name alone when only a version's note is saved", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("deck-mode-build"))
     fireEvent.press(view.getByTestId("deck-version-button"))
@@ -1938,7 +1938,6 @@ describe("DeckDetailScreen", () => {
     await waitFor(() =>
       expect(mockUpdateVersion).toHaveBeenCalledWith({
         versionId: "version-main",
-        name: "Current",
         note: "New note",
       }),
     )

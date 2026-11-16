@@ -84,7 +84,7 @@ export default {
     undoPartial:
       "La file d'attente hors ligne s'est remplie en cours d'annulation, donc seule une partie a été enregistrée. Reconnectez-vous et synchronisez, puis annulez le reste.",
     commanderDamageRange:
-      "Les modifications de blessures de commandant doivent être comprises entre 1 et {{max}}.",
+      "Les changements de blessures de commandant doivent être compris entre {{min}} et {{max}}.",
     commanderSelfDamage: "Un commandant ne peut pas se blesser lui-même",
     commanderClaimDeclined:
       "Les {{delta}} blessures de commandant infligées à {{name}} n'ont pas été ajoutées. Si cette personne n'a pas encore répondu à votre dernière demande, renvoyez-la après sa réponse.",
@@ -251,7 +251,7 @@ export default {
     header: "Invitation",
     title: "Invitation invalide",
     message:
-      "Cette invitation Scryve est mal formée ou incomplète. Demandez un nouveau lien à l'hôte ou saisissez le code à 6 caractères.",
+      "Cette invitation Scryve est mal formée ou incomplète. Demandez un nouveau lien à l'hôte ou saisissez le code de {{length}} caractères.",
     enterCode: "Saisir un code manuellement",
     openPlay: "Aller à Jouer",
   },
@@ -297,8 +297,12 @@ export default {
     close: "Fermer les actions du joueur",
     thanks: "Merci, c'est enregistré",
     reportPlayer: "Signaler {{name}}",
-    reportExplanation:
-      "Le signalement bloque aussi immédiatement ce joueur pour vous. Vous ne verrez plus son nom d'utilisateur et ne serez plus placé dans une partie avec lui. Nous examinons chaque signalement sous 24 heures.",
+    reportExplanation_one:
+      "Le signalement bloque aussi immédiatement ce joueur pour vous. Vous ne verrez plus son nom d'utilisateur et ne serez plus placé dans la même partie que lui. Nous examinons chaque signalement dans un délai de {{count}} heure.",
+    reportExplanation_many:
+      "Le signalement bloque aussi immédiatement ce joueur pour vous. Vous ne verrez plus son nom d'utilisateur et ne serez plus placé dans la même partie que lui. Nous examinons chaque signalement dans un délai de {{count}} heures.",
+    reportExplanation_other:
+      "Le signalement bloque aussi immédiatement ce joueur pour vous. Vous ne verrez plus son nom d'utilisateur et ne serez plus placé dans la même partie que lui. Nous examinons chaque signalement dans un délai de {{count}} heures.",
     reasons: {
       offensiveUsername: "Nom d'utilisateur offensant",
       harassment: "Harcèlement ou abus",
@@ -351,6 +355,7 @@ export default {
       confirmCommanderDamage:
         "La confirmation des blessures de commandant n'a pas pu être synchronisée",
       declineCommanderDamage: "Le refus des blessures de commandant n'a pas pu être synchronisé",
+      withReason: "{{action}} : {{reason}}",
     },
     menu: {
       players: "Joueurs",
@@ -453,7 +458,7 @@ export default {
     title: "Scanner une invitation",
     body: "Utilisez le scanner de l’appareil pour trouver un QR d’invitation Scryve fiable. La reconnaissance reste sur l’appareil et aucune image n’est enregistrée.",
     webUnavailable:
-      "Le scan de QR par caméra est disponible dans l'app iOS et Android. Saisissez plutôt le code à 6 caractères.",
+      "La lecture de QR code par caméra est disponible dans l'application iOS et Android. Saisissez plutôt le code de {{length}} caractères.",
     nativeUnavailable:
       "Le scanner QR natif est indisponible sur cet appareil. Saisissez le code d'invitation manuellement.",
     untrusted:
@@ -477,12 +482,12 @@ export default {
     invitedTitle: "Rejoindre le salon sur invitation",
     codeTitle: "Rejoindre avec un code",
     invitedBody: "Rejoignez vos amis grâce à cette invitation.",
-    codeBody: "Saisissez le code à 6 caractères de l'hôte.",
+    codeBody: "Saisissez le code de {{length}} caractères de l'hôte.",
     invalidInvite: "L’invitation est invalide, expirée ou révoquée",
     localGameActive:
       "Terminez votre partie locale en cours, avec ou sans résultat, avant de rejoindre une partie connectée.",
     invalidCode: "Saisissez un code d'invitation valide.",
-    invalidManualCode: "Saisissez un code d'invitation valide à 6 caractères.",
+    invalidManualCode: "Saisissez un code d'invitation valide de {{length}} caractères.",
     seatTaken: "Cette place vient d'être prise. Choisissez-en une autre.",
     failed: "Impossible de rejoindre le salon",
     scan: "Scanner le QR code",

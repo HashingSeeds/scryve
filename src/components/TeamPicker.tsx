@@ -72,7 +72,7 @@ export function TeamPicker({
                 </Pressable>
               ) : (
                 <Text
-                  text={String(index + 1)}
+                  text={index + 1}
                   weight="semiBold"
                   style={[$number, { color: colors.textDim }]}
                 />

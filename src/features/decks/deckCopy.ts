@@ -1,6 +1,7 @@
-import { translate } from "@/i18n/translate"
+import { formatPercent, formatRecord } from "@/i18n/format"
+import { translate, translateForStorage } from "@/i18n/translate"
 
-import { versionLabel } from "../../../convex/lib/deckVersions"
+import { DEFAULT_VERSION_NAME, versionLabel } from "../../../convex/lib/deckVersions"
 import {
   HIDDEN_COMMANDER_NAME,
   HIDDEN_DECK_NAME,
@@ -10,7 +11,9 @@ import {
 export const MIN_RATED_GAMES = 10
 
 export function recordText(record: Pick<DeckRecord, "wins" | "losses" | "draws">) {
-  return `${record.wins}-${record.losses}${record.draws ? `-${record.draws}` : ""}`
+  return record.draws
+    ? formatRecord(record.wins, record.losses, record.draws)
+    : formatRecord(record.wins, record.losses)
 }
 
 export type DeckRecord = {
@@ -25,14 +28,27 @@ export function cardCountLabel(quantity: number) {
   return translate("decks:cardCount", { count: quantity })
 }
 
-export function deckVersionLabel(
+export function storedVersionName(
   version: { name?: string; versionNumber: number },
   latestVersionNumber: number,
 ) {
   return (
     versionLabel(version, latestVersionNumber) ??
-    translate("decks:numberedVersion", { number: version.versionNumber })
+    translateForStorage("decks:numberedVersion", { number: version.versionNumber })
   )
+}
+
+// why: the server names a new deck's first version "Current" in English and stores it, so only that generated name is translated.
+export function deckVersionLabel(
+  version: { name?: string; versionNumber: number },
+  latestVersionNumber: number,
+  write = translate,
+) {
+  const name = versionLabel(version, latestVersionNumber)
+  if (name === undefined) return write("decks:numberedVersion", { number: version.versionNumber })
+  return name === DEFAULT_VERSION_NAME && version.versionNumber === 1
+    ? write("decks:currentVersion")
+    : name
 }
 
 export function versionTitle(
@@ -62,7 +78,7 @@ export function honestRate(record: Pick<DeckRecord, "wins" | "losses" | "draws">
   const games = record.wins + record.losses + record.draws
   if (games < MIN_RATED_GAMES) return { text: recordText(record), tooFew: true as const, games }
   const percent = Math.round((record.wins / games) * 100)
-  return { text: `${percent}%`, tooFew: false as const, games, percent }
+  return { text: formatPercent(percent / 100), tooFew: false as const, games, percent }
 }
 
 export function recordSummary(record: DeckRecord | undefined) {
@@ -70,5 +86,5 @@ export function recordSummary(record: DeckRecord | undefined) {
   if (record.games === 0) return translate("decks:record.noGames")
   const rate = honestRate(record)
   if (rate.tooFew) return rate.text
-  return translate("decks:record.winRate", { percent: rate.percent, games: rate.games })
+  return translate("decks:record.winRate", { rate: rate.percent / 100, games: rate.games })
 }

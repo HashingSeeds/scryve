@@ -58,7 +58,7 @@ function SyncStatsTable({ latency, peers }: { latency: SyncLatency; peers?: () =
             tapOwn?.p50,
             tapCross?.p50,
           ].map((value, column) => (
-            <Text key={COLUMNS[column]} size="xxs" text={value?.toString() ?? "–"} style={$cell} />
+            <Text key={COLUMNS[column]} size="xxs" text={value ?? "–"} style={$cell} />
           ))}
         </View>
       ))}

@@ -1,4 +1,5 @@
 import { COMMANDER_COLORS, colorLabel } from "@/components/CardFocusDialog"
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 export const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
@@ -43,5 +44,5 @@ export function identityLabel(identity: readonly string[]) {
   const names = identity.length
     ? COMMANDER_COLORS.filter((color) => identity.includes(color)).map(colorLabel)
     : [colorLabel("C")]
-  return translate("decks:colors.identity", { identity: names.join(", ") })
+  return translate("decks:colors.identity", { identity: formatList(names) })
 }

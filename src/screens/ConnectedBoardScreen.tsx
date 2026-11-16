@@ -121,6 +121,7 @@ import { ModesDialog } from "@/features/modes/ModesDialog"
 import { bagWithPlane, modeSeamFor, teamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
 import type { TxKeyPath } from "@/i18n"
+import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -368,7 +369,7 @@ function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
     player.role && (player.roleRevealed || !player.controlledByMe) ? player.role : undefined
   return {
     id: asPlayerId(player.playerId),
-    name: role ? `${player.displayName} · ${treacheryRoleLabel(role)}` : player.displayName,
+    name: role ? joinParts([player.displayName, treacheryRoleLabel(role)]) : player.displayName,
     color: player.color,
     ...(shownMarkShape(player) ? { shape: shownMarkShape(player) } : {}),
     seat: player.seat,
@@ -892,11 +893,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const failedActionLabel = (event: PendingLifeAction["event"]) => {
     if (event.type === "life.changed")
       return translate(`connected:board.failedAction.life.${playSystemRules(system).id}`, {
-        delta: `${event.delta > 0 ? "+" : ""}${event.delta}`,
+        delta: formatSigned(event.delta),
       })
     if (event.type === "commanderDamage.submitted")
       return translate("connected:board.failedAction.commanderDamage", {
-        delta: `${event.delta > 0 ? "+" : ""}${event.delta}`,
+        delta: formatSigned(event.delta),
       })
     if (event.type === "table.action") return translate("connected:board.failedAction.table")
     return translate(
@@ -1595,7 +1596,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 accessibilityRole="alert"
                 style={themed($failure)}
               >
-                <Text text={`${failedActionLabel(failure.action.event)}: ${failure.reason}`} />
+                <Text
+                  text={translate("connected:board.failedAction.withReason", {
+                    action: failedActionLabel(failure.action.event),
+                    reason: failure.reason,
+                  })}
+                />
                 <Button
                   tx="connected:board.status.dismissFailure"
                   onPress={() => controls.dismissFailed(failure.action.event.operationId)}

@@ -11,7 +11,12 @@ export default {
   storeScreen: "Écran du magasin",
   errors: {
     nameRejected: "Choisissez un autre nom",
-    eventLimit: "Terminez d'abord l'un de vos événements. Vous pouvez en gérer 5 à la fois.",
+    eventLimit_one:
+      "Terminez d'abord l'un de vos événements. Vous pouvez en gérer {{count}} à la fois.",
+    eventLimit_many:
+      "Terminez d'abord l'un de vos événements. Vous pouvez en gérer {{count}} à la fois.",
+    eventLimit_other:
+      "Terminez d'abord l'un de vos événements. Vous pouvez en gérer {{count}} à la fois.",
     eventFinished: "Cet événement est terminé",
     eventFull: "Cet événement est complet",
     resultsMissing: "Saisissez tous les résultats avant la ronde suivante",
@@ -61,7 +66,7 @@ export default {
     scan: "Scanner le code QR",
     join: "Rejoindre",
     joining: "Connexion en cours…",
-    invalidCode: "Saisissez le code à 6 caractères",
+    invalidCode: "Saisissez le code à {{length}} caractères",
     notFound: "Aucun événement ne porte ce code",
   },
   tabs: {
@@ -73,8 +78,7 @@ export default {
   clock: {
     pause: "Pause",
     resume: "Reprendre",
-    minus: "−1 min",
-    plus: "+1 min",
+    adjustMinutes: "{{minutes, signed}} min",
     paused: "En pause",
     timeUp: "Temps",
   },
@@ -118,7 +122,7 @@ export default {
   },
   myTable: "Votre table",
   noTable: "Pas de table cette ronde",
-  waitingToStart: "En attente de la ronde 1",
+  waitingToStart: "En attente de la ronde {{round}}",
   report: "Déclarer le résultat",
   changeReport: "Modifier le résultat",
   confirm: "Confirmer le résultat",
@@ -182,7 +186,7 @@ export default {
     player: "Joueur",
     points: "Pts",
     record: "V-D-N",
-    empty: "Le classement apparaît après la ronde 1",
+    empty: "Le classement apparaît après la ronde {{round}}",
   },
   tiebreaker: {
     opponentMatchWin: "OMW",

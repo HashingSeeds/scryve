@@ -77,7 +77,7 @@ describe("CurrentGameScreen", () => {
     fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
     fireEvent.press(view.getByTestId("life-editor-step-1--5"))
     fireEvent.press(view.getByTestId("life-editor-close-seat-1"))
-    expect(view.getByTestId("life-total-seat-1").props.children).toBe("-3")
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("−3")
     expect(useKeepAwake).toHaveBeenCalledWith(undefined, {
       suppressDeactivateWarnings: true,
     })

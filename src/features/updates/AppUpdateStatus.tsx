@@ -19,9 +19,7 @@ export function AppUpdateStatus() {
   if (update.status === "idle") return null
   if (update.status === "downloading") {
     const progress = update.progress
-      ? translate("account:updates.downloadingProgress", {
-          percent: Math.round(update.progress * 100),
-        })
+      ? translate("account:updates.downloadingProgress", { progress: update.progress })
       : translate("account:updates.downloading")
     return (
       <Text

@@ -31,7 +31,10 @@ const play = {
     openAppStore: "Open App Store",
     openGooglePlay: "Open Google Play",
     staleTitle: "Continue game?",
-    staleMessage: "This game has been waiting for more than 24 hours. Nothing was discarded.",
+    staleMessage_one:
+      "This game has been waiting for more than {{count}} hour. Nothing was discarded.",
+    staleMessage_other:
+      "This game has been waiting for more than {{count}} hours. Nothing was discarded.",
     continue: "Continue",
     endGame: "End game",
   },
@@ -318,8 +321,8 @@ const play = {
     matchFormat: "Match",
     dateRange: {
       any: "Any time",
-      last7Days: "Last 7 days",
-      last30Days: "Last 30 days",
+      lastDays_one: "Last {{count}} day",
+      lastDays_other: "Last {{count}} days",
       thisYear: "This year",
     },
     outcome: {
@@ -426,15 +429,16 @@ const play = {
       dateFormat: "Date must be YYYY-MM-DD",
       dateFuture: "Date cannot be in the future",
       eventLength: "Event name must be at most {{max}} characters",
-      roundRange: "Round must be 1–{{max}}",
+      roundRange: "Round must be {{min}}–{{max}}",
       scoreIncomplete: "Enter both wins and losses, or leave the score blank",
-      winsRange: "Wins must be 0–{{max}}",
-      lossesRange: "Losses must be 0–{{max}}",
-      drawsRange: "Draws must be 0–{{max}}",
+      winsRange: "Wins must be {{min}}–{{max}}",
+      lossesRange: "Losses must be {{min}}–{{max}}",
+      drawsRange: "Draws must be {{min}}–{{max}}",
       tooManyGames: "A best of {{bestOf}} has at most {{bestOf}} games",
-      scoreIsWin: "A {{wins}}-{{losses}} score is a win",
-      scoreIsLoss: "A {{wins}}-{{losses}} score is a loss",
-      scoreIsDraw: "A {{wins}}-{{losses}} score is a draw",
+      // {{record}} is a wins-losses score, such as "2-1".
+      scoreIsWin: "A {{record}} score is a win",
+      scoreIsLoss: "A {{record}} score is a loss",
+      scoreIsDraw: "A {{record}} score is a draw",
     },
   },
   rules: {

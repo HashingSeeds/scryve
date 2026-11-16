@@ -11,6 +11,7 @@ import {
 } from "react-native"
 
 import type { SeatDeck } from "@/features/decks/useSeatDeckCards"
+import { formatCopies, formatList, formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -299,7 +300,7 @@ export function PokemonSheet({
     ...deckHits.map(({ cardId, name, copies }) => ({
       cardId,
       name,
-      detail: [pokemonPrintingLabel(cardId), `×${copies}`].filter(Boolean).join(" "),
+      detail: [pokemonPrintingLabel(cardId), formatCopies(copies)].filter(Boolean).join(" "),
     })),
     ...(hits ?? [])
       .filter(({ cardId }) => !inDeck.has(cardId))
@@ -334,7 +335,7 @@ export function PokemonSheet({
   const typeInWithResults = searchFocus && !showForm
   const resultsShown = !formFocus && (showResults || typeInWithResults)
   const narrowForm = keypadBeside && keypadField !== undefined
-  const stepLabel = (step: number) => `${step > 0 ? "+" : "−"}${Math.abs(step * damageStep)}`
+  const stepLabel = (step: number) => formatSigned(step * damageStep)
 
   // why: beside the keypad, HP and Look up would squeeze Name to a sliver. This follows the seat shape, not the open keypad, so focusing HP never moves (and remounts) it.
   const hpAndLookup = (
@@ -492,7 +493,7 @@ export function PokemonSheet({
                     key={hit.cardId}
                     testID={`pokemon-result-${hit.cardId}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`${hit.name}${detail ? `, ${detail}` : ""}`}
+                    accessibilityLabel={formatList([hit.name, detail])}
                     accessibilityState={{ busy: picking === hit.cardId }}
                     disabled={picking !== undefined}
                     onPress={() => void pickHit(hit)}
@@ -594,7 +595,7 @@ export function PokemonSheet({
                           ]}
                         >
                           <Text
-                            text={String(count)}
+                            text={count}
                             size="xs"
                             weight="bold"
                             style={selected ? onInk : inkStyle}
@@ -615,7 +616,7 @@ export function PokemonSheet({
                   <View style={themed($damageReadout)}>
                     <Text
                       testID={`pokemon-sheet-damage-seat-${seatNumber}`}
-                      text={String(editing.damage)}
+                      text={editing.damage}
                       accessibilityLiveRegion="polite"
                       accessibilityLabel={
                         cardless

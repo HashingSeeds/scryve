@@ -19,13 +19,12 @@ const board = {
     rollResult: "{{name}}, {{tool}}, {{value}}",
     rolledGoFirstOrSecond: "{{name}} rolled {{value}}. Go first or second",
     tieRollAgain: "Tie at {{value}}, {{names}}. Rolling again",
-    nameSeparator: " and ",
     goesFirst: "{{name}} goes first",
     wonFlipGoFirstOrSecond: "{{name}} won the flip. Go first or second",
     goFirstOrSecond: "{{name}}, go first or second",
     choseSecond: "{{name}} chose second",
     clearsResult: "Clears this result",
-    // Tiny badge on the player who goes first.
+    // Tiny badge on the player who goes first: the ordinal "first", as short as your language allows. Where the region writes its own digits, use a word, never a digit.
     firstShort: "1st",
     settlesResult: "Settles this result",
     goesFirstQuestion: "Goes first?",
@@ -105,7 +104,7 @@ const board = {
     // Don't record a mulligan this game.
     skip: "Skip",
     help: "How mulligans work",
-    steps: "Shuffle, draw {{hand}}. Bottom 1 card per mulligan.",
+    steps: "Shuffle, draw {{hand}}. Bottom {{bottom}} card per mulligan.",
     // The group's house rule, chosen in game setup.
     rule: {
       none: "No free mulligans",
@@ -145,15 +144,15 @@ const board = {
     close: "Close round clock",
     overtimeLeft: "{{time}} of overtime left",
     nextTurn: "Next turn",
-    minusMinute: "−1 min",
-    plusMinute: "+1 min",
+    // Button that adds or removes minutes, as in "+1 min".
+    adjustMinutes: "{{minutes, signed}} min",
     removeMinute: "Remove a minute",
     addMinute: "Add a minute",
     resume: "Resume",
     pause: "Pause",
     callTime: "Call time",
-    bonusTurns_one: "+{{count}} turn",
-    bonusTurns_other: "+{{count}} turns",
+    bonusTurns_one: "{{count, signed}} turn",
+    bonusTurns_other: "{{count, signed}} turns",
     turnOff: "Turn off",
     tied: {
       none: "Tied on life",
@@ -196,8 +195,8 @@ const board = {
     // Ends the whole best-of-N match, not one game.
     end: "End match",
     scoreErrors: {
-      gamesWonRange: "Games won must be 0–{{max}} in a best of {{bestOf}}",
-      gamesDrawnRange: "Games drawn must be 0–{{max}}",
+      gamesWonRange: "Games won must be {{min}}–{{max}} in a best of {{bestOf}}",
+      gamesDrawnRange: "Games drawn must be {{min}}–{{max}}",
       tooManyWins: "A best of {{bestOf}} cannot have {{wins}} wins",
       partialScore: "Enter games won for every seat or leave the score blank",
       oneWinner: "A match can only have one winner",
@@ -614,13 +613,16 @@ const board = {
     // A plane card the players are on. As in "Plane: Eloren Wilds".
     plane: "Plane",
     phenomenon: "Phenomenon",
+    // Screen reader label for the plane plate on the board, as in "Plane: Eloren Wilds".
+    planeNamed: "Plane: {{name}}",
+    phenomenonNamed: "Phenomenon: {{name}}",
     ownCards: "Your planar deck",
     // Button that rolls the planar die.
     roll: "Roll",
     // Mana the next planar die roll costs this turn, as in "Next roll: 2".
     nextCost: "Next roll: {{cost}}",
     // Short cost badge on the die button, as in "+2" mana for the next roll.
-    costBadge: "+{{cost}}",
+    costBadge: "{{cost, signed}}",
     free: "Free",
     reset: "Reset cost",
     planeswalk: "Planeswalk",
@@ -646,6 +648,8 @@ const board = {
   scheme: {
     title: "Archenemy",
     archenemy: "Archenemy",
+    // Screen reader label for the scheme plate on the board, as in "Archenemy: Scheme due".
+    archenemyPlate: "Archenemy: {{label}}",
     // Button the archenemy taps at the start of their main phase to reveal the top scheme.
     setInMotion: "Set a scheme in motion",
     // Short plate text on the board when the archenemy still has to reveal a scheme this turn.

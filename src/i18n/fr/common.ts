@@ -15,6 +15,9 @@ export default {
   save: "Enregistrer",
   tryAgain: "Réessayer",
   undo: "Annuler",
+  separator: " · ",
+  listSeparator: ", ",
+  listAnd: " et ",
   emptyState: {
     heading: "Rien ici pour l'instant",
     content: "Aucune donnée trouvée. Essayez d'actualiser ou de relancer l'app.",

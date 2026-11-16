@@ -1,3 +1,4 @@
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
@@ -13,7 +14,7 @@ export function teamName(
   const names = teamMembers(players, groups, playerId).map(({ name }) => name)
   if (names.length < 2) return names[0]
   return translate("board:teams.name", {
-    first: names.slice(0, -1).join(", "),
+    first: formatList(names.slice(0, -1)),
     second: names[names.length - 1],
   })
 }
@@ -56,7 +57,7 @@ export function teamValueLabel(
     const value = label(lives[0] ?? 0)
     return { shown: value, spoken: value }
   }
-  return { spoken: lives.map(label).join(", ") }
+  return { spoken: formatList(lives.map(label)) }
 }
 
 export function teamIncoming<Id extends string, Commander>(

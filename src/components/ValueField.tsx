@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
 import type { TxKeyPath } from "@/i18n"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -46,8 +47,9 @@ export function ValueField({
     theme: { colors },
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const compactValue = String(value).length >= 4
-  const veryCompactValue = String(value).length >= 6
+  const shownLength = formatNumber(value).length
+  const compactValue = shownLength >= 4
+  const veryCompactValue = shownLength >= 6
   const scale = useSharedValue(1)
   const longPressDirection = useRef<-1 | 1 | null>(null)
 
@@ -69,7 +71,7 @@ export function ValueField({
     <View style={[themed($field), disabled && $dimmed]}>
       <Animated.View pointerEvents="none" style={[$readout, $pulse]}>
         <Text
-          text={String(value)}
+          text={value}
           maxFontSizeMultiplier={1.2}
           numberOfLines={1}
           accessibilityLabel={translate("common:valueField.readoutLabel", { label, value })}

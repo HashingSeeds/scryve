@@ -81,6 +81,13 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 - Inferred types over annotations. `any` is the enemy.
 - If a rule here fights the task in front of you, say so loudly and get a human sign-off before breaking it.
 
+## Languages
+
+- Every number, date, clock, and list a person reads goes through `src/i18n/format.ts`, or through a translation, which formats each `{{value}}` for you. Lint points at the helper when you reach for `toLocaleString`, `Intl`, `.join(" · ")`, or a hand-built sign.
+- Numbers in copy come from placeholders: `{{count}}`, `{{delta, signed}}`, `{{share, percent}}`, `{{cards, orMore}}`. `pnpm i18n:check` fails on a dropped placeholder, and on a digit the English lacks in a language whose region writes its own digits.
+- Text that gets saved (a note, a default name) uses `translateForStorage`, so it carries no direction marks or native digits into data.
+- `EXPO_PUBLIC_LOCALE=en-XA` brackets every translated string and draws formatted digits as Arabic-Indic. On screen, unbracketed text skipped i18n and an ASCII digit skipped the formatter.
+
 ## Comments
 
 `why:` comments only for breakage no test catches.

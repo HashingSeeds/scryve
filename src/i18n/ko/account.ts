@@ -80,7 +80,7 @@ export default {
       feedbackReplies: "피드백 답변",
       feedbackRepliesHelper: "답글은 항상 내 피드백에 표시됩니다",
       renewalReminders: "갱신 알림",
-      renewalRemindersHelper: "구독 갱신 3일 전",
+      renewalRemindersHelper_other: "구독 갱신 {{count}}일 전",
       channel: "답변 및 알림",
       feedbackReplyPreview: "피드백에 새 답변이 있습니다",
       blockedTitle: "알림이 꺼져 있습니다",
@@ -288,7 +288,7 @@ export default {
       "Scryve Pro는 계정에 연결됩니다. Pro를 구매하거나 이미 가지고 있는 Pro를 사용하려면 로그인하세요.",
     renewalPrompt: {
       title: "갱신 전에 알려드릴까요?",
-      body: "다음 연간 결제 3일 전에 알림을 받습니다.",
+      body_other: "다음 연간 결제 {{count}}일 전에 알림을 받으세요.",
       notNow: "나중에",
       remind: "알림 받기",
     },
@@ -328,7 +328,7 @@ export default {
   foil: {
     pageTitle: "Scryve Foil Supporter",
     title: "Foil Supporter",
-    price: "연 US$500",
+    price: "US${{amount}}/년",
     description: "Pro와 같은 기능. Scryve를 위한 선택형 후원. 취소할 때까지 매년 갱신됩니다.",
     signInPrompt: "Foil을 Scryve 계정에 연결하려면 로그인하세요.",
     alreadyPro: "이미 Pro를 이용 중입니다. 플랜을 바꾸기 전에 기존 구독을 관리하세요.",
@@ -342,7 +342,7 @@ export default {
   },
   updates: {
     downloading: "업데이트 다운로드 중…",
-    downloadingProgress: "업데이트 다운로드 중 {{percent}}%",
+    downloadingProgress: "업데이트 다운로드 중 {{progress, percent}}",
     ready: "업데이트 준비됨",
     cancelReady: "닫기",
     restart: "다시 시작",

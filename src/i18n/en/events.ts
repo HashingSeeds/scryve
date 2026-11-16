@@ -11,7 +11,9 @@ const events = {
   storeScreen: "Store screen",
   errors: {
     nameRejected: "Choose a different name",
-    eventLimit: "Finish one of your events first. You can run 5 at once.",
+    // {{count}} is how many events one organizer can have open at the same time.
+    eventLimit_one: "Finish one of your events first. You can run {{count}} at once.",
+    eventLimit_other: "Finish one of your events first. You can run {{count}} at once.",
     eventFinished: "This event has finished",
     eventFull: "This event is full",
     resultsMissing: "Enter every result before the next round",
@@ -61,7 +63,7 @@ const events = {
     scan: "Scan QR code",
     join: "Join",
     joining: "Joining…",
-    invalidCode: "Enter the 6-character code",
+    invalidCode: "Enter the {{length}}-character code",
     notFound: "No event has that code",
   },
   tabs: {
@@ -73,10 +75,8 @@ const events = {
   clock: {
     pause: "Pause",
     resume: "Resume",
-    // Takes one minute off the round clock.
-    minus: "−1 min",
-    // Adds one minute to the round clock.
-    plus: "+1 min",
+    // Adds minutes to or takes them off the round clock, as in "+1 min".
+    adjustMinutes: "{{minutes, signed}} min",
     paused: "Paused",
     // The round clock ran out.
     timeUp: "Time",
@@ -125,7 +125,7 @@ const events = {
   },
   myTable: "Your table",
   noTable: "No table this round",
-  waitingToStart: "Waiting for round 1",
+  waitingToStart: "Waiting for round {{round}}",
   report: "Report result",
   changeReport: "Change result",
   confirm: "Confirm result",
@@ -192,7 +192,7 @@ const events = {
     points: "Pts",
     // Column header: wins, losses, draws.
     record: "W-L-D",
-    empty: "Standings appear after round 1",
+    empty: "Standings appear after round {{round}}",
   },
   // Column headers for tiebreakers in Magic tournament standings. Keep the English abbreviations.
   tiebreaker: {

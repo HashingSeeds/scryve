@@ -107,7 +107,8 @@ export function RoundClockDialog({
             <View style={themed($dialogActions)}>
               <Button
                 testID="round-clock-minus"
-                tx="board:roundClock.minusMinute"
+                tx="board:roundClock.adjustMinutes"
+                txOptions={{ minutes: -1 }}
                 accessibilityLabel={translate("board:roundClock.removeMinute")}
                 disabled={view.ms <= MINUTE_MS}
                 style={themed($dialogButton)}
@@ -115,7 +116,8 @@ export function RoundClockDialog({
               />
               <Button
                 testID="round-clock-plus"
-                tx="board:roundClock.plusMinute"
+                tx="board:roundClock.adjustMinutes"
+                txOptions={{ minutes: 1 }}
                 accessibilityLabel={translate("board:roundClock.addMinute")}
                 style={themed($dialogButton)}
                 onPress={() => onChange((current) => adjustRoundClock(current, MINUTE_MS))}

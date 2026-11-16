@@ -25,7 +25,7 @@ export default {
   gameNotFound: "Partida no encontrada",
   invalidCardImage: "La imagen de la carta debe ser una URL HTTPS pública",
   invalidCardName: "El nombre de la carta no es válido",
-  invalidCardQuantity: "La cantidad de cartas debe ser de 1 a 999",
+  invalidCardQuantity: "La cantidad de cartas debe estar entre {{min}} y {{max}}",
   invalidClientTimestamp: "Marca de tiempo del cliente no válida",
   invalidDeckIdentifier: "Identificador de mazo no válido",
   invalidDeckList: "Este enlace YDKE no es válido",
@@ -33,7 +33,7 @@ export default {
   invalidDeviceId: "Identificador de dispositivo no válido",
   invalidInvite: "La invitación no es válida, caducó o fue revocada",
   invalidLifeDelta:
-    "La variación de vidas debe ser un número entero distinto de cero, de -999999 a 999999",
+    "El cambio de vidas debe ser un número entero distinto de cero, de {{min}} a {{max}}",
   invalidLocalId: "El ID local de invitado debe ser un UUID",
   invalidLocalUpdatedAt: "La marca de tiempo de invitado no es válida",
   invalidSyncId: "El ID del mazo debe ser un UUID o un ID de mazo",

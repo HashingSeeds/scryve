@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState"
 import { SectionHeader } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 
@@ -113,11 +114,11 @@ function EventRow({ event, onPress }: { event: EventListItem; onPress: () => voi
           size="meta"
           numberOfLines={1}
           tone="dim"
-          text={[
+          text={joinParts([
             eventMeta(event),
             translate("events:playerCount", { count: event.playerCount }),
-            ...(event.isOrganizer ? [translate("events:organizer")] : []),
-          ].join(" · ")}
+            event.isOrganizer && translate("events:organizer"),
+          ])}
         />
       </View>
       <Text size="xs" text={eventStatusText(event)} />

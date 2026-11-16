@@ -1,6 +1,7 @@
 import { View, type TextStyle, type ViewStyle } from "react-native"
 
 import { Text } from "@/components/Text"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { radius } from "@/theme/radius"
 
@@ -35,8 +36,11 @@ export function CardScanStats({ photo }: { photo: CardPhotoText }) {
             size="xxs"
             style={$line}
             text={translate("decks:cardScan.stats.rectangle", {
-              aspect: rectangle.aspect.toFixed(2),
-              share: Math.round(rectangle.share * 100),
+              aspect: formatNumber(rectangle.aspect, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
+              share: rectangle.share,
               verdict: translate(`decks:cardScan.stats.${rectangle.rejected ?? "accepted"}`),
             })}
           />

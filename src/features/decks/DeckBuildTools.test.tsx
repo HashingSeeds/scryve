@@ -27,8 +27,8 @@ function renderTools(typeLines: Record<string, string>) {
 describe("DeckBuildTools", () => {
   it("shows dashes instead of counts when most cards have no details", () => {
     const view = renderTools({ Forest: "Basic Land — Forest" })
-    expect(view.getByLabelText("Lands –")).toBeTruthy()
-    expect(view.getByLabelText("Avg –")).toBeTruthy()
+    expect(view.getByLabelText("Lands, –")).toBeTruthy()
+    expect(view.getByLabelText("Avg, –")).toBeTruthy()
   })
 
   it("shows counts once most cards have details", () => {
@@ -36,6 +36,6 @@ describe("DeckBuildTools", () => {
       "Grizzly Bears": "Creature — Bear",
       "Forest": "Basic Land — Forest",
     })
-    expect(view.getByLabelText("Lands 1")).toBeTruthy()
+    expect(view.getByLabelText("Lands, 1")).toBeTruthy()
   })
 })

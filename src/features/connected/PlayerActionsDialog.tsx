@@ -29,6 +29,8 @@ export interface ReportablePlayer {
   controlledByMe: boolean
 }
 
+const REPORT_REVIEW_HOURS = 24
+
 const REPORT_REASONS = [
   { id: "offensive_username", labelTx: "connected:playerActions.reasons.offensiveUsername" },
   { id: "harassment", labelTx: "connected:playerActions.reasons.harassment" },
@@ -118,7 +120,12 @@ export function PlayerActionsDialog({
             tx="connected:playerActions.reportPlayer"
             txOptions={{ name: selected.displayName }}
           />
-          <Text size="xs" tone="dim" tx="connected:playerActions.reportExplanation" />
+          <Text
+            size="xs"
+            tone="dim"
+            tx="connected:playerActions.reportExplanation"
+            txOptions={{ count: REPORT_REVIEW_HOURS }}
+          />
           <View style={themed($choices)}>
             {REPORT_REASONS.map((option) => (
               <ChoiceButton

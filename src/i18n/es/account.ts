@@ -80,7 +80,9 @@ export default {
       feedbackReplies: "Respuestas a comentarios",
       feedbackRepliesHelper: "Las respuestas siempre aparecen en Tus comentarios",
       renewalReminders: "Avisos de renovación",
-      renewalRemindersHelper: "3 días antes de que se renueve tu suscripción",
+      renewalRemindersHelper_one: "{{count}} día antes de que se renueve tu suscripción",
+      renewalRemindersHelper_many: "{{count}} de días antes de que se renueve tu suscripción",
+      renewalRemindersHelper_other: "{{count}} días antes de que se renueve tu suscripción",
       channel: "Respuestas y avisos",
       feedbackReplyPreview: "Nueva respuesta a tus comentarios",
       blockedTitle: "Las notificaciones están desactivadas",
@@ -291,7 +293,9 @@ export default {
       "Scryve Pro está vinculado a una cuenta. Inicia sesión para obtener Pro o usar el Pro que ya tienes.",
     renewalPrompt: {
       title: "¿Quieres que te avisemos antes de la renovación?",
-      body: "Recibe una notificación 3 días antes de tu próximo cobro anual.",
+      body_one: "Recibe una notificación {{count}} día antes de tu próximo cobro anual.",
+      body_many: "Recibe una notificación {{count}} de días antes de tu próximo cobro anual.",
+      body_other: "Recibe una notificación {{count}} días antes de tu próximo cobro anual.",
       notNow: "Ahora no",
       remind: "Avísame",
     },
@@ -333,7 +337,7 @@ export default {
   foil: {
     pageTitle: "Scryve Foil Supporter",
     title: "Foil Supporter",
-    price: "500 US$/año",
+    price: "US${{amount}}/año",
     description:
       "Las mismas funciones Pro. Apoyo opcional a Scryve. Se renueva cada año hasta que lo canceles.",
     signInPrompt: "Inicia sesión para vincular Foil a tu cuenta de Scryve.",
@@ -348,7 +352,7 @@ export default {
   },
   updates: {
     downloading: "Descargando actualización…",
-    downloadingProgress: "Descargando actualización {{percent}}%",
+    downloadingProgress: "Descargando actualización {{progress, percent}}",
     ready: "Actualización lista",
     cancelReady: "Cerrar",
     restart: "Reiniciar",

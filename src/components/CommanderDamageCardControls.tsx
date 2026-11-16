@@ -1050,6 +1050,7 @@ function PowerBox({
         ]}
       >
         <Text
+          // eslint-disable-next-line no-restricted-syntax -- why: a lone plus or minus on a step button is an icon, not a number.
           text={step < 0 ? "−" : "+"}
           maxFontSizeMultiplier={1}
           style={[
@@ -1095,7 +1096,7 @@ function PowerBox({
           {/* why: the keypad opens empty with the current power dimmed in its place, so typing replaces it; closing empty keeps it. The box shows the power as the attack holds it, so a typed 0 on a lone commander reads as the 1 it deals. */}
           <Text
             testID={editing ? `commander-power-input-seat-${suffix}` : undefined}
-            text={`${power}`}
+            text={power}
             weight="bold"
             numberOfLines={1}
             adjustsFontSizeToFit

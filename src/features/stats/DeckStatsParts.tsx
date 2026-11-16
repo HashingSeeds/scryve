@@ -9,7 +9,7 @@ import { Icon } from "@/components/Icon"
 import { TrailingNumber } from "@/components/NumberLane"
 import { Text } from "@/components/Text"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
-import { i18n } from "@/i18n"
+import { formatDate, formatList, formatNumber, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -21,7 +21,7 @@ import type { LabeledList } from "./listLabels"
 export type DeckStatsParams = { deckKey: string; deckName: string; game: string; format: string }
 
 export function statsDate(time: number) {
-  return new Date(time).toLocaleDateString(i18n.language, { month: "short", day: "numeric" })
+  return formatDate(time, { month: "short", day: "numeric" })
 }
 
 export function listDateSpan(row: ReturnType<typeof listStats>[number]) {
@@ -42,10 +42,11 @@ const SHOWN_CHANGES = 3
 export function listDetail(row: LabeledList) {
   const shown = row.changes.slice(0, SHOWN_CHANGES).map(formatCardChange)
   const more = row.changes.length - shown.length
-  const changes = [...shown, more > 0 ? translate("decks:stats.moreChanges", { count: more }) : ""]
-    .filter(Boolean)
-    .join(", ")
-  return [row.kind === "dated" ? "" : listDateSpan(row), changes].filter(Boolean).join(" · ")
+  const changes = formatList([
+    ...shown,
+    more > 0 && translate("decks:stats.moreChanges", { count: more }),
+  ])
+  return joinParts([row.kind !== "dated" && listDateSpan(row), changes])
 }
 
 function PreviewRow({ label, values }: { label: string; values: string[] }) {
@@ -72,7 +73,7 @@ function ComparePreview({ lists }: { lists: ComparePreviewLists }) {
       </View>
       <PreviewRow
         label={translate("decks:stats.games")}
-        values={lists.map((list) => String(list.record.games))}
+        values={lists.map((list) => formatNumber(list.record.games))}
       />
       <PreviewRow
         label={translate("decks:stats.record")}

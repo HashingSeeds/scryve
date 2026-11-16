@@ -6,6 +6,7 @@ import { Icon } from "@/components/Icon"
 import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
 import { Text, type TextProps } from "@/components/Text"
+import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -52,7 +53,7 @@ export function SettingsRow({ tx, onPress, value, testID, topSeparator }: Settin
     <ListItem
       testID={testID}
       tx={tx}
-      accessibilityLabel={value ? `${translate(tx)}, ${value}` : undefined}
+      accessibilityLabel={value ? formatList([translate(tx), value]) : undefined}
       topSeparator={topSeparator}
       bottomSeparator
       RightComponent={

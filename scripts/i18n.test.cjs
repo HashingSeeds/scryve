@@ -12,6 +12,7 @@ const {
   staleUnits,
   orphanKeys,
   validateUnit,
+  englishProblems,
 } = require("./i18n.cjs")
 
 const namespace = {
@@ -89,6 +90,96 @@ test("rejects translations that drop, rename, or miss placeholders and plural fo
       "es",
     ),
     ["seats.waiting_many: missing translation"],
+  )
+})
+
+test("rejects numbers typed into copy for languages that write their own digits", () => {
+  const seats = translationUnits({
+    seats_one: "{{count}} seat",
+    seats_other: "{{count}} seats",
+    bestOf: "Best of 3",
+  })
+  assert.deepEqual(
+    validateUnit(
+      seats.get("seats"),
+      {
+        seats_zero: "لا مقاعد",
+        seats_one: "مقعد واحد",
+        seats_two: "2 مقعدين",
+        seats_few: "{{count}} مقاعد",
+        seats_many: "{{count}} مقعدًا",
+        seats_other: "{{count}} مقعد",
+      },
+      "ar",
+    ),
+    ["seats_two: typed the number 2; use a placeholder"],
+  )
+  assert.deepEqual(validateUnit(seats.get("seats"), { seats_other: "{{count}}席" }, "ja"), [])
+  assert.deepEqual(validateUnit(seats.get("bestOf"), { bestOf: "الأفضل من ٣" }, "ar"), [])
+  assert.deepEqual(validateUnit(seats.get("bestOf"), { bestOf: "الأفضل من 5" }, "ar"), [
+    "bestOf: typed the number 5; use a placeholder",
+  ])
+  assert.deepEqual(validateUnit(seats.get("bestOf"), { bestOf: "Al mejor de 5" }, "es"), [])
+})
+
+test("treats a formatted placeholder such as {{delta, signed}} as its own placeholder", () => {
+  const unit = translationUnits({ fromStart: "{{delta, signed}} from start" }).get("fromStart")
+  assert.deepEqual(validateUnit(unit, { fromStart: "{{delta, signed}} desde el inicio" }, "es"), [])
+  assert.deepEqual(validateUnit(unit, { fromStart: "{{delta}} desde el inicio" }, "es"), [
+    "fromStart: dropped {{delta,signed}}",
+    "fromStart: introduced {{delta}}",
+  ])
+})
+
+test("lets a plural form say its number in words only when it covers one number", () => {
+  const seats = translationUnits({ seats_one: "{{count}} seat", seats_other: "{{count}} seats" })
+  const unit = seats.get("seats")
+  assert.deepEqual(validateUnit(unit, { seats_one: "one seat", seats_other: "seats" }, "en"), [
+    "seats_other: dropped {{count}}",
+  ])
+  assert.deepEqual(
+    validateUnit(
+      unit,
+      { seats_one: "un siège", seats_many: "{{count}} sièges", seats_other: "{{count}} sièges" },
+      "fr",
+    ),
+    ["seats_one: dropped {{count}}"],
+  )
+  assert.deepEqual(
+    validateUnit(
+      unit,
+      {
+        seats_zero: "لا مقاعد",
+        seats_one: "مقعد واحد",
+        seats_two: "مقعدان",
+        seats_few: "مقاعد",
+        seats_many: "مقعدًا",
+        seats_other: "{{count}} مقعد",
+      },
+      "ar",
+    ),
+    ["seats_few: dropped {{count}}", "seats_many: dropped {{count}}"],
+  )
+})
+
+test("rejects numbers and hand-built signs in English copy", () => {
+  assert.deepEqual(englishProblems("last", "Last 7 days"), [
+    "last: has the number 7; pass it as a placeholder",
+  ])
+  assert.deepEqual(englishProblems("dice", "Roll a d20 for 2HG or 2v2"), [])
+  assert.deepEqual(englishProblems("hint", 'Use lines like "1 Sol Ring"'), [])
+  assert.deepEqual(englishProblems("badge", "+{{cost}} or {{rate}}%"), [
+    'badge: "+{{" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}',
+    'badge: "}}%" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}',
+  ])
+  assert.deepEqual(englishProblems("badge", "{{cost, signed}} · {{share, percent}}"), [])
+  assert.deepEqual(
+    validateUnit(
+      { id: "share", english: { share: "{{share, percent}}" } },
+      { share: "{{share, percent}} %" },
+      "fr",
+    ),
+    ['share: "}} %" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}'],
   )
 })
 

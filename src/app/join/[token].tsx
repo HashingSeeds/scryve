@@ -5,7 +5,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { CloudScreen } from "@/features/auth/CloudScreen"
-import { isInviteToken } from "@/features/connected/inviteLinks"
+import { INVITE_CODE_LENGTH, isInviteToken } from "@/features/connected/inviteLinks"
 import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 
 export default function InviteRoute() {
@@ -15,7 +15,11 @@ export default function InviteRoute() {
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Header titleTx="connected:invalidInvite.header" onBack={() => router.dismissTo("/")} />
         <Text preset="heading" accessibilityRole="header" tx="connected:invalidInvite.title" />
-        <Text accessibilityRole="alert" tx="connected:invalidInvite.message" />
+        <Text
+          accessibilityRole="alert"
+          tx="connected:invalidInvite.message"
+          txOptions={{ length: INVITE_CODE_LENGTH }}
+        />
         <Button
           tx="connected:invalidInvite.enterCode"
           onPress={() => router.replace("/connected/join")}

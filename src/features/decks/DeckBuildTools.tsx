@@ -4,6 +4,7 @@ import Svg, { Circle, Path } from "react-native-svg"
 
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
+import { formatList, formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -45,7 +46,13 @@ export function DeckBuildTools({
           <View style={themed($stats)}>
             <Stat
               label={translate("decks:build.average")}
-              value={stats?.averageManaValue.toFixed(1)}
+              value={
+                stats &&
+                formatNumber(stats.averageManaValue, {
+                  minimumFractionDigits: 1,
+                  maximumFractionDigits: 1,
+                })
+              }
             />
             <Stat label={translate("decks:analysis.lands")} value={stats?.lands} />
             <Stat label={translate("decks:analysis.ramp")} value={stats?.ramp} />
@@ -89,9 +96,9 @@ export function DeckBuildTools({
 
 function Stat({ label, value = "–" }: { label: string; value?: string | number }) {
   return (
-    <View style={$stat} accessible accessibilityLabel={`${label} ${value}`}>
+    <View style={$stat} accessible accessibilityLabel={formatList([label, value])}>
       <Text size="xxs" tone="dim" text={label} />
-      <Text size="xxs" weight="semiBold" style={$tabular} text={String(value)} />
+      <Text size="xxs" weight="semiBold" style={$tabular} text={value} />
     </View>
   )
 }

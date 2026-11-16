@@ -15,6 +15,9 @@ export default {
   save: "저장",
   tryAgain: "다시 시도",
   undo: "실행 취소",
+  separator: " · ",
+  listSeparator: ", ",
+  listAnd: " 및 ",
   emptyState: {
     heading: "아직 아무것도 없습니다",
     content: "데이터가 없습니다. 새로고침하거나 앱을 다시 실행해 보세요.",

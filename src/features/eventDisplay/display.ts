@@ -1,4 +1,5 @@
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
+import { formatDuration } from "@/i18n/format"
 import { normalizeHttpsOrigin } from "@/utils/httpsOrigin"
 
 import type { EventClock } from "../../../convex/lib/events/commands"
@@ -10,14 +11,7 @@ export function eventDisplayUrl(origin: string, code: string) {
 }
 
 export function formatClock(ms: number) {
-  const total = Math.ceil(ms / 1000)
-  const seconds = Math.abs(total)
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const pad = (value: number) => String(value).padStart(2, "0")
-  const body =
-    hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds % 60)}` : `${minutes}:${pad(seconds % 60)}`
-  return total < 0 ? `−${body}` : body
+  return formatDuration(Math.ceil(ms / 1000) || 0)
 }
 
 export type ClockPhase = "running" | "paused" | "time"

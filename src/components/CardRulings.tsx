@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
 import { Text } from "@/components/Text"
 import { localGameRepository } from "@/features/game/localPersistence"
+import { formatDate } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -36,11 +37,8 @@ function cachedRulings(scryfallId: string): Ruling[] | undefined {
     : undefined
 }
 
-const formatDate = (isoDate: string) =>
-  new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
-    dateStyle: "medium",
-    timeZone: "UTC",
-  })
+const formatRulingDate = (isoDate: string) =>
+  formatDate(new Date(`${isoDate}T00:00:00Z`), { dateStyle: "medium", timeZone: "UTC" })
 
 export function CardRulings({ scryfallId }: { scryfallId: string }) {
   const { theme, themed } = useAppTheme()
@@ -102,7 +100,7 @@ export function CardRulings({ scryfallId }: { scryfallId: string }) {
         ) : (
           state.rulings.map((ruling) => (
             <View key={`${ruling.publishedAt}:${ruling.comment}`} style={themed($ruling)}>
-              <Text size="xxs" tone="dim" text={formatDate(ruling.publishedAt)} />
+              <Text size="xxs" tone="dim" text={formatRulingDate(ruling.publishedAt)} />
               <Text size="xs" text={ruling.comment} />
             </View>
           ))

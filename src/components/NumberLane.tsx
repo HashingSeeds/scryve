@@ -17,7 +17,7 @@ export function TrailingNumber({
   TextProps,
   "text" | "tx" | "children" | "style"
 >) {
-  return <Text {...textProps} text={String(value)} numberOfLines={1} style={[$number, style]} />
+  return <Text {...textProps} text={value} numberOfLines={1} style={[$number, style]} />
 }
 
 export function SectionHeader({

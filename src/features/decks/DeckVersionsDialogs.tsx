@@ -15,6 +15,8 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { cardCountLabel } from "./deckCopy"
 
+export type DeckVersionRename = { name?: string; note: string }
+
 export type VersionsRow<Id extends string = string> = {
   id: Id
   label: string
@@ -57,7 +59,7 @@ export function DeckVersionsDialogs<Id extends string>({
   onNew?: () => void
   onCreate: (draft: DeckVersionDraft) => void
   onManage?: () => void
-  onRename: (draft: DeckVersionDraft) => void
+  onRename: (rename: DeckVersionRename) => void
   onDelete?: () => void
   onConfirmDelete: () => void
   visible: boolean
@@ -89,7 +91,7 @@ export function DeckVersionsDialogs<Id extends string>({
         notesLocked={rename.notesLocked}
         busy={busy}
         error={error}
-        onSubmit={onRename}
+        onSubmit={({ name, note }) => onRename(name === rename.name ? { note } : { name, note })}
         {...(onDelete ? { onDelete } : {})}
         visible={visible}
         onClose={onClose}

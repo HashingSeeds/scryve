@@ -50,7 +50,10 @@ export function Tabs<Id extends string>({
             <Text size="sm" weight="medium" tone={selected ? undefined : "dim"}>
               {tab.label}
               {tab.count === undefined ? null : (
-                <Text size="xs" tone="dim" style={$count} text={` ${tab.count}`} />
+                <>
+                  {" "}
+                  <Text size="xs" tone="dim" style={$count} text={tab.count} />
+                </>
               )}
             </Text>
           </TouchableOpacity>

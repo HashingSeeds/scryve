@@ -5,8 +5,11 @@ import { translate } from "@/i18n/translate"
 import { storage } from "@/utils/storage"
 
 import { pushSupported, requestPush } from "./device"
+import { RENEWAL_REMINDER_LEAD_MS } from "../../../convex/lib/notifications"
 
 export type PushKind = "feedbackReplies" | "renewalReminders"
+
+export const RENEWAL_REMINDER_DAYS = RENEWAL_REMINDER_LEAD_MS / (24 * 60 * 60 * 1000)
 
 const prefKey = (kind: PushKind) => `notifications.${kind}`
 
@@ -56,7 +59,7 @@ export function offerRenewalReminder() {
   if (!pushSupported || storage.getBoolean(prefKey("renewalReminders"))) return
   Alert.alert(
     translate("account:billing.renewalPrompt.title"),
-    translate("account:billing.renewalPrompt.body"),
+    translate("account:billing.renewalPrompt.body", { count: RENEWAL_REMINDER_DAYS }),
     [
       { text: translate("account:billing.renewalPrompt.notNow"), style: "cancel" },
       {

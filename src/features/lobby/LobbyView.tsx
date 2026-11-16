@@ -37,6 +37,7 @@ import {
   type LobbySeat,
 } from "@/features/connected/LobbySeatList"
 import { deckVersionLabel } from "@/features/decks/deckCopy"
+import { formatList, formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -303,7 +304,7 @@ export function LobbyView({
                 selectedId={String(lobby.playerCount)}
                 chips={LOBBY_SEAT_COUNTS.map((count) => ({
                   id: String(count),
-                  label: String(count),
+                  label: formatNumber(count),
                   disabled:
                     !online ||
                     savingSettings ||
@@ -397,7 +398,7 @@ export function LobbyView({
             testID="lobby-outdated-apps"
             tone="info"
             text={translate("connected:lobby.outdatedApps", {
-              names: outdatedNames.join(", "),
+              names: formatList(outdatedNames),
               count: outdatedNames.length,
             })}
           />

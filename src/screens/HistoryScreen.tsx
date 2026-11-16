@@ -14,7 +14,8 @@ import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistorySource"
 import type { LocalGameSummary } from "@/features/game/types"
-import { appLocale, type TxKeyPath } from "@/i18n"
+import { type TxKeyPath } from "@/i18n"
+import { formatConjunction, formatList, formatSigned, formatTime, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -97,22 +98,18 @@ function badgeFor(entry: HistoryEntry) {
   return entry.status === "abandoned" ? OUTCOME_BADGES.abandoned : OUTCOME_BADGES.unrecorded
 }
 
-function timeLabel(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString(appLocale, { hour: "numeric", minute: "2-digit" })
-}
-
 function titleFor(entry: HistoryEntry) {
   if (entry.match?.opponents)
-    return translate("play:history.versus", { opponents: entry.match.opponents.join(" · ") })
+    return translate("play:history.versus", { opponents: joinParts(entry.match.opponents) })
   const names = entryPlayerNames(entry)
-  if (names.length > 0) return names.join(" · ")
+  if (names.length > 0) return joinParts(names)
   return translate("play:summary.playerCount", { count: entry.players.length })
 }
 
 function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
   const games = match.games?.length
   const decks = [...new Set(entryDeckNames(entry))]
-  return [
+  return joinParts([
     sourceLabel(entry.source),
     [translate("play:history.bestOfShort", { bestOf: match.bestOf }), match.score]
       .filter(Boolean)
@@ -127,28 +124,24 @@ function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
     ]
       .filter(Boolean)
       .join(" "),
-    match.deckName ?? (games === undefined || decks.length === 0 ? undefined : decks.join(", ")),
-  ]
-    .filter(Boolean)
-    .join(" · ")
+    match.deckName ?? (games === undefined || decks.length === 0 ? undefined : formatList(decks)),
+  ])
 }
 
 function subtitleFor(entry: HistoryEntry) {
   if (entry.match) return matchSubtitleFor(entry, entry.match)
   const decks = [...new Set(entryDeckNames(entry))]
   const gameNumber = entry.scryveMatch?.gameNumber
-  return [
+  return joinParts([
     gameNumber === undefined
       ? sourceLabel(entry.source)
       : translate("play:history.gameNumber", { number: gameNumber }),
-    timeLabel(entry.finishedAt),
+    formatTime(entry.finishedAt),
     entry.winnerNames?.length
-      ? translate("play:history.wonBy", { names: entry.winnerNames.join(" & ") })
+      ? translate("play:history.wonBy", { names: formatConjunction(entry.winnerNames) })
       : undefined,
-    decks.length > 0 ? decks.join(", ") : undefined,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+    decks.length > 0 ? formatList(decks) : undefined,
+  ])
 }
 
 function rowTestId(entry: HistoryEntry) {
@@ -183,7 +176,7 @@ function HistoryRow({
   const nested = entry.scryveMatch?.gameNumber !== undefined
   const title = titleFor(entry)
   const subtitle = subtitleFor(entry)
-  const rowLabel = [translate(badge.accessibilityTx), title, subtitle].join(" · ")
+  const rowLabel = joinParts([translate(badge.accessibilityTx), title, subtitle])
 
   return (
     <TouchableOpacity
@@ -210,7 +203,9 @@ function HistoryRow({
               style={[themed($dot), player.color ? { backgroundColor: player.color } : undefined]}
             />
           ))}
-          {extraPlayers > 0 ? <Text size="xxs" tone="dim" text={`+${extraPlayers}`} /> : null}
+          {extraPlayers > 0 ? (
+            <Text size="xxs" tone="dim" text={formatSigned(extraPlayers)} />
+          ) : null}
         </View>
       )}
       {group ? (

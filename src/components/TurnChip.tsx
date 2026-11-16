@@ -14,6 +14,7 @@ import Animated, {
 import Svg, { Path } from "react-native-svg"
 
 import type { TurnChipState } from "@/features/game/dice"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -140,7 +141,7 @@ export function TurnChip({
   const outOfTime = bank !== undefined && bank <= 0
   const time = numbered
     ? size !== "full"
-      ? String(turn.number)
+      ? formatNumber(turn.number)
       : translate("board:turn.chipNumber", { number: turn.number })
     : formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
   const ink = outOfTime ? colors.board.text : foreground

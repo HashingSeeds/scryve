@@ -1,13 +1,11 @@
 import { translate } from "@/i18n/translate"
 
 import { addCommander, selectCommander, type CommanderSelectionDetails } from "./commanderSelection"
-import { cardSection, printingKey, type DeckCard } from "./deckCards"
+import { cardSection, MAX_CARD_COPIES, printingKey, type DeckCard } from "./deckCards"
 import { canonicalDecklist } from "../../../convex/lib/deckFingerprint"
 import { deckSections } from "../../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 import { identitySection } from "../../../convex/lib/systems"
-
-export const MAX_CARD_COPIES = 999
 
 export type CardDetailsLookup<T extends DeckCard = DeckCard> = (
   card: T,

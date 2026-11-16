@@ -159,7 +159,7 @@ describe("useDice", () => {
 
     fireEvent.press(view.getByTestId("dice-rolloff"))
     expect(view.getByTestId("dice-seat-1")).not.toHaveTextContent("Tie")
-    expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada and Grace. Rolling again")
+    expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada & Grace. Rolling again")
     expect(announce).toHaveBeenCalledTimes(1)
     act(() => jest.advanceTimersByTime(700))
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/19Tie$/)

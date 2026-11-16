@@ -11,7 +11,8 @@ export default {
   storeScreen: "स्टोर स्क्रीन",
   errors: {
     nameRejected: "कोई दूसरा नाम चुनें",
-    eventLimit: "पहले अपना कोई इवेंट खत्म करें। आप एक साथ 5 इवेंट चला सकते हैं।",
+    eventLimit_one: "पहले अपना कोई एक इवेंट खत्म करें। आप एक साथ {{count}} इवेंट चला सकते हैं।",
+    eventLimit_other: "पहले अपना कोई एक इवेंट खत्म करें। आप एक साथ {{count}} इवेंट चला सकते हैं।",
     eventFinished: "यह इवेंट खत्म हो चुका है",
     eventFull: "यह इवेंट भर चुका है",
     resultsMissing: "अगले राउंड से पहले हर रिज़ल्ट दर्ज करें",
@@ -59,7 +60,7 @@ export default {
     scan: "QR कोड स्कैन करें",
     join: "शामिल हों",
     joining: "शामिल हो रहे हैं…",
-    invalidCode: "6 अक्षरों का कोड डालें",
+    invalidCode: "{{length}} अक्षरों का कोड डालें",
     notFound: "इस कोड का कोई इवेंट नहीं है",
   },
   tabs: {
@@ -71,8 +72,7 @@ export default {
   clock: {
     pause: "रोकें",
     resume: "फिर शुरू करें",
-    minus: "−1 मिनट",
-    plus: "+1 मिनट",
+    adjustMinutes: "{{minutes, signed}} मिनट",
     paused: "रुका हुआ",
     timeUp: "समय",
   },
@@ -116,7 +116,7 @@ export default {
   },
   myTable: "आपकी टेबल",
   noTable: "इस राउंड में कोई टेबल नहीं",
-  waitingToStart: "राउंड 1 का इंतज़ार है",
+  waitingToStart: "राउंड {{round}} का इंतज़ार है",
   report: "नतीजा दर्ज करें",
   changeReport: "नतीजा बदलें",
   confirm: "नतीजे की पुष्टि करें",
@@ -178,7 +178,7 @@ export default {
     player: "खिलाड़ी",
     points: "अंक",
     record: "W-L-D",
-    empty: "स्टैंडिंग राउंड 1 के बाद दिखेगी",
+    empty: "स्टैंडिंग राउंड {{round}} के बाद दिखेंगी",
   },
   tiebreaker: {
     opponentMatchWin: "OMW",

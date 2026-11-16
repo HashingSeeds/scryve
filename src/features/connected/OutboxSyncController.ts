@@ -376,6 +376,7 @@ export class OutboxSyncController {
   ): void => {
     if (!changes.every(({ delta }) => isCommanderDamageDelta(delta))) {
       this.changeError = translate("connected:outbox.commanderDamageRange", {
+        min: 1,
         max: MAX_COMMANDER_DAMAGE,
       })
       this.publish()

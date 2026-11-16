@@ -32,6 +32,7 @@ import {
   type SharedDeckView,
 } from "@/features/decks/sharedDecks"
 import { localizedDeckSections } from "@/features/game/playSystems"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -175,11 +176,11 @@ function SharedDeckList({
             <Text
               size="xs"
               tone="dim"
-              text={[
+              text={joinParts([
                 deckGame(game)?.shortLabel ?? game,
                 deckFormatLabel(game, format),
                 cardCountLabel(totalQuantity(cards)),
-              ].join(" · ")}
+              ])}
             />
           </View>
         }

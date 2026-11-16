@@ -11,7 +11,8 @@ export default {
   storeScreen: "매장 화면",
   errors: {
     nameRejected: "다른 이름을 선택하세요",
-    eventLimit: "먼저 진행 중인 이벤트 하나를 마치세요. 동시에 5개까지 운영할 수 있습니다.",
+    eventLimit_other:
+      "먼저 진행 중인 이벤트를 하나 종료하세요. 동시에 {{count}}개까지 운영할 수 있습니다.",
     eventFinished: "이미 종료된 이벤트입니다",
     eventFull: "이벤트 정원이 가득 찼습니다",
     resultsMissing: "다음 라운드 전에 모든 결과를 입력하세요",
@@ -58,7 +59,7 @@ export default {
     scan: "QR 코드 스캔",
     join: "참가",
     joining: "참가하는 중…",
-    invalidCode: "6자리 코드를 입력하세요",
+    invalidCode: "{{length}}자리 코드를 입력하세요",
     notFound: "해당 코드의 이벤트가 없습니다",
   },
   tabs: {
@@ -70,8 +71,7 @@ export default {
   clock: {
     pause: "일시정지",
     resume: "재개",
-    minus: "−1분",
-    plus: "+1분",
+    adjustMinutes: "{{minutes, signed}}분",
     paused: "일시정지됨",
     timeUp: "시간 종료",
   },
@@ -115,7 +115,7 @@ export default {
   },
   myTable: "내 테이블",
   noTable: "이번 라운드는 테이블이 없습니다",
-  waitingToStart: "1라운드를 기다리는 중",
+  waitingToStart: "{{round}}라운드 대기 중",
   report: "결과 보고",
   changeReport: "결과 변경",
   confirm: "결과 확정",
@@ -175,7 +175,7 @@ export default {
     player: "플레이어",
     points: "점수",
     record: "승-패-무",
-    empty: "순위는 1라운드 이후에 표시됩니다",
+    empty: "순위는 {{round}}라운드 이후에 표시됩니다",
   },
   tiebreaker: {
     opponentMatchWin: "OMW",

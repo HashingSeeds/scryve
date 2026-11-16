@@ -14,7 +14,8 @@ import { Text } from "@/components/Text"
 import type { RemoteValue } from "@/features/async/remoteState"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { playFormatLabel } from "@/features/game/playSystems"
-import { appLocale, type TxKeyPath } from "@/i18n"
+import { type TxKeyPath } from "@/i18n"
+import { formatDate, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -46,15 +47,11 @@ const OUTCOME_BADGES = {
 } as const satisfies Record<string, { labelTx: TxKeyPath; accessibilityTx: TxKeyPath }>
 
 function dateLabel(finishedAt: number) {
-  return new Date(finishedAt).toLocaleDateString(appLocale, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
+  return formatDate(finishedAt, { month: "short", day: "numeric", year: "numeric" })
 }
 
 export function matchMetaLine(match: ManualMatchView) {
-  return [
+  return joinParts([
     translate("play:newGame.bestOfCount", { bestOf: match.bestOf }),
     match.system && match.format ? playFormatLabel(match.system, match.format) : undefined,
     [
@@ -66,9 +63,7 @@ export function matchMetaLine(match: ManualMatchView) {
       .filter(Boolean)
       .join(" "),
     dateLabel(match.finishedAt),
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  ])
 }
 
 function SeatRow({ seat }: { seat: ManualMatchSeat }) {
@@ -92,7 +87,7 @@ function SeatRow({ seat }: { seat: ManualMatchSeat }) {
   return (
     <View
       testID={`match-seat-${seat.seat}`}
-      accessibilityLabel={`${translate(badge.accessibilityTx)} · ${seat.displayName}`}
+      accessibilityLabel={joinParts([translate(badge.accessibilityTx), seat.displayName])}
       style={themed($seatRow)}
     >
       <View style={[themed($badge), { borderColor: badgeTone }]}>

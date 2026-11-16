@@ -75,7 +75,7 @@ const connected = {
     // Shown when an undo of several life changes could queue only some of them before the offline queue filled up.
     undoPartial:
       "The offline queue filled up partway through this undo, so only part of it was saved. Reconnect and sync, then undo the rest.",
-    commanderDamageRange: "Commander damage changes have to be between 1 and {{max}}.",
+    commanderDamageRange: "Commander damage changes have to be between {{min}} and {{max}}.",
     commanderSelfDamage: "A commander cannot damage itself",
     // Shown to the attacking player after the server turned down their commander damage claim. {{name}} is the defending player; {{delta}} is the damage that was not added. The usual cause is that the defender has not answered an earlier claim from this attacker yet.
     commanderClaimDeclined:
@@ -242,7 +242,7 @@ const connected = {
     header: "Invitation",
     title: "Invalid invitation",
     message:
-      "This Scryve invitation is malformed or incomplete. Ask the host for a new link or enter the 6-character code.",
+      "This Scryve invitation is malformed or incomplete. Ask the host for a new link or enter the {{length}}-character code.",
     enterCode: "Enter a manual code",
     // Button that goes to the Play tab.
     openPlay: "Go to Play",
@@ -291,8 +291,10 @@ const connected = {
     close: "Close player actions",
     thanks: "Thanks — that's been recorded",
     reportPlayer: "Report {{name}}",
-    reportExplanation:
-      "Reporting also blocks this player for you immediately. You will stop seeing their username and will not be seated with them again. We review every report within 24 hours.",
+    reportExplanation_one:
+      "Reporting also blocks this player for you immediately. You will stop seeing their username and will not be seated with them again. We review every report within {{count}} hour.",
+    reportExplanation_other:
+      "Reporting also blocks this player for you immediately. You will stop seeing their username and will not be seated with them again. We review every report within {{count}} hours.",
     reasons: {
       offensiveUsername: "Offensive username",
       harassment: "Harassment or abuse",
@@ -351,6 +353,8 @@ const connected = {
       table: "A table change could not sync",
       confirmCommanderDamage: "Confirming commander damage could not sync",
       declineCommanderDamage: "Declining commander damage could not sync",
+      // A change that could not sync, then why. {{action}} is one of the lines above; {{reason}} comes from the server.
+      withReason: "{{action}}: {{reason}}",
     },
     menu: {
       players: "Players",
@@ -442,7 +446,7 @@ const connected = {
     title: "Scan invite",
     body: "Use the device scanner to find a trusted Scryve invite QR. Recognition stays on-device and no image is saved.",
     webUnavailable:
-      "Camera QR scanning is available in the iOS and Android app. Enter the 6-character code instead.",
+      "Camera QR scanning is available in the iOS and Android app. Enter the {{length}}-character code instead.",
     nativeUnavailable:
       "The native QR scanner is unavailable on this device. Enter the invitation code manually.",
     untrusted: "That QR is not a trusted Scryve invitation. Try another code or enter it manually.",
@@ -464,11 +468,11 @@ const connected = {
     invitedTitle: "Join invited lobby",
     codeTitle: "Join with code",
     invitedBody: "Join your friends using this invitation.",
-    codeBody: "Enter the host's 6-character code.",
+    codeBody: "Enter the host's {{length}}-character code.",
     invalidInvite: "Invite is invalid, expired, or revoked",
     localGameActive: "Finish or abandon your active local game before joining a connected game.",
     invalidCode: "Enter a valid invitation code.",
-    invalidManualCode: "Enter a valid 6-character invitation code.",
+    invalidManualCode: "Enter a valid {{length}}-character invitation code.",
     seatTaken: "That seat was just taken. Pick another seat.",
     failed: "Could not join lobby",
     scan: "Scan QR code",

@@ -67,7 +67,7 @@ export default {
       "대기 중인 변경 사항의 오프라인 대기열이 가득 찼습니다. 다시 연결해 동기화한 후에 더 변경하세요.",
     undoPartial:
       "실행 취소 도중 오프라인 대기열이 가득 차서 일부만 저장되었습니다. 다시 연결하고 동기화한 다음 나머지를 실행 취소하세요.",
-    commanderDamageRange: "커맨더 피해 변경은 1에서 {{max}} 사이여야 합니다.",
+    commanderDamageRange: "커맨더 피해 변경값은 {{min}}에서 {{max}} 사이여야 합니다.",
     commanderSelfDamage: "커맨더는 자신에게 피해를 줄 수 없습니다",
     commanderClaimDeclined:
       "{{name}}에게 준 커맨더 피해 {{delta}}점이 반영되지 않았습니다. 마지막 요청에 아직 응답하지 않았다면, 응답한 후에 다시 보내세요.",
@@ -222,7 +222,7 @@ export default {
     header: "초대",
     title: "잘못된 초대",
     message:
-      "이 Scryve 초대가 잘못되었거나 불완전합니다. 호스트에게 새 링크를 요청하거나 6자리 코드를 입력하세요.",
+      "이 Scryve 초대장이 잘못되었거나 불완전합니다. 호스트에게 새 링크를 요청하거나 {{length}}자리 코드를 입력하세요.",
     enterCode: "코드 직접 입력",
     openPlay: "플레이로 이동",
   },
@@ -267,8 +267,8 @@ export default {
     close: "플레이어 작업 닫기",
     thanks: "감사합니다. 접수되었습니다",
     reportPlayer: "{{name}} 신고",
-    reportExplanation:
-      "신고하면 이 플레이어가 즉시 차단됩니다. 해당 사용자 이름이 더 이상 표시되지 않으며 같은 게임에 배정되지 않습니다. 모든 신고는 24시간 이내에 검토합니다.",
+    reportExplanation_other:
+      "신고하면 이 플레이어가 즉시 차단됩니다. 해당 플레이어의 사용자 이름이 더 이상 표시되지 않으며 같은 게임에 다시 배정되지 않습니다. 모든 신고는 {{count}}시간 이내에 검토합니다.",
     reasons: {
       offensiveUsername: "부적절한 사용자 이름",
       harassment: "괴롭힘 또는 욕설",
@@ -318,6 +318,7 @@ export default {
       table: "테이블 변경을 동기화하지 못했습니다",
       confirmCommanderDamage: "커맨더 피해 확인을 동기화하지 못했습니다",
       declineCommanderDamage: "커맨더 피해 거절을 동기화하지 못했습니다",
+      withReason: "{{action}}: {{reason}}",
     },
     menu: {
       players: "플레이어",
@@ -414,7 +415,7 @@ export default {
     title: "초대 스캔",
     body: "기기 스캐너로 신뢰할 수 있는 Scryve 초대 QR을 찾으세요. 인식은 기기에서만 이루어지며 이미지는 저장되지 않습니다.",
     webUnavailable:
-      "카메라 QR 스캔은 iOS 및 Android 앱에서 사용할 수 있습니다. 대신 6자리 코드를 입력하세요.",
+      "카메라 QR 스캔은 iOS 및 Android 앱에서 사용할 수 있습니다. 대신 {{length}}자리 코드를 입력하세요.",
     nativeUnavailable:
       "이 기기에서는 기본 QR 스캐너를 사용할 수 없습니다. 초대 코드를 직접 입력하세요.",
     untrusted: "신뢰할 수 있는 Scryve 초대 QR이 아닙니다. 다른 코드를 시도하거나 직접 입력하세요.",
@@ -435,11 +436,11 @@ export default {
     invitedTitle: "초대받은 로비 참가",
     codeTitle: "코드로 참가",
     invitedBody: "이 초대로 친구들과 함께하세요.",
-    codeBody: "호스트의 6자리 코드를 입력하세요.",
+    codeBody: "호스트의 {{length}}자리 코드를 입력하세요.",
     invalidInvite: "초대가 유효하지 않거나 만료되었거나 취소되었습니다",
     localGameActive: "연결 게임에 참가하기 전에 진행 중인 로컬 게임을 끝내거나 중단하세요.",
     invalidCode: "올바른 초대 코드를 입력하세요.",
-    invalidManualCode: "올바른 6자리 초대 코드를 입력하세요.",
+    invalidManualCode: "올바른 {{length}}자리 초대 코드를 입력하세요.",
     seatTaken: "방금 다른 사람이 그 자리를 차지했습니다. 다른 자리를 선택하세요.",
     failed: "로비에 참가할 수 없습니다",
     scan: "QR 코드 스캔",

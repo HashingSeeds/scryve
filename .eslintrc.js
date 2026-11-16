@@ -1,3 +1,69 @@
+// why: a game's rules live in its system definition, so code that compares game IDs drifts from it.
+const gameIdSelectors = [
+  {
+    selector:
+      "BinaryExpression[operator=/^[!=]==$/]:matches([left.name=/([sS]ystem|[gG]ame)(Id)?$/], [left.property.name=/([sS]ystem|[gG]ame)(Id)?$/], [right.name=/([sS]ystem|[gG]ame)(Id)?$/], [right.property.name=/([sS]ystem|[gG]ame)(Id)?$/]):matches([left.value=/^(mtg|ygo|pokemon)$/], [right.value=/^(mtg|ygo|pokemon)$/])",
+    message:
+      "Read game rules from the system definition (convex/lib/systems) instead of comparing a game ID.",
+  },
+  {
+    selector: "SwitchCase[test.value=/^(mtg|ygo|pokemon)$/]",
+    message:
+      "Read game rules from the system definition (convex/lib/systems) instead of switching on a game ID.",
+  },
+]
+
+const UI_TEXT_ATTRIBUTE =
+  "/^(text|title|subtitle|label|placeholder|heading|content|message|description|helper|caption|accessibilityLabel|accessibilityHint|accessibilityValue|count)$/"
+
+// why: numbers, dates, signs, and joined text read wrong in other languages unless src/i18n/format.ts writes them.
+const localeSelectors = [
+  {
+    selector: "CallExpression[callee.property.name=/^toLocale(String|DateString|TimeString)$/]",
+    message: "Format with formatNumber, formatDate, or formatTime from @/i18n/format.",
+  },
+  {
+    selector: "NewExpression[callee.object.name='Intl']",
+    message: "Format with @/i18n/format, which knows the app's language and calendar.",
+  },
+  {
+    selector: "CallExpression[callee.property.name='join'][arguments.0.value=/[·•+&]|, /]",
+    message:
+      "Join UI text with joinParts, formatList, formatConjunction, or formatSum from @/i18n/format.",
+  },
+  {
+    selector: "TemplateLiteral > TemplateElement[value.raw=/×/]",
+    message: "Write a card count with formatCopies from @/i18n/format.",
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='TrailingNumber'] > JSXAttribute[name.name='value'] > JSXExpressionContainer > TemplateLiteral[expressions.length>0]",
+    message: "Pass the number to TrailingNumber, or format it with @/i18n/format.",
+  },
+  {
+    selector: "TemplateLiteral > TemplateElement[value.raw=/ [·•] /]",
+    message: "Join UI text with joinParts from @/i18n/format.",
+  },
+  {
+    selector:
+      "ConditionalExpression:matches([consequent.value=/^[+−]$/], [alternate.value=/^[+−]$/])",
+    message: "Write a signed number with formatSigned from @/i18n/format.",
+  },
+  {
+    selector: "TemplateLiteral[quasis.0.value.raw=/^[+−]$/]",
+    message: "Write a signed number with formatSigned from @/i18n/format.",
+  },
+  {
+    selector: `JSXAttribute[name.name=${UI_TEXT_ATTRIBUTE}] CallExpression:matches([callee.name='String'], [callee.property.name=/^(toString|toFixed)$/])`,
+    message: "Pass the number to Text, or format it with formatNumber from @/i18n/format.",
+  },
+  {
+    selector: `JSXAttribute[name.name=${UI_TEXT_ATTRIBUTE}] > JSXExpressionContainer > TemplateLiteral[expressions.length>0]`,
+    message:
+      "Build UI text with translate() or @/i18n/format, so word order and digits follow the language.",
+  },
+]
+
 module.exports = {
   root: true,
   extends: [
@@ -131,20 +197,21 @@ module.exports = {
         "src/features/game/localPersistence.ts",
       ],
       rules: {
-        "no-restricted-syntax": [
-          "error",
-          {
-            selector:
-              "BinaryExpression[operator=/^[!=]==$/]:matches([left.name=/([sS]ystem|[gG]ame)(Id)?$/], [left.property.name=/([sS]ystem|[gG]ame)(Id)?$/], [right.name=/([sS]ystem|[gG]ame)(Id)?$/], [right.property.name=/([sS]ystem|[gG]ame)(Id)?$/]):matches([left.value=/^(mtg|ygo|pokemon)$/], [right.value=/^(mtg|ygo|pokemon)$/])",
-            message:
-              "Read game rules from the system definition (convex/lib/systems) instead of comparing a game ID.",
-          },
-          {
-            selector: "SwitchCase[test.value=/^(mtg|ygo|pokemon)$/]",
-            message:
-              "Read game rules from the system definition (convex/lib/systems) instead of switching on a game ID.",
-          },
-        ],
+        "no-restricted-syntax": ["error", ...gameIdSelectors],
+      },
+    },
+    {
+      files: ["src/**/*.{ts,tsx}"],
+      excludedFiles: [
+        "**/*.test.{ts,tsx}",
+        "src/devtools/**",
+        "src/devtools/seeds/**",
+        "src/app/dev/**",
+        "src/features/game/localPersistence.ts",
+        "src/i18n/format.ts",
+      ],
+      rules: {
+        "no-restricted-syntax": ["error", ...gameIdSelectors, ...localeSelectors],
       },
     },
     {
@@ -160,6 +227,7 @@ module.exports = {
             "callees": {
               exclude: [
                 "translate",
+                "separator",
                 "i18n(ext)?",
                 "t",
                 "require",
