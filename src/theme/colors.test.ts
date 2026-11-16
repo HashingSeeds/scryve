@@ -10,10 +10,13 @@ describe.each([
     expect(contrastRatio(colors.brandText, colors.background)).toBeGreaterThanOrEqual(4.5)
   })
 
-  it.each(colors.searchSections)("keeps the search section color %s readable", (color) => {
-    expect(contrastRatio(color, colors.field)).toBeGreaterThanOrEqual(4.5)
-    expect(contrastRatio(color, colors.surface)).toBeGreaterThanOrEqual(4.5)
-  })
+  it.each([...colors.searchSections, colors.brandText])(
+    "keeps the search term color %s readable",
+    (color) => {
+      expect(contrastRatio(color, colors.field)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(color, colors.surface)).toBeGreaterThanOrEqual(4.5)
+    },
+  )
 
   it.each(Object.entries(colors.gameMenu.actions))(
     "keeps the %s menu action readable",

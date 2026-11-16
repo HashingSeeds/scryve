@@ -24,7 +24,6 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => mockConnection,
 }))
 
-/** why: on iOS and Android the bar holds its text as colored parts, not a `value`. */
 function barText(view: { getByTestId: (id: string) => ReactTestInstance }) {
   const read = (node: ReactTestInstance | string): string =>
     typeof node === "string" ? node : node.children.map(read).join("")

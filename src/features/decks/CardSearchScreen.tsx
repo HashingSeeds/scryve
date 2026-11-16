@@ -334,7 +334,7 @@ export function CardSearch({
     : [{ text: query }]
   /** why: `syntax` is a term the sheet has no section for, which still reads apart from the name. */
   function sectionColor(section: string | undefined) {
-    if (section === "syntax") return theme.colors.tint
+    if (section === "syntax") return theme.colors.brandText
     const index = section === undefined ? -1 : filterSections.indexOf(section)
     return index < 0
       ? undefined
