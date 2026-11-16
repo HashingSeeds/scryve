@@ -26,7 +26,6 @@ const GLOSSARY_PATH = path.join(I18N_DIR, "glossary.json")
 const PLURAL_SUFFIX = /^(.*)_(zero|one|two|few|many|other)$/
 const PLACEHOLDER = /{{\s*([\w.]+)(?:\s*,\s*\w+)?\s*}}|<\/?([\w-]+)\s*\/?>/g
 
-const NON_LATIN_LOCALES = new Set(["hi", "ja", "ko"])
 const LITERAL_TEXT = /{{[^}]*}}|<[^>]*>|https?:\/\/\S+|\S+@\S+|@\w+|「[^」]*」|"[^"]*"|“[^”]*”/g
 const LATIN_WORD = /[\p{Script=Latin}\d]+/gu
 const LATIN_INSIDE_WORD =
@@ -159,7 +158,10 @@ const wordPatterns = new Map()
 function mentions(text, word) {
   if (!wordPatterns.has(word)) {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    wordPatterns.set(word, new RegExp(`(?<![\\p{L}\\p{N}])${escaped}`, "iu"))
+    wordPatterns.set(
+      word,
+      new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?:s|es|d|ed|ing)?(?![\\p{L}\\p{N}])`, "iu"),
+    )
   }
   return wordPatterns.get(word).test(text)
 }
@@ -175,20 +177,39 @@ function unitConcepts(unit, glossary) {
   )
 }
 
+const isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value)
+const isTextList = (value) =>
+  Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string")
+
 function glossaryProblems(glossary, units, locales = Object.keys(LOCALES)) {
+  if (!isObject(glossary?.rules) || !isObject(glossary?.terms))
+    return ["glossary: needs a rules object and a terms object"]
   const texts = units.map(unitText)
   const problems = []
+  for (const key of Object.keys(glossary))
+    if (key !== "rules" && key !== "terms")
+      problems.push(`glossary: ${key} belongs under rules or inside a term`)
   for (const locale of locales)
-    if (!glossary.rules?.[locale]?.length)
-      problems.push(`glossary: rules has nothing for ${locale}`)
-  for (const [concept, term] of Object.entries(glossary.terms ?? {})) {
-    if (!term.en?.length) problems.push(`glossary: "${concept}" lists no English words in en`)
-    for (const word of term.en ?? [])
-      if (!texts.some((text) => mentions(text, word)))
-        problems.push(`glossary: "${concept}" lists "${word}", which no English string uses`)
+    if (!isTextList(glossary.rules[locale]))
+      problems.push(`glossary: rules for ${locale} must be a list of rules`)
+  for (const key of Object.keys(glossary.rules))
+    if (!locales.includes(key))
+      problems.push(`glossary: rules has ${key}, which is not a translated language`)
+  for (const [concept, term] of Object.entries(glossary.terms)) {
+    if (!isObject(term)) {
+      problems.push(`glossary: "${concept}" must be an object`)
+      continue
+    }
+    if (!isTextList(term.en)) problems.push(`glossary: "${concept}" lists no English words in en`)
+    else
+      for (const word of term.en)
+        if (!texts.some((text) => mentions(text, word)))
+          problems.push(`glossary: "${concept}" lists "${word}", which no English string uses`)
     for (const locale of locales)
       if (typeof term[locale] !== "string" || !term[locale].trim())
-        problems.push(`glossary: "${concept}" has no ${locale} term`)
+        problems.push(
+          `glossary: "${concept}" has no ${locale} term; write what the ${locale} translations already use`,
+        )
     for (const key of Object.keys(term))
       if (key !== "en" && !locales.includes(key))
         problems.push(`glossary: "${concept}" has ${key}, which is not a translated language`)
@@ -341,7 +362,7 @@ function validateUnit(unit, translatedFlat, locale) {
 }
 
 function scriptProblems(text, locale) {
-  if (!NON_LATIN_LOCALES.has(locale)) return []
+  if (new Intl.Locale(locale).maximize().script === "Latn") return []
   const stray = (text.replace(LITERAL_TEXT, " ").match(LATIN_WORD) ?? []).filter(
     (word) => /^\p{Ll}+$/u.test(word) && !LOWERCASE_LATIN_ALLOWED.has(word),
   )
@@ -369,8 +390,13 @@ function lockPath(locale, namespace) {
   return path.join(LOCKS_DIR, locale, `${namespace}.json`)
 }
 
-function loadGlossary() {
-  return readJson(GLOSSARY_PATH, { rules: {}, terms: {} })
+function loadSources(english) {
+  const glossary = readJson(GLOSSARY_PATH, {})
+  const unitsByNamespace = new Map(
+    Object.keys(english).map((namespace) => [namespace, namespaceUnits(english, namespace)]),
+  )
+  const units = [...unitsByNamespace.values()].flatMap((entries) => [...entries.values()])
+  return { glossary, unitsByNamespace, glossaryIssues: glossaryProblems(glossary, units) }
 }
 
 function readJson(file, fallback) {
@@ -438,22 +464,8 @@ async function check() {
       problems.push(`${path.relative(ROOT, file)}: out of date`)
   }
 
-  const glossary = loadGlossary()
-  const unitsByNamespace = new Map(
-    namespaces.map((namespace) => [namespace, namespaceUnits(english, namespace)]),
-  )
-  const glossaryIssues = glossaryProblems(
-    glossary,
-    [...unitsByNamespace.values()].flatMap((units) => [...units.values()]),
-  )
-  if (glossaryIssues.length) {
-    console.error(glossaryIssues.join("\n"))
-    console.error(
-      `\n${glossaryIssues.length} glossary problem(s). Every concept in src/i18n/glossary.json needs English words that appear in the copy and a term for every language.`,
-    )
-    process.exitCode = 1
-    return
-  }
+  const { glossary, unitsByNamespace, glossaryIssues } = loadSources(english)
+  problems.push(...glossaryIssues)
 
   for (const [namespace, units] of unitsByNamespace) {
     const englishFlat = flatten(english[namespace])
@@ -461,6 +473,7 @@ async function check() {
       problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
     for (const [key, text] of Object.entries(englishFlat))
       for (const problem of englishProblems(key, text)) problems.push(`en/${namespace}: ${problem}`)
+    if (glossaryIssues.length) continue
     for (const locale of Object.keys(LOCALES)) {
       const lock = readJson(lockPath(locale, namespace), {})
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
@@ -485,7 +498,9 @@ async function check() {
     return
   }
   console.error(problems.join("\n"))
-  console.error(`\n${problems.length} translation problem(s). Run \`pnpm i18n:translate\`.`)
+  console.error(
+    `\n${problems.length} problem(s). Fix glossary problems in src/i18n/glossary.json, then run \`pnpm i18n:translate\`.`,
+  )
   process.exitCode = 1
 }
 
@@ -630,14 +645,7 @@ async function translate({ onlyNamespace, retranslate }) {
   if (onlyNamespace && !namespaces.includes(onlyNamespace))
     throw new Error(`Unknown namespace "${onlyNamespace}". Known: ${namespaces.join(", ")}`)
 
-  const glossary = loadGlossary()
-  const unitsByNamespace = new Map(
-    namespaces.map((namespace) => [namespace, namespaceUnits(english, namespace)]),
-  )
-  const glossaryIssues = glossaryProblems(
-    glossary,
-    [...unitsByNamespace.values()].flatMap((units) => [...units.values()]),
-  )
+  const { glossary, unitsByNamespace, glossaryIssues } = loadSources(english)
   if (glossaryIssues.length)
     throw new Error(`Fix the glossary first:\n${glossaryIssues.join("\n")}`)
 
@@ -715,6 +723,7 @@ module.exports = {
   lockEntry,
   glossaryProblems,
   glossaryText,
+  unitConcepts,
   orphanKeys,
   validateUnit,
   englishProblems,

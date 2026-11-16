@@ -14,6 +14,7 @@ const {
   lockEntry,
   glossaryProblems,
   glossaryText,
+  unitConcepts,
   orphanKeys,
   validateUnit,
   englishProblems,
@@ -112,19 +113,34 @@ test("needs every concept to name English the copy uses and a term in every lang
 
   const { ko: _, ...noKorean } = glossary.terms.seat
   const broken = {
-    rules: { ...glossary.rules, hi: [] },
+    rules: { ...glossary.rules, hi: [], jp: ["Use です/ます."] },
     terms: {
       seat: { ...noKorean, en: ["seat", "chair"], ar: "مقعد" },
       bench: { ...glossary.terms.seat, en: [] },
     },
+    ja: { rules: [] },
   }
   assert.deepEqual(glossaryProblems(broken, entries, locales), [
-    "glossary: rules has nothing for hi",
+    "glossary: ja belongs under rules or inside a term",
+    "glossary: rules for hi must be a list of rules",
+    "glossary: rules has jp, which is not a translated language",
     'glossary: "seat" lists "chair", which no English string uses',
-    'glossary: "seat" has no ko term',
+    'glossary: "seat" has no ko term; write what the ko translations already use',
     'glossary: "seat" has ar, which is not a translated language',
     'glossary: "bench" lists no English words in en',
   ])
+  assert.deepEqual(glossaryProblems({ rules: glossary.rules }, entries, locales), [
+    "glossary: needs a rules object and a terms object",
+  ])
+})
+
+test("a glossary word matches whole words and their plain endings, not longer words", () => {
+  const concepts = (text) =>
+    unitConcepts(translationUnits({ label: text }).get("label"), {
+      terms: { hero: { en: ["hero"] }, seat: { en: ["seat"] } },
+    })
+  assert.deepEqual(concepts("Heroes and seated players"), ["hero", "seat"])
+  assert.deepEqual(concepts("Heroic Outlaw at the seatbelt"), [])
 })
 
 test("sends the translator only the glossary terms its strings mention", () => {

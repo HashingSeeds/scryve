@@ -41,6 +41,7 @@ const common = {
     decks: "Decks",
     // Floating button on the deck shelf that opens card lookup.
     cards: "Cards",
+    // The Play tab.
     play: "Play",
     // The labels below sit beside a back chevron and name the screen it returns to.
     game: "Game",

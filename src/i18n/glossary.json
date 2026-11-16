@@ -256,7 +256,9 @@
         "first or second",
         "on the play",
         "go second",
-        "goes second"
+        "goes second",
+        "went first",
+        "not first"
       ],
       "es": "jugar primero; {{name}} juega primero; jugar primero o segundo; on the play: jugando primero",
       "fr": "jouer en premier / en second ({{name}} joue en premier); question: Qui commence ?",
@@ -289,7 +291,7 @@
       "ko": "{{n}}판 승부 (label: 최대 게임 수; short Bo{{n}})"
     },
     "win / loss / draw, and their badges": {
-      "en": ["win", "won", "loss", "draw"],
+      "en": ["win", "won", "loss", "draw", "lost", "drew"],
       "es": "Victoria / Derrota / Empate; one-letter badges V / D / E",
       "fr": "Victoire / Défaite. Draw: Égalité for one game; match nul for a whole match. Badges V / D / É",
       "hi": "जीत / हार / ड्रॉ (winner: विजेता); badges: W / L / D, in Latin script",
@@ -465,7 +467,7 @@
       "ko": "포맷"
     },
     "card faces front / back": {
-      "en": ["front"],
+      "en": ["front face", "back face"],
       "es": "Anverso / Reverso; both faces: ambas caras",
       "fr": "Recto / Verso",
       "hi": "सामने / पीछे",

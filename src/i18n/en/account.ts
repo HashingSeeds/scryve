@@ -30,6 +30,7 @@ const account = {
     // Label above a choice of which screen Scryve shows when it opens.
     openScryveTo: "When Scryve opens, show",
     launchDestination: {
+      // The Play tab.
       play: "Play",
       decks: "Decks",
     },
