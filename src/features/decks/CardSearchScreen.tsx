@@ -90,7 +90,7 @@ import {
 import { isCommanderPick, sideboardSection } from "./deckDraft"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
-import { localMagicSearch, NAME_MATCHES, SCRYFALL_SYNTAX } from "./localMagicSearch"
+import { localMagicSearch, NAME_MATCHES, readsOnDevice, SCRYFALL_SYNTAX } from "./localMagicSearch"
 import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
 import { useMagicCards } from "./useMagicCards"
@@ -733,8 +733,12 @@ export function CardSearch({
       />
     ) : null
 
-  // why: syntax the device can't read, such as rules text, needs Scryfall.
-  const offlineSyntax = offline && filtersCards && SCRYFALL_SYNTAX.test(text)
+  // why: a search the device can't answer, such as rules text or a format an older card file lacks, needs Scryfall.
+  const offlineSyntax =
+    offline &&
+    filtersCards &&
+    (SCRYFALL_SYNTAX.test(text) ||
+      (lookup && magicCards !== undefined && !readsOnDevice(magicCards, { text, filters: picked })))
   const scans = CAN_READ_CARDS && prereleaseBuild() && filtersCards && !choosingCommander && !lookup
   // why: a new accessory component remounts its icons, so it changes only with what it shows.
   const queryActions = useCallback(

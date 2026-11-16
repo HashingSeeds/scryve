@@ -825,6 +825,21 @@ describe("with the device's Magic card file", () => {
     expect(mockAction).not.toHaveBeenCalled()
   })
 
+  it("says a format needs a connection offline when the card file predates legality", async () => {
+    mockConnection.isWebSocketConnected = false
+    const { legalFormats: _, ...unknownLegality } = shivan
+    mockMagicCards = parseMagicCards(JSON.stringify({ version: "1", cards: [unknownLegality] }))
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSearch game="mtg" format="modern" onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent.changeText(view.getByTestId("card-search-input"), "f:modern dragon")
+    expect(
+      await view.findByText("You’re offline. Some of these search terms need a connection."),
+    ).toBeTruthy()
+  })
+
   it("sends syntax the device can't read to Scryfall", async () => {
     mockAction.mockResolvedValue([])
     await searchFor("o:flying")

@@ -158,7 +158,10 @@ export function withRangeBound(picked: readonly string[], bound: RangeBound, val
   return value === undefined ? kept : [...kept, `${bound}${value}`]
 }
 
-const optionCache = new WeakMap<readonly object[], Map<string, readonly string[]>>()
+const optionCache = new WeakMap<
+  CardSource<never>,
+  WeakMap<readonly object[], Map<string, readonly string[]>>
+>()
 
 /** why: this walks all 30k cards, so each card file keeps its counts instead of recounting on every sheet open. */
 export function cardOptions<Card extends { legalFormats?: readonly string[] }>(
@@ -169,7 +172,9 @@ export function cardOptions<Card extends { legalFormats?: readonly string[] }>(
 ): readonly string[] {
   const scoped = formats.length > 0 && cards.some((card) => card.legalFormats !== undefined)
   const key = `${filterId}:${scoped ? formats.join(",") : ""}`
-  const cached = optionCache.get(cards)?.get(key)
+  const bySource = optionCache.get(source) ?? new WeakMap()
+  optionCache.set(source, bySource)
+  const cached = bySource.get(cards)?.get(key)
   if (cached) return cached
   const field = source.get(filterId)
   const counts = new Map<string, number>()
@@ -182,8 +187,8 @@ export function cardOptions<Card extends { legalFormats?: readonly string[] }>(
   const options = [...counts]
     .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
     .map(([option]) => option)
-  const byKey = optionCache.get(cards) ?? new Map<string, readonly string[]>()
+  const byKey = bySource.get(cards) ?? new Map<string, readonly string[]>()
   byKey.set(key, options)
-  optionCache.set(cards, byKey)
+  bySource.set(cards, byKey)
   return options
 }
