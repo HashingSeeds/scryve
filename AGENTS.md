@@ -84,9 +84,15 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 ## Languages
 
 - Every number, date, clock, and list a person reads goes through `src/i18n/format.ts`, or through a translation, which formats each `{{value}}` for you. Lint points at the helper when you reach for `toLocaleString`, `Intl`, `.join(" · ")`, or a hand-built sign.
-- Numbers in copy come from placeholders: `{{count}}`, `{{delta, signed}}`, `{{share, percent}}`, `{{cards, orMore}}`. `pnpm i18n:check` fails on a dropped placeholder, and on a digit the English lacks in a language whose region writes its own digits.
+- Numbers in copy come from placeholders: `{{count}}`, `{{delta, signed}}`, `{{share, percent}}` (a ratio: pass 0.6 for 60%), `{{cards, orMore}}`. A `Date` in a placeholder shows its day and time; for another shape, pass the result of `formatDate(date, options)`. `pnpm i18n:check` fails on a dropped placeholder, and on a digit the English lacks in a language whose region writes its own digits.
 - Text that gets saved (a note, a default name) uses `translateForStorage`, so it carries no direction marks or native digits into data.
-- Translations in `src/i18n/<language>` are generated, so fix wording at its source: a term in `src/i18n/glossary.json` (one entry per concept, listing the English words it covers and a term for every language), a language-wide rule under `rules`, or a note above the English key. `pnpm i18n:translate` retranslates only the strings each change touches; a rule touches the whole language, so prefer a term or a note. A new concept's terms describe what each language's translations already use. `pnpm i18n:check` fails on a hand edit, on a concept missing a language, and on a concept whose English words the copy never uses.
+- Translations in `src/i18n/<language>` are generated. Fix wording at its source, choosing the narrowest fix, then run `pnpm i18n:translate`, which retranslates only what the fix touches:
+  - One string in one language: a note above the English key that starts with the language code, like `// ko: Use 덱 통계.`
+  - One string in every language: a plain note above the English key.
+  - A word everywhere: its concept in `src/i18n/glossary.json`. The concept's name is the meaning the translator reads, `en` lists the English words it covers, and every language needs a term. A new concept's terms describe what the translations already use.
+  - A whole language: a rule under `rules`. This retranslates the whole language.
+- `pnpm i18n:check` fails on a hand edit to a generated file, a note for a language we don't translate, a concept missing a language, and a concept whose English words the copy never uses.
+- To add a language, add it to `LOCALES` in `scripts/i18n.cjs`, give it `rules` and a term for every concept in the glossary, then run `pnpm i18n:translate`. Its push copy lives in `convex/lib/notifications.ts`, and a test fails until it's there. Adding it is a backend release.
 - `EXPO_PUBLIC_LOCALE=en-XA` brackets every translated string and draws formatted digits as Arabic-Indic. On screen, unbracketed text skipped i18n and an ASCII digit skipped the formatter.
 
 ## Comments

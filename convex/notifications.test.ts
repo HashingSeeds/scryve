@@ -1,6 +1,11 @@
 import { type ConvexTestHarness, makeConvexTest, signedIn } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
-import { forgetAccountDevices, RENEWAL_REMINDER_LEAD_MS } from "./lib/notifications"
+import {
+  forgetAccountDevices,
+  notificationLocale,
+  RENEWAL_REMINDER_LEAD_MS,
+} from "./lib/notifications"
+import { resources } from "../src/i18n/resources"
 
 const ME = "a".repeat(64)
 const LAPTOP = "c".repeat(64)
@@ -35,6 +40,11 @@ function expo() {
 const devices = (t: ConvexTestHarness) => t.run((ctx) => ctx.db.query("pushDevices").collect())
 
 describe("push notifications", () => {
+  it("has push copy for every language the app ships", () => {
+    for (const language of Object.keys(resources))
+      expect(notificationLocale(language)).toBe(language)
+  })
+
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => {
     jest.clearAllTimers()

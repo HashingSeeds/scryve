@@ -64,6 +64,13 @@ describe("format", () => {
       expect(i18n.t("play:summary.playerCount", { count: 5 })).toBe(`${FSI}٥${PDI} لاعبين`)
     }))
 
+  it("formats a date a translation interpolates in the reader's language", () => {
+    const at = new Date(2026, 10, 16, 9, 5)
+    expect(i18n.t("x", { at, defaultValue: "{{at}}" })).toBe(
+      formatDate(at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+    )
+  })
+
   it("marks translated text and formatted numbers in the pseudo-locale", () =>
     inLanguage(PSEUDO_LOCALE, () => {
       expect(i18n.t("common:cancel")).toBe("\u27e6Cancel\u27e7")
