@@ -31,4 +31,12 @@ describe("nearby codes", () => {
     expect(findNearbyGame(games, "Sam")).toBe(games[0])
     expect(findNearbyGame(games, "QQ22QQ")).toBeUndefined()
   })
+
+  it("never takes a code for the start of another host's name", () => {
+    const games = [{ name: "AB23CD Alice ZY98XW" }]
+    expect(findNearbyGame(games, "AB23CD")).toBeUndefined()
+    expect(findNearbyGame([...games, { name: "Sam AB23CD" }], "AB23CD")).toEqual({
+      name: "Sam AB23CD",
+    })
+  })
 })

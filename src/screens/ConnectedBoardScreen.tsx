@@ -1398,6 +1398,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     bestOf: match.bestOf,
                   }),
                 },
+                benchSeats: !!table?.tableRules.pokemon,
               }
             : undefined
         }

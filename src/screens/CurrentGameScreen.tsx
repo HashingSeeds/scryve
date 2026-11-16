@@ -557,6 +557,7 @@ export function CurrentGameScreen({
                     : undefined,
                   system,
                   onClockPress: clock && runtime.game.status === "active" ? openClock : undefined,
+                  benchSeats: !!runtime.tableRuntime?.tableRules.pokemon,
                 }
               : undefined
           }

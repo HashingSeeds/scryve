@@ -22,14 +22,13 @@ export const nearbyGameCode = (serviceName: string) => CODE_SUFFIX.exec(serviceN
 
 export const nearbyGameHost = (serviceName: string) => serviceName.replace(CODE_SUFFIX, "")
 
-/** why: a test link names a game by its code, which sits at the end of the advertised name; the host name at its start still works. */
+/** why: a test link names a game by its code, which sits at the end of the advertised name. A host name works only when the link is not a code, so a code never joins a stranger whose name starts with it. */
 export function findNearbyGame<Service extends { name: string }>(
   games: readonly Service[],
   wanted: string,
 ) {
   const code = normalizeManualCode(wanted)
-  return (
-    (code ? games.find((service) => nearbyGameCode(service.name) === code) : undefined) ??
-    games.find((service) => service.name.startsWith(wanted))
+  return games.find((service) =>
+    code ? nearbyGameCode(service.name) === code : service.name.startsWith(wanted),
   )
 }

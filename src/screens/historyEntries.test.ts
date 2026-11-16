@@ -52,6 +52,7 @@ describe("localHistoryEntry", () => {
   it("names a game saved with guest seat passes as nearby, alone or as a match", () => {
     const nearby = localHistoryEntry(game({ seatPassHashes: { [grace]: "a".repeat(64) } }))
     expect(sourceLabel(nearby)).toBe("Nearby")
+    expect(sourceLabel(localHistoryEntry(game({ seatPassHashes: {} })))).toBe("Nearby")
     expect(sourceLabel(localHistoryEntry(game()))).toBe("Local")
     const match: LocalMatch = { id: "match_1", bestOf: 3, gameNumber: 1, wins: [0, 0], draws: 0 }
     const [grouped] = groupMatchGames([

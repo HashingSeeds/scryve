@@ -17,21 +17,32 @@ import {
   MENU_BUTTON_SIZE,
 } from "@/components/GameRadialMenu"
 import {
+  COMPACT_LIFE_GLYPH_LINE_HEIGHT,
+  COMPACT_LIFE_TARGET_SIZE,
+  LIFE_GLYPH_LINE_HEIGHT,
+  LIFE_TARGET_SIZE,
+} from "@/components/playerCardTypes"
+import {
+  getCellSize,
+  getLifeFontSize,
   getPlayerGridFacings,
   getPlayerGridMenuAnchor,
   type PlayerGridLayoutVariant,
   type PlayerGridProps,
 } from "@/components/PlayerGrid"
 import {
+  boardInsetsFor,
   getMenuSeamNeighbors,
   getPlayerGridRows,
   getPlayerSlotFacings,
+  seatFrames,
 } from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
-import { teamChipCrowded } from "@/components/teamGridGeometry"
+import { teamChipCrowded, teamPanelCompact } from "@/components/teamGridGeometry"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
+import { spacing } from "@/theme/spacing"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import {
@@ -58,7 +69,7 @@ export interface GameBoardStageProps {
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   roundClock?: BoardRoundClock
-  contextLabel?: Omit<BoardContextLabelsProps, "placements">
+  contextLabel?: Omit<BoardContextLabelsProps, "placements"> & { benchSeats?: boolean }
   turns?: BoardTurns
   seam?: (geometry: BoardSeamGeometry) => ReactNode
   windowOverlay?: ReactNode
@@ -154,17 +165,6 @@ function PinnedGameBoardStage({
     [playerCount, gridLayout],
   )
   const tabs = useMemo(() => edgeTabs(boardAnchor, gridFacings), [boardAnchor, gridFacings])
-  const labelInsets = pinned ? metrics.insets : safeArea
-  const labelPlacements = useMemo(
-    () =>
-      contextLabelPlacements({
-        facings: gridFacings,
-        size: { width, height },
-        insets: labelInsets,
-        compact: gridLayout.compact,
-      }),
-    [gridFacings, width, height, labelInsets, gridLayout.compact],
-  )
   const facings = useMemo(
     () => getPlayerSlotFacings(playerCount, gridLayout),
     [playerCount, gridLayout],
@@ -190,6 +190,18 @@ function PinnedGameBoardStage({
     [pinned, width, height, fontScale, metrics.insets, holderAngle],
   )
   const tabsShown = !!roundClock && !menu.open
+  const { benchSeats, ...label } = contextLabel ?? {}
+  const labelPlacements = useLabelPlacements({
+    playerCount,
+    teamBoard,
+    gridLayout,
+    width,
+    height,
+    fontScale,
+    insets: pinned ? metrics.insets : safeArea,
+    tabsShown,
+    benchSeats,
+  })
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
   const [naming, setNaming] = useState(false)
   // why: a counter name panel covers the middle of the table, and these draw above the grid.
@@ -235,7 +247,7 @@ function PinnedGameBoardStage({
             ) : null}
             {tabsShown && overlays ? <BoardTabs roundClock={roundClock} tabs={tabs} /> : null}
             {contextLabel && !menu.open && overlays ? (
-              <BoardContextLabels {...contextLabel} placements={labelPlacements} />
+              <BoardContextLabels {...label} placements={labelPlacements} />
             ) : null}
           </View>
         </TurnedBoardContext.Provider>
@@ -295,22 +307,27 @@ function LegacyGameBoardStage({
     () => edgeTabs(boardAnchor, gridFacings, rotation),
     [boardAnchor, gridFacings, rotation],
   )
-  const labelPlacements = useMemo(
-    () =>
-      contextLabelPlacements({
-        facings: gridFacings,
-        rotation,
-        size: { width: screenWidth, height: screenHeight },
-        insets: safeArea,
-        compact: gridLayout.compact,
-      }),
-    [gridFacings, rotation, screenWidth, screenHeight, safeArea, gridLayout.compact],
-  )
   const facings = useMemo(
     () => getPlayerSlotFacings(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
   const tabsShown = !!roundClock && !menu.open
+  const { benchSeats, ...label } = contextLabel ?? {}
+  const labelPlacements = useLabelPlacements({
+    playerCount,
+    teamBoard,
+    gridLayout,
+    width,
+    height,
+    screenWidth,
+    screenHeight,
+    rotation,
+    topEdgeBand: rotation === 0 ? topEdgeBand : 0,
+    fontScale,
+    insets: useMemo(() => boardInsetsFor(safeArea, rotation), [safeArea, rotation]),
+    tabsShown,
+    benchSeats,
+  })
   const spotlight = useSpotlight(turns, playerCount, gridLayout)
   const [naming, setNaming] = useState(false)
   // why: a counter name panel covers the middle of the table, and these draw above the grid.
@@ -352,7 +369,7 @@ function LegacyGameBoardStage({
       ) : null}
       {tabsShown && overlays ? <BoardTabs roundClock={roundClock} tabs={tabs} /> : null}
       {contextLabel && !menu.open && overlays ? (
-        <BoardContextLabels {...contextLabel} placements={labelPlacements} />
+        <BoardContextLabels {...label} placements={labelPlacements} />
       ) : null}
       {toast ? (
         <BoardToastSlot anchor={menuAnchor} hidden={menu.open || !overlays}>
@@ -362,6 +379,87 @@ function LegacyGameBoardStage({
       {windowOverlay}
     </Animated.View>
   )
+}
+
+/** why: the label is placed from the same seat frames the grid draws, so it follows each seat's insets, tabs, and menu corner. */
+function useLabelPlacements({
+  playerCount,
+  teamBoard,
+  gridLayout,
+  width,
+  height,
+  screenWidth = width,
+  screenHeight = height,
+  rotation = 0,
+  topEdgeBand = 0,
+  fontScale,
+  insets,
+  tabsShown,
+  benchSeats,
+}: {
+  playerCount: number
+  teamBoard?: boolean
+  gridLayout: Parameters<typeof seatFrames>[0]["layout"]
+  width: number
+  height: number
+  screenWidth?: number
+  screenHeight?: number
+  rotation?: number
+  topEdgeBand?: number
+  fontScale: number
+  insets: Parameters<typeof seatFrames>[0]["insets"]
+  tabsShown: boolean
+  benchSeats?: boolean
+}) {
+  return useMemo(() => {
+    const board = { width, height }
+    const { rows } = seatFrames({
+      playerCount,
+      layout: gridLayout,
+      boardSize: board,
+      measuredGrid: board,
+      topEdgeBand,
+      gap: spacing.xxs,
+      insets,
+      tabsShown,
+    })
+    const compact = teamBoard ? teamPanelCompact(gridLayout, playerCount) : gridLayout.compact
+    const glyphLine = compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT
+    return contextLabelPlacements({
+      rows,
+      board,
+      screen: { width: screenWidth, height: screenHeight },
+      rotation,
+      compact,
+      benchSeats,
+      // why: two digits are the largest total the grid draws, sized the way PlayerGrid sizes it.
+      lifeFontSize: getLifeFontSize({
+        ...getCellSize({
+          board: { width, height: height - topEdgeBand },
+          layout: gridLayout,
+          gap: spacing.xxs,
+        }),
+        digits: 2,
+        fontScale,
+        targetSize: compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
+        sidewaysGlyphReserve: 2 * (glyphLine + spacing.xs),
+      }),
+    })
+  }, [
+    playerCount,
+    teamBoard,
+    gridLayout,
+    width,
+    height,
+    screenWidth,
+    screenHeight,
+    rotation,
+    topEdgeBand,
+    fontScale,
+    insets,
+    tabsShown,
+    benchSeats,
+  ])
 }
 
 function useSpotlight(
