@@ -291,7 +291,17 @@
       "ko": "{{n}}판 승부 (label: 최대 게임 수; short Bo{{n}})"
     },
     "win / loss / draw, and their badges": {
-      "en": ["win", "won", "loss", "draw", "lost", "drew"],
+      "en": [
+        "win",
+        "won",
+        "loss",
+        "draw",
+        "drew",
+        "you lost",
+        "lost the last game",
+        "winner",
+        "drawn"
+      ],
       "es": "Victoria / Derrota / Empate; one-letter badges V / D / E",
       "fr": "Victoire / Défaite. Draw: Égalité for one game; match nul for a whole match. Badges V / D / É",
       "hi": "जीत / हार / ड्रॉ (winner: विजेता); badges: W / L / D, in Latin script",
@@ -299,7 +309,7 @@
       "ko": "승리 / 패배 / 무승부; badges 승 / 패 / 무"
     },
     "coin flip, heads / tails": {
-      "en": ["heads", "tails", "flip"],
+      "en": ["heads", "tails", "flip", "flipping"],
       "es": "cara / cruz; flip: lanzar moneda (ganó el lanzamiento)",
       "fr": "Pile ou face (the flip). Face / Pile (heads = Face, tails = Pile)",
       "hi": "टॉस; टॉस जीता; heads / tails: चित / पट",
