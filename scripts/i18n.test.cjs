@@ -10,6 +10,10 @@ const {
   translationUnits,
   requiredKeys,
   staleUnits,
+  editedUnits,
+  lockEntry,
+  glossaryProblems,
+  glossaryText,
   orphanKeys,
   validateUnit,
   englishProblems,
@@ -25,8 +29,28 @@ const namespace = {
 }
 const english = flatten(namespace)
 const units = translationUnits(english)
-const lockFor = (entries) =>
-  Object.fromEntries([...entries.values()].map((unit) => [unit.id, unit.hash]))
+const locales = ["es", "fr", "hi", "ja", "ko"]
+const glossaryWith = (seatTerms = {}) => ({
+  rules: Object.fromEntries(locales.map((locale) => [locale, ["Keep it short."]])),
+  terms: {
+    seat: {
+      en: ["seat"],
+      ...Object.fromEntries(locales.map((l) => [l, `seat-${l}`])),
+      ...seatTerms,
+    },
+  },
+})
+const glossary = glossaryWith({ ja: "席" })
+const jaComplete = {
+  "back": "戻る",
+  "seats.waiting_other": "あと{{count}}人",
+  "seatNumber": "席{{seat}}",
+}
+const lockFor = (entries, localeFlat, locale = "ja", terms = glossary) =>
+  Object.fromEntries(
+    [...entries.values()].map((unit) => [unit.id, lockEntry(unit, localeFlat, locale, terms)]),
+  )
+const ids = (list) => list.map((unit) => unit.id)
 
 test("round-trips nested namespaces through dotted key paths", () => {
   assert.equal(english["seats.waiting_one"], "Waiting for {{count}} more player")
@@ -45,25 +69,74 @@ test("asks each locale for its own plural categories", () => {
 })
 
 test("marks units stale when English changes or the locale lacks a key", () => {
-  const lock = lockFor(units)
-  const complete = {
-    "back": "戻る",
-    "seats.waiting_other": "あと{{count}}人",
-    "seatNumber": "席{{seat}}",
-  }
-  assert.deepEqual(staleUnits({ units, lock, localeFlat: complete, locale: "ja" }), [])
+  const lock = lockFor(units, jaComplete)
+  const state = { units, lock, localeFlat: jaComplete, locale: "ja", glossary }
+  assert.deepEqual(staleUnits(state), [])
 
   const edited = translationUnits({ ...english, back: "Go back" })
+  assert.deepEqual(ids(staleUnits({ ...state, units: edited })), ["back"])
+
+  const { seatNumber: _, ...missingSeat } = jaComplete
+  assert.deepEqual(ids(staleUnits({ ...state, localeFlat: missingSeat })), ["seatNumber"])
+})
+
+test("a glossary edit retranslates only the strings that mention it, in that language", () => {
+  const state = { units, lock: lockFor(units, jaComplete), localeFlat: jaComplete, locale: "ja" }
+  assert.deepEqual(ids(staleUnits({ ...state, glossary: glossaryWith({ ja: "座席" }) })), [
+    "seatNumber",
+  ])
   assert.deepEqual(
-    staleUnits({ units: edited, lock, localeFlat: complete, locale: "ja" }).map((unit) => unit.id),
-    ["back"],
+    ids(staleUnits({ ...state, glossary: glossaryWith({ ja: "席", ko: "좌석" }) })),
+    [],
   )
 
-  const { seatNumber: _, ...missingSeat } = complete
-  assert.deepEqual(
-    staleUnits({ units, lock, localeFlat: missingSeat, locale: "ja" }).map((unit) => unit.id),
-    ["seatNumber"],
-  )
+  const rules = { ...glossary, rules: { ...glossary.rules, ja: ["Use です/ます."] } }
+  assert.equal(staleUnits({ ...state, glossary: rules }).length, units.size)
+})
+
+test("catches a hand edit to a generated translation until English or the glossary changes", () => {
+  const lock = lockFor(units, jaComplete)
+  const handEdited = { ...jaComplete, back: "もどる" }
+  const state = { units, lock, localeFlat: handEdited, locale: "ja", glossary }
+  assert.deepEqual(ids(editedUnits(state)), ["back"])
+  assert.deepEqual(staleUnits(state), [])
+
+  const newEnglish = translationUnits({ ...english, back: "Go back" })
+  assert.deepEqual(editedUnits({ ...state, units: newEnglish }), [])
+  assert.deepEqual(ids(staleUnits({ ...state, units: newEnglish })), ["back"])
+})
+
+test("needs every concept to name English the copy uses and a term in every language", () => {
+  const entries = [...units.values()]
+  assert.deepEqual(glossaryProblems(glossary, entries, locales), [])
+
+  const { ko: _, ...noKorean } = glossary.terms.seat
+  const broken = {
+    rules: { ...glossary.rules, hi: [] },
+    terms: {
+      seat: { ...noKorean, en: ["seat", "chair"], ar: "مقعد" },
+      bench: { ...glossary.terms.seat, en: [] },
+    },
+  }
+  assert.deepEqual(glossaryProblems(broken, entries, locales), [
+    "glossary: rules has nothing for hi",
+    'glossary: "seat" lists "chair", which no English string uses',
+    'glossary: "seat" has no ko term',
+    'glossary: "seat" has ar, which is not a translated language',
+    'glossary: "bench" lists no English words in en',
+  ])
+})
+
+test("sends the translator only the glossary terms its strings mention", () => {
+  const prompt = (keys) =>
+    glossaryText(
+      "ja",
+      keys.map((key) => units.get(key)),
+      glossary,
+    )
+  assert.match(prompt(["seatNumber"]), /- seat: 席/)
+  assert.doesNotMatch(prompt(["back"]), /Glossary/)
+  assert.match(prompt(["back"]), /Rules for ja:\n- Keep it short\./)
 })
 
 test("flags keys English no longer has, including plural forms the locale does not use", () => {
@@ -212,8 +285,9 @@ test("sends comments above English keys as notes, and a changed note retranslate
   const before = translationUnits(flat)
   const after = translationUnits(flat, notes)
   assert.equal(after.get("prizes.taken").note, "Pokémon only. Prize cards the player has taken.")
-  assert.notEqual(after.get("prizes.taken").hash, before.get("prizes.taken").hash)
-  assert.equal(after.get("back").hash, before.get("back").hash)
+  const sourceOf = (entries, key) => lockEntry(entries.get(key), {}, "ja", glossary).split(".")[0]
+  assert.notEqual(sourceOf(after, "prizes.taken"), sourceOf(before, "prizes.taken"))
+  assert.equal(sourceOf(after, "back"), sourceOf(before, "back"))
 })
 
 test("rejects Latin words left in Japanese, Korean, and Hindi, and unmatched quotes", () => {

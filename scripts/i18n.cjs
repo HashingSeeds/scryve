@@ -35,7 +35,7 @@ const LATIN_INSIDE_WORD =
 const LOWERCASE_LATIN_ALLOWED = new Set(["v", "vs", "to"])
 
 const GENERATED_HEADER =
-  "// why: `pnpm i18n:translate` overwrites this file. Edit English in src/i18n/en.\n"
+  "// why: `pnpm i18n:translate` overwrites this file. Fix wording in src/i18n/en or src/i18n/glossary.json.\n"
 
 const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana, Flesh and Blood, Riftbound).
 
@@ -150,11 +150,66 @@ function translationUnits(englishFlat, notes = {}) {
     if (Object.hasOwn(notes, key)) unit.notes.add(notes[key])
     units.set(id, unit)
   }
-  for (const unit of units.values()) {
-    unit.note = [...unit.notes].join(" ") || undefined
-    unit.hash = hashText(JSON.stringify(unit.note ? [unit.english, unit.note] : unit.english))
-  }
+  for (const unit of units.values()) unit.note = [...unit.notes].join(" ") || undefined
   return units
+}
+
+const wordPatterns = new Map()
+
+function mentions(text, word) {
+  if (!wordPatterns.has(word)) {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    wordPatterns.set(word, new RegExp(`(?<![\\p{L}\\p{N}])${escaped}`, "iu"))
+  }
+  return wordPatterns.get(word).test(text)
+}
+
+function unitText(unit) {
+  return [...Object.values(unit.english), unit.note ?? ""].join("\n")
+}
+
+function unitConcepts(unit, glossary) {
+  const text = unitText(unit)
+  return Object.keys(glossary.terms).filter((concept) =>
+    glossary.terms[concept].en.some((word) => mentions(text, word)),
+  )
+}
+
+function glossaryProblems(glossary, units, locales = Object.keys(LOCALES)) {
+  const texts = units.map(unitText)
+  const problems = []
+  for (const locale of locales)
+    if (!glossary.rules?.[locale]?.length)
+      problems.push(`glossary: rules has nothing for ${locale}`)
+  for (const [concept, term] of Object.entries(glossary.terms ?? {})) {
+    if (!term.en?.length) problems.push(`glossary: "${concept}" lists no English words in en`)
+    for (const word of term.en ?? [])
+      if (!texts.some((text) => mentions(text, word)))
+        problems.push(`glossary: "${concept}" lists "${word}", which no English string uses`)
+    for (const locale of locales)
+      if (typeof term[locale] !== "string" || !term[locale].trim())
+        problems.push(`glossary: "${concept}" has no ${locale} term`)
+    for (const key of Object.keys(term))
+      if (key !== "en" && !locales.includes(key))
+        problems.push(`glossary: "${concept}" has ${key}, which is not a translated language`)
+  }
+  return problems
+}
+
+function sourceHash(unit, locale, glossary) {
+  const terms = unitConcepts(unit, glossary).map((concept) => [
+    concept,
+    glossary.terms[concept][locale],
+  ])
+  return hashText(JSON.stringify([unit.english, unit.note, glossary.rules[locale], terms]))
+}
+
+function translationHash(unit, localeFlat, locale) {
+  return hashText(JSON.stringify(requiredKeys(unit, locale).map((key) => localeFlat[key])))
+}
+
+function lockEntry(unit, localeFlat, locale, glossary) {
+  return `${sourceHash(unit, locale, glossary)}.${translationHash(unit, localeFlat, locale)}`
 }
 
 function namespaceUnits(english, namespace) {
@@ -171,10 +226,22 @@ function requiredKeys(unit, locale) {
   return pluralCategories(locale).map((category) => `${unit.id}_${category}`)
 }
 
-function staleUnits({ units, lock, localeFlat, locale }) {
+function staleUnits({ units, lock, localeFlat, locale, glossary }) {
   return [...units.values()].filter(
-    (unit) => lock[unit.id] !== unit.hash || validateUnit(unit, localeFlat, locale).length > 0,
+    (unit) =>
+      lock[unit.id]?.split(".")[0] !== sourceHash(unit, locale, glossary) ||
+      validateUnit(unit, localeFlat, locale).length > 0,
   )
+}
+
+function editedUnits({ units, lock, localeFlat, locale, glossary }) {
+  return [...units.values()].filter((unit) => {
+    const [source, translation] = lock[unit.id]?.split(".") ?? []
+    return (
+      source === sourceHash(unit, locale, glossary) &&
+      translation !== translationHash(unit, localeFlat, locale)
+    )
+  })
 }
 
 function orphanKeys({ units, localeFlat, locale }) {
@@ -298,8 +365,12 @@ function namespacePath(locale, namespace) {
   return path.join(I18N_DIR, locale, `${namespace}.ts`)
 }
 
-function lockPath(namespace) {
-  return path.join(LOCKS_DIR, `${namespace}.json`)
+function lockPath(locale, namespace) {
+  return path.join(LOCKS_DIR, locale, `${namespace}.json`)
+}
+
+function loadGlossary() {
+  return readJson(GLOSSARY_PATH, { rules: {}, terms: {} })
 }
 
 function readJson(file, fallback) {
@@ -367,22 +438,43 @@ async function check() {
       problems.push(`${path.relative(ROOT, file)}: out of date`)
   }
 
-  for (const namespace of namespaces) {
+  const glossary = loadGlossary()
+  const unitsByNamespace = new Map(
+    namespaces.map((namespace) => [namespace, namespaceUnits(english, namespace)]),
+  )
+  const glossaryIssues = glossaryProblems(
+    glossary,
+    [...unitsByNamespace.values()].flatMap((units) => [...units.values()]),
+  )
+  if (glossaryIssues.length) {
+    console.error(glossaryIssues.join("\n"))
+    console.error(
+      `\n${glossaryIssues.length} glossary problem(s). Every concept in src/i18n/glossary.json needs English words that appear in the copy and a term for every language.`,
+    )
+    process.exitCode = 1
+    return
+  }
+
+  for (const [namespace, units] of unitsByNamespace) {
     const englishFlat = flatten(english[namespace])
     for (const key of prototypeKeys(englishFlat))
       problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
     for (const [key, text] of Object.entries(englishFlat))
       for (const problem of englishProblems(key, text)) problems.push(`en/${namespace}: ${problem}`)
-    const units = namespaceUnits(english, namespace)
-    const lock = readJson(lockPath(namespace), {})
     for (const locale of Object.keys(LOCALES)) {
+      const lock = readJson(lockPath(locale, namespace), {})
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
-      for (const unit of staleUnits({ units, lock, localeFlat, locale })) {
-        if (lock[unit.id] !== unit.hash)
+      const state = { units, lock, localeFlat, locale, glossary }
+      for (const unit of staleUnits(state)) {
+        if (lock[unit.id]?.split(".")[0] !== sourceHash(unit, locale, glossary))
           problems.push(`${locale}/${namespace}: ${unit.id} needs translation`)
         for (const problem of validateUnit(unit, localeFlat, locale))
           problems.push(`${locale}/${namespace}: ${problem}`)
       }
+      for (const unit of editedUnits(state))
+        problems.push(
+          `${locale}/${namespace}: ${unit.id} was edited by hand, and the next translate overwrites it. Put the fix in src/i18n/glossary.json or a note above the English key.`,
+        )
       for (const key of orphanKeys({ units, localeFlat, locale }))
         problems.push(`${locale}/${namespace}: ${key} no longer exists in English`)
     }
@@ -448,21 +540,25 @@ function usageSummary() {
   return `${usage.input} input + ${usage.output} output tokens, about $${cost.toFixed(2)}`
 }
 
-function glossaryText(locale) {
-  const { rules, terms } = readJson(GLOSSARY_PATH, {})[locale]
+function glossaryText(locale, units, glossary) {
+  const concepts = new Set(units.flatMap((unit) => unitConcepts(unit, glossary)))
   return [
-    `Rules for ${locale}:\n${rules.map((rule) => `- ${rule}`).join("\n")}`,
-    `Glossary for ${locale}:\n${Object.entries(terms)
-      .map(([concept, term]) => `- ${concept}: ${term}`)
-      .join("\n")}`,
+    `Rules for ${locale}:\n${glossary.rules[locale].map((rule) => `- ${rule}`).join("\n")}`,
+    ...(concepts.size
+      ? [
+          `Glossary for ${locale}:\n${[...concepts]
+            .map((concept) => `- ${concept}: ${glossary.terms[concept][locale]}`)
+            .join("\n")}`,
+        ]
+      : []),
   ].join("\n\n")
 }
 
-async function requestTranslations(client, { units, namespace, locale, feedback }) {
+async function requestTranslations(client, { units, namespace, locale, glossary, feedback }) {
   const payload = requestPayload(units, namespace, locale)
   const request = [
     `Translate into ${LOCALES[locale]} (${locale}).`,
-    glossaryText(locale),
+    glossaryText(locale, units, glossary),
     JSON.stringify(payload.entries),
     ...(feedback.length
       ? [`Your previous answer had problems; fix them:\n${feedback.join("\n")}`]
@@ -497,10 +593,16 @@ async function requestTranslations(client, { units, namespace, locale, feedback 
   )
 }
 
-async function translateUnits(client, { units, namespace, locale }) {
+async function translateUnits(client, { units, namespace, locale, glossary }) {
   let feedback = []
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const translated = await requestTranslations(client, { units, namespace, locale, feedback })
+    const translated = await requestTranslations(client, {
+      units,
+      namespace,
+      locale,
+      glossary,
+      feedback,
+    })
     feedback = units.flatMap((unit) => validateUnit(unit, translated, locale))
     if (feedback.length === 0) return translated
   }
@@ -528,37 +630,56 @@ async function translate({ onlyNamespace, retranslate }) {
   if (onlyNamespace && !namespaces.includes(onlyNamespace))
     throw new Error(`Unknown namespace "${onlyNamespace}". Known: ${namespaces.join(", ")}`)
 
+  const glossary = loadGlossary()
+  const unitsByNamespace = new Map(
+    namespaces.map((namespace) => [namespace, namespaceUnits(english, namespace)]),
+  )
+  const glossaryIssues = glossaryProblems(
+    glossary,
+    [...unitsByNamespace.values()].flatMap((units) => [...units.values()]),
+  )
+  if (glossaryIssues.length)
+    throw new Error(`Fix the glossary first:\n${glossaryIssues.join("\n")}`)
+
   for (const [file, source] of scaffoldFiles(namespaces)) await writeTs(file, source)
 
   for (const namespace of namespaces.filter((ns) => !onlyNamespace || ns === onlyNamespace)) {
-    const units = namespaceUnits(english, namespace)
-    const lock = readJson(lockPath(namespace), {})
+    const units = unitsByNamespace.get(namespace)
 
     await Promise.all(
       Object.keys(LOCALES).map(async (locale) => {
         const file = namespacePath(locale, namespace)
+        const lock = readJson(lockPath(locale, namespace), {})
         const localeFlat = flatten(loadTs(file) ?? {})
-        const outdated = new Set(staleUnits({ units, lock, localeFlat, locale }))
+        const state = { units, lock, localeFlat, locale, glossary }
+        const edited = new Set(editedUnits(state))
+        const outdated = new Set(staleUnits(state))
+        for (const unit of edited)
+          console.warn(
+            `${locale}/${namespace}: ${unit.id} was edited by hand; retranslating it. Put the fix in src/i18n/glossary.json or a note above the English key.`,
+          )
         const stale = [...units.values()].filter(
           (unit) =>
             outdated.has(unit) ||
+            edited.has(unit) ||
             Object.values(unit.english).some((text) => retranslate?.test(text)),
         )
         for (const batch of chunk(stale, UNITS_PER_REQUEST)) {
           Object.assign(
             localeFlat,
-            await translateUnits(client, { units: batch, namespace, locale }),
+            await translateUnits(client, { units: batch, namespace, locale, glossary }),
           )
         }
         const ordered = orderLikeEnglish(units, localeFlat, locale)
         await writeTs(file, namespaceSource(unflatten(ordered)))
+        const nextLock = Object.fromEntries(
+          [...units.values()].map((unit) => [unit.id, lockEntry(unit, ordered, locale, glossary)]),
+        )
+        fs.mkdirSync(path.dirname(lockPath(locale, namespace)), { recursive: true })
+        fs.writeFileSync(lockPath(locale, namespace), `${JSON.stringify(nextLock, null, 2)}\n`)
         if (stale.length) console.log(`${locale}/${namespace}: translated ${stale.length} key(s)`)
       }),
     )
-
-    const nextLock = Object.fromEntries([...units.values()].map((unit) => [unit.id, unit.hash]))
-    fs.mkdirSync(LOCKS_DIR, { recursive: true })
-    fs.writeFileSync(lockPath(namespace), `${JSON.stringify(nextLock, null, 2)}\n`)
   }
   console.log(`Used ${usageSummary()}.`)
 }
@@ -590,6 +711,10 @@ module.exports = {
   translationUnits,
   requiredKeys,
   staleUnits,
+  editedUnits,
+  lockEntry,
+  glossaryProblems,
+  glossaryText,
   orphanKeys,
   validateUnit,
   englishProblems,

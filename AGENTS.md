@@ -86,6 +86,7 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 - Every number, date, clock, and list a person reads goes through `src/i18n/format.ts`, or through a translation, which formats each `{{value}}` for you. Lint points at the helper when you reach for `toLocaleString`, `Intl`, `.join(" · ")`, or a hand-built sign.
 - Numbers in copy come from placeholders: `{{count}}`, `{{delta, signed}}`, `{{share, percent}}`, `{{cards, orMore}}`. `pnpm i18n:check` fails on a dropped placeholder, and on a digit the English lacks in a language whose region writes its own digits.
 - Text that gets saved (a note, a default name) uses `translateForStorage`, so it carries no direction marks or native digits into data.
+- Translations in `src/i18n/<language>` are generated, so fix wording at its source: a term in `src/i18n/glossary.json` (one entry per concept, listing the English words it covers and a term for every language), a language-wide rule under `rules`, or a note above the English key. `pnpm i18n:translate` retranslates only the strings each change touches. `pnpm i18n:check` fails on a hand edit, on a concept missing a language, and on a concept whose English words the copy never uses.
 - `EXPO_PUBLIC_LOCALE=en-XA` brackets every translated string and draws formatted digits as Arabic-Indic. On screen, unbracketed text skipped i18n and an ASCII digit skipped the formatter.
 
 ## Comments
