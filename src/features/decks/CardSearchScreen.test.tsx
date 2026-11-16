@@ -791,7 +791,6 @@ describe("with the device's Magic card file", () => {
   it("suggests how to finish a term while the player types it", async () => {
     const { view } = await searchFor("")
     const input = view.getByTestId("card-search-input")
-    fireEvent(input, "focus")
     fireEvent.changeText(input, "f:modern t:dra")
     fireEvent.press(view.getByLabelText("Dragon, t:dragon"))
     expect(input.props.value).toBe("f:modern t:dragon ")

@@ -289,13 +289,12 @@ export function CardSearch({
   const colorFilters = parsed.colors
   const colorMatch = parsed.colorMatch ?? colorMatchPick
   const text = parsed.rest.trim()
-  const [typing, setTyping] = useState(false)
-  const suggestions =
-    filtersCards && typing
-      ? querySuggestions(query, cardFilters, (id) =>
-          magicCards ? cardOptions(magicCards.cards, id, picked.format ?? []) : [],
-        )
-      : []
+  // why: suggestions follow the bar's unfinished last word, not its focus, since clicking one on web blurs the bar first.
+  const suggestions = filtersCards
+    ? querySuggestions(query, cardFilters, (id) =>
+        magicCards ? cardOptions(magicCards.cards, id, picked.format ?? []) : [],
+      )
+    : []
   const nameIndex = useCardNameIndex(game, deviceId, scanning || text.length > 0)
   /** why: the sheet edits the search bar's text, which holds every filter. */
   function changeQuery(change: Partial<CardQuery>, match = colorMatch) {
@@ -775,8 +774,6 @@ export function CardSearch({
               containerStyle={$queryField}
               inputWrapperStyle={$queryWrapper}
               RightAccessory={busy ? SearchBusy : undefined}
-              onFocus={() => setTyping(true)}
-              onBlur={() => setTyping(false)}
             />
             {CAN_READ_CARDS &&
             prereleaseBuild() &&
