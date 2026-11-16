@@ -100,16 +100,17 @@ test("colors each term by its sheet section, and keeps the text whole", () => {
     'f:commander  id<=wur (t:creature or t:elf) mv>3 -kw:"first strike" o:draw bolt t:sol'
   const spans = querySpans(SCRYFALL_SOURCE, text, MAGIC_CARD_FILTERS, optionsFor, true)
   expect(spans.map((span) => span.text).join("")).toBe(text)
-  const words = spans.filter((span) => !span.key && span.text.trim())
+  const words = spans.filter((span) => !span.joiner && span.text.trim())
   expect(words.map(({ text, section }) => [text, section])).toEqual([
-    ["commander", "format"],
-    ["wur", "colors"],
-    ["creature", "type"],
-    ["elf", "subtype"],
-    ["3", "manaValue"],
-    ['"first strike"', "keyword"],
-    ["draw", "syntax"],
+    ["f:commander", "format"],
+    ["id<=wur", "colors"],
+    ["t:creature", "type"],
+    ["t:elf", "subtype"],
+    ["mv>3", "manaValue"],
+    ['-kw:"first strike"', "keyword"],
+    ["o:draw", "syntax"],
     ["bolt", undefined],
     ["t:sol", undefined],
   ])
+  expect(spans.filter((span) => span.joiner).map(({ text }) => text)).toEqual(["(", "or", ")"])
 })

@@ -82,6 +82,7 @@ export const colors = {
     "#9C3F73",
     "#4652A8",
   ],
+  searchSectionFill: palette.neutral200,
   gameMenu: {
     signal: {
       slow: "#E8C1B4",

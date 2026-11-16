@@ -105,6 +105,7 @@ export function CardFilterGroup({
           testID={`card-filter-${filter.id}-${option}`}
           label={optionLabel(option)}
           selected={picked.includes(option)}
+          color={picked.includes(option) ? color : undefined}
           onPress={() => onChange(toggleOption(picked, option))}
         />
       ))}

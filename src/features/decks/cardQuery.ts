@@ -204,10 +204,13 @@ export function querySuggestions(
   )
 }
 
-/** why: a part of the bar's text. `section` names the filter sheet section a term belongs to, `syntax` a term the sheet has no section for. */
-export type QuerySpan = { text: string; section?: string; key?: boolean }
+/**
+ * why: a part of the bar's text. `section` names the filter sheet section a term belongs to, `syntax`
+ * a term the sheet has no section for; `joiner` marks a group's brackets and `or`.
+ */
+export type QuerySpan = { text: string; section?: string; joiner?: boolean }
 
-const SPAN_TERM = /^(-?[a-z]+(?:>=|<=|!=|:|=|>|<))(.+)$/i
+const SPAN_TERM = /^-?[a-z]+(?:>=|<=|!=|:|=|>|<)./i
 
 /** why: the bar and the filter sheet color a section the same, so these are the sheet's sections in order. */
 export function querySections(filters: readonly CardFilterDefinition[]) {
@@ -248,19 +251,15 @@ export function querySpans(
     if (group) {
       const [, open = "", inner = "", close = ""] = group
       return [
-        { text: open, key: true },
+        { text: open, joiner: true },
         ...querySpans(source, inner, filters, cardOptionsFor).map((span) =>
-          /^or$/i.test(span.text) ? { text: span.text, key: true } : span,
+          /^or$/i.test(span.text) ? { text: span.text, joiner: true } : span,
         ),
-        ...(close ? [{ text: close, key: true }] : []),
+        ...(close ? [{ text: close, joiner: true }] : []),
       ]
     }
-    const [, key, value] = SPAN_TERM.exec(part) ?? []
-    if (!key || !value) return [{ text: part }]
-    const section = termSection(source, part, filters, cardOptionsFor)
-    return [
-      { text: key, section, key: true },
-      { text: value, section },
-    ]
+    return SPAN_TERM.test(part)
+      ? [{ text: part, section: termSection(source, part, filters, cardOptionsFor) }]
+      : [{ text: part }]
   })
 }

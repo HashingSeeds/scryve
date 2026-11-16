@@ -15,6 +15,7 @@ describe.each([
     (color) => {
       expect(contrastRatio(color, colors.field)).toBeGreaterThanOrEqual(4.5)
       expect(contrastRatio(color, colors.surface)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(color, colors.searchSectionFill)).toBeGreaterThanOrEqual(4.5)
     },
   )
 

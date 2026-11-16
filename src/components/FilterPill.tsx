@@ -25,11 +25,11 @@ export function FilterPill({
   selected?: boolean
   onPress: () => void
   removable?: boolean
-  /** why: an unselected pill can wear the color of the filter section it would add to. */
+  /** why: a filter section's color, which a selected pill wears on a neutral fill so the accent doesn't hide it. */
   color?: string
   testID?: string
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   return (
     <TouchableOpacity
       testID={testID}
@@ -37,14 +37,20 @@ export function FilterPill({
       accessibilityLabel={removable ? translate("decks:filters.remove", { label }) : label}
       accessibilityState={{ selected: Boolean(selected) }}
       activeOpacity={0.8}
-      style={[themed($chip), selected ? themed($chipSelected) : undefined]}
+      style={[
+        themed($chip),
+        selected &&
+          (color
+            ? { backgroundColor: theme.colors.searchSectionFill, borderColor: color }
+            : themed($chipSelected)),
+      ]}
       onPress={onPress}
     >
       <Text
         size="xxs"
         maxFontSizeMultiplier={PILL_MAX_FONT_SCALE}
         weight={selected ? "medium" : "normal"}
-        style={selected ? themed($chipSelectedText) : [themed($dimmedText), color && { color }]}
+        style={color ? { color } : selected ? themed($chipSelectedText) : themed($dimmedText)}
         text={removable ? label + REMOVE_MARK : label}
       />
     </TouchableOpacity>

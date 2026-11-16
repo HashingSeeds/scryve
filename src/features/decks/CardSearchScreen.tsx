@@ -845,11 +845,11 @@ export function CardSearch({
               : spans.map((span, index) => (
                   <Text
                     key={index}
-                    style={
-                      span.key
-                        ? { color: theme.colors.textDim }
-                        : sectionColor(span.section) && { color: sectionColor(span.section) }
-                    }
+                    style={{
+                      color:
+                        sectionColor(span.section) ??
+                        (span.joiner ? theme.colors.textDim : theme.colors.text),
+                    }}
                     text={span.text}
                   />
                 ))}
@@ -1134,6 +1134,7 @@ export function CardSearch({
                   testID={`card-color-${color}`}
                   label={colorLabel(color)}
                   selected={colorFilters.includes(color)}
+                  color={colorFilters.includes(color) ? sectionColor("colors") : undefined}
                   onPress={() => changeQuery({ colors: toggleColor(colorFilters, color) })}
                 />
               ))}
