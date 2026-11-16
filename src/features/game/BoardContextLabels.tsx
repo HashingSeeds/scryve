@@ -1,6 +1,10 @@
 import type { TextStyle, ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { View } from "react-native"
 
+import { BoardPressable } from "@/components/BoardPressable"
+import type { LifeCardContentRotation, LifeCardEdge } from "@/components/playerCardTypes"
+import { CONTENT_EDGES } from "@/components/playerGridGeometry"
+import { seatIdentityBottomGap, seatIdentityMetrics } from "@/components/SeatIdentity"
 import { Text } from "@/components/Text"
 import { separator } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
@@ -13,22 +17,55 @@ import { useRoundClockView } from "./useRoundClockView"
 
 const WARN_MS = 5 * 60_000
 
+const LINE_HEIGHT = 18
+const IDENTITY_CLEARANCE = 4
+const TURNS: readonly LifeCardContentRotation[] = [0, 90, 180, -90]
+
+export type ContextLabelPlacement = ReturnType<typeof contextLabelPlacements>[number]
+
+/** why: a line centred on the screen crossed the seam of a board drawn sideways and ran under a narrow seat's name and 1st chip, so each copy sits in one seat's own edge, just above that seat's identity row. `rotation` turns a board drawn sideways onto the screen. */
+export function contextLabelPlacements({
+  facings,
+  rotation = 0,
+  size,
+  insets,
+  compact,
+}: {
+  facings: readonly LifeCardContentRotation[]
+  rotation?: number
+  size: { width: number; height: number }
+  insets: Record<LifeCardEdge, number>
+  compact?: boolean
+}) {
+  const { edge, icon } = seatIdentityMetrics(compact)
+  return facings.map((facing) => {
+    const turn = TURNS[((((facing + rotation) / 90) % 4) + 4) % 4]
+    const side = CONTENT_EDGES[turn].bottom
+    const inset = insets[side]
+    const depth =
+      inset + seatIdentityBottomGap(edge, inset) + icon + IDENTITY_CLEARANCE + LINE_HEIGHT / 2
+    const sideways = side === "left" || side === "right"
+    const run = sideways ? size.height : size.width
+    const x = side === "left" ? depth : side === "right" ? size.width - depth : size.width / 2
+    const y = side === "top" ? depth : side === "bottom" ? size.height - depth : size.height / 2
+    return { left: x - run / 2, top: y - LINE_HEIGHT / 2, width: run, turn }
+  })
+}
+
 export interface BoardContextLabelsProps {
   match?: { line: string; accessibilityLabel: string }
   clock?: RoundClock
   system?: PlaySystemId
-  top: number
-  bottom: number
+  placements: readonly ContextLabelPlacement[]
   onClockPress?: () => void
 }
 
-/** why: the top copy is turned to face the player across the table, and the line ticks on its own so the seats never re-render with the clock. */
+/** why: each copy is turned to face the players on its side of the table, only the last is read out, and the line ticks on its own so the seats never re-render with the clock. */
 export function BoardContextLabels({
   match,
   clock,
   system,
-  top,
-  bottom,
+  placements,
   onClockPress,
 }: BoardContextLabelsProps) {
   const view = useRoundClockView(clock, system)
@@ -36,31 +73,28 @@ export function BoardContextLabels({
   const pointerEvents = onClockPress ? "box-none" : "none"
   return (
     <>
-      <View
-        pointerEvents={pointerEvents}
-        style={[$layer, { top: top + 4, transform: [{ rotate: "180deg" }] }]}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        aria-hidden
-      >
-        <ContextLine
-          testID="match-context-top"
-          hidden
-          match={match}
-          view={view}
-          paused={paused}
-          onPress={onClockPress}
-        />
-      </View>
-      <View pointerEvents={pointerEvents} style={[$layer, { bottom: bottom + 4 }]}>
-        <ContextLine
-          testID="match-context"
-          match={match}
-          view={view}
-          paused={paused}
-          onPress={onClockPress}
-        />
-      </View>
+      {placements.map(({ turn, ...frame }, index) => {
+        const hidden = index < placements.length - 1
+        return (
+          <View
+            key={turn}
+            pointerEvents={pointerEvents}
+            style={[$layer, frame, { transform: [{ rotate: `${turn}deg` }] }]}
+            accessibilityElementsHidden={hidden}
+            importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
+            aria-hidden={hidden}
+          >
+            <ContextLine
+              testID={hidden ? "match-context-top" : "match-context"}
+              hidden={hidden}
+              match={match}
+              view={view}
+              paused={paused}
+              onPress={onClockPress}
+            />
+          </View>
+        )
+      })}
     </>
   )
 }
@@ -110,7 +144,7 @@ function ContextLine({
   )
   if (!onPress) return line
   return (
-    <Pressable
+    <BoardPressable
       testID={`${testID}-button`}
       accessibilityRole="button"
       accessibilityHint={translate("board:clock.opensRoundClock")}
@@ -120,7 +154,7 @@ function ContextLine({
       onPress={onPress}
     >
       {line}
-    </Pressable>
+    </BoardPressable>
   )
 }
 
@@ -132,13 +166,14 @@ function clockLabel(view: RoundClockView, text: string, paused: boolean) {
   return text ? translate("board:clock.timeWith", { time: text }) : translate("board:clock.time")
 }
 
+// why: the line is anchored at its foot, so larger text grows away from the identity row.
 const $layer: ViewStyle = {
   position: "absolute",
-  left: 0,
-  right: 0,
+  height: LINE_HEIGHT,
   zIndex: 60,
   elevation: 60,
   alignItems: "center",
+  justifyContent: "flex-end",
 }
 const $text: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.board.text })
 const $line: ThemedStyle<TextStyle> = () => ({ opacity: 0.8 })

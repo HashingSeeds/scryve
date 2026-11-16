@@ -52,6 +52,8 @@ export interface HistoryMatchRef {
 export interface HistoryEntry {
   key: string
   source: HistorySource
+  /** why: a nearby game is saved as a local one, so the row names how it was played. */
+  nearby?: true
   routeId: string
   finishedAt: number
   status: "finished" | "abandoned"
@@ -75,8 +77,8 @@ const SOURCE_TX = {
   manual: "play:history.source.manual",
 } as const satisfies Record<HistorySource, TxKeyPath>
 
-export function sourceLabel(source: HistorySource) {
-  return translate(SOURCE_TX[source])
+export function sourceLabel({ source, nearby }: Pick<HistoryEntry, "source" | "nearby">) {
+  return translate(nearby ? "play:newGame.nearby" : SOURCE_TX[source])
 }
 
 function toHistoryOutcome(outcome: string | undefined): HistoryOutcome {
@@ -204,6 +206,10 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
   return {
     key: `local:${game.id}`,
     source: "local",
+    // why: only a nearby host saves its guests' seat passes, the same sign the server reads.
+    ...(game.seatPassHashes && Object.keys(game.seatPassHashes).length > 0
+      ? { nearby: true as const }
+      : {}),
     routeId: game.id,
     finishedAt: game.finishedAt,
     status: game.status,
@@ -344,6 +350,7 @@ function matchGroupEntry(publicId: string, games: HistoryEntry[]): HistoryEntry 
   return {
     key: matchGroupKey(publicId),
     source: latest.source,
+    ...(latest.nearby ? { nearby: latest.nearby } : {}),
     routeId: publicId,
     finishedAt: latest.finishedAt,
     status: "finished",

@@ -1,4 +1,5 @@
 import { CODE_ALPHABET } from "@/features/connected/identifiers"
+import { normalizeManualCode } from "@/features/connected/inviteLinks"
 
 const CODE_LENGTH = 6
 // why: Bonjour renames a clashing advert to "Name (2)", which must not hide the code.
@@ -20,3 +21,15 @@ export const nearbyServiceName = (name: string, code: string) => `${name} ${code
 export const nearbyGameCode = (serviceName: string) => CODE_SUFFIX.exec(serviceName)?.[1]
 
 export const nearbyGameHost = (serviceName: string) => serviceName.replace(CODE_SUFFIX, "")
+
+/** why: a test link names a game by its code, which sits at the end of the advertised name; the host name at its start still works. */
+export function findNearbyGame<Service extends { name: string }>(
+  games: readonly Service[],
+  wanted: string,
+) {
+  const code = normalizeManualCode(wanted)
+  return (
+    (code ? games.find((service) => nearbyGameCode(service.name) === code) : undefined) ??
+    games.find((service) => service.name.startsWith(wanted))
+  )
+}

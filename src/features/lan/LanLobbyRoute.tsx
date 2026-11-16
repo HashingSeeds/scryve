@@ -7,6 +7,7 @@ import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { lanSeatsReady, parseLanSetup, type LanSetup } from "@/features/lan/lanGame"
 import { lanSession, useLanSessionSlice, type LanSessionState } from "@/features/lan/lanSession"
+import { findNearbyGame } from "@/features/lan/nearbyCode"
 import { NearbyLobbyScreen } from "@/features/lan/NearbyLobbyScreen"
 import { useNearbyGames } from "@/features/lan/useNearbyGames"
 
@@ -70,8 +71,7 @@ function LanLobby() {
   }, [setup, access])
   const joining = useRef(false)
   useEffect(() => {
-    const target =
-      params.join && games.find((service) => service.name.startsWith(params.join ?? ""))
+    const target = params.join && findNearbyGame(games, params.join)
     if (!target || joining.current) return
     joining.current = true
     void lanSession.join(target)

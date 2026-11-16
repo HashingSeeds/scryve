@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Platform, TouchableOpacity, View } from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
@@ -14,7 +13,6 @@ import { useSheetPresence } from "@/components/useSheetPresence"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { swapCount, useMatchSideboard } from "@/features/decks/matchSideboard"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
-import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import type { AttackChange } from "@/features/game/commanderAttack"
 import {
   CLAIM_CHIP,
@@ -122,7 +120,6 @@ export function CurrentGameScreen({
   ownerId,
 }: CurrentGameScreenProps) {
   const { themed } = useAppTheme()
-  const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const { isFoil } = useRevenueCat()
   const system = runtime.game.system
@@ -546,6 +543,23 @@ export function CurrentGameScreen({
           chrome={chrome}
           onBoardSizeChange={setBoardSize}
           roundClock={clock && active ? { clock, system, onPress: openClock } : undefined}
+          contextLabel={
+            match
+              ? {
+                  match: matchLine
+                    ? {
+                        line: matchLine,
+                        accessibilityLabel: translate("board:match.contextLabel", {
+                          context: matchLine,
+                          bestOf: match.bestOf,
+                        }),
+                      }
+                    : undefined,
+                  system,
+                  onClockPress: clock && runtime.game.status === "active" ? openClock : undefined,
+                }
+              : undefined
+          }
           turns={
             turnChip ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf } : undefined
           }
@@ -611,25 +625,6 @@ export function CurrentGameScreen({
           )}
         />
       </LifeLogContext.Provider>
-      {match && !menuOpen ? (
-        <BoardContextLabels
-          match={
-            match && matchLine
-              ? {
-                  line: matchLine,
-                  accessibilityLabel: translate("board:match.contextLabel", {
-                    context: matchLine,
-                    bestOf: match.bestOf,
-                  }),
-                }
-              : undefined
-          }
-          system={system}
-          top={insets.top}
-          bottom={insets.bottom}
-          onClockPress={clock && runtime.game.status === "active" ? openClock : undefined}
-        />
-      ) : null}
 
       <ModesDialog modes={boardModes} />
       {clockOpen && clock ? (

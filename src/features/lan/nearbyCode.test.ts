@@ -1,4 +1,10 @@
-import { nearbyCodeFor, nearbyGameCode, nearbyGameHost, nearbyServiceName } from "./nearbyCode"
+import {
+  findNearbyGame,
+  nearbyCodeFor,
+  nearbyGameCode,
+  nearbyGameHost,
+  nearbyServiceName,
+} from "./nearbyCode"
 
 describe("nearby codes", () => {
   it("derives a stable invite-style code from the game id", () => {
@@ -17,5 +23,12 @@ describe("nearby codes", () => {
   it("finds no code in names from builds before codes", () => {
     expect(nearbyGameCode("Sam 3f9a")).toBeUndefined()
     expect(nearbyGameHost("Sam 3f9a")).toBe("Sam 3f9a")
+  })
+
+  it("finds the game a test link names by code or by host name", () => {
+    const games = [{ name: "Sam Fox AB23CD" }, { name: "Alex ZY98XW (2)" }]
+    expect(findNearbyGame(games, "zy98xw")).toBe(games[1])
+    expect(findNearbyGame(games, "Sam")).toBe(games[0])
+    expect(findNearbyGame(games, "QQ22QQ")).toBeUndefined()
   })
 })

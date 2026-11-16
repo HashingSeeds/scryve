@@ -7,6 +7,7 @@ import {
   groupMatchGames,
   localHistoryEntry,
   NO_FILTERS,
+  sourceLabel,
   type HistoryEntry,
   type ScryveMatchSummary,
 } from "./historyEntries"
@@ -46,6 +47,17 @@ describe("localHistoryEntry", () => {
     expect(
       localHistoryEntry(game({ account: { ownerId: "owner", mePlayerId: ada } })).outcome,
     ).toBe("win")
+  })
+
+  it("names a game saved with guest seat passes as nearby, alone or as a match", () => {
+    const nearby = localHistoryEntry(game({ seatPassHashes: { [grace]: "a".repeat(64) } }))
+    expect(sourceLabel(nearby)).toBe("Nearby")
+    expect(sourceLabel(localHistoryEntry(game()))).toBe("Local")
+    const match: LocalMatch = { id: "match_1", bestOf: 3, gameNumber: 1, wins: [0, 0], draws: 0 }
+    const [grouped] = groupMatchGames([
+      localHistoryEntry(game({ match, seatPassHashes: { [grace]: "a".repeat(64) } })),
+    ])
+    expect(sourceLabel(grouped)).toBe("Nearby")
   })
 
   it("keeps the table-level outcome for signed-out games only", () => {

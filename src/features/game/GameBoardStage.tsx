@@ -34,6 +34,11 @@ import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotl
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
+import {
+  BoardContextLabels,
+  contextLabelPlacements,
+  type BoardContextLabelsProps,
+} from "./BoardContextLabels"
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
 import type { PlaySystemId } from "./playSystems"
 import type { RoundClock } from "./roundClock"
@@ -53,6 +58,7 @@ export interface GameBoardStageProps {
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
   menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   roundClock?: BoardRoundClock
+  contextLabel?: Omit<BoardContextLabelsProps, "placements">
   turns?: BoardTurns
   seam?: (geometry: BoardSeamGeometry) => ReactNode
   windowOverlay?: ReactNode
@@ -104,6 +110,7 @@ function PinnedGameBoardStage({
   renderGrid,
   menu,
   roundClock,
+  contextLabel,
   turns,
   seam,
   windowOverlay,
@@ -142,9 +149,21 @@ function PinnedGameBoardStage({
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
-  const tabs = useMemo(
-    () => edgeTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout)),
-    [boardAnchor, playerCount, gridLayout],
+  const gridFacings = useMemo(
+    () => getPlayerGridFacings(playerCount, gridLayout),
+    [playerCount, gridLayout],
+  )
+  const tabs = useMemo(() => edgeTabs(boardAnchor, gridFacings), [boardAnchor, gridFacings])
+  const labelInsets = pinned ? metrics.insets : safeArea
+  const labelPlacements = useMemo(
+    () =>
+      contextLabelPlacements({
+        facings: gridFacings,
+        size: { width, height },
+        insets: labelInsets,
+        compact: gridLayout.compact,
+      }),
+    [gridFacings, width, height, labelInsets, gridLayout.compact],
   )
   const facings = useMemo(
     () => getPlayerSlotFacings(playerCount, gridLayout),
@@ -215,6 +234,9 @@ function PinnedGameBoardStage({
               />
             ) : null}
             {tabsShown && overlays ? <BoardTabs roundClock={roundClock} tabs={tabs} /> : null}
+            {contextLabel && !menu.open && overlays ? (
+              <BoardContextLabels {...contextLabel} placements={labelPlacements} />
+            ) : null}
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
@@ -235,6 +257,7 @@ function LegacyGameBoardStage({
   renderGrid,
   menu,
   roundClock,
+  contextLabel,
   turns,
   seam,
   windowOverlay,
@@ -243,7 +266,8 @@ function LegacyGameBoardStage({
   testID = "game-board",
 }: GameBoardStageProps) {
   const boardOrientation = useGameBoardOrientation()
-  const { width, height, fontScale, rotation } = boardOrientation
+  const { width, height, screenWidth, screenHeight, fontScale, rotation } = boardOrientation
+  const safeArea = useSafeAreaInsets()
   const gridLayout = usePlayerGridLayout({
     playerCount,
     width,
@@ -263,9 +287,24 @@ function LegacyGameBoardStage({
     () => rotateGameBoardAnchor(boardAnchor, rotation),
     [boardAnchor, rotation],
   )
+  const gridFacings = useMemo(
+    () => getPlayerGridFacings(playerCount, gridLayout),
+    [playerCount, gridLayout],
+  )
   const tabs = useMemo(
-    () => edgeTabs(boardAnchor, getPlayerGridFacings(playerCount, gridLayout), rotation),
-    [boardAnchor, playerCount, gridLayout, rotation],
+    () => edgeTabs(boardAnchor, gridFacings, rotation),
+    [boardAnchor, gridFacings, rotation],
+  )
+  const labelPlacements = useMemo(
+    () =>
+      contextLabelPlacements({
+        facings: gridFacings,
+        rotation,
+        size: { width: screenWidth, height: screenHeight },
+        insets: safeArea,
+        compact: gridLayout.compact,
+      }),
+    [gridFacings, rotation, screenWidth, screenHeight, safeArea, gridLayout.compact],
   )
   const facings = useMemo(
     () => getPlayerSlotFacings(playerCount, gridLayout),
@@ -312,6 +351,9 @@ function LegacyGameBoardStage({
         />
       ) : null}
       {tabsShown && overlays ? <BoardTabs roundClock={roundClock} tabs={tabs} /> : null}
+      {contextLabel && !menu.open && overlays ? (
+        <BoardContextLabels {...contextLabel} placements={labelPlacements} />
+      ) : null}
       {toast ? (
         <BoardToastSlot anchor={menuAnchor} hidden={menu.open || !overlays}>
           {toast}
