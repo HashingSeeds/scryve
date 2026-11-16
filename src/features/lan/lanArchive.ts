@@ -143,7 +143,6 @@ export function lanLocalGame(
           },
         }
       : {}),
-    // why: History names a save Nearby by this field, so it is kept even when no guest's pass was hashed.
     ...(seatPassHashes ? { seatPassHashes } : {}),
   }
   const match = archivedMatch(game, finished)

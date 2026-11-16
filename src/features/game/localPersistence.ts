@@ -797,7 +797,6 @@ function parseSeatPassHashes(value: unknown, players: GamePlayer[]): SeatPassHas
     const hash = value[player.id]
     if (typeof hash === "string" && isSeatPassHash(hash)) hashes[player.id] = hash
   }
-  // why: a nearby save with no guest pass keeps an empty record, which is how History knows it was nearby.
   return hashes
 }
 
