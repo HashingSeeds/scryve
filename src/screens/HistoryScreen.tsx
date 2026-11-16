@@ -327,7 +327,8 @@ export function HistoryScreen({
     }
   }
   const formats = formatChoices(options.formats, filters.systems)
-  const record = tallyOutcomes(visible)
+  const visibleGames = visible.flatMap((entry) => entry.match?.games ?? [entry])
+  const record = tallyOutcomes(visibleGames)
   const filterCount = activeFilterCount(filters)
   const anyFilters = filtersActive(filters)
   const connectedRelevant = filters.source !== "local"
@@ -348,7 +349,7 @@ export function HistoryScreen({
     connectedRelevant &&
     connectedPage?.status === "ready" &&
     connectedPage.nextPage.status === "loading"
-  const localVisibleCount = visible.filter((entry) => entry.source === "local").length
+  const localVisibleCount = visibleGames.filter((entry) => entry.source === "local").length
   const countLabel = loadingFirstPage
     ? localVisibleCount > 0
       ? translate("play:history.count.localLoading", { count: localVisibleCount })
@@ -358,9 +359,9 @@ export function HistoryScreen({
         ? translate("play:history.count.localUnavailable", { count: localVisibleCount })
         : translate("play:history.connectedUnavailable")
       : loadingMore
-        ? translate("play:history.count.loadingMore", { count: visible.length })
+        ? translate("play:history.count.loadingMore", { count: visibleGames.length })
         : translate("play:history.count.record", {
-            count: visible.length,
+            count: visibleGames.length,
             wins: record.wins,
             losses: record.losses,
             draws: record.draws,
@@ -685,7 +686,7 @@ export function HistoryScreen({
             text={
               loadingFirstPage || loadingMore
                 ? translate("play:history.showLoaded")
-                : translate("play:history.showCount", { total: visible.length })
+                : translate("play:history.showCount", { total: visibleGames.length })
             }
             onPress={() => setFiltersOpen(false)}
           />

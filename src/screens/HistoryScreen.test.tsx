@@ -546,6 +546,7 @@ describe("HistoryScreen Scryve matches", () => {
 
     expect(rowIds()).toEqual(["history-row-match-match_1", "history-row-local-local-1"])
     expect(screen.getByLabelText("Win · Ada · Grace · Local · Bo3 2-1 · 3 games")).toBeTruthy()
+    expect(screen.getByText(/^4 games · /)).toBeTruthy()
 
     fireEvent.press(screen.getByTestId("history-row-match-match_1"))
     expect(rowIds()).toEqual([
