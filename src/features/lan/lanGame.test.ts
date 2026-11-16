@@ -1127,13 +1127,9 @@ describe("first player and mulligans before a nearby round", () => {
       firstPlayerMode: "roll",
       freeMulligans: "all",
     })
-    expect(
-      parseGuestMessage(
-        JSON.stringify({ type: "pregame", action: { kind: "keep", mulligans: 3 } }),
-      ),
-    ).toEqual({ type: "pregame", action: { kind: "keep", mulligans: 3 } })
-    expect(
-      parseGuestMessage(JSON.stringify({ type: "pregame", action: { kind: "swap" } })),
-    ).toBeNull()
+    const keep = { type: "pregame", roundId: "game-1", action: { kind: "keep", mulligans: 3 } }
+    expect(parseGuestMessage(JSON.stringify(keep))).toEqual(keep)
+    expect(parseGuestMessage(JSON.stringify({ ...keep, roundId: undefined }))).toBeNull()
+    expect(parseGuestMessage(JSON.stringify({ ...keep, action: { kind: "swap" } }))).toBeNull()
   })
 })

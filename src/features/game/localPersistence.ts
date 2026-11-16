@@ -545,6 +545,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(typeof value.finishedAt === "number" ? { finishedAt: value.finishedAt } : {}),
     ...(result ? { result } : {}),
     ...(account ? { account } : {}),
+    ...parseNearbyMulligans(value.nearbyMulligans, players),
     ...(match ? { match } : {}),
     ...(clock ? { clock } : {}),
     ...(Number.isInteger(value.firstChooserSeat) &&

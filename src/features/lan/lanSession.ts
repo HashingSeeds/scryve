@@ -435,7 +435,9 @@ export class LanSession {
             : message.type === "reveal"
               ? revealLanRole(game, seatKey, now)
               : message.type === "pregame"
-                ? applyLanPregame(game, seatKey, message.action, now)
+                ? message.roundId === lanRoundId(game)
+                  ? applyLanPregame(game, seatKey, message.action, now)
+                  : game
                 : setLanDeck(game, seatKey, message.deck)
           return changed === game ? undefined : this.publish(changed)
         }
@@ -764,7 +766,9 @@ export class LanSession {
       const next = applyLanPregame(game, seatKey, action, Date.now())
       return next === game ? undefined : this.publish(next)
     }
-    if (status === "connected") this.connection?.send({ type: "pregame", action })
+    const roundId = this.state.projection?.publicId
+    if (status === "connected" && roundId)
+      this.connection?.send({ type: "pregame", roundId, action })
   }
 
   revealRole = async () => {

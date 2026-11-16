@@ -210,7 +210,7 @@ export type LanGuestMessage =
   | { type: "reveal" }
   | { type: "log"; before?: string }
   | { type: "deck"; deck: LanSeatDeck | null }
-  | { type: "pregame"; action: LanPregameAction }
+  | { type: "pregame"; roundId: string; action: LanPregameAction }
   | { type: "ping"; at: number }
   | { type: "stats"; stats: SyncLatencySummary }
 
@@ -1083,13 +1083,13 @@ export function parseGuestMessage(line: string): LanGuestMessage | null {
       ...(isCount(value.maxSeats) ? { maxSeats: value.maxSeats } : {}),
     }
   if (value.type === "reveal") return { type: "reveal" }
-  if (value.type === "pregame" && isRecord(value.action)) {
-    const { action } = value
-    if (action.kind === "roll") return { type: "pregame", action: { kind: "roll" } }
+  if (value.type === "pregame" && isId(value.roundId) && isRecord(value.action)) {
+    const { action, roundId } = value
+    if (action.kind === "roll") return { type: "pregame", roundId, action: { kind: "roll" } }
     if (action.kind === "choose" && isId(action.playerId))
-      return { type: "pregame", action: { kind: "choose", playerId: action.playerId } }
+      return { type: "pregame", roundId, action: { kind: "choose", playerId: action.playerId } }
     if (action.kind === "keep" && isCount(action.mulligans))
-      return { type: "pregame", action: { kind: "keep", mulligans: action.mulligans } }
+      return { type: "pregame", roundId, action: { kind: "keep", mulligans: action.mulligans } }
     return null
   }
   if (value.type === "log")
