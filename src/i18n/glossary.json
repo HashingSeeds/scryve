@@ -325,7 +325,7 @@
       "ko": "a game: 중단 (status 중단됨); a lobby: 로비 닫기"
     },
     "leave (just you)": {
-      "en": ["leave"],
+      "en": ["leave", "leaving"],
       "es": "salir",
       "fr": "quitter",
       "hi": "बाहर निकलें",

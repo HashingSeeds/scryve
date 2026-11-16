@@ -179,7 +179,9 @@ function unitConcepts(unit, glossary) {
 
 const isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value)
 const isTextList = (value) =>
-  Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string")
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every((item) => typeof item === "string" && item.trim())
 
 function glossaryProblems(glossary, units, locales = Object.keys(LOCALES)) {
   if (!isObject(glossary?.rules) || !isObject(glossary?.terms))
@@ -473,23 +475,22 @@ async function check() {
       problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
     for (const [key, text] of Object.entries(englishFlat))
       for (const problem of englishProblems(key, text)) problems.push(`en/${namespace}: ${problem}`)
-    if (glossaryIssues.length) continue
     for (const locale of Object.keys(LOCALES)) {
-      const lock = readJson(lockPath(locale, namespace), {})
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
-      const state = { units, lock, localeFlat, locale, glossary }
-      for (const unit of staleUnits(state)) {
-        if (lock[unit.id]?.split(".")[0] !== sourceHash(unit, locale, glossary))
-          problems.push(`${locale}/${namespace}: ${unit.id} needs translation`)
+      for (const unit of units.values())
         for (const problem of validateUnit(unit, localeFlat, locale))
           problems.push(`${locale}/${namespace}: ${problem}`)
-      }
-      for (const unit of editedUnits(state))
+      for (const key of orphanKeys({ units, localeFlat, locale }))
+        problems.push(`${locale}/${namespace}: ${key} no longer exists in English`)
+      if (glossaryIssues.length) continue
+      const lock = readJson(lockPath(locale, namespace), {})
+      for (const unit of units.values())
+        if (lock[unit.id]?.split(".")[0] !== sourceHash(unit, locale, glossary))
+          problems.push(`${locale}/${namespace}: ${unit.id} needs translation`)
+      for (const unit of editedUnits({ units, lock, localeFlat, locale, glossary }))
         problems.push(
           `${locale}/${namespace}: ${unit.id} was edited by hand, and the next translate overwrites it. Put the fix in src/i18n/glossary.json or a note above the English key.`,
         )
-      for (const key of orphanKeys({ units, localeFlat, locale }))
-        problems.push(`${locale}/${namespace}: ${key} no longer exists in English`)
     }
   }
 

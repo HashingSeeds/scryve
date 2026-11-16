@@ -117,6 +117,7 @@ test("needs every concept to name English the copy uses and a term in every lang
     terms: {
       seat: { ...noKorean, en: ["seat", "chair"], ar: "مقعد" },
       bench: { ...glossary.terms.seat, en: [] },
+      blank: { ...glossary.terms.seat, en: [" "] },
     },
     ja: { rules: [] },
   }
@@ -128,6 +129,7 @@ test("needs every concept to name English the copy uses and a term in every lang
     'glossary: "seat" has no ko term; write what the ko translations already use',
     'glossary: "seat" has ar, which is not a translated language',
     'glossary: "bench" lists no English words in en',
+    'glossary: "blank" lists no English words in en',
   ])
   assert.deepEqual(glossaryProblems({ rules: glossary.rules }, entries, locales), [
     "glossary: needs a rules object and a terms object",
