@@ -32,6 +32,7 @@ import type { LocalGame } from "@/features/game/types"
 
 import { SeedError, type SeedParams } from "./seedTypes"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { isMatchBestOf, MATCH_BEST_OF } from "../../../convex/lib/matchResults"
 import { systemDefinition } from "../../../convex/lib/systems"
 import type { TableAction } from "../../../convex/lib/table"
 import { isValidModeSetup } from "../../../convex/lib/tableModes"
@@ -88,6 +89,10 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   if (!layout)
     throw new SeedError(`layout for ${playerCount} players must be one of ${layouts.join(", ")}.`)
 
+  const bestOf = params.bestOf === undefined ? undefined : integer("bestOf", params.bestOf)
+  if (bestOf !== undefined && !isMatchBestOf(bestOf))
+    throw new SeedError(`bestOf must be one of ${MATCH_BEST_OF.join(", ")}.`)
+
   const names = list(params.names)
   const teams = list(params.teams).map((entry) =>
     entry.split("+").map((value) => integer("teams seat", value) - 1),
@@ -111,6 +116,7 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       system,
       format,
       layout,
+      ...(bestOf === undefined ? {} : { match: { bestOf } }),
       ...modeSetupOf(params, playerCount),
       ...(teams.length > 0 ? { teams, ...(twoVsTwo ? { teamVariant: TWO_VS_TWO } : {}) } : {}),
     })

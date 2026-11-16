@@ -69,7 +69,6 @@ const board = {
     draws_other: "{{count}} draws",
     context: "Game {{number}} · {{score}}",
     statusLine: "{{context}} · Best of {{bestOf}}",
-    contextLabel: "{{context}}, best of {{bestOf}}",
     closeScore: "Close match score",
     scoreTitle: "Best of {{bestOf}} · Game {{number}}",
     endHint: "Ends the match after its last finished game",

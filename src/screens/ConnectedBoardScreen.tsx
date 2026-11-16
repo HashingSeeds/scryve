@@ -13,7 +13,6 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, AppState, Platform, ScrollView, Share, View } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useMutation } from "convex/react"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
 import type { AccountEntry } from "@/components/AppUtilityMenu"
@@ -70,7 +69,6 @@ import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/Tr
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
-import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import {
   CLAIM_CHIP,
   MULLIGAN_RULE,
@@ -752,7 +750,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const insets = useSafeAreaInsets()
   const [statusOpen, setStatusOpen] = useState(false)
   const [matchOpen, setMatchOpen] = useState(false)
   const [matchEnding, setMatchEnding] = useState<"choosing" | "sending">()
@@ -1699,20 +1696,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           origin={menuDialogOrigin}
           onReveal={onRevealRole}
           onClose={() => setRoleOpen(false)}
-        />
-      ) : null}
-
-      {match && matchLine && !menuOpen ? (
-        <BoardContextLabels
-          match={{
-            line: matchLine,
-            accessibilityLabel: translate("board:match.contextLabel", {
-              context: matchLine,
-              bestOf: match.bestOf,
-            }),
-          }}
-          top={insets.top}
-          bottom={insets.bottom}
         />
       ) : null}
 

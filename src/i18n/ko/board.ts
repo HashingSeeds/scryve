@@ -78,7 +78,6 @@ export default {
     draws_other: "{{count}}무",
     context: "{{number}}게임 · {{score}}",
     statusLine: "{{context}} · {{bestOf}}판 승부",
-    contextLabel: "{{context}}, {{bestOf}}판 승부",
     closeScore: "매치 점수 닫기",
     scoreTitle: "{{bestOf}}판 승부 · 게임 {{number}}",
     endHint: "마지막으로 끝난 게임 이후 매치를 종료합니다",

@@ -2,7 +2,7 @@ import { buildFinishedLocalGameSnapshot } from "@/features/connected/localGameSn
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { PlayerId } from "@/features/game/types"
 
-import { lanLocalGame } from "./lanArchive"
+import { archiveLanGame, lanLocalGame } from "./lanArchive"
 import {
   admitLanGuest,
   applyLanWrite,
@@ -153,6 +153,17 @@ describe("lanLocalGame", () => {
       expect.objectContaining({ localId: "guest", seatPassHash: HASH }),
     ])
     expect(buildFinishedLocalGameSnapshot(pending).players[0]).toMatchObject({ me: true })
+  })
+
+  it("marks a round with no hashed guest pass as nearby without uploading a pass", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(archiveLanGame(finishedRound(), undefined, new Map(), "host-account"))
+
+    expect(repository.loadHistory()[0].seatPassHashes).toEqual({})
+    const [pending] = repository.pendingPublishes("host-account")
+    expect(
+      buildFinishedLocalGameSnapshot(pending).players.map((player) => player.seatPassHash),
+    ).toEqual([undefined, undefined])
   })
 
   it("uploads the host's deck with its own seat only", () => {

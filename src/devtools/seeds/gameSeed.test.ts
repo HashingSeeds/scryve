@@ -36,6 +36,13 @@ describe("game seed", () => {
     expect(game.players).toHaveLength(3)
   })
 
+  it("starts a best-of match the way New Game does", () => {
+    const game = buildSeededGame({ players: "2", bestOf: "3" }, repository())
+    expect(game.match).toMatchObject({ bestOf: 3, gameNumber: 1, wins: [0, 0], draws: 0 })
+    expect(buildSeededGame({ players: "2" }, repository()).match).toBeUndefined()
+    expect(() => buildSeededGame({ bestOf: "2" }, repository())).toThrow("bestOf must be one of")
+  })
+
   it.each([
     [{ system: "hearthstone" }, /system must be one of/],
     [{ format: "vintage-cube" }, /format for mtg must be one of/],

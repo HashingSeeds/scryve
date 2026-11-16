@@ -80,7 +80,6 @@ export default {
     draws_other: "{{count}} égalités",
     context: "Partie {{number}} · {{score}}",
     statusLine: "{{context}} · Au meilleur des {{bestOf}}",
-    contextLabel: "{{context}}, au meilleur des {{bestOf}}",
     closeScore: "Fermer le score du match",
     scoreTitle: "Au meilleur des {{bestOf}} · Partie {{number}}",
     endHint: "Termine le match après sa dernière partie terminée",
