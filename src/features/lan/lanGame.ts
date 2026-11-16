@@ -735,12 +735,26 @@ export function applyLanWrite(
     game: {
       ...game,
       updatedAt: now,
-      recentOperationIds: [...game.recentOperationIds, event.operationId].slice(
-        -CONNECTED_RECENT_OPERATION_LIMIT,
+      recentOperationIds: keepRecentAndNewestPerActor(
+        [...game.recentOperationIds, event.operationId],
+        game.memory,
       ),
     },
     result,
   }
+}
+
+function keepRecentAndNewestPerActor(operationIds: readonly string[], memory: MemoryGame) {
+  const actorsSeen = new Set<string>()
+  const kept: string[] = []
+  for (let i = operationIds.length - 1; i >= 0; i--) {
+    const actor = memory.events.get(operationIds[i])?.actorUserId
+    const inWindow = operationIds.length - i <= CONNECTED_RECENT_OPERATION_LIMIT
+    const newestOfActor = actor !== undefined && !actorsSeen.has(actor)
+    if (actor !== undefined) actorsSeen.add(actor)
+    if (inWindow || newestOfActor) kept.push(operationIds[i])
+  }
+  return kept.reverse()
 }
 
 /** why: only apps that draw 7 or more seats join a game that big, so its seats can use every free mark, as Convex's do. */

@@ -30,7 +30,7 @@ import {
 } from "./lanGame"
 import { encodeLine, MAX_LINE_BYTES } from "./lineReader"
 import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
-import type { ConnectedActionEvent } from "../connected/model"
+import { CONNECTED_RECENT_OPERATION_LIMIT, type ConnectedActionEvent } from "../connected/model"
 
 const NOW = 1_700_000_000_000
 const commander: LanSetup = {
@@ -365,6 +365,18 @@ describe("nearby rounds on the shared engine", () => {
       ok: false,
       error: { code: "seat_owner_required" },
     })
+  })
+
+  it("keeps a guest's newest write listed after a window of edits from other devices", () => {
+    const hostTap = (i: number) => life(`host-operation-${String(i).padStart(4, "0")}`, "host", -1)
+    let game = write(started(), "guest", life("life-operation-0001", "guest", -1)).next
+    for (let i = 0; i < CONNECTED_RECENT_OPERATION_LIMIT; i++)
+      game = write(game, "host", hostTap(i)).next
+
+    expect(lanProjection(game, "guest").recentOperationIds).toEqual(["life-operation-0001"])
+    expect(lanProjection(game, "host").recentOperationIds).toHaveLength(
+      CONNECTED_RECENT_OPERATION_LIMIT,
+    )
   })
 
   it("shows a commander claim only to its defender and applies the defender's confirm", () => {

@@ -30,9 +30,10 @@ claim-twice   | Team=FALSE MaxTaps=0 MaxUndos=0 MaxDrops=1 MaxHostTaps=0 Claims=
 double-board  | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=0 MaxHostTaps=0 Claims=FALSE | OverlaySkipsConfirmed | BoardsHonest
 stale-rejoin  | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=1 MaxHostTaps=1 Claims=FALSE | StateOnRejoin         | BoardsAgree
 merge-undo    | Team=FALSE MaxTaps=2 MaxUndos=1 MaxDrops=0 MaxHostTaps=0 Claims=FALSE | UndoEndsMerge         | IntentKept
-window        | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=1 MaxHostTaps=1 Claims=FALSE Window=1 |              | BoardsHonest
+window        | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=1 MaxHostTaps=1 Claims=FALSE Window=1 |              | pass
+shared-trim   | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=1 MaxHostTaps=1 Claims=FALSE Window=1 | KeepsNewest  | BoardsHonest
 '
-flags="HostDedupes ResolveReplays UndoEndsMerge OverlaySkipsConfirmed StateOnRejoin"
+flags="HostDedupes ResolveReplays UndoEndsMerge OverlaySkipsConfirmed StateOnRejoin KeepsNewest"
 
 run() { # name bounds off expected [verbose]
   local cfg meta out

@@ -31,7 +31,7 @@ box, and needs Java 11 or newer. The first run downloads TLC 1.7.4 into
 `~/.cache/scryve` and checks its sha256.
 
 Each `ok` line is a run that went as expected. The app runs (`edits`, `seats`,
-`drops`, `claims`) must pass. Each break turns off one thing the app does and
+`drops`, `claims`, `window`) must pass. Each break turns off one thing the app does and
 must fail on the rule it names, which proves that rule can still catch a bug:
 
 | Break | Turns off | Must fail |
@@ -41,14 +41,14 @@ must fail on the rule it names, which proves that rule can still catch a bug:
 | `double-board` | `overlayPendingDeltas` skipping ids in `recentOperationIds` | BoardsHonest |
 | `stale-rejoin` | the host publishing state after it welcomes a rejoining guest | BoardsAgree |
 | `merge-undo` | `undoLife` clearing `lastQueuedLifeChange` | IntentKept |
+| `shared-trim` | `keepRecentAndNewestPerActor` keeping each device's newest id | BoardsHonest |
 
-`window` shrinks the host's recent operation list from 100 to 1 and must fail
-BoardsHonest. That is a known gap at the real size. A guest whose ack was lost
-in a drop, and which rejoins after 100 other edits, sees its tap twice until
-its resend is acked, about one round trip. A test against the real
-`applyLanWrite` and `overlayPendingDeltas` showed it: with 99 other edits the
-board read 39, with 100 it read 38, while the host read 39. A fix for that
-gap updates the model to match, and then this run's expected result is `pass`.
+`window` shrinks the host's shared recent operation list from 100 to 1. A
+guest whose ack was lost in a drop rejoins after other devices' edits, and the
+rejoin state must still list its applied write, or its board counts that tap
+twice until the resend is acked. `keepRecentAndNewestPerActor` keeps each
+device's newest id for that, since a write still waiting for its ack is always
+its sender's newest. `shared-trim` runs the same bounds without it.
 
 ## When it fails
 
@@ -85,7 +85,7 @@ Last checked against the covered code on 2026-11-16.
 | File | What the model stands for |
 | --- | --- |
 | `src/features/lan/lanSession.ts` | `acceptPeer` (applying ops, replies, rejoin), `flush`, `guestWrite`, `rejectPendingWrites` on a drop |
-| `src/features/lan/lanGame.ts` | `applyLanWrite` and its recent list, `lanProjection` filtering that list per viewer |
+| `src/features/lan/lanGame.ts` | `applyLanWrite` and `keepRecentAndNewestPerActor`, `lanProjection` filtering that list per viewer |
 | `convex/lib/gameEngine.ts` | `writeLife` (retries, undo), `writeClaim`, `writeResolution`, `withSharedTeam` |
 | `src/features/sync/outbox.ts` | one write in flight, `acknowledge`, `rewriteUnattempted` |
 | `src/features/connected/OutboxSyncController.ts` | merging taps (`addToLastQueuedLifeChange`), `undoLife` |
