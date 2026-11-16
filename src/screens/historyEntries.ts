@@ -205,7 +205,6 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
   return {
     key: `local:${game.id}`,
     source: "local",
-    // why: only a nearby host saves a seat pass record, and it is empty when no guest's pass was hashed.
     ...(game.seatPassHashes ? { nearby: true as const } : {}),
     routeId: game.id,
     finishedAt: game.finishedAt,
