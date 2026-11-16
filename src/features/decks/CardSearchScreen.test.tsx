@@ -244,7 +244,8 @@ it("searches within the commander's colors until the player clears them", async 
   expect(view.getByLabelText("Filters (3)")).toBeTruthy()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).not.toHaveBeenCalled()
-  fireEvent.changeText(view.getByTestId("card-search-input"), "bolt")
+  expect(view.getByTestId("card-search-input").props.value).toBe("f:commander id<=ur ")
+  fireEvent.changeText(view.getByTestId("card-search-input"), "f:commander id<=ur bolt")
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
     deviceId: expect.any(String),
@@ -289,7 +290,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   const onAdd = jest.fn()
   const view = chooser([], onAdd)
   await pickColors(view, "U")
-  fireEvent.changeText(view.getByTestId("card-search-input"), "ar")
+  fireEvent.changeText(view.getByTestId("card-search-input"), "f:commander id=u ar")
   await act(async () => jest.advanceTimersByTime(400))
   fireEvent.press(view.getByText("Baral"))
   await act(async () => {})
@@ -297,7 +298,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   expect(onAdd).not.toHaveBeenCalled()
   fireEvent.press(view.getByTestId("card-focus-close"))
   expect(view.queryByTestId("card-focus-dialog")).toBeNull()
-  expect(view.getByTestId("card-search-input").props.value).toBe("ar")
+  expect(view.getByTestId("card-search-input").props.value).toBe("f:commander id=u ar")
   expect(view.getByLabelText("Filters (2)")).toBeTruthy()
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
   fireEvent.press(view.getByLabelText("Preview Baral as commander"))
@@ -397,7 +398,7 @@ it("lists keywords from the card file, combines picked keywords, and works offli
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
     deviceId: expect.any(String),
     game: "mtg",
-    query: 'is:commander f:commander kw:"Flying" kw:"Ward"',
+    query: "is:commander f:commander kw:flying kw:ward",
   })
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
   view.unmount()
@@ -456,13 +457,14 @@ it.each(["commander", "main"])(
       </ThemeProvider>,
     )
     if (section === "commander") await pickColors(view, "U")
+    const filters = section === "commander" ? "f:commander id=u" : "f:commander"
     mockAction.mockClear()
     mockAction.mockRejectedValueOnce(failure).mockResolvedValue([searchCard])
-    fireEvent.changeText(view.getByTestId("card-search-input"), "bar")
+    fireEvent.changeText(view.getByTestId("card-search-input"), `${filters} bar`)
     await act(async () => jest.advanceTimersByTime(400))
     expect(view.getByText("Retrying in 3s")).toBeTruthy()
     expect(view.getByTestId("retry-card-search")).toBeDisabled()
-    fireEvent.changeText(view.getByTestId("card-search-input"), "baral")
+    fireEvent.changeText(view.getByTestId("card-search-input"), `${filters} baral`)
     await act(async () => jest.advanceTimersByTime(1000))
     expect(view.getByText("Retrying in 2s")).toBeTruthy()
     expect(mockAction).toHaveBeenCalledTimes(1)
@@ -604,7 +606,7 @@ it.each<[string, Partial<typeof filters>, string]>([
   [
     "keywords with quotes and backslashes stripped",
     { commander: true, filters: { keyword: ["Flying", 'W"a\\rd'] } },
-    'is:commander f:commander kw:"Flying" kw:"Ward"',
+    "is:commander f:commander kw:flying kw:ward",
   ],
   [
     "any of the picked types, every picked supertype, and a mana value range",
@@ -615,7 +617,7 @@ it.each<[string, Partial<typeof filters>, string]>([
         manaValue: [">=2", "<=4"],
       },
     },
-    't:"Legendary" (t:"Creature" or t:"Artifact") mv>=2 mv<=4',
+    "t:legendary (t:creature or t:artifact) mv>=2 mv<=4",
   ],
   [
     "a minimum power and a maximum toughness",
@@ -682,7 +684,7 @@ describe("with the device's card name list", () => {
 
   it("drops name matches whose legality in the deck's format the device can't confirm", async () => {
     const view = adder("modern")
-    expect(await search(view, "lightnig bolt")).toEqual([
+    expect(await search(view, "f:modern lightnig bolt")).toEqual([
       "Add Lightning Axe to deck",
       "Add Lightning Bolt to deck",
     ])
@@ -691,13 +693,13 @@ describe("with the device's card name list", () => {
   it("keeps name matches to the picked colors", async () => {
     const view = adder()
     await pickColors(view, "R")
-    expect(await search(view, "lightnig bolt")).toEqual([
+    expect(await search(view, "id=r lightnig bolt")).toEqual([
       "Add Lightning Bolt to deck",
       "Add Lightning Axe to deck",
     ])
   })
 
-  it.each(["t:instant lightning", "lightning bolt and zzzz", "lightning OR bolt"])(
+  it.each(["lightning bolt and zzzz", "lightning OR bolt", "-t:instant lightning"])(
     "leaves Scryfall syntax like %s to Scryfall",
     async (text) => {
       const view = adder()
@@ -714,6 +716,7 @@ describe("with the device's Magic card file", () => {
     name: "Shivan Dragon",
     scryfallId: "shivan",
     colorIdentity: "R",
+    typeLine: "Creature — Dragon",
     legalFormats: ["modern"],
   }
 
@@ -726,7 +729,7 @@ describe("with the device's Magic card file", () => {
       </ThemeProvider>,
     )
     jest.useFakeTimers()
-    fireEvent.changeText(view.getByTestId("card-search-input"), text)
+    fireEvent.changeText(view.getByTestId("card-search-input"), `f:modern ${text}`)
     await act(async () => jest.advanceTimersByTime(400))
     jest.useRealTimers()
     return { view, onAdd }
@@ -785,13 +788,19 @@ describe("with the device's Magic card file", () => {
     expect(mockAction).not.toHaveBeenCalled()
   })
 
-  it("still sends Scryfall syntax to Scryfall", async () => {
+  it("answers syntax it can read on the device", async () => {
+    const { view } = await searchFor("t:dragon")
+    expect(view.getByLabelText("Add Shivan Dragon to deck")).toBeTruthy()
+    expect(mockAction).not.toHaveBeenCalled()
+  })
+
+  it("sends syntax the device can't read to Scryfall", async () => {
     mockAction.mockResolvedValue([])
-    await searchFor("t:dragon")
+    await searchFor("o:flying")
     expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
       game: "mtg",
       deviceId: expect.any(String),
-      query: "(t:dragon) f:modern",
+      query: "(o:flying) f:modern",
     })
   })
 })
@@ -816,14 +825,35 @@ it("starts a deck's search on its format and lets the player pick other formats 
   fireEvent.changeText(view.getByTestId("card-filter-manaValue-min"), "")
   expect(await lastQuery()).toBeUndefined()
   fireEvent.press(view.getByTestId("card-filter-type-Creature"))
-  expect(await lastQuery()).toBe('f:modern t:"Creature"')
+  expect(await lastQuery()).toBe("f:modern t:creature")
+  expect(view.getByTestId("card-search-input").props.value).toBe("f:modern t:creature ")
   fireEvent.press(view.getByTestId("card-filter-format-legacy"))
-  expect(await lastQuery()).toBe('f:modern f:legacy t:"Creature"')
+  expect(await lastQuery()).toBe("f:modern f:legacy t:creature")
   fireEvent.press(view.getByTestId("card-filter-format-modern"))
   fireEvent.press(view.getByTestId("card-filter-format-legacy"))
   fireEvent.press(view.getByText("Done"))
   expect(view.getByLabelText("Filters (1)")).toBeTruthy()
-  expect(await lastQuery()).toBe('t:"Creature"')
+  expect(await lastQuery()).toBe("t:creature")
+})
+
+it("lights up the filters a player types as syntax", async () => {
+  jest.useFakeTimers()
+  mockAction.mockResolvedValue([])
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardSearchScreen game="mtg" format="modern" onAdd={jest.fn()} onClose={jest.fn()} />
+    </ThemeProvider>,
+  )
+  fireEvent.changeText(view.getByTestId("card-search-input"), "f:modern t:creature mv<=2 bolt")
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction.mock.lastCall?.[1].query).toBe("(bolt) f:modern t:creature mv<=2")
+  expect(view.getByLabelText("Filters (3)")).toBeTruthy()
+  fireEvent.press(view.getByTestId("card-filters-button"))
+  await act(async () => {})
+  expect(view.getByTestId("card-filter-type-Creature").props.accessibilityState.selected).toBe(true)
+  expect(view.getByTestId("card-filter-manaValue-max").props.value).toBe("2")
+  fireEvent.press(view.getByTestId("card-filter-type-Creature"))
+  expect(view.getByTestId("card-search-input").props.value).toBe("f:modern mv<=2 bolt")
 })
 
 it("looks cards up without a deck: no adding, and a tapped card opens its sheet", async () => {
