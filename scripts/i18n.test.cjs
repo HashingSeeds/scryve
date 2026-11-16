@@ -173,6 +173,14 @@ test("rejects numbers and hand-built signs in English copy", () => {
     'badge: "}}%" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}',
   ])
   assert.deepEqual(englishProblems("badge", "{{cost, signed}} · {{share, percent}}"), [])
+  assert.deepEqual(
+    validateUnit(
+      { id: "share", english: { share: "{{share, percent}}" } },
+      { share: "{{share, percent}} %" },
+      "fr",
+    ),
+    ['share: "}} %" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}'],
+  )
 })
 
 test("flags keys that i18next would resolve to built-in object properties", () => {

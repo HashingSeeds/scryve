@@ -14,7 +14,7 @@ import { PlayerMark } from "@/components/PlayerMark"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { relativeTime } from "@/features/connected/connectedCopy"
-import { formatSigned, joinParts } from "@/i18n/format"
+import { formatSigned, joinParts, separator } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -328,7 +328,7 @@ export function GameLogDialog({
 }
 
 // why: the label shrinks to fit while the time beside it stays whole, so they are separate Texts.
-const withTrailingSeparator = (label: string) => label + translate("common:separator").trimEnd()
+const withTrailingSeparator = (label: string) => label + separator("common:separator").trimEnd()
 
 const MARK = 32
 const COUNTER_GLYPH = 12

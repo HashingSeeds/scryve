@@ -70,6 +70,7 @@ describe("format", () => {
       expect(i18n.t("play:summary.playerCount", { count: 4 })).toBe("\u27e6٤ players\u27e7")
       expect(formatSigned(-12)).toBe("\u2212١٢")
       expect(translateForStorage("play:summary.playerCount", { count: 4 })).toBe("4 players")
+      expect(translateForStorage("board:roundClock.bonusTurns", { count: 2 })).toBe("+2 turns")
       expect(formatTime(Date.UTC(1970, 0, 1, 9, 5))).toMatch(/^\u27e6[^0-9]+\u27e7$/)
     }))
 })

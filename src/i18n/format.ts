@@ -136,8 +136,18 @@ export function formatTime(date: Date | number) {
 
 type Part = string | number | false | null | undefined
 
-const separator = (key: "common:separator" | "common:listSeparator" | "common:listAnd") =>
-  i18n.t(key, { applyPostProcessor: false })
+const separators = new Map<string, string>()
+
+// why: i18n.t is slow on Hermes and lists rebuild on every clock tick, and brackets around every separator would bury the pseudo-locale's real signal.
+export function separator(key: "common:separator" | "common:listSeparator" | "common:listAnd") {
+  const id = `${locale()}\u0000${key}`
+  let text = separators.get(id)
+  if (text === undefined) {
+    text = i18n.t(key, { applyPostProcessor: false })
+    separators.set(id, text)
+  }
+  return text
+}
 
 export function joinParts(parts: readonly Part[]) {
   return present(parts).join(separator("common:separator"))
@@ -164,7 +174,16 @@ function present(parts: readonly Part[]) {
   })
 }
 
-export const formatInterpolation: FormatFunction = (value, format) => {
+function formatPlain(value: number, format?: string) {
+  if (format === "signed") return value > 0 ? `+${value}` : String(value)
+  if (format === "percent") return `${Math.round(value * 100)}%`
+  if (format === "orMore") return `${value}+`
+  return String(value)
+}
+
+export const formatInterpolation: FormatFunction = (value, format, _language, options) => {
+  // why: saved text outlives the reader's language, so translateForStorage gets plain ASCII and no isolates.
+  if (options?.forStorage) return typeof value === "number" ? formatPlain(value, format) : value
   if (typeof value === "number") {
     if (format === "signed") return isolate(formatSigned(value))
     if (format === "percent") return isolate(formatPercent(value))

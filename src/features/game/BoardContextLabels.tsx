@@ -2,6 +2,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
 import { Text } from "@/components/Text"
+import { separator } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -94,17 +95,17 @@ function ContextLine({
       style={themed([$text, $line])}
     >
       {match?.line}
-      {match && view ? translate("common:separator") : null}
+      {match && view ? separator("common:separator") : null}
       {view?.kind === "time" ? (
         <Text size="xxs" weight="semiBold" style={themed($text)} tx="board:clock.time" />
       ) : null}
-      {view?.kind === "time" && clockText ? translate("common:separator") : null}
+      {view?.kind === "time" && clockText ? separator("common:separator") : null}
       {clockText ? (
         <Text size="xxs" weight={urgent ? "semiBold" : "medium"} style={themed($text)}>
           {clockText}
         </Text>
       ) : null}
-      {paused ? translate("common:separator") + translate("board:clock.paused") : null}
+      {paused ? separator("common:separator") + translate("board:clock.paused") : null}
     </Text>
   )
   if (!onPress) return line

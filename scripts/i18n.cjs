@@ -231,15 +231,18 @@ function mayDropCount(unit, key, locale) {
 const ENGLISH_DIGIT_TOKENS =
   /\bd(?:4|6|8|10|12|20|100)\b|\bp(?:50|90|99)\b|\b2v2\b|\b2HG\b|\b8th Edition\b|\b1st\b|\b3 Ash Blossom\b/g
 
+function handBuiltSigns(key, text) {
+  return (text.match(/[+−-]{{|}}\s?%/g) ?? []).map(
+    (sign) =>
+      `${key}: "${sign}" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}`,
+  )
+}
+
 function englishProblems(key, text) {
   const digits = numbersIn(text.replace(ENGLISH_DIGIT_TOKENS, " "))
-  const signs = text.match(/[+−-]{{|}}%/g) ?? []
   return [
     ...digits.map((number) => `${key}: has the number ${number}; pass it as a placeholder`),
-    ...signs.map(
-      (sign) =>
-        `${key}: "${sign}" builds a sign or percent by hand; use {{x, signed}} or {{x, percent}}`,
-    ),
+    ...handBuiltSigns(key, text),
   ]
 }
 
@@ -263,6 +266,7 @@ function validateUnit(unit, translatedFlat, locale) {
       ...missing.map((token) => `${key}: dropped ${token}`),
       ...unknown.map((token) => `${key}: introduced ${token}`),
       ...typedNumbers.map((number) => `${key}: typed the number ${number}; use a placeholder`),
+      ...handBuiltSigns(key, text),
       ...((text.match(/"/g) ?? []).length % 2 ? [`${key}: has an unmatched quote`] : []),
       ...scriptProblems(text, locale).map((problem) => `${key}: ${problem}`),
     ]

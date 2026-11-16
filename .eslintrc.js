@@ -227,6 +227,7 @@ module.exports = {
             "callees": {
               exclude: [
                 "translate",
+                "separator",
                 "i18n(ext)?",
                 "t",
                 "require",
