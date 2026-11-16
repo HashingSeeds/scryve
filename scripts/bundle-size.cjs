@@ -12,9 +12,18 @@ function measure(exportDir) {
   return Object.fromEntries(
     Object.keys(BUNDLES).map((platform) => {
       const dir = path.join(exportDir, platform, "_expo", "static", "js", platform)
-      const files = fs.readdirSync(dir).map((name) => fs.statSync(path.join(dir, name)).size)
+      const files = fs.readdirSync(dir).map((name) => ({
+        language: name.startsWith("language-"),
+        size: fs.statSync(path.join(dir, name)).size,
+      }))
       if (files.length === 0) throw new Error(`No ${platform} bundle in ${dir}`)
-      return [platform, files.reduce((total, size) => total + size, 0)]
+      const shared = files.filter((file) => !file.language)
+      // why: web fetches only the player's language, so a new language must not count against every player.
+      const largestLanguage = Math.max(
+        0,
+        ...files.filter((file) => file.language).map((file) => file.size),
+      )
+      return [platform, shared.reduce((total, file) => total + file.size, 0) + largestLanguage]
     }),
   )
 }

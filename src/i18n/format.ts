@@ -143,6 +143,7 @@ export function formatTime(date: Date | number) {
 type Part = string | number | false | null | undefined
 
 const separators = new Map<string, string>()
+i18n.on("loaded", () => separators.clear())
 
 // why: i18n.t is slow on Hermes and lists rebuild on every clock tick, and brackets around every separator would bury the pseudo-locale's real signal.
 export function separator(key: "common:separator" | "common:listSeparator" | "common:listAnd") {

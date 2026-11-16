@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useFonts } from "expo-font"
 import { SplashScreen } from "expo-router"
 
+import { i18n, languageLoaded } from "@/i18n"
 import { fontsToLoad } from "@/theme/fontsToLoad"
 import { reportCrash } from "@/utils/crashReporting"
 
@@ -12,7 +13,12 @@ export function useLaunchReadiness() {
   const [fontsLoaded, fontError] = useFonts(fontsToLoad)
   const [launchDeadlineReached, setLaunchDeadlineReached] = useState(false)
   const [fallbackRevealReached, setFallbackRevealReached] = useState(false)
+  const [languageReady, setLanguageReady] = useState(() => i18n.isInitialized)
   const nativeSplashHidden = useRef(false)
+
+  useEffect(() => {
+    void languageLoaded.finally(() => setLanguageReady(true))
+  }, [])
 
   useEffect(() => {
     const revealTimer = setTimeout(() => setFallbackRevealReached(true), LAUNCH_FALLBACK_REVEAL_MS)
@@ -23,7 +29,7 @@ export function useLaunchReadiness() {
     }
   }, [])
 
-  const ready = fontsLoaded || !!fontError || launchDeadlineReached
+  const ready = ((fontsLoaded || !!fontError) && languageReady) || launchDeadlineReached
 
   useEffect(() => {
     if (fontError) reportCrash(fontError)
