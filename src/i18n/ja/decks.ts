@@ -361,6 +361,7 @@ export default {
     allowAdditional: "以上",
     exactColors: "完全一致",
     searchFilter: "{{filter}}を検索",
+    suggestion: "{{option}}、{{term}}",
     min: "最小",
     max: "最大",
     minimum: "最小{{filter}}",

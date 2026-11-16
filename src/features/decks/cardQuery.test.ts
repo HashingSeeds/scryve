@@ -1,9 +1,14 @@
-import { formatCardQuery, parseCardQuery } from "./cardQuery"
+import { formatCardQuery, parseCardQuery, querySuggestions } from "./cardQuery"
 import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
-const subtypes = ["Lizard", "Elf", "Time Lord"]
-const parse = (text: string) =>
-  parseCardQuery(text, MAGIC_CARD_FILTERS, (id) => (id === "subtype" ? subtypes : []))
+const cardOptions: Record<string, readonly string[]> = {
+  subtype: ["Lizard", "Elf", "Time Lord"],
+  keyword: ["Flying", "First strike"],
+}
+const optionsFor = (id: string) => cardOptions[id] ?? []
+const parse = (text: string) => parseCardQuery(text, MAGIC_CARD_FILTERS, optionsFor)
+const suggest = (text: string) =>
+  querySuggestions(text, MAGIC_CARD_FILTERS, optionsFor).map(({ text }) => text)
 
 test("reads the terms the sheet writes, in any case, and keeps the name", () => {
   expect(
@@ -19,7 +24,7 @@ test("reads the terms the sheet writes, in any case, and keeps the name", () => 
       subtype: ["Lizard"],
       manaValue: [">=2", "<=4"],
       power: [">=3", "<=3"],
-      keyword: ["first strike"],
+      keyword: ["First strike"],
     },
     colors: ["U", "R"],
     colorMatch: "within",
@@ -63,4 +68,26 @@ test("leaves everything as typed when a top-level or joins it, and groups it und
   )
   expect(text).toBe("f:modern (t:elf or t:goblin)")
   expect(parse(text).filters).toEqual({ format: ["modern"], subtype: ["Elf", "goblin"] })
+})
+
+test.each([
+  ["a subtype", "f:modern t:liz", ["f:modern t:lizard "]],
+  [
+    "a word inside an option, after those starting with it",
+    "t:or",
+    ["t:sorcery ", 't:"time lord" '],
+  ],
+  ["a quoted keyword", 'kw:"first st', ['kw:"first strike" ']],
+  ["a format", "f:mod", ["f:modern "]],
+])("finishes %s", (_name, text, expected) => {
+  expect(suggest(text)).toEqual(expected)
+})
+
+test.each([
+  ["a finished word", "t:lizard "],
+  ["a number", "mv:"],
+  ["a name", "bolt"],
+  ["a closed quote", 'kw:"flying"'],
+])("suggests nothing after %s", (_name, text) => {
+  expect(suggest(text)).toEqual([])
 })

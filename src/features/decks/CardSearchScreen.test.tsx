@@ -788,6 +788,15 @@ describe("with the device's Magic card file", () => {
     expect(mockAction).not.toHaveBeenCalled()
   })
 
+  it("suggests how to finish a term while the player types it", async () => {
+    const { view } = await searchFor("")
+    const input = view.getByTestId("card-search-input")
+    fireEvent.changeText(input, "f:modern t:dra")
+    fireEvent.press(view.getByLabelText("Dragon, t:dragon"))
+    expect(input.props.value).toBe("f:modern t:dragon ")
+    expect(view.queryByLabelText("Dragon, t:dragon")).toBeNull()
+  })
+
   it("answers syntax it can read on the device", async () => {
     const { view } = await searchFor("t:dragon")
     expect(view.getByLabelText("Add Shivan Dragon to deck")).toBeTruthy()

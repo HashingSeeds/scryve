@@ -1,6 +1,11 @@
 import { COMMANDER_COLORS } from "@/components/CardFocusDialog"
 
-import { readFilterTerm, scryfallFilterTerms, type CardFilterState } from "./cardFilters"
+import {
+  readFilterTerm,
+  scryfallFilterTerms,
+  termSuggestions,
+  type CardFilterState,
+} from "./cardFilters"
 import type { ColorMatch } from "./colorMatch"
 import type { CardFilterDefinition } from "../../../convex/lib/systems"
 
@@ -161,4 +166,25 @@ export function formatCardQuery(
   // why: a top-level `or` would split the filters from the rest of the query, so the typed part keeps its own group.
   const grouped = terms && joinsWithOr(rest) ? `(${rest})` : rest
   return terms ? `${terms} ${grouped}` : rest
+}
+
+/**
+ * why: while the bar's last word is a term the sheet reads, such as `t:liz`, the bar offers the
+ * options it could finish as. Each suggestion carries the bar's text with that word completed.
+ */
+export function querySuggestions(
+  text: string,
+  filters: readonly CardFilterDefinition[],
+  cardOptionsFor: (filterId: string) => readonly string[],
+  limit = 6,
+) {
+  const last = /\s$/.test(text) ? undefined : tokens(text).at(-1)
+  const [, key = "", typed = ""] = (last && /^([a-z]+):"?([^"]*)$/i.exec(last)) || []
+  if (!last || !key) return []
+  return termSuggestions(filters, key.toLowerCase(), typed, cardOptionsFor, limit).map(
+    (suggestion) => ({
+      ...suggestion,
+      text: `${text.slice(0, text.length - last.length)}${suggestion.term} `,
+    }),
+  )
 }

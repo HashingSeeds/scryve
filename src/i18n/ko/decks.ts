@@ -356,6 +356,7 @@ export default {
     allowAdditional: "최소",
     exactColors: "정확히",
     searchFilter: "{{filter}} 검색",
+    suggestion: "{{option}}, {{term}}",
     min: "최소",
     max: "최대",
     minimum: "최소 {{filter}}",

@@ -365,6 +365,7 @@ export default {
     allowAdditional: "कम से कम",
     exactColors: "बिल्कुल यही",
     searchFilter: "{{filter}} खोजें",
+    suggestion: "{{option}}, {{term}}",
     min: "न्यूनतम",
     max: "अधिकतम",
     minimum: "न्यूनतम {{filter}}",
