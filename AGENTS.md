@@ -58,6 +58,7 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 - For a change with non-obvious reach, name the fact that makes it safe and prove it with the cheapest real evidence: the implementation, the failure path, a focused test, or the client.
 - **Do not run repo-wide checks.** No `pnpm lint` (it auto-fixes), full `pnpm test`, or Maestro E2E unless asked.
 - Backend behavior changes ship with focused tests for that behavior.
+- A change to how nearby games sync life, undo, or commander damage runs `.agents/skills/verify-nearby-sync/check.sh`. Its SKILL.md lists the files it covers.
 - Upon request, user-visible frontend changes should get one integrated pass in a real client: `test-scryve-web` for web, `test-scryve-mobile` for mobile. The primary agent does this once after integrating, loading `.agents/skills/test-scryve-web/SKILL.md` or `.agents/skills/test-scryve-mobile/SKILL.md`. Subagents do not launch their own dev servers.
 
 ## Pull requests
