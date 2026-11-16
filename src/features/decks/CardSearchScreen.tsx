@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Modal,
@@ -63,6 +63,7 @@ import {
   type CardFilterState,
 } from "./cardFilters"
 import { searchCardNames } from "./cardNameMatch"
+import { formatCardQuery, identityTerm, parseCardQuery, type CardQuery } from "./cardQuery"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import {
   COLOR_MATCHES,
@@ -92,6 +93,7 @@ import {
   MAGIC_CARD_FILTERS,
   picksCommander,
   systemDefinition,
+  type CardFilterDefinition,
   type SystemId,
 } from "../../../convex/lib/systems"
 import { canReadCardText } from "../../../modules/card-text-reader"
@@ -100,11 +102,9 @@ type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
 const SCRYFALL = "Scryfall"
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
-const COLOR_MATCH_OPERATOR = {
-  exact: "=",
-  additional: ">=",
-  within: "<=",
-} as const satisfies Record<ColorMatch, string>
+const NO_CARD_FILTERS: readonly CardFilterDefinition[] = []
+const NO_PICKS: CardFilterState = {}
+const NO_COLORS: readonly string[] = []
 
 export function scryfallQuery({
   text,
@@ -115,15 +115,11 @@ export function scryfallQuery({
 }: {
   text: string
   commander: boolean
-  colors: string[]
+  colors: readonly string[]
   colorMatch: ColorMatch
   filters: CardFilterState
 }) {
-  const identity = colors.includes("C")
-    ? "id:c"
-    : colors.length
-      ? `id${COLOR_MATCH_OPERATOR[colorMatch]}${colors.join("").toLowerCase()}`
-      : ""
+  const identity = identityTerm(colors, colorMatch)
   const terms = [
     ...new Set([
       commander ? "is:commander" : "",
@@ -217,10 +213,8 @@ export function CardSearch({
       : undefined,
     choosingCommander,
   )
-  const [query, setQuery] = useState("")
   const [scanning, setScanning] = useState(false)
   const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
-  const nameIndex = useCardNameIndex(game, deviceId, scanning || query.trim().length > 0)
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
@@ -252,9 +246,7 @@ export function CardSearch({
     const colors = COMMANDER_COLORS.filter((color) => identities.join("").includes(color))
     return { colors: colors.length ? colors : ["C"], colorMatch: "within" }
   })
-  const [colorFilters, setColorFilters] = useState<string[]>(startingFilters.colors)
-  const [colorMatch, setColorMatch] = useState(startingFilters.colorMatch)
-  const cardFilters = filtersCards ? (systemDefinition(game)?.cardFilters ?? []) : []
+  const cardFilters = (filtersCards && systemDefinition(game)?.cardFilters) || NO_CARD_FILTERS
   // why: a deck's search starts on cards its format allows; looking up rules searches every card.
   const [startingPicked] = useState<CardFilterState>(() => ({
     format:
@@ -268,7 +260,35 @@ export function CardSearch({
         ? [format]
         : [],
   }))
-  const [picked, setPicked] = useState(startingPicked)
+  const [colorMatchPick, setColorMatchPick] = useState(startingFilters.colorMatch)
+  const [query, setQuery] = useState(() =>
+    filtersCards
+      ? formatCardQuery(
+          { rest: "", filters: startingPicked, colors: startingFilters.colors },
+          startingFilters.colorMatch,
+          cardFilters,
+        )
+      : "",
+  )
+  const parsed = useMemo<CardQuery>(
+    () =>
+      filtersCards
+        ? parseCardQuery(query, cardFilters, (id) =>
+            magicCards ? cardOptions(magicCards.cards, id, []) : [],
+          )
+        : { rest: query, filters: NO_PICKS, colors: NO_COLORS },
+    [query, filtersCards, cardFilters, magicCards],
+  )
+  const picked = parsed.filters
+  const colorFilters = parsed.colors
+  const colorMatch = parsed.colorMatch ?? colorMatchPick
+  const text = parsed.rest.trim()
+  const nameIndex = useCardNameIndex(game, deviceId, scanning || text.length > 0)
+  /** why: the sheet edits the search bar's text, which holds every filter. */
+  function changeQuery(change: Partial<CardQuery>, match = colorMatch) {
+    setColorMatchPick(match)
+    setQuery(formatCardQuery({ ...parsed, ...change }, match, cardFilters))
+  }
   const pickedFilters = pickedCount(cardFilters, picked)
   const changedFilters = cardFilters.some(({ id }) => {
     const options = picked[id] ?? []
@@ -277,10 +297,12 @@ export function CardSearch({
   })
   const needsKeywords = (picked.keyword?.length ?? 0) > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const pickedColors = colorFilters.length > 0 && colorFilters !== startingFilters.colors
+  const pickedColors =
+    colorFilters.length > 0 &&
+    (colorFilters.length !== startingFilters.colors.length ||
+      colorFilters.some((color) => !startingFilters.colors.includes(color)))
   const searchRequested =
-    query.trim().length >= 2 ||
-    (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0)))
+    text.length >= 2 || (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0)))
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
@@ -397,7 +419,6 @@ export function CardSearch({
   ])
 
   useEffect(() => {
-    const text = query.trim()
     const local =
       searchRequested && !offline
         ? localMagicSearch(magicCards, nameIndex, {
@@ -432,7 +453,7 @@ export function CardSearch({
     if (!searchRequested) return
     if (offline) {
       const wanted = (
-        choosingCommander ? query.slice(0, 80).replace(/[()"]/g, " ").trim() : query.trim()
+        choosingCommander ? text.slice(0, 80).replace(/[()"]/g, " ").trim() : text
       ).toLowerCase()
       const cached = loadCardDetails()
       setCachedRules(cached)
@@ -504,7 +525,7 @@ export function CardSearch({
   }, [
     convex,
     game,
-    query,
+    text,
     offline,
     offlineCandidates,
     choosingCommander,
@@ -670,7 +691,7 @@ export function CardSearch({
         matchesFilters(entry.card.name, cachedRules[cardDetailsKey(entry.card, game)])),
   )
 
-  const needle = query.trim().toLocaleLowerCase()
+  const needle = text.toLocaleLowerCase()
   const inDeckMatches = needle
     ? deckCards?.filter((card) => card.name.toLocaleLowerCase().includes(needle))
     : undefined
@@ -730,7 +751,7 @@ export function CardSearch({
               accessibilityLabel={translate("decks:cardSearch.searchLabel")}
               placeholderTx="decks:cardSearch.placeholder"
               value={query}
-              maxLength={choosingCommander ? 80 : 120}
+              maxLength={filtersCards ? 400 : 120}
               autoCorrect={false}
               autoFocus={!choosingCommander}
               returnKeyType="search"
@@ -1006,7 +1027,7 @@ export function CardSearch({
                   testID={`card-color-${color}`}
                   label={colorLabel(color)}
                   selected={colorFilters.includes(color)}
-                  onPress={() => setColorFilters((current) => toggleColor(current, color))}
+                  onPress={() => changeQuery({ colors: toggleColor(colorFilters, color) })}
                 />
               ))}
             </FilterGroup>
@@ -1019,7 +1040,7 @@ export function CardSearch({
                 selectedId={colorMatch}
                 onSelect={(id) => {
                   const match = COLOR_MATCHES.find((option) => option.id === id)
-                  if (match) setColorMatch(match.id)
+                  if (match) changeQuery({}, match.id)
                 }}
               />
             </View>
@@ -1044,7 +1065,7 @@ export function CardSearch({
                     }
                     picked={picked[filter.id] ?? []}
                     onChange={(options) =>
-                      setPicked((current) => ({ ...current, [filter.id]: options }))
+                      changeQuery({ filters: { ...picked, [filter.id]: options } })
                     }
                   />
                 ))}
@@ -1056,9 +1077,7 @@ export function CardSearch({
               style={themed($dialogButton)}
               tx="decks:cardSearch.clearAll"
               onPress={() => {
-                setColorFilters([])
-                setPicked(startingPicked)
-                setColorMatch(startingFilters.colorMatch)
+                changeQuery({ filters: startingPicked, colors: [] }, startingFilters.colorMatch)
               }}
             />
             <Button

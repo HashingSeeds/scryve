@@ -832,7 +832,7 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("Modern · 2 cards")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Edited islands")
     fireEvent.press(view.getByTestId("deck-add-cards"))
-    fireEvent.changeText(view.getByTestId("card-search-input"), "Sol Ring")
+    fireEvent.changeText(view.getByTestId("card-search-input"), "f:modern Sol Ring")
     await act(async () => jest.advanceTimersByTime(400))
     await waitFor(() => expect(view.getByLabelText("Add Sol Ring to deck")).toBeTruthy())
     expect(mockConvexClient.action).toHaveBeenCalledWith("cards.search", {
