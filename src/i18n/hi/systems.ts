@@ -62,7 +62,7 @@ export default {
   },
   cardFilter: {
     format: "इनमें मान्य",
-    type: "कार्ड टाइप",
+    type: "टाइप",
     supertype: "सुपरटाइप",
     subtype: "सबटाइप",
     manaValue: "मैना वैल्यू",

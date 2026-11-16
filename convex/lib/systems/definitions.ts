@@ -145,9 +145,14 @@ export type RoundClockDefinition = {
  * why: a game declares what its card search can filter; the adapter for its card catalog
  * reads each filter's field from a card and turns picked options into the catalog's query.
  * `options: "cards"` lists the values cards carry, most common first. A range filter takes
- * a minimum and a maximum number instead of options.
+ * a minimum and a maximum number instead of options. A filter with a `group` shows on its own
+ * line under the heading of the filter that group names.
  */
-export type CardFilterDefinition = { readonly id: string; readonly label: string } & (
+export type CardFilterDefinition = {
+  readonly id: string
+  readonly label: string
+  readonly group?: string
+} & (
   | { readonly match: "any" | "all"; readonly options: readonly string[] | "cards" }
   | { readonly options: "range" }
 )
@@ -167,8 +172,15 @@ export const LEGALITY_FORMATS = [
 export const MAGIC_CARD_FILTERS = [
   { id: "format", label: "Legal in", match: "all", options: LEGALITY_FORMATS },
   {
+    id: "supertype",
+    label: "Supertype",
+    group: "type",
+    match: "all",
+    options: ["Legendary", "Basic", "Snow"],
+  },
+  {
     id: "type",
-    label: "Card type",
+    label: "Type",
     match: "any",
     options: [
       "Creature",
@@ -181,8 +193,7 @@ export const MAGIC_CARD_FILTERS = [
       "Battle",
     ],
   },
-  { id: "supertype", label: "Supertype", match: "all", options: ["Legendary", "Basic", "Snow"] },
-  { id: "subtype", label: "Subtypes", match: "any", options: "cards" },
+  { id: "subtype", label: "Subtype", match: "any", options: "cards" },
   { id: "manaValue", label: "Mana value", options: "range" },
   { id: "power", label: "Power", options: "range" },
   { id: "toughness", label: "Toughness", options: "range" },

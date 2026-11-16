@@ -34,7 +34,11 @@ import { TextAction } from "@/components/TextAction"
 import { TextField, type TextFieldAccessoryProps } from "@/components/TextField"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { localizedDeckSections, playSystemShortLabel } from "@/features/game/playSystems"
+import {
+  cardFilterLabel,
+  localizedDeckSections,
+  playSystemShortLabel,
+} from "@/features/game/playSystems"
 import { VISIBLE_SYSTEM_IDS } from "@/features/game/systemVisibility"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
@@ -52,6 +56,7 @@ import {
 import { CardFilterGroup } from "./CardFilterGroup"
 import {
   cardOptions,
+  filterGroups,
   matchesCardFilters,
   pickedCount,
   scryfallFilterTerms,
@@ -1018,27 +1023,32 @@ export function CardSearch({
                 }}
               />
             </View>
-            {cardFilters.map((filter) => (
-              <CardFilterGroup
-                key={filter.id}
-                filter={filter}
-                options={
-                  filter.options === "cards"
-                    ? magicCards
-                      ? cardOptions(magicCards.cards, filter.id, picked.format ?? [])
-                      : []
-                    : filter.options === "range"
-                      ? []
-                      : filter.options
-                }
-                optionLabel={
-                  filter.id === "format" ? (option) => deckFormatLabel(game, option) : undefined
-                }
-                picked={picked[filter.id] ?? []}
-                onChange={(options) =>
-                  setPicked((current) => ({ ...current, [filter.id]: options }))
-                }
-              />
+            {filterGroups(cardFilters).map(({ heading, filters }) => (
+              <View key={heading.id} style={$filterSection}>
+                {filters.map((filter, index) => (
+                  <CardFilterGroup
+                    key={filter.id}
+                    filter={filter}
+                    heading={index === 0 ? cardFilterLabel(heading) : undefined}
+                    options={
+                      filter.options === "cards"
+                        ? magicCards
+                          ? cardOptions(magicCards.cards, filter.id, picked.format ?? [])
+                          : []
+                        : filter.options === "range"
+                          ? []
+                          : filter.options
+                    }
+                    optionLabel={
+                      filter.id === "format" ? (option) => deckFormatLabel(game, option) : undefined
+                    }
+                    picked={picked[filter.id] ?? []}
+                    onChange={(options) =>
+                      setPicked((current) => ({ ...current, [filter.id]: options }))
+                    }
+                  />
+                ))}
+              </View>
             ))}
           </ScrollView>
           <View style={themed($dialogActions)}>

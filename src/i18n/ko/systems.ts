@@ -62,7 +62,7 @@ export default {
   },
   cardFilter: {
     format: "합법인 포맷",
-    type: "카드 유형",
+    type: "유형",
     supertype: "상위 유형",
     subtype: "하위 유형",
     manaValue: "마나 값",

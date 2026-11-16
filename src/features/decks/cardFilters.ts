@@ -104,6 +104,21 @@ export function pickedCount(filters: readonly CardFilterDefinition[], picked: Ca
   }, 0)
 }
 
+/** why: filters sharing a group render together, under the heading of the filter the group names. */
+export function filterGroups(filters: readonly CardFilterDefinition[]) {
+  const groups = new Map<
+    string,
+    { heading: CardFilterDefinition; filters: CardFilterDefinition[] }
+  >()
+  for (const filter of filters) {
+    const id = filter.group ?? filter.id
+    const group = groups.get(id)
+    if (group) group.filters.push(filter)
+    else groups.set(id, { heading: filters.find((f) => f.id === id) ?? filter, filters: [filter] })
+  }
+  return [...groups.values()]
+}
+
 export function toggleOption(picked: readonly string[], option: string) {
   return picked.includes(option) ? picked.filter((value) => value !== option) : [...picked, option]
 }

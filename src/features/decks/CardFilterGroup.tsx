@@ -18,14 +18,17 @@ const RANGE_BOUNDS = [
   { bound: "<=", placeholder: "decks:cardSearch.max", label: "decks:cardSearch.maximum" },
 ] as const satisfies readonly { bound: RangeBound; placeholder: string; label: string }[]
 
+/** why: `heading` is left out for a filter that shows on its own line under the filter before it. */
 export function CardFilterGroup({
   filter,
+  heading,
   options,
   optionLabel = (option) => option,
   picked,
   onChange,
 }: {
   filter: CardFilterDefinition
+  heading?: string
   options: readonly string[]
   optionLabel?: (option: string) => string
   picked: readonly string[]
@@ -71,35 +74,37 @@ export function CardFilterGroup({
           ...options.slice(0, TOP_OPTIONS),
         ]
   return (
-    <>
-      {searchable ? (
-        <TextField
-          testID={`card-filter-search-${filter.id}`}
-          accessibilityLabel={translate("decks:cardSearch.searchFilter", {
-            filter: label.toLocaleLowerCase(),
-          })}
-          placeholder={translate("decks:cardSearch.searchFilter", {
-            filter: label.toLocaleLowerCase(),
-          })}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="done"
-          onSubmitEditing={Keyboard.dismiss}
-          autoCorrect={false}
-        />
-      ) : null}
-      <FilterGroup heading={label}>
-        {shown.map((option) => (
-          <FilterPill
-            key={option}
-            testID={`card-filter-${filter.id}-${option}`}
-            label={optionLabel(option)}
-            selected={picked.includes(option)}
-            onPress={() => onChange(toggleOption(picked, option))}
+    <FilterGroup
+      heading={heading}
+      search={
+        searchable ? (
+          <TextField
+            testID={`card-filter-search-${filter.id}`}
+            accessibilityLabel={translate("decks:cardSearch.searchFilter", {
+              filter: label.toLocaleLowerCase(),
+            })}
+            placeholder={translate("decks:cardSearch.searchFilter", {
+              filter: label.toLocaleLowerCase(),
+            })}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="done"
+            onSubmitEditing={Keyboard.dismiss}
+            autoCorrect={false}
           />
-        ))}
-      </FilterGroup>
-    </>
+        ) : null
+      }
+    >
+      {shown.map((option) => (
+        <FilterPill
+          key={option}
+          testID={`card-filter-${filter.id}-${option}`}
+          label={optionLabel(option)}
+          selected={picked.includes(option)}
+          onPress={() => onChange(toggleOption(picked, option))}
+        />
+      ))}
+    </FilterGroup>
   )
 }
 
