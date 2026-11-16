@@ -100,7 +100,7 @@ const events = {
     confirm: "Delete",
   },
   drop: {
-    // Leaving an event so you are not paired in later rounds.
+    // Withdrawing from an event so you are not paired in later rounds. Use the tournament word for dropping.
     action: "Drop",
     title: "Drop from this event?",
     message: "You won't be paired in later rounds.",

@@ -1,4 +1,4 @@
-// why: `pnpm i18n:translate` overwrites this file. Edit English in src/i18n/en.
+// why: `pnpm i18n:translate` overwrites this file. Fix wording in src/i18n/en or src/i18n/glossary.json.
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
