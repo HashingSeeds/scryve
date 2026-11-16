@@ -132,6 +132,27 @@ export function readFilterTerm(
     : undefined
 }
 
+/** why: lists the options a partly typed term could finish as, those starting with the typed text first. */
+export function termSuggestions(
+  filters: readonly CardFilterDefinition[],
+  key: string,
+  typed: string,
+  cardOptionsFor: (filterId: string) => readonly string[],
+  limit: number,
+) {
+  const wanted = typed.toLocaleLowerCase()
+  const options = filters.flatMap((filter) =>
+    filter.options !== "range" && scryfallFields.get(filter.id)?.keys.includes(key)
+      ? (Array.isArray(filter.options) ? filter.options : cardOptionsFor(filter.id)).map(
+          (option) => ({ filter, option, at: option.toLocaleLowerCase().indexOf(wanted) }),
+        )
+      : [],
+  )
+  return [...options.filter(({ at }) => at === 0), ...options.filter(({ at }) => at > 0)]
+    .slice(0, limit)
+    .map(({ filter, option }) => ({ filter, option, term: filterTerm(filter, key, option) }))
+}
+
 export function pickedCount(filters: readonly CardFilterDefinition[], picked: CardFilterState) {
   return filters.reduce((total, filter) => {
     const options = picked[filter.id]?.length ?? 0

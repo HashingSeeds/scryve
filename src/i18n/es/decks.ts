@@ -382,6 +382,7 @@ export default {
     allowAdditional: "Al menos",
     exactColors: "Exactamente",
     searchFilter: "Buscar en {{filter}}",
+    suggestion: "{{option}}, {{term}}",
     min: "Mín.",
     max: "Máx.",
     minimum: "{{filter}} mínimo",

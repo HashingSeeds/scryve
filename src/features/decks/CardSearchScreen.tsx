@@ -63,7 +63,13 @@ import {
   type CardFilterState,
 } from "./cardFilters"
 import { searchCardNames } from "./cardNameMatch"
-import { formatCardQuery, identityTerm, parseCardQuery, type CardQuery } from "./cardQuery"
+import {
+  formatCardQuery,
+  identityTerm,
+  parseCardQuery,
+  querySuggestions,
+  type CardQuery,
+} from "./cardQuery"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import {
   COLOR_MATCHES,
@@ -283,6 +289,13 @@ export function CardSearch({
   const colorFilters = parsed.colors
   const colorMatch = parsed.colorMatch ?? colorMatchPick
   const text = parsed.rest.trim()
+  const [typing, setTyping] = useState(false)
+  const suggestions =
+    filtersCards && typing
+      ? querySuggestions(query, cardFilters, (id) =>
+          magicCards ? cardOptions(magicCards.cards, id, picked.format ?? []) : [],
+        )
+      : []
   const nameIndex = useCardNameIndex(game, deviceId, scanning || text.length > 0)
   /** why: the sheet edits the search bar's text, which holds every filter. */
   function changeQuery(change: Partial<CardQuery>, match = colorMatch) {
@@ -762,6 +775,8 @@ export function CardSearch({
               containerStyle={$queryField}
               inputWrapperStyle={$queryWrapper}
               RightAccessory={busy ? SearchBusy : undefined}
+              onFocus={() => setTyping(true)}
+              onBlur={() => setTyping(false)}
             />
             {CAN_READ_CARDS &&
             prereleaseBuild() &&
@@ -787,6 +802,28 @@ export function CardSearch({
               />
             ) : null}
           </View>
+          {suggestions.map((suggestion) => {
+            const label =
+              suggestion.filter.id === "format"
+                ? deckFormatLabel(game, suggestion.option)
+                : suggestion.option
+            return (
+              <TouchableOpacity
+                key={suggestion.term}
+                testID={`card-search-suggestion-${suggestion.term}`}
+                accessibilityRole="button"
+                accessibilityLabel={translate("decks:cardSearch.suggestion", {
+                  option: label,
+                  term: suggestion.term,
+                })}
+                style={themed($suggestion)}
+                onPress={() => setQuery(suggestion.text)}
+              >
+                <Text text={label} />
+                <Text size="xs" style={{ color: theme.colors.textDim }} text={suggestion.term} />
+              </TouchableOpacity>
+            )
+          })}
           {onGameChange ? (
             <SelectField
               testID="card-search-game"
@@ -1186,6 +1223,15 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 
+const $suggestion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  minHeight: 44,
+  paddingHorizontal: spacing.xs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
 const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
 const $queryField: ViewStyle = { flex: 1 }
 const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112 }

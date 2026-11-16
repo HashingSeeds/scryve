@@ -404,6 +404,8 @@ const decks = {
     exactColors: "Exactly",
     // Placeholder over a card filter's options; {{filter}} is the filter's name in lowercase, e.g. "keywords".
     searchFilter: "Search {{filter}}",
+    // Spoken label for a search-bar suggestion: the option, then the Scryfall syntax it writes, such as "Lizard, t:lizard".
+    suggestion: "{{option}}, {{term}}",
     // Placeholders in the two number fields beside a card stat like mana value or power.
     min: "Min",
     max: "Max",
