@@ -746,6 +746,7 @@ async function terminalizeGame(
   options: {
     finishedAt?: number
     historySource?: "local"
+    nearby?: boolean
     matchId?: Id<"matches">
     clientGameId?: string
     firstPlayerId?: Id<"gamePlayers">
@@ -860,6 +861,7 @@ async function terminalizeGame(
     ...(matchId ? { matchId } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
     ...(game.variant ? { variant: game.variant } : {}),
+    ...(options.nearby ? { nearby: true as const } : {}),
   })
   const summary = (await ctx.db.get(summaryId))!
   const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()
@@ -1610,6 +1612,7 @@ export const publishFinishedLocalGame = mutation({
     startedAt: v.number(),
     finishedAt: v.number(),
     eventCount: v.number(),
+    nearby: v.optional(v.boolean()),
     firstPlayerLocalId: v.optional(v.string()),
     freeMulligans: v.optional(freeMulligansValidator),
     players: v.array(
@@ -1856,6 +1859,7 @@ export const publishFinishedLocalGame = mutation({
       {
         finishedAt: args.finishedAt,
         historySource: "local",
+        nearby: args.nearby ?? seatPassHashes.length > 0,
         clientGameId: args.publicId,
         ...(firstPlayerLocalId !== undefined
           ? { firstPlayerId: playerIdsByLocalId.get(firstPlayerLocalId)! }

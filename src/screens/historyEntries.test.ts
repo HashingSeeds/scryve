@@ -84,15 +84,18 @@ describe("localHistoryEntry", () => {
 
 describe("connectedHistoryEntry", () => {
   it("keys a published local game like the device's copy so History shows it once", () => {
-    const entry = connectedHistoryEntry({
+    const published = {
       publicId: "game_1",
-      source: "local",
+      source: "local" as const,
       eventCount: 4,
       finishedAt: 2,
       players: [],
-    })
+    }
+    const entry = connectedHistoryEntry(published)
     expect(entry.key).toBe(localHistoryEntry(game()).key)
     expect(entry.source).toBe("local")
+    expect(sourceLabel(entry)).toBe("Local")
+    expect(sourceLabel(connectedHistoryEntry({ ...published, nearby: true }))).toBe("Nearby")
     expect(
       connectedHistoryEntry({ publicId: "c1", eventCount: 1, finishedAt: 2, players: [] }).key,
     ).toBe("connected:c1")

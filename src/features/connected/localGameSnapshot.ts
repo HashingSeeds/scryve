@@ -39,6 +39,7 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary): Finished
     startedAt: game.createdAt,
     finishedAt: game.finishedAt,
     eventCount: game.eventCount,
+    nearby: game.seatPassHashes ? true : undefined,
     firstPlayerLocalId: game.firstPlayerId || undefined,
     freeMulligans: game.account?.freeMulligans ?? game.nearbyMulligans?.free,
     players: ordered.map((player, index): FinishedGameArgs["players"][number] => {
