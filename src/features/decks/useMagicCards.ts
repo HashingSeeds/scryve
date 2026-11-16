@@ -30,8 +30,11 @@ function savedMeta() {
 export async function fetchMagicCards(fetcher: typeof fetch = fetch): Promise<MagicCards> {
   const meta = savedMeta()
   const readSaved = meta && savedMagicCards()
-  if (readSaved && Date.now() - meta.checkedAt < MAX_AGE_MS)
-    return parseMagicCards(await readSaved())
+  if (readSaved && Date.now() - meta.checkedAt < MAX_AGE_MS) {
+    const saved = parseMagicCards(await readSaved())
+    // why: a file saved before legality was added sends every format search to Scryfall, so look for a newer one now.
+    if (saved.knowsLegality) return saved
+  }
   const response = await fetcher(
     MAGIC_DATASET_URL,
     readSaved && meta.etag ? { headers: { "If-None-Match": meta.etag } } : undefined,

@@ -105,7 +105,7 @@ test("colors each term by its sheet section, and keeps the text whole", () => {
     ["f:commander", "format"],
     ["id<=wur", "colors"],
     ["t:creature", "type"],
-    ["t:elf", "subtype"],
+    ["t:elf", "type"],
     ["mv>3", "manaValue"],
     ['-kw:"first strike"', "keyword"],
     ["o:draw", "syntax"],

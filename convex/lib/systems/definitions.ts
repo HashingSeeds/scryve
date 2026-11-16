@@ -193,7 +193,7 @@ export const MAGIC_CARD_FILTERS = [
       "Battle",
     ],
   },
-  { id: "subtype", label: "Subtype", match: "any", options: "cards" },
+  { id: "subtype", label: "Subtype", group: "type", match: "any", options: "cards" },
   { id: "manaValue", label: "Mana value", options: "range" },
   { id: "power", label: "Power", options: "range" },
   { id: "toughness", label: "Toughness", options: "range" },
