@@ -1,6 +1,6 @@
 ---
 name: verify-nearby-sync
-description: Use when a change touches how nearby games sync life, undo, or commander damage between the host and guests, or edits any file listed under Coverage. Model-checks every order of taps, retries, and dropped connections in about a minute.
+description: Use when a change touches how nearby games sync life, undo, or commander damage between the host and guests, or edits any file listed under Coverage. Model-checks every order of taps, retries, and dropped connections.
 ---
 
 # Verify nearby sync
@@ -22,11 +22,12 @@ within the bounds in `check.sh` and checks four rules in every state:
 ## Run it
 
 ```bash
-.agents/skills/verify-nearby-sync/check.sh        # every run, about a minute
+.agents/skills/verify-nearby-sync/check.sh        # every run, 1 to 4 minutes
 .agents/skills/verify-nearby-sync/check.sh drops  # one run, with TLC's full output
 ```
 
-It needs Java 11 or newer. The first run downloads TLC 1.7.4 into
+It takes about 80 seconds on an 18-core Mac and 4 minutes on a 12-core Linux
+box, and needs Java 11 or newer. The first run downloads TLC 1.7.4 into
 `~/.cache/scryve` and checks its sha256.
 
 Each `ok` line is a run that went as expected. The app runs (`edits`, `seats`,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Model-checks NearbySync.tla. Every app run must pass, and every break must
 # fail on the rule it names, which proves each rule can still catch a bug.
-# Usage: check.sh            run everything (about a minute)
+# Usage: check.sh            run everything (1 to 4 minutes)
 #        check.sh <run>      one run, with its full TLC output
 set -euo pipefail
 cd "$(dirname "$0")"
