@@ -60,7 +60,10 @@ function tokens(text: string) {
 function term(token: string) {
   const [, key = "", operator = "", typed = ""] = TERM.exec(token) ?? []
   const value = /^".+"$/.test(typed) ? typed.slice(1, -1) : typed
-  return key && !value.includes('"') ? { key, operator, value } : undefined
+  // why: a `/regex/` value means a pattern, not a subtype or keyword named that.
+  return key && !value.includes('"') && !value.startsWith("/")
+    ? { key, operator, value }
+    : undefined
 }
 
 function readIdentity({ key, operator, value }: NonNullable<ReturnType<typeof term>>) {
@@ -106,15 +109,18 @@ function fitsPicked({ filter, options }: FilterRead, current: readonly string[])
   return filter.match === "all" || current.length === 0
 }
 
+function joinsWithOr(text: string) {
+  return tokens(text).some((part) => /^or$/i.test(part))
+}
+
 export function parseCardQuery(
   text: string,
   filters: readonly CardFilterDefinition[],
   cardOptionsFor: (filterId: string) => readonly string[],
 ): CardQuery {
-  const parts = tokens(text)
   // why: a top-level `or` joins everything around it, so no term can move into the sheet without changing the search.
-  if (parts.some((part) => /^or$/i.test(part)))
-    return { rest: text.trim(), filters: {}, colors: [] }
+  if (joinsWithOr(text)) return { rest: text.trim(), filters: {}, colors: [] }
+  const parts = tokens(text)
   const picked: Record<string, readonly string[]> = {}
   const rest: string[] = []
   let identity: ReturnType<typeof readIdentity>
@@ -152,5 +158,7 @@ export function formatCardQuery(
   const terms = [...scryfallFilterTerms(definitions, filters), identityTerm(colors, colorMatch)]
     .filter(Boolean)
     .join(" ")
-  return terms ? `${terms} ${rest}` : rest
+  // why: a top-level `or` would split the filters from the rest of the query, so the typed part keeps its own group.
+  const grouped = terms && joinsWithOr(rest) ? `(${rest})` : rest
+  return terms ? `${terms} ${grouped}` : rest
 }

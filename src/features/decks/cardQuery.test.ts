@@ -48,10 +48,19 @@ test.each([
   ["a key the sheet has no control for", "o:flying", {}, "o:flying"],
   ["a mana value bound given twice", "mv>=2 mv>=3", { manaValue: [">=2"] }, "mv>=3"],
   ["a guild name", "id:azorius", {}, "id:azorius"],
+  ["a regular expression", "t:/dragon/", {}, "t:/dragon/"],
 ])("leaves %s as typed", (_name, text, filters, rest) => {
   expect(parse(text)).toMatchObject({ filters, rest })
 })
 
-test("leaves everything as typed when a top-level or joins it", () => {
-  expect(parse("t:elf or t:goblin")).toEqual({ rest: "t:elf or t:goblin", filters: {}, colors: [] })
+test("leaves everything as typed when a top-level or joins it, and groups it under new filters", () => {
+  const typed = parse("t:elf or t:goblin")
+  expect(typed).toEqual({ rest: "t:elf or t:goblin", filters: {}, colors: [] })
+  const text = formatCardQuery(
+    { ...typed, filters: { format: ["modern"] } },
+    "exact",
+    MAGIC_CARD_FILTERS,
+  )
+  expect(text).toBe("f:modern (t:elf or t:goblin)")
+  expect(parse(text).filters).toEqual({ format: ["modern"], subtype: ["Elf", "goblin"] })
 })
