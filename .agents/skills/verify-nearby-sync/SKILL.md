@@ -65,12 +65,13 @@ Never weaken a rule or shrink a bound to make a run pass.
 ## When you change covered code on purpose
 
 Update the matching action in `NearbySync.tla` so it still describes the code,
-run `check.sh`, and move the sync commit below forward to the commit you
-checked. Code that changed after the sync commit has not been checked against
+run `check.sh`, and commit the model with the code. If the code changed but the
+model still describes it, update the date under Coverage instead. Covered code
+that changed after the last commit to this folder has not been checked against
 the model:
 
 ```bash
-git log --oneline 9447c9a81527608a557fa5caa96cd86d0f676dee..HEAD -- \
+git log --oneline "$(git log -1 --format=%H -- .agents/skills/verify-nearby-sync)..HEAD" -- \
   src/features/lan/lanSession.ts src/features/lan/lanGame.ts \
   convex/lib/gameEngine.ts src/features/sync/outbox.ts \
   src/features/connected/OutboxSyncController.ts \
@@ -79,7 +80,7 @@ git log --oneline 9447c9a81527608a557fa5caa96cd86d0f676dee..HEAD -- \
 
 ## Coverage
 
-Last checked against `9447c9a81527608a557fa5caa96cd86d0f676dee`.
+Last checked against the covered code on 2026-11-16.
 
 | File | What the model stands for |
 | --- | --- |
