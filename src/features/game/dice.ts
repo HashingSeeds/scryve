@@ -4,7 +4,7 @@ import { translate } from "@/i18n/translate"
 
 import type { TurnSeat } from "./turnTab"
 import type { GamePlayer, PlayerId } from "./types"
-import type { FreeMulligans } from "../../../convex/lib/mulligans"
+import { keptHandSize, type FreeMulligans } from "../../../convex/lib/mulligans"
 import { systemDefinition, type FirstPlayerDefinition } from "../../../convex/lib/systems"
 import type { Turn } from "../../../convex/lib/turns"
 
@@ -344,4 +344,26 @@ export function diceSeatChips(state: DiceState, seatId: PlayerId): DiceSeatChip[
   const result = state.results[seatId]
   if (result?.phase === "chip") chips.push({ kind: "roll", roll: result.roll })
   return chips
+}
+
+export const MULLIGAN_RULE = "103.5"
+
+export function mulliganStep(
+  taken: number,
+  free: FreeMulligans,
+  handSize: number,
+  help: boolean,
+): DiceSeatView {
+  const keeps = keptHandSize(taken, free, handSize)
+  const before = keptHandSize(taken - 1, free, handSize)
+  return {
+    kind: "mulligan",
+    handSize,
+    keeps,
+    free,
+    help,
+    ...(taken > 0
+      ? { last: keeps === before ? { free: true } : { free: false, bottom: handSize - keeps } }
+      : {}),
+  }
 }

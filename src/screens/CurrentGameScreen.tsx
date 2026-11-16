@@ -18,6 +18,8 @@ import { BoardContextLabels } from "@/features/game/BoardContextLabels"
 import type { AttackChange } from "@/features/game/commanderAttack"
 import {
   CLAIM_CHIP,
+  MULLIGAN_RULE,
+  mulliganStep,
   type DiceSeatChip,
   type DiceSeatView,
   type MulliganAction,
@@ -76,12 +78,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
 
-import {
-  keptHandSize,
-  maxMulligans,
-  mulliganHandSize,
-  type FreeMulligans,
-} from "../../convex/lib/mulligans"
+import { maxMulligans, mulliganHandSize } from "../../convex/lib/mulligans"
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
 import { nextTurnSeat, sharesTurn } from "../../convex/lib/turns"
@@ -873,25 +870,3 @@ const $sideboardFirst: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
-
-const MULLIGAN_RULE = "103.5"
-
-function mulliganStep(
-  taken: number,
-  free: FreeMulligans,
-  handSize: number,
-  help: boolean,
-): DiceSeatView {
-  const keeps = keptHandSize(taken, free, handSize)
-  const before = keptHandSize(taken - 1, free, handSize)
-  return {
-    kind: "mulligan",
-    handSize,
-    keeps,
-    free,
-    help,
-    ...(taken > 0
-      ? { last: keeps === before ? { free: true } : { free: false, bottom: handSize - keeps } }
-      : {}),
-  }
-}

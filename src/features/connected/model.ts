@@ -1,3 +1,5 @@
+import { v, type Infer } from "convex/values"
+
 import { storedPlaySystem, type PlaySystemId } from "@/features/game/playSystems"
 import type {
   ActorId,
@@ -18,6 +20,12 @@ import {
   type PlayerGridLayoutVariant,
 } from "../../../convex/lib/layouts"
 import { isMatchBestOf, type MatchBestOf } from "../../../convex/lib/matchResults"
+import {
+  firstChoiceReasonValidator,
+  firstPlayerModeValidator,
+  freeMulligansValidator,
+  type FreeMulligans,
+} from "../../../convex/lib/mulligans"
 import {
   matchesValidator,
   parseTableState,
@@ -51,7 +59,16 @@ export interface ConnectedPlayerProjection {
   editsAnySeat?: boolean
   role?: TreacheryRole
   roleRevealed?: boolean
+  mulligans?: number
 }
+
+const firstPlayerValidator = v.object({
+  mode: v.optional(firstPlayerModeValidator),
+  playerId: v.optional(v.string()),
+  rolls: v.optional(v.record(v.string(), v.number())),
+  chooser: v.optional(v.object({ playerId: v.string(), reason: firstChoiceReasonValidator })),
+})
+export type ConnectedFirstPlayer = Infer<typeof firstPlayerValidator>
 
 export interface ConnectedCommanderDamageTotal {
   fromPlayerId: string
@@ -142,6 +159,8 @@ export interface ConnectedProjection {
   ruleset: string
   isHost: boolean
   lifeEditing?: "anyone"
+  freeMulligans?: FreeMulligans
+  firstPlayer?: ConnectedFirstPlayer
   treacheryOutcome?: TreacheryOutcome<string>
   rematchPublicId?: string
   match?: ConnectedMatch
@@ -280,6 +299,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       ...(player.editsAnySeat === true ? { editsAnySeat: true } : {}),
       ...(isTreacheryRole(player.role) ? { role: player.role } : {}),
       ...(typeof player.roleRevealed === "boolean" ? { roleRevealed: player.roleRevealed } : {}),
+      ...(typeof player.mulligans === "number" ? { mulligans: player.mulligans } : {}),
     })
   }
   const invitationValue = value.invitation
@@ -397,6 +417,12 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     ruleset: value.ruleset,
     isHost: value.isHost,
     ...(value.lifeEditing === "anyone" ? { lifeEditing: "anyone" as const } : {}),
+    ...(matchesValidator(freeMulligansValidator, value.freeMulligans)
+      ? { freeMulligans: value.freeMulligans }
+      : {}),
+    ...(matchesValidator(firstPlayerValidator, value.firstPlayer)
+      ? { firstPlayer: value.firstPlayer }
+      : {}),
     ...treacheryOutcomeOf(value.treacheryOutcome),
     ...(typeof value.rematchPublicId === "string" && value.rematchPublicId
       ? { rematchPublicId: value.rematchPublicId }

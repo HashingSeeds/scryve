@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react"
 import { Dimensions, Modal, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
@@ -1389,5 +1390,129 @@ describe("ConnectedBoardScreen", () => {
     expect(mockUndoLife).toHaveBeenCalledWith([
       { operationId: "operation-unsent-01", playerId: "player-1", delta: -3 },
     ])
+  })
+})
+
+describe("ConnectedBoardScreen before play", () => {
+  beforeEach(() => resetConnectedHarness())
+
+  type Seat = (typeof connectedHarness.runtime.projection.players)[number]
+  function withGame(game: Record<string, unknown>, players: (player: Seat) => Seat = (p) => p) {
+    const { projection } = connectedHarness.runtime
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...projection, ...game, players: projection.players.map(players) },
+    }
+  }
+
+  function PregameBoard({
+    pregame,
+  }: {
+    pregame: ComponentProps<typeof ConnectedBoardWithRuntime>["pregame"]
+  }) {
+    const runtime = useConnectedGame("game-public", "owner")
+    return (
+      <ConnectedBoardWithRuntime
+        publicId="game-public"
+        ownerId="owner"
+        runtime={runtime}
+        pregame={pregame}
+      />
+    )
+  }
+
+  function layout() {
+    for (const card of screen.queryAllByTestId(/^life-card-seat-\d+$/))
+      fireEvent(card, "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 400 } },
+      })
+  }
+
+  const actions = () => ({ rollFirst: jest.fn(), chooseFirst: jest.fn(), keepHand: jest.fn() })
+
+  it("rolls on the server from any seat in a roll game, and shows the roll everywhere", () => {
+    const pregame = actions()
+    withGame({ firstPlayer: { mode: "roll" } })
+    render(themed(<PregameBoard pregame={pregame} />))
+    layout()
+    expect(screen.getByTestId("dice-seat-1").props.accessibilityLabel).toBe(
+      "Roll for who goes first",
+    )
+    fireEvent.press(screen.getByTestId("dice-seat-1"))
+    expect(pregame.rollFirst).toHaveBeenCalledTimes(1)
+
+    withGame({
+      firstPlayer: { mode: "roll", playerId: "player-2", rolls: { "player-1": 4, "player-2": 17 } },
+    })
+    screen.rerender(themed(<PregameBoard pregame={pregame} />))
+    expect(screen.getByTestId("dice-seat-1")).toHaveTextContent(/17/)
+  })
+
+  it("picks the tapped seat in a pick game", () => {
+    const pregame = actions()
+    withGame({ firstPlayer: { mode: "pick" } })
+    render(themed(<PregameBoard pregame={pregame} />))
+    layout()
+    fireEvent.press(screen.getByTestId("dice-seat-1"))
+    expect(pregame.chooseFirst).toHaveBeenCalledWith("player-2")
+  })
+
+  it("asks only the loser's own device to choose, leaves other seats playable, and going second hands first to the next seat", () => {
+    const pregame = actions()
+    withGame({ firstPlayer: { mode: "roll", chooser: { playerId: "player-1", reason: "loss" } } })
+    render(themed(<PregameBoard pregame={pregame} />))
+    layout()
+    expect(screen.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
+    expect(screen.queryByTestId("dice-seat-1")).toBeNull()
+    fireEvent.press(screen.getByTestId("dice-go-second"))
+    expect(pregame.chooseFirst).toHaveBeenCalledWith("player-2")
+  })
+
+  it("logs mulligans on this device's deck seat once first player is settled", () => {
+    const pregame = actions()
+    withGame(
+      { freeMulligans: "none", firstPlayer: { mode: "pick", playerId: "player-2" } },
+      (player) =>
+        "playerId" in player && player.playerId === "player-1"
+          ? { ...player, deckVersionId: "deck" }
+          : player,
+    )
+    render(themed(<PregameBoard pregame={pregame} />))
+    layout()
+    expect(screen.getByTestId("dice-seat-2")).toHaveTextContent(/^Keep 7\?/)
+    expect(screen.queryByTestId("dice-seat-1")).toBeNull()
+    fireEvent.press(screen.getByTestId("mulligan-mulligan"))
+    expect(screen.getByTestId("dice-seat-2")).toHaveTextContent(/^Keep 6\?Draw 7, bottom 1/)
+    fireEvent.press(screen.getByTestId("mulligan-keep"))
+    expect(pregame.keepHand).toHaveBeenCalledWith(1, 1)
+  })
+
+  it("keeps the mulligan step while turn 1 waits on the first player, and ends it at the first change", () => {
+    const pregame = actions()
+    const waiting = {
+      playerId: "player-2",
+      number: 1,
+      startedAt: 1,
+      operationId: "turn-1",
+      waiting: true as const,
+    }
+    const deckSeat = (player: Seat) =>
+      player.playerId === "player-1" ? { ...player, deckVersionId: "deck" } : player
+    withGame(
+      {
+        freeMulligans: "none",
+        firstPlayer: { mode: "pick", playerId: "player-2" },
+        eventSequence: 1,
+        table: { designations: {}, players: {}, turn: waiting },
+      },
+      deckSeat,
+    )
+    render(themed(<PregameBoard pregame={pregame} />))
+    layout()
+    expect(screen.getByTestId("dice-seat-2")).toHaveTextContent(/^Keep 7\?/)
+
+    withGame({ eventSequence: 2 })
+    screen.rerender(themed(<PregameBoard pregame={pregame} />))
+    expect(screen.queryByTestId("dice-seat-2")).toBeNull()
   })
 })

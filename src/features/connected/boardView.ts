@@ -13,6 +13,7 @@ import {
 } from "../../../convex/lib/outReason"
 import { variantCounter } from "../../../convex/lib/systems"
 import { isTeamVariant } from "../../../convex/lib/teamVariants"
+import type { Turn } from "../../../convex/lib/turns"
 import { teamTableRules } from "../../../convex/lib/twoHeadedGiant"
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
@@ -23,6 +24,7 @@ export interface ConnectedBoardView extends Omit<
 > {
   players: ConnectedBoardSeat[]
   finalEventSequence?: number
+  played: boolean
 }
 
 export function connectedBoardView(projection: ConnectedDisplayProjection): ConnectedBoardView {
@@ -39,8 +41,13 @@ export function connectedBoardView(projection: ConnectedDisplayProjection): Conn
       ({ currentLife: _currentLife, pendingDelta: _pendingDelta, ...seat }) => seat,
     ),
     ...(projection.status === "finished" ? { finalEventSequence: eventSequence } : {}),
+    played: eventSequence > turnSetupWrites(game.table?.turn),
   }
 }
+
+/** why: starting turn 1 on the first player is one write before anyone plays, and it must not end the mulligans. */
+const turnSetupWrites = (turn: Turn | undefined) =>
+  turn?.number === 1 && turn.waiting === true ? 1 : 0
 
 export function connectedLives(
   projection: ConnectedDisplayProjection,

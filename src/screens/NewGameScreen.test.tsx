@@ -16,6 +16,7 @@ import {
   createLocalGame,
   defaultCommandContext,
 } from "@/features/game/domain"
+import { localGameRepository } from "@/features/game/localPersistence"
 import { deckFingerprint } from "@/features/stats/deckFingerprint"
 import { ThemeProvider } from "@/theme/context"
 
@@ -145,6 +146,12 @@ function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
 
 describe("NewGameScreen", () => {
   beforeEach(() => {
+    const {
+      freeMulligans: _rules,
+      firstPlayer: _modes,
+      ...settings
+    } = localGameRepository.loadSettings()
+    localGameRepository.saveSettings(settings)
     clearGuestDecks()
     jest
       .mocked(deckFingerprint)
@@ -846,6 +853,7 @@ describe("NewGameScreen", () => {
       format: "commander",
       layout: "tabletop",
       lifeStep: 1,
+      freeMulligans: "first",
     })
   })
 
@@ -1810,7 +1818,7 @@ describe("NewGameScreen", () => {
     expect(screen.getByTestId("game-type-treachery").props.accessibilityState.selected).toBe(true)
     expectSetup(screen, 5, 40)
     fireEvent.press(screen.getByTestId("host-connected-button"))
-    expect(host).toHaveBeenCalledWith(lobby)
+    expect(host).toHaveBeenCalledWith({ ...lobby, freeMulligans: "first" })
   })
 
   it("restores a recent setup's Planechase and Archenemy choices and starts with them", async () => {
