@@ -155,6 +155,19 @@ describe("lanLocalGame", () => {
     expect(buildFinishedLocalGameSnapshot(pending).players[0]).toMatchObject({ me: true })
   })
 
+  it("marks a round with no hashed guest pass as nearby without uploading a pass", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(
+      lanLocalGame(finishedRound(), { ownerId: "host-account", seatPassHashes: {} }),
+    )
+
+    expect(repository.loadHistory()[0].seatPassHashes).toEqual({})
+    const [pending] = repository.pendingPublishes("host-account")
+    expect(
+      buildFinishedLocalGameSnapshot(pending).players.map((player) => player.seatPassHash),
+    ).toEqual([undefined, undefined])
+  })
+
   it("uploads the host's deck with its own seat only", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.archiveGame(

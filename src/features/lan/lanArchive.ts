@@ -143,7 +143,7 @@ export function lanLocalGame(
           },
         }
       : {}),
-    ...(seatPassHashes && Object.keys(seatPassHashes).length > 0 ? { seatPassHashes } : {}),
+    ...(seatPassHashes ? { seatPassHashes } : {}),
   }
   const match = archivedMatch(game, finished)
   return match ? { ...finished, match } : finished

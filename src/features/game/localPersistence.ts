@@ -797,7 +797,7 @@ function parseSeatPassHashes(value: unknown, players: GamePlayer[]): SeatPassHas
     const hash = value[player.id]
     if (typeof hash === "string" && isSeatPassHash(hash)) hashes[player.id] = hash
   }
-  return Object.keys(hashes).length > 0 ? hashes : undefined
+  return hashes
 }
 
 const isWide = (game: { players: readonly unknown[] }) =>

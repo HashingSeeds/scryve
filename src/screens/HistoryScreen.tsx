@@ -110,7 +110,7 @@ function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
   const games = match.games?.length
   const decks = [...new Set(entryDeckNames(entry))]
   return joinParts([
-    sourceLabel(entry.source),
+    sourceLabel(entry),
     [translate("play:history.bestOfShort", { bestOf: match.bestOf }), match.score]
       .filter(Boolean)
       .join(" "),
@@ -134,7 +134,7 @@ function subtitleFor(entry: HistoryEntry) {
   const gameNumber = entry.scryveMatch?.gameNumber
   return joinParts([
     gameNumber === undefined
-      ? sourceLabel(entry.source)
+      ? sourceLabel(entry)
       : translate("play:history.gameNumber", { number: gameNumber }),
     formatTime(entry.finishedAt),
     entry.winnerNames?.length

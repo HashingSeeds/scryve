@@ -79,7 +79,6 @@ export default {
     draws_other: "{{count}}引き分け",
     context: "第{{number}}ゲーム · {{score}}",
     statusLine: "{{context}} · {{bestOf}}本勝負",
-    contextLabel: "{{context}}、{{bestOf}}本勝負",
     closeScore: "マッチのスコアを閉じる",
     scoreTitle: "{{bestOf}}本勝負 · ゲーム{{number}}",
     endHint: "最後に終了したゲームでマッチを終了します",

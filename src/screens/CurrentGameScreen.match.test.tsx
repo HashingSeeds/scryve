@@ -2,7 +2,7 @@ import { Modal } from "react-native"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { loadMatchSwaps } from "@/features/decks/matchSideboard"
-import { createLocalGame } from "@/features/game/domain"
+import { createLocalGame, matchContextLabel } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -118,7 +118,7 @@ describe("CurrentGameScreen match mode", () => {
     fireEvent.press(view.getByTestId("end-game-button"))
     fireEvent.press(view.getByTestId("abandon-game-button"))
 
-    expect(view.getByTestId("match-context")).toHaveTextContent(/^Game 2/)
+    expect(matchContextLabel(repository.loadActiveGame()!)).toMatch(/^Game 2/)
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
   })
 
@@ -140,13 +140,13 @@ describe("CurrentGameScreen match mode", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.saveActiveGame(matchGame(3))
     const { view, initial } = mount(repository)
-    expect(view.getByTestId("match-context")).toHaveTextContent("Game 1 · 0-0")
+    expect(matchContextLabel(repository.loadActiveGame()!)).toBe("Game 1 · 0-0")
 
     endGame(view, 0)
     expect(view.getByText("Game 1 saved")).toBeTruthy()
     expect(view.getByText("Ada 1 · Grace 0")).toBeTruthy()
     fireEvent.press(view.getByTestId("next-game-button"))
-    expect(view.getByTestId("match-context")).toHaveTextContent("Game 2 · 1-0")
+    expect(matchContextLabel(repository.loadActiveGame()!)).toBe("Game 2 · 1-0")
     expect(repository.loadActiveGame()).toMatchObject({
       match: { id: initial.match?.id, gameNumber: 2, wins: [1, 0] },
     })
@@ -154,7 +154,7 @@ describe("CurrentGameScreen match mode", () => {
 
     endGame(view, "draw")
     fireEvent.press(view.getByTestId("next-game-button"))
-    expect(view.getByTestId("match-context")).toHaveTextContent("Game 3 · 1-0 · 1 draw")
+    expect(matchContextLabel(repository.loadActiveGame()!)).toBe("Game 3 · 1-0 · 1 draw")
 
     endGame(view, 0)
     expect(view.queryByTestId("match-prompt-dialog")).toBeNull()
@@ -165,7 +165,7 @@ describe("CurrentGameScreen match mode", () => {
         match: { id: initial.match?.id, gameNumber: 3, result: { outcomes: ["win", "loss"] } },
       }),
     )
-    expect(view.getByTestId("match-context")).toHaveTextContent("Game 1 · 0-0")
+    expect(matchContextLabel(repository.loadActiveGame()!)).toBe("Game 1 · 0-0")
     expect(repository.loadActiveGame()?.match?.id).not.toBe(initial.match?.id)
   })
 
@@ -217,7 +217,6 @@ describe("CurrentGameScreen match mode", () => {
     endGame(view, 1)
     fireEvent.press(view.getByTestId("next-game-button"))
 
-    expect(view.getByTestId("match-context").props.onPress).toBeUndefined()
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByLabelText("Game 2 · 0-1 · Best of 3"))
     expect(view.getByText("Best of 3 · Game 2")).toBeTruthy()
@@ -249,7 +248,7 @@ describe("CurrentGameScreen match mode", () => {
     fireEvent.press(view.getByTestId("abandon-game-button"))
 
     expect(onGameAbandoned).not.toHaveBeenCalled()
-    expect(view.getByTestId("match-context")).toHaveTextContent("Game 2 · 1-0")
+    expect(matchContextLabel(repository.loadActiveGame()!)).toBe("Game 2 · 1-0")
     expect(view.getByTestId("life-total-seat-2").props.children).toBe("2")
     const restarted = repository.loadActiveGame()!
     expect(restarted.id).not.toBe(second.id)
@@ -267,7 +266,6 @@ describe("CurrentGameScreen match mode", () => {
     fireEvent.press(view.getByTestId("leave-match-button"))
 
     expect(view.queryByTestId("match-dialog")).toBeNull()
-    expect(view.queryByTestId("match-context")).toBeNull()
     const active = repository.loadActiveGame()!
     expect(active.id).toBe(initial.id)
     expect(active.match).toBeUndefined()
@@ -279,7 +277,7 @@ describe("CurrentGameScreen match mode", () => {
     const first = matchGame(1)
     repository.saveActiveGame({ ...first, match: { ...first.match!, gameNumber: 10, draws: 9 } })
     const { view, initial } = mount(repository)
-    expect(view.getByTestId("match-context")).toHaveTextContent("Game 10 · 0-0 · 9 draws")
+    expect(matchContextLabel(repository.loadActiveGame()!)).toBe("Game 10 · 0-0 · 9 draws")
     endGame(view, "draw")
     expect(view.queryByTestId("next-game-button")).toBeNull()
     expect(view.getByText("A match holds at most ten games, so this one ends here.")).toBeTruthy()

@@ -79,7 +79,6 @@ export default {
     draws_other: "{{count}} ड्रॉ",
     context: "गेम {{number}} · {{score}}",
     statusLine: "{{context}} · बेस्ट ऑफ़ {{bestOf}}",
-    contextLabel: "{{context}}, बेस्ट ऑफ़ {{bestOf}}",
     closeScore: "मैच स्कोर बंद करें",
     scoreTitle: "बेस्ट ऑफ़ {{bestOf}} · गेम {{number}}",
     endHint: "आखिरी पूरे हुए गेम के बाद मैच खत्म करता है",
