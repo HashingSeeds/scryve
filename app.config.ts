@@ -13,6 +13,8 @@ import { cpSync, existsSync } from "node:fs"
 import path from "node:path"
 
 import { APP_ICON_VARIANTS, appIconAssets } from "./src/features/appIcon/appIconVariants.ts"
+import permissions from "./src/i18n/en/permissions.ts"
+import { resources } from "./src/i18n/resources.ts"
 
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
@@ -118,6 +120,21 @@ function withLiquidGlassAlternateIcons(config: ExpoConfig, projectRoot: string):
   })
 }
 
+const permissionPrompts = (text: typeof permissions) => ({
+  NSCameraUsageDescription: text.camera,
+  NSPhotoLibraryUsageDescription: text.photos,
+  NSLocalNetworkUsageDescription: text.localNetwork,
+})
+
+const permissionLocales = Object.fromEntries(
+  Object.keys(resources)
+    .filter((language) => language !== "en")
+    .map((language) => {
+      const text: typeof permissions = require(`./src/i18n/${language}/permissions.ts`).default
+      return [language, { ios: permissionPrompts(text) }]
+    }),
+)
+
 export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => {
   const existingPlugins = config.plugins ?? []
 
@@ -139,7 +156,6 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
   plugins.push([
     "expo-image-picker",
     {
-      photosPermission: "Allow Scryve to attach a screenshot you choose to a support request.",
       microphonePermission: false,
     },
   ])
@@ -178,6 +194,7 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
     name: getAppName(),
     slug: config.slug ?? "count",
     scheme: [getAppScheme(), getLegacyAppScheme()],
+    locales: permissionLocales,
     // why: profile builds have no EAS channel, so they run only the JS they were built from.
     ...(process.env.SCRYVE_PROFILE_BUILD ? { updates: { ...config.updates, enabled: false } } : {}),
     ios: {
@@ -188,8 +205,7 @@ export default ({ config, projectRoot }: ConfigContext): Partial<ExpoConfig> => 
         : [],
       infoPlist: {
         ...config.ios?.infoPlist,
-        NSLocalNetworkUsageDescription:
-          "Scryve uses your local network to find and join games on nearby devices.",
+        ...permissionPrompts(permissions),
         NSBonjourServices: ["_scryve._tcp"],
         // why: the dev menu's floating button lives in its own full-screen window, which overrides the board's hidden status bar.
         ...(IS_DEV ? { EXDevMenuShowFloatingActionButton: false } : {}),
