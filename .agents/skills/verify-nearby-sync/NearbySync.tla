@@ -7,7 +7,9 @@ EXTENDS Integers, Sequences, FiniteSets
 
 CONSTANTS
   Team,         \* the two seats share one life total (withSharedTeam)
-  Claims,       \* g2 claims commander damage on g1, and g1 confirms or declines
+  Claims,       \* owner mode: g2 claims commander damage on g1, g1 confirms or
+                \* declines, and guests write only their own seat. FALSE is
+                \* anyone mode (lanGame.ts:559), where guests write any seat.
   MaxTaps,      \* taps per guest
   MaxUndos,     \* undos per guest
   MaxDrops,     \* connection drops in one run
@@ -104,9 +106,11 @@ Init ==
 (* Guests *)
 
 \* changeLife: a tap merges into the last queued change for that seat while it
-\* is unsent (addToLastQueuedLifeChange), or queues a new operation.
+\* is unsent (addToLastQueuedLifeChange), or queues a new operation. In owner
+\* mode, editableSeat rejects another seat's life.
 Tap(g, s) ==
   /\ taps[g] < MaxTaps
+  /\ Claims => s = g
   /\ taps' = [taps EXCEPT ![g] = @ + 1]
   /\ intent' = Plus(intent, Moved(-1, s))
   /\ LET m == mergeInto[g]
@@ -144,14 +148,16 @@ Undo(g) ==
   /\ UNCHANGED <<hostVars, sending, conn, toHost, toGuest, screen, taps, drops,
                  claimSent, resolveSent>>
 
-\* submitCommanderDamage: g2 says it dealt 1 commander damage to g1.
+\* submitCommanderDamage: g2 says it dealt 1 commander damage to g1. It ends
+\* the merge group, as resolveCommanderDamage does.
 ClaimDamage ==
   /\ Claims /\ ~claimSent
   /\ claimSent' = TRUE
   /\ outbox' = [outbox EXCEPT !["g2"] =
                  Append(@, Op([by |-> "g2", n |-> nextId["g2"]], "claim", "g1", 0, None, "none"))]
   /\ nextId' = [nextId EXCEPT !["g2"] = @ + 1]
-  /\ UNCHANGED <<hostVars, sending, mergeInto, undoable, conn, toHost, toGuest,
+  /\ mergeInto' = [mergeInto EXCEPT !["g2"] = [id |-> None, seat |-> "none"]]
+  /\ UNCHANGED <<hostVars, sending, undoable, conn, toHost, toGuest,
                  screen, intent, taps, undos, drops, resolveSent>>
 
 \* The defender answers the claim its screen shows. Only a confirm moves life.
@@ -163,7 +169,8 @@ Resolve(dec) ==
                               IF dec = "confirmed" THEN -1 ELSE 0, None, dec))]
   /\ nextId' = [nextId EXCEPT !["g1"] = @ + 1]
   /\ intent' = IF dec = "confirmed" THEN Plus(intent, Moved(-1, "g1")) ELSE intent
-  /\ UNCHANGED <<hostVars, sending, mergeInto, undoable, conn, toHost, toGuest,
+  /\ mergeInto' = [mergeInto EXCEPT !["g1"] = [id |-> None, seat |-> "none"]]
+  /\ UNCHANGED <<hostVars, sending, undoable, conn, toHost, toGuest,
                  screen, taps, undos, drops, claimSent>>
 
 \* drainOutbox sends the head and waits for its answer before the next.

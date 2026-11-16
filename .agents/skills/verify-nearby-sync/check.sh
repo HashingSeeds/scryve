@@ -24,7 +24,7 @@ runs='
 edits         | Team=TRUE  MaxTaps=2 MaxUndos=1 MaxDrops=0 MaxHostTaps=1 Claims=FALSE |                       | pass
 seats         | Team=FALSE MaxTaps=2 MaxUndos=1 MaxDrops=0 MaxHostTaps=1 Claims=FALSE |                       | pass
 drops         | Team=TRUE  MaxTaps=1 MaxUndos=1 MaxDrops=2 MaxHostTaps=1 Claims=FALSE |                       | pass
-claims        | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=2 MaxHostTaps=0 Claims=TRUE  |                       | pass
+claims        | Team=FALSE MaxTaps=2 MaxUndos=0 MaxDrops=2 MaxHostTaps=0 Claims=TRUE  |                       | pass
 no-dedupe     | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=1 MaxHostTaps=0 Claims=FALSE | HostDedupes           | CountedOnce
 claim-twice   | Team=FALSE MaxTaps=0 MaxUndos=0 MaxDrops=1 MaxHostTaps=0 Claims=TRUE  | ResolveReplays        | CountedOnce
 double-board  | Team=FALSE MaxTaps=1 MaxUndos=0 MaxDrops=0 MaxHostTaps=0 Claims=FALSE | OverlaySkipsConfirmed | BoardsHonest

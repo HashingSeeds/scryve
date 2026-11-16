@@ -6,8 +6,10 @@ description: Use when a change touches how nearby games sync life, undo, or comm
 # Verify nearby sync
 
 `NearbySync.tla` is a small model of a nearby game: the host device is the
-authority, and two guests edit any seat over connections that can drop at
-any moment. TLC, the TLA+ model checker, tries every order of those steps
+authority, and two guests edit over connections that can drop at any moment.
+The `claims` run is owner mode, the default: guests write only their own seat,
+and the defender confirms commander damage. The other runs are anyone mode,
+where every seat allows edits from anyone and guests write any seat. TLC, the TLA+ model checker, tries every order of those steps
 within the bounds in `check.sh` and checks four rules in every state:
 
 1. **CountedOnce.** Every change moves life once, however often it was resent.
