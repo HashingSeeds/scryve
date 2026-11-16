@@ -30,7 +30,6 @@
     "supportsTablet": true,
     "infoPlist": {
       "UIViewControllerBasedStatusBarAppearance": true,
-      "NSCameraUsageDescription": "Scan Scryve game invitation QR codes and read card names. Photos stay on this device.",
       "ITSAppUsesNonExemptEncryption": false
     },
     "bundleIdentifier": "com.sowinghope.count",
@@ -57,7 +56,6 @@
     [
       "expo-camera",
       {
-        "cameraPermission": "Scan Scryve game invitation QR codes and read card names. Photos stay on this device.",
         "microphonePermission": false,
         "recordAudioAndroid": false,
         "barcodeScannerEnabled": true
