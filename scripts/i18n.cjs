@@ -14,15 +14,29 @@ const USD_PER_MILLION_TOKENS = { input: 2, output: 10 }
 const UNITS_PER_REQUEST = 100
 
 const LOCALES = {
-  es: "Spanish (neutral, natural for both Spain and Latin America)",
+  es: "Spanish",
   fr: "French",
-  hi: "Hindi (Devanagari script)",
+  hi: "Hindi",
   ja: "Japanese",
   ko: "Korean",
 }
 
 const GLOSSARY_PATH = path.join(I18N_DIR, "glossary.json")
+const SYSTEMS_PATH = path.join(ROOT, "convex/lib/systems/definitions.ts")
+const PRODUCT_NAMES = [
+  "Scryve",
+  "Scryve Pro",
+  "Foil",
+  "Foil Supporter",
+  "Scryfall",
+  "YGOPRODeck",
+  "TCGdex",
+  "Limitless",
+  "YDKE",
+  "Fabrary",
+]
 
+const NOTE_LOCALE = /^([a-z]{2,3}): (.*)$/s
 const PLURAL_SUFFIX = /^(.*)_(zero|one|two|few|many|other)$/
 const PLACEHOLDER = /{{\s*([\w.]+)(?:\s*,\s*\w+)?\s*}}|<\/?([\w-]+)\s*\/?>/g
 
@@ -36,16 +50,22 @@ const LOWERCASE_LATIN_ALLOWED = new Set(["v", "vs", "to"])
 const GENERATED_HEADER =
   "// why: `pnpm i18n:translate` overwrites this file. Fix wording in src/i18n/en or src/i18n/glossary.json.\n"
 
-const SYSTEM_PROMPT = `You translate UI copy for Scryve, a phone life counter for trading card games (Magic: The Gathering, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana, Flesh and Blood, Riftbound).
+function systemPrompt() {
+  const systems = Object.values(loadModule(SYSTEMS_PATH).SYSTEMS)
+  const list = (names) => [...new Set(names)].join(", ")
+  const games = list(systems.map((system) => system.label))
+  const names = list([
+    ...PRODUCT_NAMES,
+    ...systems.flatMap((system) => [system.label, system.shortLabel]),
+  ])
+  const formats = list(systems.flatMap((system) => system.formats.map((format) => format.label)))
+  return `You translate UI copy for Scryve, a phone life counter for trading card games (${games}).
 
 Rules:
 - Keep each string short and natural for a phone screen. Match the English tone: plain, direct, no added enthusiasm.
 - Keep every {{placeholder}} exactly as written, including the name inside the braces, and keep every <tag>. Placeholders hold numbers, player names, deck names, or card names.
-- Never translate these names: Scryve, Scryve Pro, Foil, Foil Supporter, Magic: The Gathering, Magic, Yu-Gi-Oh!, Pokémon TCG, Disney Lorcana, Lorcana, Flesh and Blood, FaB, Scryfall, YGOPRODeck, TCGdex, Limitless, YDKE, Fabrary. Keep format names (Commander, Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Brawl, Limited, Constructed, Advanced, Traditional, Rush Duel, Core Constructed, Infinity Constructed, Classic Constructed, Blitz, Silver Age, Living Legend, Ultimate Pit Fight) and the word Pokémon in English unless the glossary says otherwise.
-- The request includes a glossary of the publishers' official terms and the app's fixed vocabulary for the target language, plus language rules. Always use those terms, inflected as the grammar needs, and follow the rules.
-- Product vocabulary, translate consistently: "local game" is a game on one shared device; "connected game" is players on their own phones; "cloud" means synced through Scryve's servers; "nearby" means phones on the same Wi-Fi; "seat" is a player's place at the table; "host" is the player who created a connected game.
-- A "match" is a best-of-N set of games; a "game" is one game. {{bestOf}} is the total number of games (3 means best of three), never the wins needed.
-- "Abandon" ends a game or lobby for everyone with no result. "Leave" removes only you. "End game" finishes with a result. "Cancel" closes a dialog. Never give two of these the same word.
+- Never translate these names: ${names}. Keep format names in English: ${formats}. A language rule in the request overrides either list.
+- The request includes language rules and a glossary for the target language. Each glossary entry names an English concept, with what it means, then the term to use for it. Always use those terms, inflected as the grammar needs, and follow the rules.
 - Keep ellipsis characters, and keep short labels as compact as the English.
 - Never add a digit the English does not have: the app formats every number in the reader's own digits, so numbers come only from placeholders such as {{count}}. A plural form may say its number in words ("one seat", "two seats") instead of {{count}}; the "other" form always keeps {{count}}.
 - Write whole words, not single letters: no W/L/D for wins, losses, and draws, and no "m" or "h" for minutes and hours, unless your language truly abbreviates them that way on phone screens.
@@ -55,6 +75,7 @@ Rules:
 - Each entry lists "slots". Return one translation per slot id. A slot with a "form" is a CLDR plural category: write the grammatically correct form for it, using the English plural forms as reference.
 
 Return a translation for every slot and nothing else.`
+}
 
 const OUTPUT_FORMAT = {
   type: "json_schema",
@@ -122,12 +143,16 @@ function englishNotes(source) {
       if (!ts.isPropertyAssignment(property) || ts.isComputedPropertyName(property.name)) continue
       const keyPath = prefix ? `${prefix}.${property.name.text}` : property.name.text
       const own = (ts.getLeadingCommentRanges(source, property.getFullStart()) ?? []).map(
-        commentText,
+        (range) => {
+          const text = commentText(range)
+          const scoped = NOTE_LOCALE.exec(text)
+          return scoped ? { locale: scoped[1], text: scoped[2] } : { text }
+        },
       )
       const note = [...inherited, ...own]
       if (ts.isObjectLiteralExpression(property.initializer))
         visit(property.initializer, keyPath, note)
-      else if (note.length) notes[keyPath] = note.join(" ")
+      else if (note.length) notes[keyPath] = note
     }
   }
   for (const statement of file.statements) {
@@ -144,13 +169,23 @@ function translationUnits(englishFlat, notes = {}) {
     const match = PLURAL_SUFFIX.exec(key)
     const isPlural = match && `${match[1]}_other` in englishFlat
     const id = isPlural ? match[1] : key
-    const unit = units.get(id) ?? { id, plural: Boolean(isPlural), english: {}, notes: new Set() }
+    const unit = units.get(id) ?? { id, plural: Boolean(isPlural), english: {}, notes: [] }
     unit.english[key] = text
-    if (Object.hasOwn(notes, key)) unit.notes.add(notes[key])
+    if (Object.hasOwn(notes, key)) unit.notes.push(notes[key])
     units.set(id, unit)
   }
-  for (const unit of units.values()) unit.note = [...unit.notes].join(" ") || undefined
+  for (const unit of units.values()) unit.note = noteFor(unit)
   return units
+}
+
+function noteFor(unit, locale) {
+  const keyNotes = unit.notes.map((parts) =>
+    parts
+      .filter((part) => !part.locale || part.locale === locale)
+      .map((part) => part.text)
+      .join(" "),
+  )
+  return [...new Set(keyNotes.filter(Boolean))].join(" ") || undefined
 }
 
 const wordPatterns = new Map()
@@ -224,7 +259,9 @@ function sourceHash(unit, locale, glossary) {
     concept,
     glossary.terms[concept][locale],
   ])
-  return hashText(JSON.stringify([unit.english, unit.note, glossary.rules[locale], terms]))
+  return hashText(
+    JSON.stringify([unit.english, noteFor(unit, locale), glossary.rules[locale], terms]),
+  )
 }
 
 function translationHash(unit, localeFlat, locale) {
@@ -405,10 +442,14 @@ function readJson(file, fallback) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback
 }
 
+function loadModule(file) {
+  const { require: tsxRequire } = require("tsx/cjs/api")
+  return tsxRequire(file, __filename)
+}
+
 function loadTs(file) {
   if (!fs.existsSync(file)) return undefined
-  const { require: tsxRequire } = require("tsx/cjs/api")
-  return tsxRequire(file, __filename).default
+  return loadModule(file).default
 }
 
 function loadEnglish() {
@@ -475,6 +516,12 @@ async function check() {
       problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
     for (const [key, text] of Object.entries(englishFlat))
       for (const problem of englishProblems(key, text)) problems.push(`en/${namespace}: ${problem}`)
+    for (const unit of units.values())
+      for (const part of unit.notes.flat())
+        if (part.locale && !Object.hasOwn(LOCALES, part.locale))
+          problems.push(
+            `en/${namespace}: ${unit.id} has a note for ${part.locale}, which is not a translated language`,
+          )
     for (const locale of Object.keys(LOCALES)) {
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
       for (const unit of units.values())
@@ -489,7 +536,7 @@ async function check() {
           problems.push(`${locale}/${namespace}: ${unit.id} needs translation`)
       for (const unit of editedUnits({ units, lock, localeFlat, locale, glossary }))
         problems.push(
-          `${locale}/${namespace}: ${unit.id} was edited by hand, and the next translate overwrites it. Put the fix in src/i18n/glossary.json or a note above the English key.`,
+          `${locale}/${namespace}: ${unit.id} was edited by hand, and the next translate overwrites it. Put the fix in src/i18n/glossary.json, or in a note above the English key (start it with "${locale}: " to change only this language).`,
         )
     }
   }
@@ -500,7 +547,7 @@ async function check() {
   }
   console.error(problems.join("\n"))
   console.error(
-    `\n${problems.length} problem(s). Fix glossary problems in src/i18n/glossary.json, then run \`pnpm i18n:translate\`.`,
+    `\n${problems.length} problem(s). Fix each at its source (AGENTS.md, Languages), then run \`pnpm i18n:translate\`.`,
   )
   process.exitCode = 1
 }
@@ -532,7 +579,7 @@ function requestPayload(units, namespace, locale) {
   const slotKeys = new Map()
   const entries = units.map((unit) => ({
     context: `${namespace}:${unit.id}`,
-    ...(unit.note ? { note: unit.note } : {}),
+    ...(noteFor(unit, locale) ? { note: noteFor(unit, locale) } : {}),
     english: unit.plural
       ? Object.fromEntries(
           Object.entries(unit.english).map(([key, text]) => [key.slice(unit.id.length + 1), text]),
@@ -587,7 +634,7 @@ async function requestTranslations(client, { units, namespace, locale, glossary,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "low", format: OUTPUT_FORMAT },
-    system: SYSTEM_PROMPT,
+    system: systemPrompt(),
     messages: [{ role: "user", content: request }],
   })
   usage.input += response.usage.input_tokens
@@ -665,7 +712,7 @@ async function translate({ onlyNamespace, retranslate }) {
         const outdated = new Set(staleUnits(state))
         for (const unit of edited)
           console.warn(
-            `${locale}/${namespace}: ${unit.id} was edited by hand; retranslating it. Put the fix in src/i18n/glossary.json or a note above the English key.`,
+            `${locale}/${namespace}: ${unit.id} was edited by hand; retranslating it. Put the fix in src/i18n/glossary.json, or in a note above the English key (start it with "${locale}: " to change only this language).`,
           )
         const stale = [...units.values()].filter(
           (unit) =>
@@ -722,6 +769,7 @@ module.exports = {
   staleUnits,
   editedUnits,
   lockEntry,
+  noteFor,
   glossaryProblems,
   glossaryText,
   unitConcepts,

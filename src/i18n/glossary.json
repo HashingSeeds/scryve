@@ -2,12 +2,12 @@
   "rules": {
     "es": [
       "Address the player as tú, never usted or vosotros.",
-      "Use words that work in both Spain and Latin America: teléfono (not móvil or celular), mantén presionado, escribe (not introduce or ingresa).",
+      "Use neutral Spanish that reads naturally in both Spain and Latin America: teléfono (not móvil or celular), mantén presionado, escribe (not introduce or ingresa).",
       "Strings with {{amount}} have no plural forms. Phrase them so they read for any number, e.g. \"Sumar {{amount}} a las vidas\"."
     ],
     "fr": ["Address the player as vous."],
     "hi": [
-      "Address the player with आप forms.",
+      "Write in Devanagari script, and address the player with आप forms.",
       "Game terms are the English words written in Devanagari, the way Indian players say them. Never leave a game term in Latin script; only brand names, format names and Pokémon stay Latin.",
       "Spelling: nukta on फ़ and ज़ in English loanwords (लाइफ़, फ़ॉर्मैट), never on क, ख, ग. Chandrabindu in एँ endings (जाएँ, हटाएँ). ॉ for the English \"o\" in draw, toss, lobby (ड्रॉ, टॉस, लॉबी); ै for the \"a\" in damage (डैमेज).",
       "Gender: लाइफ़, सीट, लॉबी and सेटिंग are feminine; लाइफ़ पॉइंट, प्राइज़ कार्ड, डैमेज, लोर, गेम, मैच, खाता and डिवाइस are masculine."
@@ -274,6 +274,14 @@
       "ja": "マッチ",
       "ko": "매치"
     },
+    "best of N (N is the total number of games, so 3 means best of three, never the wins needed)": {
+      "en": ["best of"],
+      "es": "al mejor de N",
+      "fr": "au meilleur des N",
+      "hi": "बेस्ट ऑफ़ N",
+      "ja": "N本勝負",
+      "ko": "N판 승부"
+    },
     "game (one game of a match), and game system (Magic, Pokémon…)": {
       "en": ["game"],
       "es": "game (one game of a match): partida. Game system (Magic, Pokémon…): juego",
@@ -356,7 +364,7 @@
       "ja": "破棄 (変更を破棄)",
       "ko": "폐기; Cancel stays 취소"
     },
-    "seat": {
+    "seat (a player's place at the table)": {
       "en": ["seat"],
       "es": "asiento",
       "fr": "place (never siège)",
@@ -364,7 +372,7 @@
       "ja": "席",
       "ko": "자리 (never 좌석)"
     },
-    "host (the player), and hosting a game or lobby": {
+    "host (the player who created a connected game), and hosting a game or lobby": {
       "en": ["host"],
       "es": "anfitrión; to host a game or lobby: crear",
       "fr": "host (the player): hôte; to host: héberger. Event host: organisateur",
@@ -380,7 +388,7 @@
       "ja": "ロビー",
       "ko": "로비"
     },
-    "nearby": {
+    "nearby (phones on the same Wi-Fi)": {
       "en": ["nearby"],
       "es": "cercana (partidas cercanas); permission: dispositivos cercanos",
       "fr": "à proximité (Parties à proximité); permission: appareils à proximité",
@@ -388,13 +396,21 @@
       "ja": "近く (Android setting: 付近のデバイス). Never ニアバイ.",
       "ko": "근처 (근처 기기)"
     },
-    "local game / connected game": {
+    "local game (one shared device) / connected game (players on their own phones)": {
       "en": ["local game", "connected game"],
       "es": "partida local / partida conectada",
       "fr": "partie locale / partie connectée",
       "hi": "लोकल गेम / कनेक्टेड गेम",
       "ja": "ローカルゲーム / 通信対戦",
       "ko": "로컬 게임 / 연결 게임"
+    },
+    "cloud (synced through Scryve's servers)": {
+      "en": ["cloud"],
+      "es": "la nube",
+      "fr": "cloud",
+      "hi": "क्लाउड",
+      "ja": "クラウド",
+      "ko": "클라우드"
     },
     "invite, invitation": {
       "en": ["invite", "invitation"],

@@ -15,6 +15,12 @@ const FIRST_STRONG_ISOLATE = "\u2068"
 const LEFT_TO_RIGHT_ISOLATE = "\u2066"
 const POP_DIRECTIONAL_ISOLATE = "\u2069"
 const GROUPING_FROM = 10_000
+const DATE_AND_TIME = {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+} as const
 
 const numberFormats = new Map<string, Intl.NumberFormat>()
 const dateFormats = new Map<string, Intl.DateTimeFormat>()
@@ -191,5 +197,6 @@ export const formatInterpolation: FormatFunction = (value, format, _language, op
     return isolate(formatNumber(value))
   }
   if (typeof value === "string") return isolate(value)
+  if (value instanceof Date) return isolate(formatDate(value, DATE_AND_TIME))
   return value
 }

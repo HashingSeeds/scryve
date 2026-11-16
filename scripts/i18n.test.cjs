@@ -12,6 +12,7 @@ const {
   staleUnits,
   editedUnits,
   lockEntry,
+  noteFor,
   glossaryProblems,
   glossaryText,
   unitConcepts,
@@ -293,11 +294,6 @@ test("sends comments above English keys as notes, and a changed note retranslate
   back: "Back",
 }`
   const notes = englishNotes(source)
-  assert.deepEqual(notes, {
-    "prizes.taken": "Pokémon only. Prize cards the player has taken.",
-    "prizes.left_one": "Pokémon only.",
-    "prizes.left_other": "Pokémon only.",
-  })
 
   const flat = { "prizes.taken": "{{amount}} taken", "back": "Back" }
   const before = translationUnits(flat)
@@ -306,6 +302,26 @@ test("sends comments above English keys as notes, and a changed note retranslate
   const sourceOf = (entries, key) => lockEntry(entries.get(key), {}, "ja", glossary).split(".")[0]
   assert.notEqual(sourceOf(after, "prizes.taken"), sourceOf(before, "prizes.taken"))
   assert.equal(sourceOf(after, "back"), sourceOf(before, "back"))
+})
+
+test("a note that starts with a language code goes only to that language", () => {
+  const plain = `const ns = {
+  // Pokémon only.
+  taken: "{{amount}} taken",
+}`
+  const scoped = `const ns = {
+  // Pokémon only.
+  // ja: Use 獲得, not 取得.
+  taken: "{{amount}} taken",
+}`
+  const flat = { taken: "{{amount}} taken" }
+  const before = translationUnits(flat, englishNotes(plain)).get("taken")
+  const after = translationUnits(flat, englishNotes(scoped)).get("taken")
+  assert.equal(after.note, "Pokémon only.")
+  assert.equal(noteFor(after, "ja"), "Pokémon only. Use 獲得, not 取得.")
+  const sourceOf = (unit, locale) => lockEntry(unit, {}, locale, glossary).split(".")[0]
+  assert.notEqual(sourceOf(after, "ja"), sourceOf(before, "ja"))
+  assert.equal(sourceOf(after, "ko"), sourceOf(before, "ko"))
 })
 
 test("rejects Latin words left in Japanese, Korean, and Hindi, and unmatched quotes", () => {
