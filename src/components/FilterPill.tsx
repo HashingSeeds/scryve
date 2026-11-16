@@ -18,12 +18,15 @@ export function FilterPill({
   selected,
   onPress,
   removable,
+  color,
   testID,
 }: {
   label: string
   selected?: boolean
   onPress: () => void
   removable?: boolean
+  /** why: an unselected pill can wear the color of the filter section it would add to. */
+  color?: string
   testID?: string
 }) {
   const { themed } = useAppTheme()
@@ -41,7 +44,7 @@ export function FilterPill({
         size="xxs"
         maxFontSizeMultiplier={PILL_MAX_FONT_SCALE}
         weight={selected ? "medium" : "normal"}
-        style={selected ? themed($chipSelectedText) : themed($dimmedText)}
+        style={selected ? themed($chipSelectedText) : [themed($dimmedText), color && { color }]}
         text={removable ? label + REMOVE_MARK : label}
       />
     </TouchableOpacity>
@@ -103,10 +106,12 @@ export function FilterButton({
 
 export function FilterGroup({
   heading,
+  headingColor,
   search,
   children,
 }: {
   heading?: string
+  headingColor?: string
   search?: ReactNode
   children: ReactNode
 }) {
@@ -114,7 +119,12 @@ export function FilterGroup({
   return (
     <View style={themed($chipGroup)}>
       {heading ? (
-        <Text weight="bold" size="xxs" style={themed($groupHeading)} text={heading} />
+        <Text
+          weight="bold"
+          size="xxs"
+          style={[themed($groupHeading), headingColor && { color: headingColor }]}
+          text={heading}
+        />
       ) : null}
       {search}
       <View style={themed($chipWrap)}>{children}</View>

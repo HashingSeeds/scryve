@@ -1,4 +1,4 @@
-import { formatCardQuery, parseCardQuery, querySuggestions } from "./cardQuery"
+import { formatCardQuery, parseCardQuery, querySpans, querySuggestions } from "./cardQuery"
 import { SCRYFALL_SOURCE } from "./cardSources"
 import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
@@ -93,4 +93,23 @@ test.each([
   ["a closed quote", 'kw:"flying"'],
 ])("suggests nothing after %s", (_name, text) => {
   expect(suggest(text)).toEqual([])
+})
+
+test("colors each term by its sheet section, and keeps the text whole", () => {
+  const text =
+    'f:commander  id<=wur (t:creature or t:elf) mv>3 -kw:"first strike" o:draw bolt t:sol'
+  const spans = querySpans(SCRYFALL_SOURCE, text, MAGIC_CARD_FILTERS, optionsFor, true)
+  expect(spans.map((span) => span.text).join("")).toBe(text)
+  const words = spans.filter((span) => !span.key && span.text.trim())
+  expect(words.map(({ text, section }) => [text, section])).toEqual([
+    ["commander", "format"],
+    ["wur", "colors"],
+    ["creature", "type"],
+    ["elf", "subtype"],
+    ["3", "manaValue"],
+    ['"first strike"', "keyword"],
+    ["draw", "syntax"],
+    ["bolt", undefined],
+    ["t:sol", undefined],
+  ])
 })
