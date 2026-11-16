@@ -17,14 +17,6 @@ import {
   MENU_BUTTON_SIZE,
 } from "@/components/GameRadialMenu"
 import {
-  COMPACT_LIFE_GLYPH_LINE_HEIGHT,
-  COMPACT_LIFE_TARGET_SIZE,
-  LIFE_GLYPH_LINE_HEIGHT,
-  LIFE_TARGET_SIZE,
-} from "@/components/playerCardTypes"
-import {
-  getCellSize,
-  getLifeFontSize,
   getPlayerGridFacings,
   getPlayerGridMenuAnchor,
   type PlayerGridLayoutVariant,
@@ -35,19 +27,17 @@ import {
   getMenuSeamNeighbors,
   getPlayerGridRows,
   getPlayerSlotFacings,
-  seatFrames,
 } from "@/components/playerGridGeometry"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
-import { teamChipCrowded, teamPanelCompact } from "@/components/teamGridGeometry"
+import { teamChipCrowded } from "@/components/teamGridGeometry"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
-import { spacing } from "@/theme/spacing"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import {
   BoardContextLabels,
-  contextLabelPlacements,
+  boardLabelPlacements,
   type BoardContextLabelsProps,
 } from "./BoardContextLabels"
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
@@ -381,85 +371,57 @@ function LegacyGameBoardStage({
   )
 }
 
-/** why: the label is placed from the same seat frames the grid draws, so it follows each seat's insets, tabs, and menu corner. */
 function useLabelPlacements({
   playerCount,
   teamBoard,
-  gridLayout,
+  gridLayout: layout,
   width,
   height,
   screenWidth = width,
   screenHeight = height,
-  rotation = 0,
-  topEdgeBand = 0,
+  rotation,
+  topEdgeBand,
   fontScale,
   insets,
   tabsShown,
   benchSeats,
-}: {
-  playerCount: number
-  teamBoard?: boolean
-  gridLayout: Parameters<typeof seatFrames>[0]["layout"]
-  width: number
-  height: number
+}: Omit<Parameters<typeof boardLabelPlacements>[0], "layout" | "screen"> & {
+  gridLayout: Parameters<typeof boardLabelPlacements>[0]["layout"]
   screenWidth?: number
   screenHeight?: number
-  rotation?: number
-  topEdgeBand?: number
-  fontScale: number
-  insets: Parameters<typeof seatFrames>[0]["insets"]
-  tabsShown: boolean
-  benchSeats?: boolean
 }) {
-  return useMemo(() => {
-    const board = { width, height }
-    const { rows } = seatFrames({
+  return useMemo(
+    () =>
+      boardLabelPlacements({
+        playerCount,
+        teamBoard,
+        layout,
+        width,
+        height,
+        screen: { width: screenWidth, height: screenHeight },
+        rotation,
+        topEdgeBand,
+        fontScale,
+        insets,
+        tabsShown,
+        benchSeats,
+      }),
+    [
       playerCount,
-      layout: gridLayout,
-      boardSize: board,
-      measuredGrid: board,
+      teamBoard,
+      layout,
+      width,
+      height,
+      screenWidth,
+      screenHeight,
+      rotation,
       topEdgeBand,
-      gap: spacing.xxs,
+      fontScale,
       insets,
       tabsShown,
-    })
-    const compact = teamBoard ? teamPanelCompact(gridLayout, playerCount) : gridLayout.compact
-    const glyphLine = compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT
-    return contextLabelPlacements({
-      rows,
-      board,
-      screen: { width: screenWidth, height: screenHeight },
-      rotation,
-      compact,
       benchSeats,
-      // why: two digits are the largest total the grid draws, sized the way PlayerGrid sizes it.
-      lifeFontSize: getLifeFontSize({
-        ...getCellSize({
-          board: { width, height: height - topEdgeBand },
-          layout: gridLayout,
-          gap: spacing.xxs,
-        }),
-        digits: 2,
-        fontScale,
-        targetSize: compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
-        sidewaysGlyphReserve: 2 * (glyphLine + spacing.xs),
-      }),
-    })
-  }, [
-    playerCount,
-    teamBoard,
-    gridLayout,
-    width,
-    height,
-    screenWidth,
-    screenHeight,
-    rotation,
-    topEdgeBand,
-    fontScale,
-    insets,
-    tabsShown,
-    benchSeats,
-  ])
+    ],
+  )
 }
 
 function useSpotlight(

@@ -1,9 +1,7 @@
-import { LIFE_TARGET_SIZE, type LifeCardEdge } from "@/components/playerCardTypes"
-import { getCellSize, getLifeFontSize } from "@/components/PlayerGrid"
-import { getPlayerGridLayout, seatFrames } from "@/components/playerGridGeometry"
-import { spacing } from "@/theme/spacing"
+import type { LifeCardEdge } from "@/components/playerCardTypes"
+import { getPlayerGridLayout } from "@/components/playerGridGeometry"
 
-import { contextLabelPlacements } from "./BoardContextLabels"
+import { boardLabelPlacements } from "./BoardContextLabels"
 
 const phone = { width: 375, height: 812 }
 const phoneInsets = { top: 50, right: 0, bottom: 34, left: 0 }
@@ -18,34 +16,19 @@ function place({
   playerCount: number
   board: { width: number; height: number }
   insets: Record<LifeCardEdge, number>
-} & Pick<Parameters<typeof contextLabelPlacements>[0], "screen" | "rotation" | "benchSeats">) {
-  const layout = getPlayerGridLayout({ playerCount, ...board })
-  const { rows } = seatFrames({
+} & Pick<Parameters<typeof boardLabelPlacements>[0], "screen" | "rotation" | "benchSeats">) {
+  return boardLabelPlacements({
     playerCount,
-    layout,
-    boardSize: board,
-    measuredGrid: board,
-    topEdgeBand: 0,
-    gap: spacing.xxs,
+    layout: getPlayerGridLayout({ playerCount, ...board }),
+    ...board,
     insets,
+    fontScale: 1,
     tabsShown: false,
-  })
-  return contextLabelPlacements({
-    rows,
-    board,
-    compact: layout.compact,
-    lifeFontSize: getLifeFontSize({
-      ...getCellSize({ board, layout, gap: spacing.xxs }),
-      digits: 2,
-      fontScale: 1,
-      targetSize: LIFE_TARGET_SIZE,
-      sidewaysGlyphReserve: 116,
-    }),
     ...rest,
   })
 }
 
-describe("contextLabelPlacements", () => {
+describe("boardLabelPlacements", () => {
   it("puts each copy above its own seat's identity row on a stacked phone board", () => {
     expect(place({ playerCount: 2, board: phone, insets: phoneInsets })).toEqual([
       { left: 0, top: 86, width: 375, turn: 180 },

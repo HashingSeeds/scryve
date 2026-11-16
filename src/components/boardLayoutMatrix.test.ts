@@ -1,8 +1,8 @@
-import { contextLabelPlacements } from "@/features/game/BoardContextLabels"
+import { boardLabelPlacements } from "@/features/game/BoardContextLabels"
 import { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
 import { spacing } from "@/theme/spacing"
 
-import { DIGIT_INK_HEIGHT } from "./commanderDamageLayout"
+import { lifeInk } from "./commanderDamageLayout"
 import { seatBagSize } from "./CounterChips"
 import { COMPACT_MENU_BUTTON_SIZE, MENU_BUTTON_SIZE } from "./GameRadialMenu"
 import { CUTOUT_HALF_WIDTH, seatIdentityPlacement } from "./LifeCard"
@@ -12,8 +12,8 @@ import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   COMPACT_LIFE_TARGET_SIZE,
   CUTOUT_ENDS_INSIDE_INSET,
-  LIFE_DIGIT_ASPECT,
   LIFE_GLYPH_LINE_HEIGHT,
+  LIFE_MAX_FONT_SCALE,
   LIFE_TARGET_SIZE,
   type LifeCardEdge,
 } from "./playerCardTypes"
@@ -24,12 +24,15 @@ import {
   EDGE_TAB,
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
+  getPlayerGridRowFlex,
+  getPlayerGridRows,
   seatFrames,
 } from "./playerGridGeometry"
 import { contentInsetsFor, MENU_CLEARANCE, menuClearance } from "./pokemon/pokemonCardLayout"
 import { tallestKeypadHeight } from "./pokemon/PokemonKeypad"
 import { keypadBesideForm } from "./pokemon/PokemonSheet"
-import { seatIdentityMetrics, seatMarkArt } from "./SeatIdentity"
+import { seatIdentityBottomGap, seatIdentityMetrics, seatMarkArt } from "./SeatIdentity"
+import { panelBoxes, teamGridLayout, teamPanelCompact } from "./teamGridGeometry"
 import { shapeForSeat } from "../../convex/lib/appearance"
 
 type Insets = Record<LifeCardEdge, number>
@@ -94,8 +97,14 @@ const DEVICES = [
   sideways?: Insets
 }[]
 
+// why: a team board lays its cards out as a board of that many seats, so `playerCount` counts cards: two to five teams of two.
+const BOARDS = [
+  ...[2, 3, 4, 5, 6].map((playerCount) => ({ playerCount, teamBoard: false })),
+  ...[2, 3, 4, 5].map((playerCount) => ({ playerCount, teamBoard: true })),
+]
+
 const CASES = DEVICES.flatMap((device) =>
-  [2, 3, 4, 5, 6].flatMap((playerCount) =>
+  BOARDS.flatMap(({ playerCount, teamBoard }) =>
     getPlayerGridLayoutOptions(playerCount).flatMap(({ variant }) =>
       ([0, 90] as const)
         .filter((boardRotation) => boardRotation === 0 || "sideways" in device)
@@ -103,7 +112,9 @@ const CASES = DEVICES.flatMap((device) =>
           [false, true].map((tabsShown) => ({
             device,
             name: device.name,
+            seats: teamBoard ? "teams" : "players",
             playerCount,
+            teamBoard,
             variant,
             boardRotation,
             tabsShown,
@@ -223,15 +234,26 @@ function boardObstacles(
   ]
 }
 
-function boardGrid({ device, playerCount, variant, boardRotation, tabsShown }: BoardCase) {
+function boardGrid({
+  device,
+  playerCount,
+  teamBoard,
+  variant,
+  boardRotation,
+  tabsShown,
+}: BoardCase) {
   const board = { x: 0, y: 0, width: device.width, height: device.height }
-  const layout = getPlayerGridLayout({
+  const layout = (teamBoard ? teamGridLayout : getPlayerGridLayout)({
     playerCount,
     width: board.width,
     height: board.height,
     layoutVariant: variant,
     spansHinge: "spansHinge" in device,
   })
+  const insets =
+    boardRotation === 90 && "sideways" in device
+      ? boardInsetsFor(device.sideways, boardRotation)
+      : device.upright
   const grid = seatFrames({
     playerCount,
     layout,
@@ -239,10 +261,7 @@ function boardGrid({ device, playerCount, variant, boardRotation, tabsShown }: B
     measuredGrid: board,
     topEdgeBand: 0,
     gap: spacing.xxs,
-    insets:
-      boardRotation === 90 && "sideways" in device
-        ? boardInsetsFor(device.sideways, boardRotation)
-        : device.upright,
+    insets,
     tabsShown,
   })
   const anchor = getPlayerGridMenuAnchor(playerCount, layout)
@@ -253,12 +272,14 @@ function boardGrid({ device, playerCount, variant, boardRotation, tabsShown }: B
   }
   const tabsAt =
     tabsShown && !(TABS_MID_SIDE_EDGE_KNOWN_GAP && layout.rowCount === 1) ? menu.y : null
-  return { board, layout, grid, obstacles: boardObstacles(board, grid, menu, tabsAt) }
+  return { board, layout, insets, grid, obstacles: boardObstacles(board, grid, menu, tabsAt) }
 }
 
 function boardSeats(boardCase: BoardCase) {
   const { layout, grid, obstacles } = boardGrid(boardCase)
-  const compact = layout.compact
+  const compact = boardCase.teamBoard
+    ? teamPanelCompact(layout, boardCase.playerCount)
+    : layout.compact
   const metrics = seatIdentityMetrics(compact)
   const buttonSize = seatBagSize(compact)
   return grid.rows.flat().flatMap((seat) => {
@@ -356,108 +377,195 @@ function expectKeypadStacksOnlyWhenItFits({ seat, compact }: BoardSeat) {
 // why: the boards pass the label only the match line, and its longest translation of "Game 3 · 2-1" measures about this at 12pt.
 const LABEL = { width: 110, height: 18 }
 
-// why: LifeCard centers the total inside the seat's insets and sizes two digits to the grid's cell, the largest it draws. Only the digits' ink counts; the line box around them is empty.
-function lifeFontSize(boardCase: BoardCase) {
+// why: PlayerGrid sizes two digits, the largest total it draws, to the grid's cell, or to a team's own panel. LifeControls then centres the line on the card, where the digits' ink sits a little high and grows with the text size; the line box around the ink is empty.
+function lifeTotalBox({ seat, compact }: BoardSeat, boardCase: BoardCase, fontScale: number) {
   const { board, layout } = boardGrid(boardCase)
-  const glyphLine = layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT
-  return (
+  const slots = getPlayerGridRows(boardCase.playerCount, layout)
+  const panel = boardCase.teamBoard
+    ? panelBoxes(
+        slots,
+        slots.map((row) => getPlayerGridRowFlex(row, layout)),
+      ).get(seat.slot)
+    : undefined
+  const glyphLine = compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT
+  const fontSize =
     getLifeFontSize({
-      ...getCellSize({ board, layout, gap: spacing.xxs }),
+      ...(panel
+        ? {
+            cellWidth: (panel.x1 - panel.x0) * board.width,
+            cellHeight: (panel.y1 - panel.y0) * board.height,
+          }
+        : getCellSize({ board, layout, gap: spacing.xxs })),
       digits: 2,
-      fontScale: 1,
-      targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
+      fontScale,
+      targetSize: compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
       sidewaysGlyphReserve: 2 * (glyphLine + spacing.xs),
     }) ?? 0
-  )
+  const ink = lifeInk(fontSize, 2)
+  const scale = Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+  const upright = uprightSize(seat)
+  return turnOntoBoard(seat, {
+    left: (upright.width - ink.width * scale) / 2,
+    bottom: upright.height / 2 - (ink.y + ink.height / 2) * scale,
+    width: ink.width * scale,
+    height: ink.height * scale,
+  })
 }
 
-function lifeTotalBox({ seat }: BoardSeat, fontSize: number): Rect {
-  const sideways = Math.abs(seat.rotation) === 90
-  const along = 2 * LIFE_DIGIT_ASPECT * fontSize
-  const line = DIGIT_INK_HEIGHT * fontSize
-  const width = sideways ? line : along
-  const height = sideways ? along : line
-  const { card, contentInsets } = seat
-  return {
-    x: card.x + (card.width + contentInsets.left - contentInsets.right - width) / 2,
-    y: card.y + (card.height + contentInsets.top - contentInsets.bottom - height) / 2,
-    width,
-    height,
-  }
+// why: a team card (TeamCorners in TeamZone) draws a name out from each top corner as far as the middle, a bag in each bottom corner, and its shared row between the bags; each is taken at its widest.
+function teamContent({ seat, compact, metrics, buttonSize }: BoardSeat) {
+  const upright = uprightSize(seat)
+  const edges = CONTENT_EDGES[seat.rotation]
+  const menuHalf = (compact ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE) / 2
+  const corner = (edge: LifeCardEdge, side: LifeCardEdge) =>
+    cornerOffset(metrics.gap, edge, side, seat.contentInsets, seat.screenEdges)
+  const along = (side: "left" | "right", end: "top" | "bottom") =>
+    corner(edges[side], edges[end]) +
+    (seat.menuCorner?.toLowerCase().includes(edges[side]) &&
+    seat.menuCorner.toLowerCase().includes(edges[end])
+      ? menuHalf
+      : 0)
+  const topMenu = seat.menuEdgeCenter === edges.top ? menuHalf : 0
+  const inset = seat.contentInsets[edges.bottom]
+  const rowBottom = seatIdentityBottomGap(metrics.edge, inset) + inset
+  const fromLeft = (side: "left" | "right", offset: number, width: number) =>
+    side === "left" ? offset : upright.width - offset - width
+  const sides = ["left", "right"] as const
+  return [
+    ...sides.map((side) => {
+      const width = Math.max(upright.width / 2 - along(side, "top") - metrics.gap - topMenu, 0)
+      return {
+        left: fromLeft(side, along(side, "top"), width),
+        bottom: upright.height - corner(edges.top, edges[side]) - metrics.icon,
+        width,
+        height: metrics.icon,
+      }
+    }),
+    ...sides.map((side) => ({
+      left: fromLeft(side, along(side, "bottom"), buttonSize),
+      bottom: rowBottom + (metrics.icon - buttonSize) / 2,
+      width: buttonSize,
+      height: buttonSize,
+    })),
+    {
+      left: along("left", "bottom"),
+      bottom: rowBottom,
+      width: upright.width - along("left", "bottom") - along("right", "bottom"),
+      height: metrics.icon,
+    },
+  ]
 }
 
-function expectMatchLabelsInsideSeatsAndClear(boardCase: BoardCase) {
-  const { board, layout, grid } = boardGrid(boardCase)
-  const seats = boardSeats(boardCase)
-  const fontSize = lifeFontSize(boardCase)
-  for (const benchSeats of [false, true]) {
-    const placements = contextLabelPlacements({
-      rows: grid.rows,
-      board,
-      compact: layout.compact,
-      benchSeats,
-      lifeFontSize: fontSize,
-    })
-    if (!benchSeats)
-      expect(new Set(placements.map(({ turn }) => turn))).toEqual(
-        new Set(seats.map(({ seat }) => seat.rotation)),
-      )
-    for (const { left, top, width, turn } of placements) {
-      const sideways = Math.abs(turn) === 90
-      const size = { width: Math.min(width, LABEL.width), height: LABEL.height }
-      const center = { x: left + width / 2, y: top + LABEL.height / 2 }
-      const rect = {
+function soloContent({ seat, placement, markHeight, metrics, buttonSize }: BoardSeat) {
+  return [
+    {
+      left: Number(placement.position.left),
+      bottom: Number(placement.position.bottom),
+      width: Number(placement.rowMaxWidth),
+      height: markHeight,
+    },
+    {
+      left: uprightSize(seat).width - placement.trailing.right - buttonSize * 2 - metrics.gap,
+      bottom: placement.trailing.bottom,
+      width: buttonSize * 2 + metrics.gap,
+      height: buttonSize,
+    },
+  ]
+}
+
+// why: the legacy stage draws a turned board upright and rotates it onto a screen of the turned size, so its copies come back in screen points and are turned back here to meet the seats.
+function labelsOnBoard(boardCase: BoardCase, fontScale: number, benchSeats: boolean) {
+  const { board, layout, insets } = boardGrid(boardCase)
+  const { boardRotation } = boardCase
+  const screen =
+    boardRotation === 90
+      ? { width: board.height, height: board.width }
+      : { width: board.width, height: board.height }
+  return boardLabelPlacements({
+    playerCount: boardCase.playerCount,
+    teamBoard: boardCase.teamBoard,
+    layout,
+    width: board.width,
+    height: board.height,
+    screen,
+    rotation: boardRotation,
+    fontScale,
+    insets,
+    tabsShown: boardCase.tabsShown,
+    benchSeats,
+  }).map(({ left, top, width, turn }) => {
+    const x = left + width / 2 - screen.width / 2
+    const y = top + LABEL.height / 2 - screen.height / 2
+    const facing = boardRotation === 90 ? (turn === -90 ? 180 : turn - 90) : turn
+    const sideways = Math.abs(facing) === 90
+    const size = { width: Math.min(width, LABEL.width), height: LABEL.height * fontScale }
+    // why: the line's text is anchored at its foot and grows toward the seat's top edge.
+    const grown = (size.height - LABEL.height) / 2
+    const angle = (facing * Math.PI) / 180
+    const center = {
+      x: board.width / 2 + (boardRotation === 90 ? y : x) + Math.round(Math.sin(angle)) * grown,
+      y: board.height / 2 + (boardRotation === 90 ? -x : y) - Math.round(Math.cos(angle)) * grown,
+    }
+    return {
+      facing,
+      rect: {
         x: center.x - (sideways ? size.height : size.width) / 2,
         y: center.y - (sideways ? size.width : size.height) / 2,
         width: sideways ? size.height : size.width,
         height: sideways ? size.width : size.height,
-      }
-      const home = seats.filter(({ seat }) => contains(seat.card, rect))
-      expect(home.map(({ seat }) => seat.rotation)).toEqual([turn])
-      const [boardSeat] = home
-      const { seat, placement, markHeight, metrics, buttonSize } = boardSeat
-      expectClear("match label", rect, boardSeat)
-      const upright = uprightSize(seat)
-      if (benchSeats) {
-        expect(seat.menuEdgeCenter).toBe(CONTENT_EDGES[seat.rotation].top)
-        const menuBand = turnOntoBoard(seat, {
-          left: 0,
-          bottom: upright.height - MENU_CLEARANCE,
-          width: upright.width,
-          height: MENU_CLEARANCE,
-        })
-        expect(contains(menuBand, rect)).toBe(true)
-        continue
-      }
-      const seatContent = [
-        {
-          left: Number(placement.position.left),
-          bottom: Number(placement.position.bottom),
-          width: Number(placement.rowMaxWidth),
-          height: markHeight,
-        },
-        {
-          left: upright.width - placement.trailing.right - buttonSize * 2 - metrics.gap,
-          bottom: placement.trailing.bottom,
-          width: buttonSize * 2 + metrics.gap,
-          height: buttonSize,
-        },
-      ].map((content) => turnOntoBoard(seat, content))
-      for (const content of [...seatContent, lifeTotalBox(boardSeat, fontSize)])
-        expect({ boardCase, turn, hit: overlaps(rect, content) && content }).toEqual({
-          boardCase,
-          turn,
-          hit: false,
-        })
+      },
     }
-  }
+  })
+}
+
+function expectMatchLabelsInsideSeatsAndClear(boardCase: BoardCase) {
+  const seats = boardSeats(boardCase)
+  const facings = new Set(seats.map(({ seat }) => seat.rotation))
+  for (const fontScale of [1, 1.3])
+    for (const benchSeats of boardCase.teamBoard ? [false] : [false, true]) {
+      const labels = labelsOnBoard(boardCase, fontScale, benchSeats)
+      const drawn = labels.map(({ facing }) => facing)
+      expect(new Set(drawn).size).toBe(drawn.length)
+      // why: a seat with no clear strip draws no copy, which only larger text or a team card brings about.
+      if (!benchSeats && !boardCase.teamBoard && fontScale === 1)
+        expect(new Set(drawn)).toEqual(facings)
+      for (const { facing, rect } of labels) {
+        const home = seats.filter(({ seat }) => contains(seat.card, rect))
+        expect(home.map(({ seat }) => seat.rotation)).toEqual([facing])
+        const [boardSeat] = home
+        const { seat } = boardSeat
+        expectClear("match label", rect, boardSeat)
+        if (benchSeats) {
+          expect(seat.menuEdgeCenter).toBe(CONTENT_EDGES[seat.rotation].top)
+          const upright = uprightSize(seat)
+          const menuBand = turnOntoBoard(seat, {
+            left: 0,
+            bottom: upright.height - MENU_CLEARANCE,
+            width: upright.width,
+            height: MENU_CLEARANCE,
+          })
+          expect(contains(menuBand, rect)).toBe(true)
+          continue
+        }
+        const content = (boardCase.teamBoard ? teamContent : soloContent)(boardSeat).map((box) =>
+          turnOntoBoard(seat, box),
+        )
+        for (const box of [...content, lifeTotalBox(boardSeat, boardCase, fontScale)])
+          expect({ boardCase, fontScale, facing, hit: overlaps(rect, box) && box }).toEqual({
+            boardCase,
+            fontScale,
+            facing,
+            hit: false,
+          })
+      }
+    }
 }
 
 describe("board layout matrix", () => {
   it.each(CASES)(
-    "$name, $playerCount players, $variant, board at $boardRotation°, tabs shown $tabsShown",
+    "$name, $playerCount $seats, $variant, board at $boardRotation°, tabs shown $tabsShown",
     (boardCase) => {
-      for (const boardSeat of boardSeats(boardCase)) {
+      for (const boardSeat of boardCase.teamBoard ? [] : boardSeats(boardCase)) {
         expectIdentityRowInsideAndClear(boardSeat)
         expectButtonsCenteredOnMarkOrOwnCornerRow(boardSeat)
         expectRaisedMarkBelowLifeGlyphs(boardSeat)

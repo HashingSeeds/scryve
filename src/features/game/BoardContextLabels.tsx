@@ -2,16 +2,35 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { BoardPressable } from "@/components/BoardPressable"
-import { DIGIT_INK_HEIGHT } from "@/components/commanderDamageLayout"
+import { lifeInk } from "@/components/commanderDamageLayout"
+import { seatBagSize } from "@/components/CounterChips"
+import { MENU_BUTTON_SIZE } from "@/components/GameRadialMenu"
 import { seatIdentityPlacement } from "@/components/LifeCard"
-import type { LifeCardContentRotation } from "@/components/playerCardTypes"
-import { CONTENT_EDGES, EDGE_TAB, type seatFrames } from "@/components/playerGridGeometry"
+import {
+  COMPACT_LIFE_GLYPH_LINE_HEIGHT,
+  COMPACT_LIFE_TARGET_SIZE,
+  cornerOffset,
+  LIFE_GLYPH_LINE_HEIGHT,
+  LIFE_MAX_FONT_SCALE,
+  LIFE_TARGET_SIZE,
+  type LifeCardContentRotation,
+} from "@/components/playerCardTypes"
+import { getCellSize, getLifeFontSize } from "@/components/PlayerGrid"
+import {
+  CONTENT_EDGES,
+  EDGE_TAB,
+  getPlayerGridRowFlex,
+  getPlayerGridRows,
+  seatFrames,
+} from "@/components/playerGridGeometry"
 import { MENU_CLEARANCE } from "@/components/pokemon/pokemonCardLayout"
-import { seatIdentityMetrics } from "@/components/SeatIdentity"
+import { seatIdentityBottomGap, seatIdentityMetrics } from "@/components/SeatIdentity"
+import { panelBoxes, teamPanelCompact } from "@/components/teamGridGeometry"
 import { Text } from "@/components/Text"
 import { separator } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { spacing } from "@/theme/spacing"
 import type { ThemedStyle } from "@/theme/types"
 
 import type { PlaySystemId } from "./playSystems"
@@ -28,6 +47,7 @@ const TURNS: readonly LifeCardContentRotation[] = [0, 90, 180, -90]
 type SeatRows = ReturnType<typeof seatFrames>["rows"]
 type Seat = NonNullable<SeatRows[number][number]>
 type Point = { x: number; y: number }
+type Spot = { along: number; up: number; width: number }
 
 interface LabelInput {
   rows: SeatRows
@@ -36,7 +56,9 @@ interface LabelInput {
   rotation?: number
   compact?: boolean
   benchSeats?: boolean
-  lifeFontSize?: number
+  teamBoard?: boolean
+  fontScale?: number
+  lifeFontSize?: (slot: number) => number | undefined
 }
 
 export type ContextLabelPlacement = ReturnType<typeof contextLabelPlacements>[number]
@@ -48,67 +70,94 @@ function turned({ x, y }: Point, degrees: number): Point {
   return { x: x * cos - y * sin, y: x * sin + y * cos }
 }
 
-/** why: a seat's free strip depends on what it draws. The life total reaches a short seat's identity row, so the line takes the strip along the seat's top edge. Where the menu holds the middle of that edge it sits above the identity row if the total leaves room, else in the strip the seat keeps clear beside the menu. A bench seat is full from its identity row to its top edge, so that strip is its only free one. Measured in the seat's own upright frame: `along` from its left, `up` from its foot. */
+/** why: a seat's free strip depends on what it draws, so each kind of seat lists its strips in order and the line takes the first one the life total leaves clear; a seat with none draws no copy, as the menu's status line carries the score too. LifeControls centres the total on the card, not inside its insets, and its ink grows with the text size. The line's own text grows up from its foot. Measured in the seat's own upright frame: `along` from its left, `up` from its foot. */
 function seatSpot(
   seat: Seat,
   {
     compact,
     benchSeats,
-    lifeFontSize = 0,
-  }: Pick<LabelInput, "compact" | "benchSeats" | "lifeFontSize">,
-) {
+    teamBoard,
+    fontScale = 1,
+    lifeFontSize,
+  }: Pick<LabelInput, "compact" | "benchSeats" | "teamBoard" | "fontScale" | "lifeFontSize">,
+): Spot | undefined {
   const { card, rotation, contentInsets, screenEdges } = seat
   const sideways = Math.abs(rotation) === 90
   const run = sideways ? card.height : card.width
   const rise = sideways ? card.width : card.height
   const edges = CONTENT_EDGES[rotation]
-  if (seat.menuEdgeCenter !== edges.top)
-    return benchSeats
-      ? undefined
-      : {
-          along: run / 2,
-          up: rise - contentInsets[edges.top] - TOP_GAP - LINE_HEIGHT / 2,
-          width: run,
-        }
-  const { edge, icon } = seatIdentityMetrics(compact)
+  const menuOnTop = seat.menuEdgeCenter === edges.top
+  const line = LINE_HEIGHT * Math.max(fontScale, 1)
+  const lifeScale = Math.min(fontScale, LIFE_MAX_FONT_SCALE)
+  const ink = lifeInk(lifeFontSize?.(seat.slot) ?? 0, 2)
+  const life = {
+    foot: rise / 2 - (ink.y + ink.height / 2) * lifeScale,
+    head: rise / 2 - (ink.y - ink.height / 2) * lifeScale,
+    halfWidth: (ink.width / 2) * lifeScale,
+  }
+  const centred = (foot: number) => ({ along: run / 2, up: foot + LINE_HEIGHT / 2, width: run })
+  const belowTotal = (foot: number) => (foot + line <= life.foot ? centred(foot) : undefined)
+  const aboveTotal = (depth: number) =>
+    rise - depth - line >= life.head ? centred(rise - depth - line) : undefined
+  const metrics = seatIdentityMetrics(compact)
+
+  if (teamBoard) {
+    // why: a team card draws its two names along its top edge out from both corners, as far as the middle, and its counters and bags along its foot, so neither edge strip nor the strip beside the menu is ever clear; only the bands between those rows and the total are.
+    const names =
+      Math.max(
+        ...(["left", "right"] as const).map((side) =>
+          cornerOffset(metrics.gap, edges.top, edges[side], contentInsets, screenEdges),
+        ),
+      ) + metrics.icon
+    const menu = menuOnTop ? MENU_BUTTON_SIZE / 2 : 0
+    const inset = contentInsets[edges.bottom]
+    const row = seatIdentityBottomGap(metrics.edge, inset) + inset
+    return (
+      aboveTotal(
+        Math.max(names + IDENTITY_CLEARANCE, menu + IDENTITY_CLEARANCE, contentInsets[edges.top]),
+      ) ?? belowTotal(row + (metrics.icon + seatBagSize(compact)) / 2 + IDENTITY_CLEARANCE)
+    )
+  }
+
   const identity = seatIdentityPlacement({
     rotation,
     cardSize: card,
-    gap: edge,
+    gap: metrics.edge,
     insets: contentInsets,
     screenEdges,
-    markHeight: icon,
-    buttonSize: icon,
+    markHeight: metrics.icon,
+    buttonSize: metrics.icon,
   })
-  const foot = Number(identity.position.bottom) + icon + IDENTITY_CLEARANCE
-  const lifeFoot =
-    (rise +
-      contentInsets[edges.bottom] -
-      contentInsets[edges.top] -
-      DIGIT_INK_HEIGHT * lifeFontSize) /
-    2
-  if (!benchSeats && foot + LINE_HEIGHT <= lifeFoot)
-    return { along: run / 2, up: foot + LINE_HEIGHT / 2, width: run }
+  const aboveIdentity = () =>
+    belowTotal(Number(identity.position.bottom) + metrics.icon + IDENTITY_CLEARANCE)
+  if (!menuOnTop)
+    return benchSeats
+      ? undefined
+      : (aboveTotal(contentInsets[edges.top] + TOP_GAP - (line - LINE_HEIGHT)) ?? aboveIdentity())
   const start = Math.max(EDGE_TAB.depth, contentInsets[edges.left])
   const end = run / 2 - MENU_CLEARANCE
-  return end > start
-    ? { along: (start + end) / 2, up: rise - MENU_CLEARANCE / 2, width: end - start }
-    : undefined
+  const beside =
+    end > start
+      ? { along: (start + end) / 2, up: rise - MENU_CLEARANCE / 2, width: end - start }
+      : undefined
+  // why: a bench seat is full from its identity row to its top edge and draws no total, so the strip it keeps clear beside the menu is its only free one.
+  if (benchSeats) return beside
+  const totalReachesStrip =
+    life.halfWidth > MENU_CLEARANCE && life.head > rise - MENU_CLEARANCE / 2 - LINE_HEIGHT / 2
+  return aboveIdentity() ?? (totalReachesStrip ? undefined : beside)
 }
 
 /** why: a line centred on a whole screen edge crossed the dividers of a board with more than two seats and drew over a bench, so each copy sits inside one seat, turned to face it. One copy per facing is enough to read from every side; it goes in the seat nearest the middle of the table. `rotation` turns a board drawn sideways onto the screen. */
-export function contextLabelPlacements({
+function contextLabelPlacements({
   rows,
   board,
   screen = board,
   rotation = 0,
-  compact,
-  benchSeats,
-  lifeFontSize,
+  ...seatInput
 }: LabelInput) {
   const nearest = new Map<LifeCardContentRotation, { center: Point; width: number; far: number }>()
   for (const seat of rows.flat()) {
-    const spot = seat && seatSpot(seat, { compact, benchSeats, lifeFontSize })
+    const spot = seat && seatSpot(seat, seatInput)
     if (!spot) continue
     const { card } = seat
     const sideways = Math.abs(seat.rotation) === 90
@@ -140,6 +189,83 @@ export function contextLabelPlacements({
       width,
       turn: TURNS[((((facing + rotation) / 90) % 4) + 4) % 4],
     }
+  })
+}
+
+/** why: the label is placed from the same seat frames the grid draws, so it follows each seat's insets, tabs, and menu corner, and from the total PlayerGrid sizes: two digits are the largest it draws, sized to the grid's cell, or to a team's own panel. */
+export function boardLabelPlacements({
+  playerCount,
+  teamBoard,
+  layout,
+  width,
+  height,
+  screen,
+  rotation,
+  topEdgeBand = 0,
+  fontScale,
+  insets,
+  tabsShown,
+  benchSeats,
+}: {
+  playerCount: number
+  teamBoard?: boolean
+  layout: Parameters<typeof seatFrames>[0]["layout"]
+  width: number
+  height: number
+  screen?: { width: number; height: number }
+  rotation?: number
+  topEdgeBand?: number
+  fontScale: number
+  insets: Parameters<typeof seatFrames>[0]["insets"]
+  tabsShown: boolean
+  benchSeats?: boolean
+}) {
+  const board = { width, height }
+  const { rows } = seatFrames({
+    playerCount,
+    layout,
+    boardSize: board,
+    measuredGrid: board,
+    topEdgeBand,
+    gap: spacing.xxs,
+    insets,
+    tabsShown,
+  })
+  const compact = teamBoard ? teamPanelCompact(layout, playerCount) : layout.compact
+  const glyphLine = compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT
+  const grid = { width, height: height - topEdgeBand }
+  const cell = getCellSize({ board: grid, layout, gap: spacing.xxs })
+  const slots = getPlayerGridRows(playerCount, layout)
+  const panels = teamBoard
+    ? panelBoxes(
+        slots,
+        slots.map((row) => getPlayerGridRowFlex(row, layout)),
+      )
+    : undefined
+  return contextLabelPlacements({
+    rows,
+    board,
+    screen,
+    rotation,
+    compact,
+    benchSeats,
+    teamBoard,
+    fontScale,
+    lifeFontSize: (slot) => {
+      const panel = panels?.get(slot)
+      return getLifeFontSize({
+        ...(panel
+          ? {
+              cellWidth: (panel.x1 - panel.x0) * grid.width,
+              cellHeight: (panel.y1 - panel.y0) * grid.height,
+            }
+          : cell),
+        digits: 2,
+        fontScale,
+        targetSize: compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
+        sidewaysGlyphReserve: 2 * (glyphLine + spacing.xs),
+      })
+    },
   })
 }
 

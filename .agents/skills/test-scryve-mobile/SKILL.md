@@ -150,6 +150,9 @@ link replaces the active local game, replays the requested state through real
 game commands, and opens it on Play. Params are documented on
 `buildSeededGame` in `src/devtools/seeds/gameSeed.ts`.
 
+`bestOf=1|3|5` starts the game as a best-of match, so the board shows its match
+label ("Game 1 · 0-0"), for example `players=4&teams=1+2,3+4&bestOf=3`.
+
 ```bash
 link='scryve-dev://dev/seed/game?format=commander&players=4&life=40,31,12,40&cmd=2>3:9'
 xcrun simctl openurl booted "$link"
