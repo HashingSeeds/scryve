@@ -14,13 +14,14 @@ CONSTANTS
   MaxUndos,     \* undos per guest
   MaxDrops,     \* connection drops in one run
   MaxHostTaps,  \* edits the host makes on g1's seat
-  Window,       \* length of the host's recent operation list (100 in the app)
+  Window,       \* length of the host's shared recent operation list (100 in the app)
   \* Each flag is TRUE in the app. check.sh turns one off to show a rule catch it.
   HostDedupes,           \* writeLife acks a retried id without applying it
   ResolveReplays,        \* writeResolution acks a retry of a settled claim
   UndoEndsMerge,         \* undoLife clears lastQueuedLifeChange
   OverlaySkipsConfirmed, \* overlayPendingDeltas skips ids in recentOperationIds
-  StateOnRejoin          \* the host publishes after it welcomes a rejoining guest
+  StateOnRejoin,         \* the host publishes after it welcomes a rejoining guest
+  KeepsNewest            \* keepRecentAndNewestPerActor keeps each device's newest
 
 Guests == {"g1", "g2"}
 Seats == Guests
@@ -33,7 +34,8 @@ VARIABLES
   log,         \* host: applied events, one record per operation id
   undone,      \* host: ids that were taken back
   claim,       \* host: "none", "pending", "confirmed" or "declined"
-  recent,      \* host: the last Window operation ids, from every device
+  recent,      \* host: the last Window operation ids from every device, plus
+               \* each device's newest
   hostTaps,
   outbox,      \* guest: queued operations, oldest first
   sending,     \* guest: the outbox head is in flight
@@ -61,7 +63,12 @@ Moved(d, seat) == [s \in Seats |-> IF Touches(seat, s) THEN d ELSE 0]
 Plus(f, g) == [s \in Seats |-> f[s] + g[s]]
 Ids(L) == {r.id : r \in L}
 Elems(q) == {q[i] : i \in DOMAIN q}
-Keep(q) == IF Len(q) > Window THEN SubSeq(q, Len(q) - Window + 1, Len(q)) ELSE q
+\* keepRecentAndNewestPerActor (lanGame.ts): the last Window ids, plus each
+\* device's newest, oldest first.
+Kept(q) == SelectSeq([i \in 1..Len(q) |-> i],
+             LAMBDA i : i > Len(q) - Window
+                        \/ (KeepsNewest /\ \A j \in i+1..Len(q) : q[j].by # q[i].by))
+Keep(q) == [k \in DOMAIN Kept(q) |-> q[Kept(q)[k]]]
 
 \* lanProjection: a viewer gets only its own ids from the shared recent list.
 \* `applied` is a ghost: what the host had applied when it sent this state.
@@ -224,6 +231,7 @@ Rejoin(g) ==
 -----------------------------------------------------------------------------
 (* Host *)
 
+\* applyLanWrite lists each applied id with keepRecentAndNewestPerActor.
 \* writeLife dedupes by id (gameEngine.ts:462). writeClaim and writeResolution
 \* dedupe by the claim's status. An invalid undo gets a nack, which the outbox
 \* drops like an ack.
@@ -259,7 +267,8 @@ HostReceive(g) ==
   /\ UNCHANGED <<hostTaps, outbox, sending, mergeInto, nextId, undoable, conn,
                  screen, intent, taps, undos, drops, claimSent, resolveSent>>
 
-\* hostWrite: the host edits g1's seat and applies it at once.
+\* hostWrite: the host edits g1's seat and applies it at once, through
+\* applyLanWrite.
 HostTap ==
   /\ hostTaps < MaxHostTaps
   /\ hostTaps' = hostTaps + 1
