@@ -755,8 +755,12 @@ export function CardSearch({
               autoCorrect={false}
               autoFocus={!choosingCommander}
               returnKeyType="search"
-              onChangeText={setQuery}
+              // why: a query with filter terms wraps onto more lines instead of scrolling out of sight.
+              multiline
+              submitBehavior="blurAndSubmit"
+              onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
               containerStyle={$queryField}
+              inputWrapperStyle={$queryWrapper}
               RightAccessory={busy ? SearchBusy : undefined}
             />
             {CAN_READ_CARDS &&
@@ -1184,6 +1188,7 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 
 const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
 const $queryField: ViewStyle = { flex: 1 }
+const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112 }
 const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $filterSection: ViewStyle = { gap: 8 }
 
