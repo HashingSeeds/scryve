@@ -241,7 +241,6 @@ it("searches within the commander's colors until the player clears them", async 
       />
     </ThemeProvider>,
   )
-  expect(view.getByLabelText("Filters (3)")).toBeTruthy()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).not.toHaveBeenCalled()
   expect(view.getByTestId("card-search-input").props.value).toBe("f:commander id<=ur ")
@@ -299,7 +298,6 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   fireEvent.press(view.getByTestId("card-focus-close"))
   expect(view.queryByTestId("card-focus-dialog")).toBeNull()
   expect(view.getByTestId("card-search-input").props.value).toBe("f:commander id=u ar")
-  expect(view.getByLabelText("Filters (2)")).toBeTruthy()
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
   fireEvent.press(view.getByLabelText("Preview Baral as commander"))
   await act(async () => {})
@@ -792,15 +790,54 @@ describe("with the device's Magic card file", () => {
     const { view } = await searchFor("")
     const input = view.getByTestId("card-search-input")
     fireEvent.changeText(input, "f:modern t:dra")
-    fireEvent.press(view.getByLabelText("Dragon, t:dragon"))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400))
+    })
+    expect(mockAction).not.toHaveBeenCalled()
+    fireEvent.press(view.getByTestId("card-search-suggestion-t:dragon"))
     expect(input.props.value).toBe("f:modern t:dragon ")
-    expect(view.queryByLabelText("Dragon, t:dragon")).toBeNull()
+    expect(view.queryByTestId("card-search-suggestion-t:dragon")).toBeNull()
   })
 
   it("answers syntax it can read on the device", async () => {
     const { view } = await searchFor("t:dragon")
     expect(view.getByLabelText("Add Shivan Dragon to deck")).toBeTruthy()
     expect(mockAction).not.toHaveBeenCalled()
+  })
+
+  it("looks up rules on the device offline, and says which syntax needs a connection", async () => {
+    mockConnection.isWebSocketConnected = false
+    mockMagicCards = parseMagicCards(JSON.stringify({ version: "1", cards: [shivan] }))
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSearch game="mtg" format="modern" onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+    const input = view.getByTestId("card-search-input")
+    fireEvent.changeText(input, "t:dragon")
+    expect(await view.findByLabelText("Show Shivan Dragon")).toBeTruthy()
+    expect(view.getByText("You’re offline. Searching the card list on this device.")).toBeTruthy()
+    fireEvent.changeText(input, "t:dragon o:flying")
+    expect(
+      await view.findByText("You’re offline. Some of these search terms need a connection."),
+    ).toBeTruthy()
+    expect(view.queryByLabelText("Show Shivan Dragon")).toBeNull()
+    expect(mockAction).not.toHaveBeenCalled()
+  })
+
+  it("says a format needs a connection offline when the card file predates legality", async () => {
+    mockConnection.isWebSocketConnected = false
+    const { legalFormats: _, ...unknownLegality } = shivan
+    mockMagicCards = parseMagicCards(JSON.stringify({ version: "1", cards: [unknownLegality] }))
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSearch game="mtg" format="modern" onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent.changeText(view.getByTestId("card-search-input"), "f:modern dragon")
+    expect(
+      await view.findByText("You’re offline. Some of these search terms need a connection."),
+    ).toBeTruthy()
   })
 
   it("sends syntax the device can't read to Scryfall", async () => {
@@ -841,7 +878,6 @@ it("starts a deck's search on its format and lets the player pick other formats 
   fireEvent.press(view.getByTestId("card-filter-format-modern"))
   fireEvent.press(view.getByTestId("card-filter-format-legacy"))
   fireEvent.press(view.getByText("Done"))
-  expect(view.getByLabelText("Filters (1)")).toBeTruthy()
   expect(await lastQuery()).toBe("t:creature")
 })
 
@@ -856,7 +892,6 @@ it("lights up the filters a player types as syntax", async () => {
   fireEvent.changeText(view.getByTestId("card-search-input"), "f:modern t:creature mv<=2 bolt")
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction.mock.lastCall?.[1].query).toBe("(bolt) f:modern t:creature mv<=2")
-  expect(view.getByLabelText("Filters (3)")).toBeTruthy()
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
   expect(view.getByTestId("card-filter-type-Creature").props.accessibilityState.selected).toBe(true)

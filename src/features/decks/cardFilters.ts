@@ -1,35 +1,21 @@
-import type { MagicDatasetCard } from "../../../convex/lib/magicDataset"
-import type { CardFilterDefinition, MagicCardFilterId } from "../../../convex/lib/systems"
+import type { CardFilterDefinition } from "../../../convex/lib/systems"
 
 export type CardFilterState = Readonly<Record<string, readonly string[]>>
-
-export type MagicFilterCard = Partial<
-  Pick<
-    MagicDatasetCard,
-    "typeLine" | "keywords" | "power" | "toughness" | "manaValue" | "legalFormats"
-  >
->
 
 /** why: a range filter keeps its bounds as picked options, so ">=3" and "<=5" read as 3 to 5. */
 export type RangeBound = ">=" | "<="
 
 /** why: one catalog's half of a filter: where a card keeps the value, and the search keys that ask for it. The first key is the one Scryve writes. */
-type FilterField<Card> = {
+export type FilterField<Card> = {
   keys: readonly string[]
   read: (card: Card) => readonly string[] | number | undefined
 }
 
-function typeLineWords(typeLine: string | undefined, part: "types" | "subtypes") {
-  return typeLine
-    ?.split(" // ")
-    .flatMap((face) => face.split(" — ")[part === "types" ? 0 : 1]?.split(" ") ?? [])
-    .filter(Boolean)
-}
-
-function stat(value: string | undefined) {
-  const number = value === undefined || value === "" ? NaN : Number(value)
-  return Number.isFinite(number) ? number : undefined
-}
+/**
+ * why: a card catalog's fields by filter id. Reading, writing, suggesting and matching filter
+ * terms go through one, so another catalog gets the search bar's syntax by declaring its own.
+ */
+export type CardSource<Card = never> = ReadonlyMap<string, FilterField<Card>>
 
 function matchesOption(value: readonly string[] | number, option: string) {
   if (typeof value !== "number") {
@@ -40,41 +26,22 @@ function matchesOption(value: readonly string[] | number, option: string) {
   return option.startsWith(">=") ? value >= bound : value <= bound
 }
 
-const TYPE_KEYS = ["t", "type"]
-
-const SCRYFALL_FIELDS = {
-  format: { keys: ["f", "format", "legal"], read: (card) => card.legalFormats },
-  type: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "types") },
-  supertype: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "types") },
-  subtype: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "subtypes") },
-  manaValue: { keys: ["mv", "cmc", "manavalue"], read: (card) => card.manaValue },
-  keyword: {
-    keys: ["kw", "keyword"],
-    read: (card) => card.keywords?.split("\n").filter(Boolean),
-  },
-  power: { keys: ["pow", "power"], read: (card) => stat(card.power) },
-  toughness: { keys: ["tou", "toughness"], read: (card) => stat(card.toughness) },
-} satisfies Record<MagicCardFilterId, FilterField<MagicFilterCard>>
-
-const scryfallFields: ReadonlyMap<string, FilterField<MagicFilterCard>> = new Map(
-  Object.entries(SCRYFALL_FIELDS),
-)
-
 function filterTerm(filter: CardFilterDefinition, key: string, option: string) {
   if (filter.options === "range") return `${key}${option}`
   const value = option.replace(/["\\]/g, "").toLocaleLowerCase()
   return `${key}:${/^[a-z0-9-]+$/.test(value) ? value : `"${value}"`}`
 }
 
-export function matchesCardFilters(
-  card: MagicFilterCard,
+export function matchesCardFilters<Card>(
+  source: CardSource<Card>,
+  card: Card,
   filters: readonly CardFilterDefinition[],
   picked: CardFilterState,
 ) {
   return filters.every((filter) => {
     const options = picked[filter.id] ?? []
     if (!options.length) return true
-    const value = scryfallFields.get(filter.id)?.read(card)
+    const value = source.get(filter.id)?.read(card)
     if (value === undefined) return false
     const has = (option: string) => matchesOption(value, option)
     return filter.options !== "range" && filter.match === "any"
@@ -83,12 +50,13 @@ export function matchesCardFilters(
   })
 }
 
-export function scryfallFilterTerms(
+export function filterTerms(
+  source: CardSource,
   filters: readonly CardFilterDefinition[],
   picked: CardFilterState,
 ) {
   return filters.flatMap((filter) => {
-    const key = scryfallFields.get(filter.id)?.keys[0]
+    const key = source.get(filter.id)?.keys[0]
     const terms = key ? (picked[filter.id] ?? []).map((o) => filterTerm(filter, key, o)) : []
     return filter.options === "range" || filter.match === "all" || terms.length < 2
       ? terms
@@ -98,16 +66,17 @@ export function scryfallFilterTerms(
 
 /**
  * why: reads one typed term back into the filter that writes it, so typed syntax lights up the
- * sheet. Undefined leaves the term as raw syntax for Scryfall. A `t:` word goes to the first
- * filter that declares it, else to the filter whose options come from cards.
+ * sheet. Undefined leaves the term as raw syntax for the catalog. A word goes to the first
+ * filter with its key that declares it, else to the filter whose options come from cards.
  */
 export function readFilterTerm(
+  source: CardSource,
   filters: readonly CardFilterDefinition[],
   { key, operator, value }: { key: string; operator: string; value: string },
   cardOptionsFor: (filterId: string) => readonly string[],
 ): { filter: CardFilterDefinition; options: readonly string[] } | undefined {
   const fields = filters.filter((filter) =>
-    scryfallFields.get(filter.id)?.keys.includes(key.toLocaleLowerCase()),
+    source.get(filter.id)?.keys.includes(key.toLocaleLowerCase()),
   )
   const range = fields.find((filter) => filter.options === "range")
   if (range) {
@@ -134,6 +103,7 @@ export function readFilterTerm(
 
 /** why: lists the options a partly typed term could finish as, those starting with the typed text first. */
 export function termSuggestions(
+  source: CardSource,
   filters: readonly CardFilterDefinition[],
   key: string,
   typed: string,
@@ -142,7 +112,7 @@ export function termSuggestions(
 ) {
   const wanted = typed.toLocaleLowerCase()
   const options = filters.flatMap((filter) =>
-    filter.options !== "range" && scryfallFields.get(filter.id)?.keys.includes(key)
+    filter.options !== "range" && source.get(filter.id)?.keys.includes(key)
       ? (Array.isArray(filter.options) ? filter.options : cardOptionsFor(filter.id)).map(
           (option) => ({ filter, option, at: option.toLocaleLowerCase().indexOf(wanted) }),
         )
@@ -188,19 +158,25 @@ export function withRangeBound(picked: readonly string[], bound: RangeBound, val
   return value === undefined ? kept : [...kept, `${bound}${value}`]
 }
 
-const optionCache = new WeakMap<readonly MagicDatasetCard[], Map<string, readonly string[]>>()
+const optionCache = new WeakMap<
+  CardSource<never>,
+  WeakMap<readonly object[], Map<string, readonly string[]>>
+>()
 
 /** why: this walks all 30k cards, so each card file keeps its counts instead of recounting on every sheet open. */
-export function cardOptions(
-  cards: readonly MagicDatasetCard[],
+export function cardOptions<Card extends { legalFormats?: readonly string[] }>(
+  source: CardSource<Card>,
+  cards: readonly Card[],
   filterId: string,
   formats: readonly string[],
 ): readonly string[] {
   const scoped = formats.length > 0 && cards.some((card) => card.legalFormats !== undefined)
   const key = `${filterId}:${scoped ? formats.join(",") : ""}`
-  const cached = optionCache.get(cards)?.get(key)
+  const bySource = optionCache.get(source) ?? new WeakMap()
+  optionCache.set(source, bySource)
+  const cached = bySource.get(cards)?.get(key)
   if (cached) return cached
-  const field = scryfallFields.get(filterId)
+  const field = source.get(filterId)
   const counts = new Map<string, number>()
   for (const card of field ? cards : []) {
     if (scoped && !formats.every((format) => card.legalFormats?.includes(format))) continue
@@ -211,8 +187,8 @@ export function cardOptions(
   const options = [...counts]
     .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
     .map(([option]) => option)
-  const byKey = optionCache.get(cards) ?? new Map<string, readonly string[]>()
+  const byKey = bySource.get(cards) ?? new Map<string, readonly string[]>()
   byKey.set(key, options)
-  optionCache.set(cards, byKey)
+  bySource.set(cards, byKey)
   return options
 }

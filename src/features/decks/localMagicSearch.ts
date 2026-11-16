@@ -1,5 +1,6 @@
 import { matchesCardFilters, pickedCount, type CardFilterState } from "./cardFilters"
 import { type CardNameIndex, matchKey, searchCardNames } from "./cardNameMatch"
+import { SCRYFALL_SOURCE } from "./cardSources"
 import { matchesColors, type ColorMatch } from "./colorMatch"
 import {
   compareCardNames,
@@ -71,8 +72,21 @@ function matchesSearch(card: MagicDatasetCard, search: MagicSearch) {
     (!search.commander ||
       ((card.commanderEligibility === "eligible" || choosesColor) &&
         card.commanderLegality === "legal")) &&
-    matchesCardFilters(card, MAGIC_CARD_FILTERS, search.filters) &&
+    matchesCardFilters(SCRYFALL_SOURCE, card, MAGIC_CARD_FILTERS, search.filters) &&
     matchesColors(card.colorIdentity, search.colors, search.colorMatch, choosesColor)
+  )
+}
+
+/** why: the card file lacks rules text and, in older files, legality, so some searches only Scryfall answers. */
+export function readsOnDevice(
+  magicCards: MagicCards | undefined,
+  search: Pick<MagicSearch, "text" | "filters">,
+): magicCards is MagicCards {
+  return Boolean(
+    magicCards &&
+    (!search.filters.format?.length || magicCards.knowsLegality) &&
+    !SCRYFALL_SYNTAX.test(search.text) &&
+    !/[^\p{ASCII}]/u.test(search.text),
   )
 }
 
@@ -81,13 +95,7 @@ export function localMagicSearch(
   nameIndex: CardNameIndex | undefined,
   search: MagicSearch,
 ) {
-  if (
-    !magicCards ||
-    (search.filters.format?.length && !magicCards.knowsLegality) ||
-    SCRYFALL_SYNTAX.test(search.text) ||
-    /[^\p{ASCII}]/u.test(search.text)
-  )
-    return undefined
+  if (!readsOnDevice(magicCards, search)) return undefined
   const filtered =
     search.commander ||
     search.colors.length > 0 ||

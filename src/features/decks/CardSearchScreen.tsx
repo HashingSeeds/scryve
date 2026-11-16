@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Modal,
@@ -21,8 +21,9 @@ import {
 } from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
-import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
+import { FilterPill, FilterGroup } from "@/components/FilterPill"
 import { Header, HeaderIcon } from "@/components/Header"
+import { PressableIcon } from "@/components/Icon"
 import { SectionHeader } from "@/components/NumberLane"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
@@ -58,8 +59,8 @@ import {
   cardOptions,
   filterGroups,
   matchesCardFilters,
+  filterTerms,
   pickedCount,
-  scryfallFilterTerms,
   type CardFilterState,
 } from "./cardFilters"
 import { searchCardNames } from "./cardNameMatch"
@@ -71,6 +72,7 @@ import {
   type CardQuery,
 } from "./cardQuery"
 import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
+import { cardSource, SCRYFALL_SOURCE } from "./cardSources"
 import {
   COLOR_MATCHES,
   matchesColors,
@@ -88,7 +90,7 @@ import {
 import { isCommanderPick, sideboardSection } from "./deckDraft"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
-import { localMagicSearch, NAME_MATCHES, SCRYFALL_SYNTAX } from "./localMagicSearch"
+import { localMagicSearch, NAME_MATCHES, readsOnDevice, SCRYFALL_SYNTAX } from "./localMagicSearch"
 import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
 import { useMagicCards } from "./useMagicCards"
@@ -133,7 +135,7 @@ export function scryfallQuery({
       commander && identity && !colors.includes("C")
         ? `(${identity} or o:"choose a color")`
         : identity,
-      ...scryfallFilterTerms(MAGIC_CARD_FILTERS, filters),
+      ...filterTerms(SCRYFALL_SOURCE, MAGIC_CARD_FILTERS, filters),
     ]),
   ].filter(Boolean)
   if (!terms.length) return text
@@ -200,8 +202,8 @@ export function CardSearch({
         item.id !== side?.id &&
         !(item.id === "commander" && picksCommander(game, format)),
     )
-  const filtersCards =
-    systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
+  const source = cardSource(systemDefinition(game)?.integration.capabilities.cardCatalog.provider)
+  const filtersCards = source !== undefined
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
   const [candidate, setCandidate] = useState<DeckCard>()
   const candidateSheet = useSheetPresence(candidate)
@@ -268,8 +270,9 @@ export function CardSearch({
   }))
   const [colorMatchPick, setColorMatchPick] = useState(startingFilters.colorMatch)
   const [query, setQuery] = useState(() =>
-    filtersCards
+    source
       ? formatCardQuery(
+          source,
           { rest: "", filters: startingPicked, colors: startingFilters.colors },
           startingFilters.colorMatch,
           cardFilters,
@@ -278,28 +281,29 @@ export function CardSearch({
   )
   const parsed = useMemo<CardQuery>(
     () =>
-      filtersCards
-        ? parseCardQuery(query, cardFilters, (id) =>
-            magicCards ? cardOptions(magicCards.cards, id, []) : [],
+      source
+        ? parseCardQuery(source, query, cardFilters, (id) =>
+            magicCards ? cardOptions(SCRYFALL_SOURCE, magicCards.cards, id, []) : [],
           )
         : { rest: query, filters: NO_PICKS, colors: NO_COLORS },
-    [query, filtersCards, cardFilters, magicCards],
+    [query, source, cardFilters, magicCards],
   )
   const picked = parsed.filters
   const colorFilters = parsed.colors
   const colorMatch = parsed.colorMatch ?? colorMatchPick
   const text = parsed.rest.trim()
   // why: suggestions follow the bar's unfinished last word, not its focus, since clicking one on web blurs the bar first.
-  const suggestions = filtersCards
-    ? querySuggestions(query, cardFilters, (id) =>
-        magicCards ? cardOptions(magicCards.cards, id, picked.format ?? []) : [],
+  const suggestions = source
+    ? querySuggestions(source, query, cardFilters, (id) =>
+        magicCards ? cardOptions(SCRYFALL_SOURCE, magicCards.cards, id, picked.format ?? []) : [],
       )
     : []
   const nameIndex = useCardNameIndex(game, deviceId, scanning || text.length > 0)
   /** why: the sheet edits the search bar's text, which holds every filter. */
   function changeQuery(change: Partial<CardQuery>, match = colorMatch) {
+    if (!source) return
     setColorMatchPick(match)
-    setQuery(formatCardQuery({ ...parsed, ...change }, match, cardFilters))
+    setQuery(formatCardQuery(source, { ...parsed, ...change }, match, cardFilters))
   }
   const pickedFilters = pickedCount(cardFilters, picked)
   const changedFilters = cardFilters.some(({ id }) => {
@@ -313,8 +317,13 @@ export function CardSearch({
     colorFilters.length > 0 &&
     (colorFilters.length !== startingFilters.colors.length ||
       colorFilters.some((color) => !startingFilters.colors.includes(color)))
+  // why: a word still being finished, such as `kw:fl`, isn't a search yet, and Scryfall rejects it.
+  const finishing =
+    suggestions.length > 0 &&
+    !suggestions.some((suggestion) => query.toLowerCase().endsWith(suggestion.term))
   const searchRequested =
-    text.length >= 2 || (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0)))
+    !finishing &&
+    (text.length >= 2 || (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0))))
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
@@ -333,7 +342,8 @@ export function CardSearch({
     const known = magicCards?.byName.get(name)
     // why: a card whose legality the device doesn't know stays in; Scryfall checked it, or the card file predates legality.
     const checked = known?.legalFormats ? picked : { ...picked, format: [] }
-    if (!matchesCardFilters(known ?? details ?? {}, cardFilters, checked)) return false
+    if (!matchesCardFilters(SCRYFALL_SOURCE, known ?? details ?? {}, cardFilters, checked))
+      return false
     return matchesPickedColors(details)
   }
 
@@ -431,8 +441,9 @@ export function CardSearch({
   ])
 
   useEffect(() => {
+    // why: looking up rules never adds a card, so offline it can search the card file, which lacks the full details an add needs.
     const local =
-      searchRequested && !offline
+      searchRequested && (!offline || lookup)
         ? localMagicSearch(magicCards, nameIndex, {
             text,
             commander: choosingCommander,
@@ -449,7 +460,7 @@ export function CardSearch({
       filters: picked,
     })
     const answered =
-      local && (local.named.length || local.found.length || remoteQuery.length < 2)
+      local && (offline || local.named.length || local.found.length || remoteQuery.length < 2)
         ? local
         : undefined
     if (searchError?.retryAfterMs && !offline && !answered) return
@@ -463,7 +474,7 @@ export function CardSearch({
       setOfflineResults(undefined)
     }
     if (!searchRequested) return
-    if (offline) {
+    if (offline && !answered) {
       const wanted = (
         choosingCommander ? text.slice(0, 80).replace(/[()"]/g, " ").trim() : text
       ).toLowerCase()
@@ -550,6 +561,7 @@ export function CardSearch({
     deviceId,
     nameIndex,
     magicCards,
+    lookup,
   ])
 
   function searchEntry(card: SearchCard, to = section) {
@@ -721,6 +733,26 @@ export function CardSearch({
       />
     ) : null
 
+  // why: a search the device can't answer, such as rules text or a format an older card file lacks, needs Scryfall.
+  const offlineSyntax =
+    offline &&
+    filtersCards &&
+    (SCRYFALL_SYNTAX.test(text) ||
+      (lookup && magicCards !== undefined && !readsOnDevice(magicCards, { text, filters: picked })))
+  const scans = CAN_READ_CARDS && prereleaseBuild() && filtersCards && !choosingCommander && !lookup
+  // why: a new accessory component remounts its icons, so it changes only with what it shows.
+  const queryActions = useCallback(
+    ({ style }: TextFieldAccessoryProps) => (
+      <QueryActions
+        style={style}
+        busy={busy}
+        onScan={scans ? () => setScanning(true) : undefined}
+        onFilters={filtersCards ? () => setFiltersOpen(true) : undefined}
+      />
+    ),
+    [busy, scans, filtersCards],
+  )
+
   const tapsRows = choosingCommander || lookup
   const ResultRow = tapsRows ? TouchableOpacity : View
   const rowLabel = (card: { name: string }) =>
@@ -757,70 +789,43 @@ export function CardSearch({
           backgroundColor={theme.colors.surface}
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
-          <View style={$queryRow}>
-            <TextField
-              testID="card-search-input"
-              accessibilityLabel={translate("decks:cardSearch.searchLabel")}
-              placeholderTx="decks:cardSearch.placeholder"
-              value={query}
-              maxLength={filtersCards ? 400 : 120}
-              autoCorrect={false}
-              autoFocus={!choosingCommander}
-              returnKeyType="search"
-              // why: a query with filter terms wraps onto more lines instead of scrolling out of sight.
-              multiline
-              submitBehavior="blurAndSubmit"
-              onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
-              containerStyle={$queryField}
-              inputWrapperStyle={$queryWrapper}
-              RightAccessory={busy ? SearchBusy : undefined}
-            />
-            {CAN_READ_CARDS &&
-            prereleaseBuild() &&
-            filtersCards &&
-            !choosingCommander &&
-            !lookup ? (
-              <Button
-                testID="card-scan-button"
-                tx="decks:cardSearch.scan"
-                accessibilityLabel={translate("decks:cardSearch.scanLabel")}
-                onPress={() => setScanning(true)}
-              />
-            ) : null}
-            {filtersCards ? (
-              <FilterButton
-                testID="card-filters-button"
-                count={
-                  colorFilters.length +
-                  pickedFilters +
-                  (colorMatch !== startingFilters.colorMatch ? 1 : 0)
-                }
-                onPress={() => setFiltersOpen(true)}
-              />
-            ) : null}
-          </View>
-          {suggestions.map((suggestion) => {
-            const label =
-              suggestion.filter.id === "format"
-                ? deckFormatLabel(game, suggestion.option)
-                : suggestion.option
-            return (
-              <TouchableOpacity
-                key={suggestion.term}
-                testID={`card-search-suggestion-${suggestion.term}`}
-                accessibilityRole="button"
-                accessibilityLabel={translate("decks:cardSearch.suggestion", {
-                  option: label,
-                  term: suggestion.term,
-                })}
-                style={themed($suggestion)}
-                onPress={() => setQuery(suggestion.text)}
-              >
-                <Text text={label} />
-                <Text size="xs" style={{ color: theme.colors.textDim }} text={suggestion.term} />
-              </TouchableOpacity>
-            )
-          })}
+          <TextField
+            testID="card-search-input"
+            accessibilityLabel={translate("decks:cardSearch.searchLabel")}
+            placeholderTx="decks:cardSearch.placeholder"
+            value={query}
+            maxLength={filtersCards ? 400 : 120}
+            autoCorrect={false}
+            autoFocus={!choosingCommander}
+            returnKeyType="search"
+            // why: a query with filter terms wraps onto more lines instead of scrolling out of sight.
+            multiline
+            submitBehavior="blurAndSubmit"
+            onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
+            inputWrapperStyle={$queryWrapper}
+            RightAccessory={queryActions}
+          />
+          {suggestions.length ? (
+            <ScrollView
+              horizontal
+              keyboardShouldPersistTaps="handled"
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={themed($suggestions)}
+            >
+              {suggestions.map((suggestion) => (
+                <FilterPill
+                  key={suggestion.term}
+                  testID={`card-search-suggestion-${suggestion.term}`}
+                  label={
+                    suggestion.filter.id === "format"
+                      ? deckFormatLabel(game, suggestion.option)
+                      : suggestion.option
+                  }
+                  onPress={() => setQuery(suggestion.text)}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
           {onGameChange ? (
             <SelectField
               testID="card-search-game"
@@ -944,7 +949,18 @@ export function CardSearch({
               tx={offline ? "decks:cardSearch.searchCached" : "decks:cardSearch.searchScryfall"}
             />
           ) : null}
-          {offline ? <Text size="xxs" tx="decks:cardSearch.offline" /> : null}
+          {offline ? (
+            <Text
+              size="xxs"
+              tx={
+                offlineSyntax
+                  ? "decks:cardSearch.offlineSyntax"
+                  : lookup && magicCards
+                    ? "decks:cardSearch.offlineCardFile"
+                    : "decks:cardSearch.offline"
+              }
+            />
+          ) : null}
           {cachedCandidates?.map((entry, index) => (
             <ResultRow
               key={index}
@@ -985,7 +1001,7 @@ export function CardSearch({
               {!tapsRows ? sideAction(entry.card, (to) => addOffline(entry, to)) : null}
             </ResultRow>
           ))}
-          {offline && cachedCandidates?.length === 0 ? (
+          {offline && !offlineSyntax && cachedCandidates?.length === 0 ? (
             <Text tx="decks:cardSearch.noCached" />
           ) : null}
           {catalogResults?.map((card, index) => (
@@ -1092,7 +1108,12 @@ export function CardSearch({
                     options={
                       filter.options === "cards"
                         ? magicCards
-                          ? cardOptions(magicCards.cards, filter.id, picked.format ?? [])
+                          ? cardOptions(
+                              SCRYFALL_SOURCE,
+                              magicCards.cards,
+                              filter.id,
+                              picked.format ?? [],
+                            )
                           : []
                         : filter.options === "range"
                           ? []
@@ -1182,14 +1203,54 @@ export function CardSearch({
     </Modal>
   )
 }
-function SearchBusy({ style }: TextFieldAccessoryProps) {
+/** why: the bar keeps the row's full width, so its spinner, scan and filters sit inside its right edge. */
+function QueryActions({
+  style,
+  busy,
+  onScan,
+  onFilters,
+}: Pick<TextFieldAccessoryProps, "style"> & {
+  busy: boolean
+  onScan?: () => void
+  onFilters?: () => void
+}) {
   const { theme } = useAppTheme()
   return (
-    <ActivityIndicator
-      style={style}
-      color={theme.colors.textDim}
-      accessibilityLabel={translate("decks:cardSearch.searching")}
-    />
+    <View style={[style, $queryActions]}>
+      {busy ? (
+        <ActivityIndicator
+          style={$queryAction}
+          color={theme.colors.textDim}
+          accessibilityLabel={translate("decks:cardSearch.searching")}
+        />
+      ) : null}
+      {onScan ? (
+        <PressableIcon
+          testID="card-scan-button"
+          icon="camera"
+          size={20}
+          color={theme.colors.textDim}
+          accessibilityRole="button"
+          accessibilityLabel={translate("decks:cardSearch.scanLabel")}
+          hitSlop={4}
+          containerStyle={$queryAction}
+          onPress={onScan}
+        />
+      ) : null}
+      {onFilters ? (
+        <PressableIcon
+          testID="card-filters-button"
+          icon="sliders"
+          size={20}
+          color={theme.colors.textDim}
+          accessibilityRole="button"
+          accessibilityLabel={translate("decks:filters.label")}
+          hitSlop={4}
+          containerStyle={$queryAction}
+          onPress={onFilters}
+        />
+      ) : null}
+    </View>
   )
 }
 
@@ -1220,17 +1281,14 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 
-const $suggestion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  justifyContent: "space-between",
+const $suggestions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $queryActions: ViewStyle = { flexDirection: "row", alignItems: "center" }
+const $queryAction: ViewStyle = {
+  width: 40,
+  height: 40,
   alignItems: "center",
-  minHeight: 44,
-  paddingHorizontal: spacing.xs,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $queryRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
-const $queryField: ViewStyle = { flex: 1 }
+  justifyContent: "center",
+}
 const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112 }
 const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $filterSection: ViewStyle = { gap: 8 }
