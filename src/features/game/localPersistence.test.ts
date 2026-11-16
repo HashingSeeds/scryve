@@ -708,6 +708,21 @@ describe("LocalGameRepository", () => {
     expect(repository.loadHistoryDetail(finished.id)?.game.status).toBe("finished")
   })
 
+  it("keeps a nearby guest's mulligans in both the history row and its detail", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const context = defaultCommandContext(asDeviceId("device"))
+    const active = makeGame()
+    const guest = active.players[1].id
+    const finished = {
+      ...applyGameCommand(active, { type: "game.finish" }, context),
+      nearbyMulligans: { free: "first" as const, counts: { [guest]: 2 } },
+    }
+    repository.archiveGame(finished)
+    const counts = { free: "first", counts: { [guest]: 2 } }
+    expect(repository.loadHistory()[0]?.nearbyMulligans).toEqual(counts)
+    expect(repository.loadHistoryDetail(finished.id)?.game.nearbyMulligans).toEqual(counts)
+  })
+
   it("keeps seven-plus-seat games where a six-seat build can neither replace nor drop them", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

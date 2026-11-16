@@ -275,6 +275,28 @@ describe("buildFinishedLocalGameSnapshot", () => {
     expect(snapshot.players[2].deckVersionId).toBeUndefined()
   })
 
+  it("sends a nearby guest's own mulligans on the guest's seat", () => {
+    const game = commanderGame()
+    const guest = game.players[2].id
+    const snapshot = buildFinishedLocalGameSnapshot({
+      schemaVersion: 1,
+      id: game.id,
+      status: "finished",
+      system: "mtg",
+      format: "commander",
+      startingLife: 40,
+      players: game.players,
+      eventCount: 1,
+      createdAt: 100,
+      finishedAt: 200,
+      nearbyMulligans: { free: "first", counts: { [guest]: 2 } },
+      seatPassHashes: { [guest]: "a".repeat(64) },
+      account: { ownerId: "owner", mePlayerId: game.players[0].id },
+    })
+    expect(snapshot.freeMulligans).toBe("first")
+    expect(snapshot.players.map(({ mulligans }) => mulligans)).toEqual([undefined, undefined, 2])
+  })
+
   it("leaves out a system this app doesn't know, so the server still accepts the game", () => {
     const game = commanderGame()
     const snapshot = buildFinishedLocalGameSnapshot({

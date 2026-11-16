@@ -819,6 +819,7 @@ describe("NewGameScreen", () => {
       system: "mtg",
       format: "commander",
       layout: "auto",
+      freeMulligans: "first",
     })
     fireEvent.press(connected.getByTestId("game-tab-mtg"))
     fireEvent.press(connected.getByTestId("game-type-treachery"))

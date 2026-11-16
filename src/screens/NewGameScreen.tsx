@@ -606,7 +606,7 @@ function NewGameForm({
     deckLife === undefined &&
     account?.decks === undefined
   const tracksMulligans = !connectedMode && !teamPlay && mulliganHandSize(system) !== undefined
-  const cloudMulligans = cloudMode && !teamPlay && mulliganHandSize(system) !== undefined
+  const connectedMulligans = connectedMode && !teamPlay && mulliganHandSize(system) !== undefined
   const [firstPlayerMode] = useFirstPlayerMode(localGameRepository, system)
   const [freeMulligans, setFreeMulligans] = useFreeMulligans(system, format, playerCount)
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
@@ -738,6 +738,10 @@ function NewGameForm({
       connected.access.request()
       return
     }
+    const pregameSetup = {
+      ...(firstPlayerMode === "off" ? {} : { firstPlayerMode }),
+      ...(connectedMulligans ? { freeMulligans } : {}),
+    }
     if (nearbyMode)
       onNearby?.({
         playerCount,
@@ -745,6 +749,7 @@ function NewGameForm({
         ruleset: format ?? NO_PLAY_SYSTEM,
         ...gameSetup,
         ...(matchBestOf ? { matchBestOf } : {}),
+        ...pregameSetup,
       })
     else if (connectedMode)
       connected?.host({
@@ -753,8 +758,7 @@ function NewGameForm({
         ruleset: format ?? NO_PLAY_SYSTEM,
         ...gameSetup,
         ...(matchBestOf ? { matchBestOf } : {}),
-        ...(firstPlayerMode === "off" ? {} : { firstPlayerMode }),
-        ...(cloudMulligans ? { freeMulligans } : {}),
+        ...pregameSetup,
       })
     else await startLocal()
   }
@@ -1143,8 +1147,8 @@ function NewGameForm({
                 />
               ) : null}
               <TurnsChoice />
-              {nearbyMode ? null : <FirstPlayerChoice system={system} playerCount={playerCount} />}
-              {cloudMulligans ? (
+              <FirstPlayerChoice system={system} playerCount={playerCount} />
+              {connectedMulligans ? (
                 <FreeMulligansChoice rule={freeMulligans} onChange={setFreeMulligans} />
               ) : null}
               {planechaseAvailable ? (

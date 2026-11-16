@@ -77,6 +77,11 @@ export type CommanderDamageTotals = Record<string, number>
 
 export type SeatPassHashes = Record<PlayerId, string>
 
+export interface NearbyMulligans {
+  free: FreeMulligans
+  counts: Partial<Record<PlayerId, number>>
+}
+
 export interface LocalGameAccount {
   ownerId: string
   mePlayerId?: PlayerId
@@ -129,6 +134,8 @@ export interface LocalGame {
   firstChooserSeat?: number
   firstPlayerOffered?: true
   firstPlayerId?: PlayerId
+  /** why: a nearby guest's mulligans ride on the host's upload, since only the host's own seat has an account here. */
+  nearbyMulligans?: NearbyMulligans
   seatPassHashes?: SeatPassHashes
   /** why: kept beside the events rather than in them, so an older build a rollback falls back to still opens the game. */
   turn?: Turn
@@ -193,6 +200,8 @@ export interface LocalGameSummary {
   players: GamePlayer[]
   eventCount: number
   firstPlayerId?: PlayerId
+  /** why: a nearby guest's mulligans ride on the host's upload, since only the host's own seat has an account here. */
+  nearbyMulligans?: NearbyMulligans
   createdAt: number
   finishedAt: number
   result?: LocalGameResult

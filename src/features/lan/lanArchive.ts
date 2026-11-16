@@ -81,6 +81,13 @@ export function lanLocalGame(
   )
   const { table } = lanProjection(game, game.hostKey)
   const hostDeck = game.seats.find((seat) => seat.key === game.hostKey)?.deck
+  const free = setup.freeMulligans
+  const counts = game.pregame?.mulligans ?? {}
+  const hostMulligans = counts[game.hostKey]
+  const guestCounts = Object.entries(counts).flatMap(([key, count]) =>
+    key === game.hostKey ? [] : [[asPlayerId(key), count] as const],
+  )
+  const firstPlayerId = game.pregame?.firstPlayer?.playerId
   const finished: LocalGame = {
     schemaVersion: 1,
     id,
@@ -111,11 +118,19 @@ export function lanLocalGame(
       : result?.kind === "draw"
         ? { result: { kind: "draw" } }
         : {}),
+    ...(firstPlayerId ? { firstPlayerId: asPlayerId(firstPlayerId) } : {}),
+    ...(free && guestCounts.length > 0
+      ? { nearbyMulligans: { free, counts: Object.fromEntries(guestCounts) } }
+      : {}),
     ...(ownerId
       ? {
           account: {
             ownerId,
             mePlayerId: asPlayerId(game.hostKey),
+            ...(free && hostDeck ? { freeMulligans: free } : {}),
+            ...(free && hostDeck && hostMulligans !== undefined
+              ? { mulligans: hostMulligans }
+              : {}),
             ...(hostDeck && isSharedDeckKey(hostDeck.versionId)
               ? {
                   deckKey: hostDeck.versionId,

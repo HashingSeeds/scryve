@@ -11,6 +11,11 @@ const backToLobby = () => (router.canGoBack() ? router.back() : router.replace("
 const backToPlay = () => router.dismissTo({ pathname: "/", params: { destination: "play" } })
 // why: leaving clears the game, and the gameGone effect takes the player to Play without stopping at the lobby's closed screen.
 const leaveGame = () => lanSession.leave()
+const nearbyPregame = {
+  rollFirst: () => lanSession.pregame({ kind: "roll" }),
+  chooseFirst: (playerId: string) => lanSession.pregame({ kind: "choose", playerId }),
+  keepHand: (_seat: number, mulligans: number) => lanSession.pregame({ kind: "keep", mulligans }),
+}
 
 export default function LanGameRoute() {
   // why: resuming before useLanGame reads the session puts the saved game on the first render instead of leaving the route.
@@ -42,6 +47,7 @@ export default function LanGameRoute() {
       logFeed={role === "host" || logs === true ? NearbyLogFeed : undefined}
       awayPlayerIds={awayPlayerIds}
       onRevealRole={lanSession.revealRole}
+      pregame={nearbyPregame}
       onEndMatch={role === "host" ? lanSession.endMatch : undefined}
       roleRevealOnline={role === "host" || status === "connected"}
       peerLatency={role === "host" ? lanSession.peerLatency : undefined}

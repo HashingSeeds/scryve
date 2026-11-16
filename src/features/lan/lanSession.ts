@@ -44,6 +44,8 @@ import {
   parseHostMessage,
   releaseLanSeat,
   revealLanRole,
+  applyLanPregame,
+  type LanPregameAction,
   setLanDeck,
   setLanPlayerCount,
   startLanRound,
@@ -432,7 +434,11 @@ export class LanSession {
             ? game
             : message.type === "reveal"
               ? revealLanRole(game, seatKey, now)
-              : setLanDeck(game, seatKey, message.deck)
+              : message.type === "pregame"
+                ? message.roundId === lanRoundId(game)
+                  ? applyLanPregame(game, seatKey, message.action, now)
+                  : game
+                : setLanDeck(game, seatKey, message.deck)
           return changed === game ? undefined : this.publish(changed)
         }
         const { operationId } = message.event
@@ -753,6 +759,18 @@ export class LanSession {
     return mergeLanLog(log?.publicId === publicId ? log : undefined, page)
   }
 
+  pregame = (action: LanPregameAction) => {
+    const { role, seatKey, status } = this.state
+    const game = this.game
+    if (role === "host" && game && seatKey) {
+      const next = applyLanPregame(game, seatKey, action, Date.now())
+      return next === game ? undefined : this.publish(next)
+    }
+    const roundId = this.state.projection?.publicId
+    if (status === "connected" && roundId)
+      this.connection?.send({ type: "pregame", roundId, action })
+  }
+
   revealRole = async () => {
     const { role, seatKey, status } = this.state
     const game = this.game
@@ -806,7 +824,14 @@ export class LanSession {
       return
     const now = Date.now()
     const finished = archiveLanGame({ ...game, updatedAt: now }, result, hashes, this.roundOwner)
-    const ended = endLanRound(game, "finished", now)
+    const losers =
+      result?.kind === "win"
+        ? game.seats.filter(({ key }) => !result.winnerPlayerIds.includes(key))
+        : []
+    const ended = {
+      ...endLanRound(game, "finished", now),
+      ...(losers.length === 1 ? { nextChooserKey: losers[0].key } : {}),
+    }
     this.publish(game.match ? { ...ended, match: lanMatchAfter(game.match, finished) } : ended)
     clearTimeout(this.flushTimer)
     this.flush()
