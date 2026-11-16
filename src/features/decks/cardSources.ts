@@ -1,4 +1,4 @@
-import type { CardSource, FilterField } from "./cardFilters"
+import { FACE_BREAK, type CardSource, type FilterField } from "./cardFilters"
 import type { MagicDatasetCard } from "../../../convex/lib/magicDataset"
 import type { CatalogProvider, MagicCardFilterId } from "../../../convex/lib/systems"
 
@@ -31,7 +31,13 @@ const SCRYFALL_FIELDS = {
   manaValue: { keys: ["mv", "cmc", "manavalue"], read: (card) => card.manaValue },
   manaCost: {
     keys: ["m", "mana"],
-    read: (card) => card.manaCost?.match(/\{[^}]+\}/g)?.map((symbol) => symbol.slice(1, -1)),
+    read: (card) =>
+      card.manaCost
+        ?.split(" // ")
+        .flatMap((face, index) => [
+          ...(index ? [FACE_BREAK] : []),
+          ...(face.match(/\{[^}]+\}/g) ?? []).map((symbol) => symbol.slice(1, -1)),
+        ]),
   },
   keyword: {
     keys: ["kw", "keyword"],

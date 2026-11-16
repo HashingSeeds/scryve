@@ -69,4 +69,6 @@ test("a mana cost matches cards with at least that many of each plain symbol", (
   expect(matches("{B}{B}{R}{R}{R}{G}{G}")).toBe(true)
   expect(matches("{4}{B}{R}{R}")).toBe(false)
   expect(matches("{B}{R/G}{R}{R}")).toBe(false)
+  expect(matches("{1}{R}{R} // {B}{R}")).toBe(false)
+  expect(matches("{1}{U} // {B}{R}{R}{R}")).toBe(true)
 })

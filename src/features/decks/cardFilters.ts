@@ -17,8 +17,20 @@ export type FilterField<Card> = {
  */
 export type CardSource<Card = never> = ReadonlyMap<string, FilterField<Card>>
 
+/** why: Scryfall matches a mana cost on one face, so a count field marks where each face of a card starts again. */
+export const FACE_BREAK = "//"
+
 function occurrences(values: readonly string[], wanted: string) {
   return values.filter((value) => value === wanted).length
+}
+
+function faces(values: readonly string[]) {
+  const all: string[][] = [[]]
+  for (const value of values) {
+    if (value === FACE_BREAK) all.push([])
+    else all.at(-1)?.push(value)
+  }
+  return all
 }
 
 function matchesOption(value: readonly string[] | number, option: string) {
@@ -50,7 +62,9 @@ export function matchesCardFilters<Card>(
     if (filter.match === "count")
       return (
         typeof value !== "number" &&
-        options.every((option) => occurrences(value, option) >= occurrences(options, option))
+        faces(value).some((face) =>
+          options.every((option) => occurrences(face, option) >= occurrences(options, option)),
+        )
       )
     const has = (option: string) => matchesOption(value, option)
     return filter.options !== "range" && filter.match === "any"
