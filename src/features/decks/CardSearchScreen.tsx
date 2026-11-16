@@ -317,8 +317,13 @@ export function CardSearch({
     colorFilters.length > 0 &&
     (colorFilters.length !== startingFilters.colors.length ||
       colorFilters.some((color) => !startingFilters.colors.includes(color)))
+  // why: a word still being finished, such as `kw:fl`, isn't a search yet, and Scryfall rejects it.
+  const finishing =
+    suggestions.length > 0 &&
+    !suggestions.some((suggestion) => query.toLowerCase().endsWith(suggestion.term))
   const searchRequested =
-    text.length >= 2 || (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0)))
+    !finishing &&
+    (text.length >= 2 || (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0))))
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()

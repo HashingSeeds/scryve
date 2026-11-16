@@ -159,7 +159,8 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   return (
     <TouchableOpacity
       activeOpacity={1}
-      accessible={!clearable}
+      // why: buttons inside the field, such as clear, need their own accessibility focus.
+      accessible={!clearable && !RightAccessory}
       style={$containerStyles}
       onPress={focusInput}
       accessibilityState={{ disabled }}

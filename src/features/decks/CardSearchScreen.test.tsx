@@ -790,6 +790,10 @@ describe("with the device's Magic card file", () => {
     const { view } = await searchFor("")
     const input = view.getByTestId("card-search-input")
     fireEvent.changeText(input, "f:modern t:dra")
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400))
+    })
+    expect(mockAction).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("card-search-suggestion-t:dragon"))
     expect(input.props.value).toBe("f:modern t:dragon ")
     expect(view.queryByTestId("card-search-suggestion-t:dragon")).toBeNull()
