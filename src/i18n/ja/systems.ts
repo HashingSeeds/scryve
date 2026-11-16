@@ -69,6 +69,7 @@ export default {
     supertype: "特殊タイプ",
     subtype: "サブタイプ",
     manaValue: "マナ総量",
+    manaCost: "マナコスト",
     keyword: "キーワード",
     power: "パワー",
     toughness: "タフネス",

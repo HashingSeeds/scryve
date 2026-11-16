@@ -69,6 +69,7 @@ export default {
     supertype: "सुपरटाइप",
     subtype: "सबटाइप",
     manaValue: "मैना वैल्यू",
+    manaCost: "मैना कॉस्ट",
     keyword: "कीवर्ड",
     power: "पावर",
     toughness: "टफ़नेस",

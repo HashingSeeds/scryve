@@ -44,6 +44,18 @@ test("writes filters before the name, and reads its own text back", () => {
   expect(parse(text)).toEqual({ ...query, colorMatch: "exact" })
 })
 
+test("a mana cost keeps each copy of a symbol, in color order", () => {
+  expect(parse("m>={R}rb m:w").filters).toEqual({ manaCost: ["R", "R", "B"] })
+  const text = formatCardQuery(
+    SCRYFALL_SOURCE,
+    { rest: "", filters: { manaCost: ["R", "B", "R", "R"] }, colors: [] },
+    "exact",
+    MAGIC_CARD_FILTERS,
+  )
+  expect(text).toBe("m>=brrr ")
+  expect(parse(text).filters).toEqual({ manaCost: ["B", "R", "R", "R"] })
+})
+
 test.each([
   [
     "a second subtype, which Scryfall reads as both",
@@ -55,6 +67,7 @@ test.each([
   ["a key the sheet has no control for", "o:flying", {}, "o:flying"],
   ["a mana value bound given twice", "mv>=2 mv>=3", { manaValue: [">=2"] }, "mv>=3"],
   ["a guild name", "id:azorius", {}, "id:azorius"],
+  ["an exact or generic mana cost", "m=rr m>=2r", {}, "m=rr m>=2r"],
   ["a regular expression", "t:/dragon/", {}, "t:/dragon/"],
 ])("leaves %s as typed", (_name, text, filters, rest) => {
   expect(parse(text)).toMatchObject({ filters, rest })

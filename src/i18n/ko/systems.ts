@@ -69,6 +69,7 @@ export default {
     supertype: "상위 유형",
     subtype: "하위 유형",
     manaValue: "마나 값",
+    manaCost: "마나 비용",
     keyword: "키워드",
     power: "공격력",
     toughness: "방어력",

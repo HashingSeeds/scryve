@@ -79,6 +79,8 @@ const systems = {
     // Heading over subtypes such as Elf, Warrior, Aura or Equipment.
     subtype: "Subtype",
     manaValue: "Mana value",
+    // Heading over steppers for how many of each colored mana symbol a card's cost has at least.
+    manaCost: "Mana cost",
     keyword: "Keywords",
     power: "Power",
     toughness: "Toughness",

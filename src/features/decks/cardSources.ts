@@ -5,7 +5,7 @@ import type { CatalogProvider, MagicCardFilterId } from "../../../convex/lib/sys
 export type MagicFilterCard = Partial<
   Pick<
     MagicDatasetCard,
-    "typeLine" | "keywords" | "power" | "toughness" | "manaValue" | "legalFormats"
+    "typeLine" | "keywords" | "power" | "toughness" | "manaValue" | "manaCost" | "legalFormats"
   >
 >
 
@@ -29,6 +29,10 @@ const SCRYFALL_FIELDS = {
   supertype: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "types") },
   subtype: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "subtypes") },
   manaValue: { keys: ["mv", "cmc", "manavalue"], read: (card) => card.manaValue },
+  manaCost: {
+    keys: ["m", "mana"],
+    read: (card) => card.manaCost?.match(/\{[^}]+\}/g)?.map((symbol) => symbol.slice(1, -1)),
+  },
   keyword: {
     keys: ["kw", "keyword"],
     read: (card) => card.keywords?.split("\n").filter(Boolean),

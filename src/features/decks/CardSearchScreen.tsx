@@ -1157,6 +1157,7 @@ export function CardSearch({
                 {filters.map((filter, index) => (
                   <CardFilterGroup
                     key={filter.id}
+                    game={game}
                     filter={filter}
                     heading={index === 0 ? cardFilterLabel(heading) : undefined}
                     color={sectionColor(heading.id)}
@@ -1175,7 +1176,14 @@ export function CardSearch({
                           : filter.options
                     }
                     optionLabel={
-                      filter.id === "format" ? (option) => deckFormatLabel(game, option) : undefined
+                      filter.id === "format"
+                        ? (option) => deckFormatLabel(game, option)
+                        : filter.id === "manaCost"
+                          ? (option) => {
+                              const symbol = SEARCH_COLORS.find((color) => color === option)
+                              return symbol ? colorLabel(symbol) : option
+                            }
+                          : undefined
                     }
                     picked={picked[filter.id] ?? []}
                     onChange={(options) =>
