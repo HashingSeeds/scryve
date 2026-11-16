@@ -71,6 +71,18 @@ export const colors = {
     border: palette.neutral600,
     text: palette.neutral100,
   },
+  /** why: one color per card filter section, shared by the search bar's terms and the filter sheet. */
+  searchSections: [
+    "#80600F",
+    "#2F6E8C",
+    "#236B63",
+    "#4F6B1E",
+    "#6F4A9E",
+    "#B04A32",
+    "#9C3F73",
+    "#4652A8",
+  ],
+  searchSectionFill: palette.neutral200,
   gameMenu: {
     signal: {
       slow: "#E8C1B4",

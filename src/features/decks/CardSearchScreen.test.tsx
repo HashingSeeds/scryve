@@ -1,6 +1,9 @@
+import { StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
+import type { ReactTestInstance } from "react-test-renderer"
 
+import { colors as darkColors } from "@/theme/colorsDark"
 import { ThemeProvider } from "@/theme/context"
 
 import { clearCardDetails, loadCardDetails, saveCardDetails } from "./cardDetailsCache"
@@ -20,6 +23,12 @@ jest.mock("convex/react", () => ({
   useAction: () => mockDetailsAction,
   useConvexConnectionState: () => mockConnection,
 }))
+
+function barText(view: { getByTestId: (id: string) => ReactTestInstance }) {
+  const read = (node: ReactTestInstance | string): string =>
+    typeof node === "string" ? node : node.children.map(read).join("")
+  return read(view.getByTestId("card-search-input"))
+}
 
 let mockNameIndex: CardNameIndex | undefined
 jest.mock("./useCardNameIndex", () => ({ useCardNameIndex: () => mockNameIndex }))
@@ -243,7 +252,7 @@ it("searches within the commander's colors until the player clears them", async 
   )
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).not.toHaveBeenCalled()
-  expect(view.getByTestId("card-search-input").props.value).toBe("f:commander id<=ur ")
+  expect(barText(view)).toBe("f:commander id<=ur ")
   fireEvent.changeText(view.getByTestId("card-search-input"), "f:commander id<=ur bolt")
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
@@ -297,7 +306,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   expect(onAdd).not.toHaveBeenCalled()
   fireEvent.press(view.getByTestId("card-focus-close"))
   expect(view.queryByTestId("card-focus-dialog")).toBeNull()
-  expect(view.getByTestId("card-search-input").props.value).toBe("f:commander id=u ar")
+  expect(barText(view)).toBe("f:commander id=u ar")
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
   fireEvent.press(view.getByLabelText("Preview Baral as commander"))
   await act(async () => {})
@@ -795,7 +804,7 @@ describe("with the device's Magic card file", () => {
     })
     expect(mockAction).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("card-search-suggestion-t:dragon"))
-    expect(input.props.value).toBe("f:modern t:dragon ")
+    expect(barText(view)).toBe("f:modern t:dragon ")
     expect(view.queryByTestId("card-search-suggestion-t:dragon")).toBeNull()
   })
 
@@ -872,7 +881,7 @@ it("starts a deck's search on its format and lets the player pick other formats 
   expect(await lastQuery()).toBeUndefined()
   fireEvent.press(view.getByTestId("card-filter-type-Creature"))
   expect(await lastQuery()).toBe("f:modern t:creature")
-  expect(view.getByTestId("card-search-input").props.value).toBe("f:modern t:creature ")
+  expect(barText(view)).toBe("f:modern t:creature ")
   fireEvent.press(view.getByTestId("card-filter-format-legacy"))
   expect(await lastQuery()).toBe("f:modern f:legacy t:creature")
   fireEvent.press(view.getByTestId("card-filter-format-modern"))
@@ -896,8 +905,14 @@ it("lights up the filters a player types as syntax", async () => {
   await act(async () => {})
   expect(view.getByTestId("card-filter-type-Creature").props.accessibilityState.selected).toBe(true)
   expect(view.getByTestId("card-filter-manaValue-max").props.value).toBe("2")
+  const color = (text: string) => StyleSheet.flatten(view.getByText(text).props.style).color
+  expect(color("t:creature")).toBe(color("Type"))
+  expect(color("Creature")).toBe(color("Type"))
+  expect(color("mv<=2")).toBe(color("Mana value"))
+  expect(color("t:creature")).not.toBe(color("mv<=2"))
+  expect(color("bolt")).toBe(darkColors.text)
   fireEvent.press(view.getByTestId("card-filter-type-Creature"))
-  expect(view.getByTestId("card-search-input").props.value).toBe("f:modern mv<=2 bolt")
+  expect(barText(view)).toBe("f:modern mv<=2 bolt")
 })
 
 it("looks cards up without a deck: no adding, and a tapped card opens its sheet", async () => {

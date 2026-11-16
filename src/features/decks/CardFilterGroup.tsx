@@ -22,6 +22,7 @@ const RANGE_BOUNDS = [
 export function CardFilterGroup({
   filter,
   heading,
+  color,
   options,
   optionLabel = (option) => option,
   picked,
@@ -29,6 +30,8 @@ export function CardFilterGroup({
 }: {
   filter: CardFilterDefinition
   heading?: string
+  /** why: the section's color, which its terms also wear in the search bar. */
+  color?: string
   options: readonly string[]
   optionLabel?: (option: string) => string
   picked: readonly string[]
@@ -39,7 +42,7 @@ export function CardFilterGroup({
   if (filter.options === "range")
     return (
       <View style={$rangeRow}>
-        <Text preset="sectionLabel" style={$rangeLabel} text={label} />
+        <Text preset="sectionLabel" style={[$rangeLabel, color && { color }]} text={label} />
         {RANGE_BOUNDS.map(({ bound, placeholder, label: boundLabel }) => (
           <TextField
             key={bound}
@@ -76,6 +79,7 @@ export function CardFilterGroup({
   return (
     <FilterGroup
       heading={heading}
+      headingColor={color}
       search={
         searchable ? (
           <TextField
@@ -101,6 +105,7 @@ export function CardFilterGroup({
           testID={`card-filter-${filter.id}-${option}`}
           label={optionLabel(option)}
           selected={picked.includes(option)}
+          color={picked.includes(option) ? color : undefined}
           onPress={() => onChange(toggleOption(picked, option))}
         />
       ))}

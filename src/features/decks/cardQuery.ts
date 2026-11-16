@@ -1,6 +1,7 @@
 import { COMMANDER_COLORS } from "@/components/CardFocusDialog"
 
 import {
+  filterGroups,
   filterTerms,
   readFilterTerm,
   termSuggestions,
@@ -44,8 +45,11 @@ export function identityTerm(colors: readonly string[], colorMatch: ColorMatch) 
     : ""
 }
 
-/** why: splits on spaces outside quotes and parentheses, so `kw:"first strike"` and `(a or b)` stay whole. */
-function tokens(text: string) {
+/**
+ * why: splits on spaces outside quotes and parentheses, so `kw:"first strike"` and `(a or b)` stay
+ * whole. The runs of spaces are kept between the words, so the parts join back into the text.
+ */
+function segments(text: string) {
   const found: string[] = []
   let current = ""
   let depth = 0
@@ -54,13 +58,19 @@ function tokens(text: string) {
     if (char === '"') quoted = !quoted
     else if (!quoted && char === "(") depth++
     else if (!quoted && char === ")") depth = Math.max(0, depth - 1)
-    if (!quoted && depth === 0 && /\s/.test(char)) {
-      if (current) found.push(current)
+    const space = !quoted && depth === 0 && /\s/.test(char)
+    if (current && space !== /\s/.test(current[0] ?? "")) {
+      found.push(current)
       current = ""
-    } else current += char
+    }
+    current += char
   }
   if (current) found.push(current)
   return found
+}
+
+function tokens(text: string) {
+  return segments(text).filter((part) => !/^\s/.test(part))
 }
 
 function term(token: string) {
@@ -192,4 +202,64 @@ export function querySuggestions(
       text: `${text.slice(0, text.length - last.length)}${suggestion.term} `,
     }),
   )
+}
+
+/**
+ * why: a part of the bar's text. `section` names the filter sheet section a term belongs to, `syntax`
+ * a term the sheet has no section for; `joiner` marks a group's brackets and `or`.
+ */
+export type QuerySpan = { text: string; section?: string; joiner?: boolean }
+
+const SPAN_TERM = /^-?[a-z]+(?:>=|<=|!=|:|=|>|<)./i
+
+/** why: the bar and the filter sheet color a section the same, so these are the sheet's sections in order. */
+export function querySections(filters: readonly CardFilterDefinition[]) {
+  return ["colors", ...filterGroups(filters).map(({ heading }) => heading.id)]
+}
+
+function termSection(
+  source: CardSource,
+  token: string,
+  filters: readonly CardFilterDefinition[],
+  cardOptionsFor: (filterId: string) => readonly string[],
+) {
+  const typed = term(token.replace(/^-/, ""))
+  if (!typed) return "syntax"
+  if (readIdentity(typed)) return "colors"
+  const key = typed.key.toLocaleLowerCase()
+  const filter =
+    readFilterTerm(source, filters, typed, cardOptionsFor)?.filter ??
+    filters.find(({ id }) => source.get(id)?.keys.includes(key))
+  return filter ? (filter.group ?? filter.id) : "syntax"
+}
+
+/**
+ * why: the bar colors each term by the sheet section it filters, so the syntax teaches itself.
+ * A `pending` last word is still being finished, so it stays plain until it is a term.
+ */
+export function querySpans(
+  source: CardSource,
+  text: string,
+  filters: readonly CardFilterDefinition[],
+  cardOptionsFor: (filterId: string) => readonly string[],
+  pending = false,
+): QuerySpan[] {
+  const parts = segments(text)
+  return parts.flatMap((part, index): QuerySpan[] => {
+    if (pending && index === parts.length - 1) return [{ text: part }]
+    const group = /^(-?\()(.*?)(\)?)$/s.exec(part)
+    if (group) {
+      const [, open = "", inner = "", close = ""] = group
+      return [
+        { text: open, joiner: true },
+        ...querySpans(source, inner, filters, cardOptionsFor).map((span) =>
+          /^or$/i.test(span.text) ? { text: span.text, joiner: true } : span,
+        ),
+        ...(close ? [{ text: close, joiner: true }] : []),
+      ]
+    }
+    return SPAN_TERM.test(part)
+      ? [{ text: part, section: termSection(source, part, filters, cardOptionsFor) }]
+      : [{ text: part }]
+  })
 }

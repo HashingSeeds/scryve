@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Modal,
@@ -23,7 +23,6 @@ import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { FilterPill, FilterGroup } from "@/components/FilterPill"
 import { Header, HeaderIcon } from "@/components/Header"
-import { PressableIcon } from "@/components/Icon"
 import { SectionHeader } from "@/components/NumberLane"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
@@ -32,7 +31,7 @@ import { SelectField } from "@/components/SelectField"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
-import { TextField, type TextFieldAccessoryProps } from "@/components/TextField"
+import { TextField } from "@/components/TextField"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import {
@@ -68,6 +67,8 @@ import {
   formatCardQuery,
   identityTerm,
   parseCardQuery,
+  querySections,
+  querySpans,
   querySuggestions,
   type CardQuery,
 } from "./cardQuery"
@@ -321,6 +322,24 @@ export function CardSearch({
   const finishing =
     suggestions.length > 0 &&
     !suggestions.some((suggestion) => query.toLowerCase().endsWith(suggestion.term))
+  const filterSections = querySections(cardFilters)
+  const spans = source
+    ? querySpans(
+        source,
+        query,
+        cardFilters,
+        (id) => (magicCards ? cardOptions(SCRYFALL_SOURCE, magicCards.cards, id, []) : []),
+        finishing,
+      )
+    : [{ text: query }]
+  /** why: `syntax` is a term the sheet has no section for, which still reads apart from the name. */
+  function sectionColor(section: string | undefined) {
+    if (section === "syntax") return theme.colors.brandText
+    const index = section === undefined ? -1 : filterSections.indexOf(section)
+    return index < 0
+      ? undefined
+      : theme.colors.searchSections[index % theme.colors.searchSections.length]
+  }
   const searchRequested =
     !finishing &&
     (text.length >= 2 || (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0))))
@@ -740,18 +759,6 @@ export function CardSearch({
     (SCRYFALL_SYNTAX.test(text) ||
       (lookup && magicCards !== undefined && !readsOnDevice(magicCards, { text, filters: picked })))
   const scans = CAN_READ_CARDS && prereleaseBuild() && filtersCards && !choosingCommander && !lookup
-  // why: a new accessory component remounts its icons, so it changes only with what it shows.
-  const queryActions = useCallback(
-    ({ style }: TextFieldAccessoryProps) => (
-      <QueryActions
-        style={style}
-        busy={busy}
-        onScan={scans ? () => setScanning(true) : undefined}
-        onFilters={filtersCards ? () => setFiltersOpen(true) : undefined}
-      />
-    ),
-    [busy, scans, filtersCards],
-  )
 
   const tapsRows = choosingCommander || lookup
   const ResultRow = tapsRows ? TouchableOpacity : View
@@ -778,6 +785,14 @@ export function CardSearch({
                 ? "decks:cardSearch.lookupTitle"
                 : "decks:cardSearch.title",
           )}
+          titleAccessory={
+            busy ? (
+              <ActivityIndicator
+                color={theme.colors.textDim}
+                accessibilityLabel={translate("decks:cardSearch.searching")}
+              />
+            ) : undefined
+          }
           LeftActionComponent={
             <HeaderIcon
               testID="card-search-close"
@@ -786,6 +801,26 @@ export function CardSearch({
               onPress={onClose}
             />
           }
+          RightActionComponent={
+            <View style={$headerActions}>
+              {scans ? (
+                <HeaderIcon
+                  testID="card-scan-button"
+                  icon="camera"
+                  label={translate("decks:cardSearch.scanLabel")}
+                  onPress={() => setScanning(true)}
+                />
+              ) : null}
+              {filtersCards ? (
+                <HeaderIcon
+                  testID="card-filters-button"
+                  icon="sliders"
+                  label={translate("decks:filters.label")}
+                  onPress={() => setFiltersOpen(true)}
+                />
+              ) : null}
+            </View>
+          }
           backgroundColor={theme.colors.surface}
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
@@ -793,7 +828,8 @@ export function CardSearch({
             testID="card-search-input"
             accessibilityLabel={translate("decks:cardSearch.searchLabel")}
             placeholderTx="decks:cardSearch.placeholder"
-            value={query}
+            // why: React Native styles the parts of a field's text only through children, which web ignores.
+            value={Platform.OS === "web" ? query : undefined}
             maxLength={filtersCards ? 400 : 120}
             autoCorrect={false}
             autoFocus={!choosingCommander}
@@ -803,8 +839,21 @@ export function CardSearch({
             submitBehavior="blurAndSubmit"
             onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
             inputWrapperStyle={$queryWrapper}
-            RightAccessory={queryActions}
-          />
+          >
+            {Platform.OS === "web"
+              ? undefined
+              : spans.map((span, index) => (
+                  <Text
+                    key={index}
+                    style={{
+                      color:
+                        sectionColor(span.section) ??
+                        (span.joiner ? theme.colors.textDim : theme.colors.text),
+                    }}
+                    text={span.text}
+                  />
+                ))}
+          </TextField>
           {suggestions.length ? (
             <ScrollView
               horizontal
@@ -821,6 +870,7 @@ export function CardSearch({
                       ? deckFormatLabel(game, suggestion.option)
                       : suggestion.option
                   }
+                  color={sectionColor(suggestion.filter.group ?? suggestion.filter.id)}
                   onPress={() => setQuery(suggestion.text)}
                 />
               ))}
@@ -1074,13 +1124,17 @@ export function CardSearch({
             contentContainerStyle={themed([$sheetScrollContent, $filterBody])}
             keyboardShouldPersistTaps="handled"
           >
-            <FilterGroup heading={translate("decks:cardSearch.colors")}>
+            <FilterGroup
+              heading={translate("decks:cardSearch.colors")}
+              headingColor={sectionColor("colors")}
+            >
               {SEARCH_COLORS.map((color) => (
                 <FilterPill
                   key={color}
                   testID={`card-color-${color}`}
                   label={colorLabel(color)}
                   selected={colorFilters.includes(color)}
+                  color={colorFilters.includes(color) ? sectionColor("colors") : undefined}
                   onPress={() => changeQuery({ colors: toggleColor(colorFilters, color) })}
                 />
               ))}
@@ -1105,6 +1159,7 @@ export function CardSearch({
                     key={filter.id}
                     filter={filter}
                     heading={index === 0 ? cardFilterLabel(heading) : undefined}
+                    color={sectionColor(heading.id)}
                     options={
                       filter.options === "cards"
                         ? magicCards
@@ -1203,57 +1258,6 @@ export function CardSearch({
     </Modal>
   )
 }
-/** why: the bar keeps the row's full width, so its spinner, scan and filters sit inside its right edge. */
-function QueryActions({
-  style,
-  busy,
-  onScan,
-  onFilters,
-}: Pick<TextFieldAccessoryProps, "style"> & {
-  busy: boolean
-  onScan?: () => void
-  onFilters?: () => void
-}) {
-  const { theme } = useAppTheme()
-  return (
-    <View style={[style, $queryActions]}>
-      {busy ? (
-        <ActivityIndicator
-          style={$queryAction}
-          color={theme.colors.textDim}
-          accessibilityLabel={translate("decks:cardSearch.searching")}
-        />
-      ) : null}
-      {onScan ? (
-        <PressableIcon
-          testID="card-scan-button"
-          icon="camera"
-          size={20}
-          color={theme.colors.textDim}
-          accessibilityRole="button"
-          accessibilityLabel={translate("decks:cardSearch.scanLabel")}
-          hitSlop={4}
-          containerStyle={$queryAction}
-          onPress={onScan}
-        />
-      ) : null}
-      {onFilters ? (
-        <PressableIcon
-          testID="card-filters-button"
-          icon="sliders"
-          size={20}
-          color={theme.colors.textDim}
-          accessibilityRole="button"
-          accessibilityLabel={translate("decks:filters.label")}
-          hitSlop={4}
-          containerStyle={$queryAction}
-          onPress={onFilters}
-        />
-      ) : null}
-    </View>
-  )
-}
-
 const $screen: ViewStyle = { flex: 1 }
 const $results: ViewStyle = { flex: 1 }
 const $name: ViewStyle = { flex: 1 }
@@ -1282,13 +1286,7 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 
 const $suggestions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $queryActions: ViewStyle = { flexDirection: "row", alignItems: "center" }
-const $queryAction: ViewStyle = {
-  width: 40,
-  height: 40,
-  alignItems: "center",
-  justifyContent: "center",
-}
+const $headerActions: ViewStyle = { flexDirection: "row" }
 const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112 }
 const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $filterSection: ViewStyle = { gap: 8 }
