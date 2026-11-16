@@ -314,7 +314,7 @@
   "cardSearch.checkFailed": "c0076cdcdb38.816792a33748",
   "cardSearch.searchFailed": "e8d5b3b15ed9.6dc49e4ff5ca",
   "cardSearch.scan": "811e2dcf89b2.28117bf205ec",
-  "cardSearch.scanLabel": "1a19290afbaf.01e475a13a24",
+  "cardSearch.scanLabel": "47addccfb41c.01e475a13a24",
   "cardScan.title": "3aee1e5fbe0b.21e28eb17881",
   "cardScan.looking": "e183be89eeb2.7a387b99c6cd",
   "cardScan.loading": "d4ce65127a56.420e738ca5ee",
@@ -618,5 +618,7 @@
   "shared.title": "6cd8c0596959.981ad7804e63",
   "shared.play": "52523ac8e766.3508b628a7e7",
   "shared.addToMine": "d79f996fd871.8d37971f0475",
-  "shared.unavailable": "60392002ae5c.f01552cdfbe5"
+  "shared.unavailable": "60392002ae5c.f01552cdfbe5",
+  "cardSearch.offlineCardFile": "88bc2510d54f.13e72d3bfadf",
+  "cardSearch.offlineSyntax": "3d4c135feed4.270dac1320d1"
 }
