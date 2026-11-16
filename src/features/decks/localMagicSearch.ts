@@ -1,5 +1,6 @@
 import { matchesCardFilters, pickedCount, type CardFilterState } from "./cardFilters"
 import { type CardNameIndex, matchKey, searchCardNames } from "./cardNameMatch"
+import { SCRYFALL_SOURCE } from "./cardSources"
 import { matchesColors, type ColorMatch } from "./colorMatch"
 import {
   compareCardNames,
@@ -71,7 +72,7 @@ function matchesSearch(card: MagicDatasetCard, search: MagicSearch) {
     (!search.commander ||
       ((card.commanderEligibility === "eligible" || choosesColor) &&
         card.commanderLegality === "legal")) &&
-    matchesCardFilters(card, MAGIC_CARD_FILTERS, search.filters) &&
+    matchesCardFilters(SCRYFALL_SOURCE, card, MAGIC_CARD_FILTERS, search.filters) &&
     matchesColors(card.colorIdentity, search.colors, search.colorMatch, choosesColor)
   )
 }

@@ -369,6 +369,9 @@ export default {
     searchScryfall: "Rechercher un commandant sur Scryfall.",
     searching: "Recherche…",
     offline: "Vous êtes hors ligne. Recherche parmi les cartes déjà dans vos decks.",
+    offlineCardFile: "Vous êtes hors ligne. Recherche dans la liste des cartes sur cet appareil.",
+    offlineSyntax:
+      "Vous êtes hors ligne. Certains de ces termes de recherche nécessitent une connexion.",
     preview: "Aperçu de {{card}} comme commandant",
     fromCache: "De vos decks en cache · {{game}}",
     add: "+ Ajouter",
@@ -388,7 +391,6 @@ export default {
     allowAdditional: "Au moins",
     exactColors: "Exactement",
     searchFilter: "Rechercher dans {{filter}}",
-    suggestion: "{{option}}, {{term}}",
     min: "Min.",
     max: "Max.",
     minimum: "{{filter}} minimum",
@@ -396,8 +398,7 @@ export default {
     clearAll: "Tout effacer",
     checkFailed: "Impossible de vérifier toutes les cartes de ce deck.",
     searchFailed: "Impossible de rechercher des cartes. Vérifiez votre connexion et réessayez.",
-    scan: "Scanner",
-    scanLabel: "Scanner une carte avec l'appareil photo",
+    scanLabel: "Scanner une carte avec l’appareil photo",
   },
   cardScan: {
     title: "Scanner des cartes",

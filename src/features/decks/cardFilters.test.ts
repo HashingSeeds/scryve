@@ -1,4 +1,5 @@
 import { cardOptions, filterGroups } from "./cardFilters"
+import { SCRYFALL_SOURCE } from "./cardSources"
 
 const card = (name: string, typeLine: string, legalFormats?: string[]) => ({
   scryfallId: name,
@@ -19,18 +20,29 @@ test("subtypes come most common first and count only cards legal in the format",
     card("G", "Creature — Goblin", ["legacy"]),
     card("H", "Creature — Goblin Rogue", ["legacy"]),
   ]
-  expect(cardOptions(cards, "subtype", ["modern"])).toEqual(["Elf", "Goblin", "Druid", "Warrior"])
-  expect(cardOptions(cards, "subtype", [])).toEqual(["Goblin", "Elf", "Druid", "Rogue", "Warrior"])
+  expect(cardOptions(SCRYFALL_SOURCE, cards, "subtype", ["modern"])).toEqual([
+    "Elf",
+    "Goblin",
+    "Druid",
+    "Warrior",
+  ])
+  expect(cardOptions(SCRYFALL_SOURCE, cards, "subtype", [])).toEqual([
+    "Goblin",
+    "Elf",
+    "Druid",
+    "Rogue",
+    "Warrior",
+  ])
 })
 
 test("a card file without legal formats counts every card", () => {
   const cards = ["A", "B", "C"].map((name) => card(name, "Artifact — Equipment"))
-  expect(cardOptions(cards, "subtype", ["modern"])).toEqual(["Equipment"])
+  expect(cardOptions(SCRYFALL_SOURCE, cards, "subtype", ["modern"])).toEqual(["Equipment"])
 })
 
 test("cards without keywords add no blank keyword", () => {
   const cards = ["A", "B", "C"].map((name) => ({ ...card(name, "Sorcery"), keywords: "" }))
-  expect(cardOptions(cards, "keyword", [])).toEqual([])
+  expect(cardOptions(SCRYFALL_SOURCE, cards, "keyword", [])).toEqual([])
 })
 
 test("a grouped filter shares the heading of the filter its group names, even listed first", () => {

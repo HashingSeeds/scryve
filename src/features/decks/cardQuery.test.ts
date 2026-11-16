@@ -1,4 +1,5 @@
 import { formatCardQuery, parseCardQuery, querySuggestions } from "./cardQuery"
+import { SCRYFALL_SOURCE } from "./cardSources"
 import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
 const cardOptions: Record<string, readonly string[]> = {
@@ -6,9 +7,10 @@ const cardOptions: Record<string, readonly string[]> = {
   keyword: ["Flying", "First strike"],
 }
 const optionsFor = (id: string) => cardOptions[id] ?? []
-const parse = (text: string) => parseCardQuery(text, MAGIC_CARD_FILTERS, optionsFor)
+const parse = (text: string) =>
+  parseCardQuery(SCRYFALL_SOURCE, text, MAGIC_CARD_FILTERS, optionsFor)
 const suggest = (text: string) =>
-  querySuggestions(text, MAGIC_CARD_FILTERS, optionsFor).map(({ text }) => text)
+  querySuggestions(SCRYFALL_SOURCE, text, MAGIC_CARD_FILTERS, optionsFor).map(({ text }) => text)
 
 test("reads the terms the sheet writes, in any case, and keeps the name", () => {
   expect(
@@ -37,7 +39,7 @@ test("writes filters before the name, and reads its own text back", () => {
     filters: { type: ["Creature", "Artifact"], subtype: ["Time Lord"], manaValue: ["<=2"] },
     colors: ["U", "R"],
   }
-  const text = formatCardQuery(query, "exact", MAGIC_CARD_FILTERS)
+  const text = formatCardQuery(SCRYFALL_SOURCE, query, "exact", MAGIC_CARD_FILTERS)
   expect(text).toBe('(t:creature or t:artifact) t:"time lord" mv<=2 id=ur bolt')
   expect(parse(text)).toEqual({ ...query, colorMatch: "exact" })
 })
@@ -62,6 +64,7 @@ test("leaves everything as typed when a top-level or joins it, and groups it und
   const typed = parse("t:elf or t:goblin")
   expect(typed).toEqual({ rest: "t:elf or t:goblin", filters: {}, colors: [] })
   const text = formatCardQuery(
+    SCRYFALL_SOURCE,
     { ...typed, filters: { format: ["modern"] } },
     "exact",
     MAGIC_CARD_FILTERS,

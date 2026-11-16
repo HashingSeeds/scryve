@@ -1,17 +1,18 @@
 import { COMMANDER_COLORS } from "@/components/CardFocusDialog"
 
 import {
+  filterTerms,
   readFilterTerm,
-  scryfallFilterTerms,
   termSuggestions,
   type CardFilterState,
+  type CardSource,
 } from "./cardFilters"
 import type { ColorMatch } from "./colorMatch"
 import type { CardFilterDefinition } from "../../../convex/lib/systems"
 
 /**
  * why: the search bar holds the whole query. These are the parts the filter sheet shows; `rest`
- * is the card name and any syntax the sheet has no control for, which goes to Scryfall as typed.
+ * is the card name and any syntax the sheet has no control for, which goes to the catalog as typed.
  */
 export type CardQuery = {
   rest: string
@@ -83,6 +84,7 @@ function readIdentity({ key, operator, value }: NonNullable<ReturnType<typeof te
 
 /** why: the sheet writes a filter matching any of several picks as `(t:a or t:b)`, so that reads back too. */
 function readAnyGroup(
+  source: CardSource,
   token: string,
   filters: readonly CardFilterDefinition[],
   cardOptionsFor: (filterId: string) => readonly string[],
@@ -93,7 +95,7 @@ function readAnyGroup(
     return undefined
   const reads = parts.flatMap((part, index) => {
     const typed = index % 2 === 0 ? term(part) : undefined
-    return typed ? [readFilterTerm(filters, typed, cardOptionsFor)] : []
+    return typed ? [readFilterTerm(source, filters, typed, cardOptionsFor)] : []
   })
   const filter = reads[0]?.filter
   const fits =
@@ -119,6 +121,7 @@ function joinsWithOr(text: string) {
 }
 
 export function parseCardQuery(
+  source: CardSource,
   text: string,
   filters: readonly CardFilterDefinition[],
   cardOptionsFor: (filterId: string) => readonly string[],
@@ -137,8 +140,8 @@ export function parseCardQuery(
       continue
     }
     const read = typed
-      ? readFilterTerm(filters, typed, cardOptionsFor)
-      : readAnyGroup(part, filters, cardOptionsFor)
+      ? readFilterTerm(source, filters, typed, cardOptionsFor)
+      : readAnyGroup(source, part, filters, cardOptionsFor)
     const current = read ? (picked[read.filter.id] ?? []) : []
     if (read && fitsPicked(read, current)) {
       picked[read.filter.id] = [...new Set([...current, ...read.options])]
@@ -156,11 +159,12 @@ export function parseCardQuery(
 
 /** why: filter terms lead and the name follows, so the player types a name straight after them. */
 export function formatCardQuery(
+  source: CardSource,
   { rest, filters, colors }: CardQuery,
   colorMatch: ColorMatch,
   definitions: readonly CardFilterDefinition[],
 ) {
-  const terms = [...scryfallFilterTerms(definitions, filters), identityTerm(colors, colorMatch)]
+  const terms = [...filterTerms(source, definitions, filters), identityTerm(colors, colorMatch)]
     .filter(Boolean)
     .join(" ")
   // why: a top-level `or` would split the filters from the rest of the query, so the typed part keeps its own group.
@@ -173,6 +177,7 @@ export function formatCardQuery(
  * options it could finish as. Each suggestion carries the bar's text with that word completed.
  */
 export function querySuggestions(
+  source: CardSource,
   text: string,
   filters: readonly CardFilterDefinition[],
   cardOptionsFor: (filterId: string) => readonly string[],
@@ -181,7 +186,7 @@ export function querySuggestions(
   const last = /\s$/.test(text) ? undefined : tokens(text).at(-1)
   const [, key = "", typed = ""] = (last && /^([a-z]+):"?([^"]*)$/i.exec(last)) || []
   if (!last || !key) return []
-  return termSuggestions(filters, key.toLowerCase(), typed, cardOptionsFor, limit).map(
+  return termSuggestions(source, filters, key.toLowerCase(), typed, cardOptionsFor, limit).map(
     (suggestion) => ({
       ...suggestion,
       text: `${text.slice(0, text.length - last.length)}${suggestion.term} `,

@@ -379,6 +379,8 @@ const decks = {
     searchScryfall: "Search Scryfall for a commander.",
     searching: "Searching…",
     offline: "You’re offline. Searching cards already in your decks.",
+    offlineCardFile: "You’re offline. Searching the card list on this device.",
+    offlineSyntax: "You’re offline. Some of these search terms need a connection.",
     preview: "Preview {{card}} as commander",
     fromCache: "From your cached decks · {{game}}",
     add: "+ Add",
@@ -404,8 +406,6 @@ const decks = {
     exactColors: "Exactly",
     // Placeholder over a card filter's options; {{filter}} is the filter's name in lowercase, e.g. "keywords".
     searchFilter: "Search {{filter}}",
-    // Spoken label for a search-bar suggestion: the option, then the Scryfall syntax it writes, such as "Lizard, t:lizard".
-    suggestion: "{{option}}, {{term}}",
     // Placeholders in the two number fields beside a card stat like mana value or power.
     min: "Min",
     max: "Max",
@@ -416,7 +416,6 @@ const decks = {
     checkFailed: "Could not check all cards in this deck.",
     searchFailed: "Could not search cards. Check your connection and try again.",
     // Button beside the card search field that opens the camera to read a card's name.
-    scan: "Scan",
     scanLabel: "Scan a card with the camera",
   },
   cardScan: {
