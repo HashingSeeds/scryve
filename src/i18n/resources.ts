@@ -21,4 +21,5 @@ export const resources = {
   hi: (): typeof import("./hi/language").default => require("./hi/language").default,
   ja: (): typeof import("./ja/language").default => require("./ja/language").default,
   ko: (): typeof import("./ko/language").default => require("./ko/language").default,
+  ar: (): typeof import("./ar/language").default => require("./ar/language").default,
 }

@@ -86,8 +86,8 @@ describe("DialogCard", () => {
 
     expect(StyleSheet.flatten(dialog.props.style)).toMatchObject({
       maxHeight: "88%",
-      borderBottomLeftRadius: 0,
-      borderBottomRightRadius: 0,
+      borderBottomStartRadius: 0,
+      borderBottomEndRadius: 0,
       paddingBottom: 58,
     })
     expect(StyleSheet.flatten(view.getByTestId("dialog-card-layout").props.style)).toMatchObject({

@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
+import { $appDirection } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 import type { SheetProps } from "./sheetTypes"
@@ -79,6 +80,7 @@ export function Sheet({
             <GestureHandlerRootView
               testID={testID}
               style={[
+                $appDirection,
                 themed(edgeToEdge ? $edgeToEdge : $padded),
                 fit
                   ? {

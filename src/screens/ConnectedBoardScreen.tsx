@@ -122,6 +122,7 @@ import type { TxKeyPath } from "@/i18n"
 import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { $tableDirection, textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, isGameUnavailableError } from "@/utils/convexError"
 import { useElapsedSince } from "@/utils/useElapsedSince"
@@ -180,7 +181,7 @@ function ConnectedBoardShell({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <View testID="connected-game-board" style={themed($board)}>
+      <View testID="connected-game-board" dir="ltr" style={themed($board)}>
         <View
           testID="connected-board-shell"
           accessibilityElementsHidden
@@ -1886,7 +1887,7 @@ const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: "100%",
   backgroundColor: colors.board.background,
 })
-const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%", ...$tableDirection })
 const $shellGrid: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   width: "100%",
@@ -1899,8 +1900,8 @@ const $shellSurface: ThemedStyle<ViewStyle> = ({ colors }) => ({
 const $toastLayer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   top: spacing.md,
-  left: spacing.md,
-  right: spacing.md,
+  start: spacing.md,
+  end: spacing.md,
   zIndex: 20,
   elevation: 20,
   alignItems: "center",
@@ -2116,7 +2117,7 @@ const $syncRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $syncLabel: TextStyle = { flexShrink: 0 }
 const $syncValue: ThemedStyle<TextStyle> = ({ colors }) => ({
   flexShrink: 1,
-  textAlign: "right",
+  textAlign: textEnd,
   color: colors.board.text,
 })
 const $statusList: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })

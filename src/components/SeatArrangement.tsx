@@ -10,6 +10,7 @@ import {
 import type { GamePlayer } from "@/features/game/types"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { $tableDirection } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
@@ -52,7 +53,11 @@ export function SeatArrangement({
   }
 
   return (
-    <View testID={testID} style={[themed($map), { width: mapWidth, aspectRatio }]}>
+    <View
+      testID={testID}
+      dir="ltr"
+      style={[themed($map), $tableDirection, { width: mapWidth, aspectRatio }]}
+    >
       {rows.map((row, rowIndex) => (
         <View
           key={rowIndex}

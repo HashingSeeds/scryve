@@ -354,7 +354,7 @@ const CHECK_SIZE = 22
 const MARK_SIZE = 28
 const MARK_TARGET = 44
 const $gameMarks: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  marginLeft: CHECK_SIZE + spacing.sm,
+  marginStart: CHECK_SIZE + spacing.sm,
 })
 const $seatMarks: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $markRow: ViewStyle = {

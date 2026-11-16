@@ -3,6 +3,7 @@ import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
+import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 import { Text, type TextProps } from "./Text"
@@ -45,7 +46,7 @@ export function SectionHeader({
 
 const $number: TextStyle = {
   width: NUMBER_LANE_WIDTH,
-  textAlign: "right",
+  textAlign: textEnd,
   fontVariant: ["tabular-nums"],
 }
 const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({

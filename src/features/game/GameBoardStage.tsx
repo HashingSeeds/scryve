@@ -32,6 +32,7 @@ import { seatIdentityMetrics } from "@/components/SeatIdentity"
 import { teamChipCrowded } from "@/components/teamGridGeometry"
 import { TurnSpotlightContext, type TurnSpotlight } from "@/components/TurnSpotlight"
 import { usePlayerGridLayout } from "@/components/usePlayerGridLayout"
+import { $tableDirection } from "@/theme/direction"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { boardPointToWindowPoint } from "./pinnedBoardGeometry"
@@ -177,7 +178,7 @@ function PinnedGameBoardStage({
   const overlays = !naming || menu.open
 
   return (
-    <View testID={testID} style={$stage}>
+    <View testID={testID} dir="ltr" style={$stage}>
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
@@ -282,6 +283,7 @@ function LegacyGameBoardStage({
       ref={boardOrientation.frameRef}
       collapsable={false}
       testID={testID}
+      dir="ltr"
       style={$stage}
     >
       <EdgeTabsShownContext.Provider value={tabsShown}>
@@ -414,5 +416,5 @@ const $toastSlot: ViewStyle = {
 }
 const $hidden: ViewStyle = { opacity: 0 }
 const $pinnedBoard: ViewStyle = { position: "absolute", left: 0, top: 0 }
-const $stage: ViewStyle = { flex: 1, width: "100%" }
+const $stage: ViewStyle = { flex: 1, width: "100%", ...$tableDirection }
 const $fill: ViewStyle = StyleSheet.absoluteFill

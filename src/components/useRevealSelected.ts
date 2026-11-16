@@ -6,6 +6,8 @@ import type {
   ScrollView,
 } from "react-native"
 
+import { isRTL } from "@/i18n"
+
 interface Span {
   x: number
   width: number
@@ -21,7 +23,8 @@ export function useRevealSelected(selectedKey: string | undefined) {
     (animated: boolean) => {
       const item = selectedKey === undefined ? undefined : items.current.get(selectedKey)
       const { offset, width } = viewport.current
-      if (!item || width === 0) return
+      // why: horizontal scroll offsets run differently per platform in RTL, so a reveal could scroll the wrong way.
+      if (!item || width === 0 || isRTL) return
       if (item.x >= offset && item.x + item.width <= offset + width) return
       scrollRef.current?.scrollTo({ x: Math.max(0, item.x - (width - item.width) / 2), animated })
     },

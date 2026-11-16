@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
+import { textStart } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
@@ -125,7 +126,7 @@ const $choicePressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $choiceSelectedPressed: ThemedStyle<ViewStyle> = () => ({ opacity: 0.85 })
 const $choiceLabel: ThemedStyle<TextStyle> = () => ({
-  textAlign: "left",
+  textAlign: textStart,
   flexGrow: 1,
   flexShrink: 1,
 })

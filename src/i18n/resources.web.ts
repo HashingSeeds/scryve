@@ -26,4 +26,6 @@ export const resources = {
     import("./ja/language").then((bundle) => bundle.default),
   ko: (): Promise<typeof import("./ko/language").default> =>
     import("./ko/language").then((bundle) => bundle.default),
+  ar: (): Promise<typeof import("./ar/language").default> =>
+    import("./ar/language").then((bundle) => bundle.default),
 }

@@ -11,6 +11,7 @@ import Animated, {
 } from "react-native-reanimated"
 
 import { useAppTheme } from "@/theme/context"
+import { towardEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -69,7 +70,9 @@ export function LoadingProgress({
   const segmentStyle = useAnimatedStyle(
     () => ({
       opacity: loading ? 1 : 0,
-      transform: [{ translateX: travel.value * trackWidth.value * (1 - PROGRESS_SEGMENT_RATIO) }],
+      transform: [
+        { translateX: towardEnd * travel.value * trackWidth.value * (1 - PROGRESS_SEGMENT_RATIO) },
+      ],
     }),
     [loading],
   )
@@ -101,14 +104,14 @@ const $progressTrack: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $progressSegment: ThemedStyle<ViewStyle> = ({ colors }) => ({
   position: "absolute",
-  left: 0,
+  start: 0,
   width: `${PROGRESS_SEGMENT_RATIO * 100}%`,
   height: "100%",
   backgroundColor: colors.tint,
 })
 const $progressComplete: ThemedStyle<ViewStyle> = ({ colors }) => ({
   position: "absolute",
-  left: 0,
+  start: 0,
   height: "100%",
   backgroundColor: colors.tint,
 })
@@ -116,15 +119,15 @@ const $edgeTop: ViewStyle = {
   marginTop: 0,
   position: "absolute",
   top: 0,
-  left: 0,
-  right: 0,
+  start: 0,
+  end: 0,
   backgroundColor: "transparent",
 }
 const $edgeBottom: ViewStyle = {
   marginTop: 0,
   position: "absolute",
   bottom: 0,
-  left: 0,
-  right: 0,
+  start: 0,
+  end: 0,
   backgroundColor: "transparent",
 }

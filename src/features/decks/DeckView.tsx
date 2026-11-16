@@ -472,7 +472,7 @@ const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.sm,
   paddingBottom: spacing.md,
 })
-const $notLatest: ThemedStyle<TextStyle> = ({ spacing }) => ({ marginLeft: spacing.sm })
+const $notLatest: ThemedStyle<TextStyle> = ({ spacing }) => ({ marginStart: spacing.sm })
 const $notes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.lg,
   gap: spacing.sm,

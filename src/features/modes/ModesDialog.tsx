@@ -38,7 +38,7 @@ function PlaneImage({ card }: { card: ModeCard }) {
             {
               width: height,
               height: width,
-              left: (width - height) / 2,
+              start: (width - height) / 2,
               top: (height - width) / 2,
             },
           ]}

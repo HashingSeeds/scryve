@@ -25,8 +25,11 @@ import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
 import { AccountLegalAcceptance } from "@/features/legal/AccountLegalAcceptance"
 import { PushDeviceSync } from "@/features/notifications/PushDeviceSync"
+import { reloadApp } from "@/features/updates/appUpdate"
 import { RestartCurtain } from "@/features/updates/RestartCurtain"
 import { UpdateReadyToastWithForegroundChecks } from "@/features/updates/UpdateReadyToast"
+import { appDirection } from "@/i18n"
+import { applyAppDirection } from "@/i18n/applyAppDirection"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider, useAppTheme } from "@/theme/context"
 import { initAnalytics } from "@/utils/analytics"
@@ -34,6 +37,7 @@ import { reportCrash } from "@/utils/crashReporting"
 import { initObservability, navigationTracing } from "@/utils/observability"
 
 initObservability()
+applyAppDirection(reloadApp)
 
 SplashScreen.preventAutoHideAsync()
 setSplashScreenOptions({ duration: 0 })
@@ -76,7 +80,7 @@ function Root() {
   }
 
   return (
-    <GestureHandlerRootView style={$root}>
+    <GestureHandlerRootView style={$root} dir={appDirection}>
       <ThemeProvider>
         <CloudProviders>
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>

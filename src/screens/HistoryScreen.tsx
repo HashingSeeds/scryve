@@ -736,7 +736,7 @@ const $chipRow: ViewStyle = {
 const $filterScroll: ViewStyle = { flex: 1 }
 const $chipScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
-  paddingRight: spacing.md,
+  paddingEnd: spacing.md,
 })
 const $chipWrap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -760,7 +760,7 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $nestedRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  paddingLeft: spacing.lg,
+  paddingStart: spacing.lg,
 })
 const $skeletonBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: BADGE_SIZE,

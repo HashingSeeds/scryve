@@ -17,7 +17,7 @@ const FSI = "\u2068"
 const LRI = "\u2066"
 const PDI = "\u2069"
 
-// why: main bundles no Arabic copy yet, and i18next's en-US fallback never loads the "en" bundle.
+// why: ar-SA copy pinned here, so retranslating Arabic cannot move what these tests expect.
 i18n.addResourceBundle("ar-SA", "common", { separator: " · ", listSeparator: "، " })
 i18n.addResourceBundle("ar-SA", "play", { summary: { playerCount_few: "{{count}} لاعبين" } })
 

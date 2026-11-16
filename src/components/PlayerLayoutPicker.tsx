@@ -7,6 +7,7 @@ import {
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
 import { useAppTheme } from "@/theme/context"
+import { $tableDirection } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 import { getPlayerGridRowFlex, getPlayerGridRows } from "./PlayerGrid"
@@ -97,7 +98,8 @@ function LayoutPreview({
     <View
       testID={testID}
       importantForAccessibility="no-hide-descendants"
-      style={[themed($preview), previewStyle]}
+      dir="ltr"
+      style={[themed($preview), $tableDirection, previewStyle]}
     >
       {rows.map((row, rowIndex) => (
         <View

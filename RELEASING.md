@@ -199,7 +199,7 @@ an incidental production command.
 
 ## Incident response
 
-**Bad OTA update:** Roll back to the previous update or the embedded update (`eas update:rollback`).
+**Bad OTA update:** Roll back to the previous update or the embedded update (`eas update:rollback`). Never roll back past the update that added Arabic: it saves a forced right-to-left flag that older bundles never clear, so Arabic phones would stay mirrored. Fix forward instead.
 
 **Bad native binary:** Halt the staged store rollout and prepare a fixed binary. Disable affected cloud features if possible.
 

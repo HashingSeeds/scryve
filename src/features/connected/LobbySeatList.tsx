@@ -707,8 +707,8 @@ const $openSeat: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.xs,
   borderBottomWidth: 1,
   borderTopWidth: 0,
-  borderLeftWidth: 0,
-  borderRightWidth: 0,
+  borderStartWidth: 0,
+  borderEndWidth: 0,
   borderStyle: "dashed",
   borderColor: colors.separator,
 })

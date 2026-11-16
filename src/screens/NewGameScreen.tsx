@@ -112,6 +112,7 @@ import {
 import { formatList, formatNumber, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { endEdge, startEdge } from "@/theme/direction"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
@@ -1070,8 +1071,8 @@ function NewGameForm({
         />
         <View
           style={{
-            marginLeft: toggleOverhang(insets.left),
-            marginRight: toggleOverhang(insets.right),
+            marginStart: toggleOverhang(insets[startEdge]),
+            marginEnd: toggleOverhang(insets[endEdge]),
           }}
         >
           <SegmentedControl

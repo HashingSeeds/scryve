@@ -634,9 +634,9 @@ const $badge: ThemedStyle<ViewStyle> = () => ({
 const $lifeColumn: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-end", minWidth: 88 })
 const $timeline: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,
-  borderLeftWidth: 2,
-  borderLeftColor: colors.separator,
-  paddingLeft: spacing.md,
+  borderStartWidth: 2,
+  borderStartColor: colors.separator,
+  paddingStart: spacing.md,
 })
 const $timelineStatus: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,

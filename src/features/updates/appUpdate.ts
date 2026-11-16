@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react"
-import { AppState, Image, Platform } from "react-native"
+import { AppState, DevSettings, Image, Platform } from "react-native"
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 
@@ -249,6 +249,12 @@ const reloadIntoUpdate = () =>
       fade: knownReducedMotion() === false,
     },
   })
+
+/** why: expo-updates refuses to reload in development, so the dev server reloads there. */
+export function reloadApp() {
+  if (__DEV__) DevSettings.reload()
+  else reloadIntoUpdate().catch(() => undefined)
+}
 
 export function restartToUpdate() {
   restartBehindCurtain(reloadIntoUpdate).catch(() => undefined)

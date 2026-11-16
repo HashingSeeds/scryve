@@ -29,6 +29,7 @@ import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { useRulesSearchAnalytics } from "@/features/rules/useRulesSearchAnalytics"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { openUrl } from "@/utils/openUrl"
 
@@ -564,7 +565,7 @@ function RuleText({
 
 const $flex: ViewStyle = { flex: 1 }
 const $alignEnd: ViewStyle = { alignItems: "flex-end" }
-const $textEnd: TextStyle = { textAlign: "right" }
+const $textEnd: TextStyle = { textAlign: textEnd }
 const $number: TextStyle = { width: 40, fontVariant: ["tabular-nums"] }
 const $recentId: TextStyle = { width: 72, fontVariant: ["tabular-nums"] }
 const $gutter: TextStyle = { width: 60, paddingTop: 2, fontVariant: ["tabular-nums"] }
