@@ -10,6 +10,7 @@ const play = {
   noGamesContent: "Finished games will appear here.",
   currentGame: {
     emptyHeading: "No active local game",
+    // hi: Play is the tab: “आपका अगला गेम “खेलें” टैब में तैयार है।”
     emptyContent: "Your next game is ready on Play.",
     // Button that goes to the Play tab.
     openPlay: "Go to Play",
@@ -48,6 +49,7 @@ const play = {
   },
   // Game setup: how the table decides who goes first. The board then shows only that.
   firstPlayerChoice: {
+    // ja: Label for how the first player is decided: 先攻の決め方.
     label: "First player",
     off: "Off",
     roll: "Roll",
@@ -75,21 +77,27 @@ const play = {
       "By playing, you agree to the <terms>Terms of Use</terms> and <privacy>Privacy Policy</privacy>.",
   },
   newGame: {
-    // Setup for Planechase, an add-on to any Magic game that uses a deck of plane cards. Keep "Planechase" and "planar deck" as official terms.
+    // Setup for Planechase, an add-on to any Magic game that uses a deck of plane cards. Use your language's official names for Planechase and the planar deck.
+    // ar: Write "بلان تشاس" despite the note to keep Planechase; planar deck is مجموعة العوالم.
     planechase: "Planechase",
     planechaseOff: "Off",
     // Players bring their own physical planar deck; the app only rolls the die and tracks its cost.
+    // hi: Reflexive अपने: “मेरे पास अपने कार्ड हैं”.
     ownPlanarDeck: "I have my cards",
     // A whole product's decks combined into one shared planar deck, as in "Planechase 2012, all 4 decks".
     allDecks: "{{product}}, all {{count}} decks",
     // Setup for Archenemy: which player is the archenemy, chosen by seat or rolled at the start.
     archenemy: "Archenemy",
+    // ja: Pick the archenemy with a die at the start: 開始時にダイスで決める. Never ロール.
+    // fr: Draw the archenemy at random at the start: "Tirer au sort au début".
     rollArchenemy: "Roll at start",
     schemeDeck: "Scheme deck",
     // The archenemy brings their own physical scheme deck.
+    // hi: Reflexive अपने: “मेरे पास अपने कार्ड हैं”.
     ownSchemeDeck: "I have my cards",
     setupTitle: "Game setup",
     newTitle: "New game",
+    // ja: Heading of the choice between one shared device, nearby phones and online: 遊び方.
     connectionLabel: "Game connection",
     onThisDevice: "On this device",
     connected: "Connected",
@@ -111,6 +119,7 @@ const play = {
     // Game type name for Two-Headed Giant played with Commander decks. Short.
     twoHeadedGiantCommander: "2HG Commander",
     // Game type name for Riftbound 2v2, two teams of two sharing one point total. Keep "2v2".
+    // ar: Write "اثنان ضد اثنين" despite the note to keep 2v2.
     twoVsTwo: "2v2",
     formatLabel: "Format",
     joinWithCode: "Join with code",
@@ -135,13 +144,16 @@ const play = {
     clockStopwatch: "Stopwatch",
     minutesLeft: "Minutes left",
     // Label next to the starting value: how much one tap changes it (1, 5 or 10).
+    // How much one tap on a seat changes its life total.
     changeBy: "Per tap",
     layout: "Layout",
+    // hi: Appearance is the player's color and mark: “{{name}} का रंग और निशान बदलें”.
     changeAppearance: "Change appearance for {{name}}",
     nameForPlayer: "Name for player {{seat}}",
     nameGateHelper: 'Connected players will see "{{name}}" instead.',
     // Name for the picked deck when its real name is unknown.
     deckFallbackName: "Deck",
+    // ko: Button marking the device owner's seat: '내 자리'.
     thisIsMe: "This is me",
     noSeat: "No seat",
     yourDeck: "Your deck",
@@ -164,11 +176,15 @@ const play = {
     startGameHint: "Starts this local game on the current device",
     cloud: "Cloud",
     // Heading above a choice of Cloud or Nearby: where the connected game runs.
+    // hi: Heading over a choice, not a button: “गेम कहाँ चलेगा”.
+    // es: Heading above Nube / Cercana. Use "Dónde se juega", never ejecutar.
     hostOn: "Run game on",
     nearby: "Nearby",
     nearbyHint: "Plays with phones on this Wi-Fi, without accounts or the cloud",
     endMatch: "End match…",
+    // ja: Records the match from the games finished so far: 終了済みのゲームまでの結果でマッチを記録します.
     endMatchHint: "Records the match result from its last finished game",
+    // fr: Turns a local game into a connected one: "Connecter la partie".
     connect: "Connect",
     connectHint: "Moves this game to the cloud so others can join it",
     statusDetailsHint: "Opens game and connection details",
@@ -178,16 +194,18 @@ const play = {
     leaveGameEllipsis: "Leave game…",
     loadMore: "Load more",
     loadingMoreGames: "Loading more games…",
-    endGameTitle: "End this game?",
-    cancelEndGame: "Cancel end this game?",
+    endGameTitle: "Abandon this game?",
+    cancelEndGame: "Keep this game",
     endGameMessage:
       "This ends the game for everyone and records it as abandoned. This cannot be undone.",
-    endGameConfirm: "End game",
+    endGameConfirm: "Abandon game",
     leaveGameTitle: "Leave this game?",
-    cancelLeaveGame: "Cancel leave this game?",
+    cancelLeaveGame: "Stay in this game",
     leaveGameMessage: "You will leave this game. Other players and their history stay unchanged.",
     leaveGameConfirm: "Leave game",
+    // ko: 'mark' is the player's on-board shape: 모양 (색상과 모양). 표식 is only Flesh and Blood's Marked.
     closeAppearancePicker: "Close color and mark picker",
+    // ko: 'mark' is the player's on-board shape: 모양 (색상과 모양). 표식 is only Flesh and Blood's Marked.
     appearanceTitle: "{{name}}'s color and mark",
     hostSeatTitle: "Which seat is you?",
     hostSeatMessage: "The other seats stay open for players to claim with an invite.",
@@ -196,16 +214,21 @@ const play = {
     endedHostAbandoned: "Abandoned by the host",
     endedInactivity: "Ended after inactivity",
     endedAccountDeleted: "Ended when the host deleted their account",
+    // ar: Write "{{name}} (الإصدار {{version}})". Never v{{version}}.
     deckVersion: "{{name}} v{{version}}",
     underAMinute: "Under a minute",
     minutes: "{{minutes}} min",
+    // hi: Hindi readers don't abbreviate these: “{{hours}} घंटे {{minutes}} मिनट”.
     hoursMinutes: "{{hours}}h {{minutes}}m",
     playerCount_one: "{{count}} player",
     playerCount_other: "{{count}} players",
     // One-letter badges for a win, loss or draw.
     badge: {
+      // hi: Hindi has no one-letter form; the full word fits the badge: “जीत”.
       win: "W",
+      // hi: The full word fits the badge: “हार”.
       loss: "L",
+      // hi: The full word fits the badge: “ड्रॉ”.
       draw: "D",
       unrecorded: "–",
     },
@@ -236,6 +259,7 @@ const play = {
       pokemon: "Final Prize cards",
       lorcana: "Final lore",
       fab: "Final Life",
+      // hi: Copy the life wording: “आखिरी पॉइंट”.
       riftbound: "Final points",
     },
     noWinner: "No winner was recorded for this game.",
@@ -243,13 +267,19 @@ const play = {
     hide: "Hide",
     show: "Show",
     unknownPlayer: "Player",
+    // hi: A timeline row label marking an undo, not a button: “अनडू”, without करें.
     undo: "undo",
     loadOlder: "Load older changes",
     loadingOlder: "Loading older changes…",
-    olderDropped: "Older events were dropped to save space.",
+    // ko: 'events' are this game's changes: '공간 절약을 위해 오래된 변경 내역을 삭제했습니다.'
+    // fr: These are older log entries for this game, not store events: "Les changements plus anciens ont été supprimés pour libérer de l’espace."
+    // es: These are changes in the game log, not store events. Use "Se descartaron los cambios más antiguos para ahorrar espacio."
+    olderDropped: "Older changes were dropped to save space.",
+    // ko: '되돌리기는 지워지지 않고 반대 방향의 변경으로 기록에 남습니다.'
+    // hi: “अनडू भी रिकॉर्ड में एक उल्टे बदलाव की तरह दिखता है।”
     undoNote: "Undo stays in the record as a compensating change.",
     helpPrompt: "Having trouble?",
-    openHelp: "Open Help",
+    openHelp: "Open Support",
     dismiss: "Dismiss",
     timeline: {
       loading: {
@@ -277,6 +307,7 @@ const play = {
         pokemon: "No Prize cards changes were recorded.",
         lorcana: "No lore changes were recorded.",
         fab: "No life changes were recorded.",
+        // hi: Copy the life wording: “कोई पॉइंट बदलाव दर्ज नहीं हुआ।”
         riftbound: "No point changes were recorded.",
       },
       loadFailed: {
@@ -315,6 +346,7 @@ const play = {
     source: {
       all: "All",
       local: "Local",
+      // fr: Plural feminine like its siblings Toutes / Locales / Manuelles: "Connectées".
       connected: "Connected",
       manual: "Manual",
     },
@@ -340,8 +372,11 @@ const play = {
     yesterday: "Yesterday",
     // Badge for an abandoned game. A symbol; keep it exactly.
     badgeAbandoned: "⊘",
+    // ar: Write "جارية". قيد التقدم is a calque.
     inProgress: "In progress",
+    // ja: Same as decks:play.versus: vs {{opponents}}.
     versus: "vs {{opponents}}",
+    // ar: Short badge: "الأفضل من {{bestOf}}", or "من {{bestOf}}" if space is tight. Never Bo.
     bestOfShort: "Bo{{bestOf}}",
     gameCount_one: "{{count}} game",
     gameCount_other: "{{count}} games",
@@ -353,7 +388,9 @@ const play = {
     connectedUnavailable: "Connected history unavailable",
     connectedUnavailableMessage: "Connected history is unavailable.",
     count: {
+      // hi: “{{count}} गेम · {{wins}} जीत · {{losses}} हार · {{draws}} ड्रॉ”.
       record_one: "{{count}} game · {{wins}}W · {{losses}}L · {{draws}}D",
+      // hi: “{{count}} गेम · {{wins}} जीत · {{losses}} हार · {{draws}} ड्रॉ”.
       record_other: "{{count}} games · {{wins}}W · {{losses}}L · {{draws}}D",
       localLoading_one: "{{count}} local game · Connected history loading",
       localLoading_other: "{{count}} local games · Connected history loading",
@@ -402,12 +439,13 @@ const play = {
     notFoundContent: "It may have been deleted.",
     deleteResult: "Delete result",
     deleteTitle: "Delete this result?",
-    cancelDelete: "Cancel delete this result?",
+    cancelDelete: "Keep this result",
     deleteMessage: "Deck stats that count it will be updated.",
   },
   recordMatch: {
     title: "Add match result",
     myResult: "My result",
+    // es: The match score counted in games, like 2-1. Use "Marcador en partidas", never "Resultado de la partida".
     gameScore: "Game score",
     opponent: "Opponent {{number}}",
     opponentResult: "Opponent {{number}} result",
@@ -431,8 +469,11 @@ const play = {
       eventLength: "Event name must be at most {{max}} characters",
       roundRange: "Round must be {{min}}–{{max}}",
       scoreIncomplete: "Enter both wins and losses, or leave the score blank",
+      // ar: Count, not the bare noun: "يجب أن يكون عدد مرات الفوز بين {{min}} و{{max}}".
       winsRange: "Wins must be {{min}}–{{max}}",
+      // ar: Count, not the bare noun: "يجب أن يكون عدد مرات الخسارة بين {{min}} و{{max}}".
       lossesRange: "Losses must be {{min}}–{{max}}",
+      // ar: Count, not the bare noun: "يجب أن يكون عدد مرات التعادل بين {{min}} و{{max}}".
       drawsRange: "Draws must be {{min}}–{{max}}",
       tooManyGames: "A best of {{bestOf}} has at most {{bestOf}} games",
       // {{record}} is a wins-losses score, such as "2-1".
@@ -447,6 +488,7 @@ const play = {
     cards: "Cards",
     search: "Search rules",
     // Tab listing rules the player opened recently.
+    // ar: Tab of rules you opened recently: "الأخيرة". الأحدث means newest rule changes.
     recent: "Recent",
     // Tab listing the rules' chapters and sections, like a table of contents.
     contents: "Contents",
@@ -461,6 +503,9 @@ const play = {
     failed: "Couldn't download the rules.",
     webOnly: "The Comprehensive Rules are on the {{publisher}} site.",
     // {{section}} is a numbered rules section such as "1. Game Concepts"; this shows every rule in it.
+    // hi: Finish the phrase: “{{section}} के सभी नियम”.
+    // fr: "Toute la section {{section}}".
+    // es: Use "Todas las reglas de {{section}}".
     allOf: "All of {{section}}",
     noResults: "No rules match.",
     notFound: "This rule isn't in this version of the rules.",

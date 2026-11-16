@@ -24,7 +24,7 @@ const LOCALES = {
 
 const GLOSSARY_PATH = path.join(I18N_DIR, "glossary.json")
 const SYSTEMS_PATH = path.join(ROOT, "convex/lib/systems/definitions.ts")
-const PRODUCT_NAMES = [
+const KEPT_NAMES = [
   "Scryve",
   "Scryve Pro",
   "Foil",
@@ -35,6 +35,24 @@ const PRODUCT_NAMES = [
   "Limitless",
   "YDKE",
   "Fabrary",
+  "MTGO",
+  "Pokémon TCG Live",
+  "Apple",
+  "App Store",
+  "iPhone",
+  "iPad",
+  "iOS",
+  "Google",
+  "Google Play",
+  "Android",
+  "Wi-Fi",
+  "RevenueCat",
+  "Sentry",
+  "PostHog",
+  "Convex",
+  "YDKe",
+  "Shift",
+  "SoS",
 ]
 
 const NOTE_LOCALE = /^([a-z]{2,3}): (.*)$/s
@@ -55,17 +73,12 @@ function systemPrompt() {
   const systems = Object.values(loadModule(SYSTEMS_PATH).SYSTEMS)
   const list = (names) => [...new Set(names)].join(", ")
   const games = list(systems.map((system) => system.label))
-  const names = list([
-    ...PRODUCT_NAMES,
-    ...systems.flatMap((system) => [system.label, system.shortLabel]),
-  ])
-  const formats = list(systems.flatMap((system) => system.formats.map((format) => format.label)))
   return `You translate UI copy for Scryve, a phone life counter for trading card games (${games}).
 
 Rules:
 - Keep each string short and natural for a phone screen. Match the English tone: plain, direct, no added enthusiasm.
 - Keep every {{placeholder}} exactly as written, including the name inside the braces, and keep every <tag>. Placeholders hold numbers, player names, deck names, or card names.
-- Never translate these names: ${names}. Keep format names in English: ${formats}. A language rule in the request overrides either list.
+- Keep these names exactly as written: ${list(KEPT_NAMES)}. Write game, format, variant and card type names the way the glossary says: players should never meet English unless the glossary keeps it. Card names and anything players typed come in placeholders, as they are.
 - The request includes language rules and a glossary for the target language. Each glossary entry names an English concept, with what it means, then the term to use for it. Always use those terms, inflected as the grammar needs, and follow the rules.
 - Keep ellipsis characters, and keep short labels as compact as the English.
 - Never add a digit the English does not have: the app formats every number in the reader's own digits, so numbers come only from placeholders such as {{count}}. A plural form may say its number in words ("one seat", "two seats") instead of {{count}}; the "other" form always keeps {{count}}.
@@ -291,7 +304,7 @@ function staleUnits({ units, lock, localeFlat, locale, glossary }) {
   return [...units.values()].filter(
     (unit) =>
       lock[unit.id]?.split(".")[0] !== sourceHash(unit, locale, glossary) ||
-      validateUnit(unit, localeFlat, locale).length > 0,
+      validateUnit(unit, localeFlat, locale, glossary).length > 0,
   )
 }
 
@@ -374,8 +387,37 @@ function englishProblems(key, text) {
   ]
 }
 
-function validateUnit(unit, translatedFlat, locale) {
+const keptLatinCache = new WeakMap()
+
+function keptLatin(locale, glossary) {
+  const byLocale = keptLatinCache.get(glossary) ?? new Map()
+  keptLatinCache.set(glossary, byLocale)
+  if (!byLocale.has(locale)) {
+    const sameName = Object.values(glossary.terms).flatMap((term) =>
+      String(term[locale] ?? "")
+        .split(";")
+        .map((entry) => entry.split(":").map((side) => side.trim()))
+        .filter(([english, local]) => local === english || local?.startsWith(`${english} (`))
+        .map(([english]) => english),
+    )
+    byLocale.set(
+      locale,
+      new Set([...KEPT_NAMES, ...sameName].flatMap((name) => name.match(LATIN_WORD) ?? [])),
+    )
+  }
+  return byLocale.get(locale)
+}
+
+function validateUnit(unit, translatedFlat, locale, glossary) {
   const englishTexts = Object.values(unit.english)
+  const kept =
+    glossary &&
+    new Set([
+      ...keptLatin(locale, glossary),
+      ...(/parser input/i.test(unit.note ?? "")
+        ? englishTexts.flatMap((text) => text.match(LATIN_WORD) ?? [])
+        : []),
+    ])
   const english = new Set(englishTexts.flatMap((text) => [...placeholders(text)]))
   const englishNumbers = new Set(englishTexts.flatMap(numbersIn))
   return requiredKeys(unit, locale).flatMap((key) => {
@@ -396,15 +438,17 @@ function validateUnit(unit, translatedFlat, locale) {
       ...typedNumbers.map((number) => `${key}: typed the number ${number}; use a placeholder`),
       ...handBuiltSigns(key, text),
       ...((text.match(/"/g) ?? []).length % 2 ? [`${key}: has an unmatched quote`] : []),
-      ...scriptProblems(text, locale).map((problem) => `${key}: ${problem}`),
+      ...scriptProblems(text, locale, kept).map((problem) => `${key}: ${problem}`),
     ]
   })
 }
 
-function scriptProblems(text, locale) {
+function scriptProblems(text, locale, kept) {
   if (new Intl.Locale(locale).maximize().script === "Latn") return []
   const stray = (text.replace(LITERAL_TEXT, " ").match(LATIN_WORD) ?? []).filter(
-    (word) => /^\p{Ll}+$/u.test(word) && !LOWERCASE_LATIN_ALLOWED.has(word),
+    (word) =>
+      (/^\p{Ll}+$/u.test(word) && !LOWERCASE_LATIN_ALLOWED.has(word)) ||
+      (kept !== undefined && /^\p{Lu}.*\p{Ll}/u.test(word) && !kept.has(word)),
   )
   return [
     ...stray.map((word) => `left "${word}" in Latin script`),
@@ -529,7 +573,7 @@ async function check() {
     for (const locale of Object.keys(LOCALES)) {
       const localeFlat = flatten(loadTs(namespacePath(locale, namespace)) ?? {})
       for (const unit of units.values())
-        for (const problem of validateUnit(unit, localeFlat, locale))
+        for (const problem of validateUnit(unit, localeFlat, locale, glossary))
           problems.push(`${locale}/${namespace}: ${problem}`)
       for (const key of orphanKeys({ units, localeFlat, locale }))
         problems.push(`${locale}/${namespace}: ${key} no longer exists in English`)
@@ -670,7 +714,7 @@ async function translateUnits(client, { units, namespace, locale, glossary }) {
       glossary,
       feedback,
     })
-    feedback = units.flatMap((unit) => validateUnit(unit, translated, locale))
+    feedback = units.flatMap((unit) => validateUnit(unit, translated, locale, glossary))
     if (feedback.length === 0) return translated
   }
   throw new Error(`${locale}/${namespace}: invalid translations\n${feedback.join("\n")}`)

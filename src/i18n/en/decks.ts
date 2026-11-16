@@ -19,12 +19,17 @@ const decks = {
   stats: {
     title: "Deck stats",
     compare: "Compare",
+    // hi: “{{count}} से कम नतीजों का सैंपल छोटा होता है।”
     smallSample: "Under {{count}} results is a small sample.",
     emptyHint: "Play a game with this deck, or add a match result on its page.",
     ofGames: "of {{count}}",
     gameCount_one: "{{count}} game",
     gameCount_other: "{{count}} games",
-    chance: "{{rate, percent}} in {{podSize}}-player games · chance {{expected, percent}}",
+    // {{expected}} is the win rate luck alone gives at this table size.
+    // ja: "chance" is the win rate pure chance gives (one in pod size), not 期待値: {{podSize}}人対戦で{{rate, percent}} · 偶然なら{{expected, percent}}.
+    // fr: {{expected}} is the win rate pure luck gives at this table size (25 % at 4 players), not this deck’s odds: "… · au hasard : {{expected, percent}}".
+    chance: "{{rate, percent}} in {{podSize}}-player games · {{expected, percent}} by chance",
+    // ja: A confidence range, not a forecast: 推定{{low, percent}}〜{{high, percent}}. Never 予想.
     likely: "Likely {{low, percent}} to {{high, percent}}",
     lists: "Lists",
     turnOrder: "Turn order",
@@ -33,6 +38,7 @@ const decks = {
     turnOrderNotTracked: "Turn order not tracked",
     // Stats grouped by how many cards the player kept in their opening hand after mulligans.
     openingHand: "Opening hand",
+    // ar: Opening hand size kept: "الاحتفاظ بـ{{count}}".
     keptHand: "Kept {{count}}",
     // {{value}} is an average with one decimal, as in "0.4 mulligans per game".
     mulligansPerGame: "{{value}} mulligans per game",
@@ -43,6 +49,7 @@ const decks = {
     // A card added or cut between lists, as in "+2 Lightning Bolt". {{change}} is a signed count.
     cardChange: "{{change}} {{card}}",
     notTracked: "Not tracked",
+    // fr: French date range: "Du {{first}} au {{last}}".
     dateSpan: "{{first}} to {{last}}",
     players_one: "{{count}} player",
     players_other: "{{count}} players",
@@ -62,8 +69,11 @@ const decks = {
     limited: "Breakdowns cover the latest {{count}} results.",
     compareList: "List",
     compareWith: "Compared with",
+    // hi: Hindi has no one-letter form; use the full word: “जीत”, never जी.
     winLetter: "W",
+    // hi: Use the full word: “हार”, never हा.
     lossLetter: "L",
+    // hi: Use the full word: “ड्रॉ”.
     drawLetter: "D",
     unknownLetter: "?",
     datesMissing: "Dates not tracked",
@@ -95,6 +105,8 @@ const decks = {
       "Outside this commander's color identity: {{names}} and {{count}} more.",
   },
   draft: {
+    // ar: The limit is on copies of one card: "الحد الأقصى لنسخ البطاقة الواحدة: {{limit}}."
+    // ja: Players say 同名カード: 同名カードは{{limit}}枚までです。
     copyLimit: "A card can have at most {{limit}} copies.",
     entryLimit: "A deck can have at most {{limit}} entries.",
   },
@@ -103,10 +115,11 @@ const decks = {
     cardChangesFailed: "Could not sync these card changes",
   },
   syncReason: {
-    deckConflict: "Deck changed on another device. Choose which version to keep.",
+    deckConflict: "Deck changed on another device. Choose which copy to keep.",
     deckRejected: "The server can't accept this edit. Discard it and edit again.",
     versionConflict: "Deck cards changed on another device. Choose which card list to keep.",
     versionQueueConflict: "An earlier card edit conflicted. Choose which card list to keep.",
+    // hi: Discard is छोड़ें, as in deckRejected and versionRejected: “यह ऑफ़लाइन ड्राफ़्ट कभी सिंक नहीं हुआ। इसे छोड़ दें और वर्शन दोबारा बनाएँ।”
     draftUnsynced: "This offline draft was never synced. Discard it and create the version again.",
     versionRejected: "The server can't accept these changes. Discard them and edit again.",
   },
@@ -123,6 +136,7 @@ const decks = {
       "The card list changed on another device after you saved. Your edits are still saved on this device.",
     cardsSummary: "{{cards}} cards · {{entries}} entries",
     noCards: "No cards",
+    // ar: The revision number of the account copy: "التعديل رقم {{revision}}". مراجعة means review.
     accountCopy: "Account copy: {{cards}} cards · {{entries}} entries · revision {{revision}}",
     keepMine: "Keep mine",
     retrySync: "Retry sync",
@@ -131,7 +145,7 @@ const decks = {
     discardLocal: "Discard local edit",
     saveCardsFailed: "Could not save your card changes",
     discardCardsFailed: "Could not discard local card edits",
-    keepWhichVersion: "Keep which version?",
+    keepWhichVersion: "Keep which copy?",
     reviewLocal: "Review local edit",
     thisDevice: "This device",
     account: "Account",
@@ -171,6 +185,7 @@ const decks = {
     createVersion: "Create version",
     versionDetails: "Version details",
     versions: "Versions",
+    // hi: “अभी नहीं खेला”.
     unplayed: "Unplayed",
     keepVersion: "Keep this version",
     deleteVersionTitle: "Delete this version?",
@@ -206,6 +221,7 @@ const decks = {
     otherAccount:
       "This deck came from another account. Add a new deck with empty stats? You'll see it twice: synced and on this device.",
     failed: "Could not sync this deck. It is still saved on this device.",
+    // fr: "Vous avez atteint la limite de decks synchronisés. Le deck reste enregistré sur cet appareil."
     limit_reached: "Your synced decks are full. The deck is still saved on this device.",
     version_limit:
       "This deck has more versions than your account keeps. Delete some on this device to sync.",
@@ -318,6 +334,7 @@ const decks = {
     // Flesh and Blood: a resource that Mystic cards produce.
     chi: "chi",
     // Flesh and Blood: a hero's hand size.
+    // ja: Flesh and Blood players say 知性.
     intellect: "intellect",
     // Turn the card sideways to use it.
     tap: "tap",
@@ -331,6 +348,8 @@ const decks = {
     green: "green mana",
     colorless: "colorless mana",
     // {{amount}} is a number or the letter X.
+    // ko: Generic mana is 일반 마나: '일반 마나 {{amount}}'. Never 무색, which is colorless {C}.
+    // ja: Generic mana is 不特定マナ (CR 107.4b), not 無色マナ, which is the {C} symbol: 不特定マナ{{amount}}.
     generic: "{{amount}} generic mana",
     energy: "energy",
     snow: "snow mana",
@@ -343,6 +362,7 @@ const decks = {
     // Riftbound: a unit's combat stat.
     might: "Might",
     // Riftbound: turn the card sideways to use it, like tapping.
+    // ja: Riftbound has no Japanese edition; players say エグゾースト. Never 疲労.
     exhaust: "exhaust",
     // Riftbound: a power cost of one domain. {{domain}} is a proper noun such as Fury or Calm and stays in English.
     domainPower: "{{domain}} power",
@@ -353,10 +373,13 @@ const decks = {
     // Lorcana: points a character earns when it quests.
     lore: "lore",
     // Lorcana: a character's damage stat.
+    // ja: Lorcana's official term: 攻撃力.
     strength: "strength",
     // Lorcana: a character's toughness stat.
+    // ja: Lorcana's official term: 意志力. Never タフネス or 意思.
     willpower: "willpower",
     // Lorcana: turn the card sideways to use it, like tapping.
+    // ja: Lorcana's official term: エグザート.
     exert: "exert",
     // Lorcana: the inkwell mark on cards that can be put into the inkwell.
     inkwell: "inkwell symbol",
@@ -408,6 +431,8 @@ const decks = {
     colors: "Colors",
     colorMatch: "Color match",
     // Segment under "Color match": cards use only the picked colors, or fewer.
+    // fr: Completes the set Au moins / Exactement: "Au plus".
+    // es: Sits beside "Al menos" and "Exactamente"; must not end in a preposition. Use "Solo estos".
     withinColors: "Within",
     // Segment under "Color match": cards use all the picked colors and may add more.
     allowAdditional: "At least",
@@ -431,18 +456,23 @@ const decks = {
     title: "Scan cards",
     looking: "Hold a card inside the frame",
     loading: "Loading card names…",
+    // es: Camera prompt while scanning a card. Use "No la muevas".
     steady: "Hold steady",
     unsure: "Couldn't tell which card this is. Hold it flat and try again.",
     failed: "Could not read the card. Try again.",
     // Shown at the bottom of the scanner before any card has been added.
     empty: "Scanned cards are added to the deck and show here.",
     // How many cards this scanner session has added to the deck.
-    addedCount: "{{count}} added",
+    addedCount_one: "{{count}} added",
+    addedCount_other: "{{count}} added",
     // Scanned cards whose lookup failed and will be tried again shortly.
+    // fr: A count of cards waiting to be tried again: "À réessayer : {{count}}".
     retryingCount: "{{count}} retrying",
     // Scanned cards that still failed after retrying and are not in the deck.
-    failedCount: "{{count}} not added",
+    failedCount_one: "{{count}} not added",
+    failedCount_other: "{{count}} not added",
     // Button next to the last scanned card when the scanner picked the wrong one.
+    // ko: '잘못된 카드'.
     wrongCard: "Wrong card",
     // Accessibility label for tapping the last scanned card to see every card scanned so far.
     review: "Review scanned cards",
@@ -458,6 +488,7 @@ const decks = {
     removeIt: "Remove it",
     addFailed: "Couldn't add the scanned cards. Check your connection.",
     // The scanner skipped a card this deck already holds, such as a second copy in Commander.
+    // ar: Start in Arabic: "البطاقة {{card}} موجودة بالفعل في المجموعة".
     alreadyInDeck: "{{card}} is already in the deck",
     // Asked the first time a basic land is scanned. The answer is that land's total in the deck.
     howMany: "How many in the deck?",
@@ -502,11 +533,14 @@ const decks = {
     close: "Close deck limit",
     unavailable: "Deck slots unavailable. Your draft is kept.",
     moveFailed: "Could not move this deck to this device.",
+    // ja: The move did not happen and the deck stays synced: 別のデバイスで変更されたため、このデッキは同期されたままです。 Never まだ同期されています, which reads as syncing in progress.
     moveConflict: "This deck changed on another device, so it is still synced. Try again.",
     title: "Synced deck limit reached",
     proBody: "Pro accounts sync {{limit}} decks. Move a deck to this device to make room.",
+    // ko: '무료 계정은 덱을 {{limit}}개까지 동기화합니다. Pro로 업그레이드하면 {{premiumLimit}}개까지 가능합니다. 또는 덱 하나를 이 기기로 옮겨 슬롯을 확보하세요.'
     freeBody:
       "Free accounts sync {{limit}} decks. Get Pro for {{premiumLimit}}, or move a deck to this device to make room.",
+    // es: Use "Pásate a Pro", not "Mejorar a Pro".
     upgrade: "Upgrade to Pro",
     moveADeck: "Move a deck to this device",
     notNow: "Not now",
@@ -557,16 +591,26 @@ const decks = {
     // e.g. "Sideboard: 12, at most 10. Remove 2."
     sizeAtMost: "{{sections}}: {{have}}, at most {{target}}. Remove {{diff}}.",
     // Too many copies of one card by name, e.g. "Ahri, Alluring has 4 copies. Remove 1 to get to 3."
+    // ar: Card names are Latin, so start in Arabic and avoid a counted noun: "عدد نسخ البطاقة {{card}}: {{have}}. أزل {{diff}} ليصبح العدد {{max}}."
     copies: "{{card}} has {{have}} copies. Remove {{diff}} to get to {{max}}.",
     // A section where every card must have a different name, e.g. "Battlefields must all differ. Remove 1 Altar to Unity."
+    // es: {{section}} is a plural section name of any gender. Use "Las cartas de {{section}} deben ser distintas. Quita {{diff}} de {{card}}."
     unique: "{{section}} must all differ. Remove {{diff}} {{card}}.",
     // {{domains}} and {{identity}} are domain names separated by commas, e.g. "Svellsongur is Calm, outside your Legend's Fury, Chaos. Remove it."
+    // ar: Riftbound. Legend is الأسطورة. Start in Arabic: "البطاقة {{card}} من {{domains}}، خارج {{identity}} أسطورتك. أزلها."
+    // hi: Legend is लेजेंड, as in systems:section.legend: “{{card}} {{domains}} है, जो आपके लेजेंड के डोमेन ({{identity}}) से बाहर है। इसे हटाएँ।”
     domain: "{{card}} is {{domains}}, outside your Legend's {{identity}}. Remove it.",
     // The Chosen Champion must be a Champion unit of the Legend's champion, e.g. "Darius, Trifarian isn't a Jinx Champion unit. Choose one that is."
+    // ar: Riftbound. Champion unit is وحدة بطل. Start in Arabic: "البطاقة {{card}} ليست وحدة بطل من {{champion}}. اختر وحدة مناسبة."
+    // hi: “{{card}} {{champion}} चैंपियन यूनिट नहीं है। सही चैंपियन यूनिट चुनें।”
     champion: "{{card}} isn't a {{champion}} Champion unit. Choose one that is.",
+    // ar: Riftbound. Champion unit is وحدة بطل. Start in Arabic: "البطاقة {{card}} ليست وحدة بطل. اختر وحدة مناسبة."
+    // hi: “{{card}} चैंपियन यूनिट नहीं है। सही चैंपियन यूनिट चुनें।”
     championUnit: "{{card}} isn't a Champion unit. Choose one that is.",
     // A deck holds at most 3 Signature cards in total.
+    // ar: Riftbound Signature cards are بطاقات التوقيع. Use a label so any number reads: "بطاقات التوقيع: {{have}}، والحد الأقصى {{max}}. أزل {{diff}}."
     signatureCount: "{{have}} Signature cards, at most {{max}}. Remove {{diff}}.",
+    // ar: Riftbound Signature card: بطاقة التوقيع. "البطاقة {{card}} هي بطاقة التوقيع لبطل آخر. أزلها."
     signatureChampion: "{{card}} is another champion's Signature card. Remove it.",
     // {{format}} is a format name, e.g. "Mana Crypt is banned in Commander. Remove it."
     banned: "{{card}} is banned in {{format}}. Remove it.",
@@ -578,12 +622,15 @@ const decks = {
   },
   play: {
     // Heading over the deck's versions. The player picks the one they bring to their next games.
-    bringing: "Bringing",
+    // ar: Heading over the deck version picker: "الإصدار الذي ستلعب به".
+    // ja: Heading over the versions; the player picks the one to use next: 使うバージョン. Never 持っていく.
+    bringing: "Playing next",
     results: "Results",
     // A recent game's opponents, named by their commanders or decks, e.g. "vs Atraxa, Krenko".
     versus: "vs {{opponents}}",
     startGame: "Start a game",
-    bringFailed: "Couldn't change the version you bring.",
+    // ja: Not a literal "bring": 使うバージョンを変更できませんでした。
+    bringFailed: "Couldn't change the version you'll play next.",
     // Where a recent game was played.
     source: {
       local: "Local",
@@ -592,11 +639,14 @@ const decks = {
     },
     // Heading over the cards swapped in and out for the match in progress.
     thisMatch: "This match",
+    // hi: The saved main deck before sideboarding: “बिना बदलाव वाला मेन डेक”.
+    // fr: Magic main deck: "Deck principal" ("Deck principal d’origine"), never Main Deck.
     asBuilt: "Main deck as built",
     // Under "Main deck as built", e.g. "60 cards · 15 in sideboard". {{cards}} is already counted, like "60 cards".
     asBuiltDetail: "{{cards}} · {{side}} in sideboard",
     // A card brought in from the sideboard (+2 Rest in Peace) or taken out of the main deck (−2 Searing Blaze) for this match.
     swapped: "{{count, signed}} {{card}}",
+    // ar: The sideboard swaps reset: "تُلغى التبديلات عند انتهاء المواجهة، ولا تتغير قائمتك."
     resetsNote: "Resets when the match ends. Your list doesn't change.",
     // Button: undo every swap for this match and play the deck as built.
     reset: "Reset",
@@ -618,6 +668,7 @@ const decks = {
     more: "Swap one more {{card}}",
     fewer: "Swap one fewer {{card}}",
     // Offered between games of a match, before the next game starts.
+    // fr: Adjust the sideboard before the next game: "Ajuster la réserve d’abord".
     first: "Sideboard first",
     // Under "Sideboard first", e.g. "Boros Burn · 15 in sideboard".
     firstDetail: "{{deck}} · {{side}} in sideboard",
@@ -648,9 +699,12 @@ const decks = {
     curve: "Mana curve",
     average: "Average {{value}}",
     lands: "Lands",
+    // ja: {{modal}} counts modal double-faced cards that can be played as lands; players say 両面: {{lands}} + 両面{{modal}}.
+    // fr: {{modal}} counts modal double-faced cards: "{{lands}} + {{modal}} cartes modales".
     landsWithModal: "{{lands}} + {{modal}} modal",
     suggested: "Suggested lands",
     range: "{{low}} to {{high}}",
+    // es: Use "Ramp", what Spanish-speaking deck builders say.
     ramp: "Ramp",
     cheapDraw: "Cheap card draw",
     colors: "Colors",
@@ -665,12 +719,14 @@ const decks = {
     },
     landDrops: "Land drop odds",
     // "On the play" means going first, with no draw on turn one.
+    // ja: No での before the verb clause: 先攻で土地を置ける確率.
     landDropsOnPlay: "Land drop odds on the play",
     turn: "Turn {{turn}}",
     openingHand: "Opening hand, keeping {{min}} to {{max}} lands",
     // Keep the opening hand of {{cards}} cards instead of taking a mulligan.
     keepHand: "Keep {{cards}}",
     mulligan: "Mulligan",
+    // fr: "Deux mulligans".
     mulliganTwice: "Mulligan twice",
     // "Free" means it costs no card, not free of charge.
     freeMulligan: "The first mulligan is free in this format.",
@@ -712,9 +768,12 @@ const decks = {
     inAccountLabel: "{{name}}, in your account",
     guestEmpty: "Save a deck on this device. No account needed.",
     dismissFilters: "Dismiss filters",
+    // ja: Game system means the game (Magic, Pokémon): ゲーム. Never システム.
     system: "System",
+    // ja: Game system means the game: すべてのゲーム. Never システム.
     allSystems: "All systems",
     format: "Format",
+    // fr: "System" is the game (Magic, Pokémon…): say jeu, never système (Aucun jeu; salon sans jeu choisi).
     chooseSystem: "Choose a system to filter by format.",
     clearFilters: "Clear filters",
     showDecks: "Show decks",
@@ -728,12 +787,13 @@ const decks = {
     changedBeforeDelete: "This deck changed elsewhere. Reload it before deleting.",
     reload: "Reload saved deck",
     deleteTitle: "Delete guest deck?",
-    cancelDelete: "Cancel delete guest deck?",
+    cancelDelete: "Keep this guest deck",
     deleteBody: "This removes the deck from this device.",
   },
   addDeck: {
     // Saved as the note on a deck imported from a website. {{source}} is the site, {{author}} the deck's author, {{url}} the deck's address on its own line.
     importedNote: "Imported from {{source}}\n{{url}}",
+    // es: {{author}} built the deck; they did not import it. Use "Importado desde {{source}}, mazo de {{author}} {{url}}".
     importedNoteBy: "Imported from {{source}} by {{author}}\n{{url}}",
     modeBrowse: "Browse",
     modeImport: "Import",
@@ -748,6 +808,7 @@ const decks = {
     saveLocalFailed: "Could not save deck locally",
     loadDecksFailed: "Could not load decks",
     previewFailed: "Could not load this deck",
+    // ko: 'matching' means matching card names: '카드 이름을 맞춘 뒤 {{card}}이(가) {{max}}장을 넘습니다. 원본을 수정한 후 다시 시도하세요.'
     overflowAfterMatch:
       "{{card}} has more than {{max}} copies after matching. Correct the source and try again.",
     linkFailed: "Could not load this deck. Try again or paste its text export.",
@@ -760,12 +821,17 @@ const decks = {
     pasteList: "Paste a list",
     viewOn: "View on {{source}}",
     // {{source}} is the deck website; {{author}} made the deck.
+    // hi: “{{source}} पर देखें ({{author}} का डेक)”.
+    // es: {{author}} built the deck. Use "Ver en {{source}} (mazo de {{author}})".
     viewOnBy: "View on {{source}} by {{author}}",
     openFailed: "Could not open {{source}}.",
     nameRequired: "Add a deck name.",
     datedExample: "Dated example. Cards may no longer be legal in this format.",
     openSourceFailed: "Could not open the deck source.",
     viewSource: "View source deck",
+    // ar: Top Deck is the same feature as errors:deckProviderUnavailable. Write "جارٍ تحميل أفضل المجموعات".
+    // ko: Top Decks is 인기 덱: '인기 덱 불러오는 중'.
+    // Top Decks are decks that placed well in recent tournaments. A feature, not a service name.
     loadingTopDeck: "Loading Top Deck",
     openDeck: "Open {{card}}",
     saveDeckOnDevice: "Save deck on this device",
@@ -775,10 +841,12 @@ const decks = {
     loadingOfficial: "Loading official card list",
     previewUnavailable: "Preview unavailable",
     browseOffline: "You're offline. Decks will load when you reconnect.",
+    // es: Singular form: "Actualización disponible en {{count}} segundo. Los resultados guardados siguen disponibles."
     rateLimited_one: "Refresh available in {{count}} seconds. Saved results remain available.",
     rateLimited_other: "Refresh available in {{count}} seconds. Saved results remain available.",
     refreshFailed: "Could not refresh decks. Saved results remain available.",
     checkAgain: "Check again",
+    // hi: “कहाँ से शुरू करें”, not the geometry term शुरुआती बिंदु.
     startingPoint: "Starting point",
     importSource: "Import source",
     pasteText: "Paste text",
@@ -797,6 +865,7 @@ const decks = {
     listHelperLorcana: 'Use lines like "4 Aladdin - Heroic Outlaw".',
     // Card names and quoted examples are parser input; keep them in English exactly.
     listHelperFab: 'Paste a Fabrary card list or lines like "3x Snatch (red)".',
+    // Card names, quoted examples and section headings are parser input; keep them in English exactly.
     listHelperRiftbound:
       'Use lines like "3 Pouty Poro" under headings like Legend, Main Deck, Battlefields, and Runes.',
     returnToDeck: "Return to deck",
@@ -823,15 +892,18 @@ const decks = {
     useFailed: "Could not add {{card}}. Try again.",
   },
   saveTo: {
+    // hi: Heading over a choice of Account or This device, not a button: “कहाँ सेव करें”.
     label: "Save to",
     account: "Account",
     // Free and Pro limits differ, so the count always comes from the player's real limit.
     left: "{{left}} of {{limit}} left",
+    // ja: The synced deck slots are used up: 上限 · {{used}}/{{limit}}同期済み. Never 満杯.
     full: "Full · {{used}} of {{limit}} synced",
     checking: "Checking room…",
     offline: "Offline",
     freeSlot: "Free a slot",
     device: "This device",
+    // ko: An option description, not an order: '이 기기에만 저장됩니다. 나중에 동기화할 수 있습니다.'
     deviceDetail: "Only here. Sync it later.",
   },
   saveStatus: {
@@ -852,6 +924,7 @@ const decks = {
     title: "Shared deck",
     play: "Play this deck",
     addToMine: "Add to my decks",
+    // hi: “यह डेक अब शेयर नहीं हो रहा।”
     unavailable: "This deck is no longer shared.",
   },
 }

@@ -1,4 +1,6 @@
 const systems = {
+  // ja: Game system means the game: ゲーム未設定. Never システム.
+  // fr: "System" is the game (Magic, Pokémon…): say jeu, never système (Aucun jeu; salon sans jeu choisi).
   noSystem: "No system",
   // A game's short name, as its players know it in your language.
   gameName: {
@@ -36,11 +38,11 @@ const systems = {
   },
   // The product a Planechase or Archenemy deck came in. Use its name in your language only if it was sold in your language.
   modeProduct: {
-    pc09: "Planechase (2009)",
-    pc12: "Planechase 2012",
+    pc09: "Planechase ({{year}})",
+    pc12: "Planechase {{year}}",
     moc: "March of the Machine Commander",
     who: "Doctor Who Commander",
-    arc: "Archenemy (2010)",
+    arc: "Archenemy ({{year}})",
     e01: "Archenemy: Nicol Bolas",
   },
   // Magic supertypes and card types, as printed on cards in your language.
@@ -132,6 +134,7 @@ const systems = {
     // Magic: experience counters a player gains. Use Magic's official term.
     experience: "Experience",
     // Riftbound: experience points a player earns. Use Riftbound's official term or abbreviation.
+    // ar: Riftbound experience points. Write "نقاط الخبرة", not XP.
     xp: "XP",
     commanderTax: "Commander tax",
     monarch: "Monarch",
@@ -152,23 +155,31 @@ const systems = {
     hero: "Hero",
     arena: "Arena",
     // Riftbound: the deck's Legend card, which sets its two domains.
+    // ar: Riftbound deck section. Write "الأسطورة", the same word the deck warnings use.
+    // ko: Riot's Korean term: '전설'.
     legend: "Legend",
     // Riftbound: the champion unit that starts the game on the table.
+    // ar: Riftbound deck section. Write "البطل المختار"; deck warnings call the card وحدة بطل.
+    // ko: Riot's Korean term: '선발 챔피언'.
     champion: "Chosen Champion",
+    // ko: Riot's Korean term: '전장'. 배틀 필드 is Pokémon's Active Spot.
     battlefields: "Battlefields",
     runes: "Rune deck",
     main: {
+      // fr: Magic main deck: "Deck principal" ("Deck principal d’origine"), never Main Deck.
       mtg: "Main deck",
       ygo: "Main Deck",
       pokemon: "Deck",
       lorcana: "Deck",
       fab: "Deck",
+      // ko: Riot's Korean term: '주 덱'.
       riftbound: "Main deck",
     },
   },
   // Headings in Magic card search filters.
   cardFilter: {
     // Heading over the formats a searched card must be legal in.
+    // hi: Format legality: “इनमें लीगल”, not मान्य.
     format: "Legal in",
     // Heading over card types (Creature, Instant) and supertypes (Legendary, Basic, Snow).
     type: "Type",
@@ -185,13 +196,19 @@ const systems = {
   formatBlurb: {
     mtg: {
       commander: "{{cards}} cards, singleton",
+      // ar: "Sets" are printed card sets: "التوسعات الحديثة". Never المجموعات, the deck word.
       standard: "Recent sets",
+      // hi: Set name in Devanagari: “रिटर्न टू रैवनिका से आगे”.
       pioneer: "Return to Ravnica forward",
+      // ar: Eighth Edition is a Magic set. Write "من الإصدار الثامن فصاعدًا", no digits or Latin.
+      // hi: “8वें एडिशन से आगे”.
       modern: "8th Edition forward",
+      // ar: "Sets" are printed card sets: "كل التوسعات تقريبًا". Never المجموعات, the deck word.
       legacy: "Nearly every set",
       vintage: "Restricted list",
       pauper: "Commons only",
       brawl: "{{cards}} cards, singleton",
+      // ar: Write the two Limited formats in Arabic script: "درافت وسيلد".
       limited: "Draft and sealed",
       constructed: "Anything else",
     },
@@ -238,6 +255,8 @@ const systems = {
     fab_one: "{{count}} life change",
     fab_other: "{{count}} life changes",
     riftbound_one: "{{count}} point change",
+    // ko: Counts changes, not points: '점수 변경 {{count}}회', like the other games.
+    // ja: A count of changes, like the other games: ポイント変動{{count}}回.
     riftbound_other: "{{count}} point changes",
   },
   // Pokémon only: no Prize cards taken yet.

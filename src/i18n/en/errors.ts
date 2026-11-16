@@ -9,8 +9,11 @@ const errors = {
   deckGameImmutable: "Create a new deck to change game systems",
   deckListTooLarge: "Deck list is too large",
   deckNotFound: "Deck not found",
+  // Top Decks are decks that placed well in recent tournaments. A feature, not a service name.
   deckProviderUnavailable: "Top Decks are temporarily unavailable",
   deckRequired: "This lobby requires every player to choose a deck",
+  // ja: Game system means the game: ゲーム未設定のロビーでは、デッキを必須にできません.
+  // fr: "System" is the game (Magic, Pokémon…): say jeu, never système (Aucun jeu; salon sans jeu choisi).
   deckRequirementNotSupported: "Decks cannot be required for a system-less lobby",
   deckSelectionNotAllowed: "Decks can only be selected in a lobby",
   detailsBatchTooLarge: "Too many cards requested at once",
@@ -18,6 +21,7 @@ const errors = {
   forbidden: "Game unavailable",
   // A lobby is the waiting room where players join before a connected game starts.
   gameFull: "Lobby is full",
+  // hi: “Game membership” means being one of this game's players, not a paid plan; never सदस्यता: “आप इस गेम में शामिल नहीं हैं”.
   gameMembershipRequired: "Game membership required",
   gameNotActive: "Game is not active",
   gameNotFound: "Game not found",
@@ -52,6 +56,7 @@ const errors = {
   seatTaken: "Seat already claimed",
   syncOwnerChanged: "The signed-in account changed",
   // Attempts to join a connected game, not to sign in.
+  // hi: Joining is शामिल होना, never जोड़ना (to add): “शामिल होने की बहुत ज़्यादा कोशिशें हो गईं; एक मिनट रुककर फिर कोशिश करें”.
   tooManyJoinAttempts: "Too many join attempts; wait a minute and try again",
   unauthenticated: "Authentication required",
   updateRequired: "Update Scryve to join this game",

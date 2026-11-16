@@ -2,31 +2,66 @@
   "rules": {
     "es": [
       "Address the player as tú, never usted or vosotros.",
-      "Use neutral Spanish that reads naturally in both Spain and Latin America: teléfono (not móvil or celular), mantén presionado, escribe (not introduce or ingresa).",
-      "Strings with {{amount}} have no plural forms. Phrase them so they read for any number, e.g. \"Sumar {{amount}} a las vidas\"."
+      "Use neutral Spanish that reads naturally in both Spain and Latin America: teléfono (not móvil or celular); mantén presionado (never mantén pulsado); escribe / escribir for typing a name or code (never introduce, introducir or ingresa).",
+      "A number placeholder with no _one/_other keys ({{amount}}, {{count}}, {{delta}}…) must read for any number: put it after a colon or in parentheses, or after a noun that does not agree with it. E.g. \"Sumar {{amount}} a las vidas\", \"Cartas de Premio tomadas: {{amount}}\", \"un cambio de vidas ({{delta}})\". Never write \"(s)\" plurals.",
+      "Placeholders such as {{shape}}, {{section}}, {{card}} and {{filter}} can be any gender or number. Never make an article or adjective agree with them; rephrase instead (\"{{shape}}, ya en uso\", \"Mínimo de {{filter}}\", \"una copia más de {{card}}\").",
+      "The tú imperative often matches the third person (termina, empieza). When a sentence says what the app or game will do, give it a subject or use the future so it cannot read as an order: \"Tu partida terminará sin resultado\".",
+      "Quote labels, names and search text with « »; keep straight quotes only in examples of text the player types or pastes.",
+      "Game, format, variant, card type and product names: use exactly the mapping in the terms. Spanish card and rules wording wins over a literal translation (coste, tirar un dado, rival)."
     ],
-    "fr": ["Address the player as vous."],
+    "fr": [
+      "Address the player as vous. Instructions use the vous imperative (Touchez, Réessayez). Buttons and menu actions use the infinitive (Enregistrer, Terminer la partie), never a bare noun such as Fin.",
+      "Use the publisher's official French term or name whenever one exists, otherwise what French players say. Leave English only where the glossary keeps it, in quoted parser examples, and in app or product names (Pokémon TCG Live, Fabrary, Limitless).",
+      "Typography: a narrow no-break space (U+202F) before ; : ! ? and inside « », never a plain space. Quote with « », never straight quotes, including around English parser examples (the text inside stays exactly as written). Use one apostrophe everywhere: ’ (U+2019). Use … as one character.",
+      "Sentence case for titles, buttons and labels (Nouvel événement, not Nouvel Événement). Glossary terms that carry a capital keep it (Banc, Pokémon Actif, Récompense, Lore).",
+      "Never write (s), (e) or ils/elles shortcuts. When a count placeholder has no plural forms, or a placeholder's gender is unknown, put the label first: « Ajoutées : {{count}} », « Carte retirée : {{card}} ».",
+      "A card name ({{card}}) takes feminine agreement, as « la carte » (est bannie, Retirez-la). Keep the same gender for one placeholder across a whole sentence.",
+      "Keep buttons, chips and badges about as short as the English. Prefer the plain everyday word to a literal calque."
+    ],
     "hi": [
-      "Write in Devanagari script, and address the player with आप forms.",
-      "Game terms are the English words written in Devanagari, the way Indian players say them. Never leave a game term in Latin script; only brand names, format names and Pokémon stay Latin.",
-      "Spelling: nukta on फ़ and ज़ in English loanwords (लाइफ़, फ़ॉर्मैट), never on क, ख, ग. Chandrabindu in एँ endings (जाएँ, हटाएँ). ॉ for the English \"o\" in draw, toss, lobby (ड्रॉ, टॉस, लॉबी); ै for the \"a\" in damage (डैमेज).",
-      "Gender: लाइफ़, सीट, लॉबी and सेटिंग are feminine; लाइफ़ पॉइंट, प्राइज़ कार्ड, डैमेज, लोर, गेम, मैच, खाता and डिवाइस are masculine."
+      "Write in Devanagari and address the player as आप. Other players named in a string take honorific plural verbs: {{name}} पहले खेलेंगे, {{name}} प्राइज़ कार्ड लेते हैं.",
+      "Write game, format, variant, card type, set, deck product and rules document names in Devanagari the way Indian players say them: मैजिक, पोकेमॉन, कमांडर, क्रिएचर, प्लेनचेस, कॉम्प्रिहेंसिव रूल्स. When an English note says to keep an official name or term, keep that term but write it in Devanagari.",
+      "Latin script stays only where a player has to match or type it exactly: Scryve and its plans (Scryve Pro, Foil, Foil Supporter); platform, store and outside service names (Apple, Google Play, App Store, iPhone, Android, Scryfall, Pokémon TCG Live, MTGO); Wi-Fi, QR, ID, AI, URLs and email addresses; abbreviations printed on cards or used by tournament software (HP, DMG, XP, d6, Bo{{bestOf}}, R{{round}}, 2HG, 2v2, OMW, GW, OGW, OOMW, SoS, and W-L-D only as a standings column header); and anything the deck importer reads (card names, section headers such as Main Deck or Sideboard, YYYY-MM-DD).",
+      "Everyday register: write UI Hindi the way people talk, not textbook or government Hindi. Where players and Indian apps use the English word, write it in Devanagari (सेव, एडिट, अनडू, शेयर, इनवाइट, मैनेज, सब्सक्रिप्शन, हिस्ट्री, लोकल); elsewhere use plain spoken Hindi (बाकी, देखें, सबसे नया, इंतज़ार, खत्म, चालू). Avoid लंबित, विफल, समीक्षा, नवीनतम, पात्रता, प्रमाणीकरण, प्रतीक्षा, संपादित, सहेजें, पूर्ववत, आमंत्रण, प्रतिद्वंद्वी, नवीनीकरण, प्रबंधित, सक्रिय, स्थानीय, and समाप्त (except for an expired session or invite).",
+      "Build each sentence the way a Hindi speaker would say it, not in English clause order. Keep short labels and badges as short as the English; a label that names a thing or a status takes no करें.",
+      "Use these words every time: फ़्री for free (never मुफ़्त); नतीजा for a result (never रिज़ल्ट); पुष्टि for confirm (never कन्फ़र्म); आयोजक for the event organizer; चालू for a game in progress; सेटिंग for Settings, the app's or the phone's (never सेटिंग्स or Latin); गोपनीयता नीति for the Privacy Policy, गोपनीयता for privacy; डेक लिस्ट / लिस्ट for a deck's card list (never सूची); मैन्युअल / मैन्युअली; इंपोर्ट; डाइस and रोल करें (never पासा or फेंका); कलर for a Magic card's color, कलरलेस for colorless (color names like सफ़ेद, नीला and player colors stay रंग); लीगल / बैन for format legality (मान्य means valid); निशान for a player's mark (रंग और निशान); खिलाड़ी for player (never प्लेयर); शामिल होना for joining (never जोड़ना, which means to add).",
+      "When running text names a screen, tab, heading or button, quote it with “ ” and copy the exact label that screen shows (“सहायता”, “खेलें” टैब).",
+      "Spelling: nukta on फ़ and ज़ in English loanwords (लाइफ़, फ़ॉर्मैट, फ़ोकस, फ़्री); never on क, ख, ग, including Urdu-origin words (आखिरी, तारीख, खराब, खत्म). Chandrabindu, never bindu, in एँ endings and words that take it (जाएँ, हटाएँ, हो जाएँगे, पहुँच, जाँचें, यहाँ). ॉ for the English \"o\" in draw, toss, lobby (ड्रॉ, टॉस, लॉबी); ै for the \"a\" in damage (डैमेज).",
+      "Gender: लाइफ़, सीट, लॉबी, सेटिंग, स्टैंडिंग, हिस्ट्री, लिस्ट, ग्रिड, पावर, भूमिका, चिप, रूलिंग, पेयरिंग and स्कीम are feminine; लाइफ़ पॉइंट, प्राइज़ कार्ड, डैमेज, लोर, गेम, मैच, टर्न, मुलिगन, इवेंट, खाता, डिवाइस, क्लॉक, स्लॉट, इनवाइट, सब्सक्रिप्शन and फ़ीडबैक are masculine."
     ],
     "ja": [
       "Messages use です/ます. Buttons and labels use plain verbs or nouns.",
-      "Write format names in the publishers' katakana: コマンダー, スタンダード, パイオニア, モダン, レガシー, ヴィンテージ, パウパー, ブロール, リミテッド, ラッシュデュエル, クラシック, ブリッツ, シルバーエイジ, リビングレジェンド, アルティメット・ピットファイト, コア. Keep any other format name in English.",
-      "The Pokémon card noun is ポケモン; keep Pokémon in Latin only for the brand (Pokémon TCG)."
+      "Use the publisher's Japanese name for every game, format, variant, product and card term (see the glossary). Where no Japanese name exists, write it in katakana, never Latin. Latin stays only for Scryve and its plans (Pro, Foil), other brands and services (Apple, Google Play, Scryfall, Top Deck, Fabrary, Pokémon TCG Live), Wi-Fi, HP, LP, ID, and anything a note marks as parser input.",
+      "Pokémon is ポケモン and the card game is ポケモンカードゲーム (short ポケカ). Never write Pokémon in Latin outside the product name Pokémon TCG Live.",
+      "Never add さん, 様 or any honorific after a player placeholder ({{name}}, {{taker}}, {{names}}): {{name}}が先攻です.",
+      "Punctuation is full-width: 、。「」？！：（）〜. Digits and Latin letters are half-width. Put no space between a placeholder, number or Latin word and Japanese text ({{elapsed}}前に更新, Scryveのサポート). Keep the English · separator, with a space on each side.",
+      "Counters: cards 枚, players 人, distinct cards in a deck 種類 (never エントリー or 件), times 回.",
+      "Strings that differ only by game (…mtg, …pokemon, …riftbound) share one Japanese pattern and change only the game's noun.",
+      "Leave out あなた and あなたの wherever Japanese drops the subject; a \"Your X\" label is 自分のX or just X."
     ],
     "ko": [
-      "Statements use 합니다체, instructions -하세요, confirmations -할까요?. Never 해요체.",
-      "Write Magic format names as Wizards Korea does: 커맨더, 스탠다드, 파이어니어, 모던, 레거시, 빈티지, 파우퍼, 난투 (Brawl). Keep other formats in English.",
-      "The Pokémon card noun is 포켓몬 (배틀 포켓몬); keep Pokémon in Latin only for the brand (Pokémon TCG)."
+      "Statements, descriptions and errors use 합니다체. Instructions end in -하세요, retry included (다시 시도하세요), never -해 주세요. Confirmations end in -할까요?. Questions to the player may end in -나요 or -인가요 (누가 이겼나요?, 누구 턴인가요?); never -입니까, and no other 해요체 (-예요, -이에요, -해요).",
+      "Buttons, menu items, labels, headings and screen-reader action names end in a noun phrase or -기 (저장, 계속 스캔, {{name}}님을 선공으로 표시), never -하세요 or a question. Statuses end in -됨 or -중 (확정됨, 등록 중).",
+      "A player's name always takes 님, attached with no space ({{name}}님이, {{name}}님의, {{names}}님). Never after Pokémon, card, deck, team or seat names.",
+      "After a name or word placeholder use the fallback particles 이(가), 을(를), 은(는), 과(와), (으)로; never (이)가. Never attach a particle to {{code}}, {{value}} or another number or code: put it after a colon or at the end (참가 코드: {{code}}).",
+      "Write every game, format, variant, card type, product and game term in Hangul: the publisher's Korean name where one exists, else what Korean players say (see terms). When an English note says to keep an official term, it means the official Korean term, not the English word.",
+      "Latin script only for: Scryve, Scryve Pro and Pro, Wi-Fi, HP, FaB, QR, ID, vs, the OMW/OGW tiebreakers, store and platform names (Apple, Google Play, iPhone, Android), English-only product and file names (Pokémon TCG Live, Fabrary, YDK), the English-only Planechase and Archenemy deck names, and anything a note marks as parser input.",
+      "Strings that differ only by game (keys ending .mtg, .ygo, .riftbound and so on) share one Korean pattern; only the counter word changes (생명점, 라이프 포인트, 프라이즈, 로어, 점수).",
+      "Translate the meaning, not the words: write what a Korean app would say, and keep the English choices intact (an \"or\" stays a choice, never \"and then\")."
     ],
     "ar": [
       "Write Modern Standard Arabic that reads naturally across the Arab world. Prefer phrasing that avoids grammatical gender for the player (nouns, يمكنك); where an imperative is needed, use the masculine singular, the usual UI convention.",
-      "Game, format, and product names stay in Latin script as the system prompt lists. Never transliterate them into Arabic letters.",
-      "Strings with {{amount}} have no plural forms. Phrase them so they read for any number.",
-      "Plural slots: the counted noun agrees with the number category, so each form differs. one: singular (1 بطاقة). two: dual (2 بطاقتين, 2 مباراتين). few (3-10): plural (3 بطاقات, 3 مباريات, 3 أدوار). many (11-99): singular with tanween (11 بطاقةً, 11 دورًا). zero and other (0, 100+): singular (100 بطاقة). Never copy one form into every slot."
+      "Write every game, format, variant, card type and product name in Arabic script, as the glossary lists it (ماجيك، بوكيمون، يوغي يو!، كوماندر، القياسي). Latin stays only for: Scryve and its plans (Scryve Pro, Pro, Scryve Foil; Supporter is داعم), Riftbound and its proper nouns such as domain names (Riot's Arabic pages keep them in Latin), card names, other companies' apps, sites and platforms (Apple, Google Play, iPhone, Android, Pokémon TCG Live, Scryfall, YGOPRODeck, Limitless), Wi-Fi, QR, file formats (YDK, YDKe), dice notation (d6, d20), and parser input that a note says to keep (sample lines, import headings). Where an English note says to keep an English name, still use the Arabic name when the glossary gives one.",
+      "Start every string with an Arabic word so the line stays right to left. Put Latin names and name placeholders ({{name}}, {{card}}) after an Arabic noun: تطبيق Scryve مستقل، اشتراك Scryve Pro مرتبط بحساب، البطاقة {{card}} محظورة. When no sentence fits, use \"Arabic label: {{name}}\" (المتقدّم في نقاط الحياة: {{name}}).",
+      "Never put a gendered verb on a named player. In log rows and status lines, use a verbal noun with the player as its agent (رمية {{name}}: {{face}}، انتقال {{name}} إلى {{plane}}، تفعيل {{name}} للمخطط {{scheme}}) or make the thing the subject (تذهب بطاقات الجائزة إلى {{taker}}).",
+      "Never type digits. Numbers come only from placeholders; write one and two as words or with the dual. The only exceptions are digits inside an official product name (بلان تشاس ٢٠١٢, in Arabic-Indic digits), dice notation, and parser input.",
+      "A number placeholder without plural forms ({{amount}}, {{limit}}, {{used}}, {{length}}, {{wins}}…) must read for any number. Never put an inflecting noun right after it, and never put it before a definite noun. Use a label and colon (المجموعات المتزامنة: {{used}} من {{limit}}، مستمرة: {{count}}), عدد with a plural (عدد اللاعبين: {{count}}، أدخل الرمز (عدد أحرفه {{length}})), or a preposition (إضافة {{step}} إلى {{label}}). Never \"{{count}} لاعبين\" or \"{{length}} من الأحرف\".",
+      "Plural slots: the counted noun follows the number category, so every slot differs. one: singular with واحد/واحدة and no number (بطاقة واحدة). two: the dual with no number, nominative when it stands alone (بطاقتان، مباراتان، مقعدان، يومان), genitive only after a preposition or verb object (خلال ساعتين، أضف بطاقتين), and without ن before a following noun (بطاقتا جائزة / بطاقتَي جائزة). few (3-10): {{count}} with the plural (بطاقات، مباريات، أيام). many (11-99): {{count}} with the singular and tanween (بطاقةً، دورًا، يومًا). zero and other: {{count}} with the singular (بطاقة). Never copy one form into every slot.",
+      "Touch gestures have one verb: tap is اضغط (اضغط على شارة الدور), long press and hold are اضغط مطولًا. Never المس.",
+      "Keep each Arabic word to one job: مجموعة is only a deck, الدور only a turn, نسخة only a copy (of a card, or this device's copy of a deck), مباراة only one game, لعبة only a game system (Magic, Pokémon). Use the glossary term for the other meaning (توسعة، هوية، إصدار).",
+      "متصل alone means online right now. For Scryve's connected play, attach متصلة only to مباراة or مباريات (لوحة المباراة المتصلة، سجل المباريات المتصلة); connected play: اللعب عبر الأجهزة; offline: دون إنترنت.",
+      "A one-word button must be clear on its own. A bare verbal noun that also reads as a thing (وضع = mode، إدخال = input، التمرير = scrolling) needs its object or an imperative: ضعه، تمرير الدور.",
+      "No Latin abbreviations and no invented Arabic ones (Bo3, v2, ي for days). Write the words: الأفضل من {{bestOf}}، الإصدار {{version}}. د for minutes is fine in tight labels."
     ]
   },
   "terms": {
@@ -37,7 +72,7 @@
       "hi": "लाइफ़ (की लाइफ़)",
       "ja": "ライフ",
       "ko": "생명점 (생명 3점, 생명점 40)",
-      "ar": "نقاط الحياة. Heading: الحياة. Counted: 20 نقطة حياة."
+      "ar": "نقاط الحياة everywhere, including logs, controls and team totals (سجل نقاط حياة {{name}}، تغيير في نقاط الحياة، أدوات التحكم بنقاط الحياة، نقاط حياة الفريق). Bare الحياة only as a standalone heading, never inside a phrase, where it reads as a person's life. Counted: نقطة حياة, following the plural rules"
     },
     "Yu-Gi-Oh! Life Points": {
       "en": ["Life Points"],
@@ -46,21 +81,21 @@
       "hi": "लाइफ़ पॉइंट",
       "ja": "ライフポイント (LP in tight labels)",
       "ko": "라이프 포인트 (LP in tight labels)",
-      "ar": "LP, invariant (8000 LP)"
+      "ar": "نقاط الحياة, the same as Magic life (نقاط الحياة النهائية; counted: نقطة حياة). Heading: الحياة. Never LP"
     },
     "deck": {
       "en": ["deck"],
-      "es": "mazo",
+      "es": "mazo for Magic, Lorcana, Flesh and Blood, Riftbound and decks in general (con este mazo, Mazo o comandante); Pokémon: baraja (the Pokémon deck section: Baraja); Yu-Gi-Oh!: Deck. Never \"deck\" outside Yu-Gi-Oh!",
       "fr": "deck, masculine (le deck, ce deck; plural decks)",
       "hi": "डेक",
-      "ja": "デッキ",
-      "ko": "덱 (내 덱, 덱 {{count}}개)",
-      "ar": "مجموعة (مجموعة أوراق when ambiguous)"
+      "ja": "デッキ; take a card out of a deck: 外す (デッキから外す, 外してください), never 削除 or 取り除く; lower a count: 減らす",
+      "ko": "덱 (내 덱, 덱 {{count}}개); a deck's card list: 덱 리스트 (short 리스트); 목록 only for other UI lists",
+      "ar": "مجموعة (مجموعة أوراق when ambiguous). Only for a deck: a printed card set is توسعة, a group of event tables is طاولة جماعية, a deck version is إصدار"
     },
     "Yu-Gi-Oh! deck sections": {
       "en": ["Main Deck", "Extra Deck", "Side Deck"],
       "es": "Deck Principal, Deck Extra, Side Deck. A Yu-Gi-Oh! deck is Deck, never mazo.",
-      "fr": "Main Deck, Extra Deck, Side Deck (untranslated)",
+      "fr": "Yu-Gi-Oh! only: Main Deck, Extra Deck, Side Deck (Konami’s French names). A Magic or Riftbound main deck is deck principal (label: Deck principal), never Main Deck.",
       "hi": "मेन डेक / एक्स्ट्रा डेक / साइड डेक",
       "ja": "メインデッキ / エクストラデッキ / サイドデッキ",
       "ko": "메인 덱 / 엑스트라 덱 / 사이드 덱",
@@ -69,7 +104,7 @@
     "Magic sideboard": {
       "en": ["sideboard"],
       "es": "sideboard (never banquillo)",
-      "fr": "Side Deck (le Side Deck; en Side Deck); import heading stays Sideboard",
+      "fr": "réserve (la réserve; en réserve; label: Réserve; 15 en réserve). Swapping cards between games: ajuster la réserve. Magic main deck: deck principal. Side Deck and Main Deck are Yu-Gi-Oh! words only. Import headings quoted as parser input (Mainboard, Sideboard) stay as written.",
       "hi": "साइडबोर्ड (short: साइड; main deck: मेन डेक, short: मेन)",
       "ja": "サイドボード (counted: サイドボード{{count}}枚)",
       "ko": "사이드보드 (short: 사이드; to sideboard: 사이드보딩)",
@@ -82,7 +117,7 @@
       "hi": "प्राइज़ कार्ड (take: लेना; give back: लौटाना)",
       "ja": "サイド (never サイドカード; counted サイド{{count}}枚); take: とる (サイドをとる)",
       "ko": "프라이즈 (counted 프라이즈 {{count}}장; never 사이드). Take: 프라이즈를 가져오다 / 가져가다",
-      "ar": "Pokémon Prize cards: بطاقات الجائزة; take a Prize card: أخذ بطاقة جائزة"
+      "ar": "بطاقات الجائزة (singular بطاقة جائزة) everywhere, including headings and counts (بطاقات الجائزة المأخوذة: {{amount}}، لم تُؤخذ أي بطاقة جائزة); take a Prize card: أخذ بطاقة جائزة. Never bare الجوائز"
     },
     "Pokémon Knocked Out": {
       "en": ["Knocked Out"],
@@ -96,18 +131,18 @@
     "Active Pokémon / Active Spot": {
       "en": ["Active"],
       "es": "Pokémon Activo / Puesto Activo",
-      "fr": "Pokémon Actif (mettre Actif, revient en Pokémon Actif)",
-      "hi": "ऐक्टिव Pokémon; the spot: ऐक्टिव (ऐक्टिव में लौटता है)",
-      "ja": "バトルポケモン; the spot: バトル場",
-      "ko": "배틀 포켓몬 (spot: 배틀필드)",
-      "ar": "البوكيمون النشط"
+      "fr": "Pokémon Actif (mettre Actif, revient en Pokémon Actif). Switch a Benched Pokémon with the Active one: échanger (button: Échanger), never faire entrer.",
+      "hi": "ऐक्टिव पोकेमॉन; the spot: ऐक्टिव (ऐक्टिव में लौटता है)",
+      "ja": "バトルポケモン; the spot: バトル場; put a Pokémon into play: 出す (バトル場に出す), never 置く or 配置",
+      "ko": "배틀 포켓몬 (spot: 배틀 필드, with a space)",
+      "ar": "the Pokémon: البوكيمون النشط; the place on the board: الموضع النشط (يعود إلى الموضع النشط). Placing one: ضع بوكيمون نشطًا, never a bare وضع; none there: بلا بوكيمون نشط"
     },
     "Bench": {
       "en": ["Bench"],
       "es": "Banca, capital B (en la Banca)",
       "fr": "Banc",
       "hi": "बेंच",
-      "ja": "ベンチ / ベンチポケモン",
+      "ja": "ベンチ / ベンチポケモン; put one there: ベンチに出す",
       "ko": "벤치 / 벤치 포켓몬",
       "ar": "دكة الاحتياط"
     },
@@ -116,9 +151,9 @@
       "es": "PS",
       "fr": "PV",
       "hi": "HP, in Latin script ({{remaining}} HP बचे)",
-      "ja": "HP, number after: HP{{hp}}, 残りHP{{remaining}}",
+      "ja": "HP, number after: HP{{hp}}, 残りHP{{remaining}}; heal: HPを{{amount}}回復 (never ダメージを回復)",
       "ko": "HP, in Latin (HP {{hp}}, HP {{remaining}} 남음)",
-      "ar": "HP"
+      "ar": "نقاط الصحة; with numbers use a label (نقاط الصحة المتبقية: {{remaining}} من {{hp}}); short unit chip: الصحة. Never HP"
     },
     "damage (Pokémon, Yu-Gi-Oh!, Magic)": {
       "en": ["damage"],
@@ -136,30 +171,30 @@
       "hi": "लोर",
       "ja": "ロア, number first: {{count}}ロア",
       "ko": "로어",
-      "ar": "Lore, kept in Latin (20 Lore)"
+      "ar": "الأسطورة as a heading; نقاط الأسطورة in phrases (المتقدّم في نقاط الأسطورة، نقاط الأسطورة النهائية); counted: نقطة أسطورة. Never Lore"
     },
     "commander, commander damage, commander tax": {
       "en": ["commander"],
       "es": "commander (the card): comandante. Commander damage: daño de comandante. Commander tax: impuesto de comandante",
-      "fr": "commander (the card): commandant. Commander damage: blessures de commandant (subies, infligées). Commander tax: taxe de commandant",
+      "fr": "commander (the card): commandant. Commander damage: blessures de commandant (subies, infligées). Assign it: attribuer des blessures de commandant infligées par {{identity}}, never assigner. Commander tax: taxe de commandant. Commander power: force (see power).",
       "hi": "the card: कमांडर; commander damage: कमांडर डैमेज; commander tax: कमांडर टैक्स",
-      "ja": "統率者; commander damage: 統率者ダメージ (never コマンダーダメージ); commander tax: 統率者税",
-      "ko": "커맨더 (card and format; never 사령관). Damage: 커맨더 피해. Tax: 커맨더 세금 (label 세금)",
-      "ar": "commander (the card): القائد; commander damage: ضرر القائد; commander tax: ضريبة القائد"
+      "ja": "the card: 統率者; the format: コマンダー; commander damage: 統率者ダメージ (never コマンダーダメージ); assign or record it: 記録する (統率者ダメージを記録), never 設定 or 割り当て; commander tax: 統率者税; can be a commander: 統率者にできる; legal in Commander: コマンダーで使える (never 適格性 or リーガル)",
+      "ko": "커맨더 (card and format; never 사령관). Damage: 커맨더 피해, always counted with 점 (커맨더 피해 {{damage}}점). Tax: 커맨더 세금 (label 세금)",
+      "ar": "the card: القائد; commander damage: ضرر القائد; commander tax: ضريبة القائد; the format: كوماندر"
     },
     "the Monarch, and giving it up": {
       "en": ["Monarch"],
       "es": "Monarca; give up: renunciar a (Renunciar a {{label}})",
-      "fr": "Monarque (devenir le monarque). Give up the Monarch or Initiative: retirer",
+      "fr": "monarque (label: Monarque; devenir le monarque). Give up: céder (céder le monarque), never retirer, which is Remove.",
       "hi": "मोनार्क; give up: छोड़ें",
-      "ja": "統治者; give up: 手放す ({{label}}を手放す)",
-      "ko": "모나크 (never 군주); give up: 포기",
+      "ja": "統治者; become it: 統治者になる (never 統治者を得る); give up: 手放す ({{label}}を手放す)",
+      "ko": "군주 (become the monarch: 군주가 되다); give up: 포기. Never 모나크",
       "ar": "الملك"
     },
     "the Initiative, and giving it up": {
       "en": ["Initiative"],
       "es": "Iniciativa; give up: renunciar a (Renunciar a {{label}})",
-      "fr": "Initiative (the designation, not first strike). Give up the Monarch or Initiative: retirer",
+      "fr": "initiative (label: Initiative; the designation, not first strike). Take it: prendre l’initiative. Give up: céder (céder l’initiative), never retirer.",
       "hi": "इनिशिएटिव; give up: छोड़ें",
       "ja": "イニシアチブ; give up: 手放す ({{label}}を手放す)",
       "ko": "이니셔티브; give up: 포기",
@@ -179,7 +214,7 @@
       "es": "identidad de color",
       "fr": "identité couleur (no \"de\")",
       "hi": "कलर आइडेंटिटी",
-      "ja": "固有色",
+      "ja": "固有色; outside it: 固有色に含まれない (never 固有色の外)",
       "ko": "색 정체성",
       "ar": "هوية اللون"
     },
@@ -205,14 +240,14 @@
       "en": ["mulligan"],
       "es": "mulligan, invariant; plural mulligans (Primer mulligan gratis, Mulligans gratis)",
       "fr": "mulligan (plural mulligans; Premier mulligan gratuit)",
-      "hi": "मुलिगन, masculine (पहला मुलिगन फ़्री); keep: रखें",
+      "hi": "मुलिगन, masculine (पहला मुलिगन फ़्री है); keep: रखें",
       "ja": "マリガン; free mulligan: フリー・マリガン; keep: キープ",
-      "ko": "멀리건 (무료 멀리건); keep: 킵",
+      "ko": "멀리건 (무료 멀리건); keep: 킵 ({{count}}장 킵; never 유지 for the keep decision)",
       "ar": "إعادة سحب; free mulligan: إعادة سحب مجانية"
     },
     "opening hand": {
       "en": ["opening hand"],
-      "es": "mano inicial",
+      "es": "mano inicial; keep a hand: quedarse con (Me quedo, ¿Te quedas con {{count}}?, Quedarse con {{cards}}), never conservar; kept, in stats: Mano de {{count}}",
       "fr": "main de départ",
       "hi": "शुरुआती हैंड",
       "ja": "初手",
@@ -225,7 +260,7 @@
       "fr": "mettre au fond (du deck): mettez {{count}} au fond",
       "hi": "नीचे रखें ({{count}} नीचे रखें)",
       "ja": "下に置く (label: {{count}}枚を下に)",
-      "ko": "라이브러리 맨 아래에 놓다 (tight label: {{count}}장 바닥)",
+      "ko": "서고 맨 밑에 놓다 (the library is 서고, never 라이브러리; tight label: {{count}}장 맨 밑)",
       "ar": "وضع في أسفل المجموعة"
     },
     "Phyrexian mana": {
@@ -239,28 +274,28 @@
     },
     "Planechase plane and phenomenon": {
       "en": ["plane", "phenomenon", "planar"],
-      "es": "Planechase stays English. Plane: plano; phenomenon: fenómeno; planeswalk: caminar entre planos; planar die: dado planar",
-      "fr": "Planechase plane (the card): Plan (Plan : {{name}}; never Plane). Phenomenon: Phénomène",
+      "es": "Planechase (official Spanish name). Plane: plano; phenomenon: fenómeno; planeswalk: caminar entre planos; chaos: caos; planar die: dado planar; roll it: tirar, a roll: tirada (Tirar, Próxima tirada: {{cost}}, Solo el jugador activo tira); cost: coste (Reiniciar coste, coste de la tirada). Never lanzar or costo here",
+      "fr": "plane (the card): plan (Plan : {{name}}; never Plane). Phenomenon: phénomène. Planeswalk: transplaner (button: Transplaner; {{name}} a transplané vers {{plane}}). Planar deck: deck de plans, never paquet planaire. Planar die: dé planaire. Chaos: chaos.",
       "hi": "प्लेन / फ़ेनोमेनन (planeswalk: प्लेनवॉक)",
-      "ja": "plane: プレイン; phenomenon: 現象; Planechase: プレインチェイス; planeswalk: 次元渡り",
-      "ko": "플레인체이스; plane: 차원 (planar deck 차원 덱, planeswalk 차원 이동); phenomenon: 현상",
-      "ar": "plane: المستوى; phenomenon: ظاهرة; Planechase stays in Latin"
+      "ja": "the variant: プレインチェイス戦 (the product: プレインチェイス); plane: 次元 (次元・カード); phenomenon: 現象; planar deck: 次元デッキ; planar die: 次元ダイス, roll it: 振る (never ロール); planeswalk: プレインズウォークする ({{plane}}にプレインズウォークしました); die faces: プレインズウォーク / カオス / 無地. Never プレイン, 次元渡り, フェノメノン, 混沌 or 白紙",
+      "ko": "플레인체이스; plane: 차원 (차원: {{name}}; never 플레인); planar deck: 차원 덱; planeswalk: 차원 여행; planar die: 차원 주사위; chaos: 혼돈; phenomenon: 현상",
+      "ar": "Planechase: بلان تشاس; plane: العالم (plural العوالم; Plane: {{name}} is العالم: {{name}}); planar deck: مجموعة العوالم; planar die: نرد العوالم; planeswalk: عبور العوالم (die face and button: عبور; log: عبور {{name}} إلى {{plane}}); phenomenon: ظاهرة; chaos: فوضى; reset the roll cost: تصفير التكلفة. Never المستوى"
     },
     "Archenemy and its schemes": {
       "en": ["Archenemy", "scheme"],
-      "es": "Archenemy (variant name) stays English; the player: archienemigo; scheme: maquinación (poner en marcha una maquinación)",
-      "fr": "Archenemy (mode name, untranslated); scheme: machination (mettre une machination en marche)",
-      "hi": "the player: आर्चएनिमी; scheme: स्कीम; set in motion: सेट इन मोशन करें",
-      "ja": "アーチエネミー; scheme: 策略 (策略デッキ); set in motion: 発動する",
-      "ko": "아크에너미; scheme: 음모 (음모 덱, set in motion 발동, abandon 버리기)",
-      "ar": "Archenemy stays in Latin; scheme: مخطط; set in motion: تفعيل"
+      "es": "Archenemy (official Spanish variant name); the player: archienemigo; scheme: plan (carta de plan); scheme deck: mazo de planes; set in motion: poner en marcha (poner en marcha un plan); ongoing: continuo (planes continuos); abandon: abandonar (abandonar un plan). Never maquinación or \"scheme\"",
+      "fr": "Archenemy is the official name of the mode (board title, setup). The player is l’archennemi (label: Archennemi). Scheme: machination. Set in motion: mettre à exécution ({{name}} a mis {{scheme}} à exécution), never en marche. Ongoing: continue. Abandon a scheme: abandonner. Scheme deck: deck de machinations, never paquet or manigances.",
+      "hi": "the player and the variant: आर्चएनिमी (never आर्कएनिमी or आर्केनेमी); scheme: स्कीम, feminine; set in motion: सेट इन मोशन करें; abandon a scheme: ऐबेंडन करें",
+      "ja": "the variant: アーチエネミー戦 (the product: アーチエネミー); the archenemy player: 魔王; scheme: 計略 (計略デッキ); set in motion: 実行中にする (button: 計略を実行); ongoing: 持続; abandon a scheme: 破棄する. Never 策略, スキーム or 発動",
+      "ko": "아치에너미 (the variant and the player; never 아크에너미); scheme: 책략 (책략 덱); set in motion: 실행 (책략을 실행합니다); ongoing: 진행 중; abandon: 유기 (책략을 유기합니다). Never 음모, 발동 or 버리기",
+      "ar": "Archenemy, the variant and the player: العدو اللدود; scheme: مخطط (plural المخططات); scheme deck: مجموعة المخططات; set in motion: تفعيل; ongoing: مستمر (counted: مستمرة: {{count}}); abandon a scheme: التخلي عن. Never Latin Archenemy or Scheme, never العدو الأعظم"
     },
     "hero and young hero (Flesh and Blood)": {
       "en": ["hero"],
       "es": "héroe (section: Héroe); young hero: héroe joven",
       "fr": "hero: Héros. Young hero (Flesh and Blood): héros jeune",
       "hi": "हीरो; young hero: यंग हीरो",
-      "ja": "ヒーロー; young hero: 若者ヒーロー",
+      "ja": "ヒーロー; young hero: ヤングヒーロー; adult hero: アダルトヒーロー",
       "ko": "영웅; young hero: 젊은 영웅",
       "ar": "البطل"
     },
@@ -294,12 +329,12 @@
         "went first",
         "not first"
       ],
-      "es": "jugar primero; {{name}} juega primero; jugar primero o segundo; on the play: jugando primero",
-      "fr": "jouer en premier / en second ({{name}} joue en premier); question: Qui commence ?",
-      "hi": "on the play / going first: पहले खेलते हुए; go first / second: पहले / बाद में खेलें ({{name}} पहले खेलेंगे)",
-      "ja": "先攻 / 後攻 (on the play: 先攻で)",
+      "es": "jugar primero / jugar segundo ({{name}} juega primero, {{name}} juega segundo, eligió jugar segundo); jugar primero o segundo; on the play: jugando primero. Never ir or empezar segundo",
+      "fr": "jouer en premier / en second ({{name}} joue en premier); question: Qui commence ? On the play: en jouant en premier; on the draw: en jouant en second. Roll or flip for who goes first: pour savoir qui commence.",
+      "hi": "on the play / going first: पहले खेलते हुए; go first: पहले खेलें; go second: बाद में खेलें ({{name}} बाद में खेलेंगे; chose second: ने बाद में खेलना चुना). Never दूसरे खेलें or दूसरा चुना",
+      "ja": "先攻 / 後攻 (on the play: 先攻で; went first: 先攻; not first: 先攻以外). Never 先手 or 後手",
       "ko": "선공 / 후공 ({{name}}님이 선공입니다; on the play: 선공 시)",
-      "ar": "اللعب أولًا / ثانيًا (يلعب {{name}} أولًا)"
+      "ar": "اللعب أولًا / ثانيًا (يلعب {{name}} أولًا); decide: تحديد البادئ; badge on the first player: الأول"
     },
     "match (a best-of-N set of games)": {
       "en": ["match"],
@@ -316,17 +351,17 @@
       "fr": "au meilleur des N",
       "hi": "बेस्ट ऑफ़ N",
       "ja": "N本勝負",
-      "ko": "N판 승부",
-      "ar": "الأفضل من N"
+      "ko": "{{n}}판 승부 (setup label: 최대 게임 수; tight: {{n}}판). Never Bo{{n}} or {{n}}게임 매치",
+      "ar": "الأفضل من {{bestOf}} everywhere, including history cards and errors (الأفضل من {{bestOf}} · {{score}}، في مواجهة الأفضل من {{bestOf}}). Never مواجهة من N مباريات, never Bo"
     },
     "game (one game of a match), and game system (Magic, Pokémon…)": {
       "en": ["game"],
-      "es": "game (one game of a match): partida. Game system (Magic, Pokémon…): juego",
-      "fr": "game (one game of a match): partie. Game system: jeu",
-      "hi": "गेम; game system: गेम सिस्टम",
-      "ja": "one game: ゲーム (第{{number}}ゲーム; counted {{count}}ゲーム); game system: ゲームシステム (short: システム)",
-      "ko": "게임. Game system: 게임 (filter label 시스템, prose 게임 시스템)",
-      "ar": "game (one game of a match): مباراة; game system (Magic, Pokémon…): لعبة"
+      "es": "one game of a match: partida (games played in stats: Partidas). Game system (Magic, Pokémon…): juego (Juego, Todos los juegos, Sin juego, cambiar de juego). Never sistema for a game system",
+      "fr": "game (one game of a match): partie. Game system: jeu (Choisissez un jeu; Aucun jeu), never système.",
+      "hi": "गेम, masculine; game system: गेम सिस्टम; a game in progress: चालू गेम (never सक्रिय)",
+      "ja": "one game: ゲーム, numbered 第{{number}}ゲーム (never ゲーム{{number}}), counted {{count}}ゲーム (never 件); game system: ゲーム (すべてのゲーム, ゲーム未設定), never システム",
+      "ko": "게임. A numbered game: 게임 {{number}} (never {{number}}게임); a count: {{count}}게임 (never 게임 {{count}}개). Game system: 게임 (filter label 시스템, prose 게임 시스템)",
+      "ar": "one game of a match: مباراة (out of the game: خارج المباراة); game system (Magic, Pokémon…): لعبة. Never لعبة for a single game"
     },
     "best of N": {
       "en": ["best of", "bestOf"],
@@ -334,8 +369,8 @@
       "fr": "au meilleur des N",
       "hi": "बेस्ट ऑफ़ N",
       "ja": "N本勝負 (never 先取; short Bo{{bestOf}})",
-      "ko": "{{n}}판 승부 (label: 최대 게임 수; short Bo{{n}})",
-      "ar": "مواجهة من N مباريات (الأفضل من 3)"
+      "ko": "{{n}}판 승부 (setup label: 최대 게임 수; tight: {{n}}판). Never Bo{{n}} or {{n}}게임 매치",
+      "ar": "الأفضل من {{bestOf}} everywhere, including history cards and errors (الأفضل من {{bestOf}} · {{score}}، في مواجهة الأفضل من {{bestOf}}). Never مواجهة من N مباريات, never Bo"
     },
     "win / loss / draw, and their badges": {
       "en": [
@@ -349,30 +384,30 @@
         "winner",
         "drawn"
       ],
-      "es": "Victoria / Derrota / Empate; one-letter badges V / D / E",
-      "fr": "Victoire / Défaite. Draw: Égalité for one game; match nul for a whole match. Badges V / D / É",
-      "hi": "जीत / हार / ड्रॉ (winner: विजेता); badges: W / L / D, in Latin script",
-      "ja": "勝ち / 負け / 引き分け; badges 勝 / 敗 / 分",
+      "es": "Victoria / Derrota / Empate; one-letter badges V / D / E; win rate: % de victorias",
+      "fr": "Victoire / Défaite. Draw: Égalité for one game; match nul for a whole match; drawn games: parties nulles. Badge and record letters are always V / D / N (V-D-N), never É.",
+      "hi": "जीत / हार / ड्रॉ, also on badges and records ({{count}} गेम · {{wins}} जीत · {{losses}} हार · {{draws}} ड्रॉ); winner: विजेता; result: नतीजा. Never one-letter forms like जी / हा or Latin W / L / D, except W-L-D as a standings column header",
+      "ja": "勝ち / 負け / 引き分け; badges 勝 / 敗 / 分; a record: {{wins}}勝{{losses}}敗{{draws}}分; draws counted alone: 引き分け{{count}} (never {{count}}引き分け); games won: 勝ったゲーム数",
       "ko": "승리 / 패배 / 무승부; badges 승 / 패 / 무",
       "ar": "فوز / خسارة / تعادل; one-letter badges ف / خ / ت"
     },
     "coin flip, heads / tails": {
       "en": ["heads", "tails", "flip", "flipping"],
       "es": "cara / cruz; flip: lanzar moneda (ganó el lanzamiento)",
-      "fr": "Pile ou face (the flip). Face / Pile (heads = Face, tails = Pile)",
-      "hi": "टॉस; टॉस जीता; heads / tails: चित / पट",
+      "fr": "Pile ou face (the flip). Face / Pile (heads = Face, tails = Pile). Won the flip: a gagné à pile ou face, never le tirage or le lancer de pièce.",
+      "hi": "टॉस (flip: टॉस करें; won the flip: टॉस जीता; decide by flip: टॉस से तय करें); heads / tails: चित / पट. Never फ़्लिप or सिक्का",
       "ja": "表 / 裏; flip: コイントス (short label: コイン)",
-      "ko": "앞면 / 뒷면; coin flip: 동전 던지기 (label 동전)",
+      "ko": "앞면 / 뒷면; coin: 동전, never 코인; coin flip: 동전 던지기",
       "ar": "صورة / كتابة"
     },
     "abandon (ends it for everyone, no result)": {
       "en": ["abandon"],
       "es": "anular (Anular partida, ¿Anular esta sala?, anulada)",
       "fr": "a game: terminer sans résultat (status: annulée); a lobby: dissoudre le salon. Never Annuler, which is Cancel.",
-      "hi": "a game: बिना नतीजे खत्म करें; a lobby: लॉबी बंद करें; abandoned (status): रद्द",
-      "ja": "a game: 中止; a lobby: 解散",
+      "hi": "a game: बिना नतीजे खत्म करें; a lobby: लॉबी बंद करें; abandoned (status and toast): रद्द (गेम रद्द हुआ)",
+      "ja": "a game: 中止; a lobby: 解散; an Archenemy scheme: 破棄する",
       "ko": "a game: 중단 (status 중단됨); a lobby: 로비 닫기",
-      "ar": "إبطال (إبطال المباراة)"
+      "ar": "a game: إبطال (إبطال المباراة); a lobby: إغلاق الغرفة للجميع; an Archenemy scheme: التخلي عن"
     },
     "leave (just you)": {
       "en": ["leave", "leaving"],
@@ -387,28 +422,28 @@
       "en": ["end game"],
       "es": "terminar partida (Terminar partida); match: Terminar encuentro",
       "fr": "terminer la partie (button: Terminer la partie)",
-      "hi": "गेम खत्म करें",
+      "hi": "गेम खत्म करें; end / ended / ending: खत्म / खत्म हुआ / खत्म हो रहा है…. Never समाप्त",
       "ja": "ゲームを終了",
       "ko": "게임 종료 (match: 매치 종료)",
       "ar": "إنهاء المباراة"
     },
     "cancel (closes a dialog)": {
       "en": ["cancel"],
-      "es": "Cancelar",
-      "fr": "Annuler; a subscription: résilier",
+      "es": "Cancelar for a plain dismiss. In a confirm dialog, the button that backs out says what staying means: Seguir con la partida, Seguir con el encuentro, Quedarme en la partida, No eliminar. Never Cancelar + another verb or noun (Cancelar terminar, Cancelar el fin de…)",
+      "fr": "Annuler. A subscription: résilier (résiliez-le, jusqu’à résiliation), never annuler.",
       "hi": "रद्द करें",
       "ja": "キャンセル",
-      "ko": "취소 (a subscription: 해지)",
+      "ko": "취소; a subscription: 해지, never 취소",
       "ar": "إلغاء"
     },
     "discard (changes)": {
       "en": ["discard"],
       "es": "descartar (¿Descartar cambios?, Descartar edición local)",
-      "fr": "abandonner (Abandonner les modifications ?)",
+      "fr": "abandonner (Abandonner les modifications ?; abandonnez-le), never annuler or supprimer.",
       "hi": "छोड़ें (बदलाव छोड़ें)",
       "ja": "破棄 (変更を破棄)",
       "ko": "폐기; Cancel stays 취소",
-      "ar": "تجاهل"
+      "ar": "a Discard changes button: تجاهل; thrown away or lost: حذف (لم يُحذف أي شيء), never تجاهل there"
     },
     "seat (a player's place at the table)": {
       "en": ["seat"],
@@ -416,17 +451,17 @@
       "fr": "place (never siège)",
       "hi": "सीट",
       "ja": "席",
-      "ko": "자리 (never 좌석)",
+      "ko": "자리 (never 좌석); numbered: {{seat}}번 자리, never 자리 {{seat}}. Never for a deck slot",
       "ar": "مقعد"
     },
     "host (the player who created a connected game), and hosting a game or lobby": {
       "en": ["host"],
-      "es": "anfitrión; to host a game or lobby: crear",
-      "fr": "host (the player): hôte; to host: héberger. Event host: organisateur",
+      "es": "anfitrión; to host a game or lobby: crear, always with its object (Inicia sesión para crear la partida, No se pudo crear la partida). Hosting an event: organizar",
+      "fr": "host (the player): hôte; to host a game or lobby: héberger. Event host: organisateur; to host an event: organiser (organiser un nouvel événement), never héberger.",
       "hi": "होस्ट; to host: होस्ट करें (लॉबी होस्ट करें)",
-      "ja": "ホスト (verb: ホストする; host a lobby: ロビーを作成)",
-      "ko": "the player: 호스트 (event host: 주최자); host a lobby or game: 로비 만들기 / 게임 만들기",
-      "ar": "المضيف; to host a game or lobby: إنشاء"
+      "ja": "ホスト (verb: ホストする; host a lobby: ロビーを作成); hosting a store event: 開催 (このデバイスで開催), its organizer: 主催者",
+      "ko": "the player: 호스트 (event host: 주최자; their device: 주최자 기기); host a lobby or game: 로비 만들기 / 게임 만들기; a hosted game: 내가 만든 게임, never 호스트 게임",
+      "ar": "the player: المضيف; to host: استضافة (سجّل الدخول للاستضافة، تعذّرت الاستضافة، استضافة على هذا الجهاز); a hosted game: مباراة تستضيفها; status: أنت المضيف · بانتظار البدء. إنشاء only on Create lobby buttons. Never مباراة منشأة"
     },
     "lobby": {
       "en": ["lobby"],
@@ -442,18 +477,18 @@
       "es": "cercana (partidas cercanas); permission: dispositivos cercanos",
       "fr": "à proximité (Parties à proximité); permission: appareils à proximité",
       "hi": "आस-पास (permission: आस-पास मौजूद डिवाइस)",
-      "ja": "近く (Android setting: 付近のデバイス). Never ニアバイ.",
+      "ja": "近く (近くのデバイスと対戦; Android setting: 付近のデバイス); alone as an option or label: 近くのデバイス. Never ニアバイ",
       "ko": "근처 (근처 기기)",
-      "ar": "قريبة (مباريات قريبة); permission: الأجهزة القريبة"
+      "ar": "title: مباريات قريبة; as an option or menu label: الشبكة المحلية (الشبكة المحلية فقط: مفعّل); permission: الأجهزة القريبة. Never bare قريبة"
     },
     "local game (one shared device) / connected game (players on their own phones)": {
       "en": ["local game", "connected game"],
       "es": "partida local / partida conectada",
-      "fr": "partie locale / partie connectée",
-      "hi": "लोकल गेम / कनेक्टेड गेम",
+      "fr": "partie locale / partie connectée. Turn a local game into a connected one: connecter la partie (button: Connecter la partie), never passer en ligne.",
+      "hi": "लोकल गेम / कनेक्टेड गेम; anything kept on this device: लोकल (लोकल बदलाव) or इस डिवाइस पर. Never स्थानीय",
       "ja": "ローカルゲーム / 通信対戦",
       "ko": "로컬 게임 / 연결 게임",
-      "ar": "مباراة محلية / مباراة متصلة"
+      "ar": "مباراة محلية / مباراة متصلة. متصلة goes only on مباراة or مباريات (لوحة المباراة المتصلة، سجل المباريات المتصلة); connected play: اللعب عبر الأجهزة; local play: اللعب على جهاز واحد"
     },
     "cloud (synced through Scryve's servers)": {
       "en": ["cloud"],
@@ -468,15 +503,15 @@
       "en": ["invite", "invitation"],
       "es": "invitación (código de invitación); verb: invitar (Invitar jugadores)",
       "fr": "invitation (code d'invitation); verb: inviter",
-      "hi": "आमंत्रण; to invite: आमंत्रित करें",
+      "hi": "इनवाइट, masculine (इनवाइट कोड, इनवाइट भेजें); to invite: इनवाइट करें. Never आमंत्रण",
       "ja": "招待 (invite code: 招待コード)",
-      "ko": "초대 (초대 코드, 플레이어 초대)",
+      "ko": "초대 (초대 코드, 플레이어 초대); never 초대장",
       "ar": "دعوة (invite code: رمز الدعوة)"
     },
     "layout": {
       "en": ["layout"],
       "es": "diseño",
-      "fr": "disposition",
+      "fr": "disposition. Layout names: Top focus: Priorité en haut; Bottom focus: Priorité en bas; Even grid: Grille régulière (Disposition priorité en haut).",
       "hi": "लेआउट",
       "ja": "レイアウト",
       "ko": "레이아웃 (균형 레이아웃)",
@@ -485,11 +520,11 @@
     "sign in / sign out": {
       "en": ["sign in", "sign-in", "sign out"],
       "es": "sign in: iniciar sesión; sign out: cerrar sesión",
-      "fr": "sign in: se connecter (noun: connexion); sign out: se déconnecter. Joining a game is rejoindre, and connecting to one is connexion en cours…; never a bare Connexion for those.",
+      "fr": "sign in: se connecter (noun: connexion); sign out: se déconnecter. Joining a game or event is rejoindre (Vous rejoignez en tant que @{{username}}); progress text may say Connexion à la partie… or Connexion à l’événement…, never a bare Connexion… and never Connexion en tant que, which reads as signing in.",
       "hi": "साइन इन करें / साइन आउट करें (noun: साइन-इन)",
       "ja": "サインイン / サインアウト",
       "ko": "로그인 / 로그아웃",
-      "ar": "تسجيل الدخول"
+      "ar": "sign in: تسجيل الدخول (سجّل الدخول); sign out: تسجيل الخروج"
     },
     "account": {
       "en": ["account"],
@@ -514,7 +549,7 @@
       "es": "dispositivo (the phone or tablet the app runs on; never teléfono for \"device\")",
       "fr": "appareil",
       "hi": "डिवाइस",
-      "ja": "デバイス",
+      "ja": "デバイス (このデバイス), never 端末",
       "ko": "기기",
       "ar": "الجهاز"
     },
@@ -523,9 +558,9 @@
       "es": "versión (Versión del mazo, Nueva versión, Versión {{number}})",
       "fr": "version",
       "hi": "वर्शन",
-      "ja": "バージョン (short: v{{version}})",
+      "ja": "バージョン (short: v{{version}}), never 版",
       "ko": "버전 (버전 {{number}}, 덱 버전)",
-      "ar": "الإصدار"
+      "ar": "الإصدار (one: إصدار واحد; two: إصداران; few: إصدارات; many: إصدارًا; other: إصدار); the version you play with: الإصدار الذي ستلعب به. Never نسخة for a deck version. In a sync conflict, this device's and the account's copies of a deck are نسخة (نسختي، نسخة الحساب)"
     },
     "menu": {
       "en": ["menu"],
@@ -547,12 +582,12 @@
     },
     "format (Commander, Standard…)": {
       "en": ["format"],
-      "es": "formato; format names stay English (Commander, Two-Headed Giant)",
+      "es": "formato; format names as in the format names term (Estándar, Limitado, Construido, Gigante de dos cabezas…)",
       "fr": "format (Tous les formats; légal en {{format}})",
-      "hi": "फ़ॉर्मैट",
-      "ja": "フォーマット; names follow the katakana format rule",
-      "ko": "포맷",
-      "ar": "الصيغة"
+      "hi": "फ़ॉर्मैट; legal in a format: लीगल; banned: बैन",
+      "ja": "フォーマット; names follow the format names term",
+      "ko": "포맷. Legal in a format: 사용 가능 (heading: 사용 가능 포맷); never 합법",
+      "ar": "النمط (plural الأنماط; كل الأنماط، في هذا النمط). Masculine, so format names agree: النمط القياسي. Never الصيغة"
     },
     "card faces front / back": {
       "en": ["front face", "back face"],
@@ -567,14 +602,14 @@
       "en": ["Play tab"],
       "es": "Jugar (Ir a Jugar)",
       "fr": "Jouer (Aller à Jouer)",
-      "hi": "खेलें टैब",
+      "hi": "“खेलें” टैब; never the Latin word Play",
       "ja": "プレイ (Go to Play: プレイへ移動)",
       "ko": "플레이 (prose: 플레이 탭)",
       "ar": "اللعب (Go to Play: الانتقال إلى اللعب)"
     },
     "Wi-Fi": {
       "en": ["Wi-Fi"],
-      "es": "red Wi-Fi (en la misma red Wi-Fi)",
+      "es": "red Wi-Fi, always with red (esta red Wi-Fi, en la misma red Wi-Fi); never la Wi-Fi or el Wi-Fi alone",
       "fr": "Wi-Fi, masculine (le même Wi-Fi)",
       "hi": "Wi-Fi, in Latin script",
       "ja": "Wi-Fi, in Latin script",
@@ -585,37 +620,359 @@
       "en": ["turn"],
       "es": "turno (Turno 3, ¿De quién es el turno?, Terminar turno)",
       "fr": "tour (Tour {{number}}; à qui est le tour)",
-      "hi": "टर्न, masculine (अगला टर्न, किसका टर्न है?)",
+      "hi": "टर्न, masculine (अगला टर्न, किसका टर्न है?); turn order: टर्न ऑर्डर. Never बारी",
       "ja": "ターン, number after: ターン{{number}}; turn order: 手番順",
-      "ko": "턴 (counted {{number}}턴)",
+      "ko": "턴 ({{number}}턴; never 차례, never {{number}}번째 턴)",
       "ar": "الدور"
     },
     "round (of an event)": {
       "en": ["round"],
       "es": "ronda (Ronda 2 de 4, Iniciar ronda 3); short: R2",
-      "fr": "ronde (Ronde {{round}} sur {{planned}})",
+      "fr": "ronde (Ronde {{round}} sur {{planned}}; La ronde doit être comprise entre…), never tour, which is a player’s turn.",
       "hi": "राउंड (राउंड {{round}} / {{planned}})",
-      "ja": "ラウンド, number after: ラウンド{{round}}; short R{{round}}",
-      "ko": "라운드 (counted {{round}}라운드; short R{{round}})",
+      "ja": "ラウンド, number after: ラウンド{{round}}; of a total: ラウンド{{round}}/{{planned}}; short R{{round}}. Never 第{{round}}ラウンド",
+      "ko": "라운드 ({{round}}라운드; short R{{round}}); round N of M: 라운드 {{round}}/{{planned}} on every screen",
       "ar": "جولة"
     },
     "standings": {
       "en": ["standings"],
       "es": "clasificación",
       "fr": "classement",
-      "hi": "स्टैंडिंग, feminine (स्टैंडिंग लॉक हो जाएगी)",
+      "hi": "स्टैंडिंग, feminine (स्टैंडिंग लॉक हो जाएगी); points column: पॉइंट, never अंक",
       "ja": "順位 (heading: 順位表)",
-      "ko": "순위",
+      "ko": "순위 (the table: 순위표); match points column: 승점 on every screen",
       "ar": "الترتيب"
     },
     "event (a store tournament)": {
       "en": ["event"],
       "es": "evento; its host: organizador; to host one: organizar",
       "fr": "événement",
-      "hi": "इवेंट, masculine (इवेंट भर चुका है)",
+      "hi": "इवेंट, masculine (इवेंट भर चुका है); organizer: आयोजक. Never इवेंट for entries in a game log",
       "ja": "イベント; to host one: 開催 (organizer: 主催者)",
-      "ko": "이벤트 (organizer: 주최자)",
-      "ar": "فعالية"
+      "ko": "이벤트, only for a store tournament (organizer: 주최자). Entries in a game's log are 변경 내역, never 이벤트",
+      "ar": "فعالية (الفعالية، لا توجد فعالية بهذا الرمز). Never حدث"
+    },
+    "power and toughness (Magic creature stats), Flesh and Blood power, Riftbound Might and rune Power": {
+      "en": ["power", "toughness", "might"],
+      "es": "Magic: fuerza / resistencia (Fuerza del comandante {{power}}, Subir la fuerza de {{name}}); Flesh and Blood power: potencia; Riftbound Might: fuerza; Riftbound rune Power: poder (poder de {{domain}}, poder de cualquier dominio)",
+      "fr": "Magic: force / endurance (Force du commandant : {{power}}; Augmenter la force de {{name}}), never puissance. Flesh and Blood power: puissance. Riftbound Might: Puissance. Riftbound Power (the rune cost): essence runique (essence runique {{domain}}; essence runique de n’importe quel domaine), never puissance.",
+      "hi": "power: पावर, feminine (कमांडर पावर, {{name}} की पावर बढ़ाएँ); toughness: टफ़नेस, feminine; Riftbound Might: माइट; rune Power: पावर",
+      "ja": "Magic: パワー / タフネス; Flesh and Blood power: パワー; Riftbound Might: マイト; Riftbound rune power: パワー. Lorcana's strength and willpower are 攻撃力 and 意志力, never パワー or タフネス",
+      "ko": "Magic power / toughness: 공격력 / 방어력; Flesh and Blood power: 공격력; Riftbound Might: 위력; Riftbound rune Power: 파워 ({{domain}} 파워)",
+      "ar": "power: القوة; toughness: الصلابة (القوة/الصلابة); Riftbound Might: البأس; Riftbound rune Power: قوة الرون (قوة {{domain}}). Never Latin Might"
+    },
+    "resume (continue where it stopped, never restart)": {
+      "en": ["resume"],
+      "es": "reanudar (Reanudar, lista para reanudar); never reiniciar",
+      "fr": "reprendre (Reprendre la partie hébergée); a resume list: parties à reprendre. Never recommencer or relancer.",
+      "hi": "जारी रखें (a game, a clock); go back to a game: उस गेम पर वापस जाएँ; resume list: चल रहे गेम. Never फिर से शुरू करें, which means start over",
+      "ja": "再開 (再開する); the list of games to go back to: 再開できるゲーム. Never 再起動 or やり直し",
+      "ko": "이어하기 (button); in a sentence 이어서 진행하다; a paused clock: 재개. Never 다시 시작 (that is restart)",
+      "ar": "استئناف (استأنف; resume list: قائمة الاستئناف). Never إعادة البدء"
+    },
+    "deck slot (room to save one more deck, not a seat)": {
+      "en": ["slot"],
+      "es": "espacio (espacios para mazos, Libera un espacio); never asiento",
+      "fr": "emplacement (Libérer un emplacement; emplacements de deck), never place, which is a seat.",
+      "hi": "स्लॉट, masculine (डेक स्लॉट, एक स्लॉट खाली करें); never सीट",
+      "ja": "デッキ枠 (short: 枠); free a slot: 枠を空ける. Never 席 or スロット. A {{slot}} placeholder is a Pokémon's position, not this",
+      "ko": "덱 슬롯 (short 슬롯; free a slot: 슬롯 비우기; make room: 슬롯 확보). Never 자리, which is a seat",
+      "ar": "خانة (خانات المجموعات; free a slot: أخلِ خانة). Not a seat (مقعد). The {{slot}} placeholder in Pokémon labels is a board position, not this"
+    },
+    "pod (a group of players sharing one table in an event)": {
+      "en": ["pod"],
+      "es": "mesa (Tamaño de mesa); the event pairing option: Mesas multijugador. Never grupo",
+      "fr": "table (Taille de table; une table de 4 joueurs). The event structure Pods, beside Suisse: Tables.",
+      "hi": "पॉड, masculine; pod size: पॉड साइज़",
+      "ja": "卓 (4人卓; pod size: 卓の人数); as the pairing method beside スイスドロー: 多人数卓. Never ポッド",
+      "ko": "조 (as in Riot's Korean rules; 4인 조; event structure option: 조 편성; pod size: 인원 수). Never 포드",
+      "ar": "طاولة جماعية (plural طاولات جماعية; the structure option: طاولات جماعية); pod size: عدد اللاعبين ({{podSize}}-player games: مباريات بعدد لاعبين {{podSize}}). Never مجموعة or حجم الطاولة"
+    },
+    "bye (a round with no opponent, scored as a win)": {
+      "en": ["bye"],
+      "es": "bye, invariant (Bye, un bye), as Spanish players say",
+      "fr": "bye (le bye; label: Bye), as French tournament players say; never exempt.",
+      "hi": "बाय, masculine (never बाई)",
+      "ja": "不戦勝 (get a bye: 不戦勝になる)",
+      "ko": "부전승",
+      "ar": "إعفاء on every screen. Never Bye"
+    },
+    "clock (an event round timer, or a chess clock for one game)": {
+      "en": ["clock", "chess clock"],
+      "es": "reloj (Reloj de ronda, Reloj de ajedrez, Reloj de {{minutes}} min)",
+      "fr": "chrono. Round clock: chrono de ronde; turn clock: chrono du tour (Chrono de {{minutes}} min). Never horloge or chronomètre. Chess clock: pendule.",
+      "hi": "क्लॉक, masculine (राउंड क्लॉक, टर्न क्लॉक, चेस क्लॉक, {{minutes}} मिनट क्लॉक); never घड़ी",
+      "ja": "a round's countdown: ラウンドタイマー (short: タイマー); a chess clock: チェスクロック; each player's time: 持ち時間. Never ラウンドクロック or ラウンド時計",
+      "ko": "event round timer: 라운드 타이머 (short 타이머); chess clock: 체스 시계",
+      "ar": "مؤقت; round clock: مؤقت الجولة; turn clock: مؤقت الدور; {{minutes}} min clock: مؤقت {{minutes}} د; chess clock: ساعة الشطرنج (fixed phrase). Never ساعة alone, which reads as hour"
+    },
+    "report (enter a game result, never reporting a person)": {
+      "en": ["report"],
+      "es": "reportar; noun: reporte (Reportar resultado, Reportar a {{name}}, Enviar reporte, Al reportar…, cada reporte). Never denunciar or denuncia. Report a bug: informar de un error",
+      "fr": "a result: déclarer (Déclarer le résultat; Résultat déclaré). Reporting a player or a bug is signaler, a different word.",
+      "hi": "नतीजा दर्ज करें; reported (table status): दर्ज हुआ; can no longer report: नतीजा नहीं भेज पाएँगे. रिपोर्ट करें is only for reporting a player",
+      "ja": "a game result: 報告 (結果を報告, 報告済み); another player agreeing to it: 承認 (承認済み), never 確認 or 確定; a bug: 不具合を報告; a player or username: 通報 (通報する, 通報を送信)",
+      "ko": "결과 보고 (보고하다; status 보고됨). Reporting a player or a bug is 신고, a different word",
+      "ar": "تسجيل النتيجة (سجّل النتيجة؛ status: تم تسجيل النتيجة). Reporting a player or a bug stays الإبلاغ عن, never for results"
+    },
+    "pass (end your turn and hand it to the next player)": {
+      "en": ["pass"],
+      "es": "pasar (Pasar, Toca para pasar a {{name}}); the noun: el pase (Deshacer el pase)",
+      "fr": "passer (Passer; Touchez pour passer à {{name}}); take it back: Annuler le passage. In a sentence, name the button: seul « Passer » change le tour.",
+      "hi": "label: पास; to pass: पास करें ({{name}} को पास करें); the pass: पास, masculine (पास वापस लें)",
+      "ja": "パス; to a named player: {{name}}にターンを渡す",
+      "ko": "넘기기 (턴 넘기기; to a player: {{name}}님에게 넘기기; undo: 넘기기 취소)",
+      "ar": "تمرير الدور (اضغط لتمرير الدور إلى {{name}}، التراجع عن تمرير الدور، تمرير الدور وحده يغيّره); the chip button: مرّر. Never bare التمرير, which reads as scrolling. Not password (كلمة المرور)"
+    },
+    "card set (a printed expansion of cards)": {
+      "en": ["set code"],
+      "es": "colección (Colecciones recientes); set code: código de colección. Pokémon: expansión, código de expansión",
+      "fr": "extension (code d’extension). In Pokémon labels, \"no card set\" means no card chosen yet: aucune carte définie.",
+      "hi": "सेट, masculine (कार्ड सेट); set code: सेट कोड; set names in Devanagari as players say them (रिटर्न टू रैवनिका)",
+      "ja": "エキスパンション (short label: セット); set code: セットコード. \"No card set\" means no card chosen yet: カード未設定",
+      "ko": "세트 (set code: 세트 코드)",
+      "ar": "توسعة (plural التوسعات: التوسعات الحديثة، رموز التوسعات); set code: رمز التوسعة. Never مجموعة, the deck word. \"no card set\" in Pokémon damage labels means no card chosen: دون بطاقة"
+    },
+    "role (a Treachery player's hidden role)": {
+      "en": ["role"],
+      "es": "rol (Tu rol, Ocultar tu rol); Treachery roles: Líder, Guardián, Asesino, Traidor",
+      "fr": "rôle. Treachery roles (official French): Seigneur (Leader), Gardien, Assassin, Traître.",
+      "hi": "भूमिका, feminine (आपकी भूमिका छिपी है); the roles: लीडर / गार्डियन / असैसिन / ट्रेटर, never हत्यारा or गद्दार",
+      "ja": "役職 (自分の役職); roles: リーダー / ガーディアン / アサシン / 裏切り者, the same words in role names and goal text",
+      "ko": "역할. Treachery roles: 리더 / 가디언 / 암살자 / 배신자, the same word in role names, goals and hints (never 지도자 or 수호자)",
+      "ar": "الهوية (your role: هويتك، كشف هويتك، إخفاء هويتك). Never الدور, the turn word"
+    },
+    "guest (someone using the app without an account)": {
+      "en": ["guest"],
+      "es": "invitado (mazo de invitado, Añadir invitado); guest Wi-Fi: red de invitados",
+      "fr": "invité (en tant qu’invité). A deck saved while signed out: deck local, never deck invité. Guest Wi-Fi: Wi-Fi invité.",
+      "hi": "गेस्ट (गेस्ट डेक, गेस्ट जोड़ें, गेस्ट का नाम); never अतिथि or मेहमान",
+      "ja": "ゲスト (ゲストデッキ, ゲストを追加)",
+      "ko": "게스트 (게스트 덱, 게스트 추가). Never 손님",
+      "ar": "ضيف (guest decks: مجموعات الضيف); guest Wi-Fi: شبكات الضيوف"
+    },
+    "opponent": {
+      "en": ["opponent"],
+      "es": "rival (Rival {{number}}, Añadir rival, tu rival, Rivales); never oponente",
+      "fr": "adversaire",
+      "hi": "ऑपोनेंट, with honorific plural verbs (आपके ऑपोनेंट की पुष्टि का इंतज़ार है); never प्रतिद्वंद्वी",
+      "ja": "対戦相手 (short: 相手)",
+      "ko": "상대 (상대 {{number}}; prose: 상대 플레이어)",
+      "ar": "الخصم (plural الخصوم; Opponent {{number}}: الخصم {{number}})"
+    },
+    "tap, long press, hold (touch gestures on the screen)": {
+      "en": ["tap", "long press", "hold"],
+      "es": "tap: tocar (Toca para…); the noun: toque (Por toque); long press / hold: mantener presionado (Mantén presionado para…); never pulsar",
+      "fr": "tap: toucher (Touchez pour…). Long press or hold as a gesture: appui long (Appui long pour plus de commandes), never appuyez longuement. Keep the card in the camera frame: placer.",
+      "hi": "tap: टैप करें; long press and hold: देर तक दबाएँ (never दबाए रखें); hold a card inside the camera frame: रखें",
+      "ja": "tap: タップ (タップで…, タップして…); long press and hold: 長押し. Holding a card up to the camera is not a gesture: 枠内に収める; holding a seat: 席についている",
+      "ko": "tap: 탭 (탭하여, 탭하면); long press and hold: 길게 누르기 (길게 눌러)",
+      "ar": "tap: اضغط (اضغط على {{target}}); long press and hold: اضغط مطولًا; the noun: ضغطة (لكل ضغطة). Never المس"
+    },
+    "filter (narrow a list)": {
+      "en": ["filter"],
+      "es": "filtro (Filtros, Quitar filtro {{label}}); clear: borrar (Borrar filtros, Borrar todo, Borrar búsqueda y filtros), never quitar for clear",
+      "fr": "filtre (Filtres; Retirer le filtre); verb: filtrer",
+      "hi": "फ़िल्टर, masculine (फ़िल्टर हटाएँ)",
+      "ja": "verb: 絞り込む (フォーマットで絞り込む); the control or a chosen filter: フィルター",
+      "ko": "필터",
+      "ar": "فلتر (plural الفلاتر: الفلاتر، مسح الفلاتر، إزالة الفلتر {{label}}); to filter: تصفية (تصفية حسب النمط). Never عوامل التصفية"
+    },
+    "Help (the screen with support and feedback)": {
+      "en": ["support", "help"],
+      "es": "the screen and menu item: Ayuda (Ayuda, Ayuda de Scryve, Abrir Ayuda, abre Ayuda, Buscar en la ayuda), never Soporte for the screen; the people who answer: soporte, lowercase (Escribir al soporte, contacta con el soporte)",
+      "fr": "Assistance, the screen and the team (Contacter l’assistance, Écrire à l’assistance, Ouvrir l’assistance), never support. Help content in general: aide (Rechercher dans l’aide). Supporting Scryve with money: soutien.",
+      "hi": "the screen and its title: सहायता (“सहायता” खोलें); help in general: मदद; the support team: सपोर्ट टीम",
+      "ja": "the Help screen: サポート; search it: ヘルプを検索; contact the team: サポートに問い合わせる; Foil's optional support for Scryve (money): 応援. Everyday \"help\" is plain Japanese (役立つ, 補助)",
+      "ko": "the screen and menu item: 도움말 (Scryve 도움말); the people who answer: 지원팀 (지원팀에 문의)",
+      "ar": "the Help screen: المساعدة (فتح المساعدة); support, contacting the team: الدعم (Scryve Support: دعم Scryve، تواصل مع الدعم)"
+    },
+    "feedback (messages players send to the Scryve team)": {
+      "en": ["feedback"],
+      "es": "comentarios (Tus comentarios, Enviar comentarios, Eliminar mis comentarios); haptic feedback: respuesta háptica",
+      "fr": "retours (Vos retours; Envoyer un retour; Réponses à vos retours), never commentaires. Haptic feedback is retour haptique.",
+      "hi": "फ़ीडबैक, masculine (आपका फ़ीडबैक, फ़ीडबैक भेजें)",
+      "ja": "フィードバック (送信したフィードバック); iOS haptic feedback: 触覚フィードバック",
+      "ko": "피드백 (내 피드백, 피드백 보내기); haptic feedback is 햅틱 피드백",
+      "ar": "الملاحظات (your feedback: ملاحظاتك; send feedback: إرسال ملاحظات). Haptic feedback is الاستجابة اللمسية, not this"
+    },
+    "rulings (official clarifications about a card)": {
+      "en": ["ruling"],
+      "es": "aclaraciones (Aclaraciones, Cargando aclaraciones…); never dictámenes",
+      "fr": "clarifications (Clarifications; Chargement des clarifications…; Aucune clarification pour cette carte), never rulings.",
+      "hi": "रूलिंग, feminine (रूलिंग लोड हो रही हैं)",
+      "ja": "ルーリング",
+      "ko": "룰링",
+      "ar": "الأحكام (أحكام البطاقة، لا توجد أحكام لهذه البطاقة بعد)"
+    },
+    "History (past games) and log (changes within one game)": {
+      "en": ["history", "log"],
+      "es": "History: Historial; log: registro (Registro, Cerrar registro); an entry in a log: cambio, never evento (evento is a store tournament)",
+      "fr": "History (past games): Historique. Log (changes within one game): journal (Journal; Fermer le journal; journal des points de vie).",
+      "hi": "History: हिस्ट्री, feminine (मैच हिस्ट्री, कनेक्टेड हिस्ट्री), never इतिहास; log: लॉग, masculine (लाइफ़ का लॉग); one entry in a log or timeline: बदलाव",
+      "ja": "past games: 履歴 (対戦履歴 where it needs context); the changes within one game: ログ (ライフのログ). Never 履歴 for the in-game log",
+      "ko": "History: 기록; log: 변경 내역 (close log: 변경 내역 닫기). Never call both 기록",
+      "ar": "History, the past games screen: السجل (سجل المباريات; connected history: سجل المباريات المتصلة); log of changes within one game: سجل التغييرات (menu item: التغييرات; life log: سجل نقاط الحياة)"
+    },
+    "pairings and Swiss (who plays whom each round)": {
+      "en": ["pairing", "Swiss"],
+      "es": "emparejamientos; Swiss: suizo (Suizo, rondas de suizo)",
+      "fr": "appariements (Appariements). Swiss: rondes suisses (structure label: Suisse).",
+      "hi": "पेयरिंग, feminine; to be paired: पेयर होना; Swiss: स्विस",
+      "ja": "the list of who plays whom: 対戦表; pair players: 対戦を組む (passive: 対戦が組まれる); the setup choice of method: 対戦方式; Swiss: スイスドロー",
+      "ko": "pairings: 대진 (the list: 대진표; setting: 대진 방식); Swiss: 스위스 라운드, never 스위스 alone",
+      "ar": "pairings: توزيع الطاولات; the structure picker heading: نظام التوزيع; Swiss: سويسري (the Swiss system: النظام السويسري). Never المواجهات, the match word, and never Latin Swiss"
+    },
+    "everyday actions: save, edit, undo, delete, share": {
+      "en": ["save", "edit", "undo", "delete", "share"],
+      "es": "guardar, editar, deshacer, eliminar, compartir. Delete is eliminar; borrar only clears text, a search or filters. Undo as a noun: rephrase with a verb (mientras se deshacían los cambios)",
+      "fr": "save: enregistrer; edit: modifier; undo: annuler (Annulation impossible); delete: supprimer; share: partager",
+      "hi": "save: सेव करें (saved: सेव हो गया; saving: सेव हो रहा है…); edit: एडिट करें (an edit: बदलाव; editor: एडिटर); undo: अनडू करें on a button, अनडू as a noun; cannot be undone: वापस नहीं लिया जा सकता; delete: हटाएँ (deleted: हट गया); share: शेयर करें. Never सहेजें, संपादित, पूर्ववत, पहले जैसा करें, मिटाएँ, डिलीट or साझा",
+      "ja": "save: 保存; edit: 編集; undo: 元に戻す (taking back one named change: 〜を取り消す); delete: 削除; share: 共有",
+      "ko": "save 저장; edit 편집 (never 수정 for the same action); undo 되돌리기 (never 실행 취소); delete 삭제; share 공유",
+      "ar": "save: حفظ; edit: تعديل; undo: تراجع (التراجع عن); delete: حذف; share: مشاركة; shared with you (tag): مُشارَكة معك (مجموعة مُشارَكة)"
+    },
+    "manage": {
+      "en": ["manage"],
+      "es": "gestionar (Gestionar, Gestionar suscripción, Gestionar suscripciones de Apple); never administrar",
+      "fr": "gérer",
+      "hi": "मैनेज करें (सब्सक्रिप्शन मैनेज करें); never प्रबंधित",
+      "ja": "管理 (サブスクリプションを管理, デッキを管理)",
+      "ko": "관리 (구독 관리)",
+      "ar": "إدارة (إدارة الاشتراك؛ verb: أدِر)"
+    },
+    "subscription and renewal": {
+      "en": ["subscription", "renew"],
+      "es": "suscripción; renew: renovarse (Se renueva el {{date}}); renewal: renovación (Avisos de renovación)",
+      "fr": "abonnement, masculine (l’abonnement; le résilier). Renew: se renouveler (Se renouvelle le {{date}}; rappels de renouvellement). Cancel it: résilier.",
+      "hi": "सब्सक्रिप्शन, masculine (आपका सब्सक्रिप्शन); renew: रिन्यू होना; renewal: रिन्यूअल (रिन्यूअल रिमाइंडर). Never सदस्यता or नवीनीकरण",
+      "ja": "サブスクリプション; renew: 更新 (renews yearly until canceled: 解約するまで毎年自動更新); cancel it: 解約. Google Play's own menu is お支払いと定期購入",
+      "ko": "구독; renew: 갱신 ({{date}}에 갱신); cancel a subscription: 해지, never 취소",
+      "ar": "subscription: الاشتراك; renew: التجديد (يتجدد سنويًا، تذكيرات التجديد)"
+    },
+    "chip (a small on-screen button, like the turn chip)": {
+      "en": ["chip"],
+      "es": "indicador (indicador de turno); never ficha, which is a Magic token",
+      "fr": "pastille (la pastille du tour)",
+      "hi": "चिप, feminine (टर्न चिप पर टैप करें)",
+      "ja": "name it by what it shows: the turn chip: ターン表示. Never チップ",
+      "ko": "칩 (턴 칩)",
+      "ar": "شارة (the turn chip: شارة الدور)"
+    },
+    "game names (Magic, Yu-Gi-Oh!, Pokémon, Lorcana, Flesh and Blood, Riftbound)": {
+      "en": ["Magic", "Yu-Gi-Oh!", "Pokémon", "Lorcana", "FaB", "Riftbound"],
+      "es": "Magic: Magic (full: Magic: The Gathering); Yu-Gi-Oh!: Yu-Gi-Oh!; Pokémon: Pokémon (full: JCC Pokémon); Lorcana: Lorcana (full: Disney Lorcana); FaB: FaB (full: Flesh and Blood); Riftbound: Riftbound",
+      "fr": "Magic: Magic (full name Magic: The Gathering, a trademark written as is); Yu-Gi-Oh!: Yu-Gi-Oh!; Pokémon: Pokémon (full name JCC Pokémon); Lorcana: Lorcana (full name Disney Lorcana); FaB: FaB (full name Flesh and Blood); Riftbound: Riftbound",
+      "hi": "Magic: The Gathering: मैजिक: द गैदरिंग (short: मैजिक); Yu-Gi-Oh!: यू-गी-ओह!; Pokémon: पोकेमॉन, also for the creatures on the board (Pokémon TCG: पोकेमॉन ट्रेडिंग कार्ड गेम); Disney Lorcana: डिज़्नी लोरकाना (short: लोरकाना); Flesh and Blood, FaB: फ़्लेश एंड ब्लड; Riftbound: रिफ़्टबाउंड. The app Pokémon TCG Live stays Latin",
+      "ja": "Magic: マジック (full: マジック：ザ・ギャザリング); Yu-Gi-Oh!: 遊戯王 (full: 遊戯王OCG); Pokémon: ポケモンカードゲーム (short ポケカ; the creature: ポケモン); Lorcana: ロルカナ (full: ディズニー・ロルカナ); Flesh and Blood / FaB: フレッシュ＆ブラッド (short フレブラ); Riftbound: リフトバウンド. Use the short form where the English is short",
+      "ko": "Magic: 매직: 더 개더링 (short 매직); Yu-Gi-Oh!: 유희왕; Pokémon: 포켓몬 카드 게임 (short 포켓몬); Lorcana: 디즈니 로카나 (short 로카나); Flesh and Blood: 플레시 앤드 블러드; FaB: FaB (short name, no Korean form); Riftbound: 리프트바운드",
+      "ar": "Magic: ماجيك (full name: ماجيك: ذا جاذرينج); Yu-Gi-Oh!: يوغي يو!; Pokémon: بوكيمون (the card game: لعبة بطاقات بوكيمون); Lorcana: لوركانا (full name: ديزني لوركانا); Flesh and Blood and FaB: فليش آند بلود; Riftbound: Riftbound (kept in Latin as on Riot's Arabic pages)"
+    },
+    "format names": {
+      "en": [
+        "Commander",
+        "Standard",
+        "Pioneer",
+        "Modern",
+        "Legacy",
+        "Vintage",
+        "Pauper",
+        "Brawl",
+        "Limited",
+        "Constructed",
+        "Advanced",
+        "Traditional",
+        "Rush Duel",
+        "Speed Duel",
+        "Expanded",
+        "Unlimited",
+        "Core Constructed",
+        "Infinity Constructed",
+        "Classic Constructed",
+        "Blitz",
+        "Silver Age",
+        "Living Legend",
+        "Ultimate Pit Fight"
+      ],
+      "es": "Commander: Commander; Standard: Estándar; Pioneer: Pioneer; Modern: Modern; Legacy: Legacy; Vintage: Vintage; Pauper: Pauper; Brawl: Brawl; Limited: Limitado; Constructed: Construido; Advanced: Avanzado; Traditional: Tradicional; Rush Duel: Rush Duel; Speed Duel: Speed Duel; Expanded: Expandido; Unlimited: Sin límites; Core Constructed: Core Construido; Infinity Constructed: Infinity Construido; Classic Constructed: Classic Constructed; Blitz: Blitz; Silver Age: Silver Age; Living Legend: Living Legend; Ultimate Pit Fight: Ultimate Pit Fight",
+      "fr": "Commander: Commander; Standard: Standard; Pioneer: Pioneer; Modern: Modern; Legacy: Legacy; Vintage: Vintage; Pauper: Pauper; Brawl: Brawl; Limited: Limité; Constructed: Construit (Magic and Riftbound); Advanced: Avancé; Traditional: Traditionnel; Rush Duel: Rush Duel; Speed Duel: Speed Duel; Expanded: Étendu; Unlimited: Illimité; Core Constructed: Core Construit; Infinity Constructed: Infinity Construit; Classic Constructed: Classic Constructed; Blitz: Blitz; Silver Age: Silver Age; Living Legend: Living Legend; Ultimate Pit Fight: Ultimate Pit Fight. In sentences: en Commander, le format Modern.",
+      "hi": "Commander: कमांडर; Standard: स्टैंडर्ड; Pioneer: पायनियर; Modern: मॉडर्न; Legacy: लेगसी; Vintage: विंटेज; Pauper: पॉपर; Brawl: ब्रॉल; Limited: लिमिटेड; Constructed: कंस्ट्रक्टेड; Advanced: एडवांस्ड; Traditional: ट्रेडिशनल; Rush Duel: रश ड्यूल; Speed Duel: स्पीड ड्यूल; Expanded: एक्सपैंडेड; Unlimited: अनलिमिटेड; Core Constructed: कोर कंस्ट्रक्टेड; Infinity Constructed: इन्फ़िनिटी कंस्ट्रक्टेड; Classic Constructed: क्लासिक कंस्ट्रक्टेड; Blitz: ब्लिट्ज़; Silver Age: सिल्वर एज; Living Legend: लिविंग लेजेंड; Ultimate Pit Fight: अल्टीमेट पिट फ़ाइट",
+      "ja": "Commander: コマンダー; Standard: スタンダード; Pioneer: パイオニア; Modern: モダン; Legacy: レガシー; Vintage: ヴィンテージ; Pauper: パウパー; Brawl: ブロール; Limited: リミテッド; Constructed: 構築; Advanced: アドバンス; Traditional: トラディショナル; Rush Duel: ラッシュデュエル; Speed Duel: スピードデュエル; Expanded (Pokémon): エクストラ; Unlimited (Pokémon): アンリミテッド (never 殿堂); Core Constructed: コア (コア構築 where 構築 helps); Infinity Constructed: インフィニティ; Classic Constructed: クラシック; Blitz: ブリッツ; Silver Age: シルバーエイジ; Living Legend: リビングレジェンド; Ultimate Pit Fight: アルティメット・ピットファイト",
+      "ko": "Commander: 커맨더; Standard (Magic and Pokémon): 스탠다드; Pioneer: 파이어니어; Modern: 모던; Legacy: 레거시; Vintage: 빈티지; Pauper: 파우퍼; Brawl: 난투; Limited: 리미티드; Constructed (Magic): 구축; Constructed (Riftbound): 사전 구성; Advanced: 어드밴스드; Traditional: 트래디셔널; Rush Duel: 러시 듀얼; Speed Duel: 스피드 듀얼; Expanded: 익스팬디드; Unlimited: 언리미티드; Core Constructed: 코어 컨스트럭티드; Infinity Constructed: 인피니티 컨스트럭티드; Classic Constructed: 클래식 컨스트럭티드; Blitz: 블리츠; Silver Age: 실버 에이지; Living Legend: 리빙 레전드; Ultimate Pit Fight: 얼티밋 핏 파이트",
+      "ar": "Commander: كوماندر; Standard: القياسي; Pioneer: بايونير; Modern: مودرن; Legacy: ليجاسي; Vintage: فينتج; Pauper: باوبر; Brawl: براول; Limited: المحدود; Constructed: المبني; Advanced: المتقدم; Traditional: التقليدي; Rush Duel: راش دويل; Speed Duel: مبارزة السرعة; Expanded: الموسّع; Unlimited: غير المحدود; Core Constructed: المبني الأساسي; Infinity Constructed: المبني اللانهائي; Classic Constructed: المبني الكلاسيكي; Blitz: بليتز; Silver Age: العصر الفضي; Living Legend: الأسطورة الحية; Ultimate Pit Fight: قتال الحلبة المطلق. Draft and Sealed: درافت وسيلد"
+    },
+    "variant names: Two-Headed Giant, Treachery, 2v2": {
+      "en": ["Two-Headed Giant", "2HG", "Treachery", "2v2"],
+      "es": "Two-Headed Giant: Gigante de dos cabezas; 2HG: 2HG; 2HG Commander: Commander de Gigante de dos cabezas (short: Commander 2HG); Treachery: Treachery; 2v2: 2 contra 2; Planechase: Planechase; Archenemy: Archenemy",
+      "fr": "Two-Headed Giant: Troll à deux têtes (never Géant à deux têtes); 2HG: Troll à deux têtes (2HG Commander: Commander Troll à deux têtes); Treachery: Treachery; 2v2: 2v2",
+      "hi": "Two-Headed Giant: टू-हेडेड जायंट; 2HG Commander: 2HG कमांडर; Treachery: ट्रेचरी; 2v2: 2v2; Planechase: प्लेनचेस; Archenemy: आर्चएनिमी",
+      "ja": "Two-Headed Giant / 2HG: 双頭巨人戦; 2HG Commander: 双頭巨人戦コマンダー; Treachery: トレチャリー; 2v2: 2対2",
+      "ko": "Two-Headed Giant and 2HG: 쌍두거인 (never 투헤디드 자이언트 or 2HG); 2HG Commander: 쌍두거인 커맨더; Treachery: 트레처리; 2v2: 2대2",
+      "ar": "Two-Headed Giant and 2HG: العملاق ذو الرأسين (genitive: مباريات العملاق ذي الرأسين); 2HG Commander: كوماندر العملاق ذي الرأسين; Treachery: الخيانة; 2v2: اثنان ضد اثنين (genitive: مباريات اثنين ضد اثنين)"
+    },
+    "Magic card types and supertypes": {
+      "en": [
+        "Legendary",
+        "Basic",
+        "Snow",
+        "Creature",
+        "Instant",
+        "Sorcery",
+        "Artifact",
+        "Enchantment",
+        "Planeswalker",
+        "Battle"
+      ],
+      "es": "Legendary: Legendario; Basic: Básica; Snow: Nevado; Creature: Criatura; Instant: Instantáneo; Sorcery: Conjuro; Artifact: Artefacto; Enchantment: Encantamiento; Planeswalker: Planeswalker; Battle: Batalla; Land: Tierra",
+      "fr": "Legendary: Légendaire; Basic: De base; Snow: Neigeux; Creature: Créature; Instant: Éphémère; Sorcery: Rituel; Artifact: Artefact; Enchantment: Enchantement; Planeswalker: Planeswalker; Battle: Bataille; Land: Terrain",
+      "hi": "Legendary: लेजेंडरी; Basic: बेसिक; Snow: स्नो; Creature: क्रिएचर; Instant: इंस्टेंट; Sorcery: सॉर्सरी; Artifact: आर्टिफ़ैक्ट; Enchantment: एनचैंटमेंट; Planeswalker: प्लेन्सवॉकर; Battle: बैटल; Land: लैंड",
+      "ja": "Legendary: 伝説の (alone as a label: 伝説); Basic: 基本; Snow: 氷雪; Creature: クリーチャー; Instant: インスタント; Sorcery: ソーサリー; Artifact: アーティファクト; Enchantment: エンチャント; Planeswalker: プレインズウォーカー; Battle: バトル; Land: 土地",
+      "ko": "Legendary: 전설적; Basic: 기본; Snow: 눈; Creature: 생물; Instant: 순간마법; Sorcery: 집중마법; Artifact: 마법물체; Enchantment: 부여마법; Planeswalker: 플레인즈워커; Land: 대지; Battle: 전투",
+      "ar": "Legendary: أسطوري; Basic: أساسي; Snow: ثلجي; Creature: مخلوق (plural المخلوقات); Instant: فوري; Sorcery: سحر; Artifact: قطعة أثرية (plural القطع الأثرية, never الأدوات); Enchantment: تعويذة; Planeswalker: بلانزووكر; Land: أرض (plural الأراضي); Battle: معركة. Supertypes agree with their noun (أرض أساسية)"
+    },
+    "Planechase and Archenemy deck and product names": {
+      "en": [
+        "Elemental Thunder",
+        "Metallic Dreams",
+        "Strike Force",
+        "Zombie Empire",
+        "Chaos Reigns",
+        "Night of the Ninja",
+        "Primordial Hunger",
+        "Savage Auras",
+        "Call for Backup",
+        "Cavalry Charge",
+        "Divine Convocation",
+        "Growing Threat",
+        "Tinker Time",
+        "Blast from the Past",
+        "Masters of Evil",
+        "Paradox Power",
+        "Timey-Wimey",
+        "Assemble the Doomsday Machine",
+        "Bring About the Undead Apocalypse",
+        "Scorch the World with Dragonfire",
+        "Trample Civilization Underfoot",
+        "Archenemy: Nicol Bolas",
+        "Planechase 2012",
+        "March of the Machine Commander",
+        "Doctor Who Commander"
+      ],
+      "es": "Elemental Thunder: Elemental Thunder; Metallic Dreams: Metallic Dreams; Strike Force: Strike Force; Zombie Empire: Zombie Empire; Chaos Reigns: Reino del caos; Night of the Ninja: Noche de los ninja; Primordial Hunger: Hambre primitivo; Savage Auras: Auras salvajes; Call for Backup: Petición de respaldo; Cavalry Charge: Carga de caballería; Divine Convocation: Convocación divina; Growing Threat: Amenaza creciente; Tinker Time: Hora de trastear; Blast from the Past: Blast from the Past; Masters of Evil: Masters of Evil; Paradox Power: Paradox Power; Timey-Wimey: Timey-Wimey; Assemble the Doomsday Machine: Assemble the Doomsday Machine; Bring About the Undead Apocalypse: Bring About the Undead Apocalypse; Scorch the World with Dragonfire: Scorch the World with Dragonfire; Trample Civilization Underfoot: Trample Civilization Underfoot; Archenemy: Nicol Bolas: Archenemy: Nicol Bolas; Planechase (2009): Planechase (2009); Planechase 2012: Planechase 2012; March of the Machine Commander: Commander de La Marcha de las Máquinas; Doctor Who Commander: Doctor Who Commander; Archenemy (2010): Archenemy (2010)",
+      "fr": "Elemental Thunder: Elemental Thunder; Metallic Dreams: Metallic Dreams; Strike Force: Strike Force; Zombie Empire: Zombie Empire; Chaos Reigns: Le chaos règne; Night of the Ninja: Nuit des ninjas; Primordial Hunger: Faim primordiale; Savage Auras: Auras sauvages; Call for Backup: Main-forte; Cavalry Charge: Charge des cavaliers; Divine Convocation: Convocation divine; Growing Threat: Menace grandissante; Tinker Time: Bricoleur dans l’âme; Blast from the Past: Voyage dans le passé; Masters of Evil: Maîtres du mal; Paradox Power: Puissance paradoxale; Timey-Wimey: Méli-mélo spatio-temporel; Assemble the Doomsday Machine: Assemble the Doomsday Machine; Bring About the Undead Apocalypse: Bring About the Undead Apocalypse; Scorch the World with Dragonfire: Scorch the World with Dragonfire; Trample Civilization Underfoot: Trample Civilization Underfoot; Archenemy: Nicol Bolas: Archenemy : Nicol Bolas; Planechase (2009): Planechase (2009); Planechase 2012: Planechase 2012; Archenemy (2010): Archenemy (2010); March of the Machine Commander: Commander L’invasion des machines; Doctor Who Commander: Commander Doctor Who",
+      "hi": "Elemental Thunder: एलिमेंटल थंडर; Metallic Dreams: मेटैलिक ड्रीम्स; Strike Force: स्ट्राइक फ़ोर्स; Zombie Empire: ज़ॉम्बी एम्पायर; Chaos Reigns: केऑस रेन्स; Night of the Ninja: नाइट ऑफ़ द निंजा; Primordial Hunger: प्राइमॉर्डियल हंगर; Savage Auras: सैवेज ऑरास; Call for Backup: कॉल फ़ॉर बैकअप; Cavalry Charge: कैवलरी चार्ज; Divine Convocation: डिवाइन कन्वोकेशन; Growing Threat: ग्रोइंग थ्रेट; Tinker Time: टिंकर टाइम; Blast from the Past: ब्लास्ट फ़्रॉम द पास्ट; Masters of Evil: मास्टर्स ऑफ़ ईविल; Paradox Power: पैराडॉक्स पावर; Timey-Wimey: टाइमी-वाइमी; Assemble the Doomsday Machine: असेंबल द डूम्सडे मशीन; Bring About the Undead Apocalypse: ब्रिंग अबाउट द अनडेड एपोकैलिप्स; Scorch the World with Dragonfire: स्कॉर्च द वर्ल्ड विद ड्रैगनफ़ायर; Trample Civilization Underfoot: ट्रैम्पल सिविलाइज़ेशन अंडरफ़ुट; Archenemy: Nicol Bolas: आर्चएनिमी: निकोल बोलस; Planechase 2012: प्लेनचेस 2012; March of the Machine Commander: मार्च ऑफ़ द मशीन कमांडर; Doctor Who Commander: डॉक्टर हू कमांडर",
+      "ja": "Elemental Thunder: Elemental Thunder (never sold in Japanese); Metallic Dreams: Metallic Dreams; Strike Force: Strike Force; Zombie Empire: Zombie Empire; Chaos Reigns: 混沌の支配; Night of the Ninja: 忍者の夜; Primordial Hunger: 始原の飢え; Savage Auras: 凶暴なるオーラ; Call for Backup: 賛助の呼びかけ; Cavalry Charge: 騎兵隊の猛進; Divine Convocation: 聖なる会合; Growing Threat: 高まる脅威; Tinker Time: 修繕の時間; Blast from the Past: 過去からの来襲; Masters of Evil: 悪の支配者; Paradox Power: パラドックスパワー; Timey-Wimey: タイミーワイミー; Assemble the Doomsday Machine: 破滅の日の機械を組み立てん; Bring About the Undead Apocalypse: アンデッドの終末を引き起こさん; Scorch the World with Dragonfire: ドラゴンの火で世界を焼き尽くさん; Trample Civilization Underfoot: 文明を足下に踏みつけん; Archenemy: Nicol Bolas: アーチエネミー：ニコル・ボーラス; Planechase (2009): プレインチェイス（2009）; Planechase 2012: プレインチェイス2012; Archenemy (2010): アーチエネミー（2010）; March of the Machine Commander: 『機械兵団の進軍』統率者デッキ; Doctor Who Commander: 『ドクター・フー』統率者デッキ",
+      "ko": "English-only decks keep the box name: Elemental Thunder: Elemental Thunder; Metallic Dreams: Metallic Dreams; Strike Force: Strike Force; Zombie Empire: Zombie Empire; Chaos Reigns: Chaos Reigns; Night of the Ninja: Night of the Ninja; Primordial Hunger: Primordial Hunger; Savage Auras: Savage Auras; Call for Backup: Call for Backup; Cavalry Charge: Cavalry Charge; Divine Convocation: Divine Convocation; Growing Threat: Growing Threat; Tinker Time: Tinker Time; Blast from the Past: Blast from the Past; Masters of Evil: Masters of Evil; Paradox Power: Paradox Power; Timey-Wimey: Timey-Wimey; Assemble the Doomsday Machine: Assemble the Doomsday Machine; Bring About the Undead Apocalypse: Bring About the Undead Apocalypse; Scorch the World with Dragonfire: Scorch the World with Dragonfire; Trample Civilization Underfoot: Trample Civilization Underfoot. Korean names: Archenemy: Nicol Bolas: 아치에너미: 니콜 볼라스; Archenemy (2010): 아치에너미 (2010); Planechase 2012: 플레인체이스 2012; March of the Machine Commander: 기계군단의 행진 커맨더; Doctor Who Commander: 닥터 후 커맨더",
+      "ar": "Elemental Thunder: رعد العناصر; Metallic Dreams: أحلام معدنية; Strike Force: قوة ضاربة; Zombie Empire: إمبراطورية الزومبي; Chaos Reigns: الفوضى تسود; Night of the Ninja: ليلة النينجا; Primordial Hunger: الجوع البدائي; Savage Auras: هالات متوحشة; Call for Backup: طلب الدعم; Cavalry Charge: هجمة الفرسان; Divine Convocation: المجمع الإلهي; Growing Threat: الخطر المتنامي; Tinker Time: وقت الاختراع; Blast from the Past: صدى من الماضي; Masters of Evil: أسياد الشر; Paradox Power: قوة المفارقة; Timey-Wimey: تايمي وايمي; Assemble the Doomsday Machine: ركّب آلة يوم القيامة; Bring About the Undead Apocalypse: أطلق نهاية العالم بالموتى الأحياء; Scorch the World with Dragonfire: أحرق العالم بنار التنين; Trample Civilization Underfoot: اسحق الحضارة تحت الأقدام; Archenemy: Nicol Bolas: العدو اللدود: نيكول بولاس; Planechase (2009): بلان تشاس (٢٠٠٩); Planechase 2012: بلان تشاس ٢٠١٢; Archenemy (2010): العدو اللدود (٢٠١٠); March of the Machine Commander: كوماندر زحف الآلات; Doctor Who Commander: كوماندر دكتور هو. Use these even though the products were sold only in English"
+    },
+    "web (Scryve's website and web app)": {
+      "en": ["web"],
+      "es": "web (la web, versión web)",
+      "fr": "web (le site web, la version web)",
+      "hi": "वेब",
+      "ja": "Web: Web (Japanese UI writes it in Latin, as in Web版)",
+      "ko": "웹",
+      "ar": "الويب (نسخة الويب)"
     }
   }
 }

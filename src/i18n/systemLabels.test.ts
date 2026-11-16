@@ -1,3 +1,5 @@
+import { modeProductName } from "@/features/game/playSystems"
+
 import systems from "./en/systems"
 import { PLANAR_DECKS, SCHEME_DECKS } from "../../convex/lib/modeDecks"
 import { SYSTEMS } from "../../convex/lib/systems/definitions"
@@ -30,9 +32,8 @@ describe("game system labels", () => {
     const productIds = (deck: (typeof decks)[number]) => deck.id.split("-")[0]
 
     expect(systems.modeDeck).toEqual(Object.fromEntries(decks.map((deck) => [deck.id, deck.name])))
-    expect(systems.modeProduct).toEqual(
-      Object.fromEntries(decks.map((deck) => [productIds(deck), deck.product])),
-    )
+    expect(Object.keys(systems.modeProduct)).toEqual([...new Set(decks.map(productIds))])
+    expect(decks.map(modeProductName)).toEqual(decks.map((deck) => deck.product))
   })
 
   it("translates every counter and designation instead of showing its English label", () => {

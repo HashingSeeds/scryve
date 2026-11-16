@@ -157,10 +157,12 @@ export function modeDeckName({ id, name }: { id: string; name: string }): string
   return hasOwnKey(systems.modeDeck, id) ? translate(`systems:modeDeck.${id}`) : name
 }
 
+const MODE_PRODUCT_YEARS: Partial<Record<string, number>> = { pc09: 2009, pc12: 2012, arc: 2010 }
+
 export function modeProductName({ id, product }: { id: string; product: string }): string {
   const productId = id.split("-")[0]
   return hasOwnKey(systems.modeProduct, productId)
-    ? translate(`systems:modeProduct.${productId}`)
+    ? translate(`systems:modeProduct.${productId}`, { year: MODE_PRODUCT_YEARS[productId] })
     : product
 }
 
