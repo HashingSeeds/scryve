@@ -1,0 +1,10 @@
+# flow: Perf life taps
+# intent: 12 quick life taps on one seat, the board's most common interaction.
+appId: ${MAESTRO_APP_ID}
+---
+- repeat:
+    times: 12
+    commands:
+      - tapOn:
+          id: "life-seat-2-1"
+- waitForAnimationToEnd
