@@ -4,9 +4,15 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   relativeTime: {
     justNow: "à l’instant",
-    minutes: "il y a {{minutes}} min",
-    hours: "il y a {{hours}} h",
-    days: "il y a {{days}} j",
+    minutes_one: "il y a {{count}} min",
+    minutes_many: "il y a {{count}} min",
+    minutes_other: "il y a {{count}} min",
+    hours_one: "il y a {{count}} h",
+    hours_many: "il y a {{count}} h",
+    hours_other: "il y a {{count}} h",
+    days_one: "il y a {{count}} j",
+    days_many: "il y a {{count}} j",
+    days_other: "il y a {{count}} j",
   },
   resumeTitle: {
     hostingLobby: "Hôte · en attente du début",

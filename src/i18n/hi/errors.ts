@@ -54,6 +54,8 @@ export default {
   syncOwnerChanged: "साइन इन किया हुआ खाता बदल गया",
   tooManyJoinAttempts: "शामिल होने की बहुत ज़्यादा कोशिशें हो गईं; एक मिनट रुककर फिर कोशिश करें",
   unauthenticated: "साइन इन ज़रूरी है",
+  unknownFormat: "यह फ़ॉर्मैट इस गेम के लिए उपलब्ध नहीं है",
+  unknownGame: "अनजान गेम",
   updateRequired: "इस गेम में शामिल होने के लिए Scryve अपडेट करें",
   ygoprodeckInvalidResponse: "डेक का जवाब बहुत बड़ा है या खाली है।",
 } satisfies LocaleNamespace

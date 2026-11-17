@@ -43,6 +43,14 @@ export default {
     arc: "Archenemy ({{year}})",
     e01: "Archenemy: Nicol Bolas",
   },
+  domain: {
+    Fury: "Furia",
+    Calm: "Calma",
+    Mind: "Mente",
+    Body: "Cuerpo",
+    Chaos: "Caos",
+    Order: "Orden",
+  },
   cardType: {
     Legendary: "Legendario",
     Basic: "Básica",
@@ -236,7 +244,9 @@ export default {
     riftbound_other: "{{count}} cambios de puntos",
   },
   noneTaken: "sin cartas de Premio tomadas",
-  taken: "Cartas de Premio tomadas: {{amount}}",
+  taken_one: "{{count}} carta de Premio tomada",
+  taken_many: "{{count}} de cartas de Premio tomadas",
+  taken_other: "{{count}} cartas de Premio tomadas",
   even: "sin cambios",
   fromStart: "{{delta, signed}} desde el inicio",
 } satisfies LocaleNamespace

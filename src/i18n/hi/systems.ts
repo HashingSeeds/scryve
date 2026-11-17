@@ -43,6 +43,14 @@ export default {
     arc: "आर्चएनिमी ({{year}})",
     e01: "आर्चएनिमी: निकोल बोलस",
   },
+  domain: {
+    Fury: "फ़्यूरी",
+    Calm: "कॉम",
+    Mind: "माइंड",
+    Body: "बॉडी",
+    Chaos: "कैओस",
+    Order: "ऑर्डर",
+  },
   cardType: {
     Legendary: "लेजेंडरी",
     Basic: "बेसिक",
@@ -222,7 +230,8 @@ export default {
     riftbound_other: "{{count}} पॉइंट बदलाव",
   },
   noneTaken: "कोई प्राइज़ कार्ड नहीं लिया",
-  taken: "{{amount}} प्राइज़ कार्ड लिए",
+  taken_one: "{{count}} प्राइज़ कार्ड लिया",
+  taken_other: "{{count}} प्राइज़ कार्ड लिए",
   even: "कोई बदलाव नहीं",
   fromStart: "शुरुआत से {{delta, signed}}",
 } satisfies LocaleNamespace

@@ -60,6 +60,8 @@ const errors = {
   // hi: Joining is शामिल होना, never जोड़ना (to add): “शामिल होने की बहुत ज़्यादा कोशिशें हो गईं; एक मिनट रुककर फिर कोशिश करें”.
   tooManyJoinAttempts: "Too many join attempts; wait a minute and try again",
   unauthenticated: "Authentication required",
+  unknownFormat: "This format isn't available for this game",
+  unknownGame: "Unknown game",
   updateRequired: "Update Scryve to join this game",
   ygoprodeckInvalidResponse: "The deck response is too large or empty.",
 }

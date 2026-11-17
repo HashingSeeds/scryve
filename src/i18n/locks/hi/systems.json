@@ -34,6 +34,12 @@
   "modeProduct.who": "b100d778ebfd.c23d08522a96",
   "modeProduct.arc": "c8e2c48c75ce.872412183f93",
   "modeProduct.e01": "034577a7391d.f9dcfda222e5",
+  "domain.Fury": "d06fc619db07.f4be886f44e4",
+  "domain.Calm": "5909461494f5.97fbc2f81fc6",
+  "domain.Mind": "b25de0f7504e.0ba380efe99c",
+  "domain.Body": "3cb9c3a32b62.b6d96648b36f",
+  "domain.Chaos": "62d31a6f8c96.2a2b2167d499",
+  "domain.Order": "9a2c454d5d05.1505bb570c99",
   "cardType.Legendary": "31a1de4a45f4.c0651583b35c",
   "cardType.Basic": "cd804fbc258b.e161e1dc4ff5",
   "cardType.Snow": "f746e819cab2.242dc1b3af97",
@@ -155,7 +161,7 @@
   "counterChange.fab": "0af633870924.be7a7964cf4d",
   "counterChange.riftbound": "70eec4560d80.81c6f536955a",
   "noneTaken": "6483b1ca2323.d043c4edd57f",
-  "taken": "6962b8b3487c.27eef2979c48",
+  "taken": "7b3c6fdc9133.e503935565f9",
   "even": "3fd6fef80438.cb0c3ba4ba37",
   "fromStart": "c46a8dcd572d.0d402d588cf2"
 }

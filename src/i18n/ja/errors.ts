@@ -53,6 +53,8 @@ export default {
   syncOwnerChanged: "サインイン中のアカウントが変更されました",
   tooManyJoinAttempts: "参加の試行回数が多すぎます。1分ほど待ってからもう一度お試しください",
   unauthenticated: "認証が必要です",
+  unknownFormat: "このゲームでは使えないフォーマットです",
+  unknownGame: "不明なゲームです",
   updateRequired: "このゲームに参加するには、Scryveを更新してください",
   ygoprodeckInvalidResponse: "デッキの応答が大きすぎるか、空です。",
 } satisfies LocaleNamespace

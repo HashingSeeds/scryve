@@ -4,9 +4,9 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   relativeTime: {
     justNow: "방금",
-    minutes: "{{minutes}}분 전",
-    hours: "{{hours}}시간 전",
-    days: "{{days}}일 전",
+    minutes_other: "{{count}}분 전",
+    hours_other: "{{count}}시간 전",
+    days_other: "{{count}}일 전",
   },
   resumeTitle: {
     hostingLobby: "호스트 · 시작 대기 중",

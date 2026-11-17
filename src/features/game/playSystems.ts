@@ -171,6 +171,10 @@ export function cardFilterOptionLabel(game: string, filterId: string, option: st
   return hasOwnKey(systems.cardType, option) ? translate(`systems:cardType.${option}`) : option
 }
 
+export function domainName(domain: string): string {
+  return hasOwnKey(systems.domain, domain) ? translate(`systems:domain.${domain}`) : domain
+}
+
 export function formatName(game: string, format: string): string {
   return hasOwnKey(systems.formatName, game) && hasOwnKey(systems.formatName[game], format)
     ? translate(`systems:formatName.${game}.${format}`)
@@ -195,7 +199,7 @@ export function counterDeltaFromStartLabel(
     const taken = startingValue - current
     return taken === 0
       ? translate("systems:noneTaken")
-      : translate("systems:taken", { amount: taken })
+      : translate("systems:taken", { count: taken })
   }
   return delta === 0 ? translate("systems:even") : translate("systems:fromStart", { delta })
 }

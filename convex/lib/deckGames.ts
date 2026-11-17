@@ -50,7 +50,7 @@ export function assertDeckGameFormat(game: string, format: string) {
   if (!known.formats.some((candidate) => candidate.id === format))
     throw new ConvexError({
       code: "unknown_format",
-      message: `${format} is not a ${known.label} format`,
+      message: "This format isn't available for this game",
     })
   return format
 }
