@@ -3,8 +3,9 @@ import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
   camera:
-    "ScryveのゲームQR招待コードをスキャンし、カード名を読み取ります。写真はこのデバイスから出ることはありません。",
-  photos: "選択したスクリーンショットをサポートリクエストに添付することをScryveに許可します。",
+    "Scryveの招待QRコードのスキャンとカード名の読み取りに使用します。写真はこのデバイスから外に出ません。",
+  photos:
+    "選択したスクリーンショットをサポートへの問い合わせに添付するため、Scryveに許可してください。",
   localNetwork:
-    "Scryveはローカルネットワークを使用して、近くのデバイスにあるゲームを見つけて参加します。",
+    "近くのデバイスにあるゲームを見つけて参加するため、ローカルネットワークを使用します。",
 } satisfies LocaleNamespace
