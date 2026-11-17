@@ -12,6 +12,8 @@ const SOURCE_LOCALE = "en"
 const MODEL = "claude-sonnet-5-5"
 const USD_PER_MILLION_TOKENS = { input: 2, output: 10 }
 const UNITS_PER_REQUEST = 100
+// why: translated like the app's copy but used outside it (RevenueCat, store listings), so no app bundle loads it.
+const OFF_APP_NAMESPACES = ["storefront"]
 
 const LOCALES = {
   es: "Spanish",
@@ -498,7 +500,14 @@ function loadTs(file) {
 }
 
 function loadEnglish() {
-  return loadTs(path.join(I18N_DIR, SOURCE_LOCALE, "index.ts"))
+  const offApp = OFF_APP_NAMESPACES.map((namespace) => [
+    namespace,
+    loadTs(namespacePath(SOURCE_LOCALE, namespace)),
+  ])
+  return {
+    ...loadTs(path.join(I18N_DIR, SOURCE_LOCALE, "index.ts")),
+    ...Object.fromEntries(offApp),
+  }
 }
 
 function namespaceSource(tree) {
@@ -521,8 +530,9 @@ function resourcesSource(locales, namespaces, { web }) {
   return `${GENERATED_HEADER}\nexport const namespaces = ${JSON.stringify(namespaces)}\n\nexport const resources = { ${[english, ...loaders].join(", ")} }\n`
 }
 
-function scaffoldFiles(namespaces) {
+function scaffoldFiles(allNamespaces) {
   const locales = Object.keys(LOCALES)
+  const namespaces = allNamespaces.filter((namespace) => !OFF_APP_NAMESPACES.includes(namespace))
   return [
     [path.join(I18N_DIR, "resources.ts"), resourcesSource(locales, namespaces, { web: false })],
     [path.join(I18N_DIR, "resources.web.ts"), resourcesSource(locales, namespaces, { web: true })],
@@ -788,12 +798,112 @@ async function translate({ onlyNamespace, retranslate }) {
   console.log(`Used ${usageSummary()}.`)
 }
 
+function parseCsv(text) {
+  const rows = []
+  let row = []
+  let field = ""
+  let quoted = false
+  const endField = () => {
+    row.push(field)
+    field = ""
+  }
+  const endRow = () => {
+    endField()
+    rows.push(row)
+    row = []
+  }
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (quoted && char === '"' && text[i + 1] === '"') field += text[++i]
+    else if (char === '"') quoted = !quoted
+    else if (quoted || (char !== "," && char !== "\n" && char !== "\r")) field += char
+    else if (char === ",") endField()
+    else if (char === "\n") endRow()
+  }
+  if (field || row.length) endRow()
+  return rows
+}
+
+const csvLine = (row) => row.map((field) => `"${field.replaceAll('"', '""')}"`).join(",")
+
+// why: plan limits come from the code that enforces them, so the paywall can't promise a different number.
+function paywallValues() {
+  const policy = loadModule(path.join(ROOT, "convex/lib/policy.ts"))
+  return {
+    proDecks: policy.MAX_PREMIUM_DECKS,
+    freeDecks: policy.FREE_DECK_LIMIT,
+    proVersions: policy.MAX_DECK_VERSIONS,
+    freeVersions: policy.FREE_DECK_VERSIONS,
+  }
+}
+
+function fillPaywallText(text, values, locale) {
+  const { language, region } = new Intl.Locale(locale).maximize()
+  const number = new Intl.NumberFormat(`${language}-${region}`)
+  return text.replace(/{{\s*([\w.]+)\s*}}/g, (token, name) =>
+    Object.hasOwn(values, name) ? number.format(values[name]) : `{{ ${name} }}`,
+  )
+}
+
+// why: RevenueCat names columns by language ("French") and rows by its own component IDs, so rows are matched by their English text.
+function paywall([input, output = input.replace(/\.csv$/, "-translated.csv")]) {
+  if (!input) throw new Error("Usage: pnpm i18n:paywall <RevenueCat export.csv> [output.csv]")
+  const values = paywallValues()
+  const english = flatten(loadEnglish().storefront.paywall)
+  const translated = Object.fromEntries(
+    Object.keys(LOCALES).map((locale) => [
+      locale,
+      flatten(loadTs(namespacePath(locale, "storefront"))?.paywall ?? {}),
+    ]),
+  )
+  const keyByEnglish = new Map(
+    Object.entries(english).map(([key, text]) => [
+      fillPaywallText(text, values, SOURCE_LOCALE),
+      key,
+    ]),
+  )
+  const localeByColumn = new Map(Object.entries(LOCALES).map(([locale, name]) => [name, locale]))
+  const [header, ...rows] = parseCsv(fs.readFileSync(input, "utf8").replace(/^\uFEFF/, ""))
+  const unknownColumns = header.slice(2).filter((name) => !localeByColumn.has(name))
+  if (unknownColumns.length)
+    throw new Error(
+      `No translations for ${unknownColumns.join(", ")}. Known: ${[...localeByColumn.keys()].join(", ")}`,
+    )
+  const unmatched = []
+  const filled = rows.map((row) => {
+    const text = row[1].trim()
+    const passThrough = /^https?:\/\//.test(text) || !text.replace(/{{[^}]*}}/g, "").trim()
+    const key = keyByEnglish.get(text)
+    if (!passThrough && !key) unmatched.push(text)
+    return [
+      ...row.slice(0, 2),
+      ...header.slice(2).map((name) => {
+        const locale = localeByColumn.get(name)
+        if (passThrough) return row[1]
+        const translation = translated[locale][key]
+        if (!translation)
+          throw new Error(
+            `${locale}/storefront: paywall.${key} is missing; run pnpm i18n:translate`,
+          )
+        return fillPaywallText(translation, values, locale)
+      }),
+    ]
+  })
+  if (unmatched.length)
+    throw new Error(
+      `Add this paywall text to src/i18n/en/storefront.ts, then run pnpm i18n:translate:\n${unmatched.join("\n")}`,
+    )
+  fs.writeFileSync(output, `\uFEFF${[header, ...filled].map(csvLine).join("\n")}\n`)
+  console.log(`Wrote ${output}. Import it in RevenueCat under Localization.`)
+}
+
 async function main() {
   const [command, ...rest] = process.argv.slice(2)
   if (command === "check") return check()
   if (command === "translate") return translate(parseArgs(rest))
+  if (command === "paywall") return paywall(rest)
   console.error(
-    "Usage: node scripts/i18n.cjs <check|translate> [--ns <namespace>] [--match <regex>]",
+    "Usage: node scripts/i18n.cjs <check|translate|paywall> [--ns <namespace>] [--match <regex>]",
   )
   process.exitCode = 1
 }

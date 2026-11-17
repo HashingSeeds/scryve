@@ -140,7 +140,7 @@ export default {
       restorePro: {
         question: "Scryve Pro 복원",
         answer:
-          "Scryve를 열고 계정으로 이동한 다음 Scryve Pro를 선택하고 구매 복원을 탭하세요. 최초 구매에 사용한 Apple 또는 Google 계정을 그대로 사용하세요.",
+          "Scryve를 열고 계정으로 이동하여 Scryve Pro를 선택한 다음 구매 복원을 탭하세요. 최초 구매 때 사용한 Apple 또는 Google 계정을 사용하세요.",
       },
       manageSubscription: {
         question: "구독 관리 또는 해지",
