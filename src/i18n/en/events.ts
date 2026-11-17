@@ -8,6 +8,7 @@ const events = {
   actions: "Event actions",
   failed: "That didn't work. Try again.",
   // Label above a web address the organizer opens on a store TV to show pairings, the clock, and standings.
+  // ja: The shop's TV display, not the App Store: 店内表示用の画面. Never ストア.
   storeScreen: "Store screen",
   errors: {
     nameRejected: "Choose a different name",
@@ -25,6 +26,7 @@ const events = {
   signIn: "Sign in to run or join events",
   notFound: "This event no longer exists",
   status: {
+    // ko: A status, not a button: '등록 중'.
     registration: "Registration",
     active: "Round {{round}}",
     finished: "Finished",
@@ -49,10 +51,15 @@ const events = {
     name: "Name",
     namePlaceholder: "Friday Modern",
     format: "Format",
+    // ja: Setup label for how players are paired: 対戦方式.
     structure: "Pairings",
-    bestOf: "Match length",
+    // The choice of best of 1, 3 or 5 games per match.
+    // ja: Organizers say マッチ形式 (values like 3本勝負).
+    // fr: The choice is best of 1, 3 or 5, not a duration: "Format du match". Never Durée.
+    bestOf: "Best of",
     rounds: "Rounds",
     roundMinutes: "Minutes per round",
+    // hi: No gender slash: “मैं भी खिलाड़ी हूँ”.
     playing: "I'm playing too",
     create: "Create event",
     creating: "Creating…",
@@ -62,6 +69,8 @@ const events = {
     code: "Event code",
     scan: "Scan QR code",
     join: "Join",
+    // fr: Joining an event, not signing in: "Connexion à l’événement…".
+    // es: Use "Uniéndote…", like events:nearby.joining.
     joining: "Joining…",
     invalidCode: "Enter the {{length}}-character code",
     notFound: "No event has that code",
@@ -79,6 +88,7 @@ const events = {
     adjustMinutes: "{{minutes, signed}} min",
     paused: "Paused",
     // The round clock ran out.
+    // hi: Time has been called, not a label: “समय खत्म”.
     timeUp: "Time",
   },
   startRound: "Start round {{round}}",
@@ -103,11 +113,14 @@ const events = {
     // Withdrawing from an event so you are not paired in later rounds. Use the tournament word for dropping.
     action: "Drop",
     title: "Drop from this event?",
+    // ja: Being paired is 対戦が組まれる: 以降のラウンドでは対戦が組まれません。
     message: "You won't be paired in later rounds.",
     confirm: "Drop",
   },
   // Puts a dropped player back into the next round's pairings.
+  // es: Puts a dropped player back into the pairings; sits next to "Retirarse". Use "Reincorporar", never "Volver", which reads as Back.
   undrop: "Return",
+  // hi: Status of a player who left the event: “ड्रॉप हुए”, not ड्रॉप किया.
   dropped: "Dropped",
   guest: "Guest",
   addGuest: "Add guest",
@@ -119,8 +132,15 @@ const events = {
   versus: "{{first}} vs {{second}}",
   bye: "Bye",
   tableStatus: {
+    // ja: A table still playing, same word as the store screen: 対戦中.
+    // hi: A table with no result yet: “बाकी”, not खुला.
+    // fr: Table status while the game is on; same word in the app and on the TV: "En cours".
     open: "Open",
+    // fr: Same word in the app and on the TV: "Résultat déclaré".
     reported: "Reported",
+    // ja: Same word as the store screen: 承認済み.
+    // hi: “पुष्टि हुई”, same as eventDisplay:tableStatus.confirmed.
+    // fr: Same word in the app and on the TV: "Résultat confirmé".
     confirmed: "Confirmed",
   },
   myTable: "Your table",
@@ -128,9 +148,11 @@ const events = {
   waitingToStart: "Waiting for round {{round}}",
   report: "Report result",
   changeReport: "Change result",
+  // ja: Another player agrees to the reported result: 結果を承認. Never 確認.
   confirm: "Confirm result",
   // {{count}} is how many players at the table could confirm the report; one confirmation is enough.
   waitingForConfirm_one: "Waiting for your opponent to confirm",
+  // ja: Agreeing to the report is 承認: 他のプレイヤーの承認を待っています.
   waitingForConfirm_other: "Waiting for another player to confirm",
   startMatch: "Start match",
   replaceGame: {
@@ -165,11 +187,15 @@ const events = {
     denied: "Allow local network access in Settings to find events on this Wi-Fi.",
     name: "Your name",
     join: "Join",
+    // fr: Joining an event, not signing in: "Connexion à l’événement…".
     joining: "Joining…",
+    // ko: '주최자 기기에 다시 연결하는 중…'.
     reconnecting: "Reconnecting to the host…",
     replaceUnsaved: {
+      // hi: Confirming deletes the last event and starts a new one; बदलना would mean edit it: “पिछला इवेंट हटाकर नया बनाएँ?”
       title: "Replace your last event?",
       message: "It isn't saved to an account, so hosting a new event deletes it from this device.",
+      // hi: “हटाकर नया बनाएँ”, matching the title.
       confirm: "Replace",
     },
     rejected: {
@@ -182,6 +208,7 @@ const events = {
   },
   settings: {
     rounds: "Rounds",
+    // ja: The recommended number of rounds for this many players: {{count}}人の推奨ラウンド数：{{rounds}}.
     suggested: "Suggested for {{count}} players: {{rounds}}",
     roundMinutes: "Minutes per round",
   },
@@ -189,6 +216,7 @@ const events = {
     rank: "#",
     player: "Player",
     // Column header: match points.
+    // hi: “पॉइंट”, never अंक, matching the store screen.
     points: "Pts",
     // Column header: wins, losses, draws.
     record: "W-L-D",

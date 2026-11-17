@@ -2,6 +2,7 @@ import { useState } from "react"
 import { ScrollView } from "react-native"
 import type { ViewStyle } from "react-native"
 
+import { formatName } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -72,7 +73,7 @@ export function DeckSettingsDialog({
           value={format}
           options={deckFormats(game).map((candidate) => ({
             id: candidate.id,
-            label: candidate.label,
+            label: formatName(game, candidate.id),
           }))}
           onSelect={(next) => {
             if (next) setFormat(next)

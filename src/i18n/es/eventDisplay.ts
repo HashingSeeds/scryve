@@ -20,7 +20,7 @@ export default {
   record: "V-D-E",
   tableStatus: {
     open: "Jugando",
-    reported: "Reportado",
-    confirmed: "Confirmado",
+    reported: "Reportada",
+    confirmed: "Confirmada",
   },
 } satisfies LocaleNamespace

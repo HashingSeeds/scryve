@@ -23,6 +23,7 @@ const feedback = {
     // Centered above the empty composer, before anything is sent.
     prompt: {
       feature: "What would you like to see?",
+      // fr: Short and plain: "Quel est le problème ?"
       bug: "What went wrong?",
     },
     // Placeholders in a narrow composer next to two buttons. Keep each to one short line.
@@ -35,6 +36,7 @@ const feedback = {
     selectedScreenshot: "Selected screenshot",
     screenshotFailed: "Couldn't add that screenshot. Try another image.",
     // One line above the composer. <privacy> links to the Privacy Policy.
+    // fr: "it" is the message: "Une IA peut nous aider à le lire."
     notice: "Any language works. AI may help us read it. <privacy>Privacy</privacy>",
     includeAccount: "Include my account",
     includeAccountHelper: "Replies sync to your devices, and we see your username.",
@@ -78,6 +80,7 @@ const feedback = {
   // Asked once, after the player's first feedback send.
   notifyPrompt: {
     title: "Get a notification for replies?",
+    // ko: 'Either way' means with or without notifications: '알림을 받지 않아도 답변은 항상 Scryve에 표시됩니다.'
     body: "Replies always show up here in Scryve either way.",
     notNow: "Not now",
     notify: "Notify me",

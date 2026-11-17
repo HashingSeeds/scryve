@@ -1,17 +1,8 @@
 import type { RenderResult } from "@testing-library/react-native"
 import type { ReactTestRendererJSON } from "react-test-renderer"
 
-import { SYSTEMS } from "../convex/lib/systems/definitions"
-
-// why: the app's name and game and format names stay in English in every language, so they never pass through a translation.
-const PROPER_NAMES = [
-  "Scryve",
-  ...Object.values(SYSTEMS).flatMap((system) => [
-    system.label,
-    system.shortLabel,
-    ...system.formats.map((format) => format.label),
-  ]),
-]
+// why: the app's name stays Scryve in every language, so it never passes through a translation.
+const PROPER_NAMES = ["Scryve"]
 
 export function visibleTexts(view: RenderResult) {
   const texts: string[] = []

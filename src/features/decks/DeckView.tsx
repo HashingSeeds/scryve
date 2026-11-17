@@ -12,7 +12,7 @@ import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
-import { localizedDeckSections } from "@/features/game/playSystems"
+import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -28,7 +28,6 @@ import { cardCountLabel } from "./deckCopy"
 import { isCommanderPick, moveTarget, sideboardSection } from "./deckDraft"
 import { DeckIssues, useDeckIssues } from "./DeckIssues"
 import { useHostDeckSearch, type DeckSearchHost } from "./deckSearchHost"
-import { deckFormatLabel, deckGame } from "../../../convex/lib/deckGames"
 import { tracksResults } from "../../../convex/lib/systems"
 
 export type DeckMode = "play" | "build"
@@ -217,8 +216,8 @@ export function DeckView({
                 size="xs"
                 tone="dim"
                 text={joinParts([
-                  deckGame(game)?.shortLabel ?? game,
-                  deckFormatLabel(game, format),
+                  gameName(game),
+                  formatName(game, format),
                   cardsUnavailable
                     ? undefined
                     : sideCount

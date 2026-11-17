@@ -2,10 +2,10 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
-  notFound: "そのコードのイベントはありません",
-  roundOf: "第{{round}}ラウンド / 全{{planned}}ラウンド",
-  round: "第{{round}}ラウンド",
-  final: "最終結果",
+  notFound: "このコードのイベントはありません",
+  roundOf: "ラウンド{{round}}/{{planned}}",
+  round: "ラウンド{{round}}",
+  final: "最終",
   code: "コード",
   paused: "一時停止中",
   time: "時間切れ",
@@ -19,6 +19,6 @@ export default {
   tableStatus: {
     open: "対戦中",
     reported: "報告済み",
-    confirmed: "確定済み",
+    confirmed: "承認済み",
   },
 } satisfies LocaleNamespace

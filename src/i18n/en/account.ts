@@ -2,6 +2,7 @@ const account = {
   // Button that goes to the Play tab.
   openPlay: "Go to Play",
   signIn: "Sign in",
+  // ja: Stay means they are kept, not deleted: ローカルゲームはこのデバイスに残ります。 Never 保存されます.
   localGamesStay: "Local games stay on this device.",
   legal: {
     heading: "Legal",
@@ -26,6 +27,7 @@ const account = {
     appearance: "Appearance",
     about: "About",
     version: "Version",
+    // ar: Unit shown after a stepper number. Write "عدد اللاعبين"; لاعبون is wrong after any number.
     players: "players",
     // Label above a choice of which screen Scryve shows when it opens.
     openScryveTo: "When Scryve opens, show",
@@ -36,6 +38,7 @@ const account = {
     },
     game: "Game",
     // Heading of the picker for the game and format new games start with.
+    // ja: Heading for the defaults new games start with: 新しいゲームの初期設定.
     chooseGame: "Start new games as",
     closeGameChoices: "Close game choices",
     haptics: {
@@ -56,12 +59,16 @@ const account = {
       proFailed: "Couldn't check Scryve Pro, so Pro icons are locked.",
       names: {
         Default: "Default",
+        // ko: '2'.
         Two: "Two",
+        // ko: '3'.
         Three: "Three",
         Midnight: "Midnight",
         Graphite: "Graphite",
         Ink: "Ink",
+        // ar: Icon drawn as an outline: "الإطار". المحيط reads as "the ocean".
         Outline: "Outline",
+        // ko: An off-white color name: '아이보리'.
         Bone: "Bone",
         Paper: "Paper",
         Ash: "Ash",
@@ -70,6 +77,7 @@ const account = {
         Contour: "Contour",
         Stripes: "Stripes",
         Neon: "Neon",
+        // ar: Icon in blueprint style: "المخطط الأزرق". Bare المخطط is the Archenemy scheme word.
         Blueprint: "Blueprint",
         Gilded: "Gilded",
         Prism: "Prism",
@@ -116,6 +124,7 @@ const account = {
     },
     beta: {
       label: "Beta updates",
+      // hi: “नए अपडेट बाकी लोगों से पहले पाएँ। इनमें गड़बड़ हो सकती है।” (बाकी सबसे पहले reads as “first of all”.)
       helper: "Gets unreleased updates before everyone else. They may be unstable.",
     },
     backToPreview: "Back to preview",
@@ -125,10 +134,12 @@ const account = {
     copyFailed: "Could not copy. Try again.",
     turns: {
       label: "Turns",
+      // ko: '현재 누구의 턴인지 표시합니다. 턴 칩을 탭하면 다음 플레이어에게 넘어갑니다.'
       helper: "Shows whose turn it is. Tap the turn chip to pass.",
     },
     syncStats: {
       // Playful name for a hidden switch that shows technical timing numbers on the game board.
+      // ko: Use YouTube's Korean name for the same menu: '전문가용 통계'.
       label: "Stats for nerds",
       helper:
         "Shows how long changes take to reach each device in online and nearby games, and how the card scanner finds cards.",
@@ -183,6 +194,7 @@ const account = {
     title: "Delete account",
     eyebrow: "ACCOUNT & DATA",
     heading: {
+      // hi: “खाता हटाने के अनुरोध पर ध्यान दें”.
       needsAttention: "Your deletion needs attention",
       inProgress: "Your deletion is in progress",
       before: "Before you delete your account",
@@ -198,14 +210,18 @@ const account = {
       },
       history: {
         title: "Shared match history is anonymized",
+        // ar: The entries are unlinked from the account and get a neutral avatar: "يحتفظ اللاعبون الآخرون بنتيجة المواجهة، لكن مقاعدك تتحول إلى إدخالات باسم «لاعب محذوف» غير مرتبطة بحسابك، مع صورة رمزية محايدة."
+        // ja: The seats become 「削除されたプレイヤー」 with the default avatar (標準アバター) and are no longer linked to the account (アカウントとのつながりは解除されます). Avoid 中立的なアバター and として…解除.
         body: "Other players keep the match result, but your seats become unlinked “Deleted player” entries with a neutral avatar.",
       },
       local: {
+        // ja: Stay means they are kept, not deleted: ローカルゲームはこのデバイスに残ります. Never 保存されます.
         title: "Local games stay on this device",
         body: "Offline game history is stored only on this device. It is not linked to your account and is not remotely erased.",
       },
       feedback: {
         title: "Feedback sent without your account stays",
+        // hi: Quote the real labels: the screen is “सहायता”, then “आपका फ़ीडबैक”, and the button is “मेरा फ़ीडबैक हटाएँ”. Deleted feedback हट जाता है, not डिलीट हो जाता है.
         body: "Feedback you included your account with is deleted. Anything sent without it stays with the device that sent it. To remove that, open Support, then Your feedback, and tap Delete my feedback.",
       },
       signOut: {
@@ -215,6 +231,7 @@ const account = {
     },
     subscription: {
       heading: "Have a Scryve Pro subscription?",
+      // es: Name the object in each clause so "it" never points at the wrong thing: "Eliminar tu cuenta no cancela la suscripción. Es posible que te sigan cobrando hasta que la canceles donde la contrataste. Aun así, puedes eliminar la cuenta ahora, pero perderás el tiempo pagado que te quede."
       body: "Deleting your account won't cancel it. You may keep being charged until you cancel it where you subscribed. You can still delete now, but you'll lose access to any paid time left.",
       manageApple: "Manage Apple subscriptions",
       manageGoogle: "Manage Google Play subscriptions",
@@ -248,6 +265,7 @@ const account = {
       },
       completed: {
         title: "Deletion complete",
+        // ko: Receipt here is a deletion confirmation, not a purchase receipt: '이 확인서에는 계정 정보가 포함되어 있지 않습니다.' Never 영수증.
         body: "This receipt contains no account details.",
       },
       received: {
@@ -272,6 +290,8 @@ const account = {
       statusCheckFailed:
         "Scryve couldn't check your deletion status. Account deletion stays unavailable until the check succeeds.",
       signInPrompt: "Sign in to request deletion of your Scryve account.",
+      // ko: '삭제 확인서 확인 중…'. Never 영수증.
+      // es: Avoid "Comprobando tu comprobante". Use "Cargando tu comprobante de eliminación…".
       checkingReceipt: "Checking your deletion receipt…",
       checkingAccount: "Checking your account…",
       reconnect: "Reconnect to Scryve before deleting your account.",
@@ -290,6 +310,7 @@ const account = {
   },
   billing: {
     // Shown when a signed-out player taps something that needs Scryve Pro, beside a Sign in button.
+    // ja: Keep both halves, buying Pro and using Pro already bought: Proを購入する、または購入済みのProを使うにはサインインしてください。
     proNeedsAccount:
       "Scryve Pro is tied to an account. Sign in to get Pro or use Pro you already have.",
     // Asked right after someone buys a yearly plan.
@@ -360,6 +381,8 @@ const account = {
     cancelReady: "Close",
     restart: "Restart",
     whatsNew: "What's in this update",
+    // ko: Say which options: '다음에 Scryve를 열 때 적용됩니다. 지금 다시 시작해도, 나중에 해도 게임은 저장됩니다.'
+    // hi: “अगली बार Scryve खोलने पर लागू होगा। आपका गेम हर हाल में सेव रहेगा।”
     dialogMessage: "Applies the next time you open Scryve. Your game is saved either way.",
     restartNow: "Restart now",
     later: "Later",

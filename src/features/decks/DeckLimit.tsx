@@ -11,6 +11,7 @@ import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
+import { formatName } from "@/features/game/playSystems"
 import { formatRatio, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -21,7 +22,7 @@ import { cardCountLabel } from "./deckCopy"
 import { useDecksWithQueuedEdits, useLocalDeckSync } from "./localDeckSync"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import { deckFormatLabel, DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
+import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
 import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../../convex/lib/policy"
 
 type DeckCapacity = FunctionReturnType<typeof api.decks.capacity>
@@ -289,7 +290,7 @@ function DeckChoices({
               tone="dim"
               numberOfLines={1}
               text={joinParts([
-                deckFormatLabel(deck.game ?? DEFAULT_DECK_GAME, deck.format),
+                formatName(deck.game ?? DEFAULT_DECK_GAME, deck.format),
                 deck.cardQuantity
                   ? cardCountLabel(deck.cardQuantity)
                   : translate("decks:shelf.emptyList"),

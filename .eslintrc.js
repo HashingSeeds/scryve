@@ -13,6 +13,18 @@ const gameIdSelectors = [
   },
 ]
 
+// why: SYSTEMS labels are English, so a screen that reads them skips the player's language.
+const nameSelectors = [
+  {
+    selector: "MemberExpression[property.name='shortLabel']",
+    message: "Show a game's name with gameName from @/features/game/playSystems.",
+  },
+  {
+    selector: "CallExpression[callee.name='deckFormatLabel']",
+    message: "Show a format's name with formatName from @/features/game/playSystems.",
+  },
+]
+
 const UI_TEXT_ATTRIBUTE =
   "/^(text|title|subtitle|label|placeholder|heading|content|message|description|helper|caption|accessibilityLabel|accessibilityHint|accessibilityValue|count)$/"
 
@@ -211,7 +223,7 @@ module.exports = {
         "src/i18n/format.ts",
       ],
       rules: {
-        "no-restricted-syntax": ["error", ...gameIdSelectors, ...localeSelectors],
+        "no-restricted-syntax": ["error", ...gameIdSelectors, ...localeSelectors, ...nameSelectors],
       },
     },
     {
