@@ -94,7 +94,13 @@ import {
 import { isCommanderPick, sideboardSection } from "./deckDraft"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
-import { localMagicSearch, NAME_MATCHES, readsOnDevice, SCRYFALL_SYNTAX } from "./localMagicSearch"
+import {
+  localMagicSearch,
+  NAME_MATCHES,
+  readsOnDevice,
+  SCRYFALL_SYNTAX,
+  type MagicCards,
+} from "./localMagicSearch"
 import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
 import { useMagicCards } from "./useMagicCards"
@@ -129,6 +135,18 @@ const NATIVE_RESULTS_PROPS = Platform.select({
   native: { keyboardShouldPersistTaps: "handled", keyboardDismissMode: "on-drag" } as const,
 })
 const NO_CARD_FILTERS: readonly CardFilterDefinition[] = []
+
+/** why: a `cards` filter lists what the card file holds, and its fallback until the file loads. */
+function filterOptions(
+  magicCards: MagicCards | undefined,
+  filters: readonly CardFilterDefinition[],
+  id: string,
+  formats: readonly string[] = [],
+): readonly string[] {
+  if (magicCards) return cardOptions(SCRYFALL_SOURCE, magicCards.cards, id, formats)
+  const filter = filters.find((candidate) => candidate.id === id)
+  return (filter && "fallback" in filter && filter.fallback) || NO_OPTIONS
+}
 const NO_PICKS: CardFilterState = {}
 const NO_COLORS: readonly string[] = []
 
@@ -301,7 +319,7 @@ export function CardSearch({
     () =>
       source
         ? parseCardQuery(source, query, cardFilters, (id) =>
-            magicCards ? cardOptions(SCRYFALL_SOURCE, magicCards.cards, id, []) : [],
+            filterOptions(magicCards, cardFilters, id),
           )
         : { rest: query, filters: NO_PICKS, colors: NO_COLORS },
     [query, source, cardFilters, magicCards],
@@ -313,7 +331,7 @@ export function CardSearch({
   // why: suggestions follow the bar's unfinished last word, not its focus, since clicking one on web blurs the bar first.
   const suggestions = source
     ? querySuggestions(source, query, cardFilters, (id) =>
-        magicCards ? cardOptions(SCRYFALL_SOURCE, magicCards.cards, id, picked.format ?? []) : [],
+        filterOptions(magicCards, cardFilters, id, picked.format),
       )
     : []
   const nameIndex = useCardNameIndex(game, deviceId, scanning || text.length > 0)
@@ -354,7 +372,7 @@ export function CardSearch({
         source,
         query,
         cardFilters,
-        (id) => (magicCards ? cardOptions(SCRYFALL_SOURCE, magicCards.cards, id, []) : []),
+        (id) => filterOptions(magicCards, cardFilters, id),
         finishing,
       )
     : [{ text: query }]
@@ -1226,14 +1244,7 @@ export function CardSearch({
                     color={sectionColor(heading.id)}
                     options={
                       filter.options === "cards"
-                        ? magicCards
-                          ? cardOptions(
-                              SCRYFALL_SOURCE,
-                              magicCards.cards,
-                              filter.id,
-                              picked.format ?? [],
-                            )
-                          : NO_OPTIONS
+                        ? filterOptions(magicCards, cardFilters, filter.id, picked.format)
                         : filter.options === "range"
                           ? NO_OPTIONS
                           : filter.options

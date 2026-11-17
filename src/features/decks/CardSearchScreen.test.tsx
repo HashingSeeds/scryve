@@ -903,6 +903,8 @@ it("starts a deck's search on its format and lets the player pick other formats 
   await act(async () => {})
   expect(view.getByTestId("card-filter-format-modern").props.accessibilityState.selected).toBe(true)
   expect(view.getByText("Pauper")).toBeTruthy()
+  // why: the card file hasn't loaded, so Type offers the basic types.
+  expect(view.getByTestId("card-filter-type-Creature")).toBeTruthy()
   fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
   fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
   expect(await lastQuery()).toBeUndefined()
@@ -932,17 +934,16 @@ it("lights up the filters a player types as syntax", async () => {
   expect(mockAction.mock.lastCall?.[1].query).toBe("(bolt) f:modern t:creature mv<=2")
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  // why: without the card file, a typed type keeps the case it was typed in.
-  expect(view.getByTestId("card-filter-type-creature").props.accessibilityState.selected).toBe(true)
+  expect(view.getByTestId("card-filter-type-Creature").props.accessibilityState.selected).toBe(true)
   expect(view.getByTestId("card-filter-manaValue-2").props.accessibilityState.selected).toBe(true)
   expect(view.getByTestId("card-filter-manaValue-<=").props.accessibilityState.selected).toBe(true)
   const color = (text: string) => StyleSheet.flatten(view.getByText(text).props.style).color
   expect(color("t:creature")).toBe(color("Type"))
-  expect(color("creature")).toBe(color("Type"))
+  expect(color("Creature")).toBe(color("Type"))
   expect(color("mv<=2")).toBe(color("Cost"))
   expect(color("t:creature")).not.toBe(color("mv<=2"))
   expect(color("bolt")).toBe(darkColors.text)
-  fireEvent.press(view.getByTestId("card-filter-type-creature"))
+  fireEvent.press(view.getByTestId("card-filter-type-Creature"))
   expect(barText(view)).toBe("f:modern mv<=2 bolt")
 })
 

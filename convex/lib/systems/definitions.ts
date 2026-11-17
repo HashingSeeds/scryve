@@ -154,7 +154,12 @@ export type CardFilterDefinition = {
   readonly label: string
   readonly group?: { readonly id: string; readonly label: string }
 } & (
-  | { readonly match: "all"; readonly options: readonly string[] | "cards" }
+  | {
+      readonly match: "all"
+      readonly options: readonly string[] | "cards"
+      /** why: the options a `cards` filter offers before the card file loads, or when it can't. */
+      readonly fallback?: readonly string[]
+    }
   | { readonly match?: never; readonly options: "range" }
   | { readonly match: "count"; readonly options: readonly string[] }
 )
@@ -175,7 +180,23 @@ const COST = { id: "cost", label: "Cost" } as const
 
 export const MAGIC_CARD_FILTERS = [
   { id: "format", label: "Legal in", match: "all", options: LEGALITY_FORMATS },
-  { id: "type", label: "Type", match: "all", options: "cards" },
+  {
+    id: "type",
+    label: "Type",
+    match: "all",
+    options: "cards",
+    fallback: [
+      "Creature",
+      "Instant",
+      "Sorcery",
+      "Artifact",
+      "Enchantment",
+      "Planeswalker",
+      "Land",
+      "Battle",
+      "Legendary",
+    ],
+  },
   { id: "manaValue", label: "Mana value", group: COST, options: "range" },
   {
     id: "manaCost",
