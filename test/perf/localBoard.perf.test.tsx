@@ -80,17 +80,11 @@ describe("local board render budget", () => {
     expectWithinBudget(counts, { "commits": 7, "LifeCard Grace": 5 })
   })
 
-  it("opening the game menu renders each seat once", () => {
+  it("opening the game menu renders no seat", () => {
     const view = renderFourPlayerBoard()
 
     const counts = countRendersOf(() => fireEvent.press(view.getByTestId("game-menu-button")))
 
-    expectWithinBudget(counts, {
-      "commits": 1,
-      "LifeCard Ada": 1,
-      "LifeCard Grace": 1,
-      "LifeCard Katherine": 1,
-      "LifeCard Dorothy": 1,
-    })
+    expectWithinBudget(counts, { commits: 1 })
   })
 })
