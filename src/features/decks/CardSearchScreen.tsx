@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
-import type { ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -878,6 +878,8 @@ export function CardSearch({
             submitBehavior="blurAndSubmit"
             onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
             inputWrapperStyle={$queryWrapper}
+            style={$queryInput}
+            textAlignVertical="center"
           >
             {Platform.OS === "web"
               ? undefined
@@ -1310,7 +1312,9 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 
 const $suggestions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $headerActions: ViewStyle = { flexDirection: "row" }
-const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112 }
+const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112, alignItems: "center" }
+/** why: a multiline field starts at the top of its box, so it hugs its lines and centers instead, scrolling past the bar's height. */
+const $queryInput: TextStyle = { alignSelf: "center", maxHeight: 100 }
 const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $filterSection: ViewStyle = { gap: 8 }
 
