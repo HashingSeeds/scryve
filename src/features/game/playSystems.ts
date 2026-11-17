@@ -237,7 +237,7 @@ export function tableItemShortLabel(item: { id: string; label: string }): string
     : tableItemLabel(item)
 }
 
-export function cardFilterLabel({ id, label }: CardFilterDefinition): string {
+export function cardFilterLabel({ id, label }: Pick<CardFilterDefinition, "id" | "label">): string {
   return hasOwnKey(systems.cardFilter, id) ? translate(`systems:cardFilter.${id}`) : label
 }
 

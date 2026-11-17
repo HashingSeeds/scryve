@@ -158,10 +158,9 @@ export default {
   cardFilter: {
     format: "इनमें लीगल",
     type: "टाइप",
-    supertype: "सुपरटाइप",
-    subtype: "सबटाइप",
+    cost: "कॉस्ट",
     manaValue: "मैना वैल्यू",
-    manaCost: "मैना कॉस्ट",
+    manaCost: "शामिल",
     keyword: "कीवर्ड",
     power: "पावर",
     toughness: "टफ़नेस",

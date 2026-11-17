@@ -72,8 +72,9 @@ function matchesSearch(card: MagicDatasetCard, search: MagicSearch) {
     (!search.commander ||
       ((card.commanderEligibility === "eligible" || choosesColor) &&
         card.commanderLegality === "legal")) &&
-    matchesCardFilters(SCRYFALL_SOURCE, card, MAGIC_CARD_FILTERS, search.filters) &&
-    matchesColors(card.colorIdentity, search.colors, search.colorMatch, choosesColor)
+    // why: the color check is the cheapest, so it turns most cards away before the filters read them.
+    matchesColors(card.colorIdentity, search.colors, search.colorMatch, choosesColor) &&
+    matchesCardFilters(SCRYFALL_SOURCE, card, MAGIC_CARD_FILTERS, search.filters)
   )
 }
 

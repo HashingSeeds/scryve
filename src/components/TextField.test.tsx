@@ -4,6 +4,7 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
+import { Text } from "./Text"
 import { TextField } from "./TextField"
 
 function SearchField({ initial }: { initial: string }) {
@@ -53,6 +54,23 @@ describe("TextField", () => {
 
     expect(view.getByTestId("search").props.value).toBe("")
     expect(view.queryByTestId("search-clear")).toBeNull()
+  })
+
+  it("clears a field styled through its children, then tells the caller", () => {
+    const onChangeText = jest.fn()
+    const onClear = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <TextField testID="search" onChangeText={onChangeText} clearable={onClear}>
+          <Text text="bolt" />
+        </TextField>
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("search-clear"))
+
+    expect(onChangeText).toHaveBeenCalledWith("")
+    expect(onClear).toHaveBeenCalled()
   })
 
   it("hides the x while empty", () => {

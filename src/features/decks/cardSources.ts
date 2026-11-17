@@ -9,11 +9,8 @@ export type MagicFilterCard = Partial<
   >
 >
 
-function typeLineWords(typeLine: string | undefined, part: "types" | "subtypes") {
-  return typeLine
-    ?.split(" // ")
-    .flatMap((face) => face.split(" — ")[part === "types" ? 0 : 1]?.split(" ") ?? [])
-    .filter(Boolean)
+function typeLineWords(typeLine: string | undefined) {
+  return typeLine?.split(/ \/\/ | — | /).filter(Boolean)
 }
 
 function stat(value: string | undefined) {
@@ -21,13 +18,9 @@ function stat(value: string | undefined) {
   return Number.isFinite(number) ? number : undefined
 }
 
-const TYPE_KEYS = ["t", "type"]
-
 const SCRYFALL_FIELDS = {
   format: { keys: ["f", "format", "legal"], read: (card) => card.legalFormats },
-  type: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "types") },
-  supertype: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "types") },
-  subtype: { keys: TYPE_KEYS, read: (card) => typeLineWords(card.typeLine, "subtypes") },
+  type: { keys: ["t", "type"], read: (card) => typeLineWords(card.typeLine) },
   manaValue: { keys: ["mv", "cmc", "manavalue"], read: (card) => card.manaValue },
   manaCost: {
     keys: ["m", "mana"],

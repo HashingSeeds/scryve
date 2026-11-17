@@ -158,10 +158,9 @@ export default {
   cardFilter: {
     format: "Legal en",
     type: "Tipo",
-    supertype: "Supertipo",
-    subtype: "Subtipo",
+    cost: "Coste",
     manaValue: "Valor de maná",
-    manaCost: "Coste de maná",
+    manaCost: "Incluye",
     keyword: "Palabras clave",
     power: "Fuerza",
     toughness: "Resistencia",
