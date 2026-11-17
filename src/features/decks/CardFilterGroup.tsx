@@ -5,10 +5,10 @@ import type { StyleProp, ViewStyle } from "react-native"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { FilterGroup, FilterPill } from "@/components/FilterPill"
 import { PressableIcon } from "@/components/Icon"
-import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { cardFilterLabel } from "@/features/game/playSystems"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -18,12 +18,12 @@ import type { CardFilterDefinition } from "../../../convex/lib/systems"
 
 const TOP_OPTIONS = 12
 const MATCHES_SHOWN = 20
-const MAX_STAT = 99
+const NUMBERS_SHOWN = 11
 const RANGE_MODES = [
-  { id: "<=", label: "≤" },
-  { id: "=", label: "=" },
-  { id: ">=", label: "≥" },
-] as const satisfies readonly { id: RangeMode; label: string }[]
+  { id: "<=", tx: "decks:cardSearch.orLess" },
+  { id: "=", tx: "decks:cardSearch.exactly" },
+  { id: ">=", tx: "decks:cardSearch.orMore" },
+] as const satisfies readonly { id: RangeMode; tx: string }[]
 
 /** why: `heading` is left out for a filter that shows as a later row of its group's section. */
 export function CardFilterGroup({
@@ -48,8 +48,6 @@ export function CardFilterGroup({
   onChange: (picked: readonly string[]) => void
 }) {
   const [search, setSearch] = useState("")
-  // why: the comparison a range takes once a number is picked; the picked bounds win after that.
-  const [mode, setMode] = useState<RangeMode>("=")
   const { themed } = useAppTheme()
   const label = cardFilterLabel(filter)
   const rowLabel = filter.group ? label : undefined
@@ -65,9 +63,7 @@ export function CardFilterGroup({
               testID={`card-filter-${filter.id}-${option}`}
               label={optionLabel(option)}
               value={count}
-              active={count > 0}
               color={color}
-              style={$countCell}
               onAdd={() => onChange([...picked, option])}
               onRemove={() => {
                 const at = picked.lastIndexOf(option)
@@ -82,39 +78,42 @@ export function CardFilterGroup({
     )
   if (filter.options === "range") {
     const current = rangeValue(picked)
-    const shown = current?.mode ?? mode
-    const pick = (next: RangeMode, value: number | undefined) => {
-      setMode(next)
-      onChange(rangeOptions(next, value))
-    }
+    const numbers = [...Array(NUMBERS_SHOWN).keys()]
+    if (current && !numbers.includes(current.value)) numbers.push(current.value)
     return (
       <FilterGroup heading={heading} headingColor={color} label={rowLabel}>
-        <View style={$rangeRow}>
-          <View style={$rangeModes}>
-            <SegmentedControl
-              testID={`card-filter-${filter.id}-mode`}
-              accessibilityLabel={label}
-              segments={RANGE_MODES}
-              selectedId={shown}
-              onSelect={(id) => {
-                const next = RANGE_MODES.find((option) => option.id === id)
-                if (next) pick(next.id, current?.value)
-              }}
+        <ScrollView
+          horizontal
+          style={$suggestionRow}
+          contentContainerStyle={themed($suggestionContent)}
+          showsHorizontalScrollIndicator={false}
+        >
+          {numbers.map((value) => (
+            <FilterPill
+              key={value}
+              testID={`card-filter-${filter.id}-${value}`}
+              label={formatNumber(value)}
+              selected={current?.value === value}
+              color={current?.value === value ? color : undefined}
+              onPress={() =>
+                onChange(current?.value === value ? [] : rangeOptions(current?.mode ?? "=", value))
+              }
             />
-          </View>
-          <Stepper
-            testID={`card-filter-${filter.id}`}
-            label={label}
-            value={current?.value}
-            active={current !== undefined}
-            color={color}
-            style={$rangeStepper}
-            onAdd={() => pick(shown, current ? Math.min(MAX_STAT, current.value + 1) : 1)}
-            onRemove={() => {
-              if (current) pick(shown, current.value > 0 ? current.value - 1 : undefined)
-            }}
-          />
-        </View>
+          ))}
+        </ScrollView>
+        {/* why: the comparison only means something once a number is picked. */}
+        {current
+          ? RANGE_MODES.map(({ id, tx }) => (
+              <FilterPill
+                key={id}
+                testID={`card-filter-${filter.id}-${id}`}
+                label={translate(tx)}
+                selected={current.mode === id}
+                color={current.mode === id ? color : undefined}
+                onPress={() => onChange(rangeOptions(id, current.value))}
+              />
+            ))
+          : null}
       </FilterGroup>
     )
   }
@@ -186,33 +185,29 @@ export function CardFilterGroup({
   )
 }
 
-/** why: an adjustable minus and plus around a number, so screen readers step it with a swipe. Without a value it reads "Any". */
+/** why: an adjustable minus and plus around a count, so screen readers step it with a swipe. */
 function Stepper({
   testID,
   label,
   value,
-  active,
   color,
-  style,
   onAdd,
   onRemove,
   children,
 }: {
   testID: string
   label: string
-  value: number | undefined
-  active: boolean
+  value: number
   color?: string
-  style?: ThemedStyle<ViewStyle>
   onAdd: () => void
   onRemove: () => void
   children?: ReactNode
 }) {
   const { themed, theme } = useAppTheme()
   const tint = color ?? theme.colors.text
+  const active = value > 0
   const cell: StyleProp<ViewStyle> = [
     themed($stepper),
-    style && themed(style),
     active && { backgroundColor: theme.colors.searchSectionFill, borderColor: tint },
   ]
   return (
@@ -221,9 +216,7 @@ function Stepper({
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={label}
-      accessibilityValue={
-        value === undefined ? { text: translate("decks:cardSearch.any") } : { now: value, min: 0 }
-      }
+      accessibilityValue={{ now: value, min: 0 }}
       accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
       onAccessibilityAction={({ nativeEvent }) =>
         nativeEvent.actionName === "increment" ? onAdd() : onRemove()
@@ -244,7 +237,7 @@ function Stepper({
         size="sm"
         weight="medium"
         style={{ color: active ? tint : theme.colors.textDim }}
-        text={value === undefined ? translate("decks:cardSearch.any") : value}
+        text={value}
       />
       <PressableIcon
         testID={`${testID}-add`}
@@ -258,11 +251,11 @@ function Stepper({
   )
 }
 
-const $rangeRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8, width: "100%" }
-const $rangeModes: ViewStyle = { flex: 1 }
 const $suggestionRow: ViewStyle = { width: "100%", flexGrow: 0 }
 const $suggestionContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $stepper: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
+  flexBasis: "48%",
+  flexGrow: 1,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
@@ -271,10 +264,4 @@ const $stepper: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   borderRadius: radius.xxxl,
   borderWidth: 1,
   borderColor: colors.separator,
-})
-const $countCell: ThemedStyle<ViewStyle> = () => ({ flexBasis: "48%", flexGrow: 1 })
-const $rangeStepper: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minWidth: 112,
-  alignSelf: "stretch",
-  gap: spacing.xs,
 })

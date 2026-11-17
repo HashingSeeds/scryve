@@ -111,6 +111,8 @@ type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
 
 const SCRYFALL = "Scryfall"
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
+/** why: color identity sits beside the mana a card costs, so its section shows just above that group. */
+const COLORS_BEFORE = "cost"
 const NO_CARD_FILTERS: readonly CardFilterDefinition[] = []
 const NO_PICKS: CardFilterState = {}
 const NO_COLORS: readonly string[] = []
@@ -314,6 +316,12 @@ export function CardSearch({
   })
   const needsKeywords = (picked.keyword?.length ?? 0) > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // why: iOS keeps a multiline field's height when its text changes from outside, so the bar is rebuilt after the sheet edits it.
+  const [barBuild, setBarBuild] = useState(0)
+  function closeFilters() {
+    setFiltersOpen(false)
+    setBarBuild((build) => build + 1)
+  }
   const pickedColors =
     colorFilters.length > 0 &&
     (colorFilters.length !== startingFilters.colors.length ||
@@ -340,6 +348,36 @@ export function CardSearch({
       ? undefined
       : theme.colors.searchSections[index % theme.colors.searchSections.length]
   }
+  const colorSection = (
+    <View key="colors" style={$filterSection}>
+      <FilterGroup
+        heading={translate("decks:cardSearch.colorIdentity")}
+        headingColor={sectionColor("colors")}
+      >
+        {SEARCH_COLORS.map((color) => (
+          <FilterPill
+            key={color}
+            testID={`card-color-${color}`}
+            label={colorLabel(color)}
+            selected={colorFilters.includes(color)}
+            color={colorFilters.includes(color) ? sectionColor("colors") : undefined}
+            onPress={() => changeQuery({ colors: toggleColor(colorFilters, color) })}
+          />
+        ))}
+      </FilterGroup>
+      <SegmentedControl
+        testID="card-color-match"
+        accessibilityLabel={translate("decks:cardSearch.colorMatch")}
+        segments={COLOR_MATCHES.map(({ id, tx }) => ({ id, label: translate(tx) }))}
+        selectedId={colorMatch}
+        onSelect={(id) => {
+          const match = COLOR_MATCHES.find((option) => option.id === id)
+          if (match) changeQuery({}, match.id)
+        }}
+      />
+    </View>
+  )
+  const filterSectionGroups = filterGroups(cardFilters)
   const searchRequested =
     !finishing &&
     (text.length >= 2 || (filtersCards && (pickedColors || (changedFilters && pickedFilters > 0))))
@@ -825,6 +863,7 @@ export function CardSearch({
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
           <TextField
+            key={barBuild}
             testID="card-search-input"
             accessibilityLabel={translate("decks:cardSearch.searchLabel")}
             placeholderTx="decks:cardSearch.placeholder"
@@ -832,7 +871,7 @@ export function CardSearch({
             value={Platform.OS === "web" ? query : undefined}
             maxLength={filtersCards ? 400 : 120}
             autoCorrect={false}
-            autoFocus={!choosingCommander}
+            autoFocus={!choosingCommander && barBuild === 0}
             returnKeyType="search"
             // why: a query with filter terms wraps onto more lines instead of scrolling out of sight.
             multiline
@@ -1112,7 +1151,7 @@ export function CardSearch({
       {filtersOpen ? (
         <DialogCard
           visible
-          onClose={() => setFiltersOpen(false)}
+          onClose={closeFilters}
           dialogTestID="card-filters-dialog"
           backdropAccessibilityLabel={translate(
             choosingCommander ? "decks:cardSearch.dismissFilters" : "decks:shelf.dismissFilters",
@@ -1124,35 +1163,11 @@ export function CardSearch({
             contentContainerStyle={themed([$sheetScrollContent, $filterBody])}
             keyboardShouldPersistTaps="handled"
           >
-            <FilterGroup
-              heading={translate("decks:cardSearch.colors")}
-              headingColor={sectionColor("colors")}
-            >
-              {SEARCH_COLORS.map((color) => (
-                <FilterPill
-                  key={color}
-                  testID={`card-color-${color}`}
-                  label={colorLabel(color)}
-                  selected={colorFilters.includes(color)}
-                  color={colorFilters.includes(color) ? sectionColor("colors") : undefined}
-                  onPress={() => changeQuery({ colors: toggleColor(colorFilters, color) })}
-                />
-              ))}
-            </FilterGroup>
-            <View style={$filterSection}>
-              <Text preset="sectionLabel" tx="decks:cardSearch.colorMatch" />
-              <SegmentedControl
-                testID="card-color-match"
-                accessibilityLabel={translate("decks:cardSearch.colorMatch")}
-                segments={COLOR_MATCHES.map(({ id, tx }) => ({ id, label: translate(tx) }))}
-                selectedId={colorMatch}
-                onSelect={(id) => {
-                  const match = COLOR_MATCHES.find((option) => option.id === id)
-                  if (match) changeQuery({}, match.id)
-                }}
-              />
-            </View>
-            {filterGroups(cardFilters).map(({ heading, filters }) => (
+            {filterSectionGroups.some(({ heading }) => heading.id === COLORS_BEFORE)
+              ? null
+              : colorSection}
+            {filterSectionGroups.map(({ heading, filters }) => [
+              heading.id === COLORS_BEFORE ? colorSection : null,
               <View key={heading.id} style={$filterSection}>
                 {filters.map((filter, index) => (
                   <CardFilterGroup
@@ -1191,8 +1206,8 @@ export function CardSearch({
                     }
                   />
                 ))}
-              </View>
-            ))}
+              </View>,
+            ])}
           </ScrollView>
           <View style={themed($dialogActions)}>
             <Button
@@ -1206,7 +1221,7 @@ export function CardSearch({
               style={themed($dialogButton)}
               preset="primary"
               tx="common:done"
-              onPress={() => setFiltersOpen(false)}
+              onPress={closeFilters}
             />
           </View>
         </DialogCard>

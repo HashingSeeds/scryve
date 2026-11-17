@@ -415,8 +415,12 @@ const decks = {
     exactColors: "Exactly",
     // Placeholder over a card filter's options; {{filter}} is the filter's name in lowercase, e.g. "keywords".
     searchFilter: "Search {{filter}}",
-    // In the stepper beside a card stat like mana value or power, while no number is picked.
-    any: "Any",
+    // Heading in card search filters over the color buttons, which match a card's color identity.
+    colorIdentity: "Color identity",
+    // Pills after a picked number for a card stat like mana value or power, e.g. "3" then "Or less".
+    orLess: "Or less",
+    exactly: "Exactly",
+    orMore: "Or more",
     clearAll: "Clear all",
     checkFailed: "Could not check all cards in this deck.",
     searchFailed: "Could not search cards. Check your connection and try again.",

@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native"
-import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 import type { ReactTestInstance } from "react-test-renderer"
 
@@ -430,8 +430,7 @@ it("trusts Scryfall's commander results for a filter the device can't check", as
   const view = chooser([])
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  fireEvent.press(view.getByTestId("card-filter-manaValue-add"))
-  fireEvent.press(view.getByTestId("card-filter-manaValue-add"))
+  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
   fireEvent.press(view.getByLabelText("Dismiss commander filters"))
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
@@ -870,12 +869,12 @@ it("starts a deck's search on its format and lets the player pick other formats 
   await act(async () => {})
   expect(view.getByTestId("card-filter-format-modern").props.accessibilityState.selected).toBe(true)
   expect(view.getByText("Pauper")).toBeTruthy()
-  fireEvent.press(view.getByTestId("card-filter-manaValue-add"))
-  fireEvent.press(view.getByTestId("card-filter-manaValue-remove"))
-  fireEvent.press(view.getByTestId("card-filter-manaValue-remove"))
+  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
+  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
   expect(await lastQuery()).toBeUndefined()
-  fireEvent.press(view.getByTestId("card-filter-power-add"))
-  fireEvent.press(within(view.getByTestId("card-filter-power-mode")).getByText("≥"))
+  expect(view.queryByTestId("card-filter-power->=")).toBeNull()
+  fireEvent.press(view.getByTestId("card-filter-power-1"))
+  fireEvent.press(view.getByTestId("card-filter-power->="))
   expect(await lastQuery()).toBe("f:modern pow>=1")
   expect(barText(view)).toBe("f:modern pow>=1 ")
   fireEvent.press(view.getByTestId("card-filter-format-legacy"))
@@ -901,7 +900,8 @@ it("lights up the filters a player types as syntax", async () => {
   await act(async () => {})
   // why: without the card file, a typed type keeps the case it was typed in.
   expect(view.getByTestId("card-filter-type-creature").props.accessibilityState.selected).toBe(true)
-  expect(view.getByTestId("card-filter-manaValue").props.accessibilityValue.now).toBe(2)
+  expect(view.getByTestId("card-filter-manaValue-2").props.accessibilityState.selected).toBe(true)
+  expect(view.getByTestId("card-filter-manaValue-<=").props.accessibilityState.selected).toBe(true)
   const color = (text: string) => StyleSheet.flatten(view.getByText(text).props.style).color
   expect(color("t:creature")).toBe(color("Type"))
   expect(color("creature")).toBe(color("Type"))
