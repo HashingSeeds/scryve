@@ -14,8 +14,10 @@ import { nearbyBetaAvailable } from "@/features/lan/lanAvailability"
 import { setNearbyOnly, useNearbyOnly } from "@/features/lan/nearbyOnly"
 import { useAppUpdate } from "@/features/updates/appUpdate"
 import { updateFromStore, useStoreUpdate } from "@/features/updates/storeUpdate"
+import { appDirection } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { $appDirection } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
@@ -124,11 +126,7 @@ export function AppUtilityMenu({
       ) : null}
       <Animated.View
         testID="utility-menu"
-        style={[
-          themed($menu),
-          placement === "bottomLeft" ? $bottomLeft : $topRight,
-          containerStyle,
-        ]}
+        style={[themed($menu), placement === "bottomLeft" ? $bottomStart : $topEnd, containerStyle]}
       >
         <Animated.View
           pointerEvents={open ? "none" : "auto"}
@@ -179,7 +177,7 @@ export function AppUtilityMenu({
           accessibilityElementsHidden={!open}
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
           style={[
-            placement === "bottomLeft" ? $bottomLeft : $topRight,
+            placement === "bottomLeft" ? $bottomStart : $topEnd,
             $itemsColumn,
             { width: openWidth },
             itemsStyle,
@@ -277,7 +275,12 @@ function MenuItem({
   } = useAppTheme()
   const color = tone === "tint" ? colors.tint : undefined
   return (
-    <Pressable {...pressableProps} accessibilityRole={accessibilityRole} style={themed($item)}>
+    <Pressable
+      {...pressableProps}
+      accessibilityRole={accessibilityRole}
+      dir={appDirection}
+      style={[themed($item), $appDirection]}
+    >
       <Icon icon={icon} size={ICON_SIZE} color={color ?? colors.textDim} />
       <Text
         tx={tx}
@@ -300,9 +303,9 @@ const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,
-  right: -1000,
+  end: -1000,
   bottom: -1000,
-  left: -1000,
+  start: -1000,
 }
 const $fill: ViewStyle = { ...StyleSheet.absoluteFill }
 const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -312,9 +315,9 @@ const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderColor: colors.separator,
   backgroundColor: colors.surface,
 })
-const $topRight: ViewStyle = { right: 0, top: 0 }
+const $topEnd: ViewStyle = { end: 0, top: 0 }
 const $itemsColumn: ViewStyle = { position: "absolute" }
-const $bottomLeft: ViewStyle = { bottom: 0, left: 0 }
+const $bottomStart: ViewStyle = { bottom: 0, start: 0 }
 const $trigger: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
@@ -352,7 +355,7 @@ const $inlineUpdateDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
 const $updateDot: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   position: "absolute",
   top: 7,
-  right: 7,
+  end: 7,
   width: 8,
   height: 8,
   borderRadius: radius.full,

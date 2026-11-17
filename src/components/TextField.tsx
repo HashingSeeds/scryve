@@ -19,7 +19,6 @@ import {
   ViewStyle,
 } from "react-native"
 
-import { isRTL } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -133,7 +132,6 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     $inputStyle,
     multiline && $multilineInputStyle,
     disabled && { color: colors.textDim },
-    isRTL && { textAlign: "right" as TextStyle["textAlign"] },
     $inputStyleOverride,
   ]
 

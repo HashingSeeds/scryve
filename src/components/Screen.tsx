@@ -21,6 +21,7 @@ import { BottomInsetClaimContext } from "@/components/BottomActionBar"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { Header, type HeaderProps, SideGutterContext } from "@/components/Header"
 import { useAppTheme } from "@/theme/context"
+import { endEdge, startEdge } from "@/theme/direction"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { ExtendedEdge, useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
@@ -246,7 +247,7 @@ export function Screen(props: ScreenProps) {
         {...KeyboardAvoidingViewProps}
         style={[
           $styles.flex1,
-          sideGutter && { paddingLeft: sideGutter.left, paddingRight: sideGutter.right },
+          sideGutter && { paddingStart: sideGutter[startEdge], paddingEnd: sideGutter[endEdge] },
           KeyboardAvoidingViewProps?.style,
         ]}
       >

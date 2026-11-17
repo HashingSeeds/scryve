@@ -11,7 +11,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { appDirection } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
+import { $appDirection } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
@@ -109,7 +111,7 @@ export function DialogCard({
       onRequestClose={requestClose}
     >
       {/* why: a Modal is its own native root, so gestures inside it need their own root view. */}
-      <GestureHandlerRootView style={$dialogFill}>
+      <GestureHandlerRootView dir={appDirection} style={[$dialogFill, $appDirection]}>
         <Pressable
           testID={backdropTestID}
           accessibilityRole="button"
@@ -183,10 +185,10 @@ const $wideDialog: ThemedStyle<ViewStyle> = () => ({ maxWidth: 520 })
 const $bottomDialog: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   maxHeight: "88%",
   borderBottomWidth: 0,
-  borderBottomLeftRadius: radius.none,
-  borderBottomRightRadius: radius.none,
-  borderTopLeftRadius: radius.xxxl,
-  borderTopRightRadius: radius.xxxl,
+  borderBottomStartRadius: radius.none,
+  borderBottomEndRadius: radius.none,
+  borderTopStartRadius: radius.xxxl,
+  borderTopEndRadius: radius.xxxl,
   backgroundColor: colors.surface,
 })
 

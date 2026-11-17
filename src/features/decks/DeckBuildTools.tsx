@@ -142,6 +142,6 @@ const $curve: ThemedStyle<ViewStyle> = () => ({
 const $bar: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: 6,
   backgroundColor: colors.border,
-  borderTopLeftRadius: radius.xxs,
-  borderTopRightRadius: radius.xxs,
+  borderTopStartRadius: radius.xxs,
+  borderTopEndRadius: radius.xxs,
 })

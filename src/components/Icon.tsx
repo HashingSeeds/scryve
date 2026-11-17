@@ -11,6 +11,7 @@ import {
 } from "react-native"
 import Svg, { Circle, Path, Rect } from "react-native-svg"
 
+import { isRTL } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
 import { decorativeSvgProps } from "@/utils/decorativeSvgProps"
 
@@ -93,6 +94,8 @@ function IconImage({
   size?: number
   style?: StyleProp<ImageStyle>
 }) {
+  // why: a caller's transform (an open caret's rotate) replaces the mirror, and a turned caret no longer points along the line.
+  const directed = [isRTL && MIRRORED_IN_RTL.has(icon) && $mirrored, style]
   if (icon in glyphRegistry) {
     const glyph = glyphRegistry[icon as keyof typeof glyphRegistry]
     const side = size ?? GLYPH_SIZE
@@ -106,8 +109,8 @@ function IconImage({
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
-        // why: callers rotate icons (RTL back, open carets) through this style; only its transform applies to SVG.
-        style={style as StyleProp<ViewStyle>}
+        // why: callers rotate icons (open carets) through this style; only its transform applies to SVG.
+        style={directed as StyleProp<ViewStyle>}
         {...decorativeSvgProps({ accessible: false })}
       >
         {glyph(color)}
@@ -120,7 +123,7 @@ function IconImage({
         $imageStyleBase,
         { tintColor: color },
         size !== undefined && { width: size, height: size },
-        style,
+        directed,
       ]}
       source={iconRegistry[icon as keyof typeof iconRegistry]}
     />
@@ -238,3 +241,6 @@ const glyphRegistry = {
 const $imageStyleBase: ImageStyle = {
   resizeMode: "contain",
 }
+
+const MIRRORED_IN_RTL = new Set<IconTypes>(["back", "arrowBack", "caretRight"])
+const $mirrored: ImageStyle = { transform: [{ scaleX: -1 }] }

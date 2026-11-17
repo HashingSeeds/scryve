@@ -37,24 +37,24 @@ describe("menuPlacement", () => {
   const anchor = { x: 24, y: 200, width: 300, height: 56 }
 
   it("drops below the trigger when there is room", () => {
-    const { dropsDown, style } = menuPlacement(anchor, 800)
+    const { dropsDown, style } = menuPlacement(anchor, { width: 400, height: 800 })
     expect(dropsDown).toBe(true)
     expect(style.top).toBe(256)
     expect(style.bottom).toBeUndefined()
-    expect(style.left).toBe(24)
+    expect(style.start).toBe(24)
     expect(style.width).toBe(300)
     expect(style.maxHeight).toBe(360)
   })
 
   it("flips above the trigger when the bottom edge is close", () => {
-    const { dropsDown, style } = menuPlacement(anchor, 300)
+    const { dropsDown, style } = menuPlacement(anchor, { width: 400, height: 300 })
     expect(dropsDown).toBe(false)
     expect(style.bottom).toBe(100)
     expect(style.top).toBeUndefined()
   })
 
   it("keeps the menu on screen when neither side is roomy", () => {
-    const { style } = menuPlacement({ ...anchor, y: 120 }, 320)
+    const { style } = menuPlacement({ ...anchor, y: 120 }, { width: 400, height: 320 })
     expect(style.maxHeight).toBe(132)
     expect((style.top as number) + (style.maxHeight as number)).toBeLessThanOrEqual(308)
   })

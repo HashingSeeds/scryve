@@ -12,6 +12,7 @@ import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { formatDate, formatList, formatNumber, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 import { formatCardChange } from "./cardChanges"
@@ -226,7 +227,7 @@ const $previewRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $previewValue: TextStyle = { flex: 1, textAlign: "right" }
+const $previewValue: TextStyle = { flex: 1, textAlign: textEnd }
 const $previewChange: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   height: spacing.lg,
   justifyContent: "center",

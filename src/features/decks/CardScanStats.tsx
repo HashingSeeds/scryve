@@ -55,7 +55,7 @@ export function CardScanStats({ photo }: { photo: CardPhotoText }) {
 const $stats: ViewStyle = {
   position: "absolute",
   top: 4,
-  left: 4,
+  start: 4,
   padding: 4,
   borderRadius: radius.sm,
   backgroundColor: "rgba(0, 0, 0, 0.7)",

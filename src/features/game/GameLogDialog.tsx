@@ -14,9 +14,11 @@ import { PlayerMark } from "@/components/PlayerMark"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { relativeTime } from "@/features/connected/connectedCopy"
+import { isRTL } from "@/i18n"
 import { formatSigned, joinParts, separator } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 import {
@@ -33,6 +35,9 @@ import { teamName } from "./teams"
 import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "./types"
 import { customCounterNameOf } from "../../../convex/lib/table"
 import type { TurnGroups } from "../../../convex/lib/turns"
+
+// why: a glyph does not mirror, so the arrow from delta to result turns with the row.
+const RESULT_ARROW = isRTL ? "←" : "→"
 
 export function GameLogDialog({
   players,
@@ -186,7 +191,7 @@ export function GameLogDialog({
             <View style={themed($headline)}>
               <Text text={name} weight="medium" numberOfLines={1} style={$name} />
               <Text text={delta} weight="semiBold" style={[$number, { color: colors.text }]} />
-              <Text text="→" style={{ color: colors.textDim }} />
+              <Text text={RESULT_ARROW} style={{ color: colors.textDim }} />
               <Text text={item.value} weight="semiBold" style={$number} />
             </View>
             <View style={themed($detail)}>
@@ -242,7 +247,7 @@ export function GameLogDialog({
               weight="semiBold"
               style={[$number, { color: item.delta < 0 ? colors.error : colors.success }]}
             />
-            <Text text="→" style={{ color: colors.textDim }} />
+            <Text text={RESULT_ARROW} style={{ color: colors.textDim }} />
             <Text text={item.life} weight="semiBold" style={$number} />
           </View>
           <View style={themed($detail)}>
@@ -360,4 +365,4 @@ const $detail: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
 })
 const $shrink: TextStyle = { flexShrink: 1 }
-const $number: TextStyle = { minWidth: 32, textAlign: "right", fontVariant: ["tabular-nums"] }
+const $number: TextStyle = { minWidth: 32, textAlign: textEnd, fontVariant: ["tabular-nums"] }

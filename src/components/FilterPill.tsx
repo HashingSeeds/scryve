@@ -172,7 +172,7 @@ const $filterSlot: ThemedStyle<ViewStyle> = () => ({
   minHeight: 44,
   justifyContent: "center",
 })
-const $filterOverlap: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginLeft: -spacing.md })
+const $filterOverlap: ThemedStyle<ViewStyle> = ({ spacing }) => ({ marginStart: -spacing.md })
 const $filterButton: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minHeight: 32,
   minWidth: 44,

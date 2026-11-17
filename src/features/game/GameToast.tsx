@@ -77,8 +77,8 @@ export function GameToast({
 
 const $layer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
-  left: spacing.md,
-  right: spacing.md,
+  start: spacing.md,
+  end: spacing.md,
   zIndex: 80,
   elevation: 80,
   alignItems: "center",
@@ -90,8 +90,8 @@ const $toast: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   maxWidth: 420,
   minHeight: 44,
   paddingVertical: spacing.xs,
-  paddingLeft: spacing.sm,
-  paddingRight: spacing.xs,
+  paddingStart: spacing.sm,
+  paddingEnd: spacing.xs,
   borderWidth: 1,
   borderColor: colors.separator,
   borderRadius: radius.sm,

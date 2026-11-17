@@ -92,7 +92,7 @@ const $button: ThemedStyle<ViewStyle> = () => ({
   minWidth: 112,
   minHeight: 44,
   justifyContent: "flex-end",
-  paddingRight: 0,
+  paddingEnd: 0,
   borderWidth: 0,
   backgroundColor: "transparent",
 })

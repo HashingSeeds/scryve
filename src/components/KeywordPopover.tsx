@@ -7,6 +7,7 @@ import { Text } from "@/components/Text"
 import type { KeywordRule } from "@/features/rules/magicKeywords"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { startFromLeft, towardEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 export type KeywordAnchor = { top: number; left: number }
@@ -59,7 +60,7 @@ export function KeywordPopover({
     <View
       style={[
         themed($popover),
-        anchor && [$anchored, { top: anchor.top, left: inset, right: inset }],
+        anchor && [$anchored, { top: anchor.top, start: inset, end: inset }],
       ]}
       onLayout={(event) => {
         setWidth(event.nativeEvent.layout.width)
@@ -67,7 +68,9 @@ export function KeywordPopover({
       }}
       testID="card-focus-keyword"
     >
-      {arrowLeft !== undefined ? <View style={[themed($arrow), { left: arrowLeft }]} /> : null}
+      {arrowLeft !== undefined && width > 0 ? (
+        <View style={[themed($arrow), { start: startFromLeft(arrowLeft, ARROW, width) }]} />
+      ) : null}
       <View style={themed($header)}>
         <Text size="sm" weight="medium" style={$shrink} text={name} />
         <Text size="xs" tone="dim" style={$flex} text={rule.id} />
@@ -142,10 +145,11 @@ const $arrow: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: ARROW,
   height: ARROW,
   backgroundColor: colors.field,
-  borderLeftWidth: 1,
+  borderStartWidth: 1,
   borderTopWidth: 1,
   borderColor: colors.border,
-  transform: [{ rotate: "45deg" }],
+  // why: the start and top borders meet at the tip only when it turns toward the start edge.
+  transform: [{ rotate: `${towardEnd * 45}deg` }],
 })
 const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

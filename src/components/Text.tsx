@@ -44,7 +44,8 @@ export const Text = forwardRef(function Text(props: TextProps, ref: ForwardedRef
   const { themed } = useAppTheme()
 
   const i18nText = tx && translate(tx, txOptions)
-  const content = i18nText || (typeof text === "number" ? formatNumber(text) : text) || children
+  const raw = i18nText || (typeof text === "number" ? formatNumber(text) : text) || children
+  const content = rest.selectable ? raw : isolateLatin(raw)
 
   const preset: Presets = props.preset ?? "default"
   const $styles: StyleProp<TextStyle> = [
@@ -115,3 +116,15 @@ const $presets: Record<Presets, ThemedStyleArray<TextStyle>> = {
   ],
 }
 const $rtlStyle: TextStyle = isRTL ? { writingDirection: "rtl" } : {}
+
+const RTL_LETTER = /[\u0590-\u08FF]/
+const LATIN_LETTER = /\p{Script=Latin}/u
+
+function isolateLatin(content: ReactNode) {
+  return isRTL &&
+    typeof content === "string" &&
+    LATIN_LETTER.test(content) &&
+    !RTL_LETTER.test(content)
+    ? `\u2066${content}\u2069`
+    : content
+}

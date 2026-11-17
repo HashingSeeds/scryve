@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Text } from "@/components/Text"
 import { LOCAL_KEYS, syncStatsEnabled } from "@/features/game/localPersistence"
 import { translate } from "@/i18n/translate"
+import { textEnd } from "@/theme/direction"
 import { radius } from "@/theme/radius"
 import { storage } from "@/utils/storage"
 
@@ -68,7 +69,7 @@ function SyncStatsTable({ latency, peers }: { latency: SyncLatency; peers?: () =
 
 const $table: ViewStyle = {
   position: "absolute",
-  left: 4,
+  start: 4,
   padding: 4,
   borderRadius: radius.sm,
   backgroundColor: "rgba(0, 0, 0, 0.7)",
@@ -80,7 +81,7 @@ const $name: TextStyle = { width: 56, color: "#FFFFFF" }
 
 const $cell: TextStyle = {
   width: 34,
-  textAlign: "right",
+  textAlign: textEnd,
   color: "#FFFFFF",
   fontVariant: ["tabular-nums"],
 }

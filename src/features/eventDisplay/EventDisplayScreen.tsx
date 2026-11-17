@@ -18,6 +18,7 @@ import { useAuthAccess } from "@/features/auth/AuthContext"
 import { formatRatio, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
+import { textEnd } from "@/theme/direction"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { chunk, clockPhase, fitGrid, formatClock } from "./display"
@@ -437,7 +438,7 @@ function RosterPanel({ event, s }: { event: EventView; s: Styles }) {
 }
 
 function displayStyles(u: number) {
-  const number: TextStyle = { textAlign: "right", fontVariant: ["tabular-nums"] }
+  const number: TextStyle = { textAlign: textEnd, fontVariant: ["tabular-nums"] }
   return {
     unit: u,
     screen: { flex: 1, backgroundColor: ink.background },
@@ -446,7 +447,7 @@ function displayStyles(u: number) {
     messageText: { color: ink.text, fontSize: 1.6 * u, lineHeight: 2 * u, textAlign: "center" },
     board: { flex: 1, paddingHorizontal: u, paddingBottom: u / 2 },
     body: { flex: 1, flexDirection: "row" },
-    side: { marginLeft: u },
+    side: { marginStart: u },
     header: {
       flexDirection: "row",
       flexWrap: "wrap",

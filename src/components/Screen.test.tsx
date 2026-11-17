@@ -109,11 +109,11 @@ describe("Screen", () => {
     const gutter = () =>
       StyleSheet.flatten(view.UNSAFE_getByProps({ behavior: "padding" }).props.style)
     try {
-      expect(gutter()).toMatchObject({ paddingLeft: 0, paddingRight: 68 })
+      expect(gutter()).toMatchObject({ paddingStart: 0, paddingEnd: 68 })
 
       view.rerender(screen(true))
 
-      expect(gutter().paddingRight).toBeUndefined()
+      expect(gutter().paddingEnd).toBeUndefined()
     } finally {
       mockInsets.right = 0
     }
@@ -133,7 +133,7 @@ describe("Screen", () => {
         </ThemeProvider>,
       )
       const style = StyleSheet.flatten(view.UNSAFE_getByProps({ behavior: "padding" }).props.style)
-      expect(style.paddingRight).toBeUndefined()
+      expect(style.paddingEnd).toBeUndefined()
     } finally {
       Object.assign(mockInsets, { left: 0, right: 0 })
       Dimensions.set({ window: portrait, screen: portrait })

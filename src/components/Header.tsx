@@ -1,6 +1,5 @@
 import { createContext, ReactElement, ReactNode, useContext, useState } from "react"
 import {
-  ImageStyle,
   LayoutChangeEvent,
   Platform,
   StyleProp,
@@ -13,9 +12,9 @@ import {
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { isRTL } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { endEdge, startEdge } from "@/theme/direction"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { type BackRoute, fitBackLabel, useBackLabel } from "@/utils/useBackLabel"
@@ -140,8 +139,8 @@ export function Header(props: HeaderProps) {
   const sideInsets = useSafeAreaInsets()
   const sideGutter = useContext(SideGutterContext)
   const $actionInsets: ViewStyle = {
-    paddingStart: Math.max(sideInsets.left - sideGutter.left, 0),
-    paddingEnd: Math.max(sideInsets.right - sideGutter.right, 0),
+    paddingStart: Math.max(sideInsets[startEdge] - sideGutter[startEdge], 0),
+    paddingEnd: Math.max(sideInsets[endEdge] - sideGutter[endEdge], 0),
   }
   const { fontScale } = useWindowDimensions()
   const centered = titleMode === "center" && fontScale <= CENTERED_TITLE_MAX_FONT_SCALE
@@ -236,7 +235,6 @@ export function HeaderIcon({
       disabled={disabled}
       onPress={onPress}
       containerStyle={[themed($actionIconContainer), disabled && $disabledIcon]}
-      style={icon === "back" && isRTL ? $flipped : undefined}
     />
   )
 }
@@ -266,7 +264,6 @@ export function HeaderBack({ onPress, label, fallback, testID }: HeaderBackProps
         disabled={disabled}
         onPress={onPress}
         containerStyle={[themed($materialBack), disabled && $disabledIcon]}
-        style={isRTL ? $flipped : undefined}
       />
     )
   }
@@ -282,7 +279,7 @@ export function HeaderBack({ onPress, label, fallback, testID }: HeaderBackProps
       onPress={onPress}
       style={[themed($backAction), disabled && $disabledIcon]}
     >
-      <Icon icon="back" size={24} color={theme.colors.tint} style={isRTL ? $flipped : undefined} />
+      <Icon icon="back" size={24} color={theme.colors.tint} />
       <Text
         weight="medium"
         size="md"
@@ -342,7 +339,6 @@ function HeaderActionContent(props: Omit<HeaderActionProps, "onLayout">) {
         color={iconColor}
         onPress={onPress}
         containerStyle={themed([$actionIconContainer, { backgroundColor }])}
-        style={isRTL ? { transform: [{ rotate: "180deg" }] } : {}}
       />
     )
   }
@@ -350,7 +346,6 @@ function HeaderActionContent(props: Omit<HeaderActionProps, "onLayout">) {
   return <View style={[$actionFillerContainer, { backgroundColor }]} />
 }
 
-const $flipped: ImageStyle = { transform: [{ rotate: "180deg" }] }
 const $disabledIcon: ViewStyle = { opacity: 0.4 }
 
 const HEADER_MAX_FONT_SCALE = 1.5
@@ -440,8 +435,8 @@ const $titleWrapperCenter: ViewStyle = {
   justifyContent: "center",
   height: "100%",
   position: "absolute",
-  left: 0,
-  right: 0,
+  start: 0,
+  end: 0,
   zIndex: 1,
 }
 

@@ -9,6 +9,7 @@ import { TextAction } from "@/components/TextAction"
 import { formatNumber, formatOrMore, formatPercent } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { textEnd } from "@/theme/direction"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -346,7 +347,7 @@ const $bar: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   borderRadius: radius.xxs,
 })
 const $colorRow: ViewStyle = { flexDirection: "row", alignItems: "center" }
-const $cell: TextStyle = { width: 64, textAlign: "right" }
+const $cell: TextStyle = { width: 64, textAlign: textEnd }
 const $sheetHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   marginHorizontal: spacing.lg,
   flexDirection: "row",

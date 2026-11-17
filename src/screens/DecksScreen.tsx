@@ -967,7 +967,7 @@ const $systemMarker: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
   width: 6,
   height: 34,
   borderRadius: radius.xxs,
-  marginRight: spacing.sm,
+  marginEnd: spacing.sm,
 })
 const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
 const $nameLine: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -989,7 +989,7 @@ const $skeletonMarker: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) =>
   width: 6,
   height: 34,
   borderRadius: radius.xxs,
-  marginRight: spacing.sm,
+  marginEnd: spacing.sm,
   backgroundColor: colors.separator,
 })
 const $skeletonContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({

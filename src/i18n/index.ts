@@ -1,4 +1,3 @@
-import { I18nManager } from "react-native"
 import * as Localization from "expo-localization"
 import i18n, { type BackendModule, type PostProcessorModule } from "i18next"
 import { initReactI18next } from "react-i18next"
@@ -30,15 +29,11 @@ const devLocaleOverride = __DEV__ ? process.env.EXPO_PUBLIC_LOCALE : undefined
 
 export const appLocale = devLocaleOverride || locale?.languageTag || fallbackLocale
 
-export let isRTL = false
+const RTL_LANGUAGES = new Set(["ar", "he", "fa", "ur"])
 
-// Need to set RTL ASAP to ensure the app is rendered correctly. Waiting for i18n to init is too late.
-if (!devLocaleOverride && locale?.languageTag && locale?.textDirection === "rtl") {
-  I18nManager.allowRTL(true)
-  isRTL = true
-} else {
-  I18nManager.allowRTL(false)
-}
+export const isRTL = RTL_LANGUAGES.has(appLocale.split("-")[0])
+
+export const appDirection = isRTL ? "rtl" : "ltr"
 
 type Bundle = Readonly<Record<string, LocaleNamespace>>
 

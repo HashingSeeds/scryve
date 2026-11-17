@@ -1,21 +1,24 @@
 import { Edge, useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { endEdge, startEdge } from "@/theme/direction"
+
 import { useTopEdgeBand } from "./useTopEdgeBand"
 
 export type ExtendedEdge = Edge | "start" | "end"
 
+// why: native swaps left and right styles in RTL, so a physical inset is written on the logical side it lands on.
 const propertySuffixMap = {
   top: "Top",
   bottom: "Bottom",
-  left: "Start",
-  right: "End",
+  left: startEdge === "left" ? "Start" : "End",
+  right: startEdge === "right" ? "Start" : "End",
   start: "Start",
   end: "End",
 }
 
 const edgeInsetMap: Record<string, Edge> = {
-  start: "left",
-  end: "right",
+  start: startEdge,
+  end: endEdge,
 }
 
 export type SafeAreaInsetsStyle<

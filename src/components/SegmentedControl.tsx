@@ -6,7 +6,9 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
 import { localGameRepository } from "@/features/game/localPersistence"
+import { isRTL } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
+import { towardEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -117,7 +119,8 @@ export function SegmentedControl({
 
   function followFinger({ x: trackX }: { x: number }) {
     const maxOffset = segmentWidth * (segments.length - 1)
-    const x = trackX - TRACK_INSET - TRACK_BORDER_WIDTH
+    const fromLeft = trackX - TRACK_INSET - TRACK_BORDER_WIDTH
+    const x = isRTL ? trackWidth - fromLeft : fromLeft
     const target = Math.min(Math.max(x - segmentWidth / 2, 0), maxOffset)
     offset.set(reducedMotion === false ? withSpring(target, FOLLOW_SPRING) : target)
     const index = segmentAt(x)
@@ -127,14 +130,16 @@ export function SegmentedControl({
     return index
   }
 
+  const selectedStart = -(TRACK_INSET + TRACK_BORDER_WIDTH + segmentWidth * selectedIndex)
   const drag = Gesture.Pan()
     .enabled(!disabled && segments.length > 1)
     .runOnJS(true)
     // why: like iOS, only a touch that starts on the selection drags it; anywhere else stays a tap, a scroll, or a back swipe.
-    .hitSlop({
-      left: -(TRACK_INSET + TRACK_BORDER_WIDTH + segmentWidth * selectedIndex),
-      width: segmentWidth,
-    })
+    .hitSlop(
+      isRTL
+        ? { right: selectedStart, width: segmentWidth }
+        : { left: selectedStart, width: segmentWidth },
+    )
     .activateAfterLongPress(CLAIM_DELAY_MS)
     .onStart((event) => {
       fingerIndex.current = selectedIndex
@@ -153,7 +158,7 @@ export function SegmentedControl({
   if (testID) drag.withTestId(`${testID}-drag`)
 
   const $thumb = useAnimatedStyle(() => ({
-    transform: [{ translateX: offset.get() }, { scale: thumbScale.get() }],
+    transform: [{ translateX: towardEnd * offset.get() }, { scale: thumbScale.get() }],
   }))
 
   return (
@@ -233,7 +238,7 @@ const $thumbShape: ThemedStyle<ViewStyle> = ({ radius }) => ({
   position: "absolute",
   top: TRACK_INSET,
   bottom: TRACK_INSET,
-  left: TRACK_INSET,
+  start: TRACK_INSET,
   borderRadius: radius.lg - TRACK_INSET,
 })
 const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
@@ -246,7 +251,7 @@ const $segment: ViewStyle = {
   paddingHorizontal: SEGMENT_PADDING,
 }
 const $segmentLabel: TextStyle = { textAlign: "center" }
-const $labelRuler: ViewStyle = { position: "absolute", top: 0, left: 0, opacity: 0 }
+const $labelRuler: ViewStyle = { position: "absolute", top: 0, start: 0, opacity: 0 }
 const $dimmed: ViewStyle = { opacity: 0.5 }
 
 function SegmentLabel({ label, color }: { label: string; color?: string }) {

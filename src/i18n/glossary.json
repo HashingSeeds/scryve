@@ -21,6 +21,12 @@
       "Statements use 합니다체, instructions -하세요, confirmations -할까요?. Never 해요체.",
       "Write Magic format names as Wizards Korea does: 커맨더, 스탠다드, 파이어니어, 모던, 레거시, 빈티지, 파우퍼, 난투 (Brawl). Keep other formats in English.",
       "The Pokémon card noun is 포켓몬 (배틀 포켓몬); keep Pokémon in Latin only for the brand (Pokémon TCG)."
+    ],
+    "ar": [
+      "Write Modern Standard Arabic that reads naturally across the Arab world. Prefer phrasing that avoids grammatical gender for the player (nouns, يمكنك); where an imperative is needed, use the masculine singular, the usual UI convention.",
+      "Game, format, and product names stay in Latin script as the system prompt lists. Never transliterate them into Arabic letters.",
+      "Strings with {{amount}} have no plural forms. Phrase them so they read for any number.",
+      "Plural slots: the counted noun agrees with the number category, so each form differs. one: singular (1 بطاقة). two: dual (2 بطاقتين, 2 مباراتين). few (3-10): plural (3 بطاقات, 3 مباريات, 3 أدوار). many (11-99): singular with tanween (11 بطاقةً, 11 دورًا). zero and other (0, 100+): singular (100 بطاقة). Never copy one form into every slot."
     ]
   },
   "terms": {
@@ -30,7 +36,8 @@
       "fr": "points de vie. Heading: Points de vie. Counted: 1 point de vie, 20 points de vie. Never \"20 de vie\".",
       "hi": "लाइफ़ (की लाइफ़)",
       "ja": "ライフ",
-      "ko": "생명점 (생명 3점, 생명점 40)"
+      "ko": "생명점 (생명 3점, 생명점 40)",
+      "ar": "نقاط الحياة. Heading: الحياة. Counted: 20 نقطة حياة."
     },
     "Yu-Gi-Oh! Life Points": {
       "en": ["Life Points"],
@@ -38,7 +45,8 @@
       "fr": "Life Points; counted: {{count}} LP",
       "hi": "लाइफ़ पॉइंट",
       "ja": "ライフポイント (LP in tight labels)",
-      "ko": "라이프 포인트 (LP in tight labels)"
+      "ko": "라이프 포인트 (LP in tight labels)",
+      "ar": "LP, invariant (8000 LP)"
     },
     "deck": {
       "en": ["deck"],
@@ -46,7 +54,8 @@
       "fr": "deck, masculine (le deck, ce deck; plural decks)",
       "hi": "डेक",
       "ja": "デッキ",
-      "ko": "덱 (내 덱, 덱 {{count}}개)"
+      "ko": "덱 (내 덱, 덱 {{count}}개)",
+      "ar": "مجموعة (مجموعة أوراق when ambiguous)"
     },
     "Yu-Gi-Oh! deck sections": {
       "en": ["Main Deck", "Extra Deck", "Side Deck"],
@@ -54,7 +63,8 @@
       "fr": "Main Deck, Extra Deck, Side Deck (untranslated)",
       "hi": "मेन डेक / एक्स्ट्रा डेक / साइड डेक",
       "ja": "メインデッキ / エクストラデッキ / サイドデッキ",
-      "ko": "메인 덱 / 엑스트라 덱 / 사이드 덱"
+      "ko": "메인 덱 / 엑스트라 덱 / 사이드 덱",
+      "ar": "المجموعة الرئيسية / المجموعة الإضافية / المجموعة الجانبية"
     },
     "Magic sideboard": {
       "en": ["sideboard"],
@@ -62,7 +72,8 @@
       "fr": "Side Deck (le Side Deck; en Side Deck); import heading stays Sideboard",
       "hi": "साइडबोर्ड (short: साइड; main deck: मेन डेक, short: मेन)",
       "ja": "サイドボード (counted: サイドボード{{count}}枚)",
-      "ko": "사이드보드 (short: 사이드; to sideboard: 사이드보딩)"
+      "ko": "사이드보드 (short: 사이드; to sideboard: 사이드보딩)",
+      "ar": "المجموعة الجانبية"
     },
     "Pokémon Prize cards, and taking one": {
       "en": ["Prize"],
@@ -70,7 +81,8 @@
       "fr": "cartes Récompense (Récompense is capitalized and invariable: 2 cartes Récompense; short form Récompenses). Take a Prize card: récupérer",
       "hi": "प्राइज़ कार्ड (take: लेना; give back: लौटाना)",
       "ja": "サイド (never サイドカード; counted サイド{{count}}枚); take: とる (サイドをとる)",
-      "ko": "프라이즈 (counted 프라이즈 {{count}}장; never 사이드). Take: 프라이즈를 가져오다 / 가져가다"
+      "ko": "프라이즈 (counted 프라이즈 {{count}}장; never 사이드). Take: 프라이즈를 가져오다 / 가져가다",
+      "ar": "Pokémon Prize cards: بطاقات الجائزة; take a Prize card: أخذ بطاقة جائزة"
     },
     "Pokémon Knocked Out": {
       "en": ["Knocked Out"],
@@ -78,7 +90,8 @@
       "fr": "K.O. (est mis K.O.)",
       "hi": "नॉक आउट",
       "ja": "きぜつ",
-      "ko": "기절"
+      "ko": "기절",
+      "ar": "خارج القتال"
     },
     "Active Pokémon / Active Spot": {
       "en": ["Active"],
@@ -86,7 +99,8 @@
       "fr": "Pokémon Actif (mettre Actif, revient en Pokémon Actif)",
       "hi": "ऐक्टिव Pokémon; the spot: ऐक्टिव (ऐक्टिव में लौटता है)",
       "ja": "バトルポケモン; the spot: バトル場",
-      "ko": "배틀 포켓몬 (spot: 배틀필드)"
+      "ko": "배틀 포켓몬 (spot: 배틀필드)",
+      "ar": "البوكيمون النشط"
     },
     "Bench": {
       "en": ["Bench"],
@@ -94,7 +108,8 @@
       "fr": "Banc",
       "hi": "बेंच",
       "ja": "ベンチ / ベンチポケモン",
-      "ko": "벤치 / 벤치 포켓몬"
+      "ko": "벤치 / 벤치 포켓몬",
+      "ar": "دكة الاحتياط"
     },
     "HP": {
       "en": ["HP"],
@@ -102,7 +117,8 @@
       "fr": "PV",
       "hi": "HP, in Latin script ({{remaining}} HP बचे)",
       "ja": "HP, number after: HP{{hp}}, 残りHP{{remaining}}",
-      "ko": "HP, in Latin (HP {{hp}}, HP {{remaining}} 남음)"
+      "ko": "HP, in Latin (HP {{hp}}, HP {{remaining}} 남음)",
+      "ar": "HP"
     },
     "damage (Pokémon, Yu-Gi-Oh!, Magic)": {
       "en": ["damage"],
@@ -110,7 +126,8 @@
       "fr": "Pokémon: dégâts. Magic: blessures (feminine plural)",
       "hi": "डैमेज",
       "ja": "ダメージ (never ダメ)",
-      "ko": "Pokémon and Yu-Gi-Oh!: 데미지. Magic: 피해 (counted 피해 3점). Never 대미지."
+      "ko": "Pokémon and Yu-Gi-Oh!: 데미지. Magic: 피해 (counted 피해 3점). Never 대미지.",
+      "ar": "الضرر"
     },
     "Lorcana lore": {
       "en": ["lore"],
@@ -118,7 +135,8 @@
       "fr": "Lore. A counted amount is éclats de Lore (1 éclat de Lore, 20 éclats de Lore).",
       "hi": "लोर",
       "ja": "ロア, number first: {{count}}ロア",
-      "ko": "로어"
+      "ko": "로어",
+      "ar": "Lore, kept in Latin (20 Lore)"
     },
     "commander, commander damage, commander tax": {
       "en": ["commander"],
@@ -126,7 +144,8 @@
       "fr": "commander (the card): commandant. Commander damage: blessures de commandant (subies, infligées). Commander tax: taxe de commandant",
       "hi": "the card: कमांडर; commander damage: कमांडर डैमेज; commander tax: कमांडर टैक्स",
       "ja": "統率者; commander damage: 統率者ダメージ (never コマンダーダメージ); commander tax: 統率者税",
-      "ko": "커맨더 (card and format; never 사령관). Damage: 커맨더 피해. Tax: 커맨더 세금 (label 세금)"
+      "ko": "커맨더 (card and format; never 사령관). Damage: 커맨더 피해. Tax: 커맨더 세금 (label 세금)",
+      "ar": "commander (the card): القائد; commander damage: ضرر القائد; commander tax: ضريبة القائد"
     },
     "the Monarch, and giving it up": {
       "en": ["Monarch"],
@@ -134,7 +153,8 @@
       "fr": "Monarque (devenir le monarque). Give up the Monarch or Initiative: retirer",
       "hi": "मोनार्क; give up: छोड़ें",
       "ja": "統治者; give up: 手放す ({{label}}を手放す)",
-      "ko": "모나크 (never 군주); give up: 포기"
+      "ko": "모나크 (never 군주); give up: 포기",
+      "ar": "الملك"
     },
     "the Initiative, and giving it up": {
       "en": ["Initiative"],
@@ -142,7 +162,8 @@
       "fr": "Initiative (the designation, not first strike). Give up the Monarch or Initiative: retirer",
       "hi": "इनिशिएटिव; give up: छोड़ें",
       "ja": "イニシアチブ; give up: 手放す ({{label}}を手放す)",
-      "ko": "이니셔티브; give up: 포기"
+      "ko": "이니셔티브; give up: 포기",
+      "ar": "المبادرة"
     },
     "poison counters": {
       "en": ["poison"],
@@ -150,7 +171,8 @@
       "fr": "marqueurs poison (label: Poison)",
       "hi": "पॉइज़न काउंटर (label: पॉइज़न)",
       "ja": "毒カウンター (label: 毒)",
-      "ko": "독 카운터 (label: 독)"
+      "ko": "독 카운터 (label: 독)",
+      "ar": "عدادات السم (label: السم)"
     },
     "color identity": {
       "en": ["color identity"],
@@ -158,7 +180,8 @@
       "fr": "identité couleur (no \"de\")",
       "hi": "कलर आइडेंटिटी",
       "ja": "固有色",
-      "ko": "색 정체성"
+      "ko": "색 정체성",
+      "ar": "هوية اللون"
     },
     "mana curve": {
       "en": ["mana curve"],
@@ -166,7 +189,8 @@
       "fr": "courbe de mana (label: Courbe de mana)",
       "hi": "मैना कर्व",
       "ja": "マナカーブ",
-      "ko": "마나 커브"
+      "ko": "마나 커브",
+      "ar": "منحنى المانا"
     },
     "land (Magic)": {
       "en": ["land"],
@@ -174,7 +198,8 @@
       "fr": "terrain (label: Terrains; pose de terrain)",
       "hi": "लैंड (लैंड ड्रॉप)",
       "ja": "土地 (counted: 土地{{count}}枚)",
-      "ko": "대지 (never 토지)"
+      "ko": "대지 (never 토지)",
+      "ar": "أرض (plural: أراضٍ; heading: الأراضي)"
     },
     "mulligan": {
       "en": ["mulligan"],
@@ -182,7 +207,8 @@
       "fr": "mulligan (plural mulligans; Premier mulligan gratuit)",
       "hi": "मुलिगन, masculine (पहला मुलिगन फ़्री); keep: रखें",
       "ja": "マリガン; free mulligan: フリー・マリガン; keep: キープ",
-      "ko": "멀리건 (무료 멀리건); keep: 킵"
+      "ko": "멀리건 (무료 멀리건); keep: 킵",
+      "ar": "إعادة سحب; free mulligan: إعادة سحب مجانية"
     },
     "opening hand": {
       "en": ["opening hand"],
@@ -190,7 +216,8 @@
       "fr": "main de départ",
       "hi": "शुरुआती हैंड",
       "ja": "初手",
-      "ko": "시작 핸드"
+      "ko": "시작 핸드",
+      "ar": "اليد الافتتاحية"
     },
     "put cards on the bottom of the deck": {
       "en": ["bottom"],
@@ -198,7 +225,8 @@
       "fr": "mettre au fond (du deck): mettez {{count}} au fond",
       "hi": "नीचे रखें ({{count}} नीचे रखें)",
       "ja": "下に置く (label: {{count}}枚を下に)",
-      "ko": "라이브러리 맨 아래에 놓다 (tight label: {{count}}장 바닥)"
+      "ko": "라이브러리 맨 아래에 놓다 (tight label: {{count}}장 바닥)",
+      "ar": "وضع في أسفل المجموعة"
     },
     "Phyrexian mana": {
       "en": ["Phyrexian"],
@@ -206,7 +234,8 @@
       "fr": "mana phyrexian",
       "hi": "फ़िरेक्सियन मैना",
       "ja": "ファイレクシア・マナ",
-      "ko": "피렉시아 마나"
+      "ko": "피렉시아 마나",
+      "ar": "مانا فيركسية"
     },
     "Planechase plane and phenomenon": {
       "en": ["plane", "phenomenon", "planar"],
@@ -214,7 +243,8 @@
       "fr": "Planechase plane (the card): Plan (Plan : {{name}}; never Plane). Phenomenon: Phénomène",
       "hi": "प्लेन / फ़ेनोमेनन (planeswalk: प्लेनवॉक)",
       "ja": "plane: プレイン; phenomenon: 現象; Planechase: プレインチェイス; planeswalk: 次元渡り",
-      "ko": "플레인체이스; plane: 차원 (planar deck 차원 덱, planeswalk 차원 이동); phenomenon: 현상"
+      "ko": "플레인체이스; plane: 차원 (planar deck 차원 덱, planeswalk 차원 이동); phenomenon: 현상",
+      "ar": "plane: المستوى; phenomenon: ظاهرة; Planechase stays in Latin"
     },
     "Archenemy and its schemes": {
       "en": ["Archenemy", "scheme"],
@@ -222,7 +252,8 @@
       "fr": "Archenemy (mode name, untranslated); scheme: machination (mettre une machination en marche)",
       "hi": "the player: आर्चएनिमी; scheme: स्कीम; set in motion: सेट इन मोशन करें",
       "ja": "アーチエネミー; scheme: 策略 (策略デッキ); set in motion: 発動する",
-      "ko": "아크에너미; scheme: 음모 (음모 덱, set in motion 발동, abandon 버리기)"
+      "ko": "아크에너미; scheme: 음모 (음모 덱, set in motion 발동, abandon 버리기)",
+      "ar": "Archenemy stays in Latin; scheme: مخطط; set in motion: تفعيل"
     },
     "hero and young hero (Flesh and Blood)": {
       "en": ["hero"],
@@ -230,7 +261,8 @@
       "fr": "hero: Héros. Young hero (Flesh and Blood): héros jeune",
       "hi": "हीरो; young hero: यंग हीरो",
       "ja": "ヒーロー; young hero: 若者ヒーロー",
-      "ko": "영웅; young hero: 젊은 영웅"
+      "ko": "영웅; young hero: 젊은 영웅",
+      "ar": "البطل"
     },
     "arena (Flesh and Blood)": {
       "en": ["arena"],
@@ -238,7 +270,8 @@
       "fr": "Arène",
       "hi": "एरीना",
       "ja": "闘技場",
-      "ko": "아레나"
+      "ko": "아레나",
+      "ar": "الحلبة"
     },
     "Pokémon Special Conditions (Asleep, Burned, Confused, Paralyzed, Poisoned)": {
       "en": ["Special Condition", "Asleep", "Burned", "Confused", "Paralyzed", "Poisoned"],
@@ -246,7 +279,8 @@
       "fr": "Endormi, Brûlé, Confus, Paralysé, Empoisonné",
       "hi": "स्लीप, बर्न, कन्फ़्यूज़्ड, पैरालाइज़्ड, पॉइज़न्ड",
       "ja": "ねむり, やけど, こんらん, マヒ, どく",
-      "ko": "잠듦, 화상, 혼란, 마비, 독"
+      "ko": "잠듦, 화상, 혼란, 마비, 독",
+      "ar": "نائم، محترق، مرتبك، مشلول، مسموم"
     },
     "go first / second, on the play": {
       "en": [
@@ -264,7 +298,8 @@
       "fr": "jouer en premier / en second ({{name}} joue en premier); question: Qui commence ?",
       "hi": "on the play / going first: पहले खेलते हुए; go first / second: पहले / बाद में खेलें ({{name}} पहले खेलेंगे)",
       "ja": "先攻 / 後攻 (on the play: 先攻で)",
-      "ko": "선공 / 후공 ({{name}}님이 선공입니다; on the play: 선공 시)"
+      "ko": "선공 / 후공 ({{name}}님이 선공입니다; on the play: 선공 시)",
+      "ar": "اللعب أولًا / ثانيًا (يلعب {{name}} أولًا)"
     },
     "match (a best-of-N set of games)": {
       "en": ["match"],
@@ -272,7 +307,8 @@
       "fr": "match (plural matchs)",
       "hi": "मैच",
       "ja": "マッチ",
-      "ko": "매치"
+      "ko": "매치",
+      "ar": "مواجهة"
     },
     "best of N (N is the total number of games, so 3 means best of three, never the wins needed)": {
       "en": ["best of"],
@@ -280,7 +316,8 @@
       "fr": "au meilleur des N",
       "hi": "बेस्ट ऑफ़ N",
       "ja": "N本勝負",
-      "ko": "N판 승부"
+      "ko": "N판 승부",
+      "ar": "الأفضل من N"
     },
     "game (one game of a match), and game system (Magic, Pokémon…)": {
       "en": ["game"],
@@ -288,7 +325,8 @@
       "fr": "game (one game of a match): partie. Game system: jeu",
       "hi": "गेम; game system: गेम सिस्टम",
       "ja": "one game: ゲーム (第{{number}}ゲーム; counted {{count}}ゲーム); game system: ゲームシステム (short: システム)",
-      "ko": "게임. Game system: 게임 (filter label 시스템, prose 게임 시스템)"
+      "ko": "게임. Game system: 게임 (filter label 시스템, prose 게임 시스템)",
+      "ar": "game (one game of a match): مباراة; game system (Magic, Pokémon…): لعبة"
     },
     "best of N": {
       "en": ["best of", "bestOf"],
@@ -296,7 +334,8 @@
       "fr": "au meilleur des N",
       "hi": "बेस्ट ऑफ़ N",
       "ja": "N本勝負 (never 先取; short Bo{{bestOf}})",
-      "ko": "{{n}}판 승부 (label: 최대 게임 수; short Bo{{n}})"
+      "ko": "{{n}}판 승부 (label: 최대 게임 수; short Bo{{n}})",
+      "ar": "مواجهة من N مباريات (الأفضل من 3)"
     },
     "win / loss / draw, and their badges": {
       "en": [
@@ -314,7 +353,8 @@
       "fr": "Victoire / Défaite. Draw: Égalité for one game; match nul for a whole match. Badges V / D / É",
       "hi": "जीत / हार / ड्रॉ (winner: विजेता); badges: W / L / D, in Latin script",
       "ja": "勝ち / 負け / 引き分け; badges 勝 / 敗 / 分",
-      "ko": "승리 / 패배 / 무승부; badges 승 / 패 / 무"
+      "ko": "승리 / 패배 / 무승부; badges 승 / 패 / 무",
+      "ar": "فوز / خسارة / تعادل; one-letter badges ف / خ / ت"
     },
     "coin flip, heads / tails": {
       "en": ["heads", "tails", "flip", "flipping"],
@@ -322,7 +362,8 @@
       "fr": "Pile ou face (the flip). Face / Pile (heads = Face, tails = Pile)",
       "hi": "टॉस; टॉस जीता; heads / tails: चित / पट",
       "ja": "表 / 裏; flip: コイントス (short label: コイン)",
-      "ko": "앞면 / 뒷면; coin flip: 동전 던지기 (label 동전)"
+      "ko": "앞면 / 뒷면; coin flip: 동전 던지기 (label 동전)",
+      "ar": "صورة / كتابة"
     },
     "abandon (ends it for everyone, no result)": {
       "en": ["abandon"],
@@ -330,7 +371,8 @@
       "fr": "a game: terminer sans résultat (status: annulée); a lobby: dissoudre le salon. Never Annuler, which is Cancel.",
       "hi": "a game: बिना नतीजे खत्म करें; a lobby: लॉबी बंद करें; abandoned (status): रद्द",
       "ja": "a game: 中止; a lobby: 解散",
-      "ko": "a game: 중단 (status 중단됨); a lobby: 로비 닫기"
+      "ko": "a game: 중단 (status 중단됨); a lobby: 로비 닫기",
+      "ar": "إبطال (إبطال المباراة)"
     },
     "leave (just you)": {
       "en": ["leave", "leaving"],
@@ -338,7 +380,8 @@
       "fr": "quitter",
       "hi": "बाहर निकलें",
       "ja": "退出 (ゲームから退出, ロビーから退出)",
-      "ko": "나가기 (게임 나가기, 로비 나가기)"
+      "ko": "나가기 (게임 나가기, 로비 나가기)",
+      "ar": "مغادرة"
     },
     "end game (finishes with a result)": {
       "en": ["end game"],
@@ -346,7 +389,8 @@
       "fr": "terminer la partie (button: Terminer la partie)",
       "hi": "गेम खत्म करें",
       "ja": "ゲームを終了",
-      "ko": "게임 종료 (match: 매치 종료)"
+      "ko": "게임 종료 (match: 매치 종료)",
+      "ar": "إنهاء المباراة"
     },
     "cancel (closes a dialog)": {
       "en": ["cancel"],
@@ -354,7 +398,8 @@
       "fr": "Annuler; a subscription: résilier",
       "hi": "रद्द करें",
       "ja": "キャンセル",
-      "ko": "취소 (a subscription: 해지)"
+      "ko": "취소 (a subscription: 해지)",
+      "ar": "إلغاء"
     },
     "discard (changes)": {
       "en": ["discard"],
@@ -362,7 +407,8 @@
       "fr": "abandonner (Abandonner les modifications ?)",
       "hi": "छोड़ें (बदलाव छोड़ें)",
       "ja": "破棄 (変更を破棄)",
-      "ko": "폐기; Cancel stays 취소"
+      "ko": "폐기; Cancel stays 취소",
+      "ar": "تجاهل"
     },
     "seat (a player's place at the table)": {
       "en": ["seat"],
@@ -370,7 +416,8 @@
       "fr": "place (never siège)",
       "hi": "सीट",
       "ja": "席",
-      "ko": "자리 (never 좌석)"
+      "ko": "자리 (never 좌석)",
+      "ar": "مقعد"
     },
     "host (the player who created a connected game), and hosting a game or lobby": {
       "en": ["host"],
@@ -378,7 +425,8 @@
       "fr": "host (the player): hôte; to host: héberger. Event host: organisateur",
       "hi": "होस्ट; to host: होस्ट करें (लॉबी होस्ट करें)",
       "ja": "ホスト (verb: ホストする; host a lobby: ロビーを作成)",
-      "ko": "the player: 호스트 (event host: 주최자); host a lobby or game: 로비 만들기 / 게임 만들기"
+      "ko": "the player: 호스트 (event host: 주최자); host a lobby or game: 로비 만들기 / 게임 만들기",
+      "ar": "المضيف; to host a game or lobby: إنشاء"
     },
     "lobby": {
       "en": ["lobby"],
@@ -386,7 +434,8 @@
       "fr": "salon (never lobby)",
       "hi": "लॉबी",
       "ja": "ロビー",
-      "ko": "로비"
+      "ko": "로비",
+      "ar": "غرفة"
     },
     "nearby (phones on the same Wi-Fi)": {
       "en": ["nearby"],
@@ -394,7 +443,8 @@
       "fr": "à proximité (Parties à proximité); permission: appareils à proximité",
       "hi": "आस-पास (permission: आस-पास मौजूद डिवाइस)",
       "ja": "近く (Android setting: 付近のデバイス). Never ニアバイ.",
-      "ko": "근처 (근처 기기)"
+      "ko": "근처 (근처 기기)",
+      "ar": "قريبة (مباريات قريبة); permission: الأجهزة القريبة"
     },
     "local game (one shared device) / connected game (players on their own phones)": {
       "en": ["local game", "connected game"],
@@ -402,7 +452,8 @@
       "fr": "partie locale / partie connectée",
       "hi": "लोकल गेम / कनेक्टेड गेम",
       "ja": "ローカルゲーム / 通信対戦",
-      "ko": "로컬 게임 / 연결 게임"
+      "ko": "로컬 게임 / 연결 게임",
+      "ar": "مباراة محلية / مباراة متصلة"
     },
     "cloud (synced through Scryve's servers)": {
       "en": ["cloud"],
@@ -410,7 +461,8 @@
       "fr": "cloud",
       "hi": "क्लाउड",
       "ja": "クラウド",
-      "ko": "클라우드"
+      "ko": "클라우드",
+      "ar": "السحابة (adjective: سحابي)"
     },
     "invite, invitation": {
       "en": ["invite", "invitation"],
@@ -418,7 +470,8 @@
       "fr": "invitation (code d'invitation); verb: inviter",
       "hi": "आमंत्रण; to invite: आमंत्रित करें",
       "ja": "招待 (invite code: 招待コード)",
-      "ko": "초대 (초대 코드, 플레이어 초대)"
+      "ko": "초대 (초대 코드, 플레이어 초대)",
+      "ar": "دعوة (invite code: رمز الدعوة)"
     },
     "layout": {
       "en": ["layout"],
@@ -426,7 +479,8 @@
       "fr": "disposition",
       "hi": "लेआउट",
       "ja": "レイアウト",
-      "ko": "레이아웃 (균형 레이아웃)"
+      "ko": "레이아웃 (균형 레이아웃)",
+      "ar": "التخطيط"
     },
     "sign in / sign out": {
       "en": ["sign in", "sign-in", "sign out"],
@@ -434,7 +488,8 @@
       "fr": "sign in: se connecter (noun: connexion); sign out: se déconnecter. Joining a game is rejoindre, and connecting to one is connexion en cours…; never a bare Connexion for those.",
       "hi": "साइन इन करें / साइन आउट करें (noun: साइन-इन)",
       "ja": "サインイン / サインアウト",
-      "ko": "로그인 / 로그아웃"
+      "ko": "로그인 / 로그아웃",
+      "ar": "تسجيل الدخول"
     },
     "account": {
       "en": ["account"],
@@ -442,7 +497,8 @@
       "fr": "compte",
       "hi": "खाता",
       "ja": "アカウント",
-      "ko": "계정"
+      "ko": "계정",
+      "ar": "الحساب"
     },
     "username": {
       "en": ["username"],
@@ -450,7 +506,8 @@
       "fr": "nom d'utilisateur (never pseudo)",
       "hi": "यूज़रनेम",
       "ja": "ユーザー名",
-      "ko": "사용자 이름"
+      "ko": "사용자 이름",
+      "ar": "اسم المستخدم"
     },
     "device": {
       "en": ["device"],
@@ -458,7 +515,8 @@
       "fr": "appareil",
       "hi": "डिवाइस",
       "ja": "デバイス",
-      "ko": "기기"
+      "ko": "기기",
+      "ar": "الجهاز"
     },
     "version (of a deck or the app)": {
       "en": ["version"],
@@ -466,7 +524,8 @@
       "fr": "version",
       "hi": "वर्शन",
       "ja": "バージョン (short: v{{version}})",
-      "ko": "버전 (버전 {{number}}, 덱 버전)"
+      "ko": "버전 (버전 {{number}}, 덱 버전)",
+      "ar": "الإصدار"
     },
     "menu": {
       "en": ["menu"],
@@ -474,7 +533,8 @@
       "fr": "menu",
       "hi": "मेन्यू",
       "ja": "メニュー",
-      "ko": "메뉴"
+      "ko": "메뉴",
+      "ar": "القائمة"
     },
     "details": {
       "en": ["details"],
@@ -482,7 +542,8 @@
       "fr": "détails",
       "hi": "विवरण",
       "ja": "詳細 (デッキの詳細)",
-      "ko": "상세 정보 (card details: 카드 정보)"
+      "ko": "상세 정보 (card details: 카드 정보)",
+      "ar": "التفاصيل"
     },
     "format (Commander, Standard…)": {
       "en": ["format"],
@@ -490,7 +551,8 @@
       "fr": "format (Tous les formats; légal en {{format}})",
       "hi": "फ़ॉर्मैट",
       "ja": "フォーマット; names follow the katakana format rule",
-      "ko": "포맷"
+      "ko": "포맷",
+      "ar": "الصيغة"
     },
     "card faces front / back": {
       "en": ["front face", "back face"],
@@ -498,7 +560,8 @@
       "fr": "Recto / Verso",
       "hi": "सामने / पीछे",
       "ja": "表面 / 裏面",
-      "ko": "앞면 / 뒷면"
+      "ko": "앞면 / 뒷면",
+      "ar": "الوجه الأمامي / الوجه الخلفي"
     },
     "the Play tab": {
       "en": ["Play tab"],
@@ -506,7 +569,8 @@
       "fr": "Jouer (Aller à Jouer)",
       "hi": "खेलें टैब",
       "ja": "プレイ (Go to Play: プレイへ移動)",
-      "ko": "플레이 (prose: 플레이 탭)"
+      "ko": "플레이 (prose: 플레이 탭)",
+      "ar": "اللعب (Go to Play: الانتقال إلى اللعب)"
     },
     "Wi-Fi": {
       "en": ["Wi-Fi"],
@@ -514,7 +578,8 @@
       "fr": "Wi-Fi, masculine (le même Wi-Fi)",
       "hi": "Wi-Fi, in Latin script",
       "ja": "Wi-Fi, in Latin script",
-      "ko": "Wi-Fi, in Latin"
+      "ko": "Wi-Fi, in Latin",
+      "ar": "Wi-Fi, in Latin script (شبكة Wi-Fi)"
     },
     "turn (a player's turn)": {
       "en": ["turn"],
@@ -522,7 +587,8 @@
       "fr": "tour (Tour {{number}}; à qui est le tour)",
       "hi": "टर्न, masculine (अगला टर्न, किसका टर्न है?)",
       "ja": "ターン, number after: ターン{{number}}; turn order: 手番順",
-      "ko": "턴 (counted {{number}}턴)"
+      "ko": "턴 (counted {{number}}턴)",
+      "ar": "الدور"
     },
     "round (of an event)": {
       "en": ["round"],
@@ -530,7 +596,8 @@
       "fr": "ronde (Ronde {{round}} sur {{planned}})",
       "hi": "राउंड (राउंड {{round}} / {{planned}})",
       "ja": "ラウンド, number after: ラウンド{{round}}; short R{{round}}",
-      "ko": "라운드 (counted {{round}}라운드; short R{{round}})"
+      "ko": "라운드 (counted {{round}}라운드; short R{{round}})",
+      "ar": "جولة"
     },
     "standings": {
       "en": ["standings"],
@@ -538,7 +605,8 @@
       "fr": "classement",
       "hi": "स्टैंडिंग, feminine (स्टैंडिंग लॉक हो जाएगी)",
       "ja": "順位 (heading: 順位表)",
-      "ko": "순위"
+      "ko": "순위",
+      "ar": "الترتيب"
     },
     "event (a store tournament)": {
       "en": ["event"],
@@ -546,7 +614,8 @@
       "fr": "événement",
       "hi": "इवेंट, masculine (इवेंट भर चुका है)",
       "ja": "イベント; to host one: 開催 (organizer: 主催者)",
-      "ko": "이벤트 (organizer: 주최자)"
+      "ko": "이벤트 (organizer: 주최자)",
+      "ar": "فعالية"
     }
   }
 }

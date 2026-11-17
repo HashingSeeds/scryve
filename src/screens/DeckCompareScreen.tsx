@@ -39,6 +39,7 @@ import { useListCards } from "@/features/stats/useListCards"
 import { formatPercent, formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
@@ -286,7 +287,7 @@ const $valueColumn: ViewStyle = {
   justifyContent: "center",
 }
 const $few: ViewStyle = { opacity: 0.55, alignItems: "flex-end" }
-const $columnLabel: TextStyle = { textAlign: "right" }
+const $columnLabel: TextStyle = { textAlign: textEnd }
 const $pickers: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.sm,

@@ -83,13 +83,13 @@ export function FloatingAppNavigation({
 const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   zIndex: 50,
-  left: spacing.md,
-  right: spacing.md,
+  start: spacing.md,
+  end: spacing.md,
   height: 48,
   alignItems: "center",
   justifyContent: "flex-end",
 })
-const $utilityAboveDestination: ViewStyle = { position: "absolute", left: 0, bottom: 0, zIndex: 1 }
+const $utilityAboveDestination: ViewStyle = { position: "absolute", start: 0, bottom: 0, zIndex: 1 }
 const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   minWidth: 92,
   height: 44,

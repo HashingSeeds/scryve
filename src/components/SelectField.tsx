@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import type common from "@/i18n/en/common"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { startFromLeft } from "@/theme/direction"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -48,19 +49,19 @@ const CHECK_MARK = "✓"
 
 export function menuPlacement(
   anchor: Anchor,
-  windowHeight: number,
+  window: { width: number; height: number },
 ): { dropsDown: boolean; style: ViewStyle } {
-  const spaceBelow = windowHeight - (anchor.y + anchor.height) - SCREEN_MARGIN
+  const spaceBelow = window.height - (anchor.y + anchor.height) - SCREEN_MARGIN
   const spaceAbove = anchor.y - SCREEN_MARGIN
   const dropsDown = spaceBelow >= MIN_MENU_HEIGHT || spaceBelow >= spaceAbove
   return {
     dropsDown,
     style: {
       position: "absolute",
-      left: anchor.x,
+      start: startFromLeft(anchor.x, anchor.width, window.width),
       width: anchor.width,
       maxHeight: Math.min(MAX_MENU_HEIGHT, Math.max(0, dropsDown ? spaceBelow : spaceAbove)),
-      ...(dropsDown ? { top: anchor.y + anchor.height } : { bottom: windowHeight - anchor.y }),
+      ...(dropsDown ? { top: anchor.y + anchor.height } : { bottom: window.height - anchor.y }),
     },
   }
 }
@@ -81,7 +82,7 @@ export function SelectField({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const { height: windowHeight } = useWindowDimensions()
+  const window = useWindowDimensions()
   const reducedMotion = useReducedMotion()
   const trigger = useRef<View>(null)
   const [anchor, setAnchor] = useState<Anchor>()
@@ -110,7 +111,7 @@ export function SelectField({
     if (id !== value) onSelect(id)
   }
 
-  const placement = anchor ? menuPlacement(anchor, windowHeight) : undefined
+  const placement = anchor ? menuPlacement(anchor, window) : undefined
   const dropsDown = placement?.dropsDown ?? true
 
   const $entrance = useAnimatedStyle(() => ({ opacity: entrance.value }))
@@ -262,12 +263,12 @@ const $triggerPressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.palette.neutral300,
 })
 const $triggerOpenDown: ViewStyle = {
-  borderBottomLeftRadius: radius.none,
-  borderBottomRightRadius: radius.none,
+  borderBottomStartRadius: radius.none,
+  borderBottomEndRadius: radius.none,
 }
 const $triggerOpenUp: ViewStyle = {
-  borderTopLeftRadius: radius.none,
-  borderTopRightRadius: radius.none,
+  borderTopStartRadius: radius.none,
+  borderTopEndRadius: radius.none,
 }
 const $triggerValue: ThemedStyle<TextStyle> = () => ({ flex: 1 })
 const $caret: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim, lineHeight: 20 })
@@ -280,13 +281,13 @@ const $menu: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
 })
 const $menuAttachedDown: ViewStyle = {
   borderTopWidth: 0,
-  borderTopLeftRadius: radius.none,
-  borderTopRightRadius: radius.none,
+  borderTopStartRadius: radius.none,
+  borderTopEndRadius: radius.none,
 }
 const $menuAttachedUp: ViewStyle = {
   borderBottomWidth: 0,
-  borderBottomLeftRadius: radius.none,
-  borderBottomRightRadius: radius.none,
+  borderBottomStartRadius: radius.none,
+  borderBottomEndRadius: radius.none,
 }
 const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",

@@ -19,6 +19,7 @@ const LOCALES = {
   hi: "Hindi",
   ja: "Japanese",
   ko: "Korean",
+  ar: "Arabic",
 }
 
 const GLOSSARY_PATH = path.join(I18N_DIR, "glossary.json")
@@ -43,7 +44,7 @@ const PLACEHOLDER = /{{\s*([\w.]+)(?:\s*,\s*\w+)?\s*}}|<\/?([\w-]+)\s*\/?>/g
 const LITERAL_TEXT = /{{[^}]*}}|<[^>]*>|https?:\/\/\S+|\S+@\S+|@\w+|「[^」]*」|"[^"]*"|“[^”]*”/g
 const LATIN_WORD = /[\p{Script=Latin}\d]+/gu
 const LATIN_INSIDE_WORD =
-  /[\p{Script=Hangul}\p{Script=Devanagari}]\p{Script=Latin}+[\p{Script=Hangul}\p{Script=Devanagari}]/u
+  /[\p{Script=Hangul}\p{Script=Devanagari}\p{Script=Arabic}]\p{Script=Latin}+[\p{Script=Hangul}\p{Script=Devanagari}\p{Script=Arabic}]/u
 // why: the English carries these lowercase words into every script ("v2", "vs", "Return to Ravnica").
 const LOWERCASE_LATIN_ALLOWED = new Set(["v", "vs", "to"])
 

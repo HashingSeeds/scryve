@@ -80,6 +80,7 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 
 - Complexity belongs at the adapter boundary. Orchestration stays pure, UI stays dumb.
 - Inferred types over annotations. `any` is the enemy.
+- Styles say start and end, not left and right, so right-to-left languages mirror on web too. The board keeps physical sides (it sits in a `$tableDirection` scope), and measured positions and safe-area insets outside it go through `src/theme/direction.ts`.
 - If a rule here fights the task in front of you, say so loudly and get a human sign-off before breaking it.
 
 ## Languages

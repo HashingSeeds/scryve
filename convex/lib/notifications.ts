@@ -9,7 +9,7 @@ const DAY = 24 * 60 * 60 * 1000
 export const RENEWAL_REMINDER_LEAD_MS = 3 * DAY
 export const USER_DEVICES = 20
 
-const LOCALES = ["en", "es", "fr", "hi", "ja", "ko"] as const
+const LOCALES = ["en", "es", "fr", "hi", "ja", "ko", "ar"] as const
 type Locale = (typeof LOCALES)[number]
 
 export function notificationLocale(tag: string | undefined): Locale {
@@ -23,6 +23,7 @@ const RENEWS_SOON: Record<Locale, string> = {
   hi: "3 दिनों में रिन्यू होगा।",
   ja: "3日後に更新されます。",
   ko: "3일 후에 갱신됩니다.",
+  ar: "يتجدد خلال 3 أيام.",
 }
 
 export const pushMessage = v.object({

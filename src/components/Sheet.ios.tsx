@@ -15,6 +15,7 @@ import { useKeyboardState } from "react-native-keyboard-controller"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
+import { $appDirection } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 import type { SheetProps } from "./sheetTypes"
@@ -93,6 +94,7 @@ export function Sheet({
               testID={testID}
               onLayout={fit ? (e) => setContentHeight(e.nativeEvent.layout.height) : undefined}
               style={[
+                $appDirection,
                 themed(edgeToEdge ? $edgeToEdge : $padded),
                 fit
                   ? { maxHeight: height - top - Math.max(bottom, keyboard) - FIT_TOP_GAP }

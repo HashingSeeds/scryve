@@ -5,6 +5,7 @@ import QRCode from "react-native-qrcode-svg"
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
+import { textStart } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 
 const QR_MAX_SIZE = 184
@@ -60,6 +61,7 @@ export function InviteCard({
               numberOfLines={1}
               adjustsFontSizeToFit
               style={[themed($code), sideBySide && themed($compactCode)]}
+              selectable
               text={manualCode}
             />
             {sideBySide ? null : (
@@ -115,7 +117,7 @@ const $label: ThemedStyle<TextStyle> = ({ colors }) => ({
   letterSpacing: 2,
 })
 const $code: ThemedStyle<TextStyle> = () => ({ letterSpacing: 4, textAlign: "center" })
-const $compactCode: ThemedStyle<TextStyle> = () => ({ letterSpacing: 2, textAlign: "left" })
+const $compactCode: ThemedStyle<TextStyle> = () => ({ letterSpacing: 2, textAlign: textStart })
 const $hint: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
   textAlign: "center",
