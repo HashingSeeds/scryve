@@ -132,13 +132,14 @@ function FilterGroupView({
   const searchable = filter.options === "cards"
   if (!options.length && !picked.length) return null
   const needle = search.trim().toLocaleLowerCase()
-  const open = options.filter((option) => !picked.includes(option))
+  const top = options.slice(0, TOP_OPTIONS)
+  // why: a pick stays where it was tapped, so the pills around it don't move under the next tap; a pick found by searching leads the row, or it would leave the sheet once the search clears.
   const suggested = needle
     ? [
-        ...open.filter((option) => option.toLocaleLowerCase().startsWith(needle)),
-        ...open.filter((option) => option.toLocaleLowerCase().indexOf(needle) > 0),
+        ...options.filter((option) => option.toLocaleLowerCase().startsWith(needle)),
+        ...options.filter((option) => option.toLocaleLowerCase().indexOf(needle) > 0),
       ].slice(0, MATCHES_SHOWN)
-    : open.slice(0, TOP_OPTIONS)
+    : [...picked.filter((option) => !top.includes(option)), ...top]
   const pill = (option: string) => (
     <FilterPill
       key={option}
@@ -177,19 +178,16 @@ function FilterGroupView({
       }
     >
       {searchable ? (
-        <>
-          {picked.map(pill)}
-          {/* why: one line of likely picks, which follows what is typed, keeps a long list from burying the rest of the sheet. */}
-          <ScrollView
-            horizontal
-            style={$suggestionRow}
-            contentContainerStyle={themed($suggestionContent)}
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {suggested.map(pill)}
-          </ScrollView>
-        </>
+        // why: one line of likely picks, which follows what is typed, keeps a long list from burying the rest of the sheet.
+        <ScrollView
+          horizontal
+          style={$suggestionRow}
+          contentContainerStyle={themed($suggestionContent)}
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {suggested.map(pill)}
+        </ScrollView>
       ) : (
         options.map(pill)
       )}

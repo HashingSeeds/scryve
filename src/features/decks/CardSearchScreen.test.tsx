@@ -425,6 +425,37 @@ it("lists keywords from the card file, combines picked keywords, and works offli
   expect(mockQuery).not.toHaveBeenCalled()
 })
 
+it("keeps a picked keyword in its place so the pills beside it stay put", async () => {
+  const bird = (name: string, keywords: string) => ({
+    name,
+    scryfallId: name,
+    oracleId: name,
+    commanderEligibility: "ineligible",
+    keywords,
+  })
+  mockMagicCards = parseMagicCards(
+    JSON.stringify({
+      version: "1",
+      cards: [
+        bird("Bird A", "Flying\nWard"),
+        bird("Bird B", "Flying"),
+        bird("Bird C", "Vigilance"),
+      ],
+    }),
+  )
+  mockAction.mockResolvedValue([])
+  const view = chooser(deck.slice(0, 2))
+  fireEvent.press(view.getByTestId("card-filters-button"))
+  await act(async () => {})
+  const keywords = () =>
+    view.getAllByLabelText(/^(Flying|Ward|Vigilance)$/).map((pill) => pill.props.accessibilityLabel)
+  const before = keywords()
+
+  fireEvent.press(view.getByLabelText(before[1]))
+
+  expect(keywords()).toEqual(before)
+})
+
 it("trusts Scryfall's commander results for a filter the device can't check", async () => {
   jest.useFakeTimers()
   mockAction.mockImplementation((_ref, args) =>
