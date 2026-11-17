@@ -16,6 +16,16 @@ jest.mock("expo-router", () => ({
 jest.mock("expo-font", () => ({ useFonts: jest.fn() }))
 jest.mock("@/utils/crashReporting", () => ({ reportCrash: jest.fn() }))
 
+const mockLanguage = { i18n: { isInitialized: true }, languageLoaded: Promise.resolve() }
+jest.mock("@/i18n", () => ({
+  get i18n() {
+    return mockLanguage.i18n
+  },
+  get languageLoaded() {
+    return mockLanguage.languageLoaded
+  },
+}))
+
 const useFontsMock = jest.mocked(useFonts)
 const reportCrashMock = jest.mocked(reportCrash)
 const hideSplashMock = jest.mocked(SplashScreen.hideAsync)
@@ -46,6 +56,22 @@ describe("useLaunchReadiness", () => {
 
     hook.rerender({})
     expect(hideSplashMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("waits for a language that loads after launch, such as a web language chunk", async () => {
+    let finishLoading = () => {}
+    mockLanguage.i18n = { isInitialized: false }
+    mockLanguage.languageLoaded = new Promise<void>((resolve) => (finishLoading = resolve))
+    useFontsMock.mockReturnValue([true, null])
+
+    const hook = renderHook(() => useLaunchReadiness())
+    expect(hook.result.current).toBe(false)
+
+    await act(async () => finishLoading())
+    expect(hook.result.current).toBe(true)
+
+    mockLanguage.i18n = { isInitialized: true }
+    mockLanguage.languageLoaded = Promise.resolve()
   })
 
   it("uses the system typeface and reports the error when fonts fail", async () => {

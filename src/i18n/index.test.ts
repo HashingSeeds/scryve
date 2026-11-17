@@ -8,9 +8,10 @@ async function launchIn(languageTag: string) {
     }))
     const evaluated = new Set<string>()
     for (const language of Object.keys(resources)) {
-      jest.doMock(`./${language}`, () => {
+      const entry = language === "en" ? "./en" : `./${language}/language`
+      jest.doMock(entry, () => {
         evaluated.add(language)
-        return jest.requireActual(`./${language}`)
+        return jest.requireActual(entry)
       })
     }
     const { i18n } = await import(".")

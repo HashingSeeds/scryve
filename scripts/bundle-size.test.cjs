@@ -6,13 +6,13 @@ const { test } = require("node:test")
 
 const { measure, parseReport, renderComment } = require("./bundle-size.cjs")
 
-test("measure adds up every chunk per platform", () => {
+test("measure adds up every chunk per platform, counting only the largest language", () => {
   using temp = fs.mkdtempDisposableSync(path.join(os.tmpdir(), "scryve-bundle-size-test-"))
   const dir = temp.path
   const files = {
     ios: { "entry-a.hbc": 300 },
     android: { "entry-b.hbc": 200 },
-    web: { "entry-c.js": 100, "index-d.js": 50 },
+    web: { "entry-c.js": 100, "index-d.js": 50, "language-e.js": 30, "language-f.js": 20 },
   }
   for (const [platform, bundles] of Object.entries(files)) {
     const platformDir = path.join(dir, platform, "_expo", "static", "js", platform)
@@ -20,7 +20,7 @@ test("measure adds up every chunk per platform", () => {
     for (const [name, size] of Object.entries(bundles))
       fs.writeFileSync(path.join(platformDir, name), "x".repeat(size))
   }
-  assert.deepEqual(measure(dir), { ios: 300, android: 200, web: 150 })
+  assert.deepEqual(measure(dir), { ios: 300, android: 200, web: 180 })
 })
 
 test("comment shows the change against main and flags bundles that grew too much", () => {

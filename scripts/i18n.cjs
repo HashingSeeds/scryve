@@ -465,21 +465,24 @@ function localeIndexSource(namespaces) {
   return `${GENERATED_HEADER}${imports.join("\n")}\n\nexport default { ${namespaces.join(", ")} }\n`
 }
 
-function resourcesSource(locales, namespaces) {
-  const all = [SOURCE_LOCALE, ...locales]
-  const loaders = all.map(
-    (locale) =>
-      `${locale}: (): typeof import("./${locale}").default => require("./${locale}").default`,
-  )
-  return `${GENERATED_HEADER}\nexport const namespaces = ${JSON.stringify(namespaces)}\n\nexport const resources = { ${loaders.join(", ")} }\n`
+function resourcesSource(locales, namespaces, { web }) {
+  const english = `${SOURCE_LOCALE}: (): typeof import("./${SOURCE_LOCALE}").default => require("./${SOURCE_LOCALE}").default`
+  const loaders = locales.map((locale) => {
+    const file = `./${locale}/language`
+    return web
+      ? `${locale}: (): Promise<typeof import("${file}").default> => import("${file}").then((bundle) => bundle.default)`
+      : `${locale}: (): typeof import("${file}").default => require("${file}").default`
+  })
+  return `${GENERATED_HEADER}\nexport const namespaces = ${JSON.stringify(namespaces)}\n\nexport const resources = { ${[english, ...loaders].join(", ")} }\n`
 }
 
 function scaffoldFiles(namespaces) {
   const locales = Object.keys(LOCALES)
   return [
-    [path.join(I18N_DIR, "resources.ts"), resourcesSource(locales, namespaces)],
+    [path.join(I18N_DIR, "resources.ts"), resourcesSource(locales, namespaces, { web: false })],
+    [path.join(I18N_DIR, "resources.web.ts"), resourcesSource(locales, namespaces, { web: true })],
     ...locales.map((locale) => [
-      path.join(I18N_DIR, locale, "index.ts"),
+      path.join(I18N_DIR, locale, "language.ts"),
       localeIndexSource(namespaces),
     ]),
   ]

@@ -40,14 +40,20 @@ if (!devLocaleOverride && locale?.languageTag && locale?.textDirection === "rtl"
   I18nManager.allowRTL(false)
 }
 
+type Bundle = Readonly<Record<string, LocaleNamespace>>
+
 const loadLocaleOnDemand: BackendModule = {
   type: "backend",
   init: () => undefined,
   read: (language, namespace, callback) => {
-    const bundle: Readonly<Record<string, LocaleNamespace>> | undefined = isBundledLocale(language)
-      ? resources[language]()
-      : undefined
-    callback(null, bundle?.[namespace])
+    if (!isBundledLocale(language)) return callback(null, undefined)
+    const bundle: Bundle | Promise<Bundle> = resources[language]()
+    if (bundle instanceof Promise)
+      bundle.then(
+        (loaded) => callback(null, loaded[namespace]),
+        (error: Error) => callback(error, undefined),
+      )
+    else callback(null, bundle[namespace])
   },
 }
 
@@ -57,7 +63,7 @@ const pseudoLocaleBrackets: PostProcessorModule = {
   process: (value: string) => (isPseudoLocale() ? `\u27e6${value}\u27e7` : value),
 }
 
-void i18n
+export const languageLoaded = i18n
   .use(loadLocaleOnDemand)
   .use(pseudoLocaleBrackets)
   .use(initReactI18next)

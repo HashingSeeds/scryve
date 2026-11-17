@@ -16,9 +16,9 @@ export const namespaces = [
 
 export const resources = {
   en: (): typeof import("./en").default => require("./en").default,
-  es: (): typeof import("./es").default => require("./es").default,
-  fr: (): typeof import("./fr").default => require("./fr").default,
-  hi: (): typeof import("./hi").default => require("./hi").default,
-  ja: (): typeof import("./ja").default => require("./ja").default,
-  ko: (): typeof import("./ko").default => require("./ko").default,
+  es: (): typeof import("./es/language").default => require("./es/language").default,
+  fr: (): typeof import("./fr/language").default => require("./fr/language").default,
+  hi: (): typeof import("./hi/language").default => require("./hi/language").default,
+  ja: (): typeof import("./ja/language").default => require("./ja/language").default,
+  ko: (): typeof import("./ko/language").default => require("./ko/language").default,
 }

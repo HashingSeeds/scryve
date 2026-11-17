@@ -288,6 +288,8 @@
   "cardSearch.searchScryfall": "9f5e4f983931.d780db9b4e4e",
   "cardSearch.searching": "8f5aad0bbf6f.44e1a91fada4",
   "cardSearch.offline": "b759dbc54a44.3cf7c51aa0f8",
+  "cardSearch.offlineCardFile": "21a0e8742c15.c93371e8a90a",
+  "cardSearch.offlineSyntax": "cd047a4f5c1c.ce13756a6f53",
   "cardSearch.preview": "b20eb7771daa.d2846c2b1202",
   "cardSearch.fromCache": "b2538dc45f81.f2b1c583157f",
   "cardSearch.add": "0fe873875243.ad23904cb2dc",
@@ -313,7 +315,6 @@
   "cardSearch.clearAll": "cc2438e3107a.2f52c88af5e3",
   "cardSearch.checkFailed": "aebb1f54347e.31181618b0d0",
   "cardSearch.searchFailed": "20e460725018.ecf5b82b7d11",
-  "cardSearch.scan": "ede1472fe623.038b6147f792",
   "cardSearch.scanLabel": "bb7dca7a6a65.af881a14bd2e",
   "cardScan.title": "3d602255ef20.f9b6223780ab",
   "cardScan.looking": "3f3101584f2b.41286f6f576c",
@@ -618,7 +619,5 @@
   "shared.title": "95cc662cc3f6.7d7a341d801a",
   "shared.play": "ce0d26f84430.03d91f773553",
   "shared.addToMine": "91dc2c0ed33b.466eb7ef8bac",
-  "shared.unavailable": "835ffb5db72e.aba0f5b23f84",
-  "cardSearch.offlineCardFile": "21a0e8742c15.c93371e8a90a",
-  "cardSearch.offlineSyntax": "cd047a4f5c1c.ce13756a6f53"
+  "shared.unavailable": "835ffb5db72e.aba0f5b23f84"
 }
