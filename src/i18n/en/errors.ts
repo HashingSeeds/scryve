@@ -1,5 +1,6 @@
 const errors = {
   accountChanged: "Consent was given by a different account",
+  // es: Never «Ya eres anfitrión»: «Ya organizas una sala o una partida activa; …»
   alreadyHosting: "You already host a lobby or active game; resume it before hosting another",
   // A player's marker on the game board: its color and its shape.
   appearanceTaken: "Another player already claimed that color or shape",

@@ -7,7 +7,8 @@
       "Placeholders such as {{shape}}, {{section}}, {{card}} and {{filter}} can be any gender or number. Never make an article or adjective agree with them; rephrase instead (\"{{shape}}, ya en uso\", \"Mínimo de {{filter}}\", \"una copia más de {{card}}\").",
       "The tú imperative often matches the third person (termina, empieza). When a sentence says what the app or game will do, give it a subject or use the future so it cannot read as an order: \"Tu partida terminará sin resultado\".",
       "Quote labels, names and search text with « »; keep straight quotes only in examples of text the player types or pastes.",
-      "Game, format, variant, card type and product names: use exactly the mapping in the terms. Spanish card and rules wording wins over a literal translation (coste, tirar un dado, rival)."
+      "Game, format, variant, card type and product names: use exactly the mapping in the terms. Spanish card and rules wording wins over a literal translation (coste, tirar un dado, rival).",
+      "Players can be any gender. Never make a pronoun, adjective or participle agree with a person whose gender the app can't know: the user, a player name, a host or an opponent. Avoid lo/él, listo, ganador, eliminado, «primer jugador» and «Ya eres anfitrión»; use «esa persona», a noun («victoria»), a verb («ganó», «juega primero») or an impersonal form («Todo listo»). A generic masculine plural for a group («Listos: 2 de 4») and a role noun with no specific person (anfitrión, invitado) are fine."
     ],
     "fr": [
       "Address the player as vous. Instructions use the vous imperative (Touchez, Réessayez). Buttons and menu actions use the infinitive (Enregistrer, Terminer la partie), never a bare noun such as Fin.",
@@ -16,7 +17,8 @@
       "Sentence case for titles, buttons and labels (Nouvel événement, not Nouvel Événement). Glossary terms that carry a capital keep it (Banc, Pokémon Actif, Récompense, Lore).",
       "Never write (s), (e) or ils/elles shortcuts. When a count placeholder has no plural forms, or a placeholder's gender is unknown, put the label first: « Ajoutées : {{count}} », « Carte retirée : {{card}} ».",
       "A card name ({{card}}) takes feminine agreement, as « la carte » (est bannie, Retirez-la). Keep the same gender for one placeholder across a whole sentence.",
-      "Keep buttons, chips and badges about as short as the English. Prefer the plain everyday word to a literal calque."
+      "Keep buttons, chips and badges about as short as the English. Prefer the plain everyday word to a literal calque.",
+      "Players can be any gender. Never make a pronoun, adjective or participle agree with a person whose gender the app can't know: the user, a player name, a host or an opponent. Avoid lui/le/l', éliminé, prêt, connecté, abonné, bloqué, placé, gagnant and vainqueur on them; use a label-first noun (« Victoire : {{name}} », « Blocage : {{name}} »), an invariable form (hors jeu), « cette personne », or make the account or session the subject (« Session ouverte », « Compte : {{email}} »). A generic masculine plural for a group (« Prêts : 2 sur 4 ») and a role noun with no specific person are fine."
     ],
     "hi": [
       "Write in Devanagari and address the player as आप. Other players named in a string take honorific plural verbs: {{name}} पहले खेलेंगे, {{name}} प्राइज़ कार्ड लेते हैं.",
@@ -27,7 +29,9 @@
       "Use these words every time: फ़्री for free (never मुफ़्त); नतीजा for a result (never रिज़ल्ट); पुष्टि for confirm (never कन्फ़र्म); आयोजक for the event organizer; चालू for a game in progress; सेटिंग for Settings, the app's or the phone's (never सेटिंग्स or Latin); गोपनीयता नीति for the Privacy Policy, गोपनीयता for privacy; डेक लिस्ट / लिस्ट for a deck's card list (never सूची); मैन्युअल / मैन्युअली; इंपोर्ट; डाइस and रोल करें (never पासा or फेंका); कलर for a Magic card's color, कलरलेस for colorless (color names like सफ़ेद, नीला and player colors stay रंग); लीगल / बैन for format legality (मान्य means valid); निशान for a player's mark (रंग और निशान); खिलाड़ी for player (never प्लेयर); शामिल होना for joining (never जोड़ना, which means to add).",
       "When running text names a screen, tab, heading or button, quote it with “ ” and copy the exact label that screen shows (“सहायता”, “खेलें” टैब).",
       "Spelling: nukta on फ़ and ज़ in English loanwords (लाइफ़, फ़ॉर्मैट, फ़ोकस, फ़्री); never on क, ख, ग, including Urdu-origin words (आखिरी, तारीख, खराब, खत्म). Chandrabindu, never bindu, in एँ endings and words that take it (जाएँ, हटाएँ, हो जाएँगे, पहुँच, जाँचें, यहाँ). ॉ for the English \"o\" in draw, toss, lobby (ड्रॉ, टॉस, लॉबी); ै for the \"a\" in damage (डैमेज).",
-      "Gender: लाइफ़, सीट, लॉबी, सेटिंग, स्टैंडिंग, हिस्ट्री, लिस्ट, ग्रिड, पावर, भूमिका, चिप, रूलिंग, पेयरिंग and स्कीम are feminine; लाइफ़ पॉइंट, प्राइज़ कार्ड, डैमेज, लोर, गेम, मैच, टर्न, मुलिगन, इवेंट, खाता, डिवाइस, क्लॉक, स्लॉट, इनवाइट, सब्सक्रिप्शन and फ़ीडबैक are masculine."
+      "Gender: लाइफ़, सीट, लॉबी, सेटिंग, स्टैंडिंग, हिस्ट्री, लिस्ट, ग्रिड, पावर, भूमिका, चिप, रूलिंग, पेयरिंग and स्कीम are feminine; लाइफ़ पॉइंट, प्राइज़ कार्ड, डैमेज, लोर, गेम, मैच, टर्न, मुलिगन, इवेंट, खाता, डिवाइस, क्लॉक, स्लॉट, इनवाइट, सब्सक्रिप्शन and फ़ीडबैक are masculine.",
+      "Players can be any gender. For another player use the honorific plural ({{name}} जीते, पहले खेलेंगे), a ने-construction or a noun (विजेता: {{name}}); never गया/गई, जीता/जीती or रहा/रही on a person. Never write first-person forms with gendered verbs.",
+      "Also feminine: प्रोफ़ाइल, रिपोर्ट, एंट्री, रसीद, कतार. Also masculine: बोर्ड, डेक, ड्राफ़्ट, सेशन, यूज़रनेम."
     ],
     "ja": [
       "Messages use です/ます. Buttons and labels use plain verbs or nouns.",
@@ -61,7 +65,8 @@
       "Keep each Arabic word to one job: مجموعة is only a deck, الدور only a turn, نسخة only a copy (of a card, or this device's copy of a deck), مباراة only one game, لعبة only a game system (Magic, Pokémon). Use the glossary term for the other meaning (توسعة، هوية، إصدار).",
       "متصل alone means online right now. For Scryve's connected play, attach متصلة only to مباراة or مباريات (لوحة المباراة المتصلة، سجل المباريات المتصلة); connected play: اللعب عبر الأجهزة; offline: دون إنترنت.",
       "A one-word button must be clear on its own. A bare verbal noun that also reads as a thing (وضع = mode، إدخال = input، التمرير = scrolling) needs its object or an imperative: ضعه، تمرير الدور.",
-      "No Latin abbreviations and no invented Arabic ones (Bo3, v2, ي for days). Write the words: الأفضل من {{bestOf}}، الإصدار {{version}}. د for minutes is fine in tight labels."
+      "No Latin abbreviations and no invented Arabic ones (Bo3, v2, ي for days). Write the words: الأفضل من {{bestOf}}، الإصدار {{version}}. د for minutes is fine in tight labels.",
+      "Never put a gendered verb, adjective, participle or pronoun (ـه، ـها، الفائز، البادئ، جاهز، غائب، خارج) on a named, reported or blocked player, a host or an opponent. Use a verbal noun with the player as agent, a label with a colon (الفوز: {{names}}), or name the thing instead (هذا الحساب، الاسم، الاتصال). For the user, avoid second-person past or present verbs (سجّلت، تختبر، تعود); use passive or verbal-noun forms (تم تسجيل خروجك، عند عودة الاتصال). Imperatives stay masculine singular."
     ]
   },
   "terms": {

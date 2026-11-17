@@ -20,7 +20,7 @@ export default {
   listAnd: " و",
   emptyState: {
     heading: "لا يوجد شيء هنا بعد",
-    content: "لم يتم العثور على بيانات. جرّب التحديث أو أعد تحميل التطبيق.",
+    content: "لم يتم العثور على بيانات. جرّب التحديث أو إعادة تشغيل التطبيق.",
   },
   appMenu: {
     more: "المزيد",
@@ -35,7 +35,7 @@ export default {
     signIn: "تسجيل الدخول",
     closeMenu: "إغلاق القائمة",
     nearbyOnlyOn: "الشبكة المحلية فقط: مفعّل",
-    nearbyOnlyOff: "الشبكة المحلية فقط: متوقف",
+    nearbyOnlyOff: "الشبكة المحلية فقط: معطّل",
   },
   appNavigation: {
     decks: "المجموعات",
@@ -51,7 +51,7 @@ export default {
     copy: "نسخ",
   },
   retryableError: {
-    retryingIn: "إعادة المحاولة خلال: {{seconds}} ثانية",
+    retryingIn: "إعادة المحاولة بعد {{seconds}} ثانية",
   },
   selectField: {
     none: "بلا",
@@ -63,7 +63,7 @@ export default {
       changeBy: "يفتح خيارات المقدار لكل ضغطة",
       thisIsMe: "يفتح خيار تحديد مقعدك",
       yourDeck: "يفتح خيارات مجموعاتك",
-      system: "يفتح خيارات اللعبة",
+      system: "يفتح خيارات النظام",
       list: "يفتح خيارات القائمة",
       planechase: "يفتح خيارات مجموعة العوالم",
       archenemy: "يفتح خيارات العدو اللدود",
@@ -76,7 +76,7 @@ export default {
       changeBy: "إغلاق خيارات المقدار لكل ضغطة",
       thisIsMe: "إغلاق خيار تحديد مقعدك",
       yourDeck: "إغلاق خيارات مجموعاتك",
-      system: "إغلاق خيارات اللعبة",
+      system: "إغلاق خيارات النظام",
       list: "إغلاق خيارات القائمة",
       planechase: "إغلاق خيارات مجموعة العوالم",
       archenemy: "إغلاق خيارات العدو اللدود",

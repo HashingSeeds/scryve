@@ -19,7 +19,7 @@ export default {
   listSeparator: ", ",
   listAnd: " et ",
   emptyState: {
-    heading: "Rien pour l’instant",
+    heading: "Rien pour le moment",
     content: "Aucune donnée trouvée. Essayez d’actualiser ou de relancer l’app.",
   },
   appMenu: {
@@ -51,18 +51,18 @@ export default {
     copy: "Copier",
   },
   retryableError: {
-    retryingIn: "Nouvelle tentative dans {{seconds}} s",
+    retryingIn: "Nouvel essai dans {{seconds}} s",
   },
   selectField: {
     none: "Aucun",
-    triggerLabel: "{{label}}, {{value}}",
+    triggerLabel: "{{label}}{{value}}",
     openHint: {
       format: "Ouvre les choix de format",
       commanderColor: "Ouvre les choix de couleur du commandant",
       addTo: "Ouvre les choix d’emplacement pour ajouter la carte",
       changeBy: "Ouvre les choix de valeur par toucher",
       thisIsMe: "Ouvre le choix de votre place",
-      yourDeck: "Ouvre le choix de votre deck",
+      yourDeck: "Ouvre les choix de votre deck",
       system: "Ouvre les choix de jeu",
       list: "Ouvre les choix de liste",
       planechase: "Ouvre les choix de deck de plans",
@@ -75,7 +75,7 @@ export default {
       addTo: "Fermer les choix d’emplacement pour ajouter la carte",
       changeBy: "Fermer les choix de valeur par toucher",
       thisIsMe: "Fermer le choix de votre place",
-      yourDeck: "Fermer le choix de votre deck",
+      yourDeck: "Fermer les choix de votre deck",
       system: "Fermer les choix de jeu",
       list: "Fermer les choix de liste",
       planechase: "Fermer les choix de deck de plans",
@@ -84,10 +84,10 @@ export default {
     },
   },
   valueField: {
-    readoutLabel: "{{label}}, {{value}}",
+    readoutLabel: "{{label}} : {{value}}",
     decrease: "Diminuer {{label}} de {{step}}",
     increase: "Augmenter {{label}} de {{step}}",
-    longPressHint: "Appui long pour la modifier de {{step}}.",
+    longPressHint: "Appui long pour modifier de {{step}}.",
   },
   optionGrid: {
     other: "Autre valeur",

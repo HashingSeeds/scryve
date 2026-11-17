@@ -5,9 +5,9 @@ export default {
   support: {
     search: "Rechercher dans l’aide",
     yourFeedback: "Vos retours",
-    newCount_one: "{{count}} nouveau",
-    newCount_many: "{{count}} nouveaux",
-    newCount_other: "{{count}} nouveaux",
+    newCount_one: "Nouveau : {{count}}",
+    newCount_many: "Nouveaux : {{count}}",
+    newCount_other: "Nouveaux : {{count}}",
     email: "Écrire à l’assistance",
     emailDetail: "Questions sur le compte ou la facturation",
     suggestFeature: "Suggérer une fonctionnalité",
@@ -15,14 +15,14 @@ export default {
     noMatch: "Aucune réponse pour « {{query}} ».",
     ask: "Nous poser une question sur « {{query}} »",
   },
-  offline: "Hors connexion. Votre brouillon reste ici jusqu’à votre retour.",
+  offline: "Hors ligne. Votre brouillon reste ici jusqu’à votre retour.",
   suggest: {
     title: "Envoyer un retour",
     kind: "De quoi s’agit-il ?",
     feature: "Fonctionnalité",
     bug: "Bug",
     prompt: {
-      feature: "Que souhaiteriez-vous voir ?",
+      feature: "Que voudriez-vous voir ?",
       bug: "Quel est le problème ?",
     },
     bodyPlaceholder: {
@@ -32,7 +32,7 @@ export default {
     addScreenshot: "Ajouter une capture d’écran",
     removeScreenshot: "Retirer la capture d’écran",
     selectedScreenshot: "Capture d’écran sélectionnée",
-    screenshotFailed: "Impossible d’ajouter cette capture d’écran. Essayez une autre image.",
+    screenshotFailed: "Impossible d’ajouter cette capture. Essayez une autre image.",
     notice:
       "Toutes les langues sont acceptées. Une IA peut nous aider à le lire. <privacy>Confidentialité</privacy>",
     includeAccount: "Inclure mon compte",
@@ -49,10 +49,10 @@ export default {
     unread: "Nouveau",
     deleteAll: "Supprimer mes retours",
     deleteHint:
-      "Supprime ce que cet appareil a envoyé et tout ce qui a été envoyé avec votre compte. Les détails de bug déjà envoyés à Sentry y restent.",
+      "Supprime ce que cet appareil a envoyé et tout ce qui a été envoyé avec votre compte. Les détails de bugs déjà envoyés à Sentry y restent.",
     deleteConfirmTitle: "Supprimer vos retours ?",
     deleteConfirmBody:
-      "Cela supprime ce que cet appareil a envoyé et tout ce qui a été envoyé avec votre compte, ainsi que les réponses. Les détails de bug déjà envoyés à Sentry y restent.",
+      "Cela supprime ce que cet appareil a envoyé et tout ce qui a été envoyé avec votre compte, ainsi que les réponses. Les détails de bugs déjà envoyés à Sentry y restent.",
     delete: "Supprimer",
     deleteFailed: "Impossible de supprimer vos retours. Réessayez une fois en ligne.",
   },
@@ -69,11 +69,11 @@ export default {
     linkedElsewhere: "Envoyé avec un autre compte",
     notLinked: "Envoyé sans votre compte.",
     includeAccount: "L’inclure",
-    signInToSync: "Se connecter pour le synchroniser",
+    signInToSync: "Connectez-vous pour le synchroniser",
   },
   notifyPrompt: {
     title: "Recevoir une notification pour les réponses ?",
-    body: "Les réponses apparaissent toujours ici dans Scryve, dans les deux cas.",
+    body: "Les réponses s’affichent toujours ici dans Scryve, dans les deux cas.",
     notNow: "Pas maintenant",
     notify: "Me notifier",
   },

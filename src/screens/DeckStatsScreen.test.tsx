@@ -164,7 +164,7 @@ it("breaks the record down by source once, and filters games by it", () => {
 
 it("names the most common pod size and compares its own rate against chance", () => {
   const view = render(screen())
-  expect(view.getByText("67% in 2-player games · chance 50%")).toBeTruthy()
+  expect(view.getByText("67% in 2-player games · 50% by chance")).toBeTruthy()
   expect(view.queryByText(/chance 40%/)).toBeNull()
   mockSummary = {
     ...deckStatsSummary,
@@ -173,7 +173,7 @@ it("names the most common pod size and compares its own rate against chance", ()
     ),
   }
   view.rerender(screen())
-  expect(view.getByText("50% in 4-player games · chance 25%")).toBeTruthy()
+  expect(view.getByText("50% in 4-player games · 25% by chance")).toBeTruthy()
 })
 
 it.each(["CanLoadMore", "LoadingMore", "LoadingFirstPage", "Exhausted"])(

@@ -20,10 +20,10 @@ export default {
     accessibilityLabel: "Compte et données",
     accessibilityHint: "Ouvre la suppression du compte et les détails des données",
   },
-  shareUsage: "Partager l’utilisation avec Scryve",
+  shareUsage: "Partager l’usage avec Scryve",
   settings: {
     title: "Réglages",
-    localDefaults: "Valeurs par défaut des parties locales",
+    localDefaults: "Réglages par défaut des parties locales",
     general: "Général",
     appearance: "Apparence",
     about: "À propos",
@@ -52,7 +52,7 @@ export default {
       lockedPro: "{{name}}, Scryve Pro",
       foilHeading: "Scryve Foil",
       opensPro: "Ouvre Scryve Pro",
-      proFailed: "Impossible de vérifier Scryve Pro, les icônes Pro sont donc verrouillées.",
+      proFailed: "Impossible de vérifier Scryve Pro : les icônes Pro sont verrouillées.",
       names: {
         Default: "Par défaut",
         Two: "Deux",
@@ -60,7 +60,7 @@ export default {
         Midnight: "Minuit",
         Graphite: "Graphite",
         Ink: "Encre",
-        Outline: "Trait",
+        Outline: "Contour",
         Bone: "Os",
         Paper: "Papier",
         Ash: "Cendre",
@@ -81,33 +81,33 @@ export default {
       feedbackRepliesHelper: "Les réponses apparaissent toujours dans Vos retours",
       renewalReminders: "Rappels de renouvellement",
       renewalRemindersHelper_one: "{{count}} jour avant le renouvellement de votre abonnement",
-      renewalRemindersHelper_many: "{{count}} jours avant le renouvellement de votre abonnement",
+      renewalRemindersHelper_many: "{{count}} de jours avant le renouvellement de votre abonnement",
       renewalRemindersHelper_other: "{{count}} jours avant le renouvellement de votre abonnement",
       channel: "Réponses et rappels",
       feedbackReplyPreview: "Nouvelle réponse à votre retour",
-      blockedTitle: "Les notifications sont désactivées",
-      blockedBody: "Activez les notifications de Scryve dans les Réglages.",
-      openSettings: "Ouvrir les Réglages",
+      blockedTitle: "Notifications désactivées",
+      blockedBody: "Activez les notifications pour Scryve dans les réglages.",
+      openSettings: "Ouvrir les réglages",
     },
     privacy: {
       heading: "Confidentialité",
       shareUsageHelper:
-        "Désactivé par défaut. Partage l’utilisation avec un identifiant aléatoire qui n’est pas lié à votre compte. Détails dans la Politique de confidentialité.",
+        "Désactivé par défaut. Partage l’usage avec un identifiant aléatoire non lié à votre compte. Détails dans la Politique de confidentialité.",
       saveFailed: "Impossible d’enregistrer votre choix. Réessayez.",
       unavailable:
-        "Le partage de l’utilisation n’est pas disponible dans cette version. Aucun événement PostHog ne sera envoyé.",
+        "Le partage de l’usage n’est pas disponible dans cette version. Aucun événement PostHog ne sera envoyé.",
     },
     appInfo: {
       heading: "Informations sur l’app",
-      analyticsId: "ID d’analyse : {{id}}",
+      analyticsId: "ID d’analyse : {{id}}",
       analyticsIdHint:
-        "Cet identifiant nous aide à retrouver vos données d’utilisation. Pour nous demander de les supprimer, envoyez-nous l’identifiant par e-mail à privacy@sowinghope.how.",
-      version: "Version : {{value}}",
-      build: "Build : {{value}}",
-      runtime: "Runtime : {{value}}",
-      update: "Mise à jour : {{value}}",
-      channel: "Canal : {{value}}",
-      platform: "Plateforme : {{value}}",
+        "Cet identifiant nous aide à retrouver vos données d’usage. Pour nous demander de les supprimer, envoyez-nous l’identifiant par e-mail à privacy@sowinghope.how.",
+      version: "Version : {{value}}",
+      build: "Build : {{value}}",
+      runtime: "Runtime : {{value}}",
+      update: "Mise à jour : {{value}}",
+      channel: "Canal : {{value}}",
+      platform: "Plateforme : {{value}}",
       notApplicable: "Sans objet",
       unavailable: "Indisponible",
       bundled: "Intégré",
@@ -130,7 +130,7 @@ export default {
     syncStats: {
       label: "Stats pour les geeks",
       helper:
-        "Affiche le temps que mettent les changements à atteindre chaque appareil dans les parties en ligne et à proximité, et comment le scanner trouve les cartes.",
+        "Affiche le temps que mettent les changements à parvenir à chaque appareil dans les parties en ligne et à proximité, et comment le scanner de cartes trouve les cartes.",
     },
   },
   support: {
@@ -143,12 +143,12 @@ export default {
       restorePro: {
         question: "Restaurer Scryve Pro",
         answer:
-          "Ouvrez Scryve, accédez à votre compte, choisissez Scryve Pro, puis touchez Restaurer les achats. Utilisez le même compte Apple ou Google que pour l’achat initial.",
+          "Ouvrez Scryve, allez dans votre compte, choisissez Scryve Pro, puis touchez Restaurer les achats. Utilisez le même compte Apple ou Google que pour l’achat initial.",
       },
       manageSubscription: {
         question: "Gérer ou résilier un abonnement",
         answer:
-          "Les abonnements sont gérés par la boutique où vous les avez achetés. Sur iPhone ou iPad, ouvrez Réglages, touchez votre nom, puis Abonnements. Sur Android, ouvrez Google Play, touchez votre profil, puis Paiements et abonnements.",
+          "Les abonnements sont gérés par la boutique où ils ont été souscrits. Sur iPhone ou iPad, ouvrez Réglages, touchez votre nom, puis Abonnements. Sur Android, ouvrez Google Play, touchez votre profil, puis Paiements et abonnements.",
       },
       gameTrouble: {
         question: "Un problème avec une partie ?",
@@ -164,20 +164,20 @@ export default {
   },
   profile: {
     title: "Compte",
-    signedIn: "Connecté",
+    signedIn: "Session ouverte",
     yourAccount: "Votre compte",
     profileAndSecurity: "Profil et sécurité",
     profileHint:
-      "Ouvre le gestionnaire de profil pour modifier votre nom, vos adresses e-mail et votre mot de passe",
+      "Ouvre la gestion du profil pour modifier votre nom, vos adresses e-mail et votre mot de passe",
     profileDetails: "Nom, e-mail, mot de passe et méthodes de connexion.",
     independence:
-      "Scryve est indépendant et n’est ni affilié ni approuvé par les éditeurs de jeux, les détenteurs de droits ou les fournisseurs de données cités dans notre mention sur le contenu des jeux.",
+      "Scryve est indépendant et n’est ni affilié ni approuvé par les éditeurs de jeux, les détenteurs de droits ou les fournisseurs de données cités dans notre avis sur le contenu des jeux.",
     signingOut: "Déconnexion…",
     signOut: "Se déconnecter",
     signOutFailed: "Déconnexion impossible. Réessayez.",
     signOutFailedShort: "Déconnexion impossible",
     signInPrompt: "Connectez-vous avant d’ouvrir votre profil.",
-    reauthenticate: "Confirmer l’identité",
+    reauthenticate: "Se reconnecter",
   },
   deleteAccount: {
     title: "Supprimer le compte",
@@ -190,7 +190,7 @@ export default {
     },
     checkingStatus: "Vérification de l’état de la suppression…",
     intro:
-      "Cela supprime définitivement votre compte Scryve et anonymise votre historique de parties connectées. Consultez d’abord ce qui va se passer.",
+      "Cette action supprime définitivement votre compte Scryve et anonymise votre historique de parties connectées. Lisez d’abord ce qui va se passer.",
     steps: {
       cloud: {
         title: "Votre compte cloud est supprimé",
@@ -206,7 +206,7 @@ export default {
       },
       feedback: {
         title: "Les retours envoyés sans votre compte sont conservés",
-        body: "Les retours associés à votre compte sont supprimés. Ceux envoyés sans compte restent liés à l’appareil qui les a envoyés. Pour les supprimer, ouvrez Assistance, puis Vos retours, et touchez Supprimer mes retours.",
+        body: "Les retours envoyés avec votre compte sont supprimés. Ceux envoyés sans compte restent associés à l’appareil qui les a envoyés. Pour les supprimer, ouvrez Assistance, puis Vos retours, et touchez Supprimer mes retours.",
       },
       signOut: {
         title: "Tous les appareils sont déconnectés",
@@ -215,13 +215,13 @@ export default {
     },
     subscription: {
       heading: "Vous avez un abonnement Scryve Pro ?",
-      body: "Supprimer votre compte ne le résiliera pas. Des prélèvements peuvent continuer tant que vous ne l’avez pas résilié là où vous vous êtes abonné. Vous pouvez quand même supprimer maintenant, mais vous perdrez l’accès au temps payé restant.",
+      body: "La suppression de votre compte ne résilie pas l’abonnement. Des paiements peuvent continuer tant qu’il n’est pas résilié là où il a été souscrit. Vous pouvez quand même supprimer maintenant, mais vous perdrez l’accès à la période payée restante.",
       manageApple: "Gérer les abonnements Apple",
       manageGoogle: "Gérer les abonnements Google Play",
-      web: "Abonné sur le web ? Résiliez dans le portail client. Chaque e-mail de facturation Scryve Pro contient un lien vers celui-ci.",
+      web: "Abonnement souscrit sur le web ? Résiliez-le dans le portail client. Chaque e-mail de facturation Scryve Pro y renvoie.",
       manageWeb: "Gérer l’abonnement web",
     },
-    signedInAs: "Connecté en tant que {{email}}",
+    signedInAs: "Compte : {{email}}",
     confirmLabel: "Saisissez {{word}} pour continuer",
     submit: {
       submitting: "Envoi de la demande…",
@@ -230,13 +230,13 @@ export default {
     },
     footnote: {
       retry:
-        "Une nouvelle tentative reprend à la dernière étape inachevée ; les données anonymisées ne sont pas restaurées.",
+        "Une nouvelle tentative reprend à la dernière étape incomplète ; les données anonymisées ne sont pas restaurées.",
       first:
         "La suppression commence immédiatement et ne peut plus être annulée une fois le traitement lancé.",
     },
     status: {
       failed:
-        "Scryve n’a pas pu terminer automatiquement. Revenez sur cette page et renvoyez la demande pour réessayer.",
+        "Scryve n’a pas pu terminer automatiquement. Revenez sur cette page et envoyez à nouveau la demande pour réessayer.",
       identityPending:
         "Vos données connectées sont anonymisées. Scryve supprime maintenant votre identité de connexion.",
       processing:
@@ -245,7 +245,7 @@ export default {
     panel: {
       failed: {
         title: "La suppression demande votre attention",
-        body: "Aucune donnée du compte ne sera restaurée. Saisissez {{word}} et envoyez à nouveau pour réessayer le travail restant.",
+        body: "Aucune donnée du compte ne sera restaurée. Saisissez {{word}} et envoyez à nouveau pour réessayer le reste du traitement.",
       },
       completed: {
         title: "Suppression terminée",
@@ -259,8 +259,8 @@ export default {
     receipt: {
       completedBody:
         "Scryve a supprimé votre compte de connexion et anonymisé votre historique de parties connectées.",
-      failedBody: "Scryve n’a pas pu terminer automatiquement la suppression restante.",
-      lastUpdated: "Dernière mise à jour le {{day}} à {{time}}",
+      failedBody: "Scryve n’a pas pu terminer automatiquement le reste de la suppression.",
+      lastUpdated: "Dernière mise à jour : {{day}} à {{time}}",
       next: {
         completed: "Aucune autre action n’est nécessaire.",
         failed: "Reconnectez-vous, revenez sur cette page et réessayez la demande.",
@@ -271,36 +271,35 @@ export default {
     },
     route: {
       statusCheckFailed:
-        "Scryve n’a pas pu vérifier l’état de votre suppression. La suppression du compte reste indisponible tant que la vérification n’a pas abouti.",
+        "Scryve n’a pas pu vérifier l’état de votre suppression. La suppression du compte reste indisponible tant que la vérification n’a pas réussi.",
       signInPrompt: "Connectez-vous pour demander la suppression de votre compte Scryve.",
       checkingReceipt: "Vérification de votre reçu de suppression…",
       checkingAccount: "Vérification de votre compte…",
-      reconnect: "Reconnectez-vous à Scryve avant de supprimer votre compte.",
+      reconnect: "Rétablissez la connexion à Scryve avant de supprimer votre compte.",
       submitFailed: "Impossible d’envoyer la demande de suppression",
     },
   },
   cloud: {
     signInToContinue: "Connectez-vous pour continuer.",
     chooseUsername: "Choisissez votre nom d’utilisateur de joueur.",
-    reconnect: "Reconnectez-vous pour continuer.",
+    reconnect: "Rétablissez la connexion pour continuer.",
     chooseUsernameAction: "Choisir un nom d’utilisateur",
     unavailableHeading: "Fonctions connectées indisponibles",
-    localPlayAvailable: "Le jeu local reste disponible.",
+    localPlayAvailable: "Les parties locales restent disponibles.",
     notConfigured:
-      "Les fonctions connectées sont indisponibles dans cette version. Le jeu local reste disponible.",
+      "Les fonctions connectées sont indisponibles dans cette version. Les parties locales restent disponibles.",
   },
   billing: {
     proNeedsAccount:
       "Scryve Pro est lié à un compte. Connectez-vous pour obtenir Pro ou utiliser votre Pro existant.",
     renewalPrompt: {
-      title: "Vous rappeler avant le renouvellement ?",
-      body_one: "Recevez une notification {{count}} jour avant votre prochain prélèvement annuel.",
+      title: "Un rappel avant le renouvellement ?",
+      body_one: "Recevez une notification {{count}} jour avant votre prochain paiement annuel.",
       body_many:
-        "Recevez une notification {{count}} de jours avant votre prochain prélèvement annuel.",
-      body_other:
-        "Recevez une notification {{count}} jours avant votre prochain prélèvement annuel.",
+        "Recevez une notification {{count}} de jours avant votre prochain paiement annuel.",
+      body_other: "Recevez une notification {{count}} jours avant votre prochain paiement annuel.",
       notNow: "Plus tard",
-      remind: "Me le rappeler",
+      remind: "Me rappeler",
     },
     access: {
       checking: "Vérification de l’accès…",
@@ -308,34 +307,35 @@ export default {
       availableUntil: "Disponible jusqu’au {{date}}",
       active: "Accès {{plan}} actif",
       unavailable: "État indisponible",
-      free: "Offre gratuite",
+      free: "Formule gratuite",
     },
     loading: "Chargement de Scryve Pro",
     manage: "Gérer",
     manageAccessibilityLabel: "Gérer l’abonnement Scryve {{plan}}",
-    viewOptions: "Voir les offres",
-    viewOptionsAccessibilityLabel: "Voir les offres Scryve Pro",
+    viewOptions: "Voir les options",
+    viewOptionsAccessibilityLabel: "Voir les options de Scryve Pro",
     paywallFailedTitle: "Scryve Pro ne s’est pas ouvert",
     notConfigured: "Les achats Scryve Pro ne sont pas configurés.",
     missingApiKey:
-      "Les achats Scryve Pro sont indisponibles, car la clé API publique RevenueCat n’est pas configurée.",
+      "Les achats Scryve Pro sont indisponibles : la clé API publique RevenueCat n’est pas configurée.",
     errors: {
       revenueCatNotConfigured: "RevenueCat n’est pas configuré.",
       unexpected: "Une erreur d’achat inattendue s’est produite.",
-      offline: "Connectez-vous à Internet et réessayez.",
-      notAllowed: "Les achats ne sont pas autorisés sur cet appareil ou ce compte de la boutique.",
+      offline: "Connectez-vous à internet et réessayez.",
+      notAllowed:
+        "Les achats ne sont pas autorisés sur cet appareil ou avec ce compte de la boutique.",
       productUnavailable: "Cette option Scryve Pro n’est pas disponible dans la boutique actuelle.",
       pending:
         "La boutique traite encore cet achat. L’accès sera mis à jour une fois l’achat terminé.",
       misconfigured: "Scryve Pro n’est pas configuré correctement pour cette version.",
-      failed: "L’achat n’a pas pu être finalisé.",
-      waitForBilling: "Attendez que la facturation se connecte à votre compte, puis réessayez.",
-      foilWebOnly: "Les achats de Foil ne sont disponibles que sur le web.",
+      failed: "L’achat n’a pas pu être terminé.",
+      waitForBilling: "Attendez que la facturation soit associée à votre compte, puis réessayez.",
+      foilWebOnly: "Les achats Foil sont uniquement disponibles sur le web.",
       manageBeforeFoil: "Gérez votre abonnement actuel avant de passer à Foil.",
       productNotInStore: "{{productId}} n’est pas disponible dans la boutique actuelle.",
       paywallFailed: "Le paywall Scryve Pro n’a pas pu traiter la demande.",
       noManagementPage:
-        "Aucune page de gestion d’abonnement n’est encore disponible pour ce client.",
+        "Aucune page de gestion de l’abonnement n’est encore disponible pour ce client.",
     },
   },
   foil: {
@@ -343,7 +343,7 @@ export default {
     title: "Foil Supporter",
     price: "{{amount}} US$/an",
     description:
-      "Les mêmes fonctionnalités Pro. Un soutien facultatif pour Scryve. Se renouvelle chaque année jusqu’à résiliation.",
+      "Les mêmes fonctionnalités Pro. Un soutien facultatif à Scryve. Se renouvelle chaque année jusqu’à résiliation.",
     signInPrompt: "Connectez-vous pour associer Foil à votre compte Scryve.",
     alreadyPro:
       "Vous avez déjà accès à Pro. Gérez votre abonnement actuel avant de changer d’offre.",
@@ -372,9 +372,9 @@ export default {
   preview: {
     heading: "Aperçu de PR",
     loading: "Chargement de {{channel}}…",
-    busy: "Un autre aperçu est encore en cours de chargement. Rouvrez ce lien.",
+    busy: "Un autre aperçu est encore en cours de chargement. Ouvrez de nouveau ce lien.",
     missing:
-      "{{channel}} n’a aucune mise à jour que cette version peut exécuter. Une nouvelle version d’aperçu est peut-être nécessaire.",
+      "{{channel}} n’a aucune mise à jour compatible avec cette version. Une nouvelle version d’aperçu est peut-être nécessaire.",
   },
   launch: {
     starting: "Démarrage de Scryve…",

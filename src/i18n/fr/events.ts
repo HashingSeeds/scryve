@@ -38,12 +38,12 @@ export default {
   },
   bestOf: "Au meilleur des {{bestOf}}",
   playerCount_one: "{{count}} joueur",
-  playerCount_many: "{{count}} joueurs",
+  playerCount_many: "{{count}} de joueurs",
   playerCount_other: "{{count}} joueurs",
   organizer: "Organisateur",
   list: {
-    current: "Actuels",
-    empty: "Aucun événement",
+    current: "En cours",
+    empty: "Aucun événement pour l’instant",
     emptyHint:
       "Organisez un tournoi pour votre magasin ou vos amis, ou rejoignez-en un avec son code.",
   },
@@ -85,7 +85,7 @@ export default {
   startRound: "Lancer la ronde {{round}}",
   blocked: {
     results: "Saisissez d’abord tous les résultats",
-    players: "{{count}} joueurs requis",
+    players: "Joueurs requis : {{count}}",
     maxRounds: "Plus de rondes",
   },
   finish: {
@@ -103,11 +103,11 @@ export default {
   drop: {
     action: "Abandonner",
     title: "Abandonner cet événement ?",
-    message: "Vous ne serez pas apparié aux rondes suivantes.",
+    message: "Vous n’aurez plus d’adversaire dans les rondes suivantes.",
     confirm: "Abandonner",
   },
   undrop: "Revenir",
-  dropped: "Abandonné",
+  dropped: "Abandon",
   guest: "Invité",
   addGuest: "Ajouter un invité",
   guestName: "Nom de l’invité",
@@ -131,7 +131,7 @@ export default {
   waitingForConfirm_other: "En attente de la confirmation d’un autre joueur",
   startMatch: "Lancer le match",
   replaceGame: {
-    title: "Terminer votre partie en cours ?",
+    title: "Mettre fin à votre partie en cours ?",
     message: "Elle se termine sans résultat, puis ce match commence.",
     confirm: "Lancer le match",
   },
@@ -139,14 +139,14 @@ export default {
     title: "Résultat de la table {{table}}",
     drawnGames: "Parties nulles",
     draw: "Égalité",
-    winner: "{{name}} gagne",
-    won: "Vous avez gagné {{score}}",
-    lost: "Vous avez perdu {{score}}",
-    drew: "Vous avez fait match nul {{score}}",
+    winner: "Victoire : {{name}}",
+    won: "Victoire : {{score}}",
+    lost: "Défaite : {{score}}",
+    drew: "Égalité : {{score}}",
     doubleLoss: "Double défaite",
     save: "Enregistrer",
     clear: "Effacer le résultat",
-    twoWinners: "Un seul joueur peut gagner le match",
+    twoWinners: "Une seule personne peut remporter le match",
   },
   nearby: {
     title: "Événements à proximité",
@@ -160,25 +160,25 @@ export default {
     name: "Votre nom",
     join: "Rejoindre",
     joining: "Connexion à l’événement…",
-    reconnecting: "Reconnexion à l’organisateur…",
+    reconnecting: "Reconnexion à l’hôte…",
     replaceUnsaved: {
       title: "Remplacer votre dernier événement ?",
       message:
-        "Il n’est pas enregistré dans un compte, donc organiser un nouvel événement le supprime de cet appareil.",
+        "Il n’est pas enregistré dans un compte : en organiser un nouveau le supprime de cet appareil.",
       confirm: "Remplacer",
     },
     rejected: {
       code: "Le code de cet événement a changé. Sélectionnez-le à nouveau.",
-      protocol: "L’organisateur doit avoir la même version de Scryve que vous.",
+      protocol: "L’hôte doit avoir la même version de Scryve que vous.",
       closed: "Cet événement est terminé.",
-      invalid: "L’organisateur a refusé cet appareil.",
+      invalid: "L’hôte a refusé cet appareil.",
       unreachable:
         "Impossible de joindre cet événement. Vérifiez que vous êtes sur le même Wi-Fi, puis réessayez.",
     },
   },
   settings: {
     rounds: "Rondes",
-    suggested: "Suggéré pour {{count}} joueurs : {{rounds}}",
+    suggested: "Suggestion pour {{count}} joueurs : {{rounds}}",
     roundMinutes: "Minutes par ronde",
   },
   standings: {

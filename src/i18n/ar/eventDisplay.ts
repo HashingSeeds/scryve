@@ -17,10 +17,10 @@ export default {
   players_two: "لاعبان",
   players_few: "{{count}} لاعبين",
   players_many: "{{count}} لاعبًا",
-  players_other: "{{count}} لاعب",
+  players_other: "عدد اللاعبين: {{count}}",
   noPlayers: "لا يوجد لاعبون بعد",
   points: "النقاط",
-  record: "ف-خ-ت",
+  record: "فوز-خسارة-تعادل",
   tableStatus: {
     open: "قيد اللعب",
     reported: "تم تسجيل النتيجة",

@@ -19,13 +19,13 @@ export default {
   listSeparator: ", ",
   listAnd: " y ",
   emptyState: {
-    heading: "Aún no hay nada aquí",
-    content: "No se encontraron datos. Intenta actualizar o volver a abrir la app.",
+    heading: "Aún no hay nada",
+    content: "No se encontraron datos. Prueba a actualizar o a reiniciar la app.",
   },
   appMenu: {
     more: "Más",
     moreUpdateReady: "Más, actualización lista",
-    moreStoreUpdate: "Más, hay una actualización de la app",
+    moreStoreUpdate: "Más, actualización de la app disponible",
     updateApp: "Actualizar la app",
     history: "Historial",
     settings: "Ajustes",
@@ -34,8 +34,8 @@ export default {
     account: "Cuenta",
     signIn: "Iniciar sesión",
     closeMenu: "Cerrar menú",
-    nearbyOnlyOn: "Solo cercanas: Sí",
-    nearbyOnlyOff: "Solo cercanas: No",
+    nearbyOnlyOn: "Solo cercanas: activado",
+    nearbyOnlyOff: "Solo cercanas: desactivado",
   },
   appNavigation: {
     decks: "Mazos",
@@ -87,10 +87,10 @@ export default {
     readoutLabel: "{{label}}, {{value}}",
     decrease: "Reducir {{label}} en {{step}}",
     increase: "Aumentar {{label}} en {{step}}",
-    longPressHint: "Mantén presionado para cambiarlo de {{step}} en {{step}}.",
+    longPressHint: "Mantén presionado para cambiarlo en {{step}}.",
   },
   optionGrid: {
     other: "Otro valor",
-    more: "{{label}}: desde {{from}}",
+    more: "{{label}}: {{from}} o más",
   },
 } satisfies LocaleNamespace

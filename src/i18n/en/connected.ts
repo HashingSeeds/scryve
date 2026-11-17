@@ -86,6 +86,7 @@ const connected = {
     commanderSelfDamage: "A commander cannot damage itself",
     // Shown to the attacking player after the server turned down their commander damage claim. {{name}} is the defending player; {{delta}} is the damage that was not added. The usual cause is that the defender has not answered an earlier claim from this attacker yet.
     // ko: {{name}} is the one who hasn't answered: '{{name}}님에게 준 커맨더 피해 {{delta}}점이 반영되지 않았습니다. {{name}}님이 이전 요청에 아직 응답하지 않았다면, 응답한 뒤 다시 보내세요.'
+    // ar: No gendered verb or pronoun on {{name}}: 'إذا لم يصل رد على مطالبتك الأخيرة بعد، فأعد إرسالها بعد وصوله.'
     commanderClaimDeclined:
       "{{delta}} commander damage to {{name}} wasn't added. If they haven't answered your last claim yet, send it again after they do.",
     // hi: “और बदलाव रखने से पहले, जो बदलाव नहीं हो सके उन्हें देखकर हटाएँ, फिर दोबारा सिंक करें।”
@@ -290,6 +291,8 @@ const connected = {
     you: "You",
     deckSelected: "Deck selected",
     noDeck: "No deck",
+    // This player is ready to start, which is more than having a deck.
+    // fr: Never « Deck choisi » or a gendered « Prêt »: « ✓ C'est bon ».
     ready: "✓ Ready",
     chooseDeck: "○ Choose a deck",
     needsDeck: "○ Needs a deck",
@@ -350,6 +353,7 @@ const connected = {
     sending: "Sending…",
     sendReport: "Send report",
     // ja: "Seated with them" means put in the same game: 今後同じゲームになることはありません。 Never 同じ席.
+    // es: Never «lo» or «él» for {{name}}: «…y bloqueamos a esa persona por ti.»
     reportConfirmation:
       "We received your report about {{name}} and blocked them for you. You will not be seated with them again.",
     // ja: "Seated with them" means put in the same game: 今後同じゲームになることはなく、… Never 同じ席.

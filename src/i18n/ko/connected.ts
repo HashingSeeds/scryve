@@ -235,7 +235,7 @@ export default {
     you: "나",
     deckSelected: "덱 선택됨",
     noDeck: "덱 없음",
-    ready: "✓ 준비됨",
+    ready: "✓ 준비 완료",
     chooseDeck: "○ 덱 선택",
     needsDeck: "○ 덱 필요",
     newDeck: "+ 새 덱",

@@ -2,12 +2,12 @@
 import type { LocaleNamespace } from "../localeNamespace"
 
 export default {
-  notFound: "इस कोड वाला कोई इवेंट नहीं है",
+  notFound: "इस कोड का कोई इवेंट नहीं है",
   roundOf: "राउंड {{round}} / {{planned}}",
   round: "राउंड {{round}}",
   final: "फ़ाइनल",
   code: "कोड",
-  paused: "रुका हुआ",
+  paused: "रुका है",
   time: "समय खत्म",
   bye: "बाय",
   pairings: "पेयरिंग",
@@ -18,7 +18,7 @@ export default {
   points: "पॉइंट",
   record: "W-L-D",
   tableStatus: {
-    open: "चालू",
+    open: "खेल रहे हैं",
     reported: "दर्ज हुआ",
     confirmed: "पुष्टि हुई",
   },
