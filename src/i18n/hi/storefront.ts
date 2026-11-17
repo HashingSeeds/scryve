@@ -25,7 +25,7 @@ export default {
     subtitle: "काउंटर, डेक, स्टैट्स, इवेंट",
     shortDescription: "TCG और कमांडर के लिए लाइफ़ काउंटर, साथ में डेक स्टैट्स और टूर्नामेंट।",
     gameName: {
-      mtg: "मैजिक: द गैदरिंग",
+      mtg: "Magic: The Gathering",
       ygo: "यू-गी-ओह!",
       pokemon: "पोकेमॉन ट्रेडिंग कार्ड गेम",
       lorcana: "डिज़्नी लोरकाना",

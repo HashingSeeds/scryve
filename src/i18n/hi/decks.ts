@@ -640,7 +640,7 @@ export default {
     modeImport: "इंपोर्ट",
     modeBuild: "बनाएँ",
     linkHelperMtg:
-      "पब्लिक मैजिक डेक के HTTPS लिंक। दूसरी साइट के लिए टेक्स्ट एक्सपोर्ट पेस्ट करें।",
+      "सार्वजनिक Magic डेक के HTTPS लिंक। दूसरी साइटों के लिए टेक्स्ट एक्सपोर्ट पेस्ट करें।",
     linkHelperYgo:
       "पब्लिक YGOPRODeck डेक के लिंक। दूसरी साइट के लिए YDK या YDKe एक्सपोर्ट पेस्ट करें।",
     linkHelperPokemon:

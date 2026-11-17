@@ -403,3 +403,19 @@ test("never reads a key file the choice does not need", () => {
     "console",
   )
 })
+
+test("keeps a glossary name in Latin script even when the name has a colon", () => {
+  const glossary = {
+    rules: {},
+    terms: { game: { hi: "Magic: The Gathering: Magic: The Gathering (short: Magic)" } },
+  }
+  const unit = translationUnits({ games: "Works with Magic: The Gathering." }).get("games")
+  assert.deepEqual(
+    validateUnit(unit, { games: "Magic: The Gathering के साथ काम करता है।" }, "hi", glossary),
+    [],
+  )
+  assert.deepEqual(
+    validateUnit(unit, { games: "Magic: The Bathering के साथ काम करता है।" }, "hi", glossary),
+    ['games: left "Bathering" in Latin script'],
+  )
+})

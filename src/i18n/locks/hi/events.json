@@ -132,9 +132,9 @@
   "standings.points": "560d3ddee0f6.20fb12e80570",
   "standings.record": "f991a241a00a.a5dd3d1682ba",
   "standings.empty": "9eb593413440.17fd6ae4e7e3",
-  "tiebreaker.opponentMatchWin": "7b10048fa35c.ae19b39c375f",
-  "tiebreaker.gameWin": "29be0fb2d6b9.bd8ef574439c",
-  "tiebreaker.opponentGameWin": "4eb81a4bacb5.dc9ef8c27bc1",
-  "tiebreaker.opponentOpponentMatchWin": "2d89b9282a48.190acd1ca3d8",
-  "tiebreaker.lostRoundSquares": "7d1118c64cfa.c7e5ec11414f"
+  "tiebreaker.opponentMatchWin": "8fa4620a0ba6.ae19b39c375f",
+  "tiebreaker.gameWin": "01ef91e4b2f9.bd8ef574439c",
+  "tiebreaker.opponentGameWin": "40c55805d682.dc9ef8c27bc1",
+  "tiebreaker.opponentOpponentMatchWin": "1d643e130965.190acd1ca3d8",
+  "tiebreaker.lostRoundSquares": "33c53c0183ab.c7e5ec11414f"
 }

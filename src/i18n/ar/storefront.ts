@@ -25,7 +25,7 @@ export default {
     subtitle: "مجموعات · إحصاءات · فعاليات",
     shortDescription: "عداد نقاط الحياة لألعاب البطاقات وكوماندر، مع إحصاءات المجموعات والبطولات.",
     gameName: {
-      mtg: "ماجيك: ذا جاذرينج",
+      mtg: "Magic: The Gathering",
       ygo: "يوغي يو!",
       pokemon: "لعبة بطاقات بوكيمون",
       lorcana: "ديزني لوركانا",

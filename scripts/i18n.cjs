@@ -398,8 +398,21 @@ function keptLatin(locale, glossary) {
     const sameName = Object.values(glossary.terms).flatMap((term) =>
       String(term[locale] ?? "")
         .split(";")
-        .map((entry) => entry.split(":").map((side) => side.trim()))
-        .filter(([english, local]) => local === english || local?.startsWith(`${english} (`))
+        // why: a kept name can hold a colon ("Magic: The Gathering: Magic: The Gathering"), so try every colon as the split.
+        .flatMap((entry) => {
+          const parts = entry.split(":")
+          return parts.slice(1).map((_, index) => [
+            parts
+              .slice(0, index + 1)
+              .join(":")
+              .trim(),
+            parts
+              .slice(index + 1)
+              .join(":")
+              .trim(),
+          ])
+        })
+        .filter(([english, local]) => local === english || local.startsWith(`${english} (`))
         .map(([english]) => english),
     )
     byLocale.set(
@@ -873,10 +886,7 @@ function paywall([input, output = input.replace(/\.csv$/, "-translated.csv")]) {
     ]),
   )
   const keyByEnglish = new Map(
-    Object.entries(english).map(([key, text]) => [
-      fillStoreText(text, values, SOURCE_LOCALE),
-      key,
-    ]),
+    Object.entries(english).map(([key, text]) => [fillStoreText(text, values, SOURCE_LOCALE), key]),
   )
   const localeByColumn = new Map(Object.entries(LOCALES).map(([locale, name]) => [name, locale]))
   const [header, ...rows] = parseCsv(fs.readFileSync(input, "utf8").replace(/^\uFEFF/, ""))
