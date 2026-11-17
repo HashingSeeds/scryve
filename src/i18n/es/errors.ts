@@ -52,6 +52,8 @@ export default {
   syncOwnerChanged: "La cuenta con la sesión iniciada cambió",
   tooManyJoinAttempts: "Demasiados intentos de unirte; espera un minuto e inténtalo de nuevo",
   unauthenticated: "Se requiere autenticación",
+  unknownFormat: "Este formato no está disponible para este juego",
+  unknownGame: "Juego desconocido",
   updateRequired: "Actualiza Scryve para unirte a esta partida",
   ygoprodeckInvalidResponse: "La respuesta del mazo es demasiado grande o está vacía.",
 } satisfies LocaleNamespace

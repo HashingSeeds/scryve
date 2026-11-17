@@ -51,6 +51,8 @@ export default {
   syncOwnerChanged: "로그인한 계정이 변경되었습니다",
   tooManyJoinAttempts: "참가 시도가 너무 많습니다. 1분 후 다시 시도하세요",
   unauthenticated: "인증이 필요합니다",
+  unknownFormat: "이 게임에서 사용할 수 없는 포맷입니다",
+  unknownGame: "알 수 없는 게임입니다",
   updateRequired: "이 게임에 참가하려면 Scryve를 업데이트하세요",
   ygoprodeckInvalidResponse: "덱 응답이 너무 크거나 비어 있습니다.",
 } satisfies LocaleNamespace

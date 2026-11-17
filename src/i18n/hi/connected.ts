@@ -4,9 +4,12 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   relativeTime: {
     justNow: "अभी",
-    minutes: "{{minutes}} मिनट पहले",
-    hours: "{{hours}} घंटे पहले",
-    days: "{{days}} दिन पहले",
+    minutes_one: "{{count}} मिनट पहले",
+    minutes_other: "{{count}} मिनट पहले",
+    hours_one: "{{count}} घंटे पहले",
+    hours_other: "{{count}} घंटे पहले",
+    days_one: "{{count}} दिन पहले",
+    days_other: "{{count}} दिन पहले",
   },
   resumeTitle: {
     hostingLobby: "होस्ट · शुरू होने का इंतज़ार",

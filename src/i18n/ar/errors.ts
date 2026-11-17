@@ -51,6 +51,8 @@ export default {
   syncOwnerChanged: "تم تغيير الحساب المسجَّل دخوله",
   tooManyJoinAttempts: "محاولات الانضمام كثيرة جدًا؛ انتظر دقيقة ثم حاول مرة أخرى",
   unauthenticated: "تسجيل الدخول مطلوب",
+  unknownFormat: "هذا النمط غير متاح لهذه اللعبة",
+  unknownGame: "لعبة غير معروفة",
   updateRequired: "حدّث تطبيق Scryve للانضمام إلى هذه المباراة",
   ygoprodeckInvalidResponse: "استجابة المجموعة كبيرة جدًا أو فارغة.",
 } satisfies LocaleNamespace

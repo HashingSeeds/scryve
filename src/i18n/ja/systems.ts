@@ -43,6 +43,14 @@ export default {
     arc: "アーチエネミー（{{year}}）",
     e01: "アーチエネミー：ニコル・ボーラス",
   },
+  domain: {
+    Fury: "憤怒",
+    Calm: "静謐",
+    Mind: "精神",
+    Body: "肉体",
+    Chaos: "混沌",
+    Order: "秩序",
+  },
   cardType: {
     Legendary: "伝説",
     Basic: "基本",
@@ -208,7 +216,7 @@ export default {
     riftbound_other: "ポイント変動{{count}}回",
   },
   noneTaken: "サイドをとっていません",
-  taken: "サイド{{amount}}枚をとりました",
+  taken_other: "サイド{{count}}枚をとった",
   even: "変化なし",
   fromStart: "開始時から{{delta, signed}}",
 } satisfies LocaleNamespace

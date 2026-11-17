@@ -1,9 +1,13 @@
 const connected = {
   relativeTime: {
     justNow: "just now",
-    minutes: "{{minutes}}m ago",
-    hours: "{{hours}}h ago",
-    days: "{{days}}d ago",
+    // A short "time ago" stamp in a list row. Abbreviate the unit the way your language does in compact UI.
+    minutes_one: "{{count}}m ago",
+    minutes_other: "{{count}}m ago",
+    hours_one: "{{count}}h ago",
+    hours_other: "{{count}}h ago",
+    days_one: "{{count}}d ago",
+    days_other: "{{count}}d ago",
   },
   resumeTitle: {
     hostingLobby: "Hosting · waiting to start",

@@ -364,7 +364,7 @@ const decks = {
     // Riftbound: turn the card sideways to use it, like tapping.
     // ja: Riftbound has no Japanese edition; players say エグゾースト. Never 疲労.
     exhaust: "exhaust",
-    // Riftbound: a power cost of one domain. {{domain}} is a proper noun such as Fury or Calm and stays in English.
+    // Riftbound: a power cost of one domain. {{domain}} is a domain name such as Fury or Calm, already translated.
     domainPower: "{{domain}} power",
     // Riftbound: a power cost payable with any domain.
     anyPower: "power of any domain",

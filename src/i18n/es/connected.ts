@@ -4,9 +4,15 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   relativeTime: {
     justNow: "ahora mismo",
-    minutes: "hace {{minutes}} min",
-    hours: "hace {{hours}} h",
-    days: "hace {{days}} d",
+    minutes_one: "hace {{count}} min",
+    minutes_many: "hace {{count}} min",
+    minutes_other: "hace {{count}} min",
+    hours_one: "hace {{count}} h",
+    hours_many: "hace {{count}} h",
+    hours_other: "hace {{count}} h",
+    days_one: "hace {{count}} d",
+    days_many: "hace {{count}} d",
+    days_other: "hace {{count}} d",
   },
   resumeTitle: {
     hostingLobby: "Anfitrión · esperando para empezar",
