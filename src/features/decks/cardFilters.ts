@@ -33,10 +33,11 @@ function faces(values: readonly string[]) {
   return all
 }
 
+// why: card text is English, so a plain lowercase matches in every locale and keeps a scan of the card file fast on Hermes.
 function matchesOption(value: readonly string[] | number, option: string) {
   if (typeof value !== "number") {
-    const wanted = option.toLocaleLowerCase()
-    return value.some((entry) => entry.toLocaleLowerCase() === wanted)
+    const wanted = option.toLowerCase()
+    return value.some((entry) => entry === option || entry.toLowerCase() === wanted)
   }
   const bound = Number(option.slice(2))
   return option.startsWith(">=") ? value >= bound : value <= bound

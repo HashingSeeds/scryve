@@ -131,6 +131,7 @@ const mockPokemonCardByReference = jest.fn(async () => ({
   rarity: "common",
   imageUrl: "https://assets.example/riolu/high.webp",
 }))
+jest.mock("@legendapp/list/react-native", () => require("../../test/support/legendListAsFlatList"))
 jest.mock("@/features/decks/guestDeck", () => {
   const actual = jest.requireActual("@/features/decks/guestDeck")
   return { ...actual, saveGuestDeck: jest.fn(actual.saveGuestDeck) }

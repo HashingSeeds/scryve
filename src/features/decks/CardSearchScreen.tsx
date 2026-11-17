@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   ActivityIndicator,
   Modal,
@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
+import { LegendList } from "@legendapp/list/react-native"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -45,6 +46,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
+import { useStableCallbacks } from "@/utils/useStableCallbacks"
 
 import {
   completeCardDetails,
@@ -115,6 +117,14 @@ const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
 const COLORS_BEFORE = "cost"
 /** why: Text's 24pt line puts the extra room above typed text on iOS, so the bar's parts keep Rubik's own 16pt line, as its placeholder does. */
 const QUERY_LINE_HEIGHT = 19
+/** why: a result row's usual height, which the list uses to place rows before it measures them. */
+const RESULT_HEIGHT = 77
+const NO_RESULTS = [] as const
+const NO_OPTIONS: readonly string[] = []
+// why: LegendList's web build copies unknown props onto its <div>, so native-only props would warn.
+const NATIVE_RESULTS_PROPS = Platform.select({
+  native: { keyboardShouldPersistTaps: "handled", keyboardDismissMode: "on-drag" } as const,
+})
 const NO_CARD_FILTERS: readonly CardFilterDefinition[] = []
 const NO_PICKS: CardFilterState = {}
 const NO_COLORS: readonly string[] = []
@@ -318,6 +328,8 @@ export function CardSearch({
   })
   const needsKeywords = (picked.keyword?.length ?? 0) > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // why: the sheet's groups skip renders their picks didn't change, so their handlers keep one identity.
+  const stable = useStableCallbacks()
   // why: iOS keeps a multiline field's height when its text changes from outside, so the bar is rebuilt after the sheet edits it or it is cleared.
   const [bar, setBar] = useState({ build: 0, focused: !choosingCommander })
   function closeFilters() {
@@ -946,162 +958,179 @@ export function CardSearch({
             />
           ) : null}
         </View>
-        <ScrollView
+        <LegendList
+          {...NATIVE_RESULTS_PROPS}
           style={$results}
-          contentContainerStyle={[themed($search), choosingCommander ? $searchResults : undefined]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-        >
-          {inDeckMatches?.length ? (
-            <SectionHeader
-              label={translate("decks:cardSearch.inDeck")}
-              count={inDeckMatches.length}
-            />
-          ) : null}
-          {inDeckMatches?.map((card) => (
-            <View key={printingKey(card)} style={themed($result)}>
-              <CardImage
-                game={game}
-                source={card.smallImageUrl ?? card.imageUrl}
-                compact
-                style={$image}
-                accessibilityLabel={card.name}
-              />
-              <View style={$name}>
-                <Text weight="medium" text={card.name} />
-                <Text
-                  size="meta"
-                  tone="dim"
-                  tx="decks:cardSearch.inSection"
-                  txOptions={{ count: card.quantity, section: sectionLabel(cardSection(card)) }}
-                />
-              </View>
-              {isCommanderPick({ game, format }, card) ? null : (
-                <TextAction
-                  style={$add}
-                  accessibilityLabel={translate("decks:cardSearch.addAnother", { card: card.name })}
-                  tx="decks:cardSearch.add"
-                  onPress={() => addCopy(card)}
-                />
-              )}
-            </View>
-          ))}
-          {choosingCommander ? (
-            <SectionHeader
-              label={translate("decks:cardSearch.inDeck")}
-              count={checkingDeck ? undefined : eligibleCommanders?.length}
-            />
-          ) : null}
-          {checkingDeck ? <Text size="sm" tx="decks:cardSearch.checking" /> : null}
-          {rulesError ? (
-            <RetryableError
-              message={rulesError}
-              retryAfterMs={rulesRetryAfterMs}
-              testID="retry-commander-eligibility"
-              onRetry={() => {
-                setRulesRetryAfterMs(undefined)
-                setRulesAttempt((current) => current + 1)
-              }}
-            />
-          ) : null}
-          {eligibleCommanders?.map((card) => (
-            <TouchableOpacity
-              key={printingKey(card)}
-              accessibilityRole="button"
-              accessibilityLabel={translate("decks:cardSearch.preview", { card: card.name })}
-              style={themed($result)}
-              onPress={() => preview(card)}
-            >
-              <CardImage
-                game={game}
-                source={card.smallImageUrl ?? card.imageUrl}
-                compact
-                style={$image}
-                accessibilityLabel={card.name}
-              />
-              <View style={$name}>
-                <Text weight="medium" text={card.name} />
-                <Text
-                  size="meta"
-                  tone="dim"
-                  text={cardColorIdentityLabel(cachedRules[cardDetailsKey(card, game)], card.name)}
-                />
-              </View>
-            </TouchableOpacity>
-          ))}
-          {choosingCommander && !checkingDeck && !eligibleCommanders?.length ? (
-            <Text size="sm" tx="decks:cardSearch.noEligible" />
-          ) : null}
-          {choosingCommander ? (
-            <SectionHeader
-              label={offline ? translate("decks:cardSearch.cachedCards") : SCRYFALL}
-              count={offline ? cachedCandidates?.length : catalogResults?.length}
-            />
-          ) : null}
-          {choosingCommander && !searchRequested ? (
-            <Text
-              size="sm"
-              tx={offline ? "decks:cardSearch.searchCached" : "decks:cardSearch.searchScryfall"}
-            />
-          ) : null}
-          {offline ? (
-            <Text
-              size="xxs"
-              tx={
-                offlineSyntax
-                  ? "decks:cardSearch.offlineSyntax"
-                  : lookup && magicCards
-                    ? "decks:cardSearch.offlineCardFile"
-                    : "decks:cardSearch.offline"
-              }
-            />
-          ) : null}
-          {cachedCandidates?.map((entry, index) => (
-            <ResultRow
-              key={index}
-              style={themed($result)}
-              accessibilityRole={tapsRows ? "button" : undefined}
-              accessibilityLabel={rowLabel(entry.card)}
-              onPress={tapsRows ? () => addOffline(entry) : undefined}
-            >
-              <View style={$name}>
-                <Text weight="medium" text={entry.card.name} />
-                <Text
-                  size="meta"
-                  tone="dim"
-                  tx="decks:cardSearch.fromCache"
-                  txOptions={{ game: entry.game ?? game }}
-                />
-                {choosingCommander ? (
-                  <Text
-                    size="meta"
-                    tone="dim"
-                    text={cardColorIdentityLabel(
-                      cachedRules[cardDetailsKey(entry.card, game)],
-                      entry.card.name,
-                    )}
-                  />
-                ) : null}
-              </View>
-              {!tapsRows ? (
-                <TextAction
-                  style={$add}
-                  accessibilityLabel={translate("decks:cardSearch.addCard", {
-                    card: entry.card.name,
-                  })}
-                  tx="decks:cardSearch.add"
-                  onPress={() => addOffline(entry)}
+          contentContainerStyle={[
+            themed($search),
+            $resultsContent,
+            choosingCommander ? $searchResults : undefined,
+          ]}
+          columnWrapperStyle={themed($resultGap)}
+          data={catalogResults ?? NO_RESULTS}
+          keyExtractor={(card, index) => `${index}:${card.name}`}
+          estimatedItemSize={RESULT_HEIGHT}
+          ListHeaderComponent={
+            <ResultSlot edge="above">
+              {inDeckMatches?.length ? (
+                <SectionHeader
+                  label={translate("decks:cardSearch.inDeck")}
+                  count={inDeckMatches.length}
                 />
               ) : null}
-              {!tapsRows ? sideAction(entry.card, (to) => addOffline(entry, to)) : null}
-            </ResultRow>
-          ))}
-          {offline && !offlineSyntax && cachedCandidates?.length === 0 ? (
-            <Text tx="decks:cardSearch.noCached" />
-          ) : null}
-          {catalogResults?.map((card, index) => (
+              {inDeckMatches?.map((card) => (
+                <View key={printingKey(card)} style={themed($result)}>
+                  <CardImage
+                    game={game}
+                    source={card.smallImageUrl ?? card.imageUrl}
+                    compact
+                    style={$image}
+                    accessibilityLabel={card.name}
+                  />
+                  <View style={$name}>
+                    <Text weight="medium" text={card.name} />
+                    <Text
+                      size="meta"
+                      tone="dim"
+                      tx="decks:cardSearch.inSection"
+                      txOptions={{
+                        count: card.quantity,
+                        section: sectionLabel(cardSection(card)),
+                      }}
+                    />
+                  </View>
+                  {isCommanderPick({ game, format }, card) ? null : (
+                    <TextAction
+                      style={$add}
+                      accessibilityLabel={translate("decks:cardSearch.addAnother", {
+                        card: card.name,
+                      })}
+                      tx="decks:cardSearch.add"
+                      onPress={() => addCopy(card)}
+                    />
+                  )}
+                </View>
+              ))}
+              {choosingCommander ? (
+                <SectionHeader
+                  label={translate("decks:cardSearch.inDeck")}
+                  count={checkingDeck ? undefined : eligibleCommanders?.length}
+                />
+              ) : null}
+              {checkingDeck ? <Text size="sm" tx="decks:cardSearch.checking" /> : null}
+              {rulesError ? (
+                <RetryableError
+                  message={rulesError}
+                  retryAfterMs={rulesRetryAfterMs}
+                  testID="retry-commander-eligibility"
+                  onRetry={() => {
+                    setRulesRetryAfterMs(undefined)
+                    setRulesAttempt((current) => current + 1)
+                  }}
+                />
+              ) : null}
+              {eligibleCommanders?.map((card) => (
+                <TouchableOpacity
+                  key={printingKey(card)}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate("decks:cardSearch.preview", { card: card.name })}
+                  style={themed($result)}
+                  onPress={() => preview(card)}
+                >
+                  <CardImage
+                    game={game}
+                    source={card.smallImageUrl ?? card.imageUrl}
+                    compact
+                    style={$image}
+                    accessibilityLabel={card.name}
+                  />
+                  <View style={$name}>
+                    <Text weight="medium" text={card.name} />
+                    <Text
+                      size="meta"
+                      tone="dim"
+                      text={cardColorIdentityLabel(
+                        cachedRules[cardDetailsKey(card, game)],
+                        card.name,
+                      )}
+                    />
+                  </View>
+                </TouchableOpacity>
+              ))}
+              {choosingCommander && !checkingDeck && !eligibleCommanders?.length ? (
+                <Text size="sm" tx="decks:cardSearch.noEligible" />
+              ) : null}
+              {choosingCommander ? (
+                <SectionHeader
+                  label={offline ? translate("decks:cardSearch.cachedCards") : SCRYFALL}
+                  count={offline ? cachedCandidates?.length : catalogResults?.length}
+                />
+              ) : null}
+              {choosingCommander && !searchRequested ? (
+                <Text
+                  size="sm"
+                  tx={offline ? "decks:cardSearch.searchCached" : "decks:cardSearch.searchScryfall"}
+                />
+              ) : null}
+              {offline ? (
+                <Text
+                  size="xxs"
+                  tx={
+                    offlineSyntax
+                      ? "decks:cardSearch.offlineSyntax"
+                      : lookup && magicCards
+                        ? "decks:cardSearch.offlineCardFile"
+                        : "decks:cardSearch.offline"
+                  }
+                />
+              ) : null}
+              {cachedCandidates?.map((entry, index) => (
+                <ResultRow
+                  key={index}
+                  style={themed($result)}
+                  accessibilityRole={tapsRows ? "button" : undefined}
+                  accessibilityLabel={rowLabel(entry.card)}
+                  onPress={tapsRows ? () => addOffline(entry) : undefined}
+                >
+                  <View style={$name}>
+                    <Text weight="medium" text={entry.card.name} />
+                    <Text
+                      size="meta"
+                      tone="dim"
+                      tx="decks:cardSearch.fromCache"
+                      txOptions={{ game: entry.game ?? game }}
+                    />
+                    {choosingCommander ? (
+                      <Text
+                        size="meta"
+                        tone="dim"
+                        text={cardColorIdentityLabel(
+                          cachedRules[cardDetailsKey(entry.card, game)],
+                          entry.card.name,
+                        )}
+                      />
+                    ) : null}
+                  </View>
+                  {!tapsRows ? (
+                    <TextAction
+                      style={$add}
+                      accessibilityLabel={translate("decks:cardSearch.addCard", {
+                        card: entry.card.name,
+                      })}
+                      tx="decks:cardSearch.add"
+                      onPress={() => addOffline(entry)}
+                    />
+                  ) : null}
+                  {!tapsRows ? sideAction(entry.card, (to) => addOffline(entry, to)) : null}
+                </ResultRow>
+              ))}
+              {offline && !offlineSyntax && cachedCandidates?.length === 0 ? (
+                <Text tx="decks:cardSearch.noCached" />
+              ) : null}
+            </ResultSlot>
+          }
+          renderItem={({ item: card }) => (
             <ResultRow
-              key={index}
               style={themed($result)}
               accessibilityRole={tapsRows ? "button" : undefined}
               accessibilityLabel={rowLabel(card)}
@@ -1135,24 +1164,30 @@ export function CardSearch({
               ) : null}
               {!tapsRows ? sideAction(card, (to) => add(card, to)) : null}
             </ResultRow>
-          ))}
-          {!busy && catalogResults?.length === 0 ? <Text tx="decks:cardSearch.noResults" /> : null}
-          {catalogResults?.length && imageCredit ? (
-            <Text size="xxs" style={{ color: theme.colors.textDim }} text={imageCredit} />
-          ) : null}
-          {searchError ? (
-            <RetryableError
-              message={searchError.message}
-              retryAfterMs={searchError.retryAfterMs}
-              testID="retry-card-search"
-              onRetry={() => {
-                setSearchError(undefined)
-                setSearchAttempt((current) => current + 1)
-              }}
-            />
-          ) : null}
-          {message ? <Text accessibilityLiveRegion="polite" text={message} /> : null}
-        </ScrollView>
+          )}
+          ListFooterComponent={
+            <ResultSlot edge="below">
+              {!busy && catalogResults?.length === 0 ? (
+                <Text tx="decks:cardSearch.noResults" />
+              ) : null}
+              {catalogResults?.length && imageCredit ? (
+                <Text size="xxs" style={{ color: theme.colors.textDim }} text={imageCredit} />
+              ) : null}
+              {searchError ? (
+                <RetryableError
+                  message={searchError.message}
+                  retryAfterMs={searchError.retryAfterMs}
+                  testID="retry-card-search"
+                  onRetry={() => {
+                    setSearchError(undefined)
+                    setSearchAttempt((current) => current + 1)
+                  }}
+                />
+              ) : null}
+              {message ? <Text accessibilityLiveRegion="polite" text={message} /> : null}
+            </ResultSlot>
+          }
+        />
       </Screen>
       {filtersOpen ? (
         <DialogCard
@@ -1191,25 +1226,25 @@ export function CardSearch({
                               filter.id,
                               picked.format ?? [],
                             )
-                          : []
+                          : NO_OPTIONS
                         : filter.options === "range"
-                          ? []
+                          ? NO_OPTIONS
                           : filter.options
                     }
                     optionLabel={
                       filter.id === "format"
-                        ? (option) => deckFormatLabel(game, option)
+                        ? stable("formatLabel", (option: string) => deckFormatLabel(game, option))
                         : filter.id === "manaCost"
-                          ? (option) => {
+                          ? stable("symbolLabel", (option: string) => {
                               const symbol = SEARCH_COLORS.find((color) => color === option)
                               return symbol ? colorLabel(symbol) : option
-                            }
+                            })
                           : undefined
                     }
-                    picked={picked[filter.id] ?? []}
-                    onChange={(options) =>
-                      changeQuery({ filters: { ...picked, [filter.id]: options } })
-                    }
+                    picked={picked[filter.id] ?? NO_OPTIONS}
+                    onChange={stable(`pick:${filter.id}`, (options: readonly string[]) =>
+                      changeQuery({ filters: { ...picked, [filter.id]: options } }),
+                    )}
                   />
                 ))}
               </View>,
@@ -1289,6 +1324,9 @@ export function CardSearch({
 }
 const $screen: ViewStyle = { flex: 1 }
 const $results: ViewStyle = { flex: 1 }
+// why: the list would also put the gap after its header slot when that slot is empty; rows take theirs from $resultGap.
+const $resultsContent: ViewStyle = { gap: 0 }
+const $resultGap: ThemedStyle<{ rowGap: number }> = ({ spacing }) => ({ rowGap: spacing.sm })
 const $name: ViewStyle = { flex: 1 }
 const $image = { width: 38, height: 53 } as const
 const $add: ViewStyle = {
@@ -1324,3 +1362,15 @@ const $filterSection: ViewStyle = { gap: 8 }
 
 const $searchHeader: ViewStyle = { paddingBottom: 4 }
 const $searchResults: ViewStyle = { paddingTop: 8 }
+
+/** why: the list spaces its rows but not its header or footer, so content beside the rows keeps that gap, and an empty slot adds none. */
+function ResultSlot({ edge, children }: { edge: "above" | "below"; children: ReactNode }) {
+  const { theme } = useAppTheme()
+  if (!Children.toArray(children).length) return null
+  const gap = theme.spacing.sm
+  return (
+    <View style={{ gap, [edge === "above" ? "paddingBottom" : "paddingTop"]: gap }}>
+      {children}
+    </View>
+  )
+}

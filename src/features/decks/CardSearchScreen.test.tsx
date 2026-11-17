@@ -18,6 +18,9 @@ const mockAction = jest.fn()
 const mockQuery = jest.fn()
 const mockClient = { action: mockAction, query: mockQuery }
 const mockConnection = { isWebSocketConnected: true }
+jest.mock("@legendapp/list/react-native", () =>
+  require("../../../test/support/legendListAsFlatList"),
+)
 jest.mock("convex/react", () => ({
   useConvex: () => mockClient,
   useAction: () => mockDetailsAction,

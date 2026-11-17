@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { memo, useState, type ReactNode } from "react"
 import { Keyboard, ScrollView, View } from "react-native"
 import type { StyleProp, ViewStyle } from "react-native"
 
@@ -25,8 +25,20 @@ const RANGE_MODES = [
   { id: ">=", tx: "decks:cardSearch.orMore" },
 ] as const satisfies readonly { id: RangeMode; tx: string }[]
 
+type CardFilterGroupProps = Parameters<typeof FilterGroupView>[0]
+
+/** why: a pick changes one group, so the others skip the render; picks parse into new lists, so they compare by contents. */
+export const CardFilterGroup = memo(FilterGroupView, (before, after) =>
+  (Object.keys(after) as (keyof CardFilterGroupProps)[]).every((key) =>
+    key === "picked" ? sameList(before.picked, after.picked) : before[key] === after[key],
+  ),
+)
+
+const sameList = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((value, index) => value === b[index])
+
 /** why: `heading` is left out for a filter that shows as a later row of its group's section. */
-export function CardFilterGroup({
+function FilterGroupView({
   game,
   filter,
   heading,
