@@ -40,6 +40,8 @@
     "i18n:translate": "node scripts/i18n.cjs translate",
     "i18n:check": "node scripts/i18n.cjs check",
     "i18n:paywall": "node scripts/i18n.cjs paywall",
+    "store:apple": "node scripts/store.cjs apple",
+    "store:play": "node scripts/store.cjs play",
     "test:watch": "jest --watch",
     "test:ygo-worker": "jest workers/ygo-image-mirror/src/index.test.ts workers/ygo-image-mirror/sync/index.test.ts workers/ygo-image-mirror/sync/mtgDataset.test.ts --runInBand && vitest run --config workers/ygo-image-mirror/vitest.config.mts",
     "check:ygo-worker": "wrangler types --check --cwd workers/ygo-image-mirror && tsrs --noEmit --fast -p workers/ygo-image-mirror/tsconfig.json && tsrs --noEmit --fast -p workers/ygo-image-mirror/sync/tsconfig.json && tsrs --noEmit --fast -p workers/ygo-image-mirror/test/tsconfig.json && pnpm test:ygo-worker && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env= --outdir .wrangler/dry-run-preview && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env production --outdir .wrangler/dry-run-production",

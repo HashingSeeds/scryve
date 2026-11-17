@@ -410,6 +410,15 @@ function keptLatin(locale, glossary) {
   return byLocale.get(locale)
 }
 
+// why: store fields have hard limits; a note that says "At most 30 characters." both tells the translator and fails the check.
+const LENGTH_LIMIT = /At most (\d+) characters/i
+
+function lengthProblems(unit, key, text) {
+  const limit = Number(LENGTH_LIMIT.exec(unit.note ?? "")?.[1])
+  const length = [...text].length
+  return limit && length > limit ? [`${key}: is ${length} characters; the limit is ${limit}`] : []
+}
+
 function validateUnit(unit, translatedFlat, locale, glossary) {
   const englishTexts = Object.values(unit.english)
   const kept =
@@ -439,6 +448,7 @@ function validateUnit(unit, translatedFlat, locale, glossary) {
       ...unknown.map((token) => `${key}: introduced ${token}`),
       ...typedNumbers.map((number) => `${key}: typed the number ${number}; use a placeholder`),
       ...handBuiltSigns(key, text),
+      ...lengthProblems(unit, key, text),
       ...((text.match(/"/g) ?? []).length % 2 ? [`${key}: has an unmatched quote`] : []),
       ...scriptProblems(text, locale, kept).map((problem) => `${key}: ${problem}`),
     ]
@@ -574,6 +584,10 @@ async function check() {
       problems.push(`en/${namespace}: ${key} shadows a built-in object property; rename it`)
     for (const [key, text] of Object.entries(englishFlat))
       for (const problem of englishProblems(key, text)) problems.push(`en/${namespace}: ${problem}`)
+    for (const unit of units.values())
+      for (const [key, text] of Object.entries(unit.english))
+        for (const problem of lengthProblems(unit, key, text))
+          problems.push(`en/${namespace}: ${problem}`)
     for (const unit of units.values())
       for (const part of unit.notes.flat())
         if (part.locale && !Object.hasOwn(LOCALES, part.locale))
@@ -837,12 +851,14 @@ function paywallValues() {
   }
 }
 
-function fillPaywallText(text, values, locale) {
+// why: fills our own placeholders and leaves RevenueCat's ({{ product.price }}) for RevenueCat, spaced the way its docs write them.
+function fillStoreText(text, values, locale) {
   const { language, region } = new Intl.Locale(locale).maximize()
   const number = new Intl.NumberFormat(`${language}-${region}`)
-  return text.replace(/{{\s*([\w.]+)\s*}}/g, (token, name) =>
-    Object.hasOwn(values, name) ? number.format(values[name]) : `{{ ${name} }}`,
-  )
+  return text.replace(/{{\s*([\w.]+)\s*}}/g, (token, name) => {
+    if (!Object.hasOwn(values, name)) return `{{ ${name} }}`
+    return typeof values[name] === "number" ? number.format(values[name]) : values[name]
+  })
 }
 
 // why: RevenueCat names columns by language ("French") and rows by its own component IDs, so rows are matched by their English text.
@@ -858,7 +874,7 @@ function paywall([input, output = input.replace(/\.csv$/, "-translated.csv")]) {
   )
   const keyByEnglish = new Map(
     Object.entries(english).map(([key, text]) => [
-      fillPaywallText(text, values, SOURCE_LOCALE),
+      fillStoreText(text, values, SOURCE_LOCALE),
       key,
     ]),
   )
@@ -885,7 +901,7 @@ function paywall([input, output = input.replace(/\.csv$/, "-translated.csv")]) {
           throw new Error(
             `${locale}/storefront: paywall.${key} is missing; run pnpm i18n:translate`,
           )
-        return fillPaywallText(translation, values, locale)
+        return fillStoreText(translation, values, locale)
       }),
     ]
   })
@@ -916,6 +932,13 @@ if (require.main === module) {
 }
 
 module.exports = {
+  LOCALES,
+  SOURCE_LOCALE,
+  loadTs,
+  loadModule,
+  namespacePath,
+  paywallValues,
+  fillStoreText,
   chooseApiKey,
   loadApiKey,
   englishNotes,

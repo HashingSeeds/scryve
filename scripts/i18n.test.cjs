@@ -185,6 +185,17 @@ test("rejects translations that drop, rename, or miss placeholders and plural fo
   )
 })
 
+test("rejects translations longer than a note's character limit", () => {
+  const name = translationUnits(
+    { name: "Scryve" },
+    { name: [{ text: "At most 10 characters." }] },
+  ).get("name")
+  assert.deepEqual(validateUnit(name, { name: "Scryve Pro" }, "fr"), [])
+  assert.deepEqual(validateUnit(name, { name: "Scryve : le compteur" }, "fr"), [
+    "name: is 20 characters; the limit is 10",
+  ])
+})
+
 test("rejects numbers typed into copy for languages that write their own digits", () => {
   const seats = translationUnits({
     seats_one: "{{count}} seat",
