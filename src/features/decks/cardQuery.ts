@@ -154,7 +154,9 @@ export function parseCardQuery(
       : readAnyGroup(source, part, filters, cardOptionsFor)
     const current = read ? (picked[read.filter.id] ?? []) : []
     if (read && fitsPicked(read, current)) {
-      picked[read.filter.id] = [...new Set([...current, ...read.options])]
+      // why: a count filter keeps each copy, so `m>=rr` stays two red.
+      picked[read.filter.id] =
+        read.filter.match === "count" ? read.options : [...new Set([...current, ...read.options])]
       continue
     }
     rest.push(part)

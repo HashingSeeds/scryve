@@ -69,6 +69,7 @@ export default {
     supertype: "Supertipo",
     subtype: "Subtipo",
     manaValue: "Valor de maná",
+    manaCost: "Coste de maná",
     keyword: "Palabras clave",
     power: "Fuerza",
     toughness: "Resistencia",

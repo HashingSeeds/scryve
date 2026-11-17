@@ -145,8 +145,9 @@ export type RoundClockDefinition = {
  * why: a game declares what its card search can filter; the adapter for its card catalog
  * reads each filter's field from a card and turns picked options into the catalog's query.
  * `options: "cards"` lists the values cards carry, most common first. A range filter takes
- * a minimum and a maximum number instead of options. A filter with a `group` shows on its own
- * line under the heading of the filter that group names.
+ * a minimum and a maximum number instead of options. A `count` filter picks an option once per
+ * copy, and a card must carry each option at least that many times. A filter with a `group` shows
+ * on its own line under the heading of the filter that group names.
  */
 export type CardFilterDefinition = {
   readonly id: string
@@ -154,7 +155,8 @@ export type CardFilterDefinition = {
   readonly group?: string
 } & (
   | { readonly match: "any" | "all"; readonly options: readonly string[] | "cards" }
-  | { readonly options: "range" }
+  | { readonly match?: never; readonly options: "range" }
+  | { readonly match: "count"; readonly options: readonly string[] }
 )
 
 /** why: Scryve's Magic formats that Scryfall tracks legality for, under the same ids. */
@@ -195,6 +197,7 @@ export const MAGIC_CARD_FILTERS = [
   },
   { id: "subtype", label: "Subtype", group: "type", match: "any", options: "cards" },
   { id: "manaValue", label: "Mana value", options: "range" },
+  { id: "manaCost", label: "Mana cost", match: "count", options: ["W", "U", "B", "R", "G", "C"] },
   { id: "power", label: "Power", options: "range" },
   { id: "toughness", label: "Toughness", options: "range" },
   { id: "keyword", label: "Keywords", match: "all", options: "cards" },

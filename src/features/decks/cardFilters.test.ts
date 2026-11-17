@@ -1,5 +1,6 @@
-import { cardOptions, filterGroups } from "./cardFilters"
+import { cardOptions, filterGroups, matchesCardFilters } from "./cardFilters"
 import { SCRYFALL_SOURCE } from "./cardSources"
+import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
 const card = (name: string, typeLine: string, legalFormats?: string[]) => ({
   scryfallId: name,
@@ -58,4 +59,16 @@ test("a grouped filter shares the heading of the filter its group names, even li
     ["Type", ["supertype", "type"]],
     ["Mana value", ["manaValue"]],
   ])
+})
+
+test("a mana cost matches cards with at least that many of each plain symbol", () => {
+  const matches = (manaCost: string) =>
+    matchesCardFilters(SCRYFALL_SOURCE, { manaCost }, MAGIC_CARD_FILTERS, {
+      manaCost: ["B", "R", "R", "R"],
+    })
+  expect(matches("{B}{B}{R}{R}{R}{G}{G}")).toBe(true)
+  expect(matches("{4}{B}{R}{R}")).toBe(false)
+  expect(matches("{B}{R/G}{R}{R}")).toBe(false)
+  expect(matches("{1}{R}{R} // {B}{R}")).toBe(false)
+  expect(matches("{1}{U} // {B}{R}{R}{R}")).toBe(true)
 })

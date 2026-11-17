@@ -17,6 +17,22 @@ export type FilterField<Card> = {
  */
 export type CardSource<Card = never> = ReadonlyMap<string, FilterField<Card>>
 
+/** why: Scryfall matches a mana cost on one face, so a count field marks where each face of a card starts again. */
+export const FACE_BREAK = "//"
+
+function occurrences(values: readonly string[], wanted: string) {
+  return values.filter((value) => value === wanted).length
+}
+
+function faces(values: readonly string[]) {
+  const all: string[][] = [[]]
+  for (const value of values) {
+    if (value === FACE_BREAK) all.push([])
+    else all.at(-1)?.push(value)
+  }
+  return all
+}
+
 function matchesOption(value: readonly string[] | number, option: string) {
   if (typeof value !== "number") {
     const wanted = option.toLocaleLowerCase()
@@ -43,6 +59,13 @@ export function matchesCardFilters<Card>(
     if (!options.length) return true
     const value = source.get(filter.id)?.read(card)
     if (value === undefined) return false
+    if (filter.match === "count")
+      return (
+        typeof value !== "number" &&
+        faces(value).some((face) =>
+          options.every((option) => occurrences(face, option) >= occurrences(options, option)),
+        )
+      )
     const has = (option: string) => matchesOption(value, option)
     return filter.options !== "range" && filter.match === "any"
       ? options.some(has)
@@ -57,7 +80,18 @@ export function filterTerms(
 ) {
   return filters.flatMap((filter) => {
     const key = source.get(filter.id)?.keys[0]
-    const terms = key ? (picked[filter.id] ?? []).map((o) => filterTerm(filter, key, o)) : []
+    const options = picked[filter.id] ?? []
+    // why: Scryfall reads `m>=brrr` as at least one black and three red, so the copies join into one term.
+    if (filter.match === "count")
+      return key && options.length
+        ? [
+            `${key}>=${filter.options
+              .flatMap((option) => Array(occurrences(options, option)).fill(option))
+              .join("")
+              .toLocaleLowerCase()}`,
+          ]
+        : []
+    const terms = key ? options.map((o) => filterTerm(filter, key, o)) : []
     return filter.options === "range" || filter.match === "all" || terms.length < 2
       ? terms
       : [`(${terms.join(" or ")})`]
@@ -78,6 +112,17 @@ export function readFilterTerm(
   const fields = filters.filter((filter) =>
     source.get(filter.id)?.keys.includes(key.toLocaleLowerCase()),
   )
+  const count = fields.find((filter) => filter.match === "count")
+  if (count) {
+    const symbols = value
+      .replace(/\{(\w)\}/g, "$1")
+      .toLocaleUpperCase()
+      .split("")
+    return (operator === ">=" || operator === ":") &&
+      symbols.every((symbol) => count.options.includes(symbol))
+      ? { filter: count, options: symbols }
+      : undefined
+  }
   const range = fields.find((filter) => filter.options === "range")
   if (range) {
     if (!/^\d{1,2}$/.test(value)) return undefined
@@ -112,7 +157,9 @@ export function termSuggestions(
 ) {
   const wanted = typed.toLocaleLowerCase()
   const options = filters.flatMap((filter) =>
-    filter.options !== "range" && source.get(filter.id)?.keys.includes(key)
+    filter.options !== "range" &&
+    filter.match !== "count" &&
+    source.get(filter.id)?.keys.includes(key)
       ? (Array.isArray(filter.options) ? filter.options : cardOptionsFor(filter.id)).map(
           (option) => ({ filter, option, at: option.toLocaleLowerCase().indexOf(wanted) }),
         )
@@ -126,7 +173,10 @@ export function termSuggestions(
 export function pickedCount(filters: readonly CardFilterDefinition[], picked: CardFilterState) {
   return filters.reduce((total, filter) => {
     const options = picked[filter.id]?.length ?? 0
-    return total + (filter.options === "range" ? Math.min(options, 1) : options)
+    return (
+      total +
+      (filter.options === "range" || filter.match === "count" ? Math.min(options, 1) : options)
+    )
   }, 0)
 }
 

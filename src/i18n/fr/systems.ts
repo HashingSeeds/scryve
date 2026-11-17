@@ -70,6 +70,7 @@ export default {
     supertype: "Supertype",
     subtype: "Sous-type",
     manaValue: "Valeur de mana",
+    manaCost: "Coût de mana",
     keyword: "Mots-clés",
     power: "Force",
     toughness: "Endurance",
