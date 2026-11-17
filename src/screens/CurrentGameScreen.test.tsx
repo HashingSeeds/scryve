@@ -183,6 +183,20 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
+  it("hides the seats from screen readers and touch while the menu is open", () => {
+    const view = renderGame()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+
+    expect(view.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(view.getByTestId("player-grid-frame", { includeHiddenElements: true })).toHaveProp(
+      "pointerEvents",
+      "none",
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-backdrop"))
+    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+  })
+
   it("lists the game's changes in Log and undoes the latest", () => {
     const view = renderGame()
     fireEvent.press(view.getByTestId("life-seat-1--1"))

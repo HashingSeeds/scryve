@@ -233,6 +233,8 @@ export interface PlayerGridProps {
   layoutVariant?: PlayerGridLayoutVariant
   seatOrder?: SeatOrder
   disabled?: boolean
+  /** why: dims and locks the whole grid as one layer, so a menu over the board re-renders no seat. */
+  covered?: boolean
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
   getStaleSince?: (player: GamePlayer) => number | undefined
@@ -258,6 +260,7 @@ export function PlayerGrid({
   layoutVariant = "auto",
   seatOrder,
   disabled,
+  covered,
   isPlayerDisabled,
   isPlayerOwned,
   getStaleSince,
@@ -743,7 +746,14 @@ export function PlayerGrid({
   }
 
   return (
-    <View testID="player-grid-frame" style={$frame}>
+    <View
+      testID="player-grid-frame"
+      pointerEvents={covered ? "none" : "auto"}
+      aria-hidden={covered}
+      accessibilityElementsHidden={covered}
+      importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
+      style={[$frame, covered && $covered]}
+    >
       <Animated.View
         testID="player-grid"
         accessibilityLabel={translate(`board:grid.label.${systemId}`, { count: players.length })}
@@ -949,5 +959,6 @@ const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
 
 const $frame: ViewStyle = { flex: 1, width: "100%" }
+const $covered: ViewStyle = { opacity: 0.72 }
 
 const $unmeasured: ViewStyle = { opacity: 0 }
