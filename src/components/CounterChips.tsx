@@ -639,6 +639,7 @@ export const CounterChips = memo(function CounterChips({
             style={({ pressed }) => [
               themed(compact ? $compactChip : $chip),
               themed($addChip),
+              $bagChip,
               { position: "absolute", ...bagAt, width: bagSize, height: bagSize },
               pressed && { backgroundColor: overlayTint(foreground, 0.14) },
             ]}
@@ -1579,6 +1580,9 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
 
 // why: the lowest opacity that keeps the plus at 3:1 on every seat color.
 const $addChip: ThemedStyle<ViewStyle> = () => ({ opacity: 0.7 })
+
+// why: the bag's box is only `seatBagSize` wide, so chip padding would leave less room than the pouch and web shrinks the SVG to fit.
+const $bagChip: ViewStyle = { paddingHorizontal: 0 }
 
 const $value: ThemedStyle<TextStyle> = () => ({
   fontSize: 15,
