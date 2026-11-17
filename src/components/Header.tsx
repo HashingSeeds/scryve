@@ -105,6 +105,7 @@ export function Header(props: HeaderProps) {
     themed,
   } = useAppTheme()
   const [actionWidths, setActionWidths] = useState({ left: 0, right: 0 })
+  const [titleFit, setTitleFit] = useState({ row: 0, title: 0 })
   const {
     backgroundColor = colors.background,
     LeftActionComponent,
@@ -147,9 +148,19 @@ export function Header(props: HeaderProps) {
 
   const titleContent = titleTx ? translate(titleTx, titleTxOptions) : title
   const centeredInset = Math.max(spacing.xxl, actionWidths.left, actionWidths.right)
+  // why: web can't shrink a title to fit, so a title that fills its centered space gives up centering and takes the room beside the shorter action. It stays off-center once moved, since its width never drops below the centered space.
+  const offCenter =
+    centered &&
+    Platform.OS === "web" &&
+    titleFit.row > 0 &&
+    titleFit.title >= titleFit.row - 2 * centeredInset - 1
   const measureAction = (side: "left" | "right") => (event: LayoutChangeEvent) => {
     const width = Math.ceil(event.nativeEvent.layout.width)
     setActionWidths((widths) => (widths[side] === width ? widths : { ...widths, [side]: width }))
+  }
+  const measureTitle = (part: "row" | "title") => (event: LayoutChangeEvent) => {
+    const width = Math.ceil(event.nativeEvent.layout.width)
+    setTitleFit((fit) => (fit[part] === width ? fit : { ...fit, [part]: width }))
   }
 
   return (
@@ -169,11 +180,17 @@ export function Header(props: HeaderProps) {
 
         {!!titleContent && (
           <View
+            onLayout={centered ? measureTitle("row") : undefined}
             style={[
               titleAccessory ? $titleWrapperAccessoryPointerEvents : $titleWrapperPointerEvents,
               !!titleAccessory && themed($titleWrapperRow),
               centered
-                ? [$titleWrapperCenter, { paddingHorizontal: centeredInset }]
+                ? [
+                    $titleWrapperCenter,
+                    offCenter
+                      ? { paddingStart: actionWidths.left, paddingEnd: actionWidths.right }
+                      : { paddingHorizontal: centeredInset },
+                  ]
                 : $titleWrapperFlex,
               $titleContainerStyleOverride,
             ]}
@@ -182,6 +199,7 @@ export function Header(props: HeaderProps) {
               weight="medium"
               size="md"
               text={titleContent}
+              onLayout={centered ? measureTitle("title") : undefined}
               numberOfLines={1}
               adjustsFontSizeToFit={centered}
               minimumFontScale={TITLE_MIN_FONT_SCALE}

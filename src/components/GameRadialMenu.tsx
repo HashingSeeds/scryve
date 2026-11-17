@@ -712,7 +712,8 @@ function RadialAction({
           <Text
             text={action.label}
             weight="bold"
-            numberOfLines={1}
+            // why: web ignores adjustsFontSizeToFit, so a long label without a detail line wraps instead of cutting off.
+            numberOfLines={action.detail ? 1 : 2}
             adjustsFontSizeToFit
             minimumFontScale={0.75}
             maxFontSizeMultiplier={1.2}
