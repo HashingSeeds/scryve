@@ -158,10 +158,9 @@ export default {
   cardFilter: {
     format: "사용 가능 포맷",
     type: "유형",
-    supertype: "상위 유형",
-    subtype: "하위 유형",
-    manaValue: "마나 가치",
-    manaCost: "마나 비용",
+    cost: "비용",
+    manaValue: "마나 값",
+    manaCost: "포함",
     keyword: "키워드",
     power: "공격력",
     toughness: "방어력",

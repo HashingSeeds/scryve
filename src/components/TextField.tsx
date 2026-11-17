@@ -1,4 +1,5 @@
 import {
+  Children,
   ComponentType,
   forwardRef,
   Ref,
@@ -9,6 +10,7 @@ import {
 } from "react"
 import {
   ImageStyle,
+  Platform,
   StyleProp,
   // eslint-disable-next-line no-restricted-imports
   TextInput,
@@ -21,6 +23,7 @@ import {
 
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { textStart } from "@/theme/direction"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
 
@@ -65,7 +68,8 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
    * Note: It is a good idea to memoize this.
    */
   LeftAccessory?: ComponentType<TextFieldAccessoryProps>
-  clearable?: boolean
+  /** why: `true` shows an x that empties the field; a function also runs after it empties. */
+  clearable?: boolean | (() => void)
 }
 
 export const TextField = forwardRef(function TextField(props: TextFieldProps, ref: Ref<TextInput>) {
@@ -150,6 +154,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   function clearInput() {
     TextInputProps.onChangeText?.("")
     input.current?.focus()
+    if (typeof clearable === "function") clearable()
   }
 
   useImperativeHandle(ref, () => input.current as TextInput)
@@ -200,19 +205,22 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
         />
         {dismissible && <KeyboardDismiss nativeID={accessoryID} />}
 
-        {clearable && !disabled && !!TextInputProps.value && (
-          <PressableIcon
-            testID={TextInputProps.testID && `${TextInputProps.testID}-clear`}
-            icon="x"
-            size={16}
-            color={colors.textDim}
-            accessibilityRole="button"
-            accessibilityLabel={translate("common:clear")}
-            hitSlop={8}
-            containerStyle={themed($rightAccessoryStyle)}
-            onPress={clearInput}
-          />
-        )}
+        {/* why: a field styled through child Text parts has no value to check. */}
+        {clearable &&
+          !disabled &&
+          (!!TextInputProps.value || Children.count(TextInputProps.children) > 0) && (
+            <PressableIcon
+              testID={TextInputProps.testID && `${TextInputProps.testID}-clear`}
+              icon="x"
+              size={16}
+              color={colors.textDim}
+              accessibilityRole="button"
+              accessibilityLabel={translate("common:clear")}
+              hitSlop={8}
+              containerStyle={themed($rightAccessoryStyle)}
+              onPress={clearInput}
+            />
+          )}
 
         {!!RightAccessory && (
           <RightAccessory
@@ -260,6 +268,8 @@ const $inputStyle: ThemedStyle<TextStyle> = ({ colors, typography, spacing }) =>
   fontFamily: typography.primary.normal,
   color: colors.text,
   fontSize: 16,
+  // why: react-native-web inputs use dir="auto", so Latin text in an RTL app would otherwise align left. Native follows the layout direction already, and Android would pin "left" to the physical left.
+  ...(Platform.OS === "web" && { textAlign: textStart }),
   // https://github.com/facebook/react-native/issues/21720#issuecomment-532642093
   paddingVertical: 0,
   paddingHorizontal: 0,

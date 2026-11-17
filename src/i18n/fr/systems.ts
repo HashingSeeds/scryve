@@ -160,10 +160,9 @@ export default {
   cardFilter: {
     format: "Légal en",
     type: "Type",
-    supertype: "Supertype",
-    subtype: "Sous-type",
+    cost: "Coût",
     manaValue: "Valeur de mana",
-    manaCost: "Coût de mana",
+    manaCost: "Contient",
     keyword: "Mots-clés",
     power: "Force",
     toughness: "Endurance",

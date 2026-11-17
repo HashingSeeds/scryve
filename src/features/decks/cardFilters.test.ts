@@ -1,4 +1,4 @@
-import { cardOptions, filterGroups, matchesCardFilters } from "./cardFilters"
+import { cardOptions, filterGroups, filterTerms, matchesCardFilters } from "./cardFilters"
 import { SCRYFALL_SOURCE } from "./cardSources"
 import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
@@ -10,7 +10,7 @@ const card = (name: string, typeLine: string, legalFormats?: string[]) => ({
   ...(legalFormats ? { legalFormats } : {}),
 })
 
-test("subtypes come most common first and count only cards legal in the format", () => {
+test("type words come most common first and count only cards legal in the format", () => {
   const cards = [
     card("A", "Creature — Elf Druid", ["modern"]),
     card("B", "Creature — Elf Warrior", ["modern"]),
@@ -21,13 +21,15 @@ test("subtypes come most common first and count only cards legal in the format",
     card("G", "Creature — Goblin", ["legacy"]),
     card("H", "Creature — Goblin Rogue", ["legacy"]),
   ]
-  expect(cardOptions(SCRYFALL_SOURCE, cards, "subtype", ["modern"])).toEqual([
+  expect(cardOptions(SCRYFALL_SOURCE, cards, "type", ["modern"])).toEqual([
+    "Creature",
     "Elf",
     "Goblin",
     "Druid",
     "Warrior",
   ])
-  expect(cardOptions(SCRYFALL_SOURCE, cards, "subtype", [])).toEqual([
+  expect(cardOptions(SCRYFALL_SOURCE, cards, "type", [])).toEqual([
+    "Creature",
     "Goblin",
     "Elf",
     "Druid",
@@ -38,7 +40,7 @@ test("subtypes come most common first and count only cards legal in the format",
 
 test("a card file without legal formats counts every card", () => {
   const cards = ["A", "B", "C"].map((name) => card(name, "Artifact — Equipment"))
-  expect(cardOptions(SCRYFALL_SOURCE, cards, "subtype", ["modern"])).toEqual(["Equipment"])
+  expect(cardOptions(SCRYFALL_SOURCE, cards, "type", ["modern"])).toEqual(["Artifact", "Equipment"])
 })
 
 test("cards without keywords add no blank keyword", () => {
@@ -46,18 +48,31 @@ test("cards without keywords add no blank keyword", () => {
   expect(cardOptions(SCRYFALL_SOURCE, cards, "keyword", [])).toEqual([])
 })
 
-test("a grouped filter shares the heading of the filter its group names, even listed first", () => {
-  const groups = filterGroups([
-    { id: "supertype", label: "Supertype", group: "type", match: "all", options: ["Legendary"] },
-    { id: "type", label: "Type", match: "any", options: ["Creature"] },
-    { id: "manaValue", label: "Mana value", options: "range" },
-  ])
-
+test("filters sharing a group show under the group's heading", () => {
   expect(
-    groups.map(({ heading, filters }) => [heading.label, filters.map(({ id }) => id)]),
+    filterGroups(MAGIC_CARD_FILTERS).map(({ heading, filters }) => [
+      heading.label,
+      filters.map(({ id }) => id),
+    ]),
   ).toEqual([
-    ["Type", ["supertype", "type"]],
-    ["Mana value", ["manaValue"]],
+    ["Legal in", ["format"]],
+    ["Type", ["type"]],
+    ["Cost", ["manaValue", "manaCost"]],
+    ["Power", ["power"]],
+    ["Toughness", ["toughness"]],
+    ["Keywords", ["keyword"]],
+  ])
+})
+
+test("picked types all have to be on the card", () => {
+  const picked = { type: ["Artifact", "Enchantment"] }
+  const matches = (typeLine: string) =>
+    matchesCardFilters(SCRYFALL_SOURCE, { typeLine }, MAGIC_CARD_FILTERS, picked)
+  expect(matches("Enchantment Artifact — Equipment")).toBe(true)
+  expect(matches("Artifact Creature — Golem")).toBe(false)
+  expect(filterTerms(SCRYFALL_SOURCE, MAGIC_CARD_FILTERS, picked)).toEqual([
+    "t:artifact",
+    "t:enchantment",
   ])
 })
 

@@ -1,0 +1,12 @@
+# flow: Perf menu toggle
+# intent: open and close the game menu 3 times over a 4-player board.
+appId: ${MAESTRO_APP_ID}
+---
+- repeat:
+    times: 3
+    commands:
+      - tapOn:
+          id: "game-menu-button"
+      - tapOn:
+          id: "game-menu-backdrop"
+- waitForAnimationToEnd

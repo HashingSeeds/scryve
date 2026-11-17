@@ -181,14 +181,14 @@ const systems = {
     // Heading over the formats a searched card must be legal in.
     // hi: Format legality: “इनमें लीगल”, not मान्य.
     format: "Legal in",
-    // Heading over card types (Creature, Instant) and supertypes (Legendary, Basic, Snow).
+    // Heading over every word of a card's type line: Legendary, Creature, Elf, Equipment.
     type: "Type",
-    supertype: "Supertype",
-    // Heading over subtypes such as Elf, Warrior, Aura or Equipment.
-    subtype: "Subtype",
+    // Heading over a card's mana value and the mana symbols its cost includes.
+    cost: "Cost",
+    // Under "Cost": the card's total mana value, e.g. 3 for a card costing {1}{R}{R}.
     manaValue: "Mana value",
-    // Heading over steppers for how many of each colored mana symbol a card's cost has at least.
-    manaCost: "Mana cost",
+    // Under "Cost", beside steppers for how many of each colored mana symbol a card's cost has at least.
+    manaCost: "Includes",
     keyword: "Keywords",
     power: "Power",
     toughness: "Toughness",

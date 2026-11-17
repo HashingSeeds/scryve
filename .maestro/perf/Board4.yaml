@@ -1,0 +1,23 @@
+# flow: Perf board
+# intent: a new 4-player game, the state every perf scenario starts from. Run Prepare.yaml first.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: "game-menu-button"
+- tapOn:
+    id: "setup-button"
+- tapOn:
+    id: "player-count-4"
+- tapOn:
+    id: "start-game-button"
+# The last run's game had life changes, so starting over asks who won it.
+- runFlow:
+    when:
+      visible:
+        id: "abandon-game-button"
+    commands:
+      - tapOn:
+          id: "abandon-game-button"
+- assertVisible:
+    id: "life-seat-4-1"
+- waitForAnimationToEnd

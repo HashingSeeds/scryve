@@ -59,6 +59,8 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 - **Do not run repo-wide checks.** No `pnpm lint` (it auto-fixes), full `pnpm test`, or Maestro E2E unless asked.
 - Backend behavior changes ship with focused tests for that behavior.
 - A change to how nearby games sync life, undo, or commander damage runs `.agents/skills/verify-nearby-sync/check.sh`. Its SKILL.md lists the files it covers.
+- A change to the board or to `lobbyProjection` runs `pnpm test test/perf convex/lobbyProjection.perf.test.ts`. They count renders and websocket bytes for set interactions and fail when any count grows. Raising a budget needs a reason in the PR. A warning that a count came in under budget means lower the budget in the same PR.
+- A change that could slow the board on a phone, or a perf fix that needs numbers, follows `.agents/skills/verify-perf/SKILL.md`: JS CPU and frame numbers before and after, on the Pixel 6a.
 - Upon request, user-visible frontend changes should get one integrated pass in a real client: `test-scryve-web` for web, `test-scryve-mobile` for mobile. The primary agent does this once after integrating, loading `.agents/skills/test-scryve-web/SKILL.md` or `.agents/skills/test-scryve-mobile/SKILL.md`. Subagents do not launch their own dev servers.
 
 ## Pull requests

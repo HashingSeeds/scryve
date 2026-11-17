@@ -158,10 +158,9 @@ export default {
   cardFilter: {
     format: "使えるフォーマット",
     type: "タイプ",
-    supertype: "基本タイプ",
-    subtype: "サブタイプ",
+    cost: "コスト",
     manaValue: "マナ総量",
-    manaCost: "マナコスト",
+    manaCost: "含む",
     keyword: "キーワード",
     power: "パワー",
     toughness: "タフネス",

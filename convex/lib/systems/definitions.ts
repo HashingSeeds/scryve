@@ -144,17 +144,22 @@ export type RoundClockDefinition = {
 /**
  * why: a game declares what its card search can filter; the adapter for its card catalog
  * reads each filter's field from a card and turns picked options into the catalog's query.
- * `options: "cards"` lists the values cards carry, most common first. A range filter takes
- * a minimum and a maximum number instead of options. A `count` filter picks an option once per
- * copy, and a card must carry each option at least that many times. A filter with a `group` shows
- * on its own line under the heading of the filter that group names.
+ * Every pick narrows the search: a card must match each option picked. `options: "cards"` lists
+ * the values cards carry, most common first. A range filter compares a card's number with one
+ * picked value. A `count` filter picks an option once per copy, and a card must carry each option
+ * at least that many times. Filters sharing a `group` show as rows under that group's heading.
  */
 export type CardFilterDefinition = {
   readonly id: string
   readonly label: string
-  readonly group?: string
+  readonly group?: { readonly id: string; readonly label: string }
 } & (
-  | { readonly match: "any" | "all"; readonly options: readonly string[] | "cards" }
+  | {
+      readonly match: "all"
+      readonly options: readonly string[] | "cards"
+      /** why: the options a `cards` filter offers before the card file loads, or when it can't. */
+      readonly fallback?: readonly string[]
+    }
   | { readonly match?: never; readonly options: "range" }
   | { readonly match: "count"; readonly options: readonly string[] }
 )
@@ -171,20 +176,16 @@ export const LEGALITY_FORMATS = [
   "brawl",
 ] as const
 
+const COST = { id: "cost", label: "Cost" } as const
+
 export const MAGIC_CARD_FILTERS = [
   { id: "format", label: "Legal in", match: "all", options: LEGALITY_FORMATS },
   {
-    id: "supertype",
-    label: "Supertype",
-    group: "type",
-    match: "all",
-    options: ["Legendary", "Basic", "Snow"],
-  },
-  {
     id: "type",
     label: "Type",
-    match: "any",
-    options: [
+    match: "all",
+    options: "cards",
+    fallback: [
       "Creature",
       "Instant",
       "Sorcery",
@@ -193,11 +194,17 @@ export const MAGIC_CARD_FILTERS = [
       "Planeswalker",
       "Land",
       "Battle",
+      "Legendary",
     ],
   },
-  { id: "subtype", label: "Subtype", group: "type", match: "any", options: "cards" },
-  { id: "manaValue", label: "Mana value", options: "range" },
-  { id: "manaCost", label: "Mana cost", match: "count", options: ["W", "U", "B", "R", "G", "C"] },
+  { id: "manaValue", label: "Mana value", group: COST, options: "range" },
+  {
+    id: "manaCost",
+    label: "Includes",
+    group: COST,
+    match: "count",
+    options: ["W", "U", "B", "R", "G", "C"],
+  },
   { id: "power", label: "Power", options: "range" },
   { id: "toughness", label: "Toughness", options: "range" },
   { id: "keyword", label: "Keywords", match: "all", options: "cards" },

@@ -158,10 +158,9 @@ export default {
   cardFilter: {
     format: "مسموحة في",
     type: "النوع",
-    supertype: "النوع الأعلى",
-    subtype: "النوع الفرعي",
+    cost: "التكلفة",
     manaValue: "قيمة المانا",
-    manaCost: "تكلفة المانا",
+    manaCost: "تتضمن",
     keyword: "الكلمات المفتاحية",
     power: "القوة",
     toughness: "الصلابة",

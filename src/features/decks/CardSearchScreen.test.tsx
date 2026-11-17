@@ -18,6 +18,9 @@ const mockAction = jest.fn()
 const mockQuery = jest.fn()
 const mockClient = { action: mockAction, query: mockQuery }
 const mockConnection = { isWebSocketConnected: true }
+jest.mock("@legendapp/list/react-native", () =>
+  require("../../../test/support/legendListAsFlatList"),
+)
 jest.mock("convex/react", () => ({
   useConvex: () => mockClient,
   useAction: () => mockDetailsAction,
@@ -422,6 +425,37 @@ it("lists keywords from the card file, combines picked keywords, and works offli
   expect(mockQuery).not.toHaveBeenCalled()
 })
 
+it("keeps a picked keyword in its place so the pills beside it stay put", async () => {
+  const bird = (name: string, keywords: string) => ({
+    name,
+    scryfallId: name,
+    oracleId: name,
+    commanderEligibility: "ineligible",
+    keywords,
+  })
+  mockMagicCards = parseMagicCards(
+    JSON.stringify({
+      version: "1",
+      cards: [
+        bird("Bird A", "Flying\nWard"),
+        bird("Bird B", "Flying"),
+        bird("Bird C", "Vigilance"),
+      ],
+    }),
+  )
+  mockAction.mockResolvedValue([])
+  const view = chooser(deck.slice(0, 2))
+  fireEvent.press(view.getByTestId("card-filters-button"))
+  await act(async () => {})
+  const keywords = () =>
+    view.getAllByLabelText(/^(Flying|Ward|Vigilance)$/).map((pill) => pill.props.accessibilityLabel)
+  const before = keywords()
+
+  fireEvent.press(view.getByLabelText(before[1]))
+
+  expect(keywords()).toEqual(before)
+})
+
 it("trusts Scryfall's commander results for a filter the device can't check", async () => {
   jest.useFakeTimers()
   mockAction.mockImplementation((_ref, args) =>
@@ -430,14 +464,13 @@ it("trusts Scryfall's commander results for a filter the device can't check", as
   const view = chooser([])
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
-  fireEvent.changeText(view.getByTestId("card-filter-manaValue-min"), "2")
-  fireEvent.changeText(view.getByTestId("card-filter-manaValue-max"), "2")
+  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
   fireEvent.press(view.getByLabelText("Dismiss commander filters"))
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
     deviceId: expect.any(String),
     game: "mtg",
-    query: "is:commander f:commander mv>=2 mv<=2",
+    query: "is:commander f:commander mv=2",
   })
   expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
 })
@@ -616,15 +649,9 @@ it.each<[string, Partial<typeof filters>, string]>([
     "is:commander f:commander kw:flying kw:ward",
   ],
   [
-    "any of the picked types, every picked supertype, and a mana value range",
-    {
-      filters: {
-        type: ["Creature", "Artifact"],
-        supertype: ["Legendary"],
-        manaValue: [">=2", "<=4"],
-      },
-    },
-    "t:legendary (t:creature or t:artifact) mv>=2 mv<=4",
+    "every picked type, and an exact mana value",
+    { filters: { type: ["Legendary", "Artifact", "Creature"], manaValue: [">=2", "<=2"] } },
+    "t:legendary t:artifact t:creature mv=2",
   ],
   [
     "a minimum power and a maximum toughness",
@@ -876,18 +903,22 @@ it("starts a deck's search on its format and lets the player pick other formats 
   await act(async () => {})
   expect(view.getByTestId("card-filter-format-modern").props.accessibilityState.selected).toBe(true)
   expect(view.getByText("Pauper")).toBeTruthy()
-  fireEvent.changeText(view.getByTestId("card-filter-manaValue-min"), "2")
-  fireEvent.changeText(view.getByTestId("card-filter-manaValue-min"), "")
+  // why: the card file hasn't loaded, so Type offers the basic types.
+  expect(view.getByTestId("card-filter-type-Creature")).toBeTruthy()
+  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
+  fireEvent.press(view.getByTestId("card-filter-manaValue-2"))
   expect(await lastQuery()).toBeUndefined()
-  fireEvent.press(view.getByTestId("card-filter-type-Creature"))
-  expect(await lastQuery()).toBe("f:modern t:creature")
-  expect(barText(view)).toBe("f:modern t:creature ")
+  expect(view.queryByTestId("card-filter-power->=")).toBeNull()
+  fireEvent.press(view.getByTestId("card-filter-power-1"))
+  fireEvent.press(view.getByTestId("card-filter-power->="))
+  expect(await lastQuery()).toBe("f:modern pow>=1")
+  expect(barText(view)).toBe("f:modern pow>=1 ")
   fireEvent.press(view.getByTestId("card-filter-format-legacy"))
-  expect(await lastQuery()).toBe("f:modern f:legacy t:creature")
+  expect(await lastQuery()).toBe("f:modern f:legacy pow>=1")
   fireEvent.press(view.getByTestId("card-filter-format-modern"))
   fireEvent.press(view.getByTestId("card-filter-format-legacy"))
   fireEvent.press(view.getByText("Done"))
-  expect(await lastQuery()).toBe("t:creature")
+  expect(await lastQuery()).toBe("pow>=1")
 })
 
 it("lights up the filters a player types as syntax", async () => {
@@ -904,11 +935,12 @@ it("lights up the filters a player types as syntax", async () => {
   fireEvent.press(view.getByTestId("card-filters-button"))
   await act(async () => {})
   expect(view.getByTestId("card-filter-type-Creature").props.accessibilityState.selected).toBe(true)
-  expect(view.getByTestId("card-filter-manaValue-max").props.value).toBe("2")
+  expect(view.getByTestId("card-filter-manaValue-2").props.accessibilityState.selected).toBe(true)
+  expect(view.getByTestId("card-filter-manaValue-<=").props.accessibilityState.selected).toBe(true)
   const color = (text: string) => StyleSheet.flatten(view.getByText(text).props.style).color
   expect(color("t:creature")).toBe(color("Type"))
   expect(color("Creature")).toBe(color("Type"))
-  expect(color("mv<=2")).toBe(color("Mana value"))
+  expect(color("mv<=2")).toBe(color("Cost"))
   expect(color("t:creature")).not.toBe(color("mv<=2"))
   expect(color("bolt")).toBe(darkColors.text)
   fireEvent.press(view.getByTestId("card-filter-type-Creature"))

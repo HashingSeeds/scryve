@@ -586,7 +586,7 @@ export function CurrentGameScreen({
               layoutVariant={layoutVariant}
               seatOrder={runtime.game.seatOrder}
               teams={teams}
-              disabled={menuOpen}
+              covered={menuOpen}
               isPlayerFoil={isFoil ? () => true : undefined}
               outState={outState}
               commanderDamage={

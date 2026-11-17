@@ -92,38 +92,13 @@ function readIdentity({ key, operator, value }: NonNullable<ReturnType<typeof te
   return { colors: COMMANDER_COLORS.filter((color) => letters.includes(color)), colorMatch }
 }
 
-/** why: the sheet writes a filter matching any of several picks as `(t:a or t:b)`, so that reads back too. */
-function readAnyGroup(
-  source: CardSource,
-  token: string,
-  filters: readonly CardFilterDefinition[],
-  cardOptionsFor: (filterId: string) => readonly string[],
-): FilterRead | undefined {
-  if (!/^\(.*\)$/.test(token)) return undefined
-  const parts = tokens(token.slice(1, -1))
-  if (parts.length < 3 || parts.some((part, index) => index % 2 === 1 && !/^or$/i.test(part)))
-    return undefined
-  const reads = parts.flatMap((part, index) => {
-    const typed = index % 2 === 0 ? term(part) : undefined
-    return typed ? [readFilterTerm(source, filters, typed, cardOptionsFor)] : []
-  })
-  const filter = reads[0]?.filter
-  const fits =
-    filter &&
-    filter.options !== "range" &&
-    filter.match === "any" &&
-    reads.length * 2 - 1 === parts.length &&
-    reads.every((read) => read?.filter === filter)
-  return fits ? { filter, options: reads.flatMap((read) => read?.options ?? []) } : undefined
-}
-
 /** why: a term the filter can't add without changing what the search means stays as typed syntax. */
 function fitsPicked({ filter, options }: FilterRead, current: readonly string[]) {
   if (filter.options === "range")
     return options.every(
       (option) => !current.some((bound) => bound.slice(0, 2) === option.slice(0, 2)),
     )
-  return filter.match === "all" || current.length === 0
+  return filter.match !== "count" || current.length === 0
 }
 
 function joinsWithOr(text: string) {
@@ -149,9 +124,7 @@ export function parseCardQuery(
       identity = colors
       continue
     }
-    const read = typed
-      ? readFilterTerm(source, filters, typed, cardOptionsFor)
-      : readAnyGroup(source, part, filters, cardOptionsFor)
+    const read = typed ? readFilterTerm(source, filters, typed, cardOptionsFor) : undefined
     const current = read ? (picked[read.filter.id] ?? []) : []
     if (read && fitsPicked(read, current)) {
       // why: a count filter keeps each copy, so `m>=rr` stays two red.
@@ -232,7 +205,7 @@ function termSection(
   const filter =
     readFilterTerm(source, filters, typed, cardOptionsFor)?.filter ??
     filters.find(({ id }) => source.get(id)?.keys.includes(key))
-  return filter ? (filter.group ?? filter.id) : "syntax"
+  return filter ? (filter.group?.id ?? filter.id) : "syntax"
 }
 
 /**

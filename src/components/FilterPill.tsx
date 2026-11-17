@@ -113,11 +113,14 @@ export function FilterButton({
 export function FilterGroup({
   heading,
   headingColor,
+  label,
   search,
   children,
 }: {
   heading?: string
   headingColor?: string
+  /** why: names one row of a section that holds several, under the section's heading. */
+  label?: string
   search?: ReactNode
   children: ReactNode
 }) {
@@ -132,6 +135,7 @@ export function FilterGroup({
           text={heading}
         />
       ) : null}
+      {label ? <Text size="xs" weight="medium" text={label} /> : null}
       {search}
       <View style={themed($chipWrap)}>{children}</View>
     </View>

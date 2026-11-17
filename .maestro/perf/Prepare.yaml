@@ -1,0 +1,36 @@
+# flow: Perf prepare
+# intent: after the dev client opens the bundle under test, get past its intro, its menu,
+# Android's nearby devices prompt, and first-run setup, onto a board.
+# Denying nearby keeps nearby play out of the numbers.
+appId: ${MAESTRO_APP_ID}
+---
+- repeat:
+    times: 15
+    while:
+      notVisible:
+        id: "game-menu-button"
+    commands:
+      - runFlow:
+          when:
+            visible: "Continue"
+          commands:
+            - tapOn: "Continue"
+      - runFlow:
+          when:
+            visible: "Toggle performance monitor"
+          commands:
+            - back
+      - runFlow:
+          when:
+            visible: "Don.t [Aa]llow"
+          commands:
+            - tapOn: "Don.t [Aa]llow"
+      - runFlow:
+          when:
+            visible: "What do you play?"
+          commands:
+            - tapOn:
+                id: "game-type-none"
+            - tapOn:
+                id: "what-you-play-start"
+      - waitForAnimationToEnd

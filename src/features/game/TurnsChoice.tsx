@@ -48,6 +48,8 @@ export function TurnsChoice({
             testID={choice.testID}
             tx={choice.tx}
             compact
+            // why: three modes share a phone-width row, and several languages need two lines for them.
+            TextProps={{ numberOfLines: 2 }}
             selected={mode === choice.mode}
             accessibilityRole="radio"
             accessibilityState={{ checked: mode === choice.mode }}

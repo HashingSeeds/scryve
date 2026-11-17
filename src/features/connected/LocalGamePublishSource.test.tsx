@@ -6,6 +6,7 @@ import type { LocalConnectFeed } from "@/screens/NewGameScreen"
 import { LocalGamePublishSource } from "./LocalGamePublishSource"
 
 const mockPublish = jest.fn()
+jest.mock("@/features/auth/AuthContext", () => ({ useAuthAccess: () => ({ configured: true }) }))
 jest.mock("convex/react", () => ({ useMutation: () => mockPublish }))
 const mockCreateLobbyIdentifiers = jest.fn()
 jest.mock("./identifiers", () => ({

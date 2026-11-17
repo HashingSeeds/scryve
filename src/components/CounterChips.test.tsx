@@ -120,6 +120,17 @@ describe("CounterChips", () => {
     expect(view.queryByTestId("counter-sheet-seat-1")).toBeNull()
   })
 
+  // why: web shrinks an SVG wider than its box, so a pouch that overflows draws smaller than the seat mark.
+  it.each([false, true])("fits the whole pouch inside the bag's box (compact: %s)", (compact) => {
+    const bag = chips(seat(), { compact }).getByTestId("seat-bag-seat-1")
+    const { width, borderWidth = 0, paddingHorizontal = 0 } = StyleSheet.flatten(bag.props.style)
+    const pouch = within(bag).UNSAFE_getByProps({ viewBox: "0 0 16 16" })
+
+    expect(Number(width) - 2 * (borderWidth + Number(paddingHorizontal))).toBeGreaterThanOrEqual(
+      pouch.props.width,
+    )
+  })
+
   it("keeps a sideways sheet's top-edge side clear of a notch, and its other side in place", () => {
     const insets = { top: 50, bottom: 0, left: 0, right: 0 }
     const view = chips(seat(), { contentRotation: -90, contentInsets: insets })
