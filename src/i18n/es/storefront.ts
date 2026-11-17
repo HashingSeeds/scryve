@@ -22,8 +22,9 @@ export default {
   listing: {
     appStoreName: "Scryve: contador de vidas TCG",
     playTitle: "Scryve: contador de vidas TCG",
-    subtitle: "Vidas y constructor de mazos",
-    shortDescription: "Lleva tus partidas de TCG, sin conexión o conectado.",
+    subtitle: "Mazos, estadísticas y torneos",
+    shortDescription:
+      "Contador de vidas para JCC y Commander, con estadísticas de mazos y torneos.",
     gameName: {
       mtg: "Magic: The Gathering",
       ygo: "Yu-Gi-Oh!",
@@ -33,7 +34,8 @@ export default {
       riftbound: "Riftbound",
     },
     description: {
-      players: "Toca para llevar las vidas de hasta {{maxPlayers}} jugadores.",
+      players:
+        "Un contador de vidas para hasta {{maxPlayers}} jugadores, con daño de comandante para Commander (EDH) y contadores de daño para Pokémon.",
       play: "Compartan un teléfono, conecten teléfonos en la misma red Wi-Fi para compartir las vidas, o inicia sesión para jugar desde cualquier lugar.",
       games: "Compatible con {{games}}.",
       decks: "Guarda tus mazos y consulta tu % de victorias y el historial de tus encuentros.",

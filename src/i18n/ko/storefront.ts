@@ -22,8 +22,8 @@ export default {
   listing: {
     appStoreName: "Scryve: 카드 게임 생명점 기록",
     playTitle: "Scryve: 카드 게임 생명점 카운터",
-    subtitle: "생명점 카운터와 덱 빌더",
-    shortDescription: "오프라인에서도, 기기를 연결해서도 카드 게임을 기록하세요.",
+    subtitle: "카운터 · 덱 · 통계 · 대회",
+    shortDescription: "TCG와 커맨더용 생명점 카운터. 덱 통계와 대회 기능까지 한 번에.",
     gameName: {
       mtg: "매직: 더 개더링",
       ygo: "유희왕",
@@ -33,9 +33,10 @@ export default {
       riftbound: "리프트바운드",
     },
     description: {
-      players: "탭하여 최대 {{maxPlayers}}명의 생명점을 기록하세요.",
+      players:
+        "최대 {{maxPlayers}}명까지 지원하는 생명점 카운터로, 커맨더(EDH)의 커맨더 피해와 포켓몬의 데미지 카운터도 사용할 수 있습니다.",
       play: "휴대폰 하나를 함께 쓰거나, 같은 Wi-Fi의 휴대폰끼리 연결해 생명점을 공유하거나, 로그인해서 어디서든 플레이하세요.",
-      games: "{{games}}을(를) 지원합니다.",
+      games: "{{games}} 지원.",
       decks: "덱을 저장하고 승률과 매치 기록을 확인하세요.",
       events:
         "휴대폰으로 스위스 라운드나 조 이벤트를 진행하세요. 인터넷이 없는 매장 Wi-Fi에서도 가능합니다. 플레이어는 각자 휴대폰으로 결과를 보고하고, 매장 TV에 대진, 타이머, 순위를 표시할 수 있습니다.",

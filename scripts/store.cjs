@@ -48,6 +48,33 @@ const APPLE_LOCALES = {
   ar: ["ar-SA"],
 }
 const LIMITS = { description: 4000, releaseNotes: 4000, keywords: 100 }
+// why: keywords may name these games and no others, even once more games release.
+const KEYWORD_GAMES = ["mtg", "ygo", "pokemon"]
+
+// why: the App Store already searches the name and subtitle, so a keyword repeating their words wastes characters; and keywords name only KEYWORD_GAMES.
+function keywordProblems(locale, copy, keywords) {
+  const words = (text) =>
+    text
+      .toLocaleLowerCase(locale)
+      .split(/[\s,:：・·、&＆!()]+/u)
+      .filter(Boolean)
+  const taken = new Set([...words(copy[locale].appStoreName), ...words(copy[locale].subtitle)])
+  const otherGames = new Set(
+    [locale, SOURCE_LOCALE].flatMap((source) =>
+      Object.entries(copy[source].gameNames)
+        .filter(([id]) => !KEYWORD_GAMES.includes(id))
+        .flatMap(([id, name]) => [id, ...words(name).filter((word) => [...word].length > 3)]),
+    ),
+  )
+  return keywords.split(",").flatMap((keyword) => {
+    const word = keyword.toLocaleLowerCase(locale)
+    if (taken.has(word))
+      return [`${locale}: keyword "${keyword}" is already in the name or subtitle`]
+    if (otherGames.has(word))
+      return [`${locale}: keyword "${keyword}" names a game outside KEYWORD_GAMES`]
+    return []
+  })
+}
 
 function releasedGames() {
   const { SYSTEMS, SYSTEM_IDS } = loadModule(path.join(ROOT, "convex/lib/systems/definitions.ts"))
@@ -94,6 +121,7 @@ function storeCopy(locale) {
       .join("\n\n"),
     releaseNotes: listing.whatsNew,
     subscriptionTitle: paywall.title,
+    gameNames: listing.gameName,
   }
 }
 
@@ -112,6 +140,7 @@ function allCopy() {
           ]
         : []),
       ...(words && /,\s/.test(words) ? [`${locale}: keywords have a space after a comma`] : []),
+      ...(words ? keywordProblems(locale, copy, words) : []),
       ...(words && [...words].length > LIMITS.keywords
         ? [
             `${locale}: keywords are ${[...words].length} characters; the limit is ${LIMITS.keywords}`,

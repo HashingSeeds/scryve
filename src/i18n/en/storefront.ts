@@ -32,16 +32,23 @@ const storefront = {
   listing: {
     // The app's name on the App Store. At most 30 characters.
     // ja: Use exactly: Scryve TCGライフカウンター＆戦績管理
+    // fr: Use exactly: Scryve : compteur de vie JCC
+    // ar: Use exactly: Scryve: عداد نقاط الحياة
     appStoreName: "Scryve: TCG Life Tracker",
     // The app's name on Google Play. At most 30 characters.
     // ja: Use exactly: Scryve TCGライフカウンター＆戦績管理
+    // fr: Use exactly: Scryve : compteur de vie JCC
+    // ar: Use exactly: Scryve: عداد نقاط الحياة
     playTitle: "Scryve: TCG Life Counter",
-    // The line under the app's name on the App Store. At most 30 characters.
+    // The line under the app's name on the App Store. At most 30 characters. The App Store already searches the words in the app's name, so use none of them here.
     // ja: Use exactly: ダメカン・デッキ管理・勝率分析
-    subtitle: "Life counter and deck builder",
+    // es: Use exactly: Mazos, estadísticas y torneos
+    // ko: Use exactly: 카운터 · 덱 · 통계 · 대회
+    // ar: Separate the items with · instead of و, so each word stands alone in search.
+    subtitle: "Counter, decks, stats & events",
     // Google Play's one-line summary. At most 80 characters.
     // ja: Use: スマホ1台でライフとダメカンを管理。デッキごとの勝率や戦績も記録できます。
-    shortDescription: "Track TCG games, offline or connected.",
+    shortDescription: "Life counter for TCGs and Commander, with deck stats and tournaments.",
     // Each game's full official name in your language, as its publisher prints it.
     gameName: {
       mtg: "Magic: The Gathering",
@@ -53,10 +60,13 @@ const storefront = {
     },
     // Paragraphs of the store description, in order.
     description: {
+      // Commander (EDH) is a Magic format. Keep EDH in Latin letters.
       // ja: Life and damage counters: ライフやダメカン.
-      players: "Tap to track life for up to {{maxPlayers}} players.",
+      players:
+        "A life counter for up to {{maxPlayers}} players, with commander damage for Commander (EDH) and damage counters for Pokémon.",
       play: "Share one phone, connect phones on the same Wi-Fi to share life totals, or sign in to play from anywhere.",
       // {{games}} is a list of full game names, already translated.
+      // ko: Use exactly: {{games}} 지원.
       games: "Works with {{games}}.",
       decks: "Save your decks and track win rates and match records.",
       // A store TV is a TV in a game store showing the event to everyone.

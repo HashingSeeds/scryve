@@ -20,12 +20,13 @@ export default {
     privacy: "Confidentialité",
   },
   listing: {
-    appStoreName: "Scryve : Points de vie JCC",
-    playTitle: "Scryve : Compteur JCC",
-    subtitle: "Points de vie et decks",
-    shortDescription: "Suivez vos parties de JCC, hors ligne ou en ligne.",
+    appStoreName: "Scryve : compteur de vie JCC",
+    playTitle: "Scryve : compteur de vie JCC",
+    subtitle: "Decks, stats et événements",
+    shortDescription:
+      "Compteur de points de vie pour JCC et Commander, avec stats de deck et tournois.",
     gameName: {
-      mtg: "Magic: The Gathering",
+      mtg: "Magic : l’Assemblée",
       ygo: "Yu-Gi-Oh!",
       pokemon: "JCC Pokémon",
       lorcana: "Disney Lorcana",
@@ -33,7 +34,8 @@ export default {
       riftbound: "Riftbound",
     },
     description: {
-      players: "Touchez pour suivre les points de vie de {{maxPlayers}} joueurs maximum.",
+      players:
+        "Un compteur de points de vie pour jusqu’à {{maxPlayers}} joueurs, avec blessures de commandant pour Commander (EDH) et marqueurs de dégâts pour Pokémon.",
       play: "Partagez un seul téléphone, connectez des téléphones sur le même Wi-Fi pour partager les points de vie, ou connectez-vous pour jouer de n’importe où.",
       games: "Compatible avec {{games}}.",
       decks: "Enregistrez vos decks et suivez vos taux de victoire et vos résultats de match.",
