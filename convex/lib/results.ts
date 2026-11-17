@@ -208,6 +208,7 @@ export async function resultDeckKey(
 async function gameResultSource(ctx: MutationCtx, summary: Doc<"gameSummaries">) {
   const game = await ctx.db.get(summary.gameId)
   if (game?.mode !== "local") return "connected" as const
+  if (summary.nearby) return "nearby" as const
   const players = await ctx.db
     .query("gamePlayers")
     .withIndex("by_game", (q) => q.eq("gameId", summary.gameId))

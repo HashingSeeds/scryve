@@ -294,6 +294,7 @@ describe("buildFinishedLocalGameSnapshot", () => {
       account: { ownerId: "owner", mePlayerId: game.players[0].id },
     })
     expect(snapshot.freeMulligans).toBe("first")
+    expect(snapshot.nearby).toBe(true)
     expect(snapshot.players.map(({ mulligans }) => mulligans)).toEqual([undefined, undefined, 2])
   })
 

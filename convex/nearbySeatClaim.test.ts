@@ -52,6 +52,33 @@ async function nearbyGame(players?: Players, publicId = PUBLIC_ID): Promise<Publ
   }
 }
 
+it("marks a nearby game in History for the host and a claimed guest, with or without seat passes", async () => {
+  const t = makeConvexTest()
+  const host = await signedIn(t, "host")
+  const guest = await signedIn(t, "guest")
+  const sources = async (actor: typeof host) =>
+    (
+      await actor.query(api.history.entries, { paginationOpts: { numItems: 10, cursor: null } })
+    ).page.map((entry) => (entry.kind === "game" && entry.nearby ? "nearby" : "local"))
+
+  await host.mutation(api.games.publishFinishedLocalGame, await nearbyGame())
+  await guest.mutation(api.games.claimNearbySeat, { publicId: PUBLIC_ID, token: GUEST_TOKEN })
+  expect(await sources(host)).toEqual(["nearby"])
+  expect(await sources(guest)).toEqual(["nearby"])
+
+  const [me, other] = (await nearbyGame()).players
+  const noPasses = [me, { ...other, seatPassHash: undefined }]
+  const second = "lan_0123456789abcdef0123456789abcdef-2"
+  await host.mutation(api.games.publishFinishedLocalGame, {
+    ...(await nearbyGame(noPasses, second)),
+    nearby: true,
+  })
+  await host.mutation(api.games.publishFinishedLocalGame, {
+    ...(await nearbyGame(noPasses, "local_game_0123456789")),
+  })
+  expect((await sources(host)).sort()).toEqual(["local", "nearby", "nearby"])
+})
+
 async function ownedDeck(actor: Awaited<ReturnType<typeof signedIn>>, format = "commander") {
   const deckId = await actor.mutation(api.decks.create, { name: "Atraxa", format })
   const versionId = await actor.mutation(api.decks.saveVersion, { deckId, cards: [] })

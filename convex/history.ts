@@ -119,6 +119,7 @@ export const entries = query({
           ? { winnerPlayerIds: summary.winnerPlayerIds }
           : {}),
         ...(summary.turnGroups ? { turnGroups: summary.turnGroups } : {}),
+        ...(summary.nearby ? { nearby: true as const } : {}),
       })
     }
     return {

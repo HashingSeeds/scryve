@@ -364,6 +364,7 @@ export default defineSchema({
     winnerPlayerIds: v.optional(v.array(v.id("gamePlayers"))),
     matchId: v.optional(v.id("matches")),
     turnGroups: v.optional(turnGroupsValidator),
+    nearby: v.optional(v.literal(true)),
   })
     .index("by_game", ["gameId"])
     .index("by_public_id", ["publicId"]),
