@@ -148,7 +148,7 @@ export function Header(props: HeaderProps) {
 
   const titleContent = titleTx ? translate(titleTx, titleTxOptions) : title
   const centeredInset = Math.max(spacing.xxl, actionWidths.left, actionWidths.right)
-  // why: web can't shrink a title to fit, so a title that fills its centered space gives up centering and takes the room beside the shorter action. It stays off-center once moved, since its width never drops below the centered space.
+  // why: web can't shrink a title to fit, so a title that fills its centered space gives up centering and takes the room beside the shorter action. Once moved, the same title stays off center, since its width never drops below the centered space.
   const offCenter =
     centered &&
     Platform.OS === "web" &&

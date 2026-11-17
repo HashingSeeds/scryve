@@ -10,6 +10,7 @@ import {
 } from "react"
 import {
   ImageStyle,
+  Platform,
   StyleProp,
   // eslint-disable-next-line no-restricted-imports
   TextInput,
@@ -267,8 +268,8 @@ const $inputStyle: ThemedStyle<TextStyle> = ({ colors, typography, spacing }) =>
   fontFamily: typography.primary.normal,
   color: colors.text,
   fontSize: 16,
-  // why: react-native-web inputs use dir="auto", so Latin text in an RTL app would otherwise align left.
-  textAlign: textStart,
+  // why: react-native-web inputs use dir="auto", so Latin text in an RTL app would otherwise align left. Native follows the layout direction already, and Android would pin "left" to the physical left.
+  ...(Platform.OS === "web" && { textAlign: textStart }),
   // https://github.com/facebook/react-native/issues/21720#issuecomment-532642093
   paddingVertical: 0,
   paddingHorizontal: 0,
