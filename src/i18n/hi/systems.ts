@@ -4,7 +4,7 @@ import type { LocaleNamespace } from "../localeNamespace"
 export default {
   noSystem: "कोई सिस्टम नहीं",
   gameName: {
-    mtg: "मैजिक",
+    mtg: "Magic",
     ygo: "यू-गी-ओह!",
     pokemon: "पोकेमॉन",
     lorcana: "लोरकाना",

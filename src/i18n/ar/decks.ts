@@ -681,7 +681,7 @@ export default {
     modeBrowse: "تصفّح",
     modeImport: "استيراد",
     modeBuild: "بناء",
-    linkHelperMtg: "روابط HTTPS لمجموعات ماجيك العامة. لمواقع أخرى، الصق قائمة نصية مصدّرة.",
+    linkHelperMtg: "روابط HTTPS لمجموعات Magic العامة. للمواقع الأخرى، الصق ملف تصدير نصيًا.",
     linkHelperYgo:
       "روابط مجموعات YGOPRODeck العامة. لمواقع أخرى، الصق قائمة مصدّرة بصيغة YDK أو YDKe.",
     linkHelperPokemon:

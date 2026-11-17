@@ -145,7 +145,7 @@ export default {
       restorePro: {
         question: "استعادة اشتراك Scryve Pro",
         answer:
-          "افتح Scryve، وانتقل إلى حسابك، واختر Scryve Pro، ثم اضغط على استعادة المشتريات. استخدم حساب Apple أو Google نفسه الذي تمت به عملية الشراء الأصلية.",
+          "افتح Scryve، وانتقل إلى الحساب، واختر اشتراك Scryve Pro، ثم اضغط على استعادة المشتريات. استخدم حساب Apple أو Google نفسه الذي أجرى عملية الشراء الأصلية.",
       },
       manageSubscription: {
         question: "إدارة الاشتراك أو إلغاؤه",

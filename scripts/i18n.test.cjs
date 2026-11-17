@@ -185,6 +185,17 @@ test("rejects translations that drop, rename, or miss placeholders and plural fo
   )
 })
 
+test("rejects translations longer than a note's character limit", () => {
+  const name = translationUnits(
+    { name: "Scryve" },
+    { name: [{ text: "At most 10 characters." }] },
+  ).get("name")
+  assert.deepEqual(validateUnit(name, { name: "Scryve Pro" }, "fr"), [])
+  assert.deepEqual(validateUnit(name, { name: "Scryve : le compteur" }, "fr"), [
+    "name: is 20 characters; the limit is 10",
+  ])
+})
+
 test("rejects numbers typed into copy for languages that write their own digits", () => {
   const seats = translationUnits({
     seats_one: "{{count}} seat",
@@ -390,5 +401,21 @@ test("never reads a key file the choice does not need", () => {
       readConsoleKey: () => "console",
     }),
     "console",
+  )
+})
+
+test("keeps a glossary name in Latin script even when the name has a colon", () => {
+  const glossary = {
+    rules: {},
+    terms: { game: { hi: "Magic: The Gathering: Magic: The Gathering (short: Magic)" } },
+  }
+  const unit = translationUnits({ games: "Works with Magic: The Gathering." }).get("games")
+  assert.deepEqual(
+    validateUnit(unit, { games: "Magic: The Gathering के साथ काम करता है।" }, "hi", glossary),
+    [],
+  )
+  assert.deepEqual(
+    validateUnit(unit, { games: "Magic: The Bathering के साथ काम करता है।" }, "hi", glossary),
+    ['games: left "Bathering" in Latin script'],
   )
 })

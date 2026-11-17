@@ -143,7 +143,7 @@ export default {
       restorePro: {
         question: "Restaurer Scryve Pro",
         answer:
-          "Ouvrez Scryve, allez dans votre compte, choisissez Scryve Pro, puis touchez Restaurer les achats. Utilisez le même compte Apple ou Google que pour l’achat initial.",
+          "Ouvrez Scryve, allez dans votre compte, choisissez Scryve Pro, puis touchez Restaurer les achats. Utilisez le même compte Apple ou Google que celui qui a effectué l’achat initial.",
       },
       manageSubscription: {
         question: "Gérer ou résilier un abonnement",

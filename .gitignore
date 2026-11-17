@@ -116,3 +116,6 @@ build-*.tar.gz
 
 # Local wrangler state and temp output
 .wrangler/
+
+# why: pulled from App Store Connect with eas metadata:pull; it can hold review contact details.
+store.config.json

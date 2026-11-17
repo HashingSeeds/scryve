@@ -154,6 +154,8 @@ const account = {
       heading: "Frequently asked questions",
       restorePro: {
         question: "Restore Scryve Pro",
+        // ja: Quote the button name: 「購入を復元」をタップ.
+        // hi: Quote the button name: “रिस्टोर परचेज़ेज़” पर टैप करें.
         answer:
           "Open Scryve, go to your account, choose Scryve Pro, and tap Restore Purchases. Use the same Apple or Google account that made the original purchase.",
       },
