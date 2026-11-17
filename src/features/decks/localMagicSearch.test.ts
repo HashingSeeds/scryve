@@ -128,12 +128,16 @@ const searchTyped = (search: Partial<MagicSearch>) =>
 
 test.each<[string, Partial<MagicSearch>, string[]]>([
   [
-    "creatures or sorceries",
-    { filters: { type: ["Creature", "Sorcery"] } },
-    ["Gisela, Blade of Goldnight", "Gitaxian Probe", "Goblin Guide", "Grave Titan"],
+    "creatures",
+    { filters: { type: ["Creature"] } },
+    ["Gisela, Blade of Goldnight", "Goblin Guide", "Grave Titan"],
   ],
-  ["legendary", { filters: { supertype: ["Legendary"] } }, ["Gisela, Blade of Goldnight"]],
-  ["a subtype", { filters: { subtype: ["Goblin"] } }, ["Goblin Guide"]],
+  [
+    "legendary creatures",
+    { filters: { type: ["Legendary", "Creature"] } },
+    ["Gisela, Blade of Goldnight"],
+  ],
+  ["a subtype", { filters: { type: ["Goblin"] } }, ["Goblin Guide"]],
   [
     "mana value 6 to 7",
     { filters: { manaValue: [">=6", "<=7"] } },

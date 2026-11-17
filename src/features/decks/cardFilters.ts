@@ -2,8 +2,8 @@ import type { CardFilterDefinition } from "../../../convex/lib/systems"
 
 export type CardFilterState = Readonly<Record<string, readonly string[]>>
 
-/** why: a range filter keeps its bounds as picked options, so ">=3" and "<=5" read as 3 to 5. */
-export type RangeBound = ">=" | "<="
+/** why: a range filter keeps its bounds as picked options: ">=3", "<=3", or both for exactly 3. */
+export type RangeMode = "<=" | "=" | ">="
 
 /** why: one catalog's half of a filter: where a card keeps the value, and the search keys that ask for it. The first key is the one Scryve writes. */
 export type FilterField<Card> = {
@@ -42,8 +42,7 @@ function matchesOption(value: readonly string[] | number, option: string) {
   return option.startsWith(">=") ? value >= bound : value <= bound
 }
 
-function filterTerm(filter: CardFilterDefinition, key: string, option: string) {
-  if (filter.options === "range") return `${key}${option}`
+function filterTerm(key: string, option: string) {
   const value = option.replace(/["\\]/g, "").toLocaleLowerCase()
   return `${key}:${/^[a-z0-9-]+$/.test(value) ? value : `"${value}"`}`
 }
@@ -66,10 +65,7 @@ export function matchesCardFilters<Card>(
           options.every((option) => occurrences(face, option) >= occurrences(options, option)),
         )
       )
-    const has = (option: string) => matchesOption(value, option)
-    return filter.options !== "range" && filter.match === "any"
-      ? options.some(has)
-      : options.every(has)
+    return options.every((option) => matchesOption(value, option))
   })
 }
 
@@ -91,10 +87,10 @@ export function filterTerms(
               .toLocaleLowerCase()}`,
           ]
         : []
-    const terms = key ? options.map((o) => filterTerm(filter, key, o)) : []
-    return filter.options === "range" || filter.match === "all" || terms.length < 2
-      ? terms
-      : [`(${terms.join(" or ")})`]
+    if (!key) return []
+    if (filter.options !== "range") return options.map((option) => filterTerm(key, option))
+    const range = rangeValue(options)
+    return range?.mode === "=" ? [`${key}=${range.value}`] : options.map((o) => `${key}${o}`)
   })
 }
 
@@ -167,7 +163,7 @@ export function termSuggestions(
   )
   return [...options.filter(({ at }) => at === 0), ...options.filter(({ at }) => at > 0)]
     .slice(0, limit)
-    .map(({ filter, option }) => ({ filter, option, term: filterTerm(filter, key, option) }))
+    .map(({ filter, option }) => ({ filter, option, term: filterTerm(key, option) }))
 }
 
 export function pickedCount(filters: readonly CardFilterDefinition[], picked: CardFilterState) {
@@ -180,17 +176,17 @@ export function pickedCount(filters: readonly CardFilterDefinition[], picked: Ca
   }, 0)
 }
 
-/** why: filters sharing a group render together, under the heading of the filter the group names. */
+/** why: filters sharing a group render together as rows under the group's heading. */
 export function filterGroups(filters: readonly CardFilterDefinition[]) {
   const groups = new Map<
     string,
-    { heading: CardFilterDefinition; filters: CardFilterDefinition[] }
+    { heading: { id: string; label: string }; filters: CardFilterDefinition[] }
   >()
   for (const filter of filters) {
-    const id = filter.group ?? filter.id
-    const group = groups.get(id)
+    const heading = filter.group ?? filter
+    const group = groups.get(heading.id)
     if (group) group.filters.push(filter)
-    else groups.set(id, { heading: filters.find((f) => f.id === id) ?? filter, filters: [filter] })
+    else groups.set(heading.id, { heading, filters: [filter] })
   }
   return [...groups.values()]
 }
@@ -199,13 +195,24 @@ export function toggleOption(picked: readonly string[], option: string) {
   return picked.includes(option) ? picked.filter((value) => value !== option) : [...picked, option]
 }
 
-export function rangeBound(picked: readonly string[], bound: RangeBound) {
-  return picked.find((option) => option.startsWith(bound))?.slice(bound.length)
+function bound(picked: readonly string[], prefix: ">=" | "<=") {
+  const option = picked.find((value) => value.startsWith(prefix))
+  return option === undefined ? undefined : Number(option.slice(2))
 }
 
-export function withRangeBound(picked: readonly string[], bound: RangeBound, value?: number) {
-  const kept = picked.filter((option) => !option.startsWith(bound))
-  return value === undefined ? kept : [...kept, `${bound}${value}`]
+/** why: the sheet shows a range as one comparison. A typed span such as `mv>=2 mv<=4` shows its minimum until the sheet changes it. */
+export function rangeValue(
+  picked: readonly string[],
+): { mode: RangeMode; value: number } | undefined {
+  const min = bound(picked, ">=")
+  const max = bound(picked, "<=")
+  if (min !== undefined) return { mode: min === max ? "=" : ">=", value: min }
+  return max === undefined ? undefined : { mode: "<=", value: max }
+}
+
+export function rangeOptions(mode: RangeMode, value: number | undefined) {
+  if (value === undefined) return []
+  return mode === "=" ? [`>=${value}`, `<=${value}`] : [`${mode}${value}`]
 }
 
 const optionCache = new WeakMap<

@@ -870,7 +870,7 @@ export function CardSearch({
                       ? deckFormatLabel(game, suggestion.option)
                       : suggestion.option
                   }
-                  color={sectionColor(suggestion.filter.group ?? suggestion.filter.id)}
+                  color={sectionColor(suggestion.filter.group?.id ?? suggestion.filter.id)}
                   onPress={() => setQuery(suggestion.text)}
                 />
               ))}

@@ -3,7 +3,7 @@ import { SCRYFALL_SOURCE } from "./cardSources"
 import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
 const cardOptions: Record<string, readonly string[]> = {
-  subtype: ["Lizard", "Elf", "Time Lord"],
+  type: ["Creature", "Sorcery", "Artifact", "Legendary", "Lizard", "Elf", "Time Lord"],
   keyword: ["Flying", "First strike"],
 }
 const optionsFor = (id: string) => cardOptions[id] ?? []
@@ -15,15 +15,13 @@ const suggest = (text: string) =>
 test("reads the terms the sheet writes, in any case, and keeps the name", () => {
   expect(
     parse(
-      'F:Modern t:LEGENDARY (t:creature or t:artifact) t:lizard mv>=2 cmc<=4 pow=3 kw:"first strike" id<=ur bolt',
+      'F:Modern t:LEGENDARY t:creature t:lizard mv>=2 cmc<=4 pow=3 kw:"first strike" id<=ur bolt',
     ),
   ).toEqual({
     rest: "bolt",
     filters: {
       format: ["modern"],
-      supertype: ["Legendary"],
-      type: ["Creature", "Artifact"],
-      subtype: ["Lizard"],
+      type: ["Legendary", "Creature", "Lizard"],
       manaValue: [">=2", "<=4"],
       power: [">=3", "<=3"],
       keyword: ["First strike"],
@@ -36,11 +34,15 @@ test("reads the terms the sheet writes, in any case, and keeps the name", () => 
 test("writes filters before the name, and reads its own text back", () => {
   const query = {
     rest: "bolt",
-    filters: { type: ["Creature", "Artifact"], subtype: ["Time Lord"], manaValue: ["<=2"] },
+    filters: {
+      type: ["Creature", "Artifact", "Time Lord"],
+      manaValue: ["<=2"],
+      power: [">=3", "<=3"],
+    },
     colors: ["U", "R"],
   }
   const text = formatCardQuery(SCRYFALL_SOURCE, query, "exact", MAGIC_CARD_FILTERS)
-  expect(text).toBe('(t:creature or t:artifact) t:"time lord" mv<=2 id=ur bolt')
+  expect(text).toBe('t:creature t:artifact t:"time lord" mv<=2 pow=3 id=ur bolt')
   expect(parse(text)).toEqual({ ...query, colorMatch: "exact" })
 })
 
@@ -57,12 +59,7 @@ test("a mana cost keeps each copy of a symbol, in color order", () => {
 })
 
 test.each([
-  [
-    "a second subtype, which Scryfall reads as both",
-    "t:elf t:lizard",
-    { subtype: ["Elf"] },
-    "t:lizard",
-  ],
+  ["a group joined by or", "(t:elf or t:lizard)", {}, "(t:elf or t:lizard)"],
   ["a negated term", "-t:creature bolt", {}, "-t:creature bolt"],
   ["a key the sheet has no control for", "o:flying", {}, "o:flying"],
   ["a mana value bound given twice", "mv>=2 mv>=3", { manaValue: [">=2"] }, "mv>=3"],
@@ -83,11 +80,14 @@ test("leaves everything as typed when a top-level or joins it, and groups it und
     MAGIC_CARD_FILTERS,
   )
   expect(text).toBe("f:modern (t:elf or t:goblin)")
-  expect(parse(text).filters).toEqual({ format: ["modern"], subtype: ["Elf", "goblin"] })
+  expect(parse(text)).toMatchObject({
+    rest: "(t:elf or t:goblin)",
+    filters: { format: ["modern"] },
+  })
 })
 
 test.each([
-  ["a subtype", "f:modern t:liz", ["f:modern t:lizard "]],
+  ["a type word", "f:modern t:liz", ["f:modern t:lizard "]],
   [
     "a word inside an option, after those starting with it",
     "t:or",
@@ -119,7 +119,7 @@ test("colors each term by its sheet section, and keeps the text whole", () => {
     ["id<=wur", "colors"],
     ["t:creature", "type"],
     ["t:elf", "type"],
-    ["mv>3", "manaValue"],
+    ["mv>3", "cost"],
     ['-kw:"first strike"', "keyword"],
     ["o:draw", "syntax"],
     ["bolt", undefined],
