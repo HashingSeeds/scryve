@@ -62,10 +62,16 @@ const common = {
     openHint: {
       format: "Opens the format choices",
       commanderColor: "Opens the commander color choices",
-      addTo: "Opens the add to choices",
-      changeBy: "Opens the change by choices",
-      thisIsMe: "Opens the this is me choices",
-      yourDeck: "Opens the your deck choices",
+      // es: Quote the visible label exactly: "Abre las opciones de «Añadir a»".
+      addTo: "Opens the choices for where to add the card",
+      // es: The field is labelled "Per tap" (play:newGame.changeBy, "Por toque"). Use "Abre las opciones de «Por toque»".
+      changeBy: "Opens the per-tap amount choices",
+      // ko: '내 자리 선택지를 엽니다'.
+      // es: Quote the visible label exactly: "Abre las opciones de «Soy yo»".
+      thisIsMe: "Opens the choice of which seat is yours",
+      yourDeck: "Opens your deck choices",
+      // ja: Game system means the game: ゲームの選択肢を開きます. Never システム.
+      // fr: "System" is the game (Magic, Pokémon…): say jeu, never système (Aucun jeu; salon sans jeu choisi).
       system: "Opens the system choices",
       list: "Opens the list choices",
       planechase: "Opens the planar deck choices",
@@ -75,10 +81,16 @@ const common = {
     closeLabel: {
       format: "Close format choices",
       commanderColor: "Close commander color choices",
-      addTo: "Close add to choices",
-      changeBy: "Close change by choices",
-      thisIsMe: "Close this is me choices",
+      // es: Quote the visible label exactly: "Cerrar opciones de «Añadir a»".
+      addTo: "Close the choices for where to add the card",
+      // es: The field is labelled "Per tap" (play:newGame.changeBy, "Por toque"). Use "Cerrar opciones de «Por toque»".
+      changeBy: "Close the per-tap amount choices",
+      // ko: '내 자리 선택지 닫기'.
+      // es: Quote the visible label exactly: "Cerrar opciones de «Soy yo»".
+      thisIsMe: "Close the choice of which seat is yours",
       yourDeck: "Close your deck choices",
+      // ja: Game system means the game: ゲームの選択肢を閉じる. Never システム.
+      // fr: "System" is the game (Magic, Pokémon…): say jeu, never système (Aucun jeu; salon sans jeu choisi).
       system: "Close system choices",
       list: "Close list choices",
       planechase: "Close planar deck choices",

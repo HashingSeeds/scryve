@@ -1,4 +1,5 @@
 import { SelectField, type SelectOption } from "@/components/SelectField"
+import { modeDeckName, modeProductName } from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 
 import { PLANAR_DECKS, SCHEME_DECKS } from "../../../convex/lib/modeDecks"
@@ -77,18 +78,23 @@ const planarOptions = (): SelectOption[] => [
   { id: "own", label: translate("play:newGame.ownPlanarDeck") },
   ...PRODUCTS.flatMap((product) => {
     const decks = PLANAR_DECKS.filter((deck) => deck.product === product)
+    const productName = modeProductName(decks[0])
     return [
       {
         id: `${ALL}${product}`,
-        label: translate("play:newGame.allDecks", { product, count: decks.length }),
+        label: translate("play:newGame.allDecks", { product: productName, count: decks.length }),
       },
-      ...decks.map((deck) => ({ id: deck.id, label: deck.name, detail: product })),
+      ...decks.map((deck) => ({ id: deck.id, label: modeDeckName(deck), detail: productName })),
     ]
   }),
 ]
 
 const schemeOptions = (): SelectOption[] => [
-  ...SCHEME_DECKS.map((deck) => ({ id: deck.id, label: deck.name, detail: deck.product })),
+  ...SCHEME_DECKS.map((deck) => ({
+    id: deck.id,
+    label: modeDeckName(deck),
+    detail: modeProductName(deck),
+  })),
   { id: "own", label: translate("play:newGame.ownSchemeDeck") },
 ]
 

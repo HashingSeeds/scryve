@@ -958,7 +958,9 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(ownedAddOne)
     expect(mockChangeLife).not.toHaveBeenCalled()
     reviewSyncIssues()
-    expect(screen.getByText("This game is lobby and is read-only on the board.")).toBeTruthy()
+    expect(
+      screen.getByText("This game hasn't started yet, so the board is read-only."),
+    ).toBeTruthy()
     fireEvent.press(screen.getByText("Close"))
     openConnectedMenu()
     expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)

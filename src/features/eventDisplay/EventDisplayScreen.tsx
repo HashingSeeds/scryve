@@ -15,6 +15,7 @@ import Head from "expo-router/head"
 
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { formatName } from "@/features/game/playSystems"
 import { formatRatio, formatRecord, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
@@ -30,7 +31,6 @@ import {
   standingsThroughRound,
   type EventClock,
 } from "../../../convex/lib/events/commands"
-import { formatDefinition } from "../../../convex/lib/systems"
 
 type EventView = NonNullable<FunctionReturnType<typeof api.events.board>>
 type Table = EventView["tables"][number]
@@ -179,7 +179,7 @@ function EventBoard({ eventId, s }: { eventId: Id<"events">; s: Styles }) {
 }
 
 function EventHeader({ event, s }: { event: EventView; s: Styles }) {
-  const format = formatDefinition(event.system, event.format)?.label ?? event.format
+  const format = formatName(event.system, event.format)
   const stage =
     event.status === "finished"
       ? translate("eventDisplay:final")

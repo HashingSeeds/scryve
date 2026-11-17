@@ -36,6 +36,7 @@ import { useSheetPresence } from "@/components/useSheetPresence"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import {
   cardFilterLabel,
+  cardFilterOptionLabel,
   localizedDeckSections,
   playSystemShortLabel,
 } from "@/features/game/playSystems"
@@ -96,7 +97,6 @@ import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
 import { useMagicCards } from "./useMagicCards"
 import { api } from "../../../convex/_generated/api"
-import { deckFormatLabel } from "../../../convex/lib/deckGames"
 import {
   isSystemId,
   MAGIC_CARD_FILTERS,
@@ -865,11 +865,7 @@ export function CardSearch({
                 <FilterPill
                   key={suggestion.term}
                   testID={`card-search-suggestion-${suggestion.term}`}
-                  label={
-                    suggestion.filter.id === "format"
-                      ? deckFormatLabel(game, suggestion.option)
-                      : suggestion.option
-                  }
+                  label={cardFilterOptionLabel(game, suggestion.filter.id, suggestion.option)}
                   color={sectionColor(suggestion.filter.group ?? suggestion.filter.id)}
                   onPress={() => setQuery(suggestion.text)}
                 />
@@ -1175,16 +1171,15 @@ export function CardSearch({
                           ? []
                           : filter.options
                     }
-                    optionLabel={
-                      filter.id === "format"
-                        ? (option) => deckFormatLabel(game, option)
-                        : filter.id === "manaCost"
-                          ? (option) => {
-                              const symbol = SEARCH_COLORS.find((color) => color === option)
-                              return symbol ? colorLabel(symbol) : option
-                            }
+                    optionLabel={(option) => {
+                      const color =
+                        filter.id === "manaCost"
+                          ? SEARCH_COLORS.find((symbol) => symbol === option)
                           : undefined
-                    }
+                      return color
+                        ? colorLabel(color)
+                        : cardFilterOptionLabel(game, filter.id, option)
+                    }}
                     picked={picked[filter.id] ?? []}
                     onChange={(options) =>
                       changeQuery({ filters: { ...picked, [filter.id]: options } })

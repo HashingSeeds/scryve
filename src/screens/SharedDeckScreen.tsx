@@ -31,7 +31,7 @@ import {
   sharedDeckPayload,
   type SharedDeckView,
 } from "@/features/decks/sharedDecks"
-import { localizedDeckSections } from "@/features/game/playSystems"
+import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -39,7 +39,6 @@ import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
-import { deckFormatLabel, deckGame } from "../../convex/lib/deckGames"
 
 type SharedDeckScreenProps = {
   token: string
@@ -177,8 +176,8 @@ function SharedDeckList({
               size="xs"
               tone="dim"
               text={joinParts([
-                deckGame(game)?.shortLabel ?? game,
-                deckFormatLabel(game, format),
+                gameName(game),
+                formatName(game, format),
                 cardCountLabel(totalQuantity(cards)),
               ])}
             />

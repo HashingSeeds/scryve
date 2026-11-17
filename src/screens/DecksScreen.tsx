@@ -42,6 +42,7 @@ import { guestDeckLocalId, guestDeckRouteId, useGuestDecks } from "@/features/de
 import { useLocalDeckLeftovers } from "@/features/decks/localDeckSync"
 import { LocalDeckSyncHeader } from "@/features/decks/LocalDeckSyncHeader"
 import { useRecentDecks } from "@/features/decks/recentDecks"
+import { formatName, gameName } from "@/features/game/playSystems"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import type { BackAction } from "@/features/game/useBackToBoard"
 import { joinParts } from "@/i18n/format"
@@ -52,12 +53,7 @@ import { decorativeSvgProps } from "@/utils/decorativeSvgProps"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
-import {
-  DECK_GAME_LIST,
-  deckFormatLabel,
-  deckFormats,
-  DEFAULT_DECK_GAME,
-} from "../../convex/lib/deckGames"
+import { DECK_GAME_LIST, deckFormats, DEFAULT_DECK_GAME } from "../../convex/lib/deckGames"
 import { isSystemId, tracksResults, type SystemId } from "../../convex/lib/systems"
 
 type ShelfDeck = {
@@ -102,17 +98,12 @@ function deckSubtitle(deck: ShelfDeck, game: string, showGame: boolean) {
   const cards = deck.cardQuantity
     ? cardCountLabel(deck.cardQuantity)
     : translate("decks:shelf.emptyList")
-  const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel
+  const gameLabel = gameName(game)
   const versions =
     deck.versionCount && deck.versionCount > 1
       ? translate("decks:shelf.versionCount", { count: deck.versionCount })
       : null
-  return joinParts([
-    showGame ? gameLabel : null,
-    deckFormatLabel(game, deck.format),
-    cards,
-    versions,
-  ])
+  return joinParts([showGame ? gameLabel : null, formatName(game, deck.format), cards, versions])
 }
 
 function deckMarkerColor(game: string, { gameMenu: { actions } }: Theme["colors"]) {
@@ -131,13 +122,10 @@ function matchesSearch(deck: ShelfDeck, search: string) {
   const term = search.trim().toLocaleLowerCase()
   if (!term) return true
   const game = deck.game ?? DEFAULT_DECK_GAME
-  const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game
-  return [
-    deck.name,
-    gameLabel,
-    deckFormatLabel(game, deck.format),
-    ...(deck.commanderNames ?? []),
-  ].some((value) => value.toLocaleLowerCase().includes(term))
+  const gameLabel = gameName(game)
+  return [deck.name, gameLabel, formatName(game, deck.format), ...(deck.commanderNames ?? [])].some(
+    (value) => value.toLocaleLowerCase().includes(term),
+  )
 }
 
 function DeckRow({
@@ -621,7 +609,7 @@ export function DecksScreen({
     if (system === ALL_SYSTEMS) return []
     const known = deckFormats(system).map((candidate) => ({
       id: candidate.id,
-      label: candidate.label,
+      label: formatName(system, candidate.id),
     }))
     return [{ id: ALL_FORMATS, label: translate("decks:shelf.allFormats") }, ...known]
   }, [system])
@@ -629,7 +617,7 @@ export function DecksScreen({
     { id: ALL_SYSTEMS, label: translate("decks:shelf.allSystems") },
     ...DECK_GAME_LIST.filter((game) => isSystemVisible(game.id)).map((game) => ({
       id: game.id,
-      label: game.shortLabel,
+      label: gameName(game.id),
     })),
   ]
   const activeFormat = system === ALL_SYSTEMS ? ALL_FORMATS : format

@@ -133,7 +133,7 @@ describe("game summary", () => {
     expect(view.getByTestId("second-game-help")).toBeTruthy()
     expect(view.getByText("Having trouble?")).toBeTruthy()
     expect(view.queryByTestId("second-game-help-details")).toBeNull()
-    fireEvent.press(view.getByText("Open Help"))
+    fireEvent.press(view.getByText("Open Support"))
     expect(onOpenSupport).toHaveBeenCalledTimes(1)
     expect(view.queryByText("Having trouble?")).toBeNull()
     view.unmount()

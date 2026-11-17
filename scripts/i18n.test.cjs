@@ -324,6 +324,27 @@ test("a note that starts with a language code goes only to that language", () =>
   assert.equal(sourceOf(after, "ko"), sourceOf(before, "ko"))
 })
 
+test("fails English left in a non-Latin language unless it is a kept name or the glossary keeps it", () => {
+  const unit = translationUnits({ label: "Commander {{name}}" }).get("label")
+  const names = {
+    rules: {},
+    terms: {
+      "format names": {
+        en: ["Commander"],
+        ja: "Commander: コマンダー; Zombie Empire: Zombie Empire",
+      },
+    },
+  }
+  assert.deepEqual(validateUnit(unit, { label: "Commander {{name}}" }, "ja", names), [
+    'label: left "Commander" in Latin script',
+  ])
+  assert.deepEqual(
+    validateUnit(unit, { label: "Scryve コマンダー Zombie Empire HP {{name}}" }, "ja", names),
+    [],
+  )
+  assert.deepEqual(validateUnit(unit, { label: "Commander {{name}}" }, "es", names), [])
+})
+
 test("rejects Latin words left in Japanese, Korean, and Hindi, and unmatched quotes", () => {
   const unit = translationUnits({ label: "Monarch {{name}}" }).get("label")
   assert.deepEqual(validateUnit(unit, { label: "monarch {{name}}" }, "ja"), [

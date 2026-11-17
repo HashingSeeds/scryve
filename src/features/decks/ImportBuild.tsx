@@ -11,7 +11,7 @@ import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { localizedDeckSections } from "@/features/game/playSystems"
+import { formatName, localizedDeckSections } from "@/features/game/playSystems"
 import { type TxKeyPath } from "@/i18n"
 import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
@@ -33,7 +33,6 @@ import type { GuestDeckPayload } from "./guestDeck"
 import { lineCardName, type ImportProblem } from "./importLines"
 import { SaveDestination, type SaveDestinationState } from "./SaveDestination"
 import { useCardNameIndex } from "./useCardNameIndex"
-import { deckFormatLabel } from "../../../convex/lib/deckGames"
 
 type Card = GuestDeckPayload["cards"][number]
 
@@ -203,7 +202,7 @@ export function ImportBuild({
                 tone="dim"
                 testID="import-build-summary"
                 text={joinParts([
-                  deckFormatLabel(game, format),
+                  formatName(game, format),
                   cards ? cardCountLabel(totalQuantity(cards)) : undefined,
                   source,
                 ])}

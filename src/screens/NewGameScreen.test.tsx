@@ -1133,7 +1133,7 @@ describe("NewGameScreen", () => {
     closeOptions()
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("end-connected-hosted-game"))
-    expect(view.getByText("End this game?")).toBeTruthy()
+    expect(view.getByText("Abandon this game?")).toBeTruthy()
     fireEvent.press(view.getByTestId("cancel-connected-game-exit"))
     expectSetup(view, 3, 20)
 
