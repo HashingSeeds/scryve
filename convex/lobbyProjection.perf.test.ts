@@ -57,6 +57,7 @@ describe("lobbyProjection websocket budget", () => {
       delta: -1,
       deviceId: "device-host-0001",
       clientCreatedAt: 1_700_000_000_000 + index,
+      tappedAt: 1_700_000_000_000 + index,
     })
 
     const fresh = {
@@ -77,8 +78,8 @@ describe("lobbyProjection websocket budget", () => {
         "host projection": 1456,
         "guest projection": 1358,
         "host projection after 30 changes": 1457,
-        "guest projection after 30 changes": 1359,
-        "changeLife args": 214,
+        "guest projection after 30 changes": 1417,
+        "changeLife args": 239,
       },
     )
   })

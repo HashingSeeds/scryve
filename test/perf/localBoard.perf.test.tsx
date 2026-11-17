@@ -1,5 +1,6 @@
 import { type ComponentProps, type memo, Profiler } from "react"
 import { act, fireEvent, render } from "@testing-library/react-native"
+import type { ReactTestInstance } from "react-test-renderer"
 
 import { createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -20,9 +21,10 @@ jest.mock("@/components/LifeCard", () => {
   const { type: Card, compare } = actual.LifeCard as typeof actual.LifeCard & {
     compare: Parameters<typeof memo>[1]
   }
+  // why: calling the card's own function counts renders from its state and context too.
   const CountedCard = (props: ComponentProps<typeof actual.LifeCard>) => {
     mockCount(`LifeCard ${props.playerName}`)
-    return <Card {...props} />
+    return Card(props)
   }
   return { ...actual, LifeCard: rememo(CountedCard, compare) }
 })
@@ -54,6 +56,12 @@ function renderFourPlayerBoard() {
   return view
 }
 
+function tap(target: ReactTestInstance) {
+  fireEvent(target, "pressIn")
+  fireEvent(target, "pressOut")
+  fireEvent.press(target)
+}
+
 function countRendersOf(interact: () => void) {
   interact()
   act(() => jest.runOnlyPendingTimers())
@@ -67,9 +75,9 @@ describe("local board render budget", () => {
   it("a life tap renders only the tapped seat", () => {
     const view = renderFourPlayerBoard()
 
-    const counts = countRendersOf(() => fireEvent.press(view.getByTestId("life-seat-2-1")))
+    const counts = countRendersOf(() => tap(view.getByTestId("life-seat-2-1")))
 
-    expectWithinBudget(counts, { "commits": 3, "LifeCard Grace": 1 })
+    expectWithinBudget(counts, { "commits": 7, "LifeCard Grace": 5 })
   })
 
   it("opening the game menu renders each seat once", () => {

@@ -16,9 +16,10 @@ jest.mock("@/components/LifeCard", () => {
   const { type: Card, compare } = actual.LifeCard as typeof actual.LifeCard & {
     compare: Parameters<typeof memo>[1]
   }
+  // why: calling the card's own function counts renders from its state and context too.
   const CountedCard = (props: ComponentProps<typeof actual.LifeCard>) => {
     mockCount(`LifeCard ${props.playerName}`)
-    return <Card {...props} />
+    return Card(props)
   }
   return { ...actual, LifeCard: rememo(CountedCard, compare) }
 })
