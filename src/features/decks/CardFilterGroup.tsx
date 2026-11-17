@@ -99,6 +99,7 @@ function FilterGroupView({
           style={$suggestionRow}
           contentContainerStyle={themed($suggestionContent)}
           showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {numbers.map((value) => (
             <FilterPill
