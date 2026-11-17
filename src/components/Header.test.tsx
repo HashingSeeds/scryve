@@ -52,6 +52,35 @@ describe("Header", () => {
     expect(titleInset()).toBe(73)
     act(() => Dimensions.set({ window }))
   })
+
+  it("moves a web title off center once it fills the centered space", () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    const window = Dimensions.get("window")
+    Dimensions.set({ window: { ...window, fontScale: 1 } })
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <Header title="Add deck" leftTx="common:back" onLeftPress={jest.fn()} />
+      </ThemeProvider>,
+    )
+    const title = view.getByText("Add deck")
+    let wrapperNode = title.parent
+    while (wrapperNode && StyleSheet.flatten(wrapperNode.props.style)?.position !== "absolute") {
+      wrapperNode = wrapperNode.parent
+    }
+    const wrapper = () => StyleSheet.flatten(wrapperNode?.props.style)
+    const layout = (width: number) => ({ nativeEvent: { layout: { width } } })
+    act(() => {
+      fireEvent(view.getByLabelText("Back"), "layout", layout(120))
+      if (wrapperNode) fireEvent(wrapperNode, "layout", layout(390))
+      fireEvent(title, "layout", layout(140))
+    })
+    expect(wrapper()).toMatchObject({ paddingHorizontal: 120 })
+
+    act(() => fireEvent(title, "layout", layout(150)))
+    expect(wrapper()).toMatchObject({ paddingStart: 120 })
+    expect(wrapper()).not.toHaveProperty("paddingHorizontal")
+    act(() => Dimensions.set({ window }))
+  })
 })
 
 describe("HeaderBack", () => {

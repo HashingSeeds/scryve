@@ -712,7 +712,8 @@ function RadialAction({
           <Text
             text={action.label}
             weight="bold"
-            numberOfLines={1}
+            // why: web ignores adjustsFontSizeToFit, so a multi-word label without a detail line wraps instead of cutting off. One word keeps one line, or it would break mid-word.
+            numberOfLines={!action.detail && action.label.includes(" ") ? 2 : 1}
             adjustsFontSizeToFit
             minimumFontScale={0.75}
             maxFontSizeMultiplier={1.2}
