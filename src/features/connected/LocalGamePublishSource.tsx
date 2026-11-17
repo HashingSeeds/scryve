@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
 import { useMutation } from "convex/react"
 
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
 import { buildLocalGameSnapshot } from "@/features/connected/localGameSnapshot"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -16,15 +17,17 @@ export interface PublishedGame {
   manualCode: string
 }
 
-export function LocalGamePublishSource({
-  game,
-  onPublished,
-  children,
-}: {
+interface LocalGamePublishSourceProps {
   game: LocalGame
   onPublished: (published: PublishedGame) => void
   children: (feed: LocalConnectFeed) => ReactNode
-}) {
+}
+
+export function LocalGamePublishSource(props: LocalGamePublishSourceProps) {
+  return useAuthAccess().configured ? <ConfiguredPublishSource {...props} /> : null
+}
+
+function ConfiguredPublishSource({ game, onPublished, children }: LocalGamePublishSourceProps) {
   const publishLocalGame = useMutation(api.games.publishLocalGame)
   const repository = useMemo(() => new LocalGameRepository(), [])
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
