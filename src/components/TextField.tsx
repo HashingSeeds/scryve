@@ -1,4 +1,5 @@
 import {
+  Children,
   ComponentType,
   forwardRef,
   Ref,
@@ -65,7 +66,8 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
    * Note: It is a good idea to memoize this.
    */
   LeftAccessory?: ComponentType<TextFieldAccessoryProps>
-  clearable?: boolean
+  /** why: `true` shows an x that empties the field; a function also runs after it empties. */
+  clearable?: boolean | (() => void)
 }
 
 export const TextField = forwardRef(function TextField(props: TextFieldProps, ref: Ref<TextInput>) {
@@ -150,6 +152,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   function clearInput() {
     TextInputProps.onChangeText?.("")
     input.current?.focus()
+    if (typeof clearable === "function") clearable()
   }
 
   useImperativeHandle(ref, () => input.current as TextInput)
@@ -200,19 +203,22 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
         />
         {dismissible && <KeyboardDismiss nativeID={accessoryID} />}
 
-        {clearable && !disabled && !!TextInputProps.value && (
-          <PressableIcon
-            testID={TextInputProps.testID && `${TextInputProps.testID}-clear`}
-            icon="x"
-            size={16}
-            color={colors.textDim}
-            accessibilityRole="button"
-            accessibilityLabel={translate("common:clear")}
-            hitSlop={8}
-            containerStyle={themed($rightAccessoryStyle)}
-            onPress={clearInput}
-          />
-        )}
+        {/* why: a field styled through child Text parts has no value to check. */}
+        {clearable &&
+          !disabled &&
+          (!!TextInputProps.value || Children.count(TextInputProps.children) > 0) && (
+            <PressableIcon
+              testID={TextInputProps.testID && `${TextInputProps.testID}-clear`}
+              icon="x"
+              size={16}
+              color={colors.textDim}
+              accessibilityRole="button"
+              accessibilityLabel={translate("common:clear")}
+              hitSlop={8}
+              containerStyle={themed($rightAccessoryStyle)}
+              onPress={clearInput}
+            />
+          )}
 
         {!!RightAccessory && (
           <RightAccessory

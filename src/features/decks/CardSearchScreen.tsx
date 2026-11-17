@@ -316,11 +316,11 @@ export function CardSearch({
   })
   const needsKeywords = (picked.keyword?.length ?? 0) > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
-  // why: iOS keeps a multiline field's height when its text changes from outside, so the bar is rebuilt after the sheet edits it.
-  const [barBuild, setBarBuild] = useState(0)
+  // why: iOS keeps a multiline field's height when its text changes from outside, so the bar is rebuilt after the sheet edits it or it is cleared.
+  const [bar, setBar] = useState({ build: 0, focused: !choosingCommander })
   function closeFilters() {
     setFiltersOpen(false)
-    setBarBuild((build) => build + 1)
+    setBar(({ build }) => ({ build: build + 1, focused: false }))
   }
   const pickedColors =
     colorFilters.length > 0 &&
@@ -863,7 +863,7 @@ export function CardSearch({
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
           <TextField
-            key={barBuild}
+            key={bar.build}
             testID="card-search-input"
             accessibilityLabel={translate("decks:cardSearch.searchLabel")}
             placeholderTx="decks:cardSearch.placeholder"
@@ -871,12 +871,13 @@ export function CardSearch({
             value={Platform.OS === "web" ? query : undefined}
             maxLength={filtersCards ? 400 : 120}
             autoCorrect={false}
-            autoFocus={!choosingCommander && barBuild === 0}
+            autoFocus={bar.focused}
             returnKeyType="search"
             // why: a query with filter terms wraps onto more lines instead of scrolling out of sight.
             multiline
             submitBehavior="blurAndSubmit"
             onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
+            clearable={() => setBar(({ build }) => ({ build: build + 1, focused: true }))}
             inputWrapperStyle={$queryWrapper}
             style={$queryInput}
             textAlignVertical="center"
