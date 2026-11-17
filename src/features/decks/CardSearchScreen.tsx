@@ -11,6 +11,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { LegendList } from "@legendapp/list/react-native"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 
 import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
@@ -119,6 +120,8 @@ const COLORS_BEFORE = "cost"
 const QUERY_LINE_HEIGHT = 19
 /** why: a result row's usual height, which the list uses to place rows before it measures them. */
 const RESULT_HEIGHT = 77
+/** why: a filter's search field has its row of matches under it, which the keyboard must leave in view. */
+const SUGGESTIONS_BELOW_FIELD = 56
 const NO_RESULTS = [] as const
 const NO_OPTIONS: readonly string[] = []
 // why: LegendList's web build copies unknown props onto its <div>, so native-only props would warn.
@@ -1199,10 +1202,12 @@ export function CardSearch({
           )}
         >
           <Text preset="subheading" tx="decks:filters.label" />
-          <ScrollView
+          <KeyboardAwareScrollView
             style={themed($sheetScroll)}
             contentContainerStyle={themed([$sheetScrollContent, $filterBody])}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            bottomOffset={SUGGESTIONS_BELOW_FIELD}
           >
             {filterSectionGroups.some(({ heading }) => heading.id === COLORS_BEFORE)
               ? null
@@ -1249,7 +1254,7 @@ export function CardSearch({
                 ))}
               </View>,
             ])}
-          </ScrollView>
+          </KeyboardAwareScrollView>
           <View style={themed($dialogActions)}>
             <Button
               style={themed($dialogButton)}
