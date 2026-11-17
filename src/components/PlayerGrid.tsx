@@ -1,4 +1,4 @@
-import { useCallback, useContext, useState } from "react"
+import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
@@ -277,6 +277,12 @@ export function PlayerGrid({
   teams,
 }: PlayerGridProps) {
   const dimensions = useWindowDimensions()
+  const frame = useRef<View>(null)
+  // why: on web, aria-hidden and pointerEvents leave seat buttons in the Tab order; inert removes them.
+  useEffect(() => {
+    if (Platform.OS === "web" && frame.current && "inert" in frame.current)
+      frame.current.inert = !!covered
+  }, [covered])
   const boardRotation = boardOrientation?.rotation ?? 0
   const { width, height, fontScale } = boardOrientation ?? dimensions
   const nativeFrame = boardOrientation?.nativeFrame
@@ -747,6 +753,7 @@ export function PlayerGrid({
 
   return (
     <View
+      ref={frame}
       testID="player-grid-frame"
       pointerEvents={covered ? "none" : "auto"}
       aria-hidden={covered}
