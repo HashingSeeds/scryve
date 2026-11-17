@@ -6,8 +6,9 @@ import type {
   TextStyle,
   ViewStyle,
 } from "react-native"
-import { Modal, Pressable, StyleSheet, View } from "react-native"
+import { Modal, Platform, Pressable, StyleSheet, View } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
+import { useKeyboardState } from "react-native-keyboard-controller"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -62,12 +63,16 @@ export function DialogCard({
   const { theme, themed } = useAppTheme()
   const safeAreaInsets = useSafeAreaInsets()
   const topEdgeBand = useTopEdgeBand()
+  // why: Android resizes a Modal's window for the keyboard; iOS leaves the card's bottom, and its buttons, behind it.
+  const keyboard = useKeyboardState((state) =>
+    Platform.OS === "ios" && state.isVisible ? state.height : 0,
+  )
   const safeAreaMarginStyle = {
     marginTop: safeAreaInsets.top + topEdgeBand,
-    marginBottom: placement === "bottom" ? 0 : safeAreaInsets.bottom,
+    marginBottom: keyboard || (placement === "bottom" ? 0 : safeAreaInsets.bottom),
   }
   const bottomSafeAreaStyle = {
-    paddingBottom: theme.spacing.lg + safeAreaInsets.bottom,
+    paddingBottom: theme.spacing.lg + (keyboard ? 0 : safeAreaInsets.bottom),
   }
   const reducedMotion = useReducedMotion()
   const animateFromOrigin = Boolean(origin) && reducedMotion === false

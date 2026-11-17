@@ -331,6 +331,7 @@ export function CardSearch({
   })
   const needsKeywords = (picked.keyword?.length ?? 0) > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filterActionsHeight, setFilterActionsHeight] = useState(0)
   // why: the sheet's groups skip renders their picks didn't change, so their handlers keep one identity.
   const stable = useStableCallbacks()
   // why: iOS keeps a multiline field's height when its text changes from outside, so the bar is rebuilt after the sheet edits it or it is cleared.
@@ -1207,7 +1208,8 @@ export function CardSearch({
             contentContainerStyle={themed([$sheetScrollContent, $filterBody])}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-            bottomOffset={SUGGESTIONS_BELOW_FIELD}
+            // why: the dialog keeps its buttons above the keyboard, so a field scrolls clear of those and of the dialog's gap, padding and margin.
+            bottomOffset={SUGGESTIONS_BELOW_FIELD + filterActionsHeight + 3 * theme.spacing.lg}
           >
             {filterSectionGroups.some(({ heading }) => heading.id === COLORS_BEFORE)
               ? null
@@ -1255,7 +1257,10 @@ export function CardSearch({
               </View>,
             ])}
           </KeyboardAwareScrollView>
-          <View style={themed($dialogActions)}>
+          <View
+            style={themed($dialogActions)}
+            onLayout={(event) => setFilterActionsHeight(event.nativeEvent.layout.height)}
+          >
             <Button
               style={themed($dialogButton)}
               tx="decks:cardSearch.clearAll"
