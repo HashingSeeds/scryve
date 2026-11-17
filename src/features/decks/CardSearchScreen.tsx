@@ -113,6 +113,8 @@ const SCRYFALL = "Scryfall"
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
 /** why: color identity sits beside the mana a card costs, so its section shows just above that group. */
 const COLORS_BEFORE = "cost"
+/** why: Text's 24pt line puts the extra room above typed text on iOS, so the bar's parts keep Rubik's own 16pt line, as its placeholder does. */
+const QUERY_LINE_HEIGHT = 19
 const NO_CARD_FILTERS: readonly CardFilterDefinition[] = []
 const NO_PICKS: CardFilterState = {}
 const NO_COLORS: readonly string[] = []
@@ -888,6 +890,7 @@ export function CardSearch({
                   <Text
                     key={index}
                     style={{
+                      lineHeight: QUERY_LINE_HEIGHT,
                       color:
                         sectionColor(span.section) ??
                         (span.joiner ? theme.colors.textDim : theme.colors.text),
@@ -1314,8 +1317,8 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $suggestions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $headerActions: ViewStyle = { flexDirection: "row" }
 const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112, alignItems: "center" }
-/** why: a multiline field starts at the top of its box, so it hugs its lines and centers instead, scrolling past the bar's height. */
-const $queryInput: TextStyle = { alignSelf: "center", maxHeight: 100 }
+/** why: iOS draws multiline text at the top of its box, so the field hugs its lines (no minimum height) and centers instead, scrolling past the bar's height. */
+const $queryInput: TextStyle = { alignSelf: "center", minHeight: 0, maxHeight: 100 }
 const $filterBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $filterSection: ViewStyle = { gap: 8 }
 
