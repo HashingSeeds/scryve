@@ -45,6 +45,18 @@ const systems = {
     arc: "Archenemy ({{year}})",
     e01: "Archenemy: Nicol Bolas",
   },
+  // A Riftbound domain, one of the six card colors. Use the official name printed on cards in your language; where Riftbound isn't sold in your language, translate the word naturally.
+  // fr: Riot's official French names: Fureur, Calme, Esprit, Corps, Chaos, Ordre.
+  // hi: Transliterate as players say them: फ़्यूरी, कॉम, माइंड, बॉडी, कैओस, ऑर्डर. Never काम, which reads as 'work'.
+  // ko: Mind is 정신, not 지혜.
+  domain: {
+    Fury: "Fury",
+    Calm: "Calm",
+    Mind: "Mind",
+    Body: "Body",
+    Chaos: "Chaos",
+    Order: "Order",
+  },
   // Magic supertypes and card types, as printed on cards in your language.
   cardType: {
     Legendary: "Legendary",
@@ -262,7 +274,8 @@ const systems = {
   // Pokémon only: no Prize cards taken yet.
   noneTaken: "no prizes taken",
   // Pokémon only: Prize cards the player has taken so far. Not damage.
-  taken: "{{amount}} prizes taken",
+  taken_one: "{{count}} prize taken",
+  taken_other: "{{count}} prizes taken",
   // A counter back at its starting value: unchanged, not a tie.
   even: "unchanged",
   fromStart: "{{delta, signed}} from start",

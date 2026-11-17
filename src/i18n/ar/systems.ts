@@ -43,6 +43,14 @@ export default {
     arc: "العدو اللدود ({{year}})",
     e01: "العدو اللدود: نيكول بولاس",
   },
+  domain: {
+    Fury: "الغضب",
+    Calm: "الهدوء",
+    Mind: "العقل",
+    Body: "الجسد",
+    Chaos: "الفوضى",
+    Order: "النظام",
+  },
   cardType: {
     Legendary: "أسطوري",
     Basic: "أساسي",
@@ -279,7 +287,12 @@ export default {
     riftbound_other: "{{count}} تغيير في النقاط",
   },
   noneTaken: "لم تُؤخذ أي بطاقة جائزة",
-  taken: "بطاقات الجائزة المأخوذة: {{amount}}",
+  taken_zero: "بطاقات الجائزة المأخوذة: {{count}}",
+  taken_one: "بطاقة جائزة واحدة مأخوذة",
+  taken_two: "بطاقتا جائزة مأخوذتان",
+  taken_few: "{{count}} بطاقات جائزة مأخوذة",
+  taken_many: "{{count}} بطاقة جائزة مأخوذةً",
+  taken_other: "بطاقات الجائزة المأخوذة: {{count}}",
   even: "دون تغيير",
   fromStart: "الفرق عن البداية: {{delta, signed}}",
 } satisfies LocaleNamespace

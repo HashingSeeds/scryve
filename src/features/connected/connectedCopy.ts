@@ -27,14 +27,14 @@ export function relativeTime(timestamp: number, now: number) {
   if (elapsed < MINUTE_MS) return translate("connected:relativeTime.justNow")
   if (elapsed < HOUR_MS) {
     const minutes = Math.floor(elapsed / MINUTE_MS)
-    return translate("connected:relativeTime.minutes", { minutes })
+    return translate("connected:relativeTime.minutes", { count: minutes })
   }
   if (elapsed < DAY_MS) {
     const hours = Math.floor(elapsed / HOUR_MS)
-    return translate("connected:relativeTime.hours", { hours })
+    return translate("connected:relativeTime.hours", { count: hours })
   }
   const days = Math.floor(elapsed / DAY_MS)
-  if (days < 7) return translate("connected:relativeTime.days", { days })
+  if (days < 7) return translate("connected:relativeTime.days", { count: days })
   return formatDate(timestamp, { month: "short", day: "numeric" })
 }
 

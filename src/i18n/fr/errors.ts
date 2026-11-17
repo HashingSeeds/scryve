@@ -54,6 +54,8 @@ export default {
   syncOwnerChanged: "Le compte connecté a changé",
   tooManyJoinAttempts: "Trop de tentatives pour rejoindre ; patientez une minute et réessayez",
   unauthenticated: "Authentification requise",
+  unknownFormat: "Ce format n’est pas disponible pour ce jeu",
+  unknownGame: "Jeu inconnu",
   updateRequired: "Mettez Scryve à jour pour rejoindre cette partie",
   ygoprodeckInvalidResponse: "La réponse du deck est trop volumineuse ou vide.",
 } satisfies LocaleNamespace

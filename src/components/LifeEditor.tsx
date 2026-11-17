@@ -413,7 +413,7 @@ export function LifeEditor({
               step > 0
                 ? `board:lifeEditor.add.${rules.id}`
                 : `board:lifeEditor.subtract.${rules.id}`,
-              { amount: Math.abs(step) },
+              { count: Math.abs(step) },
             )
           }
         />

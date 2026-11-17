@@ -4,6 +4,7 @@ import { Fragment } from "react"
 import { Text as RNText, type GestureResponderEvent, type TextStyle } from "react-native"
 
 import { Text, type TextProps } from "@/components/Text"
+import { domainName } from "@/features/game/playSystems"
 import type { TxKeyPath } from "@/i18n"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -121,7 +122,7 @@ function riftboundSymbol(token: string): CardSymbol | undefined {
     domain && {
       layers: coinLayers(domain),
       label: translate("decks:cardSymbols.domainPower", {
-        domain: token[0].toUpperCase() + token.slice(1),
+        domain: domainName(token[0].toUpperCase() + token.slice(1)),
       }),
     }
   )

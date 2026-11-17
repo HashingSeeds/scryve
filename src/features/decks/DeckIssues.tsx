@@ -4,7 +4,7 @@ import type { ViewStyle } from "react-native"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { Text } from "@/components/Text"
-import { formatName } from "@/features/game/playSystems"
+import { domainName, formatName } from "@/features/game/playSystems"
 import { formatList, formatSum } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -99,8 +99,8 @@ export function deckIssueText(issue: DeckIssue, labels: IssueLabels) {
     case "domain":
       return translate("decks:issues.domain", {
         card: issue.name,
-        domains: formatList(issue.domains),
-        identity: formatList(issue.identity),
+        domains: formatList(issue.domains.map(domainName)),
+        identity: formatList(issue.identity.map(domainName)),
       })
     case "champion":
       return issue.champion.length > 0

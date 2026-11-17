@@ -34,6 +34,12 @@
   "modeProduct.who": "a428606f8e19.4dfa8765e2f0",
   "modeProduct.arc": "d9adf2c28e69.a1468d21beb9",
   "modeProduct.e01": "ed2aad985003.528980c6d123",
+  "domain.Fury": "e881a88abc13.f56c9238ea6a",
+  "domain.Calm": "34dc4ab379fd.d788f9c892ac",
+  "domain.Mind": "42225de41d96.708cfe2f129d",
+  "domain.Body": "399b5e266981.2524eea29d98",
+  "domain.Chaos": "d9590f686711.dc2d16048393",
+  "domain.Order": "4dce56116d6b.81437961151a",
   "cardType.Legendary": "6c7c68608b39.16979daee18c",
   "cardType.Basic": "865e20bdc2fb.bd0f855ea4d5",
   "cardType.Snow": "fbaadad12289.24ed9d034181",
@@ -156,7 +162,7 @@
   "counterChange.fab": "210b4031c5f9.259948139711",
   "counterChange.riftbound": "66e7a4925569.7478f9435dd5",
   "noneTaken": "78ecbd0cbb50.5f65f02420a5",
-  "taken": "32439669bd4a.2395c777dbc8",
+  "taken": "1d5cfa2fc2bd.beba32e42dd2",
   "even": "a08afdcd1bae.126edcfaab39",
   "fromStart": "399280160a22.58aab01a28a6"
 }
