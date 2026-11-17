@@ -38,7 +38,8 @@ const PLAY_LANGUAGES = {
   ar: ["ar"],
 }
 const APPLE_LOCALES = {
-  en: ["en-US"],
+  // why: Apple searches English (US) only in the US and Japan. Most other storefronts search English (U.K.), and Canada searches English (Canada).
+  en: ["en-US", "en-GB", "en-CA"],
   es: ["es-MX", "es-ES"],
   fr: ["fr-FR", "fr-CA"],
   hi: ["hi"],
