@@ -1,4 +1,4 @@
-// why: copy shown outside the app. The app never loads it; `pnpm i18n:paywall` fills RevenueCat's CSV and `pnpm store:push` sends the listings.
+// why: copy shown outside the app. The app never loads it; `pnpm i18n:paywall` fills RevenueCat's CSV and `pnpm store:play` and `pnpm store:apple` send the listings.
 const storefront = {
   // The screen where a player buys Scryve Pro, the paid plan. Free is the plan without Pro.
   paywall: {

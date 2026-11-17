@@ -1,9 +1,9 @@
 {
   "en": "count,trading,card,game,commander,edh,stats,winrate,scorekeeper,tournament,swiss,pairings,dice,hp",
-  "es": "contador,vida,cartas,coleccionables,commander,edh,estadísticas,torneo,suizo,emparejamientos,dados",
-  "fr": "compteur,vie,cartes,collection,jcc,commander,edh,statistiques,tournoi,suisse,appariements,dés",
-  "hi": "स्क्राइव,लाइफ,काउंटर,कार्ड,ट्रेडिंग,कमांडर,EDH,टूर्नामेंट,स्कोर,डाइस,TCG",
-  "ja": "スクライブ,ライフ計算,ダメージカウンター,対戦記録,勝敗記録,統率者,トレカ,EDH",
-  "ko": "스크라이브,라이프,카운터,트레이딩카드,카드게임,커맨더,EDH,승률,전적,토너먼트,대진표,주사위",
-  "ar": "سكرايف,عداد,نقاط,الحياة,بطاقات,كوماندر,EDH,إحصائيات,بطولة,نرد,TCG"
+  "es": "vida,cartas,jcc,commander,edh,torneo,dados,marcador,puntos,anotador,partidas",
+  "fr": "compteur,tcg,cartes,commander,edh,tournoi,dés,score,statistiques,partie",
+  "hi": "life,counter,tcg,trading,card,commander,edh,stats,winrate,scorekeeper,tournament,dice,hp",
+  "ja": "スクライブ,ライフ計算,ライフ電卓,ライフポイント,ダメージカウンター,対戦記録,勝敗記録,統率者,EDH,トレカ,スイスドロー,デュエル",
+  "ko": "스크라이브,라이프,TCG,트레이딩카드,커맨더,EDH,승률,전적,토너먼트,대진표,주사위,관리,점수판",
+  "ar": "عداد,بطاقات,بطولة,نرد,life,counter,tcg,commander,edh,dice,scorekeeper,tournament"
 }
