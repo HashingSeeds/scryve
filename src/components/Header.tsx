@@ -149,11 +149,9 @@ export function Header(props: HeaderProps) {
   const titleContent = titleTx ? translate(titleTx, titleTxOptions) : title
   const centeredInset = Math.max(spacing.xxl, actionWidths.left, actionWidths.right)
   // why: web can't shrink a title to fit, so a title that fills its centered space gives up centering and takes the room beside the shorter action. Once moved, the same title stays off center, since its width never drops below the centered space.
+  const measuresTitle = centered && Platform.OS === "web"
   const offCenter =
-    centered &&
-    Platform.OS === "web" &&
-    titleFit.row > 0 &&
-    titleFit.title >= titleFit.row - 2 * centeredInset - 1
+    measuresTitle && titleFit.row > 0 && titleFit.title >= titleFit.row - 2 * centeredInset - 1
   const measureAction = (side: "left" | "right") => (event: LayoutChangeEvent) => {
     const width = Math.ceil(event.nativeEvent.layout.width)
     setActionWidths((widths) => (widths[side] === width ? widths : { ...widths, [side]: width }))
@@ -180,7 +178,7 @@ export function Header(props: HeaderProps) {
 
         {!!titleContent && (
           <View
-            onLayout={centered ? measureTitle("row") : undefined}
+            onLayout={measuresTitle ? measureTitle("row") : undefined}
             style={[
               titleAccessory ? $titleWrapperAccessoryPointerEvents : $titleWrapperPointerEvents,
               !!titleAccessory && themed($titleWrapperRow),
@@ -199,7 +197,7 @@ export function Header(props: HeaderProps) {
               weight="medium"
               size="md"
               text={titleContent}
-              onLayout={centered ? measureTitle("title") : undefined}
+              onLayout={measuresTitle ? measureTitle("title") : undefined}
               numberOfLines={1}
               adjustsFontSizeToFit={centered}
               minimumFontScale={TITLE_MIN_FONT_SCALE}
