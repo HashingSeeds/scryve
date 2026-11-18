@@ -414,6 +414,41 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().pending).toEqual([])
   })
 
+  it("confirms a waiting claim with room the same projection frees in a full queue", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1", { maxPendingRecords: 1 })
+    repository.outbox("game-public").enqueue(action("operation-full-0001", 1, 1))
+    const { clock, controller } = harness({ storage, repository })
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    controller.onRemoteProjection({
+      ...projection(0, 21),
+      recentOperationIds: ["operation-full-0001"],
+      commanderDamage: {
+        totals: [],
+        pendingClaims: [
+          {
+            claimId: "claim-1",
+            operationId: "commander-claim-000001",
+            fromPlayerId: "player-2",
+            toPlayerId: "player-1",
+            delta: 4,
+            clientCreatedAt: clock.now(),
+            createdAt: clock.now(),
+          },
+        ],
+        eliminatedPlayerIds: [],
+      },
+    })
+
+    expect(controller.getSnapshot().pending.map(({ event }) => event)).toEqual([
+      expect.objectContaining({
+        type: "commanderDamage.resolved",
+        claimOperationId: "commander-claim-000001",
+      }),
+    ])
+  })
+
   it("queues only the Life Points a Yu-Gi-Oh! seat has left, and nothing once it is at 0", () => {
     const { controller } = harness()
     controller.onRemoteProjection({ ...projection(0, 8000), system: "ygo" })

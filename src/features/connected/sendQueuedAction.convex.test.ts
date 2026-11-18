@@ -141,7 +141,6 @@ describe("sendQueuedAction against the real game mutations", () => {
           action: { kind: "designation.taken", playerId: hostPlayerId, designationId: "monarch" },
         }),
         queued(host, "operation-claim-0001", claim(hostPlayerId, joinerPlayerId, 7)),
-        // why: the total would drop below 0, so the server declines this one on arrival.
         queued(host, "operation-claim-0002", claim(hostPlayerId, joinerPlayerId, -8)),
       ]),
     ).toEqual([
@@ -173,6 +172,15 @@ describe("sendQueuedAction against the real game mutations", () => {
 
     const final = await projection()
     expect(final.players.map((player) => player.currentLife)).toEqual([38, 33])
+    expect(final.commanderDamage?.totals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fromPlayerId: hostPlayerId,
+          toPlayerId: joinerPlayerId,
+          total: 7,
+        }),
+      ]),
+    )
     expect(final.commanderDamage?.pendingClaims ?? []).toEqual([])
   })
 })

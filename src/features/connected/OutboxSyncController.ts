@@ -271,12 +271,12 @@ export class OutboxSyncController {
     this.options.repository.saveProjection(merged)
     this.confirmed = merged
     this.observeResumeProjection(merged)
-    this.confirmWaitingClaims(merged)
     if (this.environment.isWebSocketConnected && this.reconnectPending) {
       this.reconnectPending = false
       emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: pending.length })
     }
     this.outbox.acknowledge(incoming.recentOperationIds)
+    this.confirmWaitingClaims(merged)
     this.outbox.resume()
     this.publish()
     this.resolveProjectionWaiter()
