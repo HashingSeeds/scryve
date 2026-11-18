@@ -59,8 +59,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 [data-v=v1] .up > .sword { right: 9px; bottom: 7px; }
 [data-v=v1] .bag { right: 58px; }
 [data-v=v1] .tokens { right: 94px; }
-[data-v=v2] .up > .sword { left: 9px; top: 7px; }
-[data-v=v2] .ownlife { left: 58px; top: 16px; }
 
 /* attacker */
 .ownlife { left: 14px; top: 10px; font-weight: 700; font-size: 22px; opacity: .6; }
@@ -100,11 +98,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 @keyframes breathe { 0%,100% { opacity: .95 } 50% { opacity: .35 } }
 .bump { animation: bump 380ms ease; }
 @keyframes bump { 30% { transform: scale(1.07) } }
-.undo { right: 6px; top: calc(50% - 30px); height: 60px; min-width: 60px; padding: 0 8px; display: flex; align-items: center; gap: 6px; }
-.coins { display: flex; }
-.coin { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 11px; color: #000; margin-left: -7px; box-shadow: 0 0 0 2px var(--shadowbg, #000); }
-.coin:first-child { margin-left: 0; }
-.more { font-weight: 700; font-size: 12px; opacity: .7; margin-left: 3px; }
+.undo { right: 4px; top: calc(50% - 28px); width: 56px; height: 56px; display: grid; place-items: center; }
+/* each hit this attack, on an arc just outside the disc, oldest on top; a hit keeps its place as more land */
+.coins { left: 50%; top: 50%; }
+.coin, .more { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 11px; transform: rotate(var(--a)) translateX(110px) rotate(calc(var(--a) * -1)); }
+.coin { color: #000; }
+.more { font-size: 12px; opacity: .7; }
 .dname { left: 12px; bottom: 10px; display: flex; align-items: center; gap: 6px; min-height: 40px; font-weight: 700; font-size: 17px; opacity: .85; pointer-events: none; }
 
 /* center */
@@ -133,8 +132,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   <div class="row"><button id="reset">Reset board</button><button id="intro">Replay first open</button></div>
   <div class="row" id="variants">
     <button data-pick="v1" title="Grid, mark and name bottom-left. Sword in the corner, outside the bag.">1 by bag</button>
-    <button data-pick="v2" title="Grid, mark and name bottom-left. Sword alone top-left.">2 top left</button>
-    <button data-pick="v3" title="Grid top-left. Mark, name and sword bottom-left.">3 by name</button>
+    <button data-pick="v3" title="Grid top-left. Mark, name and sword bottom-left.">2 by name</button>
   </div>
   <div id="log"></div>
 </div>
@@ -152,6 +150,7 @@ const SWORD = '<path d="M12 2.5 L14.1 6.4 V14.4 H9.9 V6.4 Z"/><rect x="6.8" y="1
 const sword = (size, color = 'currentColor', tilt = 0) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" style="transform:rotate(${tilt}deg)">${SWORD}</svg>`
 const mark = (shape, size, color) => `<svg width="${size}" height="${size}" viewBox="6 6 32 32" fill="${color}">${SHAPES[shape]}</svg>`
 const line = (size, plus, color = '#fff', w = 3) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" stroke="${color}" stroke-width="${w * 24 / size}" stroke-linecap="round"><path d="M3 12H21${plus ? 'M12 3V21' : ''}"/></svg>`
+const CHECK = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 7"/></svg>'
 const UNDO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>'
 const BAG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M8.2 3.5h7.6l-1.6 3.1c3.7 1.4 6.3 5 6.3 8.9 0 3.8-3.6 5.5-8.5 5.5s-8.5-1.7-8.5-5.5c0-3.9 2.6-7.5 6.3-8.9Z"/></svg>'
 const TOKENS = {
@@ -189,8 +188,8 @@ const taken = (to) => S.players.some((p) => sum(S.dmg[p.id]?.[to] ?? []) > 0)
 const steps = () => boxes(byId(S.armed)).map((b) => (b.on ? b.power : 0))
 const sum = (xs) => xs.reduce((a, b) => a + b, 0)
 
-/* placement variant: the hash is shareable, the panel and keys 1/2/3 write it */
-const VARIANTS = ['v1', 'v2', 'v3']
+/* placement variant: the hash is shareable, the panel and keys 1/2 write it */
+const VARIANTS = ['v1', 'v3']
 const hashed = () => VARIANTS.find((v) => v === location.hash.slice(1))
 let V = hashed() ?? 'v3'
 
@@ -230,13 +229,13 @@ function grid(me, attacker) {
   })
   return `<div class="grid">${cells.join('')}</div>`
 }
-// why: v3 keeps the damage grid in the top-left corner beside a plain mark; v1 and v2 put it where the mark sits.
+// why: v3 keeps the damage grid in the top-left corner beside a plain mark; v1 puts it where the mark sits.
 function gridOrMark(p, attacker) {
   const g = attacker || taken(p.id) ? grid(p, attacker) : ''
   const m = mark(p.shape, 26, 'rgba(255,255,255,.85)')
   return V === 'v3' ? { corner: g, lead: m } : { corner: '', lead: g || m }
 }
-// why: v3 seats the sword after the name; v1 and v2 pin it to a corner in CSS.
+// why: v3 seats the sword after the name; v1 pins it to a corner in CSS.
 const byName = () => V === 'v3'
 const swordBtn = (p, label, tilt, open) => `<button class="sword${open ? ' open' : ''}" data-act="arm" data-p="${p.id}" aria-label="${label}">${sword(tilt ? 30 : 32, '#fff', tilt)}</button>`
 const tokens = (p) => (p.tokens ? `<div class="tokens">${Object.entries(p.tokens).map(([kind, n]) => `<div class="tok" aria-label="${n} ${kind}">${TOKENS[kind]}${n}</div>`).join('')}</div>` : '')
@@ -275,7 +274,7 @@ function idleSeat(p) {
 }
 
 function attackerSeat(p) {
-  const btn = swordBtn(p, 'Done', 45)
+  const btn = `<button class="sword" data-act="done" aria-label="Done">${CHECK}</button>`
   const bs = boxes(p), pair = bs.length > 1, last = bs.filter((b) => b.on).length === 1
   const ink = shade(p.color), glyph = pair ? 18 : 22
   const cols = slots(p).map((c, slot) => {
@@ -314,7 +313,7 @@ function defenderSeat(p) {
   }).join('')
   const hits = S.hits[p.id] ?? []
   const { corner, lead } = gridOrMark(p, a.id)
-  const coins = hits.slice(-4).map((h) => `<div class="coin" style="background:${tint}">${sum(h)}</div>`).join('')
+  const coins = hits.slice(-5).map((h, i) => `<div class="coin" style="background:${tint};--a:${-28 + i * 14}deg">${sum(h)}</div>`).join('')
   return `
     ${corner}
     <div class="strike${lethal ? ' lethal' : ''}" style="${lethal ? '' : `color:${mix(a.color, '#ffffff', .78)}`}"><span class="dmg">−${dealt}</span><span class="sw">${sword(34, 'currentColor', 90)}</span></div>
@@ -324,13 +323,14 @@ function defenderSeat(p) {
       <div class="dlife">${p.life}</div>
     </div>
     <div class="dname">${lead}${p.name}</div>
-    ${hits.length ? `<button class="undo" data-act="undo" data-p="${p.id}" aria-label="Take back ${sum(hits.at(-1))}" style="--shadowbg:${shade(a.color)}">${UNDO}<div class="coins">${coins}</div>${hits.length > 4 ? `<span class="more">+${hits.length - 4}</span>` : ''}</button>` : ''}`
+    ${hits.length ? `<div class="coins" data-act="none">${coins}${hits.length > 5 ? `<span class="more" style="--a:-42deg">+${hits.length - 5}</span>` : ''}</div>
+    <button class="undo" data-act="undo" data-p="${p.id}" aria-label="Take back ${sum(hits.at(-1))}">${UNDO}</button>` : ''}`
 }
 
 const modeOf = (p) => (!S.armed ? 'idle' : S.armed === p.id ? 'attacker' : 'defender')
 let lastModes = {}
-// where each variant's sword slides out from on first open: the bag, nowhere, the mark
-const UNSHEATHE = { v1: () => 49, v2: () => 0, v3: (up) => up.querySelector('.namebtn').offsetWidth }
+// where each variant's sword slides out from on first open: the bag, the mark
+const UNSHEATHE = { v1: () => 49, v3: (up) => up.querySelector('.namebtn').offsetWidth }
 function render(intro = false) {
   phone.dataset.v = V
   document.querySelectorAll('[data-pick]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.pick === V))
@@ -349,13 +349,10 @@ function render(intro = false) {
     }
     lastModes[p.id] = mode
   })
-  const a = S.armed && byId(S.armed)
-  const landed = Object.values(S.hits).some((h) => h.length)
-  menu.setAttribute('aria-label', a ? (landed ? 'Done' : 'Cancel') : 'Menu')
+  menu.setAttribute('aria-label', 'Menu')
   menu.innerHTML = `<svg width="60" height="60" viewBox="0 0 60 60">
-    <path d="M30 6 53 22.7 44.2 49.8H15.8L7 22.7Z" fill="${a ? a.color : 'var(--menu)'}" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
-    ${a ? (landed ? '<path d="M20 31l7 7 13-15" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>' : '<path d="M22 23l16 16M38 23 22 39" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>')
-        : '<path d="M20 25H40M20 32H40M20 39H40" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>'}
+    <path d="M30 6 53 22.7 44.2 49.8H15.8L7 22.7Z" fill="var(--menu)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M20 25H40M20 32H40M20 39H40" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
   </svg>`
 }
 
@@ -384,32 +381,37 @@ function fly(html, from, to, { color = '#fff', turn, scale = [1.2, .7], ms = 380
   return t.animate([{ opacity: 0, transform: pose(from, 0) }, { opacity: 1, offset: .12 }, { opacity: 1, transform: pose(to, 1) }], { duration: ms, fill: 'both', easing: 'cubic-bezier(.5,0,.3,1)' }).finished.then(() => t.remove())
 }
 
-// why: the attacker's sword splits where it rests, one blade per opponent, and each flies straight to the sword beside that seat's disc, so the eye ends on what a tap will hit.
+// why: the attacker's sword splits where it rests, one blade per opponent, and each flies straight to the sword beside that seat's disc, so the eye ends on what a tap will hit. Done plays the same flight backwards, so every blade comes home.
 const FAN = 260, FLIGHT = 420, SPLAY = 'cubic-bezier(.2,.9,.3,1.15)'
 const bearing = (from, to) => (Math.atan2(to[0] - from[0], from[1] - to[1]) * 180) / Math.PI
 // the same angle as `to`, written the short way round from `from`
 const toward = (from, to) => from + ((((to - from) % 360) + 540) % 360) - 180
 let flight = 0
 const grounded = () => { flight++; phone.querySelectorAll('.fly').forEach((t) => t.remove()); S.players.forEach((q) => delete seatEls[q.id].dataset.await) }
-function draw(a) {
-  if (calm.matches) return
-  const run = ++flight
-  const rest = seatEls[a.id].querySelector('.sword svg'), home = spot(rest)
-  const inward = bearing(home, [195, 422])
-  const blades = S.players.filter((q) => q.id !== a.id).map((q) => {
+// read while the attacker's button and every landing spot are on screen
+function plan(a) {
+  const home = spot(seatEls[a.id].querySelector('.sword svg')), inward = bearing(home, [195, 422])
+  const bs = S.players.filter((q) => q.id !== a.id).map((q) => {
     const landing = seatEls[q.id].querySelector('.strike .sw'), to = spot(landing)
-    return { q, landing, to, reach: Math.hypot(to[0] - home[0], to[1] - home[1]), aim: toward(inward, bearing(home, to)) }
+    return { q, to, color: getComputedStyle(landing).color, reach: Math.hypot(to[0] - home[0], to[1] - home[1]), aim: toward(inward, bearing(home, to)) }
   }).sort((x, y) => x.aim - y.aim)
   // each blade leans at its own opponent, but neighbours open at least 40 degrees so the fan reads as one blade each
-  blades.forEach((b, i) => (b.lean = i ? Math.max(b.aim, blades[i - 1].lean + 40) : b.aim))
-  const drift = sum(blades.map((b) => b.lean - b.aim)) / blades.length
-  blades.forEach(({ q, landing, to, reach, aim, lean }) => {
-    const seat = seatEls[q.id], tilt = toward(a.rot, lean - drift), rad = (tilt * Math.PI) / 180, ahead = toward(tilt, aim)
-    const out = [home[0] + 26 * Math.sin(rad), home[1] - 26 * Math.cos(rad)]
-    const go = FAN + 60 + reach * .25, end = go + FLIGHT, timing = { duration: end, fill: 'both' }
+  bs.forEach((b, i) => (b.lean = i ? Math.max(b.aim, bs[i - 1].lean + 40) : b.aim))
+  const drift = sum(bs.map((b) => b.lean - b.aim)) / bs.length
+  return bs.map((b) => {
+    const tilt = toward(a.rot, b.lean - drift), rad = (tilt * Math.PI) / 180
+    return { ...b, home, tilt, ahead: toward(tilt, b.aim), out: [home[0] + 26 * Math.sin(rad), home[1] - 26 * Math.cos(rad)], go: FAN + 60 + b.reach * .25 }
+  })
+}
+// returns when the last blade lands; backwards, every blade reaches home together
+function launch(a, bs, back) {
+  const run = ++flight, whole = Math.max(...bs.map((b) => b.go)) + FLIGHT
+  bs.forEach(({ q, home, to, color, tilt, ahead, out, go }) => {
+    const seat = seatEls[q.id], end = go + FLIGHT
+    const timing = { duration: end, fill: 'both', direction: back ? 'reverse' : 'normal', delay: back ? whole - end : 0 }
     const face = (deg, scale = 1) => `rotate(${deg}deg) scale(${scale})`
-    seat.dataset.await = ''
-    const t = token(sword(32), getComputedStyle(landing).color)
+    if (!back) seat.dataset.await = ''
+    const t = token(sword(32), color)
     // blade first for the first half of the trip, then round to point at the disc
     t.firstElementChild.animate([
       { transform: face(a.rot), easing: SPLAY },
@@ -423,10 +425,15 @@ function draw(a) {
       { transform: at(out), offset: FAN / end },
       { transform: at(out), offset: go / end, easing: 'cubic-bezier(.5,0,.3,1)' },
       { transform: at(to) },
-    ], timing).finished.then(() => { t.remove(); if (run === flight) delete seat.dataset.await })
+    ], timing).finished.then(() => { t.remove(); if (!back && run === flight) delete seat.dataset.await })
   })
-  // the resting sword is the blades until they part
-  rest.animate([{ opacity: 0 }, { opacity: 0, offset: .6 }, { opacity: 1 }], { duration: FAN + 180 })
+  return whole
+}
+function draw(a) {
+  if (calm.matches) return
+  launch(a, plan(a), false)
+  // the blades leave Done behind where the sword was
+  seatEls[a.id].querySelector('.sword svg').animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 0, transform: 'scale(.4)', offset: .6 }, { opacity: 1, transform: 'none' }], { duration: FAN + 220, easing: 'ease-out' })
 }
 
 /* log for reviewers, outside the phone */
@@ -456,13 +463,19 @@ function done(quiet) {
   const hit = Object.entries(S.hits).filter(([, h]) => h.length)
   S.last = hit.length ? { from: a.id, hits: S.hits } : null
   grounded()
+  const back = quiet || calm.matches ? null : plan(a)
   hit.forEach(([to, h]) => {
     const seat = seatEls[to], rot = byId(to).rot
-    fly(String(sum(h.map(sum))), spot(seat.querySelector('.coins')), spot(seat.querySelector(`[data-cell="${a.id}"]`)), { color: light(a.color), turn: [rot, rot], ms: 320 })
+    fly(String(sum(h.map(sum))), spot(seat.querySelector('.coin:last-of-type')), spot(seat.querySelector(`[data-cell="${a.id}"]`)), { color: light(a.color), turn: [rot, rot], ms: 320 })
   })
   S.armed = null
   S.hits = {}
   render()
+  if (back) {
+    // the blades fold back into the one sword, which shows again as they meet
+    const whole = launch(a, back, true)
+    seatEls[a.id].querySelector('.sword').animate([{ opacity: 0 }, { opacity: 0, offset: (whole - 40) / whole }, { opacity: 1 }], { duration: whole })
+  }
   if (!quiet) log(`${a.name} done${hit.length ? '; tap the ringed sword to reopen until the board changes' : ''}`)
 }
 function hit(to) {
@@ -479,7 +492,7 @@ function hit(to) {
 function undo(to) {
   const a = byId(S.armed), d = byId(to), st = S.hits[to].pop()
   apply(a.id, to, st.map((x) => -x))
-  fly(`+${sum(st)}`, spot(seatEls[to].querySelector('.coin:last-child') ?? seatEls[to].querySelector('.undo')), spot(seatEls[a.id].querySelector('.pbox:not(.off) .pnum')), { color: light(a.color), turn: [d.rot, a.rot], ms: 320 })
+  fly(`+${sum(st)}`, spot(seatEls[to].querySelector('.coin:last-of-type')), spot(seatEls[a.id].querySelector('.pbox:not(.off) .pnum')), { color: light(a.color), turn: [d.rot, a.rot], ms: 320 })
   render()
   log(`take back ${sum(st)} from ${d.name}: life → ${d.life}`)
 }
@@ -523,10 +536,9 @@ phone.addEventListener('click', (e) => {
   if (act === 'arm') arm(id)
   else if (act === 'hit') hit(id)
   else if (act === 'undo') undo(id)
-  else if (act === 'menu') {
-    if (S.armed) done()
-    else { menu.classList.remove('pulse'); void menu.offsetWidth; menu.classList.add('pulse') }
-  } else if (act === 'life') {
+  else if (act === 'done') done()
+  else if (act === 'menu') { menu.classList.remove('pulse'); void menu.offsetWidth; menu.classList.add('pulse') }
+  else if (act === 'life') {
     byId(id).life += +t.dataset.d
     if (S.last) log('board changed: last attack is now only in the Log')
     S.last = null
