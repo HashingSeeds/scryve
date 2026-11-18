@@ -179,6 +179,8 @@ export class OutboxSyncController {
     })
     this.store = createSnapshotStore(this.buildSnapshot())
     this.unsubscribeOutbox = this.outbox.state$.onChange(() => {
+      // why: a write leaving a full queue frees the room a waiting claim's confirmation needs.
+      if (this.confirmed) this.confirmWaitingClaims(this.confirmed)
       this.publish()
       this.resolveProjectionWaiter()
     })
@@ -582,6 +584,11 @@ export class OutboxSyncController {
   abandon = async (): Promise<boolean> => this.endGame("abandon", () => this.options.abandonGame())
 
   dismissFailed = (operationId: string): void => {
+    const { event } =
+      this.outbox.getState().failures.find(({ action }) => action.event.operationId === operationId)
+        ?.action ?? {}
+    if (event?.type === "commanderDamage.resolved")
+      this.confirmedClaims.delete(event.claimOperationId)
     this.outbox.dismiss(operationId)
     this.changeError = undefined
     this.publish()

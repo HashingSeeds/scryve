@@ -414,6 +414,63 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().pending).toEqual([])
   })
 
+  const waitingClaim = (createdAt: number) => ({
+    ...projection(0, 21),
+    commanderDamage: {
+      totals: [],
+      pendingClaims: [
+        {
+          claimId: "claim-1",
+          operationId: "commander-claim-000001",
+          fromPlayerId: "player-2",
+          toPlayerId: "player-1",
+          delta: 4,
+          clientCreatedAt: createdAt,
+          createdAt,
+        },
+      ],
+      eliminatedPlayerIds: [],
+    },
+  })
+
+  it("confirms a waiting claim once a sent write leaves a full queue, with no new projection", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1", { maxPendingRecords: 1 })
+    repository.outbox("game-public").enqueue(action("operation-full-0002", 1, 1))
+    const { clock, controller, sent } = harness({ storage, repository })
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    controller.onRemoteProjection(waitingClaim(clock.now()))
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+
+    controller.setEnvironment(ONLINE)
+    await settle()
+
+    expect(sent).toEqual(["operation-full-0002", expect.stringContaining("commanderResolve")])
+  })
+
+  it("confirms a waiting claim again after its failed confirmation is dismissed", async () => {
+    let failing = true
+    const { clock, controller, sent } = harness({
+      send: async (queued) => {
+        if (failing) throw new Error("Seat-owner permission required for the defending seat")
+        sent.push(queued.event.operationId)
+        return { operationId: queued.event.operationId }
+      },
+    })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(waitingClaim(clock.now()))
+    await settle()
+    const [failed] = controller.getSnapshot().failed
+    expect(failed.action.event.type).toBe("commanderDamage.resolved")
+
+    failing = false
+    controller.dismissFailed(failed.action.event.operationId)
+    controller.onRemoteProjection(waitingClaim(clock.now()))
+    await settle()
+
+    expect(sent).toEqual([expect.stringContaining("commanderResolve")])
+  })
+
   it("confirms a waiting claim with room the same projection frees in a full queue", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1", { maxPendingRecords: 1 })
