@@ -131,11 +131,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
     <button data-pick="v1" title="Grid, mark and name bottom-left. Sword in the corner, outside the bag.">1 by bag</button>
     <button data-pick="v3" title="Grid top-left. Mark, name and sword bottom-left.">2 by name</button>
   </div>
-  <div class="row" id="checks">
-    <button data-check="line">Check: line</button>
-    <button data-check="solid">solid</button>
-    <button data-check="disc">disc</button>
-  </div>
   <div id="log"></div>
 </div>
 
@@ -154,12 +149,8 @@ const SWORD = '<path d="M12 2.5 L14.1 6.4 V14.4 H9.9 V6.4 Z"/><rect x="6.8" y="1
 const sword = (size, color = 'currentColor', tilt = 0) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" style="transform:rotate(${tilt}deg)">${SWORD}</svg>`
 const mark = (shape, size, color) => `<svg width="${size}" height="${size}" viewBox="6 6 32 32" fill="${color}">${SHAPES[shape]}</svg>`
 const line = (size, plus, color = '#fff', w = 3) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" stroke="${color}" stroke-width="${w * 24 / size}" stroke-linecap="round"><path d="M3 12H21${plus ? 'M12 3V21' : ''}"/></svg>`
-const CHECKS = {
-  line: () => '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 7"/></svg>',
-  solid: () => '<svg width="30" height="30" viewBox="0 0 24 24" fill="#fff"><path d="M3.6 12.4 6.4 9.6 9.6 12.8 17.6 4.8 20.4 7.6 9.6 18.4Z"/></svg>',
-  disc: (color) => `<svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff"/><path d="M7 12.4 10.4 15.8 17.2 9" fill="none" stroke="${color}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-}
-let CK = 'disc'
+// solid, with Rubik Bold's stroke weight and softened corners
+const CHECK = '<svg width="30" height="30" viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"><path d="M5.52 11.68 9.4 15.56 18.68 6.28 20.52 8.12 9.4 19.24 3.68 13.52Z"/></svg>'
 const UNDO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>'
 const BAG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M8.2 3.5h7.6l-1.6 3.1c3.7 1.4 6.3 5 6.3 8.9 0 3.8-3.6 5.5-8.5 5.5s-8.5-1.7-8.5-5.5c0-3.9 2.6-7.5 6.3-8.9Z"/></svg>'
 const TOKENS = {
@@ -283,7 +274,7 @@ function idleSeat(p) {
 }
 
 function attackerSeat(p) {
-  const btn = `<button class="sword" data-act="done" aria-label="Done">${CHECKS[CK](p.color)}</button>`
+  const btn = `<button class="sword" data-act="done" aria-label="Done">${CHECK}</button>`
   const bs = boxes(p), pair = bs.length > 1, last = bs.filter((b) => b.on).length === 1
   const ink = shade(p.color), glyph = pair ? 18 : 22
   const cols = slots(p).map((c, slot) => {
@@ -345,7 +336,6 @@ const UNSHEATHE = { v1: () => 49, v3: (up) => up.querySelector('.namebtn').offse
 function render(intro = false) {
   phone.dataset.v = V
   document.querySelectorAll('[data-pick]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.pick === V))
-  document.querySelectorAll('[data-check]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.check === CK))
   S.players.forEach((p) => {
     const el = seatEls[p.id], up = el.firstElementChild, mode = modeOf(p)
     el.className = `seat${mode === 'defender' ? ' def' : ''}`
@@ -565,7 +555,6 @@ function show(v) {
   render()
 }
 document.getElementById('variants').onclick = (e) => show(e.target.dataset.pick)
-document.getElementById('checks').onclick = (e) => { if (e.target.dataset.check) { CK = e.target.dataset.check; render() } }
 addEventListener('keydown', (e) => show(VARIANTS[e.key - 1]))
 addEventListener('hashchange', () => show(hashed()))
 
