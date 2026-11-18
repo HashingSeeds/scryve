@@ -37,21 +37,19 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .tok { display: flex; align-items: center; gap: 2px; }
 .grid { display: grid; grid-template-columns: 22px 22px; gap: 3px; pointer-events: none; }
 .up > .grid { left: 12px; top: 10px; }
-.cell { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 11px; transition: opacity 200ms; }
+.cell { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-weight: 700; font-size: 11px; transition: opacity 200ms; }
 .cell.rim { box-shadow: inset 0 0 0 2px #fff; }
 .cell.near, .half.near { background: #fff !important; color: #000; }
 .cell.faded { opacity: .28; }
 .cell.lit { box-shadow: 0 0 0 2px #fff; }
-/* partners: the same circle cut across, one total per commander, first on top */
-.cell.duo { grid-template-rows: 1fr 1fr; place-items: stretch; gap: 1px; overflow: hidden; font-size: 9px; line-height: 1; }
+/* partners: the same square cut across, one total per commander, first on top */
+.cell.duo { grid-template-rows: 1fr 1fr; place-items: stretch; gap: 1px; overflow: hidden; font-size: 9.5px; line-height: 1; }
 .half { position: relative; display: grid; place-items: center; overflow: hidden; }
-.half:first-child { padding-top: 2.5px; }
-.half:last-child { padding-bottom: 2.5px; }
-/* a half's outline is its arc of the whole circle */
-.half::after { content: ""; position: absolute; left: 0; width: 22px; height: 22px; border-radius: 50%; }
+/* a half's outline is its part of the whole square's */
+.half::after { content: ""; position: absolute; left: 0; width: 22px; height: 22px; border-radius: 6px; }
 .half:first-child::after { top: 0; }
 .half:last-child::after { bottom: 0; }
-.half.rim::after { box-shadow: inset 0 0 0 1.5px #fff; }
+.half.rim::after { box-shadow: inset 0 0 0 2px #fff; }
 .half.zero { color: rgba(255,255,255,.4); }
 
 /* placement variants, in the seat's upright frame; v3 is the base */
@@ -101,9 +99,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .undo { right: 4px; top: calc(50% - 28px); width: 56px; height: 56px; display: grid; place-items: center; }
 /* each hit this attack, on an arc just outside the disc, oldest on top; a hit keeps its place as more land */
 .coins { left: 50%; top: 50%; }
-.coin, .more { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 11px; transform: rotate(var(--a)) translateX(110px) rotate(calc(var(--a) * -1)); }
-.coin { color: #000; }
-.more { font-size: 12px; opacity: .7; }
+.coin { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 11px; transform: rotate(var(--a)) translateX(110px) rotate(calc(var(--a) * -1)); }
+.coin { color: #000; box-shadow: 0 0 0 2px var(--ring); }
 .dname { left: 12px; bottom: 10px; display: flex; align-items: center; gap: 6px; min-height: 40px; font-weight: 700; font-size: 17px; opacity: .85; pointer-events: none; }
 
 /* center */
@@ -134,11 +131,18 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
     <button data-pick="v1" title="Grid, mark and name bottom-left. Sword in the corner, outside the bag.">1 by bag</button>
     <button data-pick="v3" title="Grid top-left. Mark, name and sword bottom-left.">2 by name</button>
   </div>
+  <div class="row" id="checks">
+    <button data-check="line">Check: line</button>
+    <button data-check="solid">solid</button>
+    <button data-check="disc">disc</button>
+  </div>
   <div id="log"></div>
 </div>
 
 <script>
 const LETHAL = 21
+// degrees of arc the hits on one seat may use
+const ARC = 70
 const W = 189, H = 416, PAD = 4, GAP = 4
 const SHAPES = {
   heart: '<path fill-rule="evenodd" d="M22 7.5C29.5 12 33.5 18.5 32.8 25.2 32.2 30.6 27.8 33.6 22.9 33.6V36.5A.9.9 0 0 1 21.1 36.5V33.6C16.2 33.6 11.8 30.6 11.2 25.2 10.5 18.5 14.5 12 22 7.5Z"/>',
@@ -150,7 +154,12 @@ const SWORD = '<path d="M12 2.5 L14.1 6.4 V14.4 H9.9 V6.4 Z"/><rect x="6.8" y="1
 const sword = (size, color = 'currentColor', tilt = 0) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" style="transform:rotate(${tilt}deg)">${SWORD}</svg>`
 const mark = (shape, size, color) => `<svg width="${size}" height="${size}" viewBox="6 6 32 32" fill="${color}">${SHAPES[shape]}</svg>`
 const line = (size, plus, color = '#fff', w = 3) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" stroke="${color}" stroke-width="${w * 24 / size}" stroke-linecap="round"><path d="M3 12H21${plus ? 'M12 3V21' : ''}"/></svg>`
-const CHECK = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 7"/></svg>'
+const CHECKS = {
+  line: () => '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 7"/></svg>',
+  solid: () => '<svg width="30" height="30" viewBox="0 0 24 24" fill="#fff"><path d="M3.6 12.4 6.4 9.6 9.6 12.8 17.6 4.8 20.4 7.6 9.6 18.4Z"/></svg>',
+  disc: (color) => `<svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff"/><path d="M7 12.4 10.4 15.8 17.2 9" fill="none" stroke="${color}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+}
+let CK = 'disc'
 const UNDO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>'
 const BAG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M8.2 3.5h7.6l-1.6 3.1c3.7 1.4 6.3 5 6.3 8.9 0 3.8-3.6 5.5-8.5 5.5s-8.5-1.7-8.5-5.5c0-3.9 2.6-7.5 6.3-8.9Z"/></svg>'
 const TOKENS = {
@@ -274,7 +283,7 @@ function idleSeat(p) {
 }
 
 function attackerSeat(p) {
-  const btn = `<button class="sword" data-act="done" aria-label="Done">${CHECK}</button>`
+  const btn = `<button class="sword" data-act="done" aria-label="Done">${CHECKS[CK](p.color)}</button>`
   const bs = boxes(p), pair = bs.length > 1, last = bs.filter((b) => b.on).length === 1
   const ink = shade(p.color), glyph = pair ? 18 : 22
   const cols = slots(p).map((c, slot) => {
@@ -313,7 +322,9 @@ function defenderSeat(p) {
   }).join('')
   const hits = S.hits[p.id] ?? []
   const { corner, lead } = gridOrMark(p, a.id)
-  const coins = hits.slice(-5).map((h, i) => `<div class="coin" style="background:${tint};--a:${-28 + i * 14}deg">${sum(h)}</div>`).join('')
+  // why: hits keep their spot until the arc is full; past that they close up so the arc never grows, and the newest sits on top
+  const step = hits.length > ARC / 14 + 1 ? ARC / (hits.length - 1) : 14
+  const coins = hits.map((h, i) => `<div class="coin" style="background:${tint};--a:${-ARC / 2 + i * step}deg">${sum(h)}</div>`).join('')
   return `
     ${corner}
     <div class="strike${lethal ? ' lethal' : ''}" style="${lethal ? '' : `color:${mix(a.color, '#ffffff', .78)}`}"><span class="dmg">−${dealt}</span><span class="sw">${sword(34, 'currentColor', 90)}</span></div>
@@ -323,7 +334,7 @@ function defenderSeat(p) {
       <div class="dlife">${p.life}</div>
     </div>
     <div class="dname">${lead}${p.name}</div>
-    ${hits.length ? `<div class="coins" data-act="none">${coins}${hits.length > 5 ? `<span class="more" style="--a:-42deg">+${hits.length - 5}</span>` : ''}</div>
+    ${hits.length ? `<div class="coins" data-act="none" style="--ring:${shade(a.color)}">${coins}</div>
     <button class="undo" data-act="undo" data-p="${p.id}" aria-label="Take back ${sum(hits.at(-1))}">${UNDO}</button>` : ''}`
 }
 
@@ -334,6 +345,7 @@ const UNSHEATHE = { v1: () => 49, v3: (up) => up.querySelector('.namebtn').offse
 function render(intro = false) {
   phone.dataset.v = V
   document.querySelectorAll('[data-pick]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.pick === V))
+  document.querySelectorAll('[data-check]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.check === CK))
   S.players.forEach((p) => {
     const el = seatEls[p.id], up = el.firstElementChild, mode = modeOf(p)
     el.className = `seat${mode === 'defender' ? ' def' : ''}`
@@ -553,6 +565,7 @@ function show(v) {
   render()
 }
 document.getElementById('variants').onclick = (e) => show(e.target.dataset.pick)
+document.getElementById('checks').onclick = (e) => { if (e.target.dataset.check) { CK = e.target.dataset.check; render() } }
 addEventListener('keydown', (e) => show(VARIANTS[e.key - 1]))
 addEventListener('hashchange', () => show(hashed()))
 
