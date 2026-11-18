@@ -14,7 +14,6 @@ import { recordReviewCompletion } from "@/utils/storeReview"
 import type { CommanderUndo } from "./connectedLog"
 import type {
   ConnectedCommanderDamageChange,
-  ConnectedCommanderDamageClaim,
   ConnectedDisplayProjection,
   ConnectedOperationStatus,
   ConnectionStatus,
@@ -45,7 +44,6 @@ interface ConnectedGameRuntimeBase extends TableRuntime {
     fromPlayerId: string,
     changes: readonly ConnectedCommanderDamageChange[],
   ) => void
-  resolveCommanderDamageClaim: (claim: ConnectedCommanderDamageClaim, accepted: boolean) => void
   finish: (result?: ConnectedGameResult) => Promise<boolean>
   abandon: () => Promise<boolean>
   dismissFailed: (operationId: string) => void
@@ -215,7 +213,6 @@ export function useConnectedRuntime(
       undoTable: controller.undoTable,
       undoCommander: controller.undoCommander,
       submitCommanderDamage: controller.submitCommanderDamage,
-      resolveCommanderDamageClaim: controller.resolveCommanderDamage,
       finish: controller.finish,
       abandon: controller.abandon,
       dismissFailed: controller.dismissFailed,

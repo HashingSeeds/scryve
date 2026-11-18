@@ -346,12 +346,7 @@ type ConnectedBoardReadyView = {
 
 type ConnectedBoardControls = Pick<
   ConnectedGameRuntime,
-  | "changeLife"
-  | "submitCommanderDamage"
-  | "resolveCommanderDamageClaim"
-  | "finish"
-  | "abandon"
-  | "dismissFailed"
+  "changeLife" | "submitCommanderDamage" | "finish" | "abandon" | "dismissFailed"
 > & {
   current: () => ConnectedGameRuntime
 }
@@ -634,32 +629,17 @@ export function ConnectedBoardWithRuntime({
   useLayoutEffect(() => {
     latest.current = runtime
   })
-  const {
-    changeLife,
-    submitCommanderDamage,
-    resolveCommanderDamageClaim,
-    finish,
-    abandon,
-    dismissFailed,
-  } = runtime
+  const { changeLife, submitCommanderDamage, finish, abandon, dismissFailed } = runtime
   const controls = useMemo(
     (): ConnectedBoardControls => ({
       changeLife,
       submitCommanderDamage,
-      resolveCommanderDamageClaim,
       finish,
       abandon,
       dismissFailed,
       current: () => latest.current,
     }),
-    [
-      abandon,
-      changeLife,
-      dismissFailed,
-      finish,
-      resolveCommanderDamageClaim,
-      submitCommanderDamage,
-    ],
+    [abandon, changeLife, dismissFailed, finish, submitCommanderDamage],
   )
   if (runtime.status === "loading")
     return (
@@ -904,9 +884,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         : "connected:board.failedAction.declineCommanderDamage",
     )
   }
-  const displayNameOf = (playerId: string) =>
-    game.players.find((candidate) => candidate.playerId === playerId)?.displayName ??
-    translate("connected:board.anotherSeat")
   const seatDeck = (playerId: PlayerId) => {
     const versionId = controlled.has(playerId)
       ? game.players.find((candidate) => candidate.playerId === playerId)?.deckVersionId
@@ -1430,18 +1407,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     incomingFor: commanderPort.incoming,
                     lethal: commanderLethal,
                     attack,
-                    pendingFor: (player) =>
-                      controlled.has(player.id)
-                        ? (game.commanderDamage?.pendingClaims ?? [])
-                            .filter((claim) => claim.toPlayerId === player.id)
-                            .map((claim) => ({
-                              claimId: claim.claimId,
-                              attackerName: displayNameOf(claim.fromPlayerId),
-                              delta: claim.delta,
-                              onConfirm: () => controls.resolveCommanderDamageClaim(claim, true),
-                              onDecline: () => controls.resolveCommanderDamageClaim(claim, false),
-                            }))
-                        : [],
                     onPressSword: toggleCommanderSword,
                   }
                 : undefined
@@ -1492,7 +1457,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           modes={boardModes.log.map(modeLogRow)}
           counterTable={counterTable}
           turnsShown={tabOn}
-          anyoneEdits={anySeat}
           origin={menuDialogOrigin}
           onUndoTurn={(playerId, operationId) => {
             table?.undoTurn(playerId, operationId)

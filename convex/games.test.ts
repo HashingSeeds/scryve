@@ -1501,6 +1501,30 @@ function commanderArgs(
   }
 }
 
+/** why: a claim sent before claims landed at once can still be waiting on its defender. */
+async function waitingClaim(
+  t: ConvexTestHarness,
+  game: Awaited<ReturnType<typeof activeGame>>,
+  operationId: string,
+  delta: number,
+) {
+  await t.run(async (ctx) => {
+    const attacker = await ctx.db.get(game.hostPlayerId)
+    await ctx.db.insert("gameCommanderClaims", {
+      gameId: attacker!.gameId,
+      operationId,
+      fromPlayerId: game.hostPlayerId,
+      toPlayerId: game.joinerPlayerId,
+      delta,
+      status: "pending",
+      actorUserId: attacker!.userId,
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      createdAt: 1_700_000_000_000,
+    })
+  })
+}
+
 describe("connected commander damage claims", () => {
   it("refuses to treat a commander claim as a replayed life change", async () => {
     const t = makeConvexTest()
@@ -1522,187 +1546,95 @@ describe("connected commander damage claims", () => {
     ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
   })
 
-  it("projects defender-only pending claims and confirms them atomically", async () => {
+  it("lands a claim at once where only a seat's owner edits it, and replays an older app's confirm or decline", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)
-    const submitted = await game.host.mutation(
-      api.games.submitCommanderDamage,
-      commanderArgs(
-        game.publicId,
-        game.hostPlayerId,
-        game.joinerPlayerId,
-        "commander-claim-0001",
-        7,
-      ),
+    const args = commanderArgs(
+      game.publicId,
+      game.hostPlayerId,
+      game.joinerPlayerId,
+      "commander-claim-0001",
+      7,
     )
-    expect(submitted).toMatchObject({ status: "pending", deduplicated: false })
-    await expect(
-      game.host.mutation(
-        api.games.submitCommanderDamage,
-        commanderArgs(
-          game.publicId,
-          game.hostPlayerId,
-          game.joinerPlayerId,
-          "commander-claim-0001",
-          7,
-        ),
-      ),
-    ).resolves.toMatchObject({ status: "pending", deduplicated: true })
-    await expect(
-      game.host.mutation(
-        api.games.submitCommanderDamage,
-        commanderArgs(
-          game.publicId,
-          game.hostPlayerId,
-          game.joinerPlayerId,
-          "commander-claim-0007",
-          1,
-        ),
-      ),
-    ).resolves.toMatchObject({ status: "declined" })
-
-    const attackerProjection = await game.host.query(api.games.lobbyProjection, {
-      publicId: game.publicId,
-      deviceId: "device-host-0001",
+    await expect(game.host.mutation(api.games.submitCommanderDamage, args)).resolves.toMatchObject({
+      status: "confirmed",
+      deduplicated: false,
     })
-    const defenderProjection = await game.joiner.query(api.games.lobbyProjection, {
-      publicId: game.publicId,
+    await expect(game.host.mutation(api.games.submitCommanderDamage, args)).resolves.toMatchObject({
+      status: "confirmed",
+      deduplicated: true,
     })
-    expect(attackerProjection.commanderDamage?.pendingClaims).toEqual([])
-    expect(defenderProjection.commanderDamage?.pendingClaims).toMatchObject([
-      expect.objectContaining({
-        operationId: "commander-claim-0001",
-        fromPlayerId: game.hostPlayerId,
-        toPlayerId: game.joinerPlayerId,
-        delta: 7,
-      }),
-    ])
-
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        publicId: game.publicId,
-        operationId: "commander-claim-0001",
-        deviceId: "device-joiner-001",
-        clientCreatedAt: 1_700_000_000_001,
-      }),
-    ).resolves.toMatchObject({ status: "confirmed", total: 7, currentLife: 33 })
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        publicId: game.publicId,
-        operationId: "commander-claim-0001",
-        deviceId: "device-joiner-001",
-        clientCreatedAt: 1_700_000_000_002,
-      }),
-    ).resolves.toMatchObject({ status: "confirmed", deduplicated: true, total: 7 })
-
-    const projection = await game.host.query(api.games.lobbyProjection, {
-      publicId: game.publicId,
+    const defender = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(defender.players.map((player) => player.currentLife)).toEqual([40, 33])
+    expect(defender.commanderDamage).toMatchObject({
+      totals: [{ fromPlayerId: game.hostPlayerId, toPlayerId: game.joinerPlayerId, total: 7 }],
+      pendingClaims: [],
     })
-    expect(projection.players.map((player) => player.currentLife)).toEqual([40, 33])
-    expect(projection.commanderDamage).toMatchObject({
-      totals: [
-        expect.objectContaining({
-          fromPlayerId: game.hostPlayerId,
-          toPlayerId: game.joinerPlayerId,
-          total: 7,
-        }),
-      ],
-    })
-    expect(await t.run((ctx) => ctx.db.query("gameEvents").collect())).toHaveLength(4)
-  })
+    const eventCount = async () =>
+      (await t.run((ctx) => ctx.db.query("gameEvents").collect())).length
+    const events = await eventCount()
 
-  it("supports negative claims, declines without changing life, and projects lethal damage", async () => {
-    const t = makeConvexTest()
-    const game = await activeGame(t)
-    await game.host.mutation(
-      api.games.submitCommanderDamage,
-      commanderArgs(
-        game.publicId,
-        game.hostPlayerId,
-        game.joinerPlayerId,
-        "commander-claim-0002",
-        21,
-      ),
-    )
-    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+    const resolution = {
       publicId: game.publicId,
-      operationId: "commander-claim-0002",
+      operationId: "commander-claim-0001",
+      resolutionOperationId: "commander-resolution-0001",
       deviceId: "device-joiner-001",
       clientCreatedAt: 1_700_000_000_001,
-    })
+    }
+    for (const resolve of [api.games.confirmCommanderDamage, api.games.declineCommanderDamage])
+      await expect(game.joiner.mutation(resolve, resolution)).resolves.toMatchObject({
+        operationId: "commander-resolution-0001",
+        status: "confirmed",
+        deduplicated: true,
+        total: 7,
+        currentLife: 33,
+      })
+    const { publicId, resolutionOperationId, operationId, ...sent } = resolution
+    for (const accepted of [true, false])
+      await expect(
+        game.joiner.query(api.games.connectedOperationStatus, {
+          publicId,
+          operation: {
+            kind: "commanderDamage.resolved",
+            operationId: resolutionOperationId,
+            claimOperationId: operationId,
+            toPlayerId: game.joinerPlayerId,
+            accepted,
+            ...sent,
+          },
+        }),
+      ).resolves.toMatchObject({ status: "acknowledged" })
+    await expect(
+      game.host.mutation(api.games.declineCommanderDamage, {
+        ...resolution,
+        deviceId: "device-host-0001",
+      }),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+    expect(await eventCount()).toBe(events)
+  })
+
+  it("supports negative claims and projects lethal damage", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const claim = (operationId: string, delta: number) =>
+      game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta),
+      )
+    await claim("commander-claim-0002", 21)
     let projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
     expect(projection.players[1]).toMatchObject({
       currentLife: 19,
       eliminatedByCommanderDamage: true,
     })
 
-    await game.host.mutation(
-      api.games.submitCommanderDamage,
-      commanderArgs(
-        game.publicId,
-        game.hostPlayerId,
-        game.joinerPlayerId,
-        "commander-claim-0003",
-        -3,
-      ),
-    )
-    await game.joiner.mutation(api.games.confirmCommanderDamage, {
-      publicId: game.publicId,
-      operationId: "commander-claim-0003",
-      deviceId: "device-joiner-001",
-      clientCreatedAt: 1_700_000_000_002,
-    })
+    await claim("commander-claim-0003", -3)
     projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
     expect(projection.players[1]).toMatchObject({
       currentLife: 22,
       eliminatedByCommanderDamage: false,
     })
     expect(projection.commanderDamage?.totals[0]).toMatchObject({ total: 18 })
-
-    await game.host.mutation(
-      api.games.submitCommanderDamage,
-      commanderArgs(
-        game.publicId,
-        game.hostPlayerId,
-        game.joinerPlayerId,
-        "commander-claim-0004",
-        1,
-      ),
-    )
-    await expect(
-      game.host.mutation(api.games.declineCommanderDamage, {
-        publicId: game.publicId,
-        operationId: "commander-claim-0004",
-        deviceId: "device-host-0001",
-        clientCreatedAt: 1_700_000_000_003,
-      }),
-    ).rejects.toThrow("Seat-owner permission required for the defending seat")
-    await expect(
-      game.joiner.mutation(api.games.declineCommanderDamage, {
-        publicId: game.publicId,
-        operationId: "commander-claim-0004",
-        deviceId: "device-joiner-001",
-        clientCreatedAt: 1_700_000_000_003,
-      }),
-    ).resolves.toMatchObject({ status: "declined", deduplicated: false })
-    projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
-    expect(projection.players[1].currentLife).toBe(22)
-    expect(projection.commanderDamage?.pendingClaims).toEqual([])
-    const events = await game.joiner.query(api.games.connectedEvents, {
-      publicId: game.publicId,
-      paginationOpts: { cursor: null, numItems: 20 },
-    })
-    expect(events.page.map((event) => event.kind)).toEqual(
-      expect.arrayContaining([
-        "commanderDamage.declined",
-        "commanderDamage.confirmed",
-        "commanderDamage.confirmed",
-        "commanderDamage.claimed",
-        "commanderDamage.confirmed",
-        "commanderDamage.claimed",
-        "commanderDamage.claimed",
-      ]),
-    )
   })
 
   it("rejects non-owners and non-Commander games", async () => {
@@ -1763,58 +1695,31 @@ describe("connected commander damage claims", () => {
       commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta)
     const claim = (operationId: string, delta: number) =>
       game.host.mutation(api.games.submitCommanderDamage, claimArgs(operationId, delta))
-    const confirm = (operationId: string) =>
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        publicId: game.publicId,
-        operationId,
-        deviceId: "device-joiner-001",
-        clientCreatedAt: 1_700_000_000_001,
-      })
     await claim("commander-queued-0001", 5)
-    await confirm("commander-queued-0001")
-    await claim("commander-queued-0002", -5)
     const eventCount = async () =>
       (await t.run((ctx) => ctx.db.query("gameEvents").collect())).length
-    await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
+    await expect(claim("commander-queued-0003", -6)).resolves.toMatchObject({
       status: "declined",
       deduplicated: false,
     })
     const eventsAfterDecline = await eventCount()
-    await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
+    await expect(claim("commander-queued-0003", -6)).resolves.toMatchObject({
       status: "declined",
       deduplicated: true,
     })
     expect(await eventCount()).toBe(eventsAfterDecline)
-    const { publicId, ...submitted } = claimArgs("commander-queued-0003", -5)
+    const { publicId, ...submitted } = claimArgs("commander-queued-0003", -6)
     await expect(
       game.host.query(api.games.connectedOperationStatus, {
         publicId,
         operation: { kind: "commanderDamage.submitted", ...submitted },
       }),
     ).resolves.toMatchObject({ status: "acknowledged" })
-    const defender = await game.joiner.query(api.games.lobbyProjection, {
-      publicId: game.publicId,
-    })
-    expect(defender.commanderDamage?.pendingClaims).toMatchObject([
-      { operationId: "commander-queued-0002" },
-    ])
-
-    await confirm("commander-queued-0002")
-    await expect(claim("commander-queued-0006", -5)).resolves.toMatchObject({
-      status: "declined",
-    })
-    await game.host.mutation(
-      api.games.changeLife,
-      lifeArgs(game.publicId, game.hostPlayerId, "operation-after-decline", -3),
-    )
     const projection = await game.joiner.query(api.games.lobbyProjection, {
       publicId: game.publicId,
     })
-    expect(projection.players.map((player) => player.currentLife)).toEqual([37, 40])
-    expect(projection.commanderDamage).toMatchObject({
-      totals: [expect.objectContaining({ total: 0 })],
-      pendingClaims: [],
-    })
+    expect(projection.players.map((player) => player.currentLife)).toEqual([40, 35])
+    expect(projection.commanderDamage?.totals).toMatchObject([{ total: 5 }])
 
     await expect(
       game.joiner.mutation(
@@ -1829,15 +1734,6 @@ describe("connected commander damage claims", () => {
         ),
       ),
     ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
-    await expect(claim("commander-queued-0005", 1)).resolves.toMatchObject({ status: "pending" })
-    await expect(
-      game.host.mutation(api.games.declineCommanderDamage, {
-        publicId: game.publicId,
-        operationId: "commander-queued-0005",
-        deviceId: "device-host-0001",
-        clientCreatedAt: 1_700_000_000_002,
-      }),
-    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
   })
 
   it("declines totals above 999 and refuses a decline id another event already uses", async () => {
@@ -1849,12 +1745,6 @@ describe("connected commander damage claims", () => {
         commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta),
       )
     await claim("commander-ceiling-0001", 999)
-    await game.joiner.mutation(api.games.confirmCommanderDamage, {
-      publicId: game.publicId,
-      operationId: "commander-ceiling-0001",
-      deviceId: "device-joiner-001",
-      clientCreatedAt: 1_700_000_000_001,
-    })
     await expect(claim("commander-ceiling-0002", 1)).resolves.toMatchObject({
       status: "declined",
     })
@@ -1871,195 +1761,52 @@ describe("connected commander damage claims", () => {
     })
   })
 
-  it("does not acknowledge a resolution whose stored outcome conflicts with the queue", async () => {
+  it("confirms a claim left waiting from before claims landed at once", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)
-    await game.host.mutation(
-      api.games.submitCommanderDamage,
-      commanderArgs(
-        game.publicId,
-        game.hostPlayerId,
-        game.joinerPlayerId,
-        "commander-claim-status",
-        3,
-      ),
-    )
-    await game.joiner.mutation(api.games.declineCommanderDamage, {
-      publicId: game.publicId,
-      operationId: "commander-claim-status",
-      deviceId: "device-joiner-001",
-      clientCreatedAt: 1_700_000_000_001,
-    })
-
-    await expect(
-      game.joiner.query(api.games.connectedOperationStatus, {
-        publicId: game.publicId,
-        operation: {
-          kind: "commanderDamage.resolved",
-          operationId: "commander-resolution-status",
-          claimOperationId: "commander-claim-status",
-          toPlayerId: game.joinerPlayerId,
-          accepted: true,
-          deviceId: "device-joiner-001",
-          clientCreatedAt: 1_700_000_000_001,
-        },
-      }),
-    ).resolves.toMatchObject({
-      status: "conflict",
-      reason: expect.stringContaining("resolved differently"),
-    })
-  })
-
-  it("returns a mismatch code when a commander resolution operation ID is reused", async () => {
-    const t = makeConvexTest()
-    const game = await activeGame(t)
-    const claimIds = ["commander-unique-claim-one", "commander-unique-claim-two"]
-    for (const claimId of claimIds.slice(0, 1)) {
-      await game.host.mutation(
-        api.games.submitCommanderDamage,
-        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, claimId, 3),
-      )
-    }
-    const resolution = {
-      publicId: game.publicId,
-      operationId: claimIds[0],
-      resolutionOperationId: "commander-unique-resolution",
-      deviceId: "device-joiner-001",
-      clientCreatedAt: 1_700_000_000_004,
-    }
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        ...resolution,
-        resolutionOperationId: "",
-      }),
-    ).rejects.toThrow("Invalid operation identifier")
-    await game.joiner.mutation(api.games.confirmCommanderDamage, resolution)
-    for (const claimId of claimIds.slice(1)) {
-      await game.host.mutation(
-        api.games.submitCommanderDamage,
-        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, claimId, 3),
-      )
-    }
-
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        ...resolution,
-        operationId: claimIds[1],
-      }),
-    ).rejects.toMatchObject({
-      data: {
-        code: "sync_operation_mismatch",
-        message: "Operation identifier was reused with different data",
-      },
-    })
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
-    ).resolves.toMatchObject({ deduplicated: true })
-    const projection = await game.joiner.query(api.games.lobbyProjection, {
-      publicId: game.publicId,
-    })
-    expect(
-      projection.players.find((player) => player.playerId === game.joinerPlayerId)?.currentLife,
-    ).toBe(37)
-  })
-
-  it("binds new resolution retries while preserving old resolution calls", async () => {
-    const t = makeConvexTest()
-    const game = await activeGame(t)
-    await game.host.mutation(
-      api.games.submitCommanderDamage,
-      commanderArgs(
-        game.publicId,
-        game.hostPlayerId,
-        game.joinerPlayerId,
-        "commander-claim-binding",
-        3,
-      ),
-    )
-    const resolution = {
-      publicId: game.publicId,
-      operationId: "commander-claim-binding",
-      resolutionOperationId: "commander-resolution-binding",
-      deviceId: "device-joiner-001",
-      clientCreatedAt: 1_700_000_000_004,
-    }
-    await game.joiner.mutation(api.games.confirmCommanderDamage, {
-      publicId: resolution.publicId,
-      operationId: resolution.operationId,
-      deviceId: resolution.deviceId,
-      clientCreatedAt: resolution.clientCreatedAt,
-    })
+    await waitingClaim(t, game, "commander-waiting-0001", 4)
+    const defender = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(defender.commanderDamage?.pendingClaims).toMatchObject([
+      { operationId: "commander-waiting-0001", delta: 4 },
+    ])
     const operation = {
       kind: "commanderDamage.resolved" as const,
-      operationId: resolution.resolutionOperationId,
-      claimOperationId: resolution.operationId,
+      operationId: "commander-resolution-wait",
+      claimOperationId: "commander-waiting-0001",
       toPlayerId: game.joinerPlayerId,
       accepted: true,
-      deviceId: resolution.deviceId,
-      clientCreatedAt: resolution.clientCreatedAt,
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_004,
     }
+    const status = () =>
+      game.joiner.query(api.games.connectedOperationStatus, { publicId: game.publicId, operation })
+    await expect(status()).resolves.toMatchObject({ status: "not_found" })
+
     await expect(
-      game.joiner.query(api.games.connectedOperationStatus, {
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
         publicId: game.publicId,
-        operation,
+        operationId: "commander-waiting-0001",
+        resolutionOperationId: "commander-resolution-wait",
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_004,
       }),
-    ).resolves.toMatchObject({ status: "not_found" })
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
     ).resolves.toMatchObject({
       status: "confirmed",
-      operationId: resolution.resolutionOperationId,
+      deduplicated: false,
+      total: 4,
+      currentLife: 36,
     })
-    await expect(
-      game.joiner.query(api.games.connectedOperationStatus, {
-        publicId: game.publicId,
-        operation,
-      }),
-    ).resolves.toMatchObject({ status: "acknowledged" })
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        ...resolution,
-        resolutionOperationId: "commander-resolution-other",
-      }),
-    ).rejects.toThrow("reused with different data")
-
+    await expect(status()).resolves.toMatchObject({ status: "acknowledged" })
+    await waitingClaim(t, game, "commander-waiting-0002", 3)
     await expect(
       game.joiner.mutation(api.games.confirmCommanderDamage, {
         publicId: game.publicId,
-        operationId: resolution.operationId,
-        deviceId: resolution.deviceId,
-        clientCreatedAt: resolution.clientCreatedAt + 1,
+        operationId: "commander-waiting-0002",
+        resolutionOperationId: "commander-resolution-wait",
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_005,
       }),
-    ).resolves.toMatchObject({ status: "confirmed", deduplicated: true })
-  })
-
-  it("does not bind a new operation ID to the opposite legacy decision", async () => {
-    const t = makeConvexTest()
-    const game = await activeGame(t)
-    await game.host.mutation(
-      api.games.submitCommanderDamage,
-      commanderArgs(
-        game.publicId,
-        game.hostPlayerId,
-        game.joinerPlayerId,
-        "commander-claim-legacy-binding",
-        3,
-      ),
-    )
-    const legacyResolution = {
-      publicId: game.publicId,
-      operationId: "commander-claim-legacy-binding",
-      deviceId: "device-joiner-001",
-      clientCreatedAt: 1_700_000_000_005,
-    }
-    await game.joiner.mutation(api.games.declineCommanderDamage, legacyResolution)
-
-    await expect(
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        ...legacyResolution,
-        resolutionOperationId: "commander-resolution-legacy-binding",
-      }),
-    ).rejects.toThrow("reused with different data")
+    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
   })
 
   it("tracks partner commander damage separately, so only 21 from one commander is lethal", async () => {
@@ -2071,30 +1818,9 @@ describe("connected commander damage claims", () => {
       ...first(operationId, delta),
       commander: 1,
     })
-    const confirm = (operationId: string) =>
-      game.joiner.mutation(api.games.confirmCommanderDamage, {
-        publicId: game.publicId,
-        operationId,
-        deviceId: "device-joiner-001",
-        clientCreatedAt: 1_700_000_000_001,
-      })
 
-    await expect(
-      game.host.mutation(api.games.submitCommanderDamage, first("first-commander-0001", 11)),
-    ).resolves.toMatchObject({ status: "pending" })
-    await expect(
-      game.host.mutation(api.games.submitCommanderDamage, partner("partner-commander-0001", 11)),
-    ).resolves.toMatchObject({ status: "pending" })
-    const defender = await game.joiner.query(api.games.lobbyProjection, {
-      publicId: game.publicId,
-    })
-    expect(defender.commanderDamage?.pendingClaims).toEqual([
-      expect.not.objectContaining({ commander: expect.anything() }),
-      expect.objectContaining({ operationId: "partner-commander-0001", commander: 1 }),
-    ])
-    await confirm("first-commander-0001")
-    await expect(confirm("partner-commander-0001")).resolves.toMatchObject({ total: 11 })
-
+    await game.host.mutation(api.games.submitCommanderDamage, first("first-commander-0001", 11))
+    await game.host.mutation(api.games.submitCommanderDamage, partner("partner-commander-0001", 11))
     let projection = await game.joiner.query(api.games.lobbyProjection, {
       publicId: game.publicId,
     })
@@ -2111,7 +1837,6 @@ describe("connected commander damage claims", () => {
     )
 
     await game.host.mutation(api.games.submitCommanderDamage, partner("partner-commander-0002", 10))
-    await confirm("partner-commander-0002")
     projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
     expect(projection.players[1]).toMatchObject({ eliminatedByCommanderDamage: true })
     expect(projection.commanderDamage?.totals).toEqual(

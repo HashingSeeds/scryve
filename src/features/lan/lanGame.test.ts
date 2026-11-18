@@ -379,7 +379,7 @@ describe("nearby rounds on the shared engine", () => {
     )
   })
 
-  it("shows a commander claim only to its defender and applies the defender's confirm", () => {
+  it("lands commander damage at once, with no claim left for the defender", () => {
     const claimed = write(
       started(),
       "host",
@@ -392,28 +392,14 @@ describe("nearby rounds on the shared engine", () => {
       }),
     ).next
 
-    expect(lanProjection(claimed, "guest").commanderDamage?.pendingClaims).toHaveLength(1)
-    expect(lanProjection(claimed, "host").commanderDamage?.pendingClaims).toEqual([])
-
-    const confirmed = write(
-      claimed,
-      "guest",
-      op({
-        type: "commanderDamage.resolved",
-        operationId: "resolve-operation-1",
-        claimOperationId: "claim-operation-001",
-        toPlayerId: "guest",
-        accepted: true,
-      }),
-    ).next
-
-    expect(lifeOf(confirmed, "host", "guest")).toBe(33)
-    expect(lanProjection(confirmed, "host").commanderDamage?.totals).toEqual([
+    expect(lanProjection(claimed, "guest").commanderDamage?.pendingClaims).toEqual([])
+    expect(lifeOf(claimed, "host", "guest")).toBe(33)
+    expect(lanProjection(claimed, "host").commanderDamage?.totals).toEqual([
       { fromPlayerId: "host", toPlayerId: "guest", total: 7 },
     ])
   })
 
-  it("takes a confirmed claim back once when its undo names it", () => {
+  it("takes a claim back once when its undo names it", () => {
     const claim = (operationId: string, delta: number, undo = {}) =>
       op({
         type: "commanderDamage.submitted",
@@ -424,24 +410,10 @@ describe("nearby rounds on the shared engine", () => {
         commanderLimit: 999,
         ...undo,
       })
-    const confirm = (operationId: string, claimOperationId: string) =>
-      op({
-        type: "commanderDamage.resolved",
-        operationId,
-        claimOperationId,
-        toPlayerId: "guest",
-        accepted: true,
-      })
     const undone = [
       claim("claim-operation-001", 7),
-      confirm("resolve-operation-1", "claim-operation-001"),
       claim("claim-operation-002", -7, { undoOf: "claim-operation-001" }),
-      confirm("resolve-operation-2", "claim-operation-002"),
-    ].reduce(
-      (game, event) =>
-        write(game, event.type === "commanderDamage.resolved" ? "guest" : "host", event).next,
-      started(),
-    )
+    ].reduce((game, event) => write(game, "host", event).next, started())
 
     expect(lifeOf(undone, "host", "guest")).toBe(40)
     expect(
@@ -460,22 +432,7 @@ describe("nearby rounds on the shared engine", () => {
         delta,
         ...marker,
       })
-    const confirm = (operationId: string, claimOperationId: string) =>
-      op({
-        type: "commanderDamage.resolved",
-        operationId,
-        claimOperationId,
-        toPlayerId: "guest",
-        accepted: true,
-      })
-    const at120 = [
-      claim("claim-operation-001", 120),
-      confirm("resolve-operation-1", "claim-operation-001"),
-    ].reduce(
-      (game, event) =>
-        write(game, event.type === "commanderDamage.resolved" ? "guest" : "host", event).next,
-      started(),
-    )
+    const at120 = write(started(), "host", claim("claim-operation-001", 120)).next
     const marked = claim("claim-operation-003", -21, { commanderLimit: 999 })
 
     expect(marked).toMatchObject({ commanderLimit: 999 })
@@ -485,7 +442,7 @@ describe("nearby rounds on the shared engine", () => {
     })
     expect(write(at120, "host", marked).result).toMatchObject({
       ok: true,
-      ack: { status: "pending" },
+      ack: { status: "confirmed", total: 99 },
     })
   })
 
@@ -499,39 +456,16 @@ describe("nearby rounds on the shared engine", () => {
         delta,
         ...partner,
       })
-    const confirm = (operationId: string, claimOperationId: string) =>
-      op({
-        type: "commanderDamage.resolved",
-        operationId,
-        claimOperationId,
-        toPlayerId: "guest",
-        accepted: true,
-      })
     const claimed = [
       claim("claim-operation-001", 7),
       claim("claim-operation-002", 14, { commander: 1 }),
     ].reduce((game, event) => write(game, "host", event).next, started())
 
-    expect(
-      lanProjection(claimed, "guest").commanderDamage?.pendingClaims.map(
-        ({ operationId, commander }) => [operationId, commander],
-      ),
-    ).toEqual([
-      ["claim-operation-001", undefined],
-      ["claim-operation-002", 1],
-    ])
-
-    const confirmed = [
-      confirm("resolve-operation-1", "claim-operation-002"),
-      confirm("resolve-operation-2", "claim-operation-001"),
-    ].reduce((game, event) => write(game, "guest", event).next, claimed)
-    const projection = lanProjection(confirmed, "host")
-
-    expect(lifeOf(confirmed, "host", "guest")).toBe(19)
-    expect(projection.commanderDamage).toMatchObject({
+    expect(lifeOf(claimed, "host", "guest")).toBe(19)
+    expect(lanProjection(claimed, "host").commanderDamage).toMatchObject({
       totals: [
-        { fromPlayerId: "host", toPlayerId: "guest", commander: 1, total: 14 },
         { fromPlayerId: "host", toPlayerId: "guest", total: 7 },
+        { fromPlayerId: "host", toPlayerId: "guest", commander: 1, total: 14 },
       ],
       eliminatedPlayerIds: [],
     })

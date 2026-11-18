@@ -31,7 +31,6 @@ import { startTapTiming } from "@/utils/tapTiming"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
 import {
   ATTACK_SHADE,
   DAMAGE_INK,
@@ -140,7 +139,6 @@ export type LifeCardCommanderDamage = {
   onUndo?: () => void
   acted?: boolean
   armBar?: { stagedTargets: number; onSend: () => void }
-  pendingClaims?: readonly CommanderClaim[]
 }
 
 export type LifeCardOut = { reason: string } & (
@@ -574,10 +572,8 @@ export const LifeCard = memo(function LifeCard({
   }))
   const lifeControlsShown =
     !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
-  const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   const trailingButtonSize = seatBagSize(compact)
-  const claimShown = !!claims?.length
   const sourceShown = attackerSide || sourceLanding
   // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card.
   const commanderStripShown =
@@ -1143,21 +1139,8 @@ export const LifeCard = memo(function LifeCard({
           ) : null}
         </Animated.View>
       ) : null}
-      {claims?.length ? (
-        <CommanderClaimBanner
-          seatNumber={seatNumber}
-          claims={claims}
-          contentRotation={contentRotation}
-          contentInsets={contentInsets}
-          menuEdgeCenter={menuEdgeCenter}
-          cardSize={cardSize}
-          compact={compact}
-          disabled={disabled}
-        />
-      ) : null}
       {(seatTable || seatBag) &&
       (!team || sheetOwner === undefined || sheetOwner === "zone") &&
-      !claimShown &&
       !diceCovers &&
       !commanderCovers &&
       !sittingOut &&
@@ -1207,9 +1190,7 @@ export const LifeCard = memo(function LifeCard({
           compact={compact}
           row={{ start: teamRow.start, end: teamRow.end, bottom: teamBagBottom }}
           namesHidden={tableSheetOpen || diceCovers || (commanderCovers && !attackerSide)}
-          countersShown={
-            !claimShown && !diceCovers && !commanderCovers && !sittingOut && !editorOpen
-          }
+          countersShown={!diceCovers && !commanderCovers && !sittingOut && !editorOpen}
           sheetOwner={sheetOwner}
           onSheetFor={sheetFor}
         />

@@ -27,7 +27,6 @@ export function connectedLogEvents(
   confirmed: readonly ConnectedLogEvent[],
   pending: readonly PendingLifeAction[],
   gameId: string,
-  anyoneEdits = false,
 ): ConnectedLogEvent[] {
   const known = new Set(confirmed.map(({ operationId }) => operationId))
   const unsent = [...pending].sort(compareQueued).flatMap(({ event }): ConnectedLogEvent[] => {
@@ -59,7 +58,7 @@ export function connectedLogEvents(
         },
       ]
     const confirmation = `${event.operationId}_confirmed`
-    if (event.type === "commanderDamage.submitted" && anyoneEdits && !known.has(confirmation))
+    if (event.type === "commanderDamage.submitted" && !known.has(confirmation))
       return [
         {
           ...base,
@@ -307,7 +306,7 @@ export function connectedLogUndo(
       }),
     }
   if (row.fromPlayerId) {
-    // why: the authority takes back a claim only for the person who made it, and on an owner-only table the confirmed row belongs to the defender.
+    // why: the authority takes back a claim only for the person who made it, and a claim confirmed by its defender, before claims landed at once, has a confirmed row that is theirs.
     const myClaims = new Set(
       events.flatMap((event) =>
         event.kind === "commanderDamage.claimed" && event.mine && !event.undoOf

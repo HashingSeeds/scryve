@@ -33,7 +33,7 @@ import { counterOutReason, seatTableState } from "./CounterChips"
 import { CounterNameHostContext, useCounterNameBoard } from "./CounterNamePanel"
 import type { LifeCardDice } from "./DiceSeatOverlay"
 import { EdgeTabsShownContext } from "./EdgeTabs"
-import { LifeCard, type LifeCardCommanderDamage, type LifeCardOut } from "./LifeCard"
+import { LifeCard, type LifeCardOut } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   COMPACT_LIFE_TARGET_SIZE,
@@ -65,7 +65,6 @@ export interface CommanderDamageGridBinding {
   incomingFor: (playerId: PlayerId, commander?: CommanderSlot) => Record<PlayerId, number>
   lethal: number
   attack: CommanderAttack
-  pendingFor?: (player: GamePlayer) => LifeCardCommanderDamage["pendingClaims"]
   onPressSword: (player: GamePlayer) => void
 }
 
@@ -607,9 +606,6 @@ export function PlayerGrid({
                         defenderIndex: ownerIndex,
                       })
                     : undefined,
-                pendingClaims: team
-                  ? team.flatMap((member) => commanderDamage.pendingFor?.(member) ?? [])
-                  : commanderDamage.pendingFor?.(player),
                 onPressSword: sword,
                 acted: attack.acted,
                 onHit: stable(`hit:${owner.id}`, () =>

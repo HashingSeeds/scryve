@@ -20,7 +20,6 @@ import { darkTheme } from "@/theme/theme"
 import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
 import * as reducedMotion from "@/utils/useReducedMotion"
 
-import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
 import {
   ATTACK_SHADE,
   attackerLayout,
@@ -1160,75 +1159,6 @@ describe("LifeCard", () => {
       view.getByTestId("commander-exit-check-seat-1", { includeHiddenElements: true }),
     )
     expect(onSend).toHaveBeenCalledTimes(1)
-  })
-
-  describe("pending commander damage claims", () => {
-    const claim = (claimId: string, attackerName: string) => ({
-      claimId,
-      attackerName,
-      delta: 4,
-      onConfirm: jest.fn(),
-      onDecline: jest.fn(),
-    })
-    const claimCard = (claims: ReturnType<typeof claim>[], onChange = jest.fn()) => (
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={40}
-          color="#41476E"
-          commanderDamage={commanderDamage({ pendingClaims: claims })}
-          onChange={onChange}
-        />
-      </ThemeProvider>
-    )
-    const renderClaims = (claims: ReturnType<typeof claim>[], onChange = jest.fn()) => {
-      const view = render(claimCard(claims, onChange))
-      fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
-        nativeEvent: { layout: { width: 360, height: 280, x: 0, y: 0 } },
-      })
-      return view
-    }
-
-    it("queues claims in a banner while the seat's own life controls keep working", () => {
-      const onChange = jest.fn()
-      const first = claim("claim-1", "Grace")
-      const view = renderClaims([first, claim("claim-2", "Linus")], onChange)
-
-      expect(view.getByText("Grace: 4 commander damage")).toBeTruthy()
-      expect(view.getByText("1 more")).toBeTruthy()
-      fireEvent.press(view.getByTestId(lifeControlTestId(1, -1)))
-      fireEvent.press(view.getByTestId(lifeControlTestId(1, 1)))
-      expect(onChange.mock.calls).toEqual([[-1], [1]])
-
-      act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
-      fireEvent.press(view.getByTestId("commander-decline-seat-1-claim-1"))
-      fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-1"))
-      expect(first.onDecline).toHaveBeenCalledTimes(1)
-      expect(first.onConfirm).toHaveBeenCalledTimes(1)
-    })
-
-    it("ignores taps on a claim until it has been on show for a beat", () => {
-      const first = claim("claim-1", "Grace")
-      const next = claim("claim-2", "Linus")
-      const view = renderClaims([first, next])
-
-      const confirm = () => view.getByTestId("commander-confirm-seat-1-claim-1")
-      expect(confirm().props.accessibilityState.disabled).toBe(true)
-      fireEvent.press(confirm())
-      expect(first.onConfirm).not.toHaveBeenCalled()
-      act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
-      expect(confirm().props.accessibilityState.disabled).toBe(false)
-      fireEvent.press(confirm())
-      expect(first.onConfirm).toHaveBeenCalledTimes(1)
-
-      view.rerender(claimCard([next]))
-      fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-2"))
-      expect(next.onConfirm).not.toHaveBeenCalled()
-      act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
-      fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-2"))
-      expect(next.onConfirm).toHaveBeenCalledTimes(1)
-    })
   })
 
   it("closes the life editor on Android Back", () => {

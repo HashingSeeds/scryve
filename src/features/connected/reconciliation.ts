@@ -48,7 +48,6 @@ export function overlayPendingDeltas(
   }
   const seatRules = playTableRules(confirmed.system, confirmed.format)
   const rules = teams ? teamTableRules(seatRules) : seatRules
-  const resolvingClaims = new Set<string>()
   const commanderHits: {
     fromPlayerId: string
     toPlayerId: string
@@ -74,24 +73,19 @@ export function overlayPendingDeltas(
       table = change.table
       for (const life of change.life) addDelta(life.playerId, life.delta)
     }
-    // why: where a seat's owner must confirm commander damage, a queued claim moves no life until they do.
-    if (event.type === "commanderDamage.submitted" && confirmed.lifeEditing === "anyone") {
+    if (event.type === "commanderDamage.submitted") {
       addDelta(event.toPlayerId, -event.delta)
       commanderHits.push(event)
     }
-    if (event.type === "commanderDamage.resolved") resolvingClaims.add(event.claimOperationId)
   }
   const { commanderDamage } = confirmed
   return {
     ...confirmed,
-    ...(commanderDamage && (resolvingClaims.size > 0 || commanderHits.length > 0)
+    ...(commanderDamage && commanderHits.length > 0
       ? {
           commanderDamage: {
             ...commanderDamage,
             totals: withCommanderHits(commanderDamage.totals, commanderHits),
-            pendingClaims: commanderDamage.pendingClaims.filter(
-              (claim) => !resolvingClaims.has(claim.operationId),
-            ),
           },
         }
       : {}),

@@ -352,7 +352,7 @@ describe("nearby host", () => {
     expect(lifeOf(session, alice.pass().key)).toBe(40)
   })
 
-  it("tells the attacker, guest or host, when a claim waits on an unanswered one", async () => {
+  it("lands a guest's and the host's commander damage at once, and acks it as confirmed", async () => {
     const { session, alice, bob } = await startedGame()
     const defender = alice.pass().key
     const claim = (operationId: string, fromPlayerId: string) =>
@@ -376,13 +376,16 @@ describe("nearby host", () => {
     jest.advanceTimersByTime(100)
 
     expect(acks()).toEqual([
-      { type: "ack", operationId: "claim-operation-0001", status: "pending" },
-      { type: "ack", operationId: "claim-operation-0002", status: "declined" },
+      { type: "ack", operationId: "claim-operation-0001", status: "confirmed" },
+      { type: "ack", operationId: "claim-operation-0002", status: "confirmed" },
     ])
-    await expect(first).resolves.toEqual({ operationId: "claim-operation-0003", status: "pending" })
+    await expect(first).resolves.toEqual({
+      operationId: "claim-operation-0003",
+      status: "confirmed",
+    })
     await expect(second).resolves.toEqual({
       operationId: "claim-operation-0004",
-      status: "declined",
+      status: "confirmed",
     })
   })
 

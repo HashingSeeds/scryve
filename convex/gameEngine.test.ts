@@ -195,6 +195,24 @@ async function parityGame(
     memory.status = "finished"
   }
 
+  /** why: a claim sent before claims landed at once can still be waiting on its defender. */
+  async function waitingClaim(operationId: string, delta: number, from: Seat = "host") {
+    const [attacker, defender] = from === "host" ? [hostRow, joinerRow] : [joinerRow, hostRow]
+    const claim = {
+      operationId,
+      fromPlayerId: attacker._id,
+      toPlayerId: defender._id,
+      delta,
+      status: "pending" as const,
+      actorUserId: attacker.userId!,
+      deviceId: from === "host" ? HOST_DEVICE : JOINER_DEVICE,
+      clientCreatedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+    }
+    await t.run((ctx) => ctx.db.insert("gameCommanderClaims", { ...claim, gameId: game._id }))
+    memory.claims.set(operationId, claim)
+  }
+
   async function expectSameState() {
     const stored = await t.run(async (ctx) => {
       const seats = await ctx.db
@@ -334,6 +352,7 @@ async function parityGame(
     joinerSeat: joinerRow._id as string,
     write,
     end,
+    waitingClaim,
     expectSameState,
     expectSameTurn,
     expectSameModeLog,
@@ -808,7 +827,7 @@ describe("engine parity: submitCommanderDamage", () => {
     await game.expectSameState()
   })
 
-  it("lets an undo the defender declined be sent again", async () => {
+  it("lets an undo that was declined on arrival be sent again", async () => {
     const game = await parityGame(makeConvexTest(), commander)
     const claim = (operationId: string, delta: number, undoOf?: string) =>
       game.write("host", {
@@ -820,20 +839,16 @@ describe("engine parity: submitCommanderDamage", () => {
         ...(undoOf ? { undoOf } : {}),
         ...sent(operationId),
       })
-    const resolve = (operationId: string, decision: "confirmed" | "declined") =>
-      game.write("joiner", {
-        kind: "commander.resolve",
-        decision,
-        ...sent(operationId, JOINER_DEVICE),
-      })
 
     await claim("claim-redo-00000001", 7)
-    await resolve("claim-redo-00000001", "confirmed")
-    await claim("claim-redo-00000002", -7, "claim-redo-00000001")
-    await resolve("claim-redo-00000002", "declined")
+    await claim("claim-redo-00000002", -5)
     expect(await claim("claim-redo-00000003", -7, "claim-redo-00000001")).toMatchObject({
+      ack: { status: "declined" },
+    })
+    await claim("claim-redo-00000004", 5)
+    expect(await claim("claim-redo-00000005", -7, "claim-redo-00000001")).toMatchObject({
       ok: true,
-      ack: { status: "pending" },
+      ack: { status: "confirmed", total: 0 },
     })
     await game.expectSameState()
   })
@@ -919,80 +934,98 @@ describe("engine parity: confirm and decline commander damage", () => {
       ...(resolutionOperationId ? { resolutionOperationId } : {}),
     }) as const
 
-  async function claimed(operationId: string, delta: number) {
+  async function waiting(operationId: string, delta: number) {
+    const game = await parityGame(makeConvexTest(), commander)
+    await game.waitingClaim(operationId, delta)
+    return game
+  }
+
+  it("answers an older app's confirm or decline of a claim that landed at once as a replay", async () => {
     const game = await parityGame(makeConvexTest(), commander)
     await game.write("host", {
       kind: "commander.claim",
       fromPlayerId: game.hostSeat,
       toPlayerId: game.joinerSeat,
-      delta,
-      ...sent(operationId),
+      delta: 6,
+      ...sent("claim-landed-000001"),
     })
-    return game
-  }
 
-  it("lets only the defender confirm, and binds and replays the resolution", async () => {
-    const game = await claimed("claim-confirm-0001", 9)
+    for (const write of [
+      resolve("confirmed", "claim-landed-000001", "resolve-landed-01"),
+      resolve("declined", "claim-landed-000001", "resolve-landed-02"),
+      resolve("declined", "claim-landed-000001"),
+    ])
+      expect(await game.write("joiner", write)).toMatchObject({
+        ok: true,
+        ack: { deduplicated: true, status: "confirmed", total: 6, currentLife: 34 },
+      })
+    await game.write("host", {
+      ...resolve("declined", "claim-landed-000001"),
+      deviceId: HOST_DEVICE,
+    })
+    await game.expectSameState()
+  })
+
+  it("lets only the defender confirm a claim left waiting, then replays any resolution", async () => {
+    const game = await waiting("claim-confirm-0001", 9)
 
     await game.write("host", {
       ...resolve("confirmed", "claim-confirm-0001"),
       deviceId: HOST_DEVICE,
     })
-    await game.write("joiner", resolve("confirmed", "claim-confirm-0001", "resolve-confirm-01"))
     expect(
       await game.write("joiner", resolve("confirmed", "claim-confirm-0001", "resolve-confirm-01")),
-    ).toMatchObject({ ok: true, ack: { deduplicated: true } })
-    await game.write("joiner", resolve("declined", "claim-confirm-0001", "resolve-confirm-01"))
-    await game.write("joiner", resolve("confirmed", "claim-confirm-0001", "resolve-confirm-02"))
+    ).toMatchObject({ ok: true, ack: { deduplicated: false, total: 9, currentLife: 31 } })
+    for (const write of [
+      resolve("confirmed", "claim-confirm-0001", "resolve-confirm-01"),
+      resolve("declined", "claim-confirm-0001", "resolve-confirm-01"),
+      resolve("confirmed", "claim-confirm-0001", "resolve-confirm-02"),
+    ])
+      expect(await game.write("joiner", write)).toMatchObject({
+        ok: true,
+        ack: { deduplicated: true, status: "confirmed" },
+      })
     await game.write("joiner", resolve("confirmed", "claim-missing-00001"))
     await game.expectSameState()
   })
 
-  it("declines without touching life and replays the legacy decline", async () => {
-    const game = await claimed("claim-decline-0001", 5)
+  it("declines a claim left waiting without touching life", async () => {
+    const game = await waiting("claim-decline-0001", 5)
 
     await game.write("joiner", resolve("declined", "claim-decline-0001"))
     await game.write("joiner", resolve("declined", "claim-decline-0001"))
-    await game.write("joiner", resolve("declined", "claim-decline-0001", "resolve-decline-01"))
+    await game.write("joiner", resolve("confirmed", "claim-decline-0001", "resolve-decline-01"))
     await game.expectSameState()
   })
 
   it("refuses a resolution id another claim already used", async () => {
-    const game = await claimed("claim-first-000001", 2)
-    await game.write("joiner", {
-      kind: "commander.claim",
-      fromPlayerId: game.joinerSeat,
-      toPlayerId: game.hostSeat,
-      delta: 3,
-      ...sent("claim-second-00001", JOINER_DEVICE),
-    })
+    const game = await waiting("claim-first-000001", 2)
+    await game.waitingClaim("claim-second-00001", 3, "joiner")
     await game.write("joiner", resolve("confirmed", "claim-first-000001", "resolve-shared-001"))
-    await game.write("host", {
-      ...resolve("confirmed", "claim-second-00001", "resolve-shared-001"),
-      deviceId: HOST_DEVICE,
-    })
+    expect(
+      await game.write("host", {
+        ...resolve("confirmed", "claim-second-00001", "resolve-shared-001"),
+        deviceId: HOST_DEVICE,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "sync_operation_mismatch" } })
     await game.expectSameState()
   })
 
   it("replays a settled claim after the game ends but refuses a new resolution", async () => {
-    const game = await claimed("claim-ended-000001", 6)
-    await game.write("joiner", {
-      kind: "commander.claim",
-      fromPlayerId: game.joinerSeat,
-      toPlayerId: game.hostSeat,
-      delta: 1,
-      ...sent("claim-ended-000002", JOINER_DEVICE),
-    })
+    const game = await waiting("claim-ended-000001", 6)
+    await game.waitingClaim("claim-ended-000002", 1, "joiner")
     await game.write("joiner", resolve("confirmed", "claim-ended-000001", "resolve-ended-0001"))
     await game.end()
 
     expect(
       await game.write("joiner", resolve("confirmed", "claim-ended-000001", "resolve-ended-0001")),
     ).toMatchObject({ ok: true, ack: { deduplicated: true } })
-    await game.write("host", {
-      ...resolve("confirmed", "claim-ended-000002"),
-      deviceId: HOST_DEVICE,
-    })
+    expect(
+      await game.write("host", {
+        ...resolve("confirmed", "claim-ended-000002"),
+        deviceId: HOST_DEVICE,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "game_not_active" } })
     await game.expectSameState()
   })
 })
@@ -1009,22 +1042,12 @@ describe("engine parity: partner commanders", () => {
         delta,
         ...sent(operationId),
       })
-    const confirm = (operationId: string) =>
-      game.write("joiner", {
-        kind: "commander.resolve",
-        decision: "confirmed",
-        ...sent(operationId, JOINER_DEVICE),
-      })
 
-    expect(await claim("claim-first-commander", 5)).toMatchObject({ ack: { status: "pending" } })
+    expect(await claim("claim-first-commander", 5)).toMatchObject({
+      ack: { status: "confirmed", total: 5, currentLife: 35 },
+    })
     expect(await claim("claim-partner-commander", 6, PARTNER_COMMANDER)).toMatchObject({
-      ack: { status: "pending" },
-    })
-    expect(await confirm("claim-first-commander")).toMatchObject({
-      ack: { total: 5, currentLife: 35 },
-    })
-    expect(await confirm("claim-partner-commander")).toMatchObject({
-      ack: { total: 6, currentLife: 29 },
+      ack: { status: "confirmed", total: 6, currentLife: 29 },
     })
     await game.write("host", {
       kind: "commander.claim",
@@ -1038,9 +1061,9 @@ describe("engine parity: partner commanders", () => {
   })
 })
 
-describe("engine parity: anyone edits any seat", () => {
-  it("lands commander damage the moment the claim arrives", async () => {
-    const game = await parityGame(makeConvexTest(), { ...commander, lifeEditing: "anyone" })
+describe("engine parity: commander damage lands at once", () => {
+  it("confirms a claim in the write that records it, where only a seat's owner edits it", async () => {
+    const game = await parityGame(makeConvexTest(), commander)
     const claim = (operationId: string, delta: number, slot?: CommanderSlot) =>
       game.write("host", {
         kind: "commander.claim",

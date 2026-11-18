@@ -351,19 +351,6 @@ export default {
     benchPromoteHint: "탭하여 배틀 포켓몬으로 지정하거나 편집하세요.",
     benchFocusHint: "탭하여 데미지를 세거나, 교체하거나, 편집하세요.",
   },
-  commanderClaim: {
-    dealt: "{{name}}: 커맨더 피해 {{damage}}점",
-    more_other: "{{count}}개 더 있음",
-    morePending_other: "{{count}}개 대기 중",
-    action: {
-      decline: "거절",
-      confirm: "확인",
-    },
-    actionLabel: {
-      decline: "{{name}}님의 커맨더 피해 {{damage}}점 거절",
-      confirm: "{{name}}님의 커맨더 피해 {{damage}}점 확인",
-    },
-  },
   commander: {
     assignFromSeat: "{{seat}}번 자리의 커맨더 피해 지정",
     assigningFromSeat: "{{seat}}번 자리의 커맨더 피해를 지정하는 중",

@@ -141,15 +141,16 @@ describe("sendQueuedAction against the real game mutations", () => {
           action: { kind: "designation.taken", playerId: hostPlayerId, designationId: "monarch" },
         }),
         queued(host, "operation-claim-0001", claim(hostPlayerId, joinerPlayerId, 7)),
-        // why: the pair already has a pending claim, so the server declines this one on arrival.
-        queued(host, "operation-claim-0002", claim(hostPlayerId, joinerPlayerId, 1)),
+        // why: the total would drop below 0, so the server declines this one on arrival.
+        queued(host, "operation-claim-0002", claim(hostPlayerId, joinerPlayerId, -8)),
       ]),
     ).toEqual([
       ["operation-life-0001", undefined],
       ["operation-table-0001", undefined],
-      ["operation-claim-0001", "pending"],
+      ["operation-claim-0001", "confirmed"],
       ["operation-claim-0002", "declined"],
     ])
+    // why: an older app's confirm or decline of a claim that already landed must drain, not fail.
     expect(
       await drain(joiner, [
         queued(
@@ -157,24 +158,21 @@ describe("sendQueuedAction against the real game mutations", () => {
           "operation-confirm-0001",
           resolve("operation-claim-0001", joinerPlayerId, true),
         ),
+        queued(
+          joiner,
+          "operation-decline-0001",
+          resolve("operation-claim-0001", joinerPlayerId, false),
+        ),
         queued(joiner, "operation-claim-0003", claim(joinerPlayerId, hostPlayerId, 3)),
       ]),
     ).toEqual([
       ["operation-confirm-0001", "confirmed"],
-      ["operation-claim-0003", "pending"],
+      ["operation-decline-0001", "confirmed"],
+      ["operation-claim-0003", "confirmed"],
     ])
-    expect(
-      await drain(host, [
-        queued(
-          host,
-          "operation-decline-0001",
-          resolve("operation-claim-0003", hostPlayerId, false),
-        ),
-      ]),
-    ).toEqual([["operation-decline-0001", "declined"]])
 
     const final = await projection()
-    expect(final.players.map((player) => player.currentLife)).toEqual([41, 33])
+    expect(final.players.map((player) => player.currentLife)).toEqual([38, 33])
     expect(final.commanderDamage?.pendingClaims ?? []).toEqual([])
   })
 })

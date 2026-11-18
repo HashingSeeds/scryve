@@ -23,14 +23,12 @@ import {
   mockLeave,
   mockRuntimeAbandon,
   mockReportPlayer,
-  mockResolveCommanderDamageClaim,
   mockSubmitCommanderDamage,
   mockSyncUser,
   mockUseConnectedGame,
   resetConnectedHarness,
   themed,
 } from "../../test/support/connectedHarness"
-import { CLAIM_ARM_MS } from "../components/CommanderClaimBanner"
 import type { PlayerGridLayoutVariant } from "../features/game/playerLayouts"
 
 jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
@@ -250,38 +248,6 @@ describe("ConnectedBoardScreen", () => {
 
     expect(screen.queryByTestId("commander-hit-seat-1")).toBeNull()
     expect(mockSubmitCommanderDamage).not.toHaveBeenCalled()
-  })
-
-  it("lets the defending seat confirm and decline a claim from its banner", () => {
-    const claim = {
-      claimId: "claim-1",
-      operationId: "commander-claim-0001",
-      fromPlayerId: "player-2",
-      toPlayerId: "player-1",
-      delta: 4,
-      clientCreatedAt: 10,
-      createdAt: 11,
-    }
-    connectedHarness.runtime = {
-      ...connectedHarness.runtime,
-      projection: {
-        ...connectedHarness.runtime.projection,
-        commanderDamage: { totals: [], pendingClaims: [claim], eliminatedPlayerIds: [] },
-      },
-    }
-    jest.useFakeTimers()
-    render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    fireEvent(screen.getByTestId("life-card-seat-2"), "layout", {
-      nativeEvent: { layout: { width: 360, height: 280, x: 0, y: 0 } },
-    })
-    act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
-
-    fireEvent.press(screen.getByTestId("commander-confirm-seat-2-claim-1"))
-    expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, true)
-
-    fireEvent.press(screen.getByTestId("commander-decline-seat-2-claim-1"))
-    expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, false)
-    jest.useRealTimers()
   })
 
   it("shows pending, connection, and retained failure state accessibly", () => {
