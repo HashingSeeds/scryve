@@ -1,0 +1,27 @@
+project:
+    id: 0deb1097-36db-4e74-a32f-70d5e1532dfb
+session:
+    idle_timeout_seconds: 1800
+build:
+    framework: expo
+    profiles:
+        development:
+            ios:
+                app_id: ffe02298-5176-46ee-a0fc-8d4b815f1cd1
+                env:
+                    APP_VARIANT: development
+                setup_commands:
+                    - pnpm install
+                    - if [ ! -d ios ]; then npx expo prebuild --platform ios --no-install; fi
+                build_commands:
+                    - cd ios && if [ ! -d Pods ]; then pod install; fi && WS=$(ls -d *.xcworkspace | head -n 1) && xcodebuild -workspace "$WS" -scheme "${WS%.xcworkspace}" -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' ARCHS=arm64 -derivedDataPath build
+                output_path: ios/build/Build/Products/Debug-iphonesimulator/*.app
+            android:
+                env:
+                    APP_VARIANT: development
+                setup_commands:
+                    - pnpm install
+                    - if [ ! -d android ]; then npx expo prebuild --platform android --no-install; fi
+                build_commands:
+                    - cd android && ./gradlew assembleDebug -PreactNativeArchitectures=x86_64
+                output_path: android/app/build/outputs/apk/debug/app-debug.apk
