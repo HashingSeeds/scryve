@@ -1809,6 +1809,23 @@ describe("connected commander damage claims", () => {
     ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
   })
 
+  it("settles a waiting claim that no longer fits as declined, so the confirming queue drains", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    await waitingClaim(t, game, "commander-waiting-0003", -4)
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        publicId: game.publicId,
+        operationId: "commander-waiting-0003",
+        resolutionOperationId: "commander-resolution-misfit",
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_006,
+      }),
+    ).resolves.toMatchObject({ status: "declined", deduplicated: false })
+    const defender = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(defender.commanderDamage?.pendingClaims ?? []).toEqual([])
+  })
+
   it("tracks partner commander damage separately, so only 21 from one commander is lethal", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)

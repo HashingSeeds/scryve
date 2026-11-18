@@ -419,15 +419,24 @@ export class OutboxSyncController {
     }
   }
 
-  /** why: claims land at once now, but a nearby host on an older app, or a claim sent before that change, still waits on the defender, so this device confirms it for them. */
+  /** why: claims land at once now, but a nearby host on an older app, or a claim sent before that change, still waits on the defender, so the defender's device confirms it for them. */
   private confirmWaitingClaims(projection: ConnectedProjection): void {
+    if (projection.status !== "active") return
+    const mine = new Set(
+      projection.players.flatMap((player) => (player.controlledByMe ? [player.playerId] : [])),
+    )
     const queued = new Set<string>(
       this.pending.flatMap(({ event }) =>
         event.type === "commanderDamage.resolved" ? [event.claimOperationId] : [],
       ),
     )
     for (const claim of projection.commanderDamage?.pendingClaims ?? []) {
-      if (this.confirmedClaims.has(claim.operationId) || queued.has(claim.operationId)) continue
+      if (
+        !mine.has(claim.toPlayerId) ||
+        this.confirmedClaims.has(claim.operationId) ||
+        queued.has(claim.operationId)
+      )
+        continue
       const now = this.now()
       const confirmed = this.outbox.enqueue({
         schemaVersion: 1,

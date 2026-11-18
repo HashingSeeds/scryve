@@ -41,13 +41,7 @@ export function applyGameChanges(game: MemoryGame, changes: readonly GameChange[
       if (seat) game.seats.set(change.seatId, { ...seat, ...change.patch })
     } else if (change.kind === "event.insert")
       game.events.set(change.event.operationId, change.event)
-    else if (change.kind === "event.rekey") {
-      const event = game.events.get(change.operationId)
-      if (!event) continue
-      game.events.delete(change.operationId)
-      game.events.set(change.to, { ...event, operationId: change.to })
-    } else if (change.kind === "claim.insert")
-      game.claims.set(change.claim.operationId, change.claim)
+    else if (change.kind === "claim.insert") game.claims.set(change.claim.operationId, change.claim)
     else if (change.kind === "claim.patch") {
       const claim = game.claims.get(change.operationId)
       if (claim) game.claims.set(change.operationId, { ...claim, ...change.patch })

@@ -140,9 +140,6 @@ export async function writeCloudGame(
     } else if (change.kind === "event.insert") {
       const id = await ctx.db.insert("gameEvents", eventRow(change.event))
       insertedEvents.set(change.event.operationId, id)
-    } else if (change.kind === "event.rekey") {
-      const event = await eventDoc(change.operationId)
-      if (event) await ctx.db.patch(event._id, { operationId: change.to })
     } else if (change.kind === "claim.insert") {
       const id = await ctx.db.insert("gameCommanderClaims", claimRow(change.claim))
       insertedClaims.set(change.claim.operationId, id)

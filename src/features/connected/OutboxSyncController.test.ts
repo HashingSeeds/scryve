@@ -378,9 +378,20 @@ describe("outbox sync controller", () => {
       clientCreatedAt: clock.now(),
       createdAt: clock.now(),
     }
+    const claimOnSeatHeldElsewhere = {
+      ...claim,
+      claimId: "claim-2",
+      operationId: "commander-claim-000002",
+      fromPlayerId: "player-1",
+      toPlayerId: "player-2",
+    }
     const waiting = {
       ...projection(0, 20),
-      commanderDamage: { totals: [], pendingClaims: [claim], eliminatedPlayerIds: [] },
+      commanderDamage: {
+        totals: [],
+        pendingClaims: [claim, claimOnSeatHeldElsewhere],
+        eliminatedPlayerIds: [],
+      },
     }
     controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
 

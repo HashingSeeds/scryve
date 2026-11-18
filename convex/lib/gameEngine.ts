@@ -166,7 +166,6 @@ export interface SeatPatch {
 export type GameChange =
   | { kind: "seat.patch"; seatId: string; patch: SeatPatch }
   | { kind: "event.insert"; event: GameEventRecord }
-  | { kind: "event.rekey"; operationId: string; to: string }
   | { kind: "claim.insert"; claim: CommanderClaimRecord }
   | {
       kind: "claim.patch"
@@ -1057,14 +1056,20 @@ function* writeResolution(
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
   const pairTotal = decision === "confirmed" ? yield* read(store.pairTotal(claim)) : 0
-  const outcome = resolveClaim(claim, decision, pairTotal, target, request, now)
+  // why: a claim left waiting stops fitting once other damage moves its total, so it settles as declined and the confirming outbox drains instead of retrying.
+  const settledAs =
+    decision === "declined" ||
+    confirmCommanderClaim({ total: pairTotal, life: target.currentLife, delta: claim.delta })
+      ? decision
+      : "declined"
+  const outcome = resolveClaim(claim, settledAs, pairTotal, target, request, now)
   if (isEngineError(outcome)) return failed(outcome)
   yield* read(store.apply(outcome.changes))
   const { total, currentLife } = outcome
   return acknowledged({
     operationId,
     deduplicated: false,
-    status: decision,
+    status: settledAs,
     ...(total === undefined ? {} : { total, currentLife }),
   })
 }
