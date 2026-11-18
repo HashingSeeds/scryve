@@ -1,8 +1,3 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Commander Damage Flow</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&display=swap" rel="stylesheet">
@@ -14,9 +9,10 @@
   --dim: rgba(255,255,255,.55);
   --lethal: #ff6b5e;
   --menu: #26262b;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body { margin: 0; background: var(--page); color: var(--ink); font-family: Rubik, system-ui, sans-serif; min-height: 100vh; display: flex; gap: 24px; align-items: flex-start; justify-content: center; padding: 24px 16px; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: Rubik, system-ui, sans-serif; min-height: 100vh; display: flex; gap: 24px; align-items: flex-start; justify-content: center; padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .phone { width: 390px; height: 844px; flex: none; border-radius: 44px; background: var(--board); position: relative; overflow: hidden; outline: 1px solid #222; user-select: none; }
 .seat { position: absolute; width: 189px; height: 416px; border-radius: 24px; overflow: hidden; transition: background-color 420ms cubic-bezier(.45,.05,.25,1); }
@@ -60,9 +56,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 /* defender */
 .seat.def .up { cursor: pointer; }
 .disc { left: calc(50% - 90px); top: calc(50% - 90px); width: 180px; height: 180px; pointer-events: none; }
-.disc svg { position: absolute; inset: 0; }
+.disc > svg { position: absolute; inset: 0; overflow: visible; }
+.disc .cap { position: absolute; left: 0; right: 0; top: -13px; text-align: center; font-weight: 700; font-size: 10px; opacity: .55; }
 .disc .dlife { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-58%); text-align: center; font-weight: 700; font-size: 66px; line-height: 1; font-variant-numeric: tabular-nums; }
-.disc .prev { position: absolute; left: 0; right: 0; top: 63%; text-align: center; font-weight: 700; font-size: 20px; animation: breathe 1.6s ease-in-out infinite; }
+.disc .prev { position: absolute; left: 0; right: 0; top: 61%; display: flex; justify-content: center; align-items: center; gap: 1px; font-weight: 700; font-size: 20px; animation: breathe 1.6s ease-in-out infinite; }
 .disc .prev.lethal { color: var(--lethal); text-shadow: 0 1px 3px rgba(0,0,0,.7); }
 .seg-prev { animation: breathe 1.6s ease-in-out infinite; }
 @keyframes breathe { 0%,100% { opacity: .95 } 50% { opacity: .35 } }
@@ -90,11 +87,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .side button:hover { border-color: #666; }
 #log { font-family: ui-monospace, monospace; font-size: 11.5px; line-height: 1.5; color: #bbb; white-space: pre-wrap; max-height: 720px; overflow: auto; }
 #log div:first-child { color: #fff; }
-@media (max-width: 760px) { .side { display: none } body { padding: 0 } }
-@media (max-width: 400px) { .phone { transform-origin: top left; transform: scale(calc(100vw / 390px)); border-radius: 0 } }
+@media (max-width: 760px) { .side { display: none } }
 </style>
-</head>
-<body>
 <div class="phone" id="phone"></div>
 <div class="side">
   <div class="row"><button id="reset">Reset board</button><button id="intro">Replay first open</button></div>
@@ -247,8 +241,9 @@ function defenderSeat(p) {
     ${grid(p, a.id)}
     <div class="disc" data-disc>
       <svg viewBox="0 0 180 180"><circle cx="90" cy="90" r="${discR}" fill="${p.color}"/>${rings}</svg>
+      <div class="cap">${LETHAL}</div>
       <div class="dlife">${p.life}</div>
-      ${dealt > 0 ? `<div class="prev${lethal ? ' lethal' : ''}" style="${lethal ? '' : `color:${mix(a.color, '#ffffff', .78)}`}">−${dealt}</div>` : ''}
+      ${dealt > 0 ? `<div class="prev${lethal ? ' lethal' : ''}" style="${lethal ? '' : `color:${mix(a.color, '#ffffff', .78)}`}">${sword(18, 'currentColor', 0)}−${dealt}</div>` : ''}
     </div>
     <div class="dname">${mark(p.shape, 26, 'rgba(255,255,255,.7)')}${p.name}</div>
     ${hits.length ? `<button class="undo" data-act="undo" data-p="${p.id}" aria-label="Take back ${sum(hits.at(-1))}" style="--shadowbg:${shade(a.color)}">${UNDO}<div class="coins">${coins}</div>${hits.length > 4 ? `<span class="more">+${hits.length - 4}</span>` : ''}</button>` : ''}`
@@ -273,10 +268,11 @@ function render(intro = false) {
     lastModes[p.id] = mode
   })
   const a = S.armed && byId(S.armed)
-  menu.setAttribute('aria-label', a ? 'Done' : 'Menu')
+  const landed = Object.values(S.hits).some((h) => h.length)
+  menu.setAttribute('aria-label', a ? (landed ? 'Done' : 'Cancel') : 'Menu')
   menu.innerHTML = `<svg width="60" height="60" viewBox="0 0 60 60">
     <path d="M30 6 53 22.7 44.2 49.8H15.8L7 22.7Z" fill="${a ? a.color : 'var(--menu)'}" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
-    ${a ? '<path d="M20 31l7 7 13-15" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    ${a ? (landed ? '<path d="M20 31l7 7 13-15" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>' : '<path d="M22 23l16 16M38 23 22 39" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>')
         : '<path d="M20 25H40M20 32H40M20 39H40" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>'}
   </svg>`
 }
@@ -388,8 +384,9 @@ phone.addEventListener('click', (e) => {
 
 document.getElementById('reset').onclick = () => { S = START(); lastModes = {}; logEl.textContent = ''; render(true) }
 document.getElementById('intro').onclick = () => render(true)
+const fit = () => { phone.style.zoom = Math.min(1, (innerWidth - 32) / 390) }
+addEventListener('resize', fit)
+fit()
 render(true)
 log('First Commander board: swords slide out of each mark once')
 </script>
-</body>
-</html>
