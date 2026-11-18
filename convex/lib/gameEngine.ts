@@ -1,7 +1,7 @@
 import { DEFAULT_DECK_GAME } from "./deckGames"
 import {
   applyLifeChange,
-  commanderClaimOutcome,
+  commanderClaimLands,
   commanderField,
   commanderLethalDamage,
   confirmCommanderClaim,
@@ -11,7 +11,6 @@ import {
   isCommanderSlot,
   isLifeDelta,
   isSameCommanderClaim,
-  isSameCommanderResolution,
   isSameLifeChange,
   MAX_COMMANDER_DAMAGE,
   PARTNER_COMMANDER,
@@ -167,7 +166,6 @@ export interface SeatPatch {
 export type GameChange =
   | { kind: "seat.patch"; seatId: string; patch: SeatPatch }
   | { kind: "event.insert"; event: GameEventRecord }
-  | { kind: "event.rekey"; operationId: string; to: string }
   | { kind: "claim.insert"; claim: CommanderClaimRecord }
   | {
       kind: "claim.patch"
@@ -226,8 +224,7 @@ export type GameWriteResult = { ok: true; ack: GameAck } | { ok: false; error: E
 export type Read<T> = T | Promise<T>
 
 /**
- * why: reads only see this game, and `pendingClaims` may stop after
- * MAX_PENDING_COMMANDER_CLAIMS + 1. `beforeNewWrite` runs once a write is known not to be a
+ * why: reads only see this game. `beforeNewWrite` runs once a write is known not to be a
  * retry, so a retry never spends the rate limit.
  */
 export interface GameStore {
@@ -236,7 +233,6 @@ export interface GameStore {
   event(operationId: string): Read<GameEventRecord | undefined>
   undoneBy(operationId: string): Read<GameEventRecord | undefined>
   claim(operationId: string): Read<CommanderClaimRecord | undefined>
-  pendingClaims(): Read<readonly CommanderPair[]>
   pairTotal(pair: CommanderPair): Read<number>
   seats(): Read<readonly EngineSeat[]>
   commanderTotals(): Read<readonly CommanderTotal[]>
@@ -909,21 +905,12 @@ function* writeClaim(
   }
   yield* admitNewWrite(store)
   const total = yield* read(store.pairTotal(pair))
-  const pending = yield* read(store.pendingClaims())
-  const status = commanderClaimOutcome({
-    total,
-    delta: write.delta,
-    commanderLimit: write.commanderLimit,
-    pendingClaims: pending.length,
-    pairHasPendingClaim: pending.some((claim) => isSamePair(claim, pair)),
-  })
-  if (status === "declined" && (yield* read(store.event(declinedClaimOperationId(operationId)))))
-    return failed(MISMATCH)
-  const submitted = submitClaim(pair, status, target, request, now, write.undoOf)
-  if (status === "declined" || store.game.lifeEditing !== "anyone") {
-    yield* read(store.apply(submitted))
-    return acknowledged({ operationId, deduplicated: false, status })
+  if (!commanderClaimLands({ total, delta: write.delta, commanderLimit: write.commanderLimit })) {
+    if (yield* read(store.event(declinedClaimOperationId(operationId)))) return failed(MISMATCH)
+    yield* read(store.apply(submitClaim(pair, "declined", target, request, now, write.undoOf)))
+    return acknowledged({ operationId, deduplicated: false, status: "declined" })
   }
+  const submitted = submitClaim(pair, "pending", target, request, now, write.undoOf)
   const confirmed = confirmAtOnce(submitted, total, target, request, now)
   if (isEngineError(confirmed)) return failed(confirmed)
   yield* read(store.apply([...submitted, ...confirmed.changes]))
@@ -936,7 +923,7 @@ function* writeClaim(
   })
 }
 
-// why: where anyone may change any seat, the defender has nothing to approve, so a claim lands the moment it arrives.
+// why: commander damage needs no approval from the defender, so a claim is confirmed in the write that records it. The claim row stays, so older apps' confirm and decline calls still find it.
 function confirmAtOnce(
   submitted: readonly GameChange[],
   pairTotal: number,
@@ -962,53 +949,6 @@ function confirmAtOnce(
 export interface ResolutionRequest extends WriteRequest {
   actorUserId: string
   resolutionOperationId?: string
-}
-
-export const resolutionEventIds = (claim: CommanderClaimRecord) => [
-  ...(claim.resolutionOperationId ? [claim.resolutionOperationId] : []),
-  `${claim.operationId}_${claim.status}`,
-]
-
-function* recordedResolution(store: GameStore, claim: CommanderClaimRecord) {
-  for (const operationId of resolutionEventIds(claim)) {
-    const event = yield* read(store.event(operationId))
-    if (event) return event
-  }
-  return undefined
-}
-
-export function rebindResolution(
-  claim: CommanderClaimRecord,
-  recorded: GameEventRecord | undefined,
-  request: ResolutionRequest & { resolutionOperationId: string },
-): GameChange[] | EngineError {
-  const { resolutionOperationId } = request
-  if (
-    !recorded ||
-    !isSameCommanderResolution(recorded, {
-      kind: `commanderDamage.${claim.status}`,
-      claimOperationId: claim.operationId,
-      defenderPlayerId: claim.toPlayerId,
-      actorUserId: request.actorUserId,
-      deviceId: request.deviceId,
-      clientCreatedAt: request.clientCreatedAt,
-    })
-  )
-    return MISMATCH
-  const changes: GameChange[] = []
-  if (!claim.resolutionOperationId)
-    changes.push({
-      kind: "claim.patch",
-      operationId: claim.operationId,
-      patch: { resolutionOperationId },
-    })
-  if (recorded.operationId !== resolutionOperationId)
-    changes.push({
-      kind: "event.rekey",
-      operationId: recorded.operationId,
-      to: resolutionOperationId,
-    })
-  return changes
 }
 
 export function resolveClaim(
@@ -1094,12 +1034,6 @@ function* writeResolution(
   const claim = yield* read(store.claim(write.operationId))
   if (!claim) return failed(rejected("Commander damage claim not found"))
   const { decision, resolutionOperationId } = write
-  if (
-    resolutionOperationId &&
-    claim.resolutionOperationId &&
-    claim.resolutionOperationId !== resolutionOperationId
-  )
-    return failed(MISMATCH)
   const target = yield* editableSeat(
     store,
     claim.toPlayerId,
@@ -1107,43 +1041,35 @@ function* writeResolution(
     "Seat-owner permission required for the defending seat",
   )
   if (isEngineError(target)) return failed(target)
-  const request = { ...write, actorUserId: actor.userId }
-  if (resolutionOperationId) {
-    const bound = yield* read(store.event(resolutionOperationId))
-    if (
-      bound &&
-      (bound.claimOperationId !== claim.operationId || bound.kind !== `commanderDamage.${decision}`)
-    )
-      return failed(MISMATCH)
-  }
   const operationId = resolutionOperationId ?? claim.operationId
+  // why: claims confirm as they arrive, so an older app's confirm or decline finds the claim settled and is acknowledged as a replay, which drains its queue.
   if (claim.status !== "pending") {
-    if (resolutionOperationId) {
-      if (claim.status !== decision) return failed(MISMATCH)
-      const rebound = rebindResolution(claim, yield* recordedResolution(store, claim), {
-        ...request,
-        resolutionOperationId,
-      })
-      if (isEngineError(rebound)) return failed(rebound)
-      yield* read(store.apply(rebound))
-    }
     const replayed = { operationId, deduplicated: true, status: claim.status }
-    if (decision !== "confirmed" || claim.status !== "confirmed") return acknowledged(replayed)
+    if (claim.status !== "confirmed") return acknowledged(replayed)
     const total = yield* read(store.pairTotal(claim))
     return acknowledged({ ...replayed, total, currentLife: target.currentLife })
   }
+  const request = { ...write, actorUserId: actor.userId }
+  if (resolutionOperationId && (yield* read(store.event(resolutionOperationId))))
+    return failed(MISMATCH)
   yield* admitNewWrite(store)
   const inactive = checkActive(store.game)
   if (inactive) return failed(inactive)
   const pairTotal = decision === "confirmed" ? yield* read(store.pairTotal(claim)) : 0
-  const outcome = resolveClaim(claim, decision, pairTotal, target, request, now)
+  // why: a claim left waiting stops fitting once other damage moves its total, so it settles as declined and the confirming outbox drains instead of retrying.
+  const settledAs =
+    decision === "declined" ||
+    confirmCommanderClaim({ total: pairTotal, life: target.currentLife, delta: claim.delta })
+      ? decision
+      : "declined"
+  const outcome = resolveClaim(claim, settledAs, pairTotal, target, request, now)
   if (isEngineError(outcome)) return failed(outcome)
   yield* read(store.apply(outcome.changes))
   const { total, currentLife } = outcome
   return acknowledged({
     operationId,
     deduplicated: false,
-    status: decision,
+    status: settledAs,
     ...(total === undefined ? {} : { total, currentLife }),
   })
 }

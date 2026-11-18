@@ -349,19 +349,6 @@ export default {
     benchPromoteHint: "タップでバトル場に出すか、編集します。",
     benchFocusHint: "タップでダメージを数えるか入れ替えます。編集もできます。",
   },
-  commanderClaim: {
-    dealt: "{{name}}：統率者ダメージ{{damage}}",
-    more_other: "ほか{{count}}件",
-    morePending_other: "承認待ちがほか{{count}}件",
-    action: {
-      decline: "拒否",
-      confirm: "承認",
-    },
-    actionLabel: {
-      decline: "{{name}}からの統率者ダメージ{{damage}}を拒否",
-      confirm: "{{name}}からの統率者ダメージ{{damage}}を承認",
-    },
-  },
   commander: {
     assignFromSeat: "席{{seat}}からの統率者ダメージを記録する",
     assigningFromSeat: "席{{seat}}からの統率者ダメージを記録中",

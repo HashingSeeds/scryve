@@ -93,7 +93,7 @@ export default {
       "Les modifications de blessures de commandant doivent être comprises entre {{min}} et {{max}}.",
     commanderSelfDamage: "Un commandant ne peut pas s’infliger de blessures",
     commanderClaimDeclined:
-      "{{delta}} blessures de commandant pour {{name}} n’ont pas été ajoutées. Si cette personne n’a pas encore répondu à votre dernière demande, renvoyez-la après sa réponse.",
+      "Blessures de commandant non ajoutées : {{delta}}. Le total de {{name}} a changé entre-temps. Vérifiez l’état de la partie et réessayez.",
     failureCapacity:
       "Les modifications échouées doivent être examinées avant que d’autres modifications refusées puissent être conservées. Ignorez les échecs examinés, puis relancez la synchronisation.",
     finish: {

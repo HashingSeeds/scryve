@@ -7,8 +7,9 @@ description: Use when a change touches how nearby games sync life, undo, or comm
 
 `NearbySync.tla` is a small model of a nearby game: the host device is the
 authority, and two guests edit over connections that can drop at any moment.
-The `claims` run is owner mode, the default: guests write only their own seat,
-and the defender confirms commander damage. The other runs are anyone mode,
+The `claims` run is owner mode, the default: guests write only their own seat.
+It models the defender confirming commander damage, which only claims from
+before claims landed at once, or from a host on an older app, still do. The other runs are anyone mode,
 where every seat allows edits from anyone and guests write any seat. TLC, the TLA+ model checker, tries every order of those steps
 within the bounds in `check.sh` and checks four rules in every state:
 

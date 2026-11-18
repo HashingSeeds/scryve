@@ -112,7 +112,6 @@ export type MockConnectedRuntime = TableRuntime & {
   undoLife: jest.Mock
   undoTable: jest.Mock
   submitCommanderDamage: jest.Mock
-  resolveCommanderDamageClaim: jest.Mock
   finish: jest.Mock
   abandon: jest.Mock
   dismissFailed: jest.Mock
@@ -147,7 +146,6 @@ export const mockBlockPlayer = jest.fn(async () => ({ blocked: true }))
 export const mockChangeLife = jest.fn()
 export const mockUndoLife = jest.fn()
 export const mockSubmitCommanderDamage = jest.fn(async () => undefined)
-export const mockResolveCommanderDamageClaim = jest.fn(async () => undefined)
 export const mockDismissFailed = jest.fn()
 export const mockFinish = jest.fn(async () => true)
 export const mockRuntimeAbandon = jest.fn(async () => true)
@@ -208,7 +206,6 @@ function defaultRuntime(): MockConnectedRuntime {
     undoLife: mockUndoLife,
     undoTable: jest.fn(),
     submitCommanderDamage: mockSubmitCommanderDamage,
-    resolveCommanderDamageClaim: mockResolveCommanderDamageClaim,
     finish: mockFinish,
     abandon: mockRuntimeAbandon,
     dismissFailed: mockDismissFailed,
@@ -280,7 +277,6 @@ export function resetConnectedHarness() {
   mockBlockPlayer.mockReset().mockResolvedValue({ blocked: true })
   mockChangeLife.mockReset()
   mockSubmitCommanderDamage.mockReset().mockResolvedValue(undefined)
-  mockResolveCommanderDamageClaim.mockReset().mockResolvedValue(undefined)
   mockDismissFailed.mockReset()
   mockFinish.mockReset().mockResolvedValue(true)
   mockRuntimeAbandon.mockReset().mockResolvedValue(true)

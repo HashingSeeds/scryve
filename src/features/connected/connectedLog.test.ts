@@ -8,7 +8,8 @@ import {
   logPositions,
 } from "./connectedLog"
 import type { PendingLifeAction } from "./model"
-import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
+import { writeMemoryGame, type MemoryGame } from "../../../convex/lib/gameEngineMemory"
+import { connectedLogEvent, type ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import type { Turn } from "../../../convex/lib/turns"
 
 const GAME = "game-connected-log"
@@ -101,7 +102,6 @@ describe("connected log", () => {
       ],
       [unsent],
       GAME,
-      true,
     )
     expect(
       connectedLogUndo(events, players, GAME, undefined, {
@@ -119,7 +119,6 @@ describe("connected log", () => {
       [life("confirmed-at-60s", "ada", -2, 60_000, { mine: true })],
       [queued("unsent-at-11s", "ada", -3, 11_000)],
       GAME,
-      true,
     )
     expect(connectedLogUndo(events, players, GAME, undefined, { turns: true })).toEqual({
       kind: "life",
@@ -186,7 +185,63 @@ describe("connected log", () => {
     ])
   })
 
-  it("shows an unsent commander damage claim where anyone edits, then the authority's confirmation in its place", () => {
+  it("lets the attacker take back its own commander damage from the log where only owners edit", () => {
+    const memory: MemoryGame = {
+      status: "active",
+      system: "mtg",
+      format: "commander",
+      designations: {},
+      seats: new Map([
+        ["ada", { id: "ada", userId: "attacker", deviceId: "ada-phone", currentLife: 40 }],
+        ["bo", { id: "bo", userId: "defender", deviceId: "bo-phone", currentLife: 40 }],
+      ]),
+      events: new Map(),
+      claims: new Map(),
+      pairs: new Map(),
+    }
+    const attacker = { userId: "attacker", isHost: true }
+    const claim = (operationId: string, delta: number, undoOf?: string) =>
+      writeMemoryGame(
+        memory,
+        attacker,
+        {
+          kind: "commander.claim",
+          operationId,
+          deviceId: "ada-phone",
+          clientCreatedAt: 10,
+          fromPlayerId: "ada",
+          toPlayerId: "bo",
+          delta,
+          commanderLimit: 999,
+          ...(undoOf ? { undoOf } : {}),
+        },
+        11,
+      )
+    claim("commander-hit-0001", 5)
+    const seats = [
+      { id: asPlayerId("ada"), life: 40 },
+      { id: asPlayerId("bo"), life: 35 },
+    ]
+    const logFor = (viewer: string) =>
+      [...memory.events.values()].map((event) => connectedLogEvent(event, viewer))
+
+    const undo = connectedLogUndo(logFor("attacker"), seats, GAME, undefined, { turns: false })
+    expect(undo).toEqual({
+      kind: "commander",
+      changes: [
+        { claimOperationId: "commander-hit-0001", fromPlayerId: "ada", toPlayerId: "bo", delta: 5 },
+      ],
+    })
+    expect(connectedLogUndo(logFor("defender"), seats, GAME, undefined, { turns: false })).toBe(
+      undefined,
+    )
+    expect(claim("commander-undo-0001", -5, "commander-hit-0001")).toMatchObject({
+      ok: true,
+      ack: { status: "confirmed", total: 0, currentLife: 40 },
+    })
+  })
+
+  it("shows an unsent commander damage claim at once, then the authority's confirmation in its place", () => {
     const claim = {
       schemaVersion: 1,
       event: {
@@ -203,8 +258,7 @@ describe("connected log", () => {
       queuedAt: 10,
       attempts: 0,
     } as PendingLifeAction
-    expect(connectedLogEvents([], [claim], GAME)).toEqual([])
-    expect(connectedLogEvents([], [claim], GAME, true)).toEqual([
+    expect(connectedLogEvents([], [claim], GAME)).toEqual([
       expect.objectContaining({
         operationId: "op-claim-ada-bo-1",
         kind: "commanderDamage.claimed",
@@ -225,7 +279,7 @@ describe("connected log", () => {
       delta: 5,
       clientCreatedAt: 10,
     }
-    expect(connectedLogEvents([confirmed], [claim], GAME, true)).toEqual([confirmed])
+    expect(connectedLogEvents([confirmed], [claim], GAME)).toEqual([confirmed])
   })
 
   it("shows an unsent change at once and keeps one row once the authority has it", () => {

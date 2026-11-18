@@ -88,11 +88,9 @@ const connected = {
       "The offline queue filled up partway through this undo, so only part of it was saved. Reconnect and sync, then undo the rest.",
     commanderDamageRange: "Commander damage changes have to be between {{min}} and {{max}}.",
     commanderSelfDamage: "A commander cannot damage itself",
-    // Shown to the attacking player after the server turned down their commander damage claim. {{name}} is the defending player; {{delta}} is the damage that was not added. The usual cause is that the defender has not answered an earlier claim from this attacker yet.
-    // ko: {{name}} is the one who hasn't answered: '{{name}}님에게 준 커맨더 피해 {{delta}}점이 반영되지 않았습니다. {{name}}님이 이전 요청에 아직 응답하지 않았다면, 응답한 뒤 다시 보내세요.'
-    // ar: No gendered verb or pronoun on {{name}}: 'إذا لم يصل رد على مطالبتك الأخيرة بعد، فأعد إرسالها بعد وصوله.'
+    // Shown to the attacking player when their commander damage could not be added because the defender's total changed before it arrived, for example after someone else undid the same hit. {{name}} is the defending player; {{delta}} is the damage that was not added.
     commanderClaimDeclined:
-      "{{delta}} commander damage to {{name}} wasn't added. If they haven't answered your last claim yet, send it again after they do.",
+      "{{delta}} commander damage to {{name}} wasn't added because their total changed first. Check the board and try again.",
     // hi: “और बदलाव रखने से पहले, जो बदलाव नहीं हो सके उन्हें देखकर हटाएँ, फिर दोबारा सिंक करें।”
     failureCapacity:
       "Failed changes need review before more rejected changes can be retained. Dismiss reviewed failures, then retry syncing.",

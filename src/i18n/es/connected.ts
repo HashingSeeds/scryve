@@ -91,7 +91,7 @@ export default {
     commanderDamageRange: "Los cambios de daño de comandante deben estar entre {{min}} y {{max}}.",
     commanderSelfDamage: "Un comandante no puede dañarse a sí mismo",
     commanderClaimDeclined:
-      "No se añadió el daño de comandante a {{name}} ({{delta}}). Si aún no ha respondido a tu última solicitud, envíala de nuevo cuando lo haga.",
+      "No se añadió el daño de comandante a {{name}} ({{delta}}) porque su total cambió antes. Revisa el tablero e inténtalo de nuevo.",
     failureCapacity:
       "Hay que revisar los cambios fallidos antes de poder conservar más cambios rechazados. Descarta los fallos revisados y vuelve a intentar sincronizar.",
     finish: {

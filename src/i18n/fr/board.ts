@@ -373,23 +373,6 @@ export default {
     benchPromoteHint: "Touchez pour mettre Actif, ou modifier.",
     benchFocusHint: "Touchez pour compter les dégâts dessus ou l’échanger, ou modifier.",
   },
-  commanderClaim: {
-    dealt: "{{name}} : {{damage}} blessures de commandant",
-    more_one: "{{count}} de plus",
-    more_many: "{{count}} de plus",
-    more_other: "{{count}} de plus",
-    morePending_one: "{{count}} de plus en attente",
-    morePending_many: "{{count}} de plus en attente",
-    morePending_other: "{{count}} de plus en attente",
-    action: {
-      decline: "Refuser",
-      confirm: "Confirmer",
-    },
-    actionLabel: {
-      decline: "Refuser {{damage}} blessures de commandant infligées par {{name}}",
-      confirm: "Confirmer {{damage}} blessures de commandant infligées par {{name}}",
-    },
-  },
   commander: {
     assignFromSeat: "Attribuer des blessures de commandant infligées par la place {{seat}}",
     assigningFromSeat: "Attribution des blessures de commandant infligées par la place {{seat}}",

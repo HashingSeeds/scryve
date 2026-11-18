@@ -108,22 +108,13 @@ const isClampedBack = (claim: { total: number; delta: number; commanderLimit?: n
   claim.delta < 0 && claim.total > (claim.commanderLimit ?? LEGACY_COMMANDER_LIMIT)
 
 // why: a claim that can never land is declined when it arrives instead of rejected, so every installed outbox sees a success and stops retrying it.
-// why: a pair's total moves only when its claim is confirmed, and a pair holds one pending claim at a time, so the total checked here is still the total when that claim is confirmed.
-export function commanderClaimOutcome(claim: {
+export function commanderClaimLands(claim: {
   total: number
   delta: number
   commanderLimit?: number
-  pendingClaims: number
-  pairHasPendingClaim: boolean
-}): "pending" | "declined" {
+}): boolean {
   const nextTotal = claim.total + claim.delta
-  return nextTotal < 0 ||
-    nextTotal > MAX_COMMANDER_DAMAGE ||
-    isClampedBack(claim) ||
-    claim.pendingClaims >= MAX_PENDING_COMMANDER_CLAIMS ||
-    claim.pairHasPendingClaim
-    ? "declined"
-    : "pending"
+  return nextTotal >= 0 && nextTotal <= MAX_COMMANDER_DAMAGE && !isClampedBack(claim)
 }
 
 export function confirmCommanderClaim(state: { total: number; life: number; delta: number }) {
@@ -152,30 +143,6 @@ export const isSameCommanderClaim = (
   recorded.toPlayerId === request.toPlayerId &&
   recorded.commander === request.commander &&
   recorded.delta === request.delta &&
-  recorded.actorUserId === request.actorUserId &&
-  recorded.deviceId === request.deviceId &&
-  recorded.clientCreatedAt === request.clientCreatedAt
-
-export interface CommanderResolutionRequest {
-  kind: string
-  claimOperationId: string
-  defenderPlayerId: string
-  actorUserId: string
-  deviceId: string
-  clientCreatedAt: number
-}
-
-export const isSameCommanderResolution = (
-  recorded: Partial<Omit<CommanderResolutionRequest, "defenderPlayerId">> & {
-    playerId?: string
-    toPlayerId?: string
-  },
-  request: CommanderResolutionRequest,
-) =>
-  recorded.kind === request.kind &&
-  recorded.claimOperationId === request.claimOperationId &&
-  recorded.playerId === request.defenderPlayerId &&
-  recorded.toPlayerId === request.defenderPlayerId &&
   recorded.actorUserId === request.actorUserId &&
   recorded.deviceId === request.deviceId &&
   recorded.clientCreatedAt === request.clientCreatedAt

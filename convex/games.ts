@@ -37,7 +37,6 @@ import {
   matchTableRetry,
   rejectForGame,
   rejectRequest,
-  resolutionEventIds,
   type ClaimDecision,
   type GameWrite,
 } from "./lib/gameEngine"
@@ -51,7 +50,6 @@ import {
   isCommanderSlot,
   isLifeDelta,
   isSameCommanderClaim,
-  isSameCommanderResolution,
   lastChangeFor,
   MAX_COMMANDER_DAMAGE,
   MAX_PENDING_COMMANDER_CLAIMS,
@@ -2420,25 +2418,8 @@ async function statusForOperation(
         q.eq("gameId", game._id).eq("operationId", operation.claimOperationId),
       )
       .unique()
-    if (!claim) return notFound()
-    const decision = operation.accepted ? "confirmed" : "declined"
-    if (claim.status === "pending") return notFound()
-    if (claim.status !== decision)
-      return conflict(`${reused}: Commander damage claim was resolved differently`)
-    if (!claim.resolutionOperationId) return notFound()
-    if (claim.resolutionOperationId !== operation.operationId) return conflict(reused)
-    const event = await commanderResolutionEvent(ctx, claim)
-    if (!event) return notFound()
-    return isSameCommanderResolution(event, {
-      kind: `commanderDamage.${decision}`,
-      claimOperationId: operation.claimOperationId,
-      defenderPlayerId: operation.toPlayerId,
-      actorUserId: user._id,
-      deviceId: operation.deviceId,
-      clientCreatedAt: operation.clientCreatedAt,
-    })
-      ? acknowledged()
-      : conflict(reused)
+    // why: a settled claim counts every confirm or decline as done, as the mutation does, so an older app's queue drains.
+    return !claim || claim.status === "pending" ? notFound() : acknowledged()
   }
 
   const event = await ctx.db
@@ -3064,19 +3045,6 @@ export const submitCommanderDamage = mutation({
     }
   },
 })
-
-async function commanderResolutionEvent(ctx: QueryCtx, claim: Doc<"gameCommanderClaims">) {
-  for (const operationId of resolutionEventIds(claim)) {
-    const event = await ctx.db
-      .query("gameEvents")
-      .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", claim.gameId).eq("operationId", operationId),
-      )
-      .unique()
-    if (event) return event
-  }
-  return null
-}
 
 async function resolveCommanderClaim(
   ctx: MutationCtx,

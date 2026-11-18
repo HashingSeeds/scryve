@@ -11,7 +11,7 @@ import {
   type GameWrite,
 } from "./gameEngine"
 import { limitGameRate } from "./gameRateLimits"
-import { commanderField, MAX_PENDING_COMMANDER_CLAIMS } from "./gameRules"
+import { commanderField } from "./gameRules"
 import { gameWriteError } from "./gameWriteErrors"
 import { MAX_PLAYERS } from "./policy"
 import type { TableState } from "./table"
@@ -140,9 +140,6 @@ export async function writeCloudGame(
     } else if (change.kind === "event.insert") {
       const id = await ctx.db.insert("gameEvents", eventRow(change.event))
       insertedEvents.set(change.event.operationId, id)
-    } else if (change.kind === "event.rekey") {
-      const event = await eventDoc(change.operationId)
-      if (event) await ctx.db.patch(event._id, { operationId: change.to })
     } else if (change.kind === "claim.insert") {
       const id = await ctx.db.insert("gameCommanderClaims", claimRow(change.claim))
       insertedClaims.set(change.claim.operationId, id)
@@ -195,11 +192,6 @@ export async function writeCloudGame(
       return undefined
     },
     claim: async (operationId) => (await claimDoc(operationId)) ?? undefined,
-    pendingClaims: () =>
-      ctx.db
-        .query("gameCommanderClaims")
-        .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
-        .take(MAX_PENDING_COMMANDER_CLAIMS + 1),
     pairTotal: async (pair) => (await pairDoc(pair))?.total ?? 0,
     seats: async () =>
       (

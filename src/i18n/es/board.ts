@@ -377,23 +377,6 @@ export default {
     benchPromoteHint: "Toca para pasarlo al Puesto Activo, o edita.",
     benchFocusHint: "Toca para contar daño en él o cambiarlo, o edita.",
   },
-  commanderClaim: {
-    dealt: "{{name}}: {{damage}} de daño de comandante",
-    more_one: "{{count}} más",
-    more_many: "{{count}} más",
-    more_other: "{{count}} más",
-    morePending_one: "{{count}} más pendiente",
-    morePending_many: "{{count}} más pendientes",
-    morePending_other: "{{count}} más pendientes",
-    action: {
-      decline: "Rechazar",
-      confirm: "Confirmar",
-    },
-    actionLabel: {
-      decline: "Rechazar {{damage}} de daño de comandante de {{name}}",
-      confirm: "Confirmar {{damage}} de daño de comandante de {{name}}",
-    },
-  },
   commander: {
     assignFromSeat: "Asignar daño de comandante desde el asiento {{seat}}",
     assigningFromSeat: "Asignando daño de comandante desde el asiento {{seat}}",

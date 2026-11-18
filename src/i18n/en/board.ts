@@ -435,24 +435,6 @@ const board = {
     // ko: Three alternatives: '탭하여 데미지를 세거나, 교체하거나, 편집하세요.'
     benchFocusHint: "Tap to count damage on it or switch it in, or edit.",
   },
-  commanderClaim: {
-    // One line that cuts off its end on narrow seats: keep {{name}} and {{damage}} first.
-    dealt: "{{name}}: {{damage}} commander damage",
-    more_one: "{{count}} more",
-    more_other: "{{count}} more",
-    morePending_one: "{{count}} more pending",
-    morePending_other: "{{count}} more pending",
-    action: {
-      decline: "Decline",
-      // ja: Same verb as its screen reader label: 承認. Never 確定.
-      confirm: "Confirm",
-    },
-    actionLabel: {
-      // ja: Same verb as the button: {{name}}からの統率者ダメージ{{damage}}を拒否. Never 却下.
-      decline: "Decline {{damage}} commander damage from {{name}}",
-      confirm: "Confirm {{damage}} commander damage from {{name}}",
-    },
-  },
   // Magic Commander damage: damage a commander card dealt to a player. {{seat}} is a seat number.
   commander: {
     assignFromSeat: "Assign commander damage from seat {{seat}}",

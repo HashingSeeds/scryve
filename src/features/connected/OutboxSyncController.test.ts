@@ -367,7 +367,7 @@ describe("outbox sync controller", () => {
     expect(sent).toHaveLength(2)
   })
 
-  it("queues a defender confirmation made while offline and replays it on reconnect", async () => {
+  it("confirms a claim still waiting on this device's seat once, and sends it on reconnect", async () => {
     const { clock, controller, repository, sent } = harness()
     const claim = {
       claimId: "claim-1",
@@ -378,19 +378,132 @@ describe("outbox sync controller", () => {
       clientCreatedAt: clock.now(),
       createdAt: clock.now(),
     }
+    const claimOnSeatHeldElsewhere = {
+      ...claim,
+      claimId: "claim-2",
+      operationId: "commander-claim-000002",
+      fromPlayerId: "player-1",
+      toPlayerId: "player-2",
+    }
+    const waiting = {
+      ...projection(0, 20),
+      commanderDamage: {
+        totals: [],
+        pendingClaims: [claim, claimOnSeatHeldElsewhere],
+        eliminatedPlayerIds: [],
+      },
+    }
     controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
 
-    controller.resolveCommanderDamage(claim, true)
-    expect(controller.getSnapshot().pending).toHaveLength(1)
-    expect(controller.getSnapshot().changeError).toBeUndefined()
+    controller.onRemoteProjection(waiting)
+    controller.onRemoteProjection(waiting)
+    expect(controller.getSnapshot().pending.map(({ event }) => event)).toEqual([
+      expect.objectContaining({
+        type: "commanderDamage.resolved",
+        claimOperationId: claim.operationId,
+        accepted: true,
+      }),
+    ])
     expect(stored(repository).pending).toHaveLength(1)
 
     controller.setEnvironment(ONLINE)
     await settle()
+    controller.onRemoteProjection(waiting)
 
     expect(sent).toHaveLength(1)
     expect(controller.getSnapshot().pending).toEqual([])
-    expect(stored(repository).pending).toEqual([])
+  })
+
+  const waitingClaim = (createdAt: number) => ({
+    ...projection(0, 21),
+    commanderDamage: {
+      totals: [],
+      pendingClaims: [
+        {
+          claimId: "claim-1",
+          operationId: "commander-claim-000001",
+          fromPlayerId: "player-2",
+          toPlayerId: "player-1",
+          delta: 4,
+          clientCreatedAt: createdAt,
+          createdAt,
+        },
+      ],
+      eliminatedPlayerIds: [],
+    },
+  })
+
+  it("confirms a waiting claim once a sent write leaves a full queue, with no new projection", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1", { maxPendingRecords: 1 })
+    repository.outbox("game-public").enqueue(action("operation-full-0002", 1, 1))
+    const { clock, controller, sent } = harness({ storage, repository })
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+    controller.onRemoteProjection(waitingClaim(clock.now()))
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+
+    controller.setEnvironment(ONLINE)
+    await settle()
+
+    expect(sent).toEqual(["operation-full-0002", expect.stringContaining("commanderResolve")])
+  })
+
+  it("confirms a waiting claim again after its failed confirmation is dismissed", async () => {
+    let failing = true
+    const { clock, controller, sent } = harness({
+      send: async (queued) => {
+        if (failing) throw new Error("Seat-owner permission required for the defending seat")
+        sent.push(queued.event.operationId)
+        return { operationId: queued.event.operationId }
+      },
+    })
+    controller.setEnvironment(ONLINE)
+    controller.onRemoteProjection(waitingClaim(clock.now()))
+    await settle()
+    const [failed] = controller.getSnapshot().failed
+    expect(failed.action.event.type).toBe("commanderDamage.resolved")
+
+    failing = false
+    controller.dismissFailed(failed.action.event.operationId)
+    controller.onRemoteProjection(waitingClaim(clock.now()))
+    await settle()
+
+    expect(sent).toEqual([expect.stringContaining("commanderResolve")])
+  })
+
+  it("confirms a waiting claim with room the same projection frees in a full queue", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1", { maxPendingRecords: 1 })
+    repository.outbox("game-public").enqueue(action("operation-full-0001", 1, 1))
+    const { clock, controller } = harness({ storage, repository })
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    controller.onRemoteProjection({
+      ...projection(0, 21),
+      recentOperationIds: ["operation-full-0001"],
+      commanderDamage: {
+        totals: [],
+        pendingClaims: [
+          {
+            claimId: "claim-1",
+            operationId: "commander-claim-000001",
+            fromPlayerId: "player-2",
+            toPlayerId: "player-1",
+            delta: 4,
+            clientCreatedAt: clock.now(),
+            createdAt: clock.now(),
+          },
+        ],
+        eliminatedPlayerIds: [],
+      },
+    })
+
+    expect(controller.getSnapshot().pending.map(({ event }) => event)).toEqual([
+      expect.objectContaining({
+        type: "commanderDamage.resolved",
+        claimOperationId: "commander-claim-000001",
+      }),
+    ])
   })
 
   it("queues only the Life Points a Yu-Gi-Oh! seat has left, and nothing once it is at 0", () => {
@@ -676,7 +789,7 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toMatch(/only part of it was saved/)
   })
 
-  it("tells the attacker when the server declines a claim the defender has not answered yet", async () => {
+  it("tells the attacker when the server declines a claim that can no longer land", async () => {
     const { controller, repository } = harness({
       send: async ({ event }) => ({
         operationId: event.operationId,
@@ -691,7 +804,7 @@ describe("outbox sync controller", () => {
 
     expect(stored(repository).pending).toEqual([])
     expect(controller.getSnapshot().changeError).toBe(
-      "5 commander damage to Grace wasn't added. If they haven't answered your last claim yet, send it again after they do.",
+      "5 commander damage to Grace wasn't added because their total changed first. Check the board and try again.",
     )
   })
 
@@ -724,89 +837,8 @@ describe("outbox sync controller", () => {
     expect(sentDeltas).toEqual([-3, -2])
     expect(controller.getSnapshot().pending).toEqual([])
     expect(controller.getSnapshot().changeError).toBe(
-      "7 commander damage to Grace wasn't added. If they haven't answered your last claim yet, send it again after they do.",
+      "7 commander damage to Grace wasn't added because their total changed first. Check the board and try again.",
     )
-  })
-
-  it("queues one resolution when the defender taps Confirm twice", () => {
-    const { clock, controller } = harness()
-    const claim = {
-      claimId: "claim-1",
-      operationId: "commander-claim-000001",
-      fromPlayerId: "player-2",
-      toPlayerId: "player-1",
-      delta: 4,
-      clientCreatedAt: clock.now(),
-      createdAt: clock.now(),
-    }
-    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
-
-    controller.resolveCommanderDamage(claim, true)
-    controller.resolveCommanderDamage(claim, true)
-
-    expect(controller.getSnapshot().pending).toHaveLength(1)
-  })
-
-  it("shows a claim again after its resolution is rejected, so it can be resolved again", async () => {
-    const { clock, controller } = harness({
-      send: async () => {
-        throw new Error("Game is not active")
-      },
-    })
-    const claim = {
-      claimId: "claim-1",
-      operationId: "commander-claim-000001",
-      fromPlayerId: "player-2",
-      toPlayerId: "player-1",
-      delta: 4,
-      clientCreatedAt: clock.now(),
-      createdAt: clock.now(),
-    }
-    controller.onRemoteProjection({
-      ...projection(0, 20),
-      commanderDamage: { totals: [], pendingClaims: [claim], eliminatedPlayerIds: [] },
-    })
-    const shownClaims = () =>
-      controller
-        .getSnapshot()
-        .projection?.commanderDamage?.pendingClaims.map(({ operationId }) => operationId)
-
-    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
-    controller.resolveCommanderDamage(claim, true)
-    expect(shownClaims()).toEqual([])
-
-    controller.setEnvironment(ONLINE)
-    await settle()
-    expect(controller.getSnapshot().failed).toHaveLength(1)
-    expect(shownClaims()).toEqual([claim.operationId])
-
-    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
-    controller.resolveCommanderDamage(claim, true)
-    expect(controller.getSnapshot().pending).toHaveLength(1)
-  })
-
-  it("keeps a declined claim distinct from a confirmed one", () => {
-    const { clock, controller } = harness()
-    const claim = {
-      claimId: "claim-1",
-      operationId: "commander-claim-000001",
-      fromPlayerId: "player-2",
-      toPlayerId: "player-1",
-      delta: 4,
-      clientCreatedAt: clock.now(),
-      createdAt: clock.now(),
-    }
-    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
-
-    controller.resolveCommanderDamage(claim, false)
-
-    const [queued] = controller.getSnapshot().pending
-    expect(queued.event).toMatchObject({
-      type: "commanderDamage.resolved",
-      claimOperationId: claim.operationId,
-      toPlayerId: claim.toPlayerId,
-      accepted: false,
-    })
   })
 
   it("schedules a backoff retry after a transient send failure", async () => {

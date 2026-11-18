@@ -359,21 +359,6 @@ export default {
     benchPromoteHint: "ऐक्टिव बनाने के लिए टैप करें, या एडिट करें।",
     benchFocusHint: "उस पर डैमेज गिनने या उसे स्विच इन करने के लिए टैप करें, या एडिट करें।",
   },
-  commanderClaim: {
-    dealt: "{{name}}: {{damage}} कमांडर डैमेज",
-    more_one: "{{count}} और",
-    more_other: "{{count}} और",
-    morePending_one: "{{count}} और बाकी",
-    morePending_other: "{{count}} और बाकी",
-    action: {
-      decline: "नामंज़ूर करें",
-      confirm: "पुष्टि करें",
-    },
-    actionLabel: {
-      decline: "{{name}} से {{damage}} कमांडर डैमेज नामंज़ूर करें",
-      confirm: "{{name}} से {{damage}} कमांडर डैमेज की पुष्टि करें",
-    },
-  },
   commander: {
     assignFromSeat: "सीट {{seat}} से कमांडर डैमेज दें",
     assigningFromSeat: "सीट {{seat}} से कमांडर डैमेज दिया जा रहा है",

@@ -141,49 +141,7 @@ describe("connected reconciliation", () => {
     },
   )
 
-  it("hides a claim from the defender once its resolution is queued", () => {
-    const claim = (operationId: string) => ({
-      claimId: operationId,
-      operationId,
-      fromPlayerId: "player-2",
-      toPlayerId: "player-1",
-      delta: 3,
-      clientCreatedAt: 1,
-      createdAt: 1,
-    })
-    const withClaims: ConnectedProjection = {
-      ...projection,
-      commanderDamage: {
-        totals: [],
-        pendingClaims: [claim("claim-resolved-0001"), claim("claim-waiting-00001")],
-        eliminatedPlayerIds: [],
-      },
-    }
-    const resolution: PendingLifeAction = {
-      schemaVersion: 1,
-      event: {
-        type: "commanderDamage.resolved",
-        operationId: asOperationId("resolve-operation-1"),
-        claimOperationId: asOperationId("claim-resolved-0001"),
-        gameId: asGameId("game-public"),
-        toPlayerId: asPlayerId("player-1"),
-        accepted: true,
-        actorId: asActorId("user-1"),
-        deviceId: asDeviceId("device-1"),
-        clientCreatedAt: 2,
-      },
-      queuedAt: 2,
-      attempts: 0,
-    }
-
-    expect(
-      overlayPendingDeltas(withClaims, [resolution]).commanderDamage?.pendingClaims.map(
-        ({ operationId }) => operationId,
-      ),
-    ).toEqual(["claim-waiting-00001"])
-  })
-
-  it("shows queued commander damage at once where anyone can edit, and waits where the defender confirms", () => {
+  it("shows queued commander damage at once, where only a seat's owner edits it too", () => {
     const hit: PendingLifeAction = {
       schemaVersion: 1,
       event: {
@@ -209,14 +167,11 @@ describe("connected reconciliation", () => {
       },
     }
 
-    const direct = overlayPendingDeltas({ ...commander, lifeEditing: "anyone" }, [hit])
+    const direct = overlayPendingDeltas(commander, [hit])
     expect(direct.players[0]).toMatchObject({ currentLife: 16, pendingDelta: -4 })
     expect(direct.commanderDamage?.totals).toEqual([
       { fromPlayerId: "player-2", toPlayerId: "player-1", total: 7 },
     ])
-    const confirmedByDefender = overlayPendingDeltas(commander, [hit])
-    expect(confirmedByDefender.players[0]).toMatchObject({ currentLife: 20, pendingDelta: 0 })
-    expect(confirmedByDefender.commanderDamage?.totals[0]?.total).toBe(3)
   })
 
   it("never lets an older or reordered subscription replace a newer projection", () => {

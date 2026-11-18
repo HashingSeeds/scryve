@@ -1,12 +1,11 @@
 import {
   applyLifeChange,
-  commanderClaimOutcome,
+  commanderClaimLands,
   confirmCommanderClaim,
   controlsSeat,
   isSameCommanderClaim,
   isSameLifeChange,
   lastChangeFor,
-  MAX_PENDING_COMMANDER_CLAIMS,
 } from "./gameRules"
 
 const player = { userId: "player", deviceId: "phone", isHost: false }
@@ -68,25 +67,21 @@ describe("game rules", () => {
     expect(applyLifeChange("mtg", 5, -8)).toEqual({ delta: -8, currentLife: -3 })
   })
 
-  it("declines a commander claim on arrival when it could never be confirmed", () => {
-    const open = { total: 10, delta: 5, pendingClaims: 0, pairHasPendingClaim: false }
+  it("declines a commander claim on arrival when it could never land", () => {
+    const open = { total: 10, delta: 5 }
 
-    expect(commanderClaimOutcome(open)).toBe("pending")
-    expect(commanderClaimOutcome({ ...open, delta: 90 })).toBe("pending")
-    expect(commanderClaimOutcome({ ...open, total: 995, delta: 5 })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, delta: -11 })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, total: 99, delta: -9 })).toBe("pending")
-    expect(commanderClaimOutcome({ ...open, total: 120, delta: -21 })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, total: 120, delta: -22 })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, total: 100, delta: -1 })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, total: 120, delta: 3 })).toBe("pending")
+    expect(commanderClaimLands(open)).toBe(true)
+    expect(commanderClaimLands({ ...open, delta: 90 })).toBe(true)
+    expect(commanderClaimLands({ ...open, total: 995, delta: 5 })).toBe(false)
+    expect(commanderClaimLands({ ...open, delta: -11 })).toBe(false)
+    expect(commanderClaimLands({ ...open, total: 99, delta: -9 })).toBe(true)
+    expect(commanderClaimLands({ ...open, total: 120, delta: -21 })).toBe(false)
+    expect(commanderClaimLands({ ...open, total: 120, delta: -22 })).toBe(false)
+    expect(commanderClaimLands({ ...open, total: 100, delta: -1 })).toBe(false)
+    expect(commanderClaimLands({ ...open, total: 120, delta: 3 })).toBe(true)
     const marked = { ...open, commanderLimit: 999 }
-    expect(commanderClaimOutcome({ ...marked, total: 100, delta: -1 })).toBe("pending")
-    expect(commanderClaimOutcome({ ...marked, total: 120, delta: -21 })).toBe("pending")
-    expect(commanderClaimOutcome({ ...open, pairHasPendingClaim: true })).toBe("declined")
-    expect(commanderClaimOutcome({ ...open, pendingClaims: MAX_PENDING_COMMANDER_CLAIMS })).toBe(
-      "declined",
-    )
+    expect(commanderClaimLands({ ...marked, total: 100, delta: -1 })).toBe(true)
+    expect(commanderClaimLands({ ...marked, total: 120, delta: -21 })).toBe(true)
   })
 
   it("moves life one for one when a claim is confirmed, and refuses totals outside 0 to 999", () => {

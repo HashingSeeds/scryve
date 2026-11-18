@@ -25,7 +25,6 @@ import type { CommanderUndo } from "./connectedLog"
 import type {
   ConnectionStatus,
   ConnectedCommanderDamageChange,
-  ConnectedCommanderDamageClaim,
   ConnectedDisplayProjection,
   ConnectedProjection,
   FailedLifeAction,
@@ -136,6 +135,7 @@ export class OutboxSyncController {
   private timingLive = false
   private environmentInitialized = false
   private lastQueuedLifeChange: { playerId: string; operationId: string } | undefined
+  private readonly confirmedClaims = new Set<string>()
   private operationStatus: ConnectedOperationStatus | null = null
   private readonly projectionWaiters = new Map<
     string,
@@ -179,6 +179,8 @@ export class OutboxSyncController {
     })
     this.store = createSnapshotStore(this.buildSnapshot())
     this.unsubscribeOutbox = this.outbox.state$.onChange(() => {
+      // why: a write leaving a full queue frees the room a waiting claim's confirmation needs.
+      if (this.confirmed) this.confirmWaitingClaims(this.confirmed)
       this.publish()
       this.resolveProjectionWaiter()
     })
@@ -276,6 +278,7 @@ export class OutboxSyncController {
       emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: pending.length })
     }
     this.outbox.acknowledge(incoming.recentOperationIds)
+    this.confirmWaitingClaims(merged)
     this.outbox.resume()
     this.publish()
     this.resolveProjectionWaiter()
@@ -418,44 +421,43 @@ export class OutboxSyncController {
     }
   }
 
-  /**
-   * Queues the defender's decision. Confirming offline is legitimate — the claim is
-   * already on the server, so the resolution just replays when the socket returns.
-   */
-  resolveCommanderDamage = (claim: ConnectedCommanderDamageClaim, accepted: boolean): void => {
-    // why: the server keeps one resolution per claim, so a second tap before the banner hides would fail with sync_operation_mismatch.
-    if (
-      this.pending.some(
-        ({ event }) =>
-          event.type === "commanderDamage.resolved" && event.claimOperationId === claim.operationId,
-      )
+  /** why: claims land at once now, but a nearby host on an older app, or a claim sent before that change, still waits on the defender, so the defender's device confirms it for them. */
+  private confirmWaitingClaims(projection: ConnectedProjection): void {
+    if (projection.status !== "active") return
+    const mine = new Set(
+      projection.players.flatMap((player) => (player.controlledByMe ? [player.playerId] : [])),
     )
-      return
-    const now = this.now()
-    const action: PendingLifeAction = {
-      schemaVersion: 1,
-      event: {
-        type: "commanderDamage.resolved",
-        operationId: asOperationId(createClientId("commanderResolve", now)),
-        claimOperationId: asOperationId(claim.operationId),
-        gameId: asGameId(this.options.publicId),
-        toPlayerId: asPlayerId(claim.toPlayerId),
-        accepted,
-        actorId: asActorId(this.options.ownerId),
-        deviceId: this.options.deviceId,
-        clientCreatedAt: now,
-      },
-      queuedAt: now,
-      attempts: 0,
+    const queued = new Set<string>(
+      this.pending.flatMap(({ event }) =>
+        event.type === "commanderDamage.resolved" ? [event.claimOperationId] : [],
+      ),
+    )
+    for (const claim of projection.commanderDamage?.pendingClaims ?? []) {
+      if (
+        !mine.has(claim.toPlayerId) ||
+        this.confirmedClaims.has(claim.operationId) ||
+        queued.has(claim.operationId)
+      )
+        continue
+      const now = this.now()
+      const confirmed = this.outbox.enqueue({
+        schemaVersion: 1,
+        event: {
+          type: "commanderDamage.resolved",
+          operationId: asOperationId(createClientId("commanderResolve", now)),
+          claimOperationId: asOperationId(claim.operationId),
+          gameId: asGameId(this.options.publicId),
+          toPlayerId: asPlayerId(claim.toPlayerId),
+          accepted: true,
+          actorId: asActorId(this.options.ownerId),
+          deviceId: this.options.deviceId,
+          clientCreatedAt: now,
+        },
+        queuedAt: now,
+        attempts: 0,
+      })
+      if (confirmed) this.confirmedClaims.add(claim.operationId)
     }
-    if (!this.outbox.enqueue(action)) {
-      this.changeError = translate("connected:outbox.queueFull")
-      this.publish()
-      return
-    }
-    this.lastQueuedLifeChange = undefined
-    this.changeError = undefined
-    this.publish()
   }
 
   private tableSource(): TableSource | null {
@@ -582,6 +584,11 @@ export class OutboxSyncController {
   abandon = async (): Promise<boolean> => this.endGame("abandon", () => this.options.abandonGame())
 
   dismissFailed = (operationId: string): void => {
+    const { event } =
+      this.outbox.getState().failures.find(({ action }) => action.event.operationId === operationId)
+        ?.action ?? {}
+    if (event?.type === "commanderDamage.resolved")
+      this.confirmedClaims.delete(event.claimOperationId)
     this.outbox.dismiss(operationId)
     this.changeError = undefined
     this.publish()
