@@ -71,7 +71,7 @@ export default {
     commanderDamageRange: "커맨더 피해 변경은 {{min}}점에서 {{max}}점 사이여야 합니다.",
     commanderSelfDamage: "커맨더는 자신에게 피해를 줄 수 없습니다",
     commanderClaimDeclined:
-      "{{name}}님에게 준 커맨더 피해 {{delta}}점이 반영되지 않았습니다. {{name}}님이 이전 요청에 아직 응답하지 않았다면, 응답한 뒤 다시 보내세요.",
+      "{{name}}님에게 준 커맨더 피해 {{delta}}점이 추가되지 않았습니다. 먼저 총합이 변경되었습니다. 보드를 확인하고 다시 시도하세요.",
     failureCapacity:
       "실패한 변경 사항을 확인해야 거부된 변경 사항을 더 보관할 수 있습니다. 확인한 실패 항목을 지우고 동기화를 다시 시도하세요.",
     finish: {

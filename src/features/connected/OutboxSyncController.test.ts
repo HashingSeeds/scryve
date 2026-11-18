@@ -686,7 +686,7 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toMatch(/only part of it was saved/)
   })
 
-  it("tells the attacker when the server declines a claim the defender has not answered yet", async () => {
+  it("tells the attacker when the server declines a claim that can no longer land", async () => {
     const { controller, repository } = harness({
       send: async ({ event }) => ({
         operationId: event.operationId,
@@ -701,7 +701,7 @@ describe("outbox sync controller", () => {
 
     expect(stored(repository).pending).toEqual([])
     expect(controller.getSnapshot().changeError).toBe(
-      "5 commander damage to Grace wasn't added. If they haven't answered your last claim yet, send it again after they do.",
+      "5 commander damage to Grace wasn't added because their total changed first. Check the board and try again.",
     )
   })
 
@@ -734,7 +734,7 @@ describe("outbox sync controller", () => {
     expect(sentDeltas).toEqual([-3, -2])
     expect(controller.getSnapshot().pending).toEqual([])
     expect(controller.getSnapshot().changeError).toBe(
-      "7 commander damage to Grace wasn't added. If they haven't answered your last claim yet, send it again after they do.",
+      "7 commander damage to Grace wasn't added because their total changed first. Check the board and try again.",
     )
   })
 

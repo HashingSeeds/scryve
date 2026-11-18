@@ -42,7 +42,7 @@
   "outbox.undoPartial": "03f14a51d08e.b2196c004115",
   "outbox.commanderDamageRange": "825bd920ca22.b23bf182bcbf",
   "outbox.commanderSelfDamage": "60f7079d5fba.1f0af3c10394",
-  "outbox.commanderClaimDeclined": "545434ec2d2a.b514d73fc1e3",
+  "outbox.commanderClaimDeclined": "efcfc96625a0.ef97d6694f1a",
   "outbox.failureCapacity": "f895b8bafeea.2c3fa1d012e6",
   "outbox.finish.signIn": "4f76dda5a688.9cc4bdc3b28c",
   "outbox.finish.pendingChanges": "ae4381dfd5b5.1597558c6173",
