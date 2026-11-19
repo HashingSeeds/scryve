@@ -140,7 +140,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # why: downloads the official rules, so a publisher's format change fails here too.
       - name: Score rules search
         run: pnpm rules:eval --misses
 
@@ -167,7 +166,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # why: downloads the app's card file and Scryfall's name catalog, so a change to either fails here too.
       - name: Score card search
         run: pnpm cards:eval --misses
 

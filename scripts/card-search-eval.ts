@@ -1,4 +1,3 @@
-/** why: grades the list the add screen shows, closest names first and then every name holding the typed words, since that list is what a player picks from. */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -17,13 +16,10 @@ import {
   type MagicSearch,
 } from "../src/features/decks/localMagicSearch"
 
-/** why: `app` cases are copied from what players typed in the app, the only proof of real queries; keep them apart from ones we wrote. */
 type Source = "app" | "web" | "written"
 type Case = { query: string; cards: string[]; source: Source; asked?: string }
 
-// why: CI fails when search ranks fewer cases first than this; raise it whenever search improves.
 const FLOOR = 224
-// why: a phone runs search several times slower than CI, and it runs on every keystroke.
 const P95_BUDGET_MS = 25
 const TOP = 3
 const CACHE_HOURS = 12

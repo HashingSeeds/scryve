@@ -5,6 +5,5 @@ android
 .vscode
 package.json
 .eslintignore
-# why: one case per line keeps the search evals easy to review and edit.
 scripts/rules-search/*.json
 scripts/card-search/*.json

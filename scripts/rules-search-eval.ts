@@ -1,4 +1,3 @@
-/** why: grades the screen a result opens, not the result's id, since that screen is what a player at the table reads. An answer can list rules that say the same thing in two places (104.3b, 704.5a) so either counts. */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -14,7 +13,6 @@ import {
 } from "../src/features/rules/comprehensiveRules"
 import { GAME_RULES, type TextRules } from "../src/features/rules/rulesCatalog"
 
-/** why: analytics keeps a search's text only when it found nothing, so `app` cases are copied from those `rules_search` events; they are the only proof of what players really type. */
 type Source = "app" | "web" | "written"
 type Case = {
   query: string
@@ -24,10 +22,8 @@ type Case = {
   asked?: string
 }
 
-// why: CI fails when search answers fewer cases than this; raise it whenever search improves.
 const FLOOR = { mtg: 29, fab: 18 }
 type System = keyof typeof FLOOR
-// why: a phone runs search several times slower than CI, and it runs on every keystroke.
 const P95_BUDGET_MS = 10
 const TOP = 3
 const CACHE_HOURS = 12
@@ -53,7 +49,6 @@ async function rulesText(source: TextRules) {
   return text
 }
 
-// why: a glossary term opens the first rule it cites, so a term citing nothing answers nothing.
 function screenOpenedBy(rules: ComprehensiveRules, source: TextRules, result: RuleSearchResult) {
   const id =
     result.kind === "rule"
@@ -146,6 +141,8 @@ async function evaluate(system: System, file: string) {
 
 async function main() {
   if (values.cases && !values.system) throw new Error("--cases needs --system")
+  if (values.system && !(values.system in FLOOR))
+    throw new Error(`--system is one of ${Object.keys(FLOOR).join(", ")}`)
   const systems = (Object.keys(FLOOR) as System[]).filter(
     (system) => !values.system || values.system === system,
   )
