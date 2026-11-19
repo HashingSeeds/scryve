@@ -1,4 +1,10 @@
-import { findRules, matchExcerpt, ruleReferences, searchRules } from "./comprehensiveRules"
+import {
+  findRules,
+  matchExcerpt,
+  ruleReferences,
+  searchRules,
+  type ComprehensiveRules,
+} from "./comprehensiveRules"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
 
 const SOURCE = [
@@ -131,5 +137,157 @@ describe("matchExcerpt", () => {
       match: "",
       after: "",
     })
+  })
+})
+
+describe("searchRules ranking", () => {
+  const rule = (id: string, text: string) => ({ id, text, examples: [] })
+  const rules: ComprehensiveRules = {
+    chapters: [
+      {
+        id: "5",
+        title: "Turn Structure",
+        sections: [
+          {
+            id: "509",
+            title: "Declare Blockers Step",
+            rules: [
+              rule("509.1", "The defending player declares blockers."),
+              rule("509.1a", "The defending player chooses which untapped creatures block."),
+              rule("509.1b", "Check restrictions."),
+            ],
+          },
+        ],
+      },
+      {
+        id: "7",
+        title: "Additional Rules",
+        sections: [
+          {
+            id: "701",
+            title: "Keyword Actions",
+            rules: [
+              rule("701.8", "Destroy"),
+              rule("701.8a", "To destroy a permanent, move it to its owner's graveyard."),
+              rule("701.8b", "Effects can destroy all creatures at once."),
+            ],
+          },
+          {
+            id: "702",
+            title: "Keyword Abilities",
+            rules: [
+              rule("702.2", "Deathtouch"),
+              rule("702.2b", "A creature dealt damage by a source with deathtouch is destroyed."),
+            ],
+          },
+        ],
+      },
+      {
+        id: "9",
+        title: "Casual Variants",
+        sections: [
+          {
+            id: "903",
+            title: "Commander",
+            rules: [
+              rule("903.3", "Each deck has a commander."),
+              rule("903.8", "A player may cast a commander from the command zone for 2 more."),
+            ],
+          },
+        ],
+      },
+    ],
+    glossary: [
+      { term: "Commander Tax", text: "The extra cost to cast a commander. See rule 903.8." },
+    ],
+    notice: [],
+    slang: { wrath: "destroy all creatures" },
+    references: MAGIC_RULE_REFERENCE,
+  }
+  const ids = (query: string) =>
+    searchRules(rules, query).map((result) =>
+      result.kind === "term" ? result.entry.term : result.rule.id,
+    )
+
+  it("matches the words of a question and ranks the rule that has its rarest ones first", () => {
+    expect(ids("does deathtouch destroy creatures")[0]).toBe("702.2b")
+  })
+
+  it("reads player slang as the rules' wording", () => {
+    expect(ids("wrath")[0]).toBe("701.8b")
+  })
+
+  it("forgives one typo in a word the rules never use", () => {
+    expect(ids("deathtuch")[0]).toBe("702.2")
+  })
+
+  it("lists one result per rule screen, shown by the subrule that says the words", () => {
+    expect(ids("untapped blockers")).toEqual(["509.1a"])
+  })
+
+  it("keeps a rule while the player is partway through typing its word", () => {
+    const flying: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "7",
+          title: "Additional Rules",
+          sections: [
+            {
+              id: "702",
+              title: "Keyword Abilities",
+              rules: [
+                rule("702.9", "Flying"),
+                rule("702.9b", "A creature with flying can't be blocked."),
+              ],
+            },
+          ],
+        },
+      ],
+      glossary: [{ term: "Forestcycling", text: "See rule 702.9." }],
+      notice: [],
+    }
+    expect(searchRules(flying, "forestcycli")[0]).toMatchObject({ kind: "term" })
+    expect(
+      searchRules(flying, "flyi").map((result) => result.kind === "rule" && result.rule.id),
+    ).toEqual(["702.9"])
+  })
+
+  it("lifts the rule a glossary term in the query cites", () => {
+    expect(ids("commander tax")).toEqual(["Commander Tax", "903.8", "903.3"])
+  })
+
+  it("goes straight to a rule number in either game's format, and finds nothing for punctuation", () => {
+    const fab: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "1",
+          title: "Game Concepts",
+          sections: [
+            {
+              id: "1.0",
+              title: "General",
+              rules: [rule("1.0.1", "Rules."), rule("1.0.1a", "More.")],
+            },
+          ],
+        },
+      ],
+      glossary: [{ term: "Go again", text: "An ability keyword.[8.3.5]" }],
+      notice: [],
+    }
+    expect(
+      searchRules(fab, "1.0.1a").map((result) => result.kind === "rule" && result.rule.id),
+    ).toEqual(["1.0.1a"])
+    expect(searchRules(fab, "???")).toEqual([])
+  })
+
+  it("marks the first matched word in an excerpt", () => {
+    expect(matchExcerpt("The defending player chooses blockers.", "can my creature block")).toEqual(
+      {
+        before: "The defending player chooses ",
+        match: "blockers",
+        after: ".",
+      },
+    )
+    expect(matchExcerpt("Put a +1/+1 counter on it.", "+1/+1 counters").match).toBe("+1/+1")
   })
 })

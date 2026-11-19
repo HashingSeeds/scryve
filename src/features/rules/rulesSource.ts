@@ -3,7 +3,7 @@ import { Platform } from "react-native"
 
 import { storage } from "@/utils/storage"
 
-import type { ComprehensiveRules } from "./comprehensiveRules"
+import { searchIndex, type ComprehensiveRules } from "./comprehensiveRules"
 import type { TextRules } from "./gameRules"
 
 type RulesStore = {
@@ -150,6 +150,12 @@ export function useComprehensiveRules(source: TextRules) {
       active = false
     }
   }, [source, attempt])
+  // why: building the search index takes a phone a noticeable moment, so it starts once the rules show instead of on the first keystroke.
+  useEffect(() => {
+    if (!rules) return
+    const timer = setTimeout(() => searchIndex(rules), 0)
+    return () => clearTimeout(timer)
+  }, [rules])
   return {
     rules,
     failed,
