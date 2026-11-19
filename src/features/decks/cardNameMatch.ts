@@ -118,20 +118,23 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
   const key = matchKey(line)
   if (key.length < 3) return []
   const lineTrigrams = trigrams(key)
-  const sharedTrigrams = new Map<number, number>()
+  const shared = new Uint16Array(index.faces.length)
+  const touched: number[] = []
   for (const gram of lineTrigrams)
     for (const faceIndex of index.facesByTrigram.get(gram) ?? [])
-      sharedTrigrams.set(faceIndex, (sharedTrigrams.get(faceIndex) ?? 0) + 1)
-  const overlap = (faceIndex: number, shared: number) =>
-    typed
-      ? shared / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4
-      : shared / (lineTrigrams.size + index.faces[faceIndex].trigramCount - shared)
+      if (shared[faceIndex]++ === 0) touched.push(faceIndex)
+  const overlap = new Float64Array(index.faces.length)
+  for (const faceIndex of touched)
+    overlap[faceIndex] = typed
+      ? shared[faceIndex] / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4
+      : shared[faceIndex] /
+        (lineTrigrams.size + index.faces[faceIndex].trigramCount - shared[faceIndex])
   const bestByName = new Map<
     number,
     { similarity: number; wholeName: boolean; face: string; printedName?: string }
   >()
-  for (const [faceIndex] of [...sharedTrigrams]
-    .sort((a, b) => overlap(b[0], b[1]) - overlap(a[0], a[1]))
+  for (const faceIndex of touched
+    .sort((a, b) => overlap[b] - overlap[a])
     .slice(0, typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE)) {
     const face = index.faces[faceIndex]
     const score = {
