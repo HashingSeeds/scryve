@@ -7,6 +7,7 @@ const TYPED_SHORTLIST_SIZE = 300
 const MIN_TYPED_SIMILARITY = 0.6
 const WORD_START_WEIGHT = 0.95
 const PART_WORD_WEIGHT = 0.97
+const ANY_ORDER_WEIGHT = 0.9
 
 export type CardNameIndex = {
   names: string[]
@@ -112,8 +113,8 @@ function endsOnWholeWord(face: string, end: number) {
   return face[end] === " " && !possessive
 }
 
-function typedSimilarity(query: string, face: string) {
-  let best = similarity(query, face)
+function bestSliceSimilarity(query: string, face: string) {
+  let best = 0
   for (let start = 0; start < face.length; start++) {
     if (start > 0 && face[start - 1] !== " ") continue
     const end = start + query.length
@@ -124,6 +125,21 @@ function typedSimilarity(query: string, face: string) {
     if (score > best) best = score
   }
   return best
+}
+
+/** why: players type a name's words out of order ("plowshares swords"), so each word is also scored on its own. */
+function anyOrderSimilarity(words: string[], face: string) {
+  let matched = 0
+  let letters = 0
+  for (const word of words) {
+    matched += bestSliceSimilarity(word, face) * word.length
+    letters += word.length
+  }
+  return (matched / letters) * ANY_ORDER_WEIGHT
+}
+
+function typedSimilarity(query: string, face: string) {
+  return Math.max(similarity(query, face), bestSliceSimilarity(query, face))
 }
 
 function rankedNames(index: CardNameIndex, line: string, typed = false) {
@@ -145,19 +161,31 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
     number,
     { similarity: number; wholeName: boolean; face: string; printedName?: string }
   >()
-  for (const faceIndex of touched
+  const shortlist = touched
     .sort((a, b) => overlap[b] - overlap[a])
-    .slice(0, typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE)) {
+    .slice(0, typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE)
+  const keep = (faceIndex: number, similarity: number) => {
     const face = index.faces[faceIndex]
-    const score = {
-      similarity: typed ? typedSimilarity(key, face.key) : similarity(key, face.key),
-      wholeName: face.wholeName,
-      face: face.key,
-      printedName: face.printedName,
-    }
     const current = bestByName.get(face.nameIndex)
-    if (!current || score.similarity > current.similarity) bestByName.set(face.nameIndex, score)
+    if (!current || similarity > current.similarity)
+      bestByName.set(face.nameIndex, {
+        similarity,
+        wholeName: face.wholeName,
+        face: face.key,
+        printedName: face.printedName,
+      })
   }
+  let best = 0
+  for (const faceIndex of shortlist) {
+    const score = (typed ? typedSimilarity : similarity)(key, index.faces[faceIndex].key)
+    best = Math.max(best, score)
+    keep(faceIndex, score)
+  }
+  // why: scoring words out of order costs a pass per word, so it runs only when no name matches in order.
+  const words = key.split(" ")
+  if (typed && words.length > 1 && best < ANY_ORDER_WEIGHT)
+    for (const faceIndex of shortlist)
+      keep(faceIndex, anyOrderSimilarity(words, index.faces[faceIndex].key))
   return [...bestByName]
     .map(([nameIndex, score]) => ({ nameIndex, ...score }))
     .sort((a, b) => b.similarity - a.similarity || Number(b.wholeName) - Number(a.wholeName))
