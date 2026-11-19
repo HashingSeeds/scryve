@@ -4,7 +4,7 @@ import {
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   getPlayerSlotFacings,
-} from "@/components/playerGridGeometry"
+} from "@/components/playerGridLayout"
 
 import { chipCrowdedBySeam, ICON_WIDTH, planSeam, seamRoom } from "./seamPlan"
 

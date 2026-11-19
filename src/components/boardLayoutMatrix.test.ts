@@ -19,7 +19,7 @@ import {
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   seatFrames,
-} from "./playerGridGeometry"
+} from "./playerGridLayout"
 import { contentInsetsFor, menuClearance } from "./pokemon/pokemonCardLayout"
 import { tallestKeypadHeight } from "./pokemon/PokemonKeypad"
 import { keypadBesideForm } from "./pokemon/PokemonSheet"

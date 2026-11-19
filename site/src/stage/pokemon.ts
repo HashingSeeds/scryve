@@ -7,7 +7,7 @@ import {
   getCentralMenuBoundary,
   getFourCardMenuJunction,
   type getPlayerGridLayout,
-} from "@/components/playerGridGeometry"
+} from "@/components/playerGridLayout"
 import { defaultStartingLife, playTableRules } from "@/features/game/playSystems"
 
 import {

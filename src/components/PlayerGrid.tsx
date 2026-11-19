@@ -54,7 +54,7 @@ import {
   getPlayerGridRowFlex,
   getPlayerGridRows,
   seatFrames,
-} from "./playerGridGeometry"
+} from "./playerGridLayout"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 import { panelBoxes, teamPanelCompact, teamSeatRows } from "./teamGridGeometry"
 import type { TeamHead } from "./TeamZone"
@@ -863,7 +863,7 @@ export {
   getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
-} from "./playerGridGeometry"
+} from "./playerGridLayout"
 
 const NO_INCOMING: Record<PlayerId, number> = {}
 

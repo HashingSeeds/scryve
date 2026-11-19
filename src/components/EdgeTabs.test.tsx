@@ -1,6 +1,6 @@
 import { edgeTabs } from "@/features/game/GameBoardStage"
 
-import { getPlayerGridFacings, getPlayerGridLayout } from "./playerGridGeometry"
+import { getPlayerGridFacings, getPlayerGridLayout } from "./playerGridLayout"
 
 describe("edgeTabs", () => {
   it.each([
