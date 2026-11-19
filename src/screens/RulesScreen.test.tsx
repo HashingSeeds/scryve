@@ -136,10 +136,10 @@ it("reports a search once, numbers each result opened from it, and keeps only a 
   expect(capture.mock.calls).toEqual([
     [
       "rules_search",
-      { system: "mtg", result_count: 3, top_results: "509.1,509.1a,733.2", query: "Block" },
+      { system: "mtg", result_count: 2, top_results: "733.2,509.1a", query: "Block" },
     ],
     ["rules_opened", { system: "mtg", rank: 2, open_count: 1 }],
-    ["rules_opened", { system: "mtg", rank: 3, open_count: 2 }],
+    ["rules_opened", { system: "mtg", rank: 1, open_count: 2 }],
     ["rules_search", { system: "mtg", result_count: 0, top_results: "", query: "Banding" }],
   ])
 })

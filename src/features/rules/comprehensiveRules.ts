@@ -31,7 +31,7 @@ const BM25_K1 = 1.2
 const BM25_B = 0.75
 const TYPO_MIN_LENGTH = 5
 // why: words a rule inherits count less than its own, so the subrule that says them is the one a screen's result shows.
-const INHERITED_WEIGHT = 1
+const INHERITED_WEIGHT = 0.5
 const RULE_NUMBER = /^\d+(\.\d*[a-z]*)?$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9]+/g
 const STOPWORDS = new Set(
