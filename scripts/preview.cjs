@@ -43,11 +43,19 @@ function writeOverride(url, siteUrl, file = override) {
   const deployment = parsed.hostname.split(".")[0]
   if (siteUrl !== `https://${deployment}.convex.site`)
     throw new Error("Convex did not provide the matching preview site URL")
-  const values = {
-    EXPO_PUBLIC_CONVEX_URL: parsed.origin,
-    EXPO_PUBLIC_CONVEX_SITE_URL: siteUrl,
-    CONVEX_DEPLOYMENT: `preview:${deployment}`,
-  }
+  writeEnvValues(
+    {
+      EXPO_PUBLIC_CONVEX_URL: parsed.origin,
+      EXPO_PUBLIC_CONVEX_SITE_URL: siteUrl,
+      CONVEX_DEPLOYMENT: `preview:${deployment}`,
+    },
+    file,
+  )
+  console.log(`Wrote preview settings to ${file}`)
+}
+
+/** why: Expo reads .env.development.local over the shared .env.local, so this points only this worktree's app. */
+function writeEnvValues(values, file = override) {
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink())
     throw new Error(`Refusing to write through symlink ${file}`)
   let content = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""
@@ -59,7 +67,6 @@ function writeOverride(url, siteUrl, file = override) {
       : `${content.trimEnd()}\n${line}\n`
   }
   fs.writeFileSync(file, content, { mode: 0o600 })
-  console.log(`Wrote preview settings to ${file}`)
 }
 
 function run(args, env, stdio = "inherit") {
@@ -144,4 +151,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { previewKey, previewName, writeOverride }
+module.exports = { previewKey, previewName, writeEnvValues, writeOverride }

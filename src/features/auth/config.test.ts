@@ -27,6 +27,17 @@ describe("public cloud configuration", () => {
     ).toBe(true)
   })
 
+  it("accepts this machine's local backend over plain HTTP, and no other host", () => {
+    const config = (url: string) =>
+      validatePublicCloudConfig({
+        EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: `pk_test_${Buffer.from("foo-bar-13.clerk.accounts.dev$").toString("base64").replace(/=+$/, "")}`,
+        EXPO_PUBLIC_CONVEX_URL: url,
+        EXPO_PUBLIC_INVITE_ORIGIN: "https://count.example",
+      }).configured
+    expect(config("http://127.0.0.1:3210")).toBe(true)
+    expect(config("http://192.168.1.4:3210")).toBe(false)
+  })
+
   it("keeps .env.example placeholders on the local-safe unconfigured path", () => {
     expect(
       validatePublicCloudConfig({

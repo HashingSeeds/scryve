@@ -72,7 +72,7 @@ function devDeployment(convexEnv, expoEnv) {
   const url = expoEnv.EXPO_PUBLIC_CONVEX_URL?.replace(/\/$/, "")
   if (url && url !== `https://${name}.convex.cloud`)
     return {
-      error: `Metro would use ${url}, not the dev deployment ${name}. For a preview, run pnpm start:expo.`,
+      error: `Metro would use ${url}, not the dev deployment ${name}. For a preview or local backend, run pnpm start:expo.`,
     }
   return { deployment: name }
 }

@@ -51,6 +51,8 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 
 `pnpm start` is safe to rerun from any worktree. It stops this worktree's stale Metro and `convex dev`, reinstalls when `pnpm-lock.yaml` changed, and picks a free Metro port from 8081. It writes `{ worktree, port, pid, convex }` to `~/.local/state/scryve-dev/<worktree>-<hash>.json` while it runs; pass that port to `agent-device --metro-port`. Every worktree shares one Convex dev deployment, so only the first `pnpm start` runs `convex dev`. Later ones start Metro only and say which worktree owns the push. Stop that one before testing backend changes from yours.
 
+For connected play, bots, or backend changes, run `pnpm convex:local` in the background, then `pnpm start:expo`. It runs a Convex backend of this worktree's own, so it never touches the shared dev deployment or the bill. Use `pnpm preview:up` only for clients that can't reach this machine: PR preview builds, Revyl, and the Mac mini's devices. See README.md.
+
 ## Verifying
 
 - Smallest proof that the change works. `pnpm test <files>` for the tests you touched, targeted lint (`pnpm lint:check <files>`) and `pnpm compile` (typechecks both the app and test tsconfigs) for the scope you changed.

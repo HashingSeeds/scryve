@@ -1,5 +1,5 @@
 /**
- * why: stand-in players for events, up to 128 on either authority. On Convex they act through admin auth on a preview;
+ * why: stand-in players for events, up to 128 on either authority. On Convex they act through admin auth (see bots.cjs);
  * nearby they join a real device's event over Wi-Fi, which no unit test runs.
  */
 const { ConvexClient } = require("convex/browser")
@@ -12,16 +12,14 @@ const { clearInterval, clearTimeout, setInterval, setTimeout } = require("node:t
 const { parseArgs } = require("node:util")
 
 const {
+  backendCredentials,
   createReporter,
-  currentPreviewName,
   lobbyIdentifiers,
   parseCount,
   parseDuration,
-  previewCredentials,
 } = require("./bots.cjs")
-const { previewKey } = require("./preview.cjs")
 
-const USAGE = `Stand-in players for events: on a Convex preview, or in a nearby event a device hosts.
+const USAGE = `Stand-in players for events: on Convex, or in a nearby event a device hosts.
 
   pnpm event-bots convex host [--players 16] [--guests 0] [--structure swiss|pods]
                               [--best-of 3] [--rounds 3] [--format standard]
@@ -52,7 +50,7 @@ Failure
 
 Run
   --duration 30m           stop after this long (off runs until the event finishes or Ctrl-C)
-  --preview <name>         convex: defaults to this branch's preview (pnpm preview:up)
+  --preview <name>         convex: a cloud preview instead of this worktree's local backend
   --json                   one JSON event per line, for agents and scripts
 `
 
@@ -855,9 +853,8 @@ class NearbyLink {
 }
 
 async function startConvex(options, tracker, report, bots) {
-  const preview = options.preview ?? currentPreviewName()
-  const credentials = await previewCredentials(previewKey(), preview)
-  report(null, "preview", { name: preview, deployment: credentials.deploymentName })
+  const credentials = await backendCredentials(options.preview)
+  report(null, "backend", { deployment: credentials.deploymentName, url: credentials.url })
   const player = (slot) => {
     const bot = new Bot({ name: `Bot ${slot}`, options, tracker, report })
     bot.link = new ConvexLink(bot, credentials, slot, slot - options.first < options.legacy)

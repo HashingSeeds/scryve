@@ -33,7 +33,8 @@ app (react-native-web via Expo) in a browser.
    worktree's server; start on a free explicit port if needed.
 2. Otherwise start `pnpm web` from the repository root and wait for the
    bundler. Do not start `convex dev`; it overwrites the shared development
-   deployment. Connected play uses that deployment as it is (see below).
+   deployment. For connected play, run `pnpm convex:local` in the background
+   before starting the bundler (see below).
 3. Open the app in the browser using the harness's browser automation
    (preview tools where available).
 4. Check the console for errors after load; record any that appear.
@@ -106,17 +107,14 @@ Otherwise use Playwright with one `browser.newContext()` per identity. Sign in
 `jane+clerk_test@sow.care` in one and `john+clerk_test@sow.care` in the other
 through the flow above.
 
-Both players use the shared development Convex deployment, which any
-worktree's `convex dev` can overwrite with older code. Check it matches this
-worktree's `convex/` before trusting results: function specs can match while
-the code is stale, so compare a call's behavior or `npx convex logs` stack
-lines instead. If it is stale, mark connected-play flows skipped and note the
-risk in the report. Do not redeploy it.
+Both players use this worktree's own Convex backend from `pnpm convex:local`,
+which runs this worktree's `convex/` and points the app at it. Without it they
+use the shared development deployment, which any worktree's `convex dev` can
+overwrite with older code; then mark connected-play flows skipped if its
+behavior doesn't match this worktree's code. Do not redeploy it.
 
-For more seats, scripted remote load, failure cases, or a stale dev deployment,
-use `pnpm bots` instead of a second tab. Bots only run against a Convex preview:
-`pnpm preview:up` points this worktree's app at the branch preview (a preview
-passes the development-deployment check). Then host in the app and run
+For more seats, scripted remote load, or failure cases, use `pnpm bots` instead
+of a second tab. Bots play on the same local backend. Host in the app and run
 `pnpm bots join <CODE> --count <n>`, or run `pnpm bots host --players <n>` and
 join the code it prints. `pnpm bots --help` lists play and failure options
 (commander damage, socket drops, bursts, duplicates); `--json` prints one event
@@ -189,8 +187,7 @@ actually saw.
   skip authenticated flows and record them as such. Do not switch to a personal
   account, production instance, or secret-bearing workaround.
 - **Connected-play screens fail:** confirm both tabs are signed in as
-  different test accounts and the dev deployment is current. If it is stale
-  or unreachable, use a preview with `pnpm bots` (below), else record as
+  different test accounts and `pnpm convex:local` is running, else record as
   skipped, not failed.
 - **Interaction has no effect:** check the console first — RN-web-only
   crashes often appear there before the UI visibly breaks.

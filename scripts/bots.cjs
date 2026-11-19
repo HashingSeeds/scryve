@@ -1,20 +1,20 @@
 /**
- * why: stand-in players for connected games. They act through Convex admin auth, which only a deploy key grants,
- * so the key and the deployment it resolves to must be a preview, never production.
+ * why: stand-in players for connected games. They act through Convex admin auth, so they hold the admin key of this
+ * worktree's local backend, or of a preview a deploy key resolves to, never production.
  */
 const { ConvexClient } = require("convex/browser")
 const { anyApi: api, getFunctionName } = require("convex/server")
-const { spawnSync } = require("node:child_process")
 const { randomBytes, randomUUID } = require("node:crypto")
 const { clearInterval, clearTimeout, setInterval, setTimeout } = require("node:timers")
 const { parseArgs } = require("node:util")
 
-const { previewKey, previewName } = require("./preview.cjs")
+const { localCredentials } = require("./local-backend.cjs")
+const { previewKey } = require("./preview.cjs")
 const { SYSTEM_IDS } = require("../convex/lib/systems/definitions.ts")
 
 const VARIANTS = ["treachery", "archenemy", "twoHeadedGiant", "planechase"]
 
-const USAGE = `Stand-in players for connected games on a Convex preview.
+const USAGE = `Stand-in players for connected games on this worktree's local Convex backend.
 
   pnpm bots host [--players 2] [--fill 0] [--format commander|none|<mtg format>] [--life 40]
                  [--variant treachery|twoHeadedGiant]  (players default to 4)
@@ -41,7 +41,7 @@ Failure
   --duplicate              send every change twice with the same operation id
 
 Target
-  --preview <name>         defaults to this branch's preview (pnpm preview:up)
+  --preview <name>         a cloud preview instead (pnpm preview:up prints its name)
   --json                   one JSON event per line, for agents and scripts
 `
 
@@ -145,7 +145,8 @@ function parseCli(argv) {
   const players = parseCount(values.players ?? (variant ? "4" : "2"), "players", 2, MAX_SEATS)
   if (values.variant === "treachery" && (players < 4 || players > 6))
     throw new Error("--variant treachery needs --players 4 to 6")
-  if (variant === "archenemy" && players < 3) throw new Error("--archenemy needs --players 3 or more")
+  if (variant === "archenemy" && players < 3)
+    throw new Error("--archenemy needs --players 3 or more")
   const fill = parseCount(values.fill, "fill", 0, players - 1)
   const none = values.format === "none"
   return {
@@ -224,9 +225,7 @@ async function previewCredentials(deployKey, preview) {
     }),
   })
   if (!response.ok)
-    throw new Error(
-      `No preview named ${preview} (${response.status}). Run pnpm preview:up or pass --preview.`,
-    )
+    throw new Error(`No preview named ${preview} (${response.status}). Run pnpm preview:up first.`)
   const { adminKey, url, deploymentName } = await response.json()
   assertPreviewTarget({ deploymentName, url })
   return { adminKey, url, deploymentName }
@@ -510,19 +509,16 @@ class Bot {
   }
 }
 
-function currentPreviewName() {
-  const branch = spawnSync("git", ["branch", "--show-current"], { encoding: "utf8" }).stdout?.trim()
-  if (!branch) throw new Error("Check out a branch or pass --preview <name>")
-  return previewName(branch)
+async function backendCredentials(preview) {
+  return preview ? await previewCredentials(previewKey(), preview) : await localCredentials()
 }
 
 async function main() {
   const options = parseCli(process.argv.slice(2))
   if (options.command === "help") return void console.log(USAGE)
   const report = createReporter(options.json)
-  const preview = options.preview ?? currentPreviewName()
-  const credentials = await previewCredentials(previewKey(), preview)
-  report(null, "preview", { name: preview, deployment: credentials.deploymentName })
+  const credentials = await backendCredentials(options.preview)
+  report(null, "backend", { deployment: credentials.deploymentName, url: credentials.url })
 
   const bots = []
   const spawn = (slot) => {
@@ -585,13 +581,12 @@ if (require.main === module) {
 
 module.exports = {
   assertPreviewTarget,
+  backendCredentials,
   Bot,
   botIdentity,
   createReporter,
-  currentPreviewName,
   lobbyIdentifiers,
   parseCli,
   parseCount,
   parseDuration,
-  previewCredentials,
 }

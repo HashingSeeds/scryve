@@ -80,8 +80,8 @@ exists.
    to this worktree, and matches `APP_VARIANT=development` + `--dev-client`.
    Never kill another worktree's Metro; use a free explicit port if needed.
 3. Otherwise start `pnpm start:expo` from the repository root and wait for
-   the bundler. Do not start `convex dev`; test against whatever backend
-   state exists and note connected-play gaps in the report.
+   the bundler. Do not start `convex dev`. When the flow needs the backend,
+   first run `pnpm convex:local` in the background (see Connected play).
 4. Open the app with one stable session:
    `agent-device open com.sowinghope.count.dev --platform ios --session scryve-mobile-check`.
    If the development build isn't installed, follow the launch path above;
@@ -128,9 +128,8 @@ the affected flow needs:
    or a full `*+clerk_test` address for another), and
    `agent-device open com.sowinghope.count.dev "<link>"` signs in and lands on
    Play in a few seconds. The ticket comes from the deployment this worktree's
-   app uses; after `pnpm preview:up` it needs the preview deploy key, like
-   `pnpm bots`. A signed-in app refuses the link; sign out first only for a
-   test account.
+   app uses; after `pnpm preview:up` it needs the preview deploy key. A
+   signed-in app refuses the link; sign out first only for a test account.
 4. Use Clerk's own sign-in screens only when the change touches sign-in, or
    the address has no Clerk account yet: `jane+clerk_test@sow.care` and OTP
    `424242`, acting on fields from a fresh snapshot. If Clerk asks for a
@@ -207,9 +206,12 @@ loop.
 ## Connected play
 
 When the change touches connected play, fill the other seats with `pnpm bots`
-instead of more devices. Bots only run against a Convex preview, so first run
-`pnpm preview:up`, which points this worktree's app at the branch preview (a
-preview passes the development-deployment check). Then either host in the app
+instead of more devices. Run `pnpm convex:local` in the background first: it
+starts this worktree's own Convex backend and points the app at it (it passes
+the development-deployment check). Restart Metro if it was already running. On
+an Android emulator, `adb reverse tcp:<port> tcp:<port>` for the port in the
+printed URL. A lab device on the Mac mini can't reach this machine, so there
+use `pnpm preview:up` and pass `--preview <name>` to the bots. Then either host in the app
 with the HostConnected flow and run `pnpm bots join <CODE> --count <n>`, or run `pnpm bots host --players <n>`
 and join the code it prints. `pnpm bots --help` lists the play and failure
 options (commander damage, socket drops, bursts, duplicates); add `--json` for
@@ -260,8 +262,8 @@ backend, stale dev client, etc.). Be specific about what you actually saw.
   pre-grant permissions only if asked.
 - **agent-device can't see an element:** take a fresh snapshot after
   navigation; fall back to screenshot estimation, then Maestro smoke.
-- **Connected-play screens fail:** expected without a Convex backend; use a
-  preview and `pnpm bots` (see Connected play), else record as skipped.
+- **Connected-play screens fail:** expected without a Convex backend; use
+  `pnpm convex:local` and `pnpm bots` (see Connected play), else record as skipped.
 - **Clerk rejects the test identity or OTP:** confirm the app uses the Clerk
   development instance and that email-code sign-in is enabled. Do not switch
   to a personal account, production instance, or secret-bearing workaround.
