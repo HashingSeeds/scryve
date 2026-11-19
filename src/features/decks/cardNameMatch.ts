@@ -151,8 +151,19 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
   for (const gram of lineTrigrams)
     for (const faceIndex of index.facesByTrigram.get(gram) ?? [])
       if (shared[faceIndex]++ === 0) touched.push(faceIndex)
+  const shortlistSize = typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE
+  // why: typed overlap ranks by shared trigrams first, so faces below the count that fills the shortlist never need sorting.
+  let candidates = touched
+  if (typed) {
+    const facesSharing = new Uint32Array(lineTrigrams.size + 1)
+    for (const faceIndex of touched) facesSharing[shared[faceIndex]]++
+    let minShared = lineTrigrams.size
+    let count = facesSharing[minShared]
+    while (minShared > 1 && count < shortlistSize) count += facesSharing[--minShared]
+    candidates = touched.filter((faceIndex) => shared[faceIndex] >= minShared)
+  }
   const overlap = new Float64Array(index.faces.length)
-  for (const faceIndex of touched)
+  for (const faceIndex of candidates)
     overlap[faceIndex] = typed
       ? shared[faceIndex] / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4
       : shared[faceIndex] /
@@ -161,9 +172,7 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
     number,
     { similarity: number; wholeName: boolean; face: string; printedName?: string }
   >()
-  const shortlist = touched
-    .sort((a, b) => overlap[b] - overlap[a])
-    .slice(0, typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE)
+  const shortlist = candidates.sort((a, b) => overlap[b] - overlap[a]).slice(0, shortlistSize)
   const keep = (faceIndex: number, similarity: number) => {
     const face = index.faces[faceIndex]
     const current = bestByName.get(face.nameIndex)
