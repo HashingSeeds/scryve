@@ -30,6 +30,7 @@ const BM25_K1 = 1.2
 const BM25_B = 0.75
 // why: a rule rarely repeats its section's subject, so the title stands in for it.
 const TITLE_WEIGHT = 3
+const TYPO_MIN_LENGTH = 5
 const RULE_NUMBER = /^\d+(\.\d*[a-z]*)?$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9]+/g
 const STOPWORDS = new Set(
@@ -63,6 +64,7 @@ type SearchIndex = {
   lengths: number[]
   average: number
   slang: Map<string, string[]>
+  spellings: Map<string, string>
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
@@ -95,7 +97,7 @@ function searchIndex(source: ComprehensiveRules) {
   const slang = new Map(
     Object.entries(source.slang ?? {}).map(([word, meaning]) => [stem(word), words(meaning).map(stem)]),
   )
-  const index = { rules, postings, lengths, average, slang }
+  const index = { rules, postings, lengths, average, slang, spellings: stems }
   indexes.set(source, index)
   return index
 }
@@ -106,11 +108,26 @@ function queryWords(query: string) {
   const kept = typed.filter((word) => !STOPWORDS.has(word))
   const chosen = kept.length > 0 ? kept : typed
   const partial = /[a-z0-9]$/i.test(query) ? chosen.at(-1) : undefined
-  return { stems: [...new Set(chosen.map(stem))], partial }
+  return { chosen, stems: [...new Set(chosen.map(stem))], partial }
 }
 
 function matchesWord(candidate: string, wanted: string, partial: string | undefined) {
   return candidate === wanted || (partial !== undefined && candidate.startsWith(partial))
+}
+
+// why: true when one insertion, deletion, substitution, or swap of neighbors turns a into b.
+function oneEditApart(a: string, b: string) {
+  if (Math.abs(a.length - b.length) > 1 || a === b) return false
+  let start = 0
+  while (start < a.length && a[start] === b[start]) start++
+  const restA = a.slice(start + 1)
+  const restB = b.slice(start + 1)
+  return (
+    restA === restB ||
+    a.slice(start) === b.slice(start + 1) ||
+    a.slice(start + 1) === b.slice(start) ||
+    (a[start] === b[start + 1] && a[start + 1] === b[start] && a.slice(start + 2) === b.slice(start + 2))
+  )
 }
 
 export function searchRules(rules: ComprehensiveRules, query: string, limit = 50) {
@@ -121,7 +138,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
       .rules.filter((rule) => rule.id.startsWith(needle))
       .slice(0, limit)
       .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
-  const { stems, partial } = queryWords(needle)
+  const { chosen, stems, partial } = queryWords(needle)
   const lastStem = partial === undefined ? undefined : stem(partial)
   const terms: RuleSearchResult[] = rules.glossary
     .filter((entry) => {
@@ -137,11 +154,23 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   const weights = new Map(stems.map((word) => [word, 1]))
   for (const meaning of stems.map((word) => index.slang.get(word) ?? []))
     for (const word of meaning) weights.set(word, (weights.get(word) ?? 0) + 1 / meaning.length)
+  // why: a misspelled word the rules never use searches the rules' words one typo away.
+  const spelled = new Map<string, Set<string>>()
+  for (const raw of chosen) {
+    const wanted = stem(raw)
+    if (raw.length < TYPO_MIN_LENGTH || index.slang.has(wanted)) continue
+    const prefix = wanted === lastStem ? partial : undefined
+    if ([...index.postings.keys()].some((word) => matchesWord(word, wanted, prefix))) continue
+    const near = new Set<string>()
+    for (const [spelling, word] of index.spellings) if (oneEditApart(raw, spelling)) near.add(word)
+    spelled.set(wanted, near)
+  }
   for (const [wanted, weight] of weights) {
     const best = new Map<number, number>()
     const prefix = wanted === lastStem ? partial : undefined
+    const near = spelled.get(wanted)
     for (const [word, list] of index.postings) {
-      if (!matchesWord(word, wanted, prefix)) continue
+      if (!(near ? near.has(word) : matchesWord(word, wanted, prefix))) continue
       const idf = Math.log(1 + (index.rules.length - list.rules.length + 0.5) / (list.rules.length + 0.5))
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
