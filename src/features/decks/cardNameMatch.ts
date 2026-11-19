@@ -40,17 +40,29 @@ function trigrams(key: string) {
   return grams
 }
 
+// why: search scores hundreds of names per keystroke, so the edit-distance rows are reused instead of allocated.
+let previousRow = new Int32Array(64)
+let currentRow = new Int32Array(64)
+
 function similarity(a: string, b: string) {
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index)
+  if (previousRow.length <= b.length) {
+    previousRow = new Int32Array(b.length * 2)
+    currentRow = new Int32Array(b.length * 2)
+  }
+  let previous = previousRow
+  let current = currentRow
+  for (let j = 0; j <= b.length; j++) previous[j] = j
   for (let i = 1; i <= a.length; i++) {
-    const current = [i]
-    for (let j = 1; j <= b.length; j++)
-      current[j] = Math.min(
-        previous[j] + 1,
-        current[j - 1] + 1,
-        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
-      )
-    previous = current
+    current[0] = i
+    const letter = a.charCodeAt(i - 1)
+    for (let j = 1; j <= b.length; j++) {
+      const replace = previous[j - 1] + (letter === b.charCodeAt(j - 1) ? 0 : 1)
+      const remove = previous[j] + 1
+      const insert = current[j - 1] + 1
+      current[j] =
+        replace < remove ? (replace < insert ? replace : insert) : remove < insert ? remove : insert
+    }
+    ;[previous, current] = [current, previous]
   }
   return 1 - previous[b.length] / Math.max(a.length, b.length, 1)
 }
