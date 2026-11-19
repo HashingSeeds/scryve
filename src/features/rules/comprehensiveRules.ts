@@ -133,6 +133,8 @@ export function searchIndex(source: ComprehensiveRules) {
     ]),
   )
   const known = new Set(rules.map((rule) => rule.id))
+  for (const entry of source.glossary)
+    for (const raw of words(entry.term)) if (!stems.has(raw)) stems.set(raw, stem(raw))
   const defined = source.glossary.map((entry) => {
     const cited = source.references
       ? ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")?.id

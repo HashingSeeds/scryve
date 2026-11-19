@@ -243,9 +243,10 @@ describe("searchRules ranking", () => {
           ],
         },
       ],
-      glossary: [],
+      glossary: [{ term: "Forestcycling", text: "See rule 702.9." }],
       notice: [],
     }
+    expect(searchRules(flying, "forestcycli")[0]).toMatchObject({ kind: "term" })
     expect(
       searchRules(flying, "flyi").map((result) => result.kind === "rule" && result.rule.id),
     ).toEqual(["702.9"])
