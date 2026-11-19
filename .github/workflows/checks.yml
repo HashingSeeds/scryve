@@ -56,6 +56,8 @@ jobs:
               - 'src/features/rules/**'
               - 'scripts/rules-search-eval.ts'
               - 'scripts/rules-search/**'
+              - '.github/workflows/checks.yml'
+              - 'package.json'
             cards:
               - 'src/features/decks/localMagicSearch.ts'
               - 'src/features/decks/cardNameMatch.ts'
@@ -64,8 +66,12 @@ jobs:
               - 'src/features/decks/colorMatch.ts'
               - 'convex/lib/cardNameCatalog.ts'
               - 'convex/lib/magicDataset.ts'
+              - 'convex/lib/scryfall.ts'
+              - 'convex/lib/systems/**'
               - 'scripts/card-search-eval.ts'
               - 'scripts/card-search/**'
+              - '.github/workflows/checks.yml'
+              - 'package.json'
             exportable:
               - 'src/**'
               - 'modules/**'

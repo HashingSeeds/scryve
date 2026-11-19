@@ -65,11 +65,10 @@ function screenOpenedBy(rules: ComprehensiveRules, source: TextRules, result: Ru
 }
 
 function rankOf(screens: Set<string>[], wanted: Case["rules"]) {
-  return Math.max(
-    ...wanted.map((answer) =>
-      screens.findIndex((screen) => [answer].flat().some((id) => screen.has(id))),
-    ),
+  const ranks = wanted.map((answer) =>
+    screens.findIndex((screen) => [answer].flat().some((id) => screen.has(id))),
   )
+  return ranks.includes(-1) ? -1 : Math.max(...ranks)
 }
 
 function percentile(sorted: number[], p: number) {
