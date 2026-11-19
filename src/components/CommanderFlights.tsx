@@ -28,9 +28,9 @@ const FLIGHT_MS = 420
 const FAN_SPREAD = 40
 const FAN_REACH = 26
 const BLADE = 32
-const LANDED_SCALE = 34 / 32
 
 type Point = { x: number; y: number }
+type Spot = Point & { size: number }
 type AnchorKind = "home" | "landing"
 
 type Flights = {
@@ -60,6 +60,8 @@ type Blade = {
   tilt: number
   ahead: number
   land: number
+  // why: the blade lands at the size of the strike's own sword.
+  landed: number
   go: number
   end: number
   delay: number
@@ -169,12 +171,16 @@ export function CommanderFlights({
   )
 }
 
-type Spots = { home: Point; landings: Map<number, Point> }
+type Spots = { home: Point; landings: Map<number, Spot> }
 
 function measureCenter(node: View) {
-  return new Promise<Point | null>((resolve) =>
+  return new Promise<Spot | null>((resolve) =>
     node.measureInWindow((x, y, width, height) =>
-      resolve(width || height ? { x: x + width / 2, y: y + height / 2 } : null),
+      resolve(
+        width || height
+          ? { x: x + width / 2, y: y + height / 2, size: Math.max(width, height) }
+          : null,
+      ),
     ),
   )
 }
@@ -190,11 +196,11 @@ async function measureAll(
   const origin = await new Promise<Point>((resolve) =>
     frame.measureInWindow((x, y) => resolve({ x, y })),
   )
-  const local = (point: Point | null) =>
-    point ? { x: point.x - origin.x, y: point.y - origin.y } : null
+  const local = <At extends Point>(point: At | null) =>
+    point ? { ...point, x: point.x - origin.x, y: point.y - origin.y } : null
   const homeAt = (home && local(await measureCenter(home))) ?? lastHome
   if (!homeAt) return null
-  const landings = new Map<number, Point>()
+  const landings = new Map<number, Spot>()
   for (const [landing, node] of nodes.landing) {
     if (landing === seat) continue
     const at = local(await measureCenter(node))
@@ -244,6 +250,7 @@ function plan(
       ahead,
       // why: the landed blade lies across the defender's view, pointing at its disc.
       land: toward(ahead, rotationOf(landing) + 90),
+      landed: to.size / BLADE,
       go,
       end: go + FLIGHT_MS,
       delay: 0,
@@ -277,7 +284,7 @@ function FlyingBlade({
     )
   }, [back, delay, end, onLanded, seat, t])
   const style = useAnimatedStyle(() => {
-    const { home, out, to, from, tilt, ahead, land, go } = blade
+    const { home, out, to, from, tilt, ahead, land, landed, go } = blade
     const now = t.value
     let point = home
     let angle = from
@@ -295,7 +302,7 @@ function FlyingBlade({
       point = { x: out.x + (to.x - out.x) * travel, y: out.y + (to.y - out.y) * travel }
       angle =
         k < 0.5 ? tilt + (ahead - tilt) * easeOut(k * 2) : ahead + (land - ahead) * (k * 2 - 1)
-      scale = 1 + (LANDED_SCALE - 1) * k
+      scale = 1 + (landed - 1) * k
     }
     return {
       opacity: Math.min(1, now / (end * 0.12)),

@@ -241,7 +241,27 @@ export const LifeCard = memo(function LifeCard({
     stopTapTiming.current?.()
     stopTapTiming.current = undefined
   }, [preview])
-  const shownLife = life + preview
+  const armedCommanderId = commanderDamage?.armedPlayerId
+  const attacked =
+    !!commanderDamage && !!armedCommanderId && armedCommanderId !== commanderDamage.ownerPlayerId
+  // why: a seat already out sits an attack out; one knocked out during it stays a target so the lethal hit can be undone.
+  const [outWhenArmed, setOutWhenArmed] = useState(() => (out ? armedCommanderId : undefined))
+  const [armedSeen, setArmedSeen] = useState(armedCommanderId)
+  if (armedSeen !== armedCommanderId) {
+    setArmedSeen(armedCommanderId)
+    setOutWhenArmed(out ? armedCommanderId : undefined)
+  }
+  const sittingOut = attacked && outWhenArmed === armedCommanderId
+  const defending = attacked && !sittingOut
+  const armedCommanders = commanderDamage?.commanders ?? [
+    { power: 1, total: (armedCommanderId && commanderDamage?.incoming[armedCommanderId]) || 0 },
+  ]
+  const causeGlyphShown =
+    out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
+  const incoming = armedCommanders.reduce((sum, { landed = 0 }) => sum + landed, 0)
+  // why: a connected attack holds its hits until it is sent, so the defender's total already counts them down as they land.
+  const held = defending && commanderDamage ? incoming - (commanderDamage.applied ?? 0) : 0
+  const shownLife = life + preview - held
   const shownDigits = formatNumber(shownLife).length
   const fontSizeFor = (digits: number) =>
     lifeFontSizeFor?.(digits) ??
@@ -301,26 +321,6 @@ export const LifeCard = memo(function LifeCard({
   }, [identity, life, playerId, system])
 
   const ownershipLabel = ownership ? translate(`board:seat.ownership.${ownership}`) : undefined
-  const armedCommanderId = commanderDamage?.armedPlayerId
-  const attacked =
-    !!commanderDamage && !!armedCommanderId && armedCommanderId !== commanderDamage.ownerPlayerId
-  // why: a seat already out sits an attack out; one knocked out during it stays a target so the lethal hit can be undone.
-  const [outWhenArmed, setOutWhenArmed] = useState(() => (out ? armedCommanderId : undefined))
-  const [armedSeen, setArmedSeen] = useState(armedCommanderId)
-  if (armedSeen !== armedCommanderId) {
-    setArmedSeen(armedCommanderId)
-    setOutWhenArmed(out ? armedCommanderId : undefined)
-  }
-  const sittingOut = attacked && outWhenArmed === armedCommanderId
-  const defending = attacked && !sittingOut
-  const armedCommanders = commanderDamage?.commanders ?? [
-    { power: 1, total: (armedCommanderId && commanderDamage?.incoming[armedCommanderId]) || 0 },
-  ]
-  const causeGlyphShown =
-    out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
-  const incoming = armedCommanders.reduce((sum, { landed = 0 }) => sum + landed, 0)
-  // why: a connected attack holds its hits until it is sent, so the defender's total already counts them down as they land.
-  const held = defending && commanderDamage ? incoming - (commanderDamage.applied ?? 0) : 0
   const readoutInk = !out
     ? lifeInk(resolvedLifeFontSize, shownDigits)
     : out.cause === "life"
@@ -665,7 +665,7 @@ export const LifeCard = memo(function LifeCard({
   const lifeTotal = (...style: StyleProp<TextStyle>[]) => (
     <Text
       testID={`life-total-seat-${seatNumber}`}
-      text={shownLife - held}
+      text={shownLife}
       weight={lifeLanded ? "normal" : "bold"}
       accessible
       accessibilityLabel={translate("board:counters.seatItem", {

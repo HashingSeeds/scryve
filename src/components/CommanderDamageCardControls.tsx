@@ -439,8 +439,17 @@ function DefenderControls({
   const strikeFont = (compact ? 24 : 30) * strikeScale
   const strikeSword = (compact ? 28 : 34) * strikeScale
   const coin = compact ? 20 : 24
-  const coinRadius = disc + coin / 2 + COIN_GAP
   const inset = contentInsets?.[contentEdge(contentRotation, "right")] ?? 0
+  const undoGlyph = compact ? 20 : 22
+  // why: undo stays put just outside the arc of hits, or at the card's edge on a narrow seat, where the arc pulls in to keep its hits clear of it.
+  const undoX = Math.min(
+    content.width - UNDO_INSET - inset - UNDO_SIZE / 2,
+    discX + disc + COIN_GAP + coin + COIN_GAP + undoGlyph / 2,
+  )
+  const coinRadius = Math.min(
+    disc + coin / 2 + COIN_GAP,
+    undoX - undoGlyph / 2 - COIN_GAP - coin / 2 - discX,
+  )
 
   return (
     <>
@@ -527,9 +536,12 @@ function DefenderControls({
             accessibilityRole="button"
             accessibilityLabel={translate("board:commander.undoHit", { damage: takeBack })}
             onPress={mode.onUndo}
-            style={[$undo, { right: UNDO_INSET + inset, top: content.height / 2 - UNDO_SIZE / 2 }]}
+            style={[
+              $undo,
+              { left: undoX - UNDO_SIZE / 2, top: content.height / 2 - UNDO_SIZE / 2 },
+            ]}
           >
-            <UndoGlyph size={compact ? 20 : 22} color={SHADOW_INK} />
+            <UndoGlyph size={undoGlyph} color={SHADOW_INK} />
           </BoardPressable>
         </View>
       ) : null}
