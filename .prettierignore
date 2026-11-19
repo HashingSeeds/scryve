@@ -5,3 +5,5 @@ android
 .vscode
 package.json
 .eslintignore
+scripts/rules-search/*.json
+scripts/card-search/*.json

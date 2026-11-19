@@ -83,6 +83,14 @@ export function cardNameIndex(
   return { names, faces, facesByTrigram }
 }
 
+export function catalogNameIndex(catalog: { names: string; alternateNames: string }) {
+  const alternates = catalog.alternateNames
+    .split("\n")
+    .map((line) => line.split("\t"))
+    .flatMap(([printed, name]) => (printed && name ? [[printed, name] as const] : []))
+  return cardNameIndex(catalog.names.split("\n"), alternates)
+}
+
 function typedSimilarity(query: string, face: string) {
   let best = similarity(query, face)
   for (let start = 0; start < face.length; start++) {

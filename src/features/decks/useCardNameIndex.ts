@@ -4,7 +4,7 @@ import type { FunctionReturnType } from "convex/server"
 
 import { loadString, saveString } from "@/utils/storage"
 
-import { cardNameIndex, type CardNameIndex } from "./cardNameMatch"
+import { cardNameIndex, catalogNameIndex, type CardNameIndex } from "./cardNameMatch"
 import { api } from "../../../convex/_generated/api"
 import { systemDefinition } from "../../../convex/lib/systems"
 
@@ -20,11 +20,7 @@ function indexFor(catalog: CardNameCatalog) {
     lastBuilt?.catalog.names !== catalog.names ||
     lastBuilt.catalog.alternateNames !== catalog.alternateNames
   ) {
-    const alternates = catalog.alternateNames
-      .split("\n")
-      .map((line) => line.split("\t"))
-      .flatMap(([printed, name]) => (printed && name ? [[printed, name] as const] : []))
-    lastBuilt = { catalog, index: cardNameIndex(catalog.names.split("\n"), alternates) }
+    lastBuilt = { catalog, index: catalogNameIndex(catalog) }
   }
   return lastBuilt.index
 }

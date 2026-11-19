@@ -36,6 +36,8 @@ jobs:
       pull-requests: read
     outputs:
       ygo: ${{ steps.filter.outputs.ygo }}
+      rules: ${{ steps.filter.outputs.rules }}
+      cards: ${{ steps.filter.outputs.cards }}
       exportable: ${{ steps.filter.outputs.exportable }}
     steps:
       - name: Filter changed paths
@@ -49,6 +51,26 @@ jobs:
               - 'jest.config.js'
               - 'babel.config.js'
               - 'pnpm-lock.yaml'
+              - 'package.json'
+            rules:
+              - 'src/features/rules/**'
+              - 'scripts/rules-search-eval.ts'
+              - 'scripts/rules-search/**'
+              - '.github/workflows/checks.yml'
+              - 'package.json'
+            cards:
+              - 'src/features/decks/localMagicSearch.ts'
+              - 'src/features/decks/cardNameMatch.ts'
+              - 'src/features/decks/cardFilters.ts'
+              - 'src/features/decks/cardSources.ts'
+              - 'src/features/decks/colorMatch.ts'
+              - 'convex/lib/cardNameCatalog.ts'
+              - 'convex/lib/magicDataset.ts'
+              - 'convex/lib/scryfall.ts'
+              - 'convex/lib/systems/**'
+              - 'scripts/card-search-eval.ts'
+              - 'scripts/card-search/**'
+              - '.github/workflows/checks.yml'
               - 'package.json'
             exportable:
               - 'src/**'
@@ -94,6 +116,58 @@ jobs:
 
       - name: Check Yu-Gi-Oh image mirror
         run: pnpm check:ygo-worker
+
+  rules-search:
+    needs: changes
+    if: needs.changes.outputs.rules == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Score rules search
+        run: pnpm rules:eval --misses
+
+  card-search:
+    needs: changes
+    if: needs.changes.outputs.cards == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Score card search
+        run: pnpm cards:eval --misses
 
   checks:
     runs-on: ubuntu-latest

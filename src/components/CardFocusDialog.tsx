@@ -21,6 +21,7 @@ import { SelectField } from "@/components/SelectField"
 import { Sheet } from "@/components/Sheet"
 import { Text } from "@/components/Text"
 import { readCardFaces } from "@/features/decks/cardFaces"
+import { COMMANDER_COLORS } from "@/features/decks/colorMatch"
 import { isBackground } from "@/features/decks/commanderSelection"
 import type { CommanderColor } from "@/features/decks/deckCards"
 import { commanderNameWarning } from "@/features/decks/deckCopy"
@@ -80,8 +81,6 @@ export interface CardFocusDialogProps {
 
 const CARD_ASPECT_RATIO = 488 / 680
 
-export const COMMANDER_COLORS = ["W", "U", "B", "R", "G"] as const
-
 const COLOR_LABEL_KEYS = {
   W: "decks:colors.white",
   U: "decks:colors.blue",
@@ -93,6 +92,14 @@ const COLOR_LABEL_KEYS = {
 
 export function colorLabel(id: keyof typeof COLOR_LABEL_KEYS) {
   return translate(COLOR_LABEL_KEYS[id])
+}
+
+/** why: color pips sit inside a row's button, so VoiceOver only hears them through its label. */
+export function identityLabel(identity: readonly string[]) {
+  const names = identity.length
+    ? COMMANDER_COLORS.filter((color) => identity.includes(color)).map(colorLabel)
+    : [colorLabel("C")]
+  return translate("decks:colors.identity", { identity: formatList(names) })
 }
 
 export function cardColorIdentityLabel(details: FocusedCardDetails | undefined, name: string) {

@@ -1,5 +1,3 @@
-import { COMMANDER_COLORS } from "@/components/CardFocusDialog"
-
 import {
   filterGroups,
   filterTerms,
@@ -8,7 +6,7 @@ import {
   type CardFilterState,
   type CardSource,
 } from "./cardFilters"
-import type { ColorMatch } from "./colorMatch"
+import { COMMANDER_COLORS, type ColorMatch } from "./colorMatch"
 import type { CardFilterDefinition } from "../../../convex/lib/systems"
 
 /**
