@@ -225,6 +225,32 @@ describe("searchRules ranking", () => {
     expect(ids("untapped blockers")).toEqual(["509.1a"])
   })
 
+  it("keeps a rule while the player is partway through typing its word", () => {
+    const flying: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "7",
+          title: "Additional Rules",
+          sections: [
+            {
+              id: "702",
+              title: "Keyword Abilities",
+              rules: [
+                rule("702.9", "Flying"),
+                rule("702.9b", "A creature with flying can't be blocked."),
+              ],
+            },
+          ],
+        },
+      ],
+      glossary: [],
+      notice: [],
+    }
+    expect(
+      searchRules(flying, "flyi").map((result) => result.kind === "rule" && result.rule.id),
+    ).toEqual(["702.9"])
+  })
+
   it("lifts the rule a glossary term in the query cites", () => {
     expect(ids("commander tax")).toEqual(["Commander Tax", "903.8", "903.3"])
   })

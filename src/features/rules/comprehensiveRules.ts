@@ -163,8 +163,21 @@ function queryWords(query: string) {
   return { chosen, stems: [...new Set(chosen.map(stem))], partial }
 }
 
-function matchesWord(candidate: string, wanted: string, partial: string | undefined) {
-  return candidate === wanted || (partial !== undefined && candidate.startsWith(partial))
+type Prefix = { partial: string; completions: ReadonlySet<string> }
+
+function matchesWord(candidate: string, wanted: string, prefix: Prefix | undefined) {
+  return (
+    candidate === wanted ||
+    (prefix !== undefined &&
+      (prefix.completions.has(candidate) || candidate.startsWith(prefix.partial)))
+  )
+}
+
+function completionsOf(spellings: Map<string, string>, partial: string | undefined) {
+  if (partial === undefined) return undefined
+  const completions = new Set<string>()
+  for (const [spelling, word] of spellings) if (spelling.startsWith(partial)) completions.add(word)
+  return { partial, completions }
 }
 
 function oneEditApart(a: string, b: string) {
@@ -195,11 +208,12 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   if (stems.length === 0) return []
   const lastStem = partial === undefined ? undefined : stem(partial)
   const index = searchIndex(rules)
+  const completions = completionsOf(index.spellings, partial)
   const terms: RuleSearchResult[] = index.defined
     .filter((term) =>
       stems.every((wanted) =>
         term.words.some((word) =>
-          matchesWord(word, wanted, wanted === lastStem ? partial : undefined),
+          matchesWord(word, wanted, wanted === lastStem ? completions : undefined),
         ),
       ),
     )
@@ -212,7 +226,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   for (const raw of chosen) {
     const wanted = stem(raw)
     if (raw.length < TYPO_MIN_LENGTH || index.slang.has(wanted)) continue
-    const prefix = wanted === lastStem ? partial : undefined
+    const prefix = wanted === lastStem ? completions : undefined
     if ([...index.postings.keys()].some((word) => matchesWord(word, wanted, prefix))) continue
     const near = new Set<string>()
     for (const [spelling, word] of index.spellings) if (oneEditApart(raw, spelling)) near.add(word)
@@ -220,7 +234,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   }
   for (const [wanted, weight] of weights) {
     const best = new Map<number, number>()
-    const prefix = wanted === lastStem ? partial : undefined
+    const prefix = wanted === lastStem ? completions : undefined
     const near = spelled.get(wanted)
     for (const [word, list] of index.postings) {
       if (!(near ? near.has(word) : matchesWord(word, wanted, prefix))) continue
@@ -280,12 +294,9 @@ function firstMatch(text: string, query: string) {
   if (at >= 0) return { at, length: query.length }
   if (RULE_NUMBER.test(query)) return undefined
   const { stems, partial } = queryWords(query)
-  const lastStem = partial === undefined ? undefined : stem(partial)
   for (const token of text.matchAll(WORD)) {
-    const word = stem(normalized(token[0]))
-    if (
-      stems.some((wanted) => matchesWord(word, wanted, wanted === lastStem ? partial : undefined))
-    )
+    const raw = normalized(token[0])
+    if ((partial !== undefined && raw.startsWith(partial)) || stems.includes(stem(raw)))
       return { at: token.index, length: token[0].length }
   }
   return undefined
