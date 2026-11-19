@@ -17,7 +17,7 @@ import type { FunctionReturnType } from "convex/server"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { CardFocusDialog, colorLabel } from "@/components/CardFocusDialog"
+import { CardFocusDialog, colorLabel, identityLabel } from "@/components/CardFocusDialog"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { FilterPill } from "@/components/FilterPill"
 import { HeaderBack } from "@/components/Header"
@@ -34,7 +34,7 @@ import { useSheetPresence } from "@/components/useSheetPresence"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
-import { identityLabel, SEARCH_COLORS, toggleColor } from "@/features/decks/colorMatch"
+import { SEARCH_COLORS, toggleColor } from "@/features/decks/colorMatch"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import {
   cardDetailsKey,

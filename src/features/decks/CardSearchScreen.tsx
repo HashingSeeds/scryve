@@ -15,12 +15,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 
 import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
-import {
-  CardFocusDialog,
-  COMMANDER_COLORS,
-  cardColorIdentityLabel,
-  colorLabel,
-} from "@/components/CardFocusDialog"
+import { CardFocusDialog, cardColorIdentityLabel, colorLabel } from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { FilterPill, FilterGroup } from "@/components/FilterPill"
@@ -80,6 +75,7 @@ import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
 import { cardSource, SCRYFALL_SOURCE } from "./cardSources"
 import {
   COLOR_MATCHES,
+  COMMANDER_COLORS,
   matchesColors,
   SEARCH_COLORS,
   toggleColor,

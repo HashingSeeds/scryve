@@ -37,6 +37,7 @@ jobs:
     outputs:
       ygo: ${{ steps.filter.outputs.ygo }}
       rules: ${{ steps.filter.outputs.rules }}
+      cards: ${{ steps.filter.outputs.cards }}
       exportable: ${{ steps.filter.outputs.exportable }}
     steps:
       - name: Filter changed paths
@@ -55,6 +56,16 @@ jobs:
               - 'src/features/rules/**'
               - 'scripts/rules-search-eval.ts'
               - 'scripts/rules-search/**'
+            cards:
+              - 'src/features/decks/localMagicSearch.ts'
+              - 'src/features/decks/cardNameMatch.ts'
+              - 'src/features/decks/cardFilters.ts'
+              - 'src/features/decks/cardSources.ts'
+              - 'src/features/decks/colorMatch.ts'
+              - 'convex/lib/cardNameCatalog.ts'
+              - 'convex/lib/magicDataset.ts'
+              - 'scripts/card-search-eval.ts'
+              - 'scripts/card-search/**'
             exportable:
               - 'src/**'
               - 'modules/**'
@@ -126,6 +137,33 @@ jobs:
       # why: downloads the official rules, so a publisher's format change fails here too.
       - name: Score rules search
         run: pnpm rules:eval --misses
+
+  card-search:
+    needs: changes
+    if: needs.changes.outputs.cards == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # why: downloads the app's card file and Scryfall's name catalog, so a change to either fails here too.
+      - name: Score card search
+        run: pnpm cards:eval --misses
 
   checks:
     runs-on: ubuntu-latest

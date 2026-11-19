@@ -1,7 +1,4 @@
-import { COMMANDER_COLORS, colorLabel } from "@/components/CardFocusDialog"
-import { formatList } from "@/i18n/format"
-import { translate } from "@/i18n/translate"
-
+export const COMMANDER_COLORS = ["W", "U", "B", "R", "G"] as const
 export const SEARCH_COLORS = [...COMMANDER_COLORS, "C"] as const
 export const COLOR_MATCHES = [
   { id: "within", tx: "decks:cardSearch.withinColors" },
@@ -37,12 +34,4 @@ export function matchesColors(
     (missing.length === 0 || (choosesColor && missing.length === 1)) &&
     (match === "additional" || within)
   )
-}
-
-/** why: color pips sit inside a row's button, so VoiceOver only hears them through its label. */
-export function identityLabel(identity: readonly string[]) {
-  const names = identity.length
-    ? COMMANDER_COLORS.filter((color) => identity.includes(color)).map(colorLabel)
-    : [colorLabel("C")]
-  return translate("decks:colors.identity", { identity: formatList(names) })
 }

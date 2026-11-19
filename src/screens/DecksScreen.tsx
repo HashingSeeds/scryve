@@ -7,7 +7,7 @@ import Svg, { Path } from "react-native-svg"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
-import { colorLabel } from "@/components/CardFocusDialog"
+import { colorLabel, identityLabel } from "@/components/CardFocusDialog"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
@@ -25,7 +25,6 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import {
   COLOR_MATCHES,
-  identityLabel,
   matchesColors,
   SEARCH_COLORS,
   toggleColor,

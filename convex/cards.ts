@@ -6,6 +6,7 @@ import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery, query } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { cardImageCandidates } from "./lib/cardImageFallback"
+import { fetchCardNameCatalog, isCatalogName } from "./lib/cardNameCatalog"
 import { limitCardLookup } from "./lib/deckRateLimits"
 import {
   nameSearchKey,
@@ -30,7 +31,6 @@ import {
   normalizeScryfallCard,
   objectRecord,
   officialRulings,
-  SCRYFALL_BASE_URL,
 } from "./lib/scryfall"
 import {
   resolveScryfallCards,
@@ -335,10 +335,8 @@ export const keywordAbilities = action({
   },
 })
 
-const MAX_CARD_NAMES_BYTES = 900_000
 const CARD_NAME_CATALOG_MAX_AGE_MS = 86_400_000
 const CARD_NAME_CATALOG_REFRESH_CLAIM_MS = 120_000
-const MAX_ALTERNATE_NAME_PAGES = 10
 const MAX_CACHED_PRINTINGS_PER_NAME = 8
 
 const cardNameCatalogValidator = v.object({
@@ -347,59 +345,6 @@ const cardNameCatalogValidator = v.object({
   fetchedAt: v.number(),
 })
 type CardNameCatalog = Infer<typeof cardNameCatalogValidator>
-
-const isCatalogName = (name: unknown): name is string =>
-  typeof name === "string" && name.trim().length > 0 && name.length <= 200 && !/[\r\n\t]/.test(name)
-
-function invalidCatalog(): never {
-  throw new ConvexError({
-    code: "scryfall_invalid_response",
-    message: "Invalid card names response",
-  })
-}
-
-async function scryfallJson(ctx: ActionCtx, path: string) {
-  const response = await fetchScryfall(ctx, path)
-  if (!response.ok)
-    throw new ConvexError({
-      code: "scryfall_unavailable",
-      message: "Card names are temporarily unavailable",
-    })
-  return objectRecord((await response.json()) as unknown)
-}
-
-async function fetchCardNames(ctx: ActionCtx) {
-  const payload = await scryfallJson(ctx, "/catalog/card-names")
-  const data = payload?.data
-  if (payload?.object !== "catalog" || !Array.isArray(data) || !data.length) invalidCatalog()
-  if (!data.every(isCatalogName)) invalidCatalog()
-  const names = data.join("\n")
-  if (names.length > MAX_CARD_NAMES_BYTES) invalidCatalog()
-  return names
-}
-
-async function fetchPrintedToRulesNameLines(ctx: ActionCtx) {
-  const pairs = new Set<string>()
-  let path = "/cards/search?q=has%3Aflavorname&unique=prints"
-  for (let page = 0; page < MAX_ALTERNATE_NAME_PAGES; page++) {
-    const payload = await scryfallJson(ctx, path)
-    const cards = Array.isArray(payload?.data) ? payload.data : invalidCatalog()
-    for (const value of cards) {
-      const card = objectRecord(value)
-      const faces = Array.isArray(card?.card_faces) ? card.card_faces.map(objectRecord) : []
-      for (const entry of [card, ...faces]) {
-        const printed = entry?.flavor_name
-        if (isCatalogName(printed) && isCatalogName(card?.name))
-          pairs.add(`${printed}\t${card.name}`)
-      }
-    }
-    if (payload?.has_more !== true) return [...pairs].join("\n")
-    const next = payload.next_page
-    if (typeof next !== "string" || !next.startsWith(`${SCRYFALL_BASE_URL}/`)) invalidCatalog()
-    path = next.slice(SCRYFALL_BASE_URL.length)
-  }
-  return invalidCatalog()
-}
 
 export const cachedNameCatalog = internalQuery({
   args: { game: v.string() },
@@ -463,10 +408,15 @@ export const cardNameCatalog = action({
     }
     try {
       await limitCardLookup(ctx, args.deviceId)
-      const catalog = {
-        names: await fetchCardNames(ctx),
-        alternateNames: await fetchPrintedToRulesNameLines(ctx),
-      }
+      const catalog = await fetchCardNameCatalog(async (path) => {
+        const response = await fetchScryfall(ctx, path)
+        if (!response.ok)
+          throw new ConvexError({
+            code: "scryfall_unavailable",
+            message: "Card names are temporarily unavailable",
+          })
+        return objectRecord((await response.json()) as unknown)
+      })
       await ctx.runMutation(internal.cards.storeNameCatalog, { game: "mtg", ...catalog })
       return { ...catalog, fetchedAt: Date.now() }
     } catch (error) {
