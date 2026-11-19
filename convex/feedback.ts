@@ -1,5 +1,5 @@
 import { HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter"
-import { ConvexError, v } from "convex/values"
+import { ConvexError, v, type Infer } from "convex/values"
 
 import { components, internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
@@ -26,9 +26,12 @@ import {
   fixReach,
   fixedReply,
   isStorePlatform,
+  playerTurn,
+  rakazoItem,
   senderHash,
 } from "./lib/feedback"
 import { notifyFeedbackReply } from "./lib/notifications"
+import { secretMatches } from "./lib/webhookSecret"
 
 const limiter = new RateLimiter(components.rateLimiter, {
   feedbackSubmit: { kind: "token bucket", rate: 5, period: HOUR, capacity: 5 },
@@ -45,6 +48,7 @@ const APOLLO_BATCH = 100
 const SENTRY_EVENT_ID = /^[0-9a-f]{32}$/
 const ISSUE_NUMBER = /^#?(\d{1,9})$/
 const FIXES_PER_ISSUE = 100
+const RAKAZO_BATCH = 20
 
 type Ctx = QueryCtx | MutationCtx
 type Viewer = { hash: string | null; user: Doc<"users"> | null }
@@ -207,6 +211,7 @@ export const submit = mutation({
           : undefined,
       unread: false,
       updatedAt: now,
+      rakazoPending: true,
     })
     await postCard(ctx, requestId)
     return requestId
@@ -228,7 +233,7 @@ export const reply = mutation({
       from: "player",
       body: cleanText(body, FEEDBACK_LIMITS.message, "Message"),
     })
-    await ctx.db.patch(requestId, { updatedAt: Date.now() })
+    await ctx.db.patch(requestId, { updatedAt: Date.now(), rakazoPending: true })
     await postCard(ctx, requestId, true)
     return null
   },
@@ -330,21 +335,24 @@ export async function deleteAccountFeedback(ctx: MutationCtx, userId: Id<"users"
   return linked.length
 }
 
+async function cardInput(ctx: QueryCtx, request: Doc<"feedbackRequests">) {
+  const messages = await latestMessages(ctx, request._id)
+  const user = request.userId ? await ctx.db.get(request.userId) : null
+  const account = user
+    ? [
+        user.moderationHold?.placeholderUsername ??
+          (user.username ? `@${user.username}` : user.displayName),
+        ...((await hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit)) ? ["Pro"] : []),
+      ].join(" · ")
+    : undefined
+  return { request, messages, account }
+}
+
 export const apolloCardInput = internalQuery({
   args: { requestId: v.id("feedbackRequests") },
   handler: async (ctx, { requestId }) => {
     const request = await ctx.db.get(requestId)
-    if (!request) return null
-    const messages = await latestMessages(ctx, requestId)
-    const user = request.userId ? await ctx.db.get(request.userId) : null
-    const account = user
-      ? [
-          user.moderationHold?.placeholderUsername ??
-            (user.username ? `@${user.username}` : user.displayName),
-          ...((await hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit)) ? ["Pro"] : []),
-        ].join(" · ")
-      : undefined
-    return { request, messages, account }
+    return request ? await cardInput(ctx, request) : null
   },
 })
 
@@ -422,23 +430,77 @@ export const applyApolloEvent = internalMutation({
       ? ctx.db.normalizeId("feedbackRequests", event.key.slice(APOLLO_KEY_PREFIX.length))
       : null
     const request = requestId ? await ctx.db.get(requestId) : null
-    const text = event.text?.trim()
-    if (!request || !text) return null
-    if (event.actionId === "link_issue") {
-      const issue = Number(ISSUE_NUMBER.exec(text)?.[1] ?? 0)
-      if (issue > 0 && issue !== request.issue) {
-        await ctx.db.patch(request._id, { issue, fixedIn: undefined, awaitingStore: undefined })
-        await postCard(ctx, request._id)
-      }
-      return null
-    }
-    if (event.actionId !== "reply") return null
-    const body = text.slice(0, FEEDBACK_LIMITS.message)
-    await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
-    await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now() })
-    await postCard(ctx, request._id)
-    await notifyFeedbackReply(ctx, request, body)
+    if (request && (event.actionId === "reply" || event.actionId === "link_issue"))
+      await answer(ctx, request, event.actionId, event.text ?? "")
     return null
+  },
+})
+
+const teamAction = v.union(v.literal("reply"), v.literal("link_issue"))
+
+async function answer(
+  ctx: MutationCtx,
+  request: Doc<"feedbackRequests">,
+  action: Infer<typeof teamAction>,
+  given: string,
+) {
+  const text = given.trim()
+  if (!text) return false
+  if (action === "link_issue") {
+    const issue = Number(ISSUE_NUMBER.exec(text)?.[1] ?? 0)
+    if (issue === 0) return false
+    if (issue !== request.issue) {
+      await ctx.db.patch(request._id, { issue, fixedIn: undefined, awaitingStore: undefined })
+      await postCard(ctx, request._id)
+    }
+    return true
+  }
+  const body = text.slice(0, FEEDBACK_LIMITS.message)
+  await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
+  await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now(), rakazoPending: undefined })
+  await postCard(ctx, request._id)
+  await notifyFeedbackReply(ctx, request, body)
+  return true
+}
+
+async function bridgeOnly(secret: string) {
+  if (!env.RAKAZO_BRIDGE_SECRET || !(await secretMatches(secret, env.RAKAZO_BRIDGE_SECRET)))
+    throw new ConvexError({ code: "unauthorized", message: "Unauthorized" })
+}
+
+export const rakazoPending = query({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    await bridgeOnly(secret)
+    const requests = await ctx.db
+      .query("feedbackRequests")
+      .withIndex("by_rakazo_pending", (q) => q.eq("rakazoPending", true))
+      .take(RAKAZO_BATCH)
+    return await Promise.all(
+      requests.map(async (request) => rakazoItem(await cardInput(ctx, request))),
+    )
+  },
+})
+
+// why: the player can reply while the bridge is sending, and clearing that newer turn would never forward it.
+export const rakazoDelivered = mutation({
+  args: { secret: v.string(), requestId: v.id("feedbackRequests"), turn: v.string() },
+  handler: async (ctx, { secret, requestId, turn }) => {
+    await bridgeOnly(secret)
+    const request = await ctx.db.get(requestId)
+    if (request?.rakazoPending && playerTurn(await latestMessages(ctx, requestId)) === turn)
+      await ctx.db.patch(requestId, { rakazoPending: undefined })
+    return null
+  },
+})
+
+export const answerFromRakazo = internalMutation({
+  args: { requestId: v.string(), action: teamAction, text: v.string() },
+  handler: async (ctx, { requestId, action, text }) => {
+    const id = ctx.db.normalizeId("feedbackRequests", requestId)
+    const request = id ? await ctx.db.get(id) : null
+    if (!request) return "not_found" as const
+    return (await answer(ctx, request, action, text)) ? ("ok" as const) : ("ignored" as const)
   },
 })
 

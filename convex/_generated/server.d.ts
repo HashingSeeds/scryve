@@ -33,6 +33,8 @@ type Env = {
   readonly CLERK_WEBHOOK_SIGNING_SECRET: string | undefined;
   readonly MODERATION_ALERT_FROM: string | undefined;
   readonly MODERATION_ALERT_TO: string | undefined;
+  readonly RAKAZO_BRIDGE_SECRET: string | undefined;
+  readonly RAKAZO_REPLY_TOKEN: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
   readonly REVENUECAT_ENVIRONMENT: string | undefined;
   readonly REVENUECAT_SECRET_API_KEY: string | undefined;

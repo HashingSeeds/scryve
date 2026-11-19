@@ -339,6 +339,72 @@ describe("feedback", () => {
     }
   })
 
+  it("holds each player turn for Rakazo until the bridge delivers that turn", async () => {
+    process.env.RAKAZO_BRIDGE_SECRET = "bridge-secret"
+    try {
+      const t = makeConvexTest()
+      const pending = () => t.query(api.feedback.rakazoPending, { secret: "bridge-secret" })
+      await expect(t.query(api.feedback.rakazoPending, { secret: "wrong" })).rejects.toThrow(
+        "Unauthorized",
+      )
+
+      const requestId = await submit(t)
+      const [first] = await pending()
+      expect(first).toMatchObject({ requestId, turn: "request", title: "Idea: Sync timers" })
+
+      await t.mutation(api.feedback.reply, { key: ME, requestId, body: "Also on web please" })
+      await t.mutation(api.feedback.rakazoDelivered, {
+        secret: "bridge-secret",
+        requestId,
+        turn: first!.turn,
+      })
+      const [second] = await pending()
+      expect(second?.turn).not.toBe("request")
+      expect(second?.thread.at(-1)).toEqual({ from: "player", body: "Also on web please" })
+
+      await t.mutation(api.feedback.rakazoDelivered, {
+        secret: "bridge-secret",
+        requestId,
+        turn: second!.turn,
+      })
+      expect(await pending()).toEqual([])
+    } finally {
+      delete process.env.RAKAZO_BRIDGE_SECRET
+    }
+  })
+
+  it("takes Rakazo's approved replies and issue links over HTTP", async () => {
+    process.env.RAKAZO_BRIDGE_SECRET = "bridge-secret"
+    process.env.RAKAZO_REPLY_TOKEN = "reply-token"
+    try {
+      const t = makeConvexTest()
+      const requestId = await submit(t)
+      const send = (body: object, token = "reply-token") =>
+        t.fetch("/rakazo/feedback", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        })
+
+      expect((await send({ requestId, action: "reply", text: "Hi" }, "wrong")).status).toBe(401)
+      expect((await send({ requestId, action: "archive", text: "x" })).status).toBe(400)
+      expect((await send({ requestId: "nope", action: "reply", text: "Hi" })).status).toBe(404)
+      expect((await send({ requestId, action: "link_issue", text: "soon" })).status).toBe(422)
+      expect((await send({ requestId, action: "link_issue", text: "#42" })).status).toBe(200)
+      expect((await send({ requestId, action: "reply", text: "Shipping Friday." })).status).toBe(
+        200,
+      )
+
+      const thread = await t.query(api.feedback.thread, { key: ME, requestId })
+      expect(thread?.messages).toMatchObject([{ from: "team", body: "Shipping Friday." }])
+      expect(await t.run(async (ctx) => (await ctx.db.get(requestId))?.issue)).toBe(42)
+      expect(await t.query(api.feedback.rakazoPending, { secret: "bridge-secret" })).toEqual([])
+    } finally {
+      delete process.env.RAKAZO_BRIDGE_SECRET
+      delete process.env.RAKAZO_REPLY_TOKEN
+    }
+  })
+
   it("reopens an archived card when the player replies", async () => {
     process.env.APOLLO_CLOUD_URL = "https://apollo.test"
     process.env.APOLLO_FEEDBACK_TOKEN = "feedback-token"

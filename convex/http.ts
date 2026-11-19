@@ -182,7 +182,7 @@ http.route({
   }),
 })
 
-// why: Apollo calls this when Matthew replies on a card, so the reply reaches the player now instead of on the next 1-minute poll.
+// why: Apollo calls this when Matthew replies on a card, so the reply reaches the player now instead of on the next 15-minute poll.
 http.route({
   path: "/apollo/events",
   method: "POST",
@@ -198,6 +198,38 @@ http.route({
       return new Response("Unauthorized", { status: 401 })
     await ctx.scheduler.runAfter(0, internal.feedback.pullApollo, {})
     return new Response(null, { status: 204 })
+  }),
+})
+
+http.route({
+  path: "/rakazo/feedback",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    if (!env.RAKAZO_REPLY_TOKEN)
+      return new Response("Rakazo replies are not configured", { status: 503 })
+    if (
+      !(await secretMatches(
+        request.headers.get("authorization"),
+        `Bearer ${env.RAKAZO_REPLY_TOKEN}`,
+      ))
+    )
+      return new Response("Unauthorized", { status: 401 })
+    const body = asRecord(await request.json().catch(() => null))
+    const action = body?.action
+    if (
+      typeof body?.requestId !== "string" ||
+      (action !== "reply" && action !== "link_issue") ||
+      typeof body.text !== "string"
+    )
+      return new Response('Send { requestId, action: "reply" | "link_issue", text }', {
+        status: 400,
+      })
+    const result = await ctx.runMutation(internal.feedback.answerFromRakazo, {
+      requestId: body.requestId,
+      action,
+      text: body.text,
+    })
+    return new Response(result, { status: { ok: 200, ignored: 422, not_found: 404 }[result] })
   }),
 })
 
