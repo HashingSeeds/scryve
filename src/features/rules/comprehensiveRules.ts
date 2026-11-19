@@ -77,14 +77,20 @@ function searchIndex(source: ComprehensiveRules) {
   if (cached) return cached
   const sections = source.chapters.flatMap((chapter) => chapter.sections)
   const rules = sections.flatMap((section) => section.rules)
-  const titles = sections.flatMap((section) => section.rules.map(() => words(section.title)))
+  const byId = new Map(rules.map((rule) => [rule.id, rule]))
+  // why: a rule rarely repeats the subject of its section or, for a lettered subrule, of its base rule, so those words count as its own.
+  const context = sections.flatMap((section) =>
+    section.rules.map((rule) => {
+      const base = byId.get(rule.id.replace(/[a-z]+$/, ""))
+      return [...words(section.title), ...(base && base !== rule ? words(base.text) : [])]
+    }),
+  )
   const postings = new Map<string, Postings>()
   const stems = new Map<string, string>()
   const lengths = rules.map((rule, index) => {
     const counts = new Map<string, number>()
     const raws = words(rule.text)
-    // why: a rule rarely repeats its section's subject, so the title's words count as its own.
-    for (const raw of [...raws, ...titles[index]]) {
+    for (const raw of [...raws, ...context[index]]) {
       let word = stems.get(raw)
       if (word === undefined) stems.set(raw, (word = stem(raw)))
       counts.set(word, (counts.get(word) ?? 0) + 1)
