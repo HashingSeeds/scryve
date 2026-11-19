@@ -420,6 +420,11 @@ export function PlayerGrid({
   const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
   // why: a team zone is one card, seated under its lead, whichever head attacks.
   const armedCard = teamIndexes.find((team) => team.includes(armedIndex))?.[0] ?? armedIndex
+  const reachGrid = teams
+    ? { gridRows: rows, rowFlexes }
+    : { gridRows: seatedRows, rowFlexes: seatedRowFlexes }
+  const cardOf = (index: number) =>
+    teams ? teamIndexes.findIndex((team) => team.includes(index)) : index
   const seatRotations = new Map<number, LifeCardContentRotation>()
   rows.forEach((row, rowIndex) =>
     row.forEach((slot, columnIndex) => {
@@ -602,14 +607,13 @@ export function PlayerGrid({
                 reach:
                   armedIndex >= 0 && armedIndex !== ownerIndex
                     ? commanderReach({
-                        gridRows: seatedRows,
-                        rowFlexes: seatedRowFlexes,
+                        ...reachGrid,
                         board: {
                           width: board.width,
                           height: board.height - topEdgeBand,
                         },
-                        attackerIndex: armedIndex,
-                        defenderIndex: ownerIndex,
+                        attackerIndex: cardOf(armedIndex),
+                        defenderIndex: cardOf(ownerIndex),
                       })
                     : undefined,
                 onPressSword: sword,

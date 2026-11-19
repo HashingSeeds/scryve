@@ -170,6 +170,32 @@ describe("PlayerGrid", () => {
     expect(second.right).toBeGreaterThan(0)
   })
 
+  it("grows a team's attack shadow from its whole zone to cover the whole defending zone", () => {
+    const seats = players(4)
+    const ids = seats.map(({ id }) => id)
+    const view = render(
+      <ThemeProvider>
+        <CommanderGrid
+          players={seats}
+          teams={[ids.slice(0, 2), ids.slice(2)]}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("player-grid"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 800, x: 0, y: 0 } },
+    })
+    const zone = (seat: number) =>
+      view.UNSAFE_getAllByType(LifeCard).find(({ props }) => props.seatNumber === seat)!
+    act(() => zone(3).props.team.heads[1].sword.onPress())
+    expect(zone(1).props.commanderDamage.reach).toEqual({
+      x: 200,
+      y: 0,
+      card: { width: 200, height: 800 },
+      distance: 200,
+    })
+  })
+
   it("fills each team zone with its color and shows one pip per opposing team at its stronger commander", () => {
     const colors = ["#B85636", "#39755C", "#A33A52"]
     const seats = players(6).map((seat) => ({ ...seat, color: colors[Math.floor(seat.seat / 2)] }))
