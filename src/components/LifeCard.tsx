@@ -32,7 +32,7 @@ import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 import { BoardPressable } from "./BoardPressable"
 import {
   ATTACK_SHADE,
-  strikeRoom,
+  sideRoom,
   CommanderDamageCardControls,
   shadowReached,
   SWAP_MS,
@@ -346,7 +346,7 @@ export const LifeCard = memo(function LifeCard({
           lifeFontSize: resolvedLifeFontSize,
           ink: readoutInk,
           reach: commanderDamage?.reach,
-          side: strikeRoom(compact),
+          side: sideRoom(compact),
         })
       : undefined
   const floodedBy = useCommanderTakeover(takeover, {

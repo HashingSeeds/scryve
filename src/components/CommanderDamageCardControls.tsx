@@ -439,16 +439,26 @@ function DefenderControls({
   const strikeFont = (compact ? 24 : 30) * strikeScale
   const strikeSword = (compact ? 28 : 34) * strikeScale
   const coin = compact ? 20 : 24
-  const inset = contentInsets?.[contentEdge(contentRotation, "right")] ?? 0
   const undoGlyph = compact ? 20 : 22
-  // why: undo stays put just outside the arc of hits, or at the card's edge on a narrow seat, where the arc pulls in to keep its hits clear of it.
-  const undoX = Math.min(
-    content.width - UNDO_INSET - inset - UNDO_SIZE / 2,
-    discX + disc + COIN_GAP + coin + COIN_GAP + undoGlyph / 2,
-  )
+  // why: undo is fixed to the card, not the disc, so it stays put as the life changes: beside the hits at the edge's middle on a seat wide enough for the disc, the hits, and undo, else in the corner below the hits.
+  const wide = content.width >= content.height + sideRoom(compact) * 2
+  const undo = wide ? UNDO_SIZE : MIN_TARGET
+  const undoAt = {
+    x:
+      content.width -
+      UNDO_INSET -
+      (contentInsets?.[contentEdge(contentRotation, "right")] ?? 0) -
+      undo / 2,
+    y: wide
+      ? content.height / 2
+      : content.height -
+        UNDO_INSET -
+        (contentInsets?.[contentEdge(contentRotation, "bottom")] ?? 0) -
+        undo / 2,
+  }
   const coinRadius = Math.min(
     disc + coin / 2 + COIN_GAP,
-    undoX - undoGlyph / 2 - COIN_GAP - coin / 2 - discX,
+    wide ? undoAt.x - undo / 2 - COIN_GAP - coin / 2 - discX : Infinity,
   )
 
   return (
@@ -538,7 +548,12 @@ function DefenderControls({
             onPress={mode.onUndo}
             style={[
               $undo,
-              { left: undoX - UNDO_SIZE / 2, top: content.height / 2 - UNDO_SIZE / 2 },
+              {
+                left: undoAt.x - undo / 2,
+                top: undoAt.y - undo / 2,
+                width: undo,
+                height: undo,
+              },
             ]}
           >
             <UndoGlyph size={undoGlyph} color={SHADOW_INK} />
@@ -549,9 +564,10 @@ function DefenderControls({
   )
 }
 
-/** why: the strike's sword and a two-digit hit, with a gap to the disc and the card's edge; the disc keeps this much room on each side. */
-export function strikeRoom(compact?: boolean) {
-  return compact ? 72 : 90
+/** why: the disc keeps room on each side for the strike to its left (a sword and a two-digit hit) and the hits and undo to its right. */
+export function sideRoom(compact?: boolean) {
+  const coin = compact ? 20 : 24
+  return Math.max(compact ? 72 : 90, COIN_GAP * 2 + coin + UNDO_SIZE + UNDO_INSET)
 }
 
 /** why: the strike and the blades that fly to it wear the attacker's color, light enough to read on the shadow. */
@@ -566,9 +582,14 @@ export function hitAngle(index: number, count: number) {
 }
 
 /** why: the card edge on the content's own side, for the content insets that keep a control off a notch. */
-function contentEdge(rotation: LifeCardContentRotation, side: "right") {
-  return ({ 0: "right", 180: "left", 90: "bottom", [-90]: "top" } as const)[rotation] ?? side
+function contentEdge(rotation: LifeCardContentRotation, side: "right" | "bottom") {
+  return CONTENT_SIDES[side][rotation]
 }
+
+const CONTENT_SIDES = {
+  right: { 0: "right", 180: "left", 90: "bottom", [-90]: "top" },
+  bottom: { 0: "bottom", 180: "top", 90: "left", [-90]: "right" },
+} as const
 
 function DamageRings({
   seatNumber,
@@ -1070,6 +1091,8 @@ const COIN_GAP = 6
 const HIT_ARC = 70
 const HIT_STEP = 14
 const UNDO_SIZE = 56
+// why: the smallest comfortable touch target, for undo in a narrow seat's corner.
+const MIN_TARGET = 44
 const UNDO_INSET = 4
 
 /** why: a creature-style power box; its left and right ends lower and raise power, and tapping the number types one in. A partner's − at 1 takes it out of the attack; out, the whole box dims at the power it keeps and a tap brings it back. */
