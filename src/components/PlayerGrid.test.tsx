@@ -187,7 +187,7 @@ describe("PlayerGrid", () => {
     })
     const zone = (seat: number) =>
       view.UNSAFE_getAllByType(LifeCard).find(({ props }) => props.seatNumber === seat)!
-    act(() => zone(3).props.team.heads[0].sword.onPress())
+    act(() => zone(3).props.team.heads[1].sword.onPress())
     expect(zone(1).props.commanderDamage.reach).toEqual({
       x: 200,
       y: 0,
