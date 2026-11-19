@@ -572,6 +572,25 @@ describe("PlayerGrid", () => {
     }
   })
 
+  it("gives a seat with no commander a Commander box and a sat-out Partner, and one box where the game has one slot", () => {
+    const grid = (singleCommander?: boolean) => (
+      <ThemeProvider>
+        <CommanderGrid
+          players={players(2)}
+          singleCommander={singleCommander}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(grid())
+    armFirstSeat(view)
+    expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Commander")
+    expect(view.getByTestId("commander-sit-seat-1-partner")).toHaveTextContent("1Partner")
+
+    view.rerender(grid(true))
+    expect(view.queryByTestId("commander-sit-seat-1-partner")).toBeNull()
+  })
+
   it("lays a hit circle by each defender's disc per hit it took, and no undo before one lands", () => {
     const view = render(
       <ThemeProvider>

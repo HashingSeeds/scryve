@@ -866,7 +866,9 @@ function AttackerControls({
       <PowerBox
         {...box}
         suffix={testSeats[index]}
-        name={name}
+        name={
+          name ?? translate(index ? "board:commander.unnamedPartner" : "board:commander.unnamed")
+        }
         partner={partners}
         power={power}
         sitting={!!sitting}
@@ -1116,7 +1118,7 @@ function PowerBox({
   onSit,
 }: {
   suffix: string
-  name?: string
+  name: string
   partner: boolean
   power: number
   sitting: boolean
@@ -1135,7 +1137,7 @@ function PowerBox({
 }) {
   const editing = draft !== undefined
   const pressedTint = { backgroundColor: overlayTint(ink, 0.14) }
-  const shownName = name ?? translate("board:commander.unnamed")
+  const shownName = name
   // why: shrink the number to its row's middle so two digits fit a narrowed box instead of wrapping out of sight; the platform shrinks it further if the font runs wider than this estimate.
   const valueWidth = (width * VALUE_FLEX) / (VALUE_FLEX + HALF_FLEX * 2)
   const digits = Math.max(1, String(power).length)
@@ -1202,10 +1204,10 @@ function PowerBox({
     const disabled = step < 0 ? power <= LOWEST_POWER && !leaves : power >= MAX_COMMANDER_DAMAGE
     const label =
       step < 0
-        ? partner && name
+        ? partner
           ? translate("board:commander.lowerPowerOf", { name })
           : translate("board:commander.lowerPower")
-        : partner && name
+        : partner
           ? translate("board:commander.raisePowerOf", { name })
           : translate("board:commander.raisePower")
     return (

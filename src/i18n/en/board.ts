@@ -456,6 +456,8 @@ const board = {
     lowerPowerOf: "Lower {{name}}'s power",
     // Shown dimmed in place of the commander's name when the seat has no deck.
     unnamed: "Commander",
+    // Shown in place of the second commander's name when the seat has no deck: the partner that can join the attack.
+    unnamedPartner: "Partner",
     totalFrom: "{{damage}} commander damage from {{name}}",
     amountFrom: "{{amount}} from {{name}}",
     unknownAttacker: "Commander",

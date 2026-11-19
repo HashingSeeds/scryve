@@ -21,7 +21,8 @@ export type CommanderDamagePort = {
 
 export type CommanderAttack = ReturnType<typeof useCommanderAttack>
 
-const NO_COMMANDER = [{}]
+// why: a seat with no deck or no commander chosen attacks with a commander and a partner, the partner sat out until brought in.
+const NO_DECK = [{}, {}]
 
 export function useCommanderAttack(
   port: CommanderDamagePort,
@@ -37,10 +38,11 @@ export function useCommanderAttack(
 ) {
   const [state, setState] = useState(IDLE_ATTACK)
   const deck = useSeatCommanders(state.armed ? seatDeck(state.armed) : undefined)
-  const attackers = singleCommander ? deck.slice(0, 1) : deck
+  const shown = deck.length ? deck : NO_DECK
+  const attackers = singleCommander ? shown.slice(0, 1) : shown
   const board: AttackBoard = {
     recorded: (from, to, commander) => port.incoming(to, commander)[from] ?? 0,
-    commanders: attackers.length ? attackers : NO_COMMANDER,
+    commanders: attackers,
     buffered,
   }
   // why: two taps can land before a render, so the next tap reduces from the last tap's state rather than the rendered one.

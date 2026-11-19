@@ -366,6 +366,7 @@ export default {
     raisePowerOf: "{{name}}의 공격력 올리기",
     lowerPowerOf: "{{name}}의 공격력 내리기",
     unnamed: "커맨더",
+    unnamedPartner: "파트너",
     totalFrom: "{{name}}의 커맨더 피해 {{damage}}점",
     amountFrom: "{{name}}: {{amount}}점",
     unknownAttacker: "커맨더",
