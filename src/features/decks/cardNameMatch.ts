@@ -42,7 +42,6 @@ function trigrams(key: string) {
   return grams
 }
 
-// why: search scores hundreds of names per keystroke, so the edit-distance rows are reused instead of allocated.
 let previousRow = new Int32Array(64)
 let currentRow = new Int32Array(64)
 
@@ -105,7 +104,6 @@ export function catalogNameIndex(catalog: { names: string; alternateNames: strin
   return cardNameIndex(catalog.names.split("\n"), alternates)
 }
 
-/** why: "sheoldred" means the legend, not "Sheoldred's Edict", and "swords" means "Swords to Plowshares", not "Swordsman". */
 function endsOnWholeWord(face: string, end: number) {
   if (end === face.length) return true
   const possessive =
@@ -127,7 +125,6 @@ function bestSliceSimilarity(query: string, face: string, laterWordWeight = WORD
   return best
 }
 
-/** why: players type a name's words out of order ("plowshares swords"), so each word is also scored on its own. */
 function anyOrderSimilarity(words: string[], face: string) {
   let matched = 0
   let letters = 0
@@ -152,7 +149,6 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
     for (const faceIndex of index.facesByTrigram.get(gram) ?? [])
       if (shared[faceIndex]++ === 0) touched.push(faceIndex)
   const shortlistSize = typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE
-  // why: typed overlap ranks by shared trigrams first, so faces below the count that fills the shortlist never need sorting.
   let candidates = touched
   if (typed) {
     const facesSharing = new Uint32Array(lineTrigrams.size + 1)
@@ -190,7 +186,6 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
     best = Math.max(best, score)
     keep(faceIndex, score)
   }
-  // why: scoring words out of order costs a pass per word, so it runs only when no name matches in order.
   const words = key.split(" ")
   if (typed && words.length > 1 && best < GOOD_IN_ORDER)
     for (const faceIndex of shortlist)
@@ -245,10 +240,6 @@ export function closestNamesFromCardTop(
     .map(([nameIndex]) => index.names[nameIndex])
 }
 
-/**
- * why: an exact name comes first, then a whole name over one face of a double-faced card, then
- * `preference` breaks ties between names that match equally well, before the shorter name wins.
- */
 export function searchCardNames(
   index: CardNameIndex,
   query: string,

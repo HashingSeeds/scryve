@@ -11,14 +11,12 @@ import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
 export const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 export const NAME_MATCHES = 20
-// why: players type a name to find a chase card, so among names that match equally the rarer card comes first.
 const RARITIES = ["common", "uncommon", "rare", "mythic"]
 const LOCAL_RESULTS = 60
 
 export type MagicCards = {
   cards: MagicDatasetCard[]
   keys: string[]
-  /** why: one string of every key, so a typed word is found by a native scan instead of 30k `includes` calls. */
   keyText: string
   keyStarts: Int32Array
   byName: Map<string, MagicDatasetCard>
