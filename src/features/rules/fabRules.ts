@@ -26,7 +26,6 @@ export function parseFabRules(source: string): ComprehensiveRules | undefined {
     const line = raw.trim()
     if (!line) continue
     const chapter = CHAPTER.exec(line)
-    // why: since November 2026 the preface and glossary headings carry no chapter number.
     const heading = CHAPTER_MODES.get(chapter?.[2] ?? line)
     if (heading || chapter) {
       mode = heading ?? "rules"
@@ -37,7 +36,6 @@ export function parseFabRules(source: string): ComprehensiveRules | undefined {
     if (mode === "glossary") {
       const numbered = GLOSSARY_TERM.exec(line)?.[1]
       if (numbered) numberedGlossary = true
-      // why: unnumbered glossaries alternate a term line with its definition, plus "kind:" lines for terms with several meanings.
       const term =
         numbered ??
         (!numberedGlossary && (!entry || (entry.text && !SUB_DEFINITION.test(line)))
