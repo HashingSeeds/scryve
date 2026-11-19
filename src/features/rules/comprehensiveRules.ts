@@ -152,9 +152,18 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     }
     for (const [at, score] of best) scores.set(at, (scores.get(at) ?? 0) + score)
   }
+  // why: a rule opens on a screen with its lettered subrules, so one result per screen keeps the list from repeating itself.
+  const screens = new Set<string>()
   const matches: RuleSearchResult[] = [...scores]
     .sort(([a, scoreA], [b, scoreB]) => scoreB - scoreA || a - b)
-    .map(([at]) => ({ kind: "rule", rule: index.rules[at] }))
+    .map(([at]) => index.rules[at])
+    .filter((rule) => {
+      const screen = rule.id.replace(/[a-z]+$/, "")
+      if (screens.has(screen)) return false
+      screens.add(screen)
+      return true
+    })
+    .map((rule) => ({ kind: "rule", rule }))
   return [...terms, ...matches].slice(0, limit)
 }
 
