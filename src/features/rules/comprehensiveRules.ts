@@ -8,6 +8,7 @@ export type ComprehensiveRules = {
   glossary: GlossaryEntry[]
   notice: string[]
   slang?: Readonly<Record<string, string>>
+  references?: RegExp
 }
 
 export function findRules(rules: ComprehensiveRules, id: string) {
@@ -65,6 +66,7 @@ type SearchIndex = {
   average: number
   slang: Map<string, string[]>
   spellings: Map<string, string>
+  defined: { words: string[]; rules: number[] }[]
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
@@ -97,9 +99,28 @@ function searchIndex(source: ComprehensiveRules) {
   const slang = new Map(
     Object.entries(source.slang ?? {}).map(([word, meaning]) => [stem(word), words(meaning).map(stem)]),
   )
-  const index = { rules, postings, lengths, average, slang, spellings: stems }
+  const at = new Map(rules.map((rule, position) => [rule, position]))
+  // why: a glossary term names an idea, and the rules it cites are where that idea lives.
+  const defined = source.glossary.map((entry) => ({
+    words: words(entry.term)
+      .filter((word) => !STOPWORDS.has(word))
+      .map(stem),
+    rules: citedRules(source, entry).map((rule) => at.get(rule)!),
+  }))
+  const index = { rules, postings, lengths, average, slang, spellings: stems, defined }
   indexes.set(source, index)
   return index
+}
+
+function citedRules(source: ComprehensiveRules, entry: GlossaryEntry) {
+  if (!source.references) return []
+  const cited = ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")
+  return (cited && findRules(source, cited.id)?.rules) || []
+}
+
+function idf(index: SearchIndex, list: Postings | undefined) {
+  const found = list?.rules.length ?? 0
+  return Math.log(1 + (index.rules.length - found + 0.5) / (found + 0.5))
 }
 
 // why: the last word may be half typed, so it also matches as a prefix of any indexed word.
@@ -171,15 +192,21 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     const near = spelled.get(wanted)
     for (const [word, list] of index.postings) {
       if (!(near ? near.has(word) : matchesWord(word, wanted, prefix))) continue
-      const idf = Math.log(1 + (index.rules.length - list.rules.length + 0.5) / (list.rules.length + 0.5))
+      const rarity = idf(index, list)
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
         const norm = BM25_K1 * (1 - BM25_B + (BM25_B * index.lengths[at]) / index.average)
-        const score = (weight * idf * count * (BM25_K1 + 1)) / (count + norm)
+        const score = (weight * rarity * count * (BM25_K1 + 1)) / (count + norm)
         if (score > (best.get(at) ?? 0)) best.set(at, score)
       })
     }
     for (const [at, score] of best) scores.set(at, (scores.get(at) ?? 0) + score)
+  }
+  const asked = new Set(stems)
+  for (const term of index.defined) {
+    if (term.words.length === 0 || !term.words.every((word) => asked.has(word))) continue
+    const bonus = term.words.reduce((sum, word) => sum + idf(index, index.postings.get(word)), 0)
+    for (const at of term.rules) scores.set(at, (scores.get(at) ?? 0) + bonus)
   }
   // why: a rule opens on a screen with its lettered subrules, so one result per screen keeps the list from repeating itself.
   const screens = new Set<string>()

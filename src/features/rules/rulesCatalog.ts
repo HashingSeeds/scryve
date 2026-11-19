@@ -24,8 +24,13 @@ export type TextRules = {
 }
 export type GameRules = TextRules | { kind: "link"; pageUrl: string }
 
-function withSlang(rules: ComprehensiveRules | undefined, slang: Record<string, string>) {
-  return rules && { ...rules, slang }
+// why: search needs each game's slang and citation format, and the rules object is all it receives.
+function searchable(
+  rules: ComprehensiveRules | undefined,
+  slang: Record<string, string>,
+  references: RegExp,
+) {
+  return rules && { ...rules, slang, references }
 }
 
 export const GAME_RULES = {
@@ -35,7 +40,7 @@ export const GAME_RULES = {
     pageUrl: "https://magic.wizards.com/en/rules",
     publisher: "Wizards of the Coast",
     cacheKey: "scryve.rules",
-    parse: (text) => withSlang(parseMagicRules(text), MAGIC_SLANG),
+    parse: (text) => searchable(parseMagicRules(text), MAGIC_SLANG, MAGIC_RULE_REFERENCE),
     references: MAGIC_RULE_REFERENCE,
     keyword: magicKeyword,
     tableItemRules: {
@@ -55,7 +60,7 @@ export const GAME_RULES = {
     pageUrl: "https://rules.fabtcg.com/en/",
     publisher: "Legend Story Studios",
     cacheKey: "scryve.rules.fab",
-    parse: (text) => withSlang(parseFabRules(text), FAB_SLANG),
+    parse: (text) => searchable(parseFabRules(text), FAB_SLANG, FAB_RULE_REFERENCE),
     references: FAB_RULE_REFERENCE,
     revalidate: true,
     tableItemRules: { marked: "9.3" } satisfies Partial<Record<FabTableItemId, string>>,
