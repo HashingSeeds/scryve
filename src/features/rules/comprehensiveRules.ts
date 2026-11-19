@@ -43,15 +43,17 @@ const STOPWORDS = new Set(
 // why: light suffix stripping so "attacking", "attacks", and "attacked" all meet "attack" without a stemming library.
 function stem(word: string) {
   let base = word
-  if (base.length > 4 && base.endsWith("ies")) base = `${base.slice(0, -3)}y`
+  if (/^.ie[sd]$/.test(base)) base = base.slice(0, -1)
+  else if (base.length > 4 && /ie[sd]$/.test(base)) base = `${base.slice(0, -3)}y`
+  else if (base.length === 5 && base.endsWith("ying")) base = `${base.slice(0, -4)}ie`
   else if (base.length > 3 && base.endsWith("s") && !/(ss|us|is)$/.test(base)) base = base.slice(0, -1)
   for (const suffix of ["ing", "ed"])
     if (base.length > suffix.length + 2 && base.endsWith(suffix)) {
       base = base.slice(0, -suffix.length)
-      if (/([b-df-hj-np-tv-z])\1$/.test(base) && !/(ll|ss|ff)$/.test(base)) base = base.slice(0, -1)
       break
     }
-  return base.length > 3 && base.endsWith("e") ? base.slice(0, -1) : base
+  if (base.length > 3 && base.endsWith("e")) base = base.slice(0, -1)
+  return base.length > 3 && /([b-df-hj-np-tv-z])\1$/.test(base) ? base.slice(0, -1) : base
 }
 
 function words(text: string) {
