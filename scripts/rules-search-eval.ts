@@ -42,7 +42,7 @@ const { values } = parseArgs({
 
 async function rulesText(source: TextRules) {
   const dir = path.join(tmpdir(), "scryve-rules-search-eval")
-  const file = path.join(dir, `${source.cacheKey}.txt`)
+  const file = path.join(dir, encodeURIComponent(source.url))
   if (existsSync(file) && Date.now() - statSync(file).mtimeMs < CACHE_HOURS * 3_600_000)
     return readFileSync(file, "utf8")
   const response = await fetch(source.url)
