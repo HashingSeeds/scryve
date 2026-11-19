@@ -85,6 +85,14 @@ describe("searchCardNames", () => {
     expect(searchCardNames(typed, "light", 3)).toEqual(["Light", "Lightning Axe", "Lightning Bolt"])
   })
 
+  it.each([
+    ["a whole word over a longer word it starts", "swords", "Swords to Plowshares"],
+    ["a legend over a card named for it", "sheoldred", "Sheoldred, the Apocalypse"],
+  ])("ranks %s", (_case, query, name) => {
+    const words = cardNameIndex(["Swordsman's Steel", "Sheoldred's Edict", name])
+    expect(searchCardNames(words, query, 3)[0]).toBe(name)
+  })
+
   it("finds nothing for text unlike any name", () => {
     expect(searchCardNames(typed, "zzzz", 3)).toEqual([])
   })

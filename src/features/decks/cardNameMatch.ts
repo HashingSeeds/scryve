@@ -6,6 +6,7 @@ const MIN_LEAD_OVER_RUNNER_UP = 0.05
 const TYPED_SHORTLIST_SIZE = 300
 const MIN_TYPED_SIMILARITY = 0.6
 const WORD_START_WEIGHT = 0.95
+const PART_WORD_WEIGHT = 0.97
 
 export type CardNameIndex = {
   names: string[]
@@ -103,12 +104,23 @@ export function catalogNameIndex(catalog: { names: string; alternateNames: strin
   return cardNameIndex(catalog.names.split("\n"), alternates)
 }
 
+/** why: "sheoldred" means the legend, not "Sheoldred's Edict", and "swords" means "Swords to Plowshares", not "Swordsman". */
+function endsOnWholeWord(face: string, end: number) {
+  if (end === face.length) return true
+  const possessive =
+    face.startsWith(" s", end) && (end + 2 === face.length || face[end + 2] === " ")
+  return face[end] === " " && !possessive
+}
+
 function typedSimilarity(query: string, face: string) {
   let best = similarity(query, face)
   for (let start = 0; start < face.length; start++) {
     if (start > 0 && face[start - 1] !== " ") continue
+    const end = start + query.length
     const score =
-      similarity(query, face.slice(start, start + query.length)) * (start ? WORD_START_WEIGHT : 1)
+      similarity(query, face.slice(start, end)) *
+      (start ? WORD_START_WEIGHT : 1) *
+      (endsOnWholeWord(face, end) ? 1 : PART_WORD_WEIGHT)
     if (score > best) best = score
   }
   return best
