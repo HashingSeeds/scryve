@@ -245,14 +245,32 @@ export function closestNamesFromCardTop(
     .map(([nameIndex]) => index.names[nameIndex])
 }
 
-export function searchCardNames(index: CardNameIndex, query: string, limit: number) {
+/**
+ * why: an exact name comes first, then a whole name over one face of a double-faced card, then
+ * `preference` breaks ties between names that match equally well, before the shorter name wins.
+ */
+export function searchCardNames(
+  index: CardNameIndex,
+  query: string,
+  limit: number,
+  preference?: (name: string) => number,
+) {
+  const key = matchKey(query)
   return rankedNames(index, query, true)
     .filter((match) => match.similarity >= MIN_TYPED_SIMILARITY)
+    .map((match) => {
+      const name = index.names[match.nameIndex]
+      const exact = match.wholeName && match.face === key
+      return { ...match, name, exact, preference: preference?.(name) ?? 0 }
+    })
     .sort(
       (a, b) =>
+        Number(b.exact) - Number(a.exact) ||
         b.similarity - a.similarity ||
-        index.names[a.nameIndex].length - index.names[b.nameIndex].length,
+        Number(b.wholeName) - Number(a.wholeName) ||
+        b.preference - a.preference ||
+        a.name.length - b.name.length,
     )
     .slice(0, limit)
-    .map(({ nameIndex }) => index.names[nameIndex])
+    .map(({ name }) => name)
 }

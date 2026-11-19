@@ -11,6 +11,8 @@ import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
 export const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 export const NAME_MATCHES = 20
+// why: players type a name to find a chase card, so among names that match equally the rarer card comes first.
+const RARITIES = ["common", "uncommon", "rare", "mythic"]
 const LOCAL_RESULTS = 60
 
 export type MagicCards = {
@@ -138,7 +140,11 @@ export function localMagicSearch(
   if (!words.length && !filtered) return { named: [], found: [] }
 
   const named = (
-    nameIndex && words.length ? searchCardNames(nameIndex, search.text, NAME_MATCHES) : []
+    nameIndex && words.length
+      ? searchCardNames(nameIndex, search.text, NAME_MATCHES, (name) =>
+          RARITIES.indexOf(magicCards.byName.get(name)?.rarity ?? ""),
+        )
+      : []
   )
     .flatMap((name) => magicCards.byName.get(name) ?? [])
     .filter((card) => matchesSearch(card, search))

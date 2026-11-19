@@ -94,6 +94,19 @@ describe("searchCardNames", () => {
     expect(searchCardNames(words, query, 3)[0]).toBe(name)
   })
 
+  it.each([
+    ["an exact name over a preferred longer one", ["Fog", "Fog Bank"], "fog", "Fog"],
+    [
+      "a whole name over a preferred card with it on one face",
+      ["Emeritus of Truce // Swords to Plowshares", "Swords to Plowshares"],
+      "swords to plowshares",
+      "Swords to Plowshares",
+    ],
+  ])("ranks %s", (_case, names, query, name) => {
+    const prefer = (candidate: string) => (candidate === name ? 0 : 1)
+    expect(searchCardNames(cardNameIndex(names), query, 3, prefer)[0]).toBe(name)
+  })
+
   it("finds nothing for text unlike any name", () => {
     expect(searchCardNames(typed, "zzzz", 3)).toEqual([])
   })
