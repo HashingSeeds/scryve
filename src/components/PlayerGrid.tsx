@@ -418,6 +418,8 @@ export function PlayerGrid({
   const attack = commanderDamage?.attack
   const armedPlayer = players.find(({ id }) => id === attack?.armedPlayerId)
   const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
+  // why: a team zone is one card, seated under its lead, whichever head attacks.
+  const armedCard = teamIndexes.find((team) => team.includes(armedIndex))?.[0] ?? armedIndex
   const seatRotations = new Map<number, LifeCardContentRotation>()
   rows.forEach((row, rowIndex) =>
     row.forEach((slot, columnIndex) => {
@@ -708,7 +710,8 @@ export function PlayerGrid({
           onPress: stable(`sword:${player.id}`, () => commanderDamage.onPressSword(player)),
           disabled:
             playerDisabled ||
-            (!!armedPlayer && !team.includes(armedIndex)) ||
+            // why: an open attack ends only at its check, so no head's mark can end it or arm another.
+            !!armedPlayer ||
             (!!outState && outReason(outState, player.id) !== undefined),
         },
       }
@@ -761,7 +764,7 @@ export function PlayerGrid({
       style={[$frame, covered && $covered]}
     >
       <CommanderFlights
-        attacker={armedIndex >= 0 ? armedIndex + 1 : null}
+        attacker={armedCard >= 0 ? armedCard + 1 : null}
         rotationOf={(seat) => boardRotation + (seatRotations.get(seat - 1) ?? 0)}
         color={armedPlayer ? strikeTint(armedPlayer.color) : "#FFFFFF"}
       >

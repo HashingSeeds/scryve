@@ -297,7 +297,6 @@ export const CommanderStrip = memo(function CommanderStrip({
                               : accessibleForeground(foreground),
                         },
                         total > 99 && (compact ? $compactThreeDigits : $threeDigits),
-                        total === 0 && partners && $zeroHalf,
                       ]}
                     />
                   </View>
@@ -474,7 +473,6 @@ const $partnerCount: TextStyle = { fontSize: 11, lineHeight: 12 }
 const $compactPartnerCount: TextStyle = { fontSize: 9, lineHeight: 10 }
 const $threeDigits: TextStyle = { fontSize: 11 }
 const $compactThreeDigits: TextStyle = { fontSize: 9 }
-const $zeroHalf: TextStyle = { opacity: 0.4 }
 
 // why: the attacker's square gets a ring a step outside it, so it reads lit without changing the total's own rim.
 const LIT_GAP = 3

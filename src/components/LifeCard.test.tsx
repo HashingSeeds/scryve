@@ -833,9 +833,9 @@ describe("LifeCard", () => {
     })
     const corner = view.getByTestId("life-identity-row-seat-1")
     expect(StyleSheet.flatten(corner.props.style)).toMatchObject({ left: 16, bottom: 16 })
-    // why: the name gives up room for the sword after it.
+    // why: the name keeps its half-run cap; the sword sits past it.
     expect(StyleSheet.flatten(view.getByTestId("life-identity-seat-1").props.style)).toMatchObject({
-      maxWidth: 340 / 2 - 16 - 16 - (32 + 8),
+      maxWidth: 340 / 2 - 16 - 16,
     })
     expect(view.getByTestId("player-name-seat-1")).toBeVisible()
     expect(view.getByTestId("commander-mark-seat-1")).toBeEnabled()

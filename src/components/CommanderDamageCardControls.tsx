@@ -435,8 +435,9 @@ function DefenderControls({
   const lethal =
     live.some(({ total, step }) => reachesLethal(total, step)) || mode.life - dealt <= 0
   const strikeColor = lethal ? DAMAGE_INK : strikeTint(attackerColor)
-  const strikeFont = compact ? 24 : 30
-  const strikeSword = compact ? 28 : 34
+  const strikeScale = takeover?.strike ?? 1
+  const strikeFont = (compact ? 24 : 30) * strikeScale
+  const strikeSword = (compact ? 28 : 34) * strikeScale
   const coin = compact ? 20 : 24
   const coinRadius = disc + coin / 2 + COIN_GAP
   const inset = contentInsets?.[contentEdge(contentRotation, "right")] ?? 0

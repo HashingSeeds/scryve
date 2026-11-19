@@ -628,15 +628,14 @@ export const LifeCard = memo(function LifeCard({
       setChipSize((size) => (size === "full" ? "number" : "pass"))
   }, [rowChip, nameRetracted, shownChipWidth, bareMarkRoom])
   const seatRun = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
-  // why: a name cut to a few letters reads worse than none, so in commander games short seats keep just their mark and sword from the start; judged by seat length alone so seats of one size match.
+  // why: a name cut to a few letters reads worse than none, so in commander games short seats keep just their mark from the start; judged by seat length alone so seats of one size match.
   const markOnly =
     commanderSeat &&
     seatRun > 0 &&
-    seatRun / 2 - identityMetrics.edge * 2 - (identityMetrics.icon + identityMetrics.gap) * 2 <
+    seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.icon - identityMetrics.gap <
       MIN_NAME_ROOM
   // why: commander seats carry a sword after the name that starts an attack, and holds the check that ends it; a defender's row only says whose seat it is. A team zone starts attacks from its heads' marks, so its row holds only the check.
   const swordShown = commanderSeat && (team ? attackerSide : !commanderCardMode || attackerSide)
-  const swordRoom = swordShown ? identityMetrics.icon + identityMetrics.gap : 0
   const rowInk = floodedBy.takeover ? SHADOW_INK : foreground
   const seatIdentity = (
     <SeatIdentity
@@ -671,7 +670,7 @@ export const LifeCard = memo(function LifeCard({
       accessible
       accessibilityLabel={translate("board:counters.seatItem", {
         identity,
-        label: counterValueLabel(system, life),
+        label: counterValueLabel(system, life - held),
       })}
       accessibilityLiveRegion="polite"
       maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
@@ -934,11 +933,8 @@ export const LifeCard = memo(function LifeCard({
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
                 $cornerIdentity,
-                // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
-                commanderSeat &&
-                  typeof identityCorner.position.maxWidth === "number" && {
-                    maxWidth: Math.max(identityCorner.position.maxWidth - swordRoom, 0),
-                  },
+                // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit. The sword sits past it.
+                commanderSeat && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
               {team ? null : commanderDamage ? (

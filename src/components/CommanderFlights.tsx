@@ -86,6 +86,8 @@ export function CommanderFlights({
   const [inbound, setInbound] = useState<ReadonlySet<number>>(NOWHERE)
   const [homeBound, setHomeBound] = useState<number | null>(null)
   const flight = useRef(0)
+  // why: a team zone's check unmounts on Done, so its blades fly home to where they left from.
+  const homes = useRef(new Map<number, Point>())
   const latest = useRef({ rotationOf, color })
   useEffect(() => {
     latest.current = { rotationOf, color }
@@ -120,8 +122,9 @@ export function CommanderFlights({
     if (!back) setShownColor(latest.current.color)
     // why: the defenders' strikes lay out in the commit that arms the attack, so the plan reads them a frame later.
     const frameId = requestAnimationFrame(() => {
-      void measureAll(frame.current, seat, nodes.current).then((spots) => {
+      void measureAll(frame.current, seat, nodes.current, homes.current.get(seat)).then((spots) => {
         if (!spots || run !== flight.current) return
+        homes.current.set(seat, spots.home)
         const planned = plan(spots, seat, latest.current.rotationOf, back)
         if (!planned.length) return
         setBlades(planned)
@@ -180,15 +183,16 @@ async function measureAll(
   frame: View | null,
   seat: number,
   nodes: { home: Map<number, View>; landing: Map<number, View> },
+  lastHome?: Point,
 ): Promise<Spots | null> {
   const home = nodes.home.get(seat)
-  if (!frame || !home) return null
+  if (!frame || (!home && !lastHome)) return null
   const origin = await new Promise<Point>((resolve) =>
     frame.measureInWindow((x, y) => resolve({ x, y })),
   )
   const local = (point: Point | null) =>
     point ? { x: point.x - origin.x, y: point.y - origin.y } : null
-  const homeAt = local(await measureCenter(home))
+  const homeAt = (home && local(await measureCenter(home))) ?? lastHome
   if (!homeAt) return null
   const landings = new Map<number, Point>()
   for (const [landing, node] of nodes.landing) {

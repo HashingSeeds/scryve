@@ -122,6 +122,8 @@ export interface CommanderTakeover {
   disc: number
   // why: a readout too big for the disc shrinks into it while the attack holds the card.
   fit: number
+  // why: a narrow seat's strike shrinks to the room left beside the disc.
+  strike: number
   discOffset: { x: number; y: number }
   cardDiscOffset: { x: number; y: number }
   // why: a hit knocks the card away from the attacker, in the card's own space.
@@ -210,7 +212,7 @@ export function commanderTakeover(input: {
   lifeFontSize: number
   ink: ReadoutInk
   reach?: CommanderReach
-  /** why: room the strike needs to the disc's left in the seat's upright view, kept on both sides so the disc stays centered and its hits have the same room to its right. */
+  /** why: room the strike wants to the disc's left in the seat's upright view, kept on both sides so the disc stays centered and its hits have the same room to its right. A narrow seat gives the strike less, never so little disc that the readout outgrows it; `strike` is the share it got. */
   side?: number
 }): CommanderTakeover {
   const { card, rotation, lifeFontSize, ink, reach, side = 0 } = input
@@ -219,13 +221,10 @@ export function commanderTakeover(input: {
     ? { width: card.height, height: card.width }
     : { width: card.width, height: card.height }
   const needed = (Math.hypot(ink.width, ink.height) / 2 + lifeFontSize * DISC_CLEARANCE) / DISC_FILL
+  const sideRoom = Math.max(DISC_GAP, Math.min(side, content.width / 2 - needed * MIN_FIT))
   const disc = Math.max(
     0,
-    Math.min(
-      needed,
-      content.height / 2 - DISC_GAP - Math.abs(ink.y),
-      content.width / 2 - Math.max(DISC_GAP, side),
-    ),
+    Math.min(needed, content.height / 2 - DISC_GAP - Math.abs(ink.y), content.width / 2 - sideRoom),
   )
   const fit = needed > 0 ? Math.max(MIN_FIT, disc / needed) : 1
   // why: the readout shrinks about the card's center, so its ink center moves in with it.
@@ -239,6 +238,7 @@ export function commanderTakeover(input: {
     content,
     disc,
     fit,
+    strike: side > 0 ? Math.min(1, sideRoom / side) : 1,
     discOffset,
     cardDiscOffset,
     knock: { x: -outward.x, y: -outward.y },
