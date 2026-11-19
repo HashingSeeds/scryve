@@ -229,6 +229,30 @@ describe("searchRules ranking", () => {
     expect(ids("commander tax")).toEqual(["Commander Tax", "903.8", "903.3"])
   })
 
+  it("goes straight to a rule number in either game's format, and finds nothing for punctuation", () => {
+    const fab: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "1",
+          title: "Game Concepts",
+          sections: [
+            {
+              id: "1.0",
+              title: "General",
+              rules: [rule("1.0.1", "Rules."), rule("1.0.1a", "More.")],
+            },
+          ],
+        },
+      ],
+      glossary: [{ term: "Go again", text: "An ability keyword.[8.3.5]" }],
+      notice: [],
+    }
+    expect(
+      searchRules(fab, "1.0.1a").map((result) => result.kind === "rule" && result.rule.id),
+    ).toEqual(["1.0.1a"])
+    expect(searchRules(fab, "???")).toEqual([])
+  })
+
   it("marks the first matched word in an excerpt", () => {
     expect(matchExcerpt("The defending player chooses blockers.", "can my creature block")).toEqual(
       {
@@ -237,5 +261,6 @@ describe("searchRules ranking", () => {
         after: ".",
       },
     )
+    expect(matchExcerpt("Put a +1/+1 counter on it.", "+1/+1 counters").match).toBe("+1/+1")
   })
 })

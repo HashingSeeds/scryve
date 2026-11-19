@@ -32,8 +32,8 @@ const BM25_B = 0.75
 const TYPO_MIN_LENGTH = 5
 // why: words a rule inherits count less than its own, so the subrule that says them is the one a screen's result shows.
 const INHERITED_WEIGHT = 0.5
-const RULE_NUMBER = /^\d+(\.\d*[a-z]*)?$/
-const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9]+/g
+const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
+const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9’']+/gi
 const STOPWORDS = new Set(
   "a an and are as at be but by can could do does did doing for from had has have how i if in into is it its me my of on or our so than that the their them then there these they this to us vs was we were what when where which while who why will with would you your".split(
     " ",
@@ -57,8 +57,12 @@ function stem(word: string) {
   return base.length > 3 && /([b-df-hj-np-tv-z])\1$/.test(base) ? base.slice(0, -1) : base
 }
 
+function normalized(word: string) {
+  return word.toLowerCase().replace(/[’']/g, "")
+}
+
 function words(text: string) {
-  return text.toLowerCase().replace(/[’']/g, "").match(WORD) ?? []
+  return (text.match(WORD) ?? []).map(normalized)
 }
 
 type Postings = { rules: number[]; counts: number[] }
@@ -196,6 +200,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
       .slice(0, limit)
       .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
   const { chosen, stems, partial } = queryWords(needle)
+  if (stems.length === 0) return []
   const lastStem = partial === undefined ? undefined : stem(partial)
   const index = searchIndex(rules)
   const terms: RuleSearchResult[] = index.defined
@@ -288,8 +293,8 @@ function firstMatch(text: string, query: string) {
   if (RULE_NUMBER.test(query)) return undefined
   const { stems, partial } = queryWords(query)
   const lastStem = partial === undefined ? undefined : stem(partial)
-  for (const token of text.matchAll(/[a-z0-9’']+/gi)) {
-    const word = stem(token[0].toLowerCase().replace(/[’']/g, ""))
+  for (const token of text.matchAll(WORD)) {
+    const word = stem(normalized(token[0]))
     if (
       stems.some((wanted) => matchesWord(word, wanted, wanted === lastStem ? partial : undefined))
     )
