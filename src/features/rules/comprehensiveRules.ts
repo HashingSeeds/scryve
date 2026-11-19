@@ -25,6 +25,8 @@ export function findRules(rules: ComprehensiveRules, id: string) {
 
 export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: "rule"; rule: Rule }
 
+const BM25_K1 = 1.2
+const BM25_B = 0.75
 const RULE_NUMBER = /^\d+(\.\d*[a-z]*)?$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9]+/g
 const STOPWORDS = new Set(
@@ -51,7 +53,8 @@ function words(text: string) {
   return text.toLowerCase().replace(/[’']/g, "").match(WORD) ?? []
 }
 
-type SearchIndex = { rules: Rule[]; postings: Map<string, number[]> }
+type Postings = { rules: number[]; counts: number[] }
+type SearchIndex = { rules: Rule[]; postings: Map<string, Postings>; lengths: number[]; average: number }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
 function searchIndex(source: ComprehensiveRules) {
@@ -60,21 +63,26 @@ function searchIndex(source: ComprehensiveRules) {
   const rules = source.chapters.flatMap((chapter) =>
     chapter.sections.flatMap((section) => section.rules),
   )
-  const postings = new Map<string, number[]>()
+  const postings = new Map<string, Postings>()
   const stems = new Map<string, string>()
-  rules.forEach((rule, index) => {
-    const seen = new Set<string>()
-    for (const raw of words(rule.text)) {
+  const lengths = rules.map((rule, index) => {
+    const counts = new Map<string, number>()
+    const raws = words(rule.text)
+    for (const raw of raws) {
       let word = stems.get(raw)
       if (word === undefined) stems.set(raw, (word = stem(raw)))
-      if (seen.has(word)) continue
-      seen.add(word)
-      const list = postings.get(word)
-      if (list) list.push(index)
-      else postings.set(word, [index])
+      counts.set(word, (counts.get(word) ?? 0) + 1)
     }
+    for (const [word, count] of counts) {
+      const list = postings.get(word) ?? { rules: [], counts: [] }
+      if (list.rules.length === 0) postings.set(word, list)
+      list.rules.push(index)
+      list.counts.push(count)
+    }
+    return raws.length
   })
-  const index = { rules, postings }
+  const average = lengths.reduce((sum, length) => sum + length, 0) / Math.max(1, rules.length)
+  const index = { rules, postings, lengths, average }
   indexes.set(source, index)
   return index
 }
@@ -113,11 +121,19 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   const index = searchIndex(rules)
   const scores = new Map<number, number>()
   for (const wanted of stems) {
-    const hit = new Set<number>()
+    const best = new Map<number, number>()
     const prefix = wanted === lastStem ? partial : undefined
-    for (const [word, list] of index.postings)
-      if (matchesWord(word, wanted, prefix)) for (const at of list) hit.add(at)
-    for (const at of hit) scores.set(at, (scores.get(at) ?? 0) + 1)
+    for (const [word, list] of index.postings) {
+      if (!matchesWord(word, wanted, prefix)) continue
+      const idf = Math.log(1 + (index.rules.length - list.rules.length + 0.5) / (list.rules.length + 0.5))
+      list.rules.forEach((at, i) => {
+        const count = list.counts[i]
+        const norm = BM25_K1 * (1 - BM25_B + (BM25_B * index.lengths[at]) / index.average)
+        const score = (idf * count * (BM25_K1 + 1)) / (count + norm)
+        if (score > (best.get(at) ?? 0)) best.set(at, score)
+      })
+    }
+    for (const [at, score] of best) scores.set(at, (scores.get(at) ?? 0) + score)
   }
   const matches: RuleSearchResult[] = [...scores]
     .sort(([a, scoreA], [b, scoreB]) => scoreB - scoreA || a - b)
