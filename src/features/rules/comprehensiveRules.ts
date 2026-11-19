@@ -27,6 +27,8 @@ export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: 
 
 const BM25_K1 = 1.2
 const BM25_B = 0.75
+// why: a rule rarely repeats its section's subject, so the title stands in for it.
+const TITLE_WEIGHT = 3
 const RULE_NUMBER = /^\d+(\.\d*[a-z]*)?$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9]+/g
 const STOPWORDS = new Set(
@@ -60,15 +62,16 @@ const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 function searchIndex(source: ComprehensiveRules) {
   const cached = indexes.get(source)
   if (cached) return cached
-  const rules = source.chapters.flatMap((chapter) =>
-    chapter.sections.flatMap((section) => section.rules),
-  )
+  const sections = source.chapters.flatMap((chapter) => chapter.sections)
+  const rules = sections.flatMap((section) => section.rules)
+  const titles = sections.flatMap((section) => section.rules.map(() => words(section.title)))
   const postings = new Map<string, Postings>()
   const stems = new Map<string, string>()
   const lengths = rules.map((rule, index) => {
     const counts = new Map<string, number>()
     const raws = words(rule.text)
-    for (const raw of raws) {
+    // why: a rule rarely repeats its section's subject, so the title's words count as its own.
+    for (const raw of [...raws, ...titles[index]]) {
       let word = stems.get(raw)
       if (word === undefined) stems.set(raw, (word = stem(raw)))
       counts.set(word, (counts.get(word) ?? 0) + 1)
