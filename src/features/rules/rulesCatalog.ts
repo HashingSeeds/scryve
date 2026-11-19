@@ -24,7 +24,6 @@ export type TextRules = {
 }
 export type GameRules = TextRules | { kind: "link"; pageUrl: string }
 
-// why: search needs each game's slang and citation format, and the rules object is all it receives.
 function searchable(
   rules: ComprehensiveRules | undefined,
   slang: Record<string, string>,

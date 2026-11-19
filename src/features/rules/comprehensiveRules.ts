@@ -30,7 +30,6 @@ export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: 
 const BM25_K1 = 1.2
 const BM25_B = 0.75
 const TYPO_MIN_LENGTH = 5
-// why: words a rule inherits count less than its own, so the subrule that says them is the one a screen's result shows.
 const INHERITED_WEIGHT = 0.5
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
@@ -40,7 +39,6 @@ const STOPWORDS = new Set(
   ),
 )
 
-// why: light suffix stripping so "attacking", "attacks", and "attacked" all meet "attack" without a stemming library.
 function stem(word: string) {
   let base = word
   if (/^.ie[sd]$/.test(base)) base = base.slice(0, -1)
@@ -85,7 +83,6 @@ export function searchIndex(source: ComprehensiveRules) {
   const stems = new Map<string, string>()
   const postings = new Map<string, Postings>()
   const lists = new Map<string, Postings>()
-  // why: each spelling resolves to its stem's postings once, so indexing a word is a push, not a lookup.
   const listsOf = (text: string) =>
     words(text).map((raw) => {
       let list = lists.get(raw)
@@ -99,7 +96,6 @@ export function searchIndex(source: ComprehensiveRules) {
     })
   const texts = new Map(rules.map((rule) => [rule.id, listsOf(rule.text)]))
   const lengths: number[] = []
-  // why: the screens a glossary citation can open, by the id it cites: a section, or a rule with its lettered subrules.
   const screens = new Map<string, number[]>()
   const screenOf = (id: string) => {
     const screen = screens.get(id) ?? []
@@ -114,7 +110,6 @@ export function searchIndex(source: ComprehensiveRules) {
       const baseId = rule.id.replace(/[a-z]+$/, "")
       screenOf(section.id).push(index)
       screenOf(baseId).push(index)
-      // why: a rule rarely repeats the subject of its section or, for a lettered subrule, of its base rule, so those words count as its own.
       for (const [found, weight] of [
         [own, 1],
         [title, INHERITED_WEIGHT],
@@ -138,7 +133,6 @@ export function searchIndex(source: ComprehensiveRules) {
     ]),
   )
   const known = new Set(rules.map((rule) => rule.id))
-  // why: a glossary term names an idea, and the rules it cites are where that idea lives.
   const defined = source.glossary.map((entry) => {
     const cited = source.references
       ? ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")?.id
@@ -161,7 +155,6 @@ function idf(index: SearchIndex, list: Postings | undefined) {
   return Math.log(1 + (index.rules.length - found + 0.5) / (found + 0.5))
 }
 
-// why: the last word may be half typed, so it also matches as a prefix of any indexed word.
 function queryWords(query: string) {
   const typed = words(query)
   const kept = typed.filter((word) => !STOPWORDS.has(word))
@@ -174,7 +167,6 @@ function matchesWord(candidate: string, wanted: string, partial: string | undefi
   return candidate === wanted || (partial !== undefined && candidate.startsWith(partial))
 }
 
-// why: true when one insertion, deletion, substitution, or swap of neighbors turns a into b.
 function oneEditApart(a: string, b: string) {
   if (Math.abs(a.length - b.length) > 1 || a === b) return false
   let start = 0
@@ -213,11 +205,9 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     )
     .map(({ entry }) => ({ kind: "term", entry }))
   const scores = new Map<number, number>()
-  // why: a slang word weighs as one word however many words its meaning takes.
   const weights = new Map(stems.map((word) => [word, 1]))
   for (const meaning of stems.map((word) => index.slang.get(word) ?? []))
     for (const word of meaning) weights.set(word, (weights.get(word) ?? 0) + 1 / meaning.length)
-  // why: a misspelled word the rules never use searches the rules' words one typo away.
   const spelled = new Map<string, Set<string>>()
   for (const raw of chosen) {
     const wanted = stem(raw)
@@ -250,7 +240,6 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     const bonus = term.words.reduce((sum, word) => sum + idf(index, index.postings.get(word)), 0)
     for (const at of term.rules) scores.set(at, (scores.get(at) ?? 0) + bonus)
   }
-  // why: a rule opens on a screen with its lettered subrules, so one result per screen keeps the list from repeating itself.
   const screens = new Set<string>()
   const matches: RuleSearchResult[] = [...scores]
     .sort(([a, scoreA], [b, scoreB]) => scoreB - scoreA || a - b)
@@ -286,7 +275,6 @@ export function adjacentSections(rules: ComprehensiveRules, id: string) {
   return { previous: index > 0 ? sections[index - 1] : undefined, next: sections.at(index + 1) }
 }
 
-// why: search matches words, so the excerpt marks the whole query where the text has it and otherwise the first word it matched.
 function firstMatch(text: string, query: string) {
   const at = text.toLowerCase().indexOf(query)
   if (at >= 0) return { at, length: query.length }
