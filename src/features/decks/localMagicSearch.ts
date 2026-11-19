@@ -16,6 +16,9 @@ const LOCAL_RESULTS = 60
 export type MagicCards = {
   cards: MagicDatasetCard[]
   keys: string[]
+  /** why: one string of every key, so a typed word is found by a native scan instead of 30k `includes` calls. */
+  keyText: string
+  keyStarts: Int32Array
   byName: Map<string, MagicDatasetCard>
   knowsLegality: boolean
 }
@@ -58,9 +61,14 @@ export function parseMagicCards(text: string): MagicCards {
     (card, index, all) => index === 0 || compareCardNames(all[index - 1], card) <= 0,
   )
   const cards = sorted ? dataset.cards : dataset.cards.sort(compareCardNames)
+  const keys = cards.map((card) => matchKey(card.name))
+  const keyStarts = new Int32Array(keys.length + 1)
+  keys.forEach((key, index) => (keyStarts[index + 1] = keyStarts[index] + key.length + 1))
   return {
     cards,
-    keys: cards.map((card) => matchKey(card.name)),
+    keys,
+    keyText: keys.join("\n"),
+    keyStarts,
     byName: new Map(cards.map((card) => [card.name, card])),
     knowsLegality: cards.some((card) => card.legalFormats !== undefined),
   }
@@ -91,6 +99,30 @@ export function readsOnDevice(
   )
 }
 
+function cardsHoldingWords(magicCards: MagicCards, words: string[], search: MagicSearch) {
+  const { cards, keys, keyText, keyStarts } = magicCards
+  const found: MagicDatasetCard[] = []
+  const keep = (index: number) => {
+    if (words.every((word) => keys[index].includes(word)) && matchesSearch(cards[index], search))
+      found.push(cards[index])
+  }
+  const longest = words.reduce((best, word) => (word.length > best.length ? word : best), "")
+  if (!longest) {
+    for (let index = 0; index < cards.length && found.length < LOCAL_RESULTS; index++) keep(index)
+    return found
+  }
+  let index = 0
+  for (
+    let at = keyText.indexOf(longest);
+    at >= 0 && found.length < LOCAL_RESULTS;
+    at = keyText.indexOf(longest, keyStarts[index])
+  ) {
+    while (keyStarts[index + 1] <= at) index++
+    keep(index++)
+  }
+  return found
+}
+
 export function localMagicSearch(
   magicCards: MagicCards | undefined,
   nameIndex: CardNameIndex | undefined,
@@ -110,11 +142,5 @@ export function localMagicSearch(
   )
     .flatMap((name) => magicCards.byName.get(name) ?? [])
     .filter((card) => matchesSearch(card, search))
-  const found: MagicDatasetCard[] = []
-  for (const [index, card] of magicCards.cards.entries()) {
-    if (found.length === LOCAL_RESULTS) break
-    if (words.every((word) => magicCards.keys[index].includes(word)) && matchesSearch(card, search))
-      found.push(card)
-  }
-  return { named, found }
+  return { named, found: cardsHoldingWords(magicCards, words, search) }
 }
