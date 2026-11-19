@@ -420,7 +420,6 @@ export function PlayerGrid({
   const armedIndex = armedPlayer ? players.indexOf(armedPlayer) : -1
   // why: a team zone is one card, seated under its lead, whichever head attacks.
   const armedCard = teamIndexes.find((team) => team.includes(armedIndex))?.[0] ?? armedIndex
-  // why: a team zone is one card, so the shadow grows from the whole attacking zone and must cover the whole defending zone.
   const reachGrid = teams
     ? { gridRows: rows, rowFlexes }
     : { gridRows: seatedRows, rowFlexes: seatedRowFlexes }
