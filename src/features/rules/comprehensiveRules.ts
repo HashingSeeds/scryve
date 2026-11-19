@@ -281,15 +281,33 @@ export function adjacentSections(rules: ComprehensiveRules, id: string) {
   return { previous: index > 0 ? sections[index - 1] : undefined, next: sections.at(index + 1) }
 }
 
+// why: search matches words, so the excerpt marks the whole query where the text has it and otherwise the first word it matched.
+function firstMatch(text: string, query: string) {
+  const at = text.toLowerCase().indexOf(query)
+  if (at >= 0) return { at, length: query.length }
+  if (RULE_NUMBER.test(query)) return undefined
+  const { stems, partial } = queryWords(query)
+  const lastStem = partial === undefined ? undefined : stem(partial)
+  for (const token of text.matchAll(/[a-z0-9’']+/gi)) {
+    const word = stem(token[0].toLowerCase().replace(/[’']/g, ""))
+    if (
+      stems.some((wanted) => matchesWord(word, wanted, wanted === lastStem ? partial : undefined))
+    )
+      return { at: token.index, length: token[0].length }
+  }
+  return undefined
+}
+
 export function matchExcerpt(text: string, query: string, lead = 60) {
   const needle = query.trim().toLowerCase()
-  const at = needle ? text.toLowerCase().indexOf(needle) : -1
-  if (at < 0) return { before: text, match: "", after: "" }
+  const found = needle ? firstMatch(text, needle) : undefined
+  if (!found) return { before: text, match: "", after: "" }
+  const { at, length } = found
   const space = text.indexOf(" ", at - lead)
   const start = at > lead && space >= 0 && space < at ? space + 1 : 0
   return {
     before: `${start > 0 ? "…" : ""}${text.slice(start, at)}`,
-    match: text.slice(at, at + needle.length),
-    after: text.slice(at + needle.length),
+    match: text.slice(at, at + length),
+    after: text.slice(at + length),
   }
 }
