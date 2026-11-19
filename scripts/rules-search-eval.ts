@@ -29,7 +29,7 @@ const FLOOR = { mtg: 29, fab: 18 }
 type System = keyof typeof FLOOR
 // why: a phone runs search several times slower than CI, and it runs on every keystroke.
 const P95_BUDGET_MS = 10
-const DEEP = 5
+const TOP = 3
 const CACHE_HOURS = 12
 
 const { values } = parseArgs({
@@ -100,7 +100,7 @@ async function evaluate(system: System, file: string) {
   const bySource = new Map<Source, { passed: number; total: number }>()
   const misses: string[] = []
   let passed = 0
-  let deep = 0
+  let inTop = 0
   let empty = 0
   for (const entry of cases) {
     let results: RuleSearchResult[] = []
@@ -117,7 +117,7 @@ async function evaluate(system: System, file: string) {
     const tally = bySource.get(entry.source) ?? { passed: 0, total: 0 }
     bySource.set(entry.source, { passed: tally.passed + (hit ? 1 : 0), total: tally.total + 1 })
     if (hit) passed++
-    if (rank >= 0 && rank < DEEP) deep++
+    if (rank >= 0 && rank < TOP) inTop++
     if (results.length === 0) empty++
     if (!hit) {
       const got = results
@@ -132,7 +132,7 @@ async function evaluate(system: System, file: string) {
   const sorted = timings.toSorted((a, b) => a - b)
   const p95 = percentile(sorted, 0.95)
   console.log(
-    `${system}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${DEEP} ${percent(deep, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
+    `${system}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
   )
   console.log(
     `  ${[...bySource].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}`,
