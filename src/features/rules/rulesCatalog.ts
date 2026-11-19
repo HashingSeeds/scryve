@@ -3,6 +3,7 @@ import type { ComprehensiveRules } from "./comprehensiveRules"
 import { FAB_RULE_REFERENCE, parseFabRules } from "./fabRules"
 import { magicKeyword, type KeywordRule } from "./magicKeywords"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
+import { FAB_SLANG, MAGIC_SLANG } from "./slang"
 import type { SYSTEMS, SystemId } from "../../../convex/lib/systems"
 
 type MagicTable = (typeof SYSTEMS)["mtg"]["table"]
@@ -23,6 +24,10 @@ export type TextRules = {
 }
 export type GameRules = TextRules | { kind: "link"; pageUrl: string }
 
+function withSlang(rules: ComprehensiveRules | undefined, slang: Record<string, string>) {
+  return rules && { ...rules, slang }
+}
+
 export const GAME_RULES = {
   mtg: {
     kind: "text",
@@ -30,7 +35,7 @@ export const GAME_RULES = {
     pageUrl: "https://magic.wizards.com/en/rules",
     publisher: "Wizards of the Coast",
     cacheKey: "scryve.rules",
-    parse: parseMagicRules,
+    parse: (text) => withSlang(parseMagicRules(text), MAGIC_SLANG),
     references: MAGIC_RULE_REFERENCE,
     keyword: magicKeyword,
     tableItemRules: {
@@ -50,7 +55,7 @@ export const GAME_RULES = {
     pageUrl: "https://rules.fabtcg.com/en/",
     publisher: "Legend Story Studios",
     cacheKey: "scryve.rules.fab",
-    parse: parseFabRules,
+    parse: (text) => withSlang(parseFabRules(text), FAB_SLANG),
     references: FAB_RULE_REFERENCE,
     revalidate: true,
     tableItemRules: { marked: "9.3" } satisfies Partial<Record<FabTableItemId, string>>,

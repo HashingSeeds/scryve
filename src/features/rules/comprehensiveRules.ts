@@ -7,6 +7,7 @@ export type ComprehensiveRules = {
   chapters: RuleChapter[]
   glossary: GlossaryEntry[]
   notice: string[]
+  slang?: Readonly<Record<string, string>>
 }
 
 export function findRules(rules: ComprehensiveRules, id: string) {
@@ -56,7 +57,13 @@ function words(text: string) {
 }
 
 type Postings = { rules: number[]; counts: number[] }
-type SearchIndex = { rules: Rule[]; postings: Map<string, Postings>; lengths: number[]; average: number }
+type SearchIndex = {
+  rules: Rule[]
+  postings: Map<string, Postings>
+  lengths: number[]
+  average: number
+  slang: Map<string, string[]>
+}
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
 function searchIndex(source: ComprehensiveRules) {
@@ -85,7 +92,10 @@ function searchIndex(source: ComprehensiveRules) {
     return raws.length
   })
   const average = lengths.reduce((sum, length) => sum + length, 0) / Math.max(1, rules.length)
-  const index = { rules, postings, lengths, average }
+  const slang = new Map(
+    Object.entries(source.slang ?? {}).map(([word, meaning]) => [stem(word), words(meaning).map(stem)]),
+  )
+  const index = { rules, postings, lengths, average, slang }
   indexes.set(source, index)
   return index
 }
@@ -123,7 +133,11 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     .map((entry) => ({ kind: "term", entry }))
   const index = searchIndex(rules)
   const scores = new Map<number, number>()
-  for (const wanted of stems) {
+  // why: a slang word weighs as one word however many words its meaning takes.
+  const weights = new Map(stems.map((word) => [word, 1]))
+  for (const meaning of stems.map((word) => index.slang.get(word) ?? []))
+    for (const word of meaning) weights.set(word, (weights.get(word) ?? 0) + 1 / meaning.length)
+  for (const [wanted, weight] of weights) {
     const best = new Map<number, number>()
     const prefix = wanted === lastStem ? partial : undefined
     for (const [word, list] of index.postings) {
@@ -132,7 +146,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
         const norm = BM25_K1 * (1 - BM25_B + (BM25_B * index.lengths[at]) / index.average)
-        const score = (idf * count * (BM25_K1 + 1)) / (count + norm)
+        const score = (weight * idf * count * (BM25_K1 + 1)) / (count + norm)
         if (score > (best.get(at) ?? 0)) best.set(at, score)
       })
     }
