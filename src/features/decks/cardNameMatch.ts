@@ -7,7 +7,7 @@ const TYPED_SHORTLIST_SIZE = 300
 const MIN_TYPED_SIMILARITY = 0.6
 const WORD_START_WEIGHT = 0.95
 const PART_WORD_WEIGHT = 0.97
-const ANY_ORDER_WEIGHT = 0.9
+const GOOD_IN_ORDER = 0.9
 
 export type CardNameIndex = {
   names: string[]
@@ -113,14 +113,14 @@ function endsOnWholeWord(face: string, end: number) {
   return face[end] === " " && !possessive
 }
 
-function bestSliceSimilarity(query: string, face: string) {
+function bestSliceSimilarity(query: string, face: string, laterWordWeight = WORD_START_WEIGHT) {
   let best = 0
   for (let start = 0; start < face.length; start++) {
     if (start > 0 && face[start - 1] !== " ") continue
     const end = start + query.length
     const score =
       similarity(query, face.slice(start, end)) *
-      (start ? WORD_START_WEIGHT : 1) *
+      (start ? laterWordWeight : 1) *
       (endsOnWholeWord(face, end) ? 1 : PART_WORD_WEIGHT)
     if (score > best) best = score
   }
@@ -132,10 +132,10 @@ function anyOrderSimilarity(words: string[], face: string) {
   let matched = 0
   let letters = 0
   for (const word of words) {
-    matched += bestSliceSimilarity(word, face) * word.length
+    matched += bestSliceSimilarity(word, face, 1) * word.length
     letters += word.length
   }
-  return (matched / letters) * ANY_ORDER_WEIGHT
+  return matched / letters
 }
 
 function typedSimilarity(query: string, face: string) {
@@ -192,7 +192,7 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
   }
   // why: scoring words out of order costs a pass per word, so it runs only when no name matches in order.
   const words = key.split(" ")
-  if (typed && words.length > 1 && best < ANY_ORDER_WEIGHT)
+  if (typed && words.length > 1 && best < GOOD_IN_ORDER)
     for (const faceIndex of shortlist)
       keep(faceIndex, anyOrderSimilarity(words, index.faces[faceIndex].key))
   return [...bestByName]

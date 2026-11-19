@@ -89,8 +89,14 @@ describe("searchCardNames", () => {
     ["a whole word over a longer word it starts", "swords", "Swords to Plowshares"],
     ["a legend over a card named for it", "sheoldred", "Sheoldred, the Apocalypse"],
     ["a name typed with its words out of order", "plowshares swords", "Swords to Plowshares"],
+    ["every typed word over a closer start", "lightning arc", "Arc Lightning"],
   ])("ranks %s", (_case, query, name) => {
-    const words = cardNameIndex(["Swordsman's Steel", "Sheoldred's Edict", name])
+    const words = cardNameIndex([
+      "Swordsman's Steel",
+      "Sheoldred's Edict",
+      "Lightning, Army of One",
+      name,
+    ])
     expect(searchCardNames(words, query, 3)[0]).toBe(name)
   })
 
