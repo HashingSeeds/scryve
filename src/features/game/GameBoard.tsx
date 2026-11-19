@@ -49,7 +49,7 @@ export interface BoardChromeOptions {
   }
   teams?: readonly (readonly string[])[]
   petals: readonly [BoardPetal, BoardPetal]
-  attack: Pick<CommanderAttack, "dispatch">
+  attack: Pick<CommanderAttack, "armedPlayerId">
   onDiceTool?: () => void
   onLog?: () => void
   signal?: GameMenuSignal
@@ -72,7 +72,7 @@ export function useBoardChrome({
   layout,
   petals: [third, end],
   teams,
-  attack: { dispatch },
+  attack: { armedPlayerId },
   onDiceTool,
   onLog,
   signal,
@@ -115,21 +115,15 @@ export function useBoardChrome({
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const closeLayout = useCallback(() => setLayoutOpen(false), [])
-  // why: the menu pauses a commander attack; a petal that takes over or leaves the board finishes it first, sending held hits.
-  const finishAttack = useCallback(() => dispatch({ type: "send" }), [dispatch])
   const fromMenu = useCallback(
-    (run: () => void, { keepsAttack = false } = {}) =>
-      (event?: GestureResponderEvent) => {
-        setDialogOrigin(
-          event?.nativeEvent
-            ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
-            : undefined,
-        )
-        setMenuOpen(false)
-        if (!keepsAttack) finishAttack()
-        run()
-      },
-    [finishAttack],
+    (run: () => void) => (event?: GestureResponderEvent) => {
+      setDialogOrigin(
+        event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
+      )
+      setMenuOpen(false)
+      run()
+    },
+    [],
   )
   const pressThird = stable("third", third.onPress)
   const pressEnd = stable("end", end.onPress)
@@ -162,7 +156,7 @@ export function useBoardChrome({
         ? {
             kind: "rules",
             label: translate("board:menu.rules"),
-            onPress: fromMenu(showRules, { keepsAttack: true }),
+            onPress: fromMenu(showRules),
           }
         : {
             kind: "decks",
@@ -188,7 +182,11 @@ export function useBoardChrome({
     ],
   )
 
-  const toggleMenu = useCallback(() => setMenuOpen((current) => !current), [])
+  // why: an open attack ends only at its own check, so the pentagon sits it out rather than pausing it.
+  const attacking = !!armedPlayerId
+  const toggleMenu = useCallback(() => {
+    if (!attacking) setMenuOpen((current) => !current)
+  }, [attacking])
   const pressStatus = stable("status", () => {
     setMenuOpen(false)
     statusLine?.onPress()
@@ -229,8 +227,6 @@ export function useBoardChrome({
             onSettings,
             onSupport,
             onAccount,
-            // why: every app destination leaves the board, Update app and Events included.
-            onChoose: finishAttack,
           }
         : undefined,
   }

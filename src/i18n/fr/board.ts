@@ -388,12 +388,11 @@ export default {
     raisePowerOf: "Augmenter la force de {{name}}",
     lowerPowerOf: "Diminuer la force de {{name}}",
     unnamed: "Commandant",
+    unnamedPartner: "Partenaire",
     totalFrom: "{{damage}} blessures de commandant infligées par {{name}}",
     amountFrom: "{{amount}} de {{name}}",
     unknownAttacker: "Commandant",
     assignFrom: "Attribuer des blessures de commandant infligées par {{identity}}",
-    assignFromWithDamage:
-      "Attribuer des blessures de commandant infligées par {{identity}}. Subies : {{sources}}",
     assignFromStale: "Attribuer des blessures de commandant infligées par {{identity}}, pas à jour",
   },
   outReason: {

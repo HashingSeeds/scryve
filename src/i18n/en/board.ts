@@ -456,13 +456,12 @@ const board = {
     lowerPowerOf: "Lower {{name}}'s power",
     // Shown dimmed in place of the commander's name when the seat has no deck.
     unnamed: "Commander",
+    // Shown in place of the second commander's name when the seat has no deck: the partner that can join the attack.
+    unnamedPartner: "Partner",
     totalFrom: "{{damage}} commander damage from {{name}}",
     amountFrom: "{{amount}} from {{name}}",
     unknownAttacker: "Commander",
     assignFrom: "Assign commander damage from {{identity}}",
-    // {{sources}} lists the commander damage this seat has taken, such as "6 from Ana, 3 from Ben".
-    // ko: Match its sibling labels: '{{identity}}의 커맨더 피해 지정. 받은 피해: {{sources}}'.
-    assignFromWithDamage: "Assign commander damage from {{identity}}. Taken: {{sources}}",
     // fr: Out of date: "pas à jour", never périmé.
     assignFromStale: "Assign commander damage from {{identity}}, out of date",
   },

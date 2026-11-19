@@ -392,11 +392,11 @@ export default {
     raisePowerOf: "Subir la fuerza de {{name}}",
     lowerPowerOf: "Bajar la fuerza de {{name}}",
     unnamed: "Comandante",
+    unnamedPartner: "Compañero",
     totalFrom: "{{damage}} de daño de comandante de {{name}}",
     amountFrom: "{{amount}} de {{name}}",
     unknownAttacker: "Comandante",
     assignFrom: "Asignar daño de comandante desde {{identity}}",
-    assignFromWithDamage: "Asignar daño de comandante desde {{identity}}. Recibido: {{sources}}",
     assignFromStale: "Asignar daño de comandante desde {{identity}}, desactualizado",
   },
   outReason: {

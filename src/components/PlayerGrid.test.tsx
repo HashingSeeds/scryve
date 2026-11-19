@@ -558,53 +558,56 @@ describe("PlayerGrid", () => {
       armFirstSeat(view)
       expect(view.getByTestId("commander-power-seat-1")).toHaveTextContent("2")
       // why: the second partner starts at its printed power but sat out, so a fresh attack lands on one commander.
+      const sitting = view.getByTestId("commander-sit-seat-1-partner")
+      expect(sitting).toHaveTextContent("4Kraum")
+      expect(sitting).toHaveProp("accessibilityState", { checked: false })
+      fireEvent.press(sitting)
       expect(view.getByTestId("commander-power-seat-1-partner")).toHaveTextContent("4")
-      expect(view.getByTestId("commander-sit-seat-1-partner")).toHaveProp("accessibilityState", {
-        checked: false,
-      })
 
       view.rerender(grid(true))
       expect(view.queryByTestId("commander-power-seat-1-partner")).toBeNull()
+      expect(view.queryByTestId("commander-sit-seat-1-partner")).toBeNull()
     } finally {
       partners.mockRestore()
     }
   })
 
-  it("pulses the targets until the attacker hits one, then pulses the attacker's mark to finish", () => {
+  it("gives a seat with no commander a Commander box and a sat-out Partner, and one box where the game has one slot", () => {
+    const grid = (singleCommander?: boolean) => (
+      <ThemeProvider>
+        <CommanderGrid
+          players={players(2)}
+          singleCommander={singleCommander}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(grid())
+    armFirstSeat(view)
+    expect(view.getByTestId("commander-name-seat-1")).toHaveTextContent("Commander")
+    expect(view.getByTestId("commander-sit-seat-1-partner")).toHaveTextContent("1Partner")
+
+    view.rerender(grid(true))
+    expect(view.queryByTestId("commander-sit-seat-1-partner")).toBeNull()
+  })
+
+  it("lays a hit circle by each defender's disc per hit it took, and no undo before one lands", () => {
     const view = render(
       <ThemeProvider>
         <CommanderGrid players={players(3)} onChange={jest.fn()} />
       </ThemeProvider>,
     )
-    const pulsing = () =>
-      ["commander-target-pulse-seat-2", "commander-target-pulse-seat-3"].filter((id) =>
-        view.queryByTestId(id),
-      )
-
+    for (const card of view.getAllByTestId(/^life-card-seat-/))
+      fireEvent(card, "layout", { nativeEvent: { layout: { width: 193, height: 420 } } })
     armFirstSeat(view)
-    expect(pulsing()).toHaveLength(2)
-    expect(
-      view.queryByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
-    ).toBeNull()
-    expect(
-      view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
-    ).toBeTruthy()
+    expect(view.getByTestId("commander-finish-seat-1")).toBeTruthy()
+    expect(view.queryAllByTestId("commander-hit-coin-seat-2")).toHaveLength(0)
+    expect(view.queryByTestId("commander-undo-seat-2")).toBeNull()
 
     fireEvent.press(view.getByTestId("commander-hit-seat-2"))
-    expect(pulsing()).toHaveLength(0)
-    expect(
-      view.getByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
-    ).toBeTruthy()
-    expect(
-      view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
-    ).toBeTruthy()
-
-    fireEvent.press(view.getByTestId("commander-exit-seat-1"))
-    armFirstSeat(view)
-    expect(pulsing()).toHaveLength(2)
-    expect(
-      view.queryByTestId("commander-finish-pulse-seat-1", { includeHiddenElements: true }),
-    ).toBeNull()
+    fireEvent.press(view.getByTestId("commander-hit-seat-2"))
+    expect(view.getAllByTestId("commander-hit-coin-seat-2")).toHaveLength(2)
+    expect(view.queryAllByTestId("commander-hit-coin-seat-3")).toHaveLength(0)
   })
 
   it.each([-90, 90])(

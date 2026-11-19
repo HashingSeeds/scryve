@@ -413,11 +413,11 @@ export default {
     raisePowerOf: "زيادة قوة {{name}}",
     lowerPowerOf: "تقليل قوة {{name}}",
     unnamed: "القائد",
+    unnamedPartner: "الشريك",
     totalFrom: "ضرر القائد {{damage}} من {{name}}",
     amountFrom: "{{amount}} من {{name}}",
     unknownAttacker: "القائد",
     assignFrom: "تعيين ضرر القائد من {{identity}}",
-    assignFromWithDamage: "تعيين ضرر القائد من {{identity}}. المأخوذ: {{sources}}",
     assignFromStale: "تعيين ضرر القائد من {{identity}}، قديم",
   },
   outReason: {
