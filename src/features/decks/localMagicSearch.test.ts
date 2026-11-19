@@ -186,3 +186,23 @@ test("leaves every search to Scryfall until the card file loads", () => {
 test("a malformed card file is refused", () => {
   expect(() => parseMagicCards(JSON.stringify({ version: "1", cards: [{ name: 1 }] }))).toThrow()
 })
+
+test("the rarer card comes first among names that match equally", () => {
+  const cards = parseMagicCards(
+    JSON.stringify({
+      version: "1",
+      cards: [
+        card("Rhystic Cave", { rarity: "uncommon" }),
+        card("Rhystic Study", { rarity: "rare" }),
+      ],
+    }),
+  )
+  const found = localMagicSearch(cards, cardNameIndex(cards.cards.map((c) => c.name)), {
+    text: "rhystic",
+    commander: false,
+    colors: [],
+    colorMatch: "exact",
+    filters: {},
+  })
+  expect(found?.named.map((c) => c.name)).toEqual(["Rhystic Study", "Rhystic Cave"])
+})

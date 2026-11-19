@@ -6,6 +6,8 @@ const MIN_LEAD_OVER_RUNNER_UP = 0.05
 const TYPED_SHORTLIST_SIZE = 300
 const MIN_TYPED_SIMILARITY = 0.6
 const WORD_START_WEIGHT = 0.95
+const PART_WORD_WEIGHT = 0.97
+const GOOD_IN_ORDER = 0.9
 
 export type CardNameIndex = {
   names: string[]
@@ -40,17 +42,28 @@ function trigrams(key: string) {
   return grams
 }
 
+let previousRow = new Int32Array(64)
+let currentRow = new Int32Array(64)
+
 function similarity(a: string, b: string) {
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index)
+  if (previousRow.length <= b.length) {
+    previousRow = new Int32Array(b.length * 2)
+    currentRow = new Int32Array(b.length * 2)
+  }
+  let previous = previousRow
+  let current = currentRow
+  for (let j = 0; j <= b.length; j++) previous[j] = j
   for (let i = 1; i <= a.length; i++) {
-    const current = [i]
-    for (let j = 1; j <= b.length; j++)
-      current[j] = Math.min(
-        previous[j] + 1,
-        current[j - 1] + 1,
-        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
-      )
-    previous = current
+    current[0] = i
+    const letter = a.charCodeAt(i - 1)
+    for (let j = 1; j <= b.length; j++) {
+      const replace = previous[j - 1] + (letter === b.charCodeAt(j - 1) ? 0 : 1)
+      const remove = previous[j] + 1
+      const insert = current[j - 1] + 1
+      current[j] =
+        replace < remove ? (replace < insert ? replace : insert) : remove < insert ? remove : insert
+    }
+    ;[previous, current] = [current, previous]
   }
   return 1 - previous[b.length] / Math.max(a.length, b.length, 1)
 }
@@ -91,46 +104,92 @@ export function catalogNameIndex(catalog: { names: string; alternateNames: strin
   return cardNameIndex(catalog.names.split("\n"), alternates)
 }
 
-function typedSimilarity(query: string, face: string) {
-  let best = similarity(query, face)
+function endsOnWholeWord(face: string, end: number) {
+  if (end === face.length) return true
+  const possessive =
+    face.startsWith(" s", end) && (end + 2 === face.length || face[end + 2] === " ")
+  return face[end] === " " && !possessive
+}
+
+function bestSliceSimilarity(query: string, face: string, laterWordWeight = WORD_START_WEIGHT) {
+  let best = 0
   for (let start = 0; start < face.length; start++) {
     if (start > 0 && face[start - 1] !== " ") continue
+    const end = start + query.length
     const score =
-      similarity(query, face.slice(start, start + query.length)) * (start ? WORD_START_WEIGHT : 1)
+      similarity(query, face.slice(start, end)) *
+      (start ? laterWordWeight : 1) *
+      (endsOnWholeWord(face, end) ? 1 : PART_WORD_WEIGHT)
     if (score > best) best = score
   }
   return best
+}
+
+function anyOrderSimilarity(words: string[], face: string) {
+  let matched = 0
+  let letters = 0
+  for (const word of words) {
+    matched += bestSliceSimilarity(word, face, 1) * word.length
+    letters += word.length
+  }
+  return matched / letters
+}
+
+function typedSimilarity(query: string, face: string) {
+  return Math.max(similarity(query, face), bestSliceSimilarity(query, face))
 }
 
 function rankedNames(index: CardNameIndex, line: string, typed = false) {
   const key = matchKey(line)
   if (key.length < 3) return []
   const lineTrigrams = trigrams(key)
-  const sharedTrigrams = new Map<number, number>()
+  const shared = new Uint16Array(index.faces.length)
+  const touched: number[] = []
   for (const gram of lineTrigrams)
     for (const faceIndex of index.facesByTrigram.get(gram) ?? [])
-      sharedTrigrams.set(faceIndex, (sharedTrigrams.get(faceIndex) ?? 0) + 1)
-  const overlap = (faceIndex: number, shared: number) =>
-    typed
-      ? shared / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4
-      : shared / (lineTrigrams.size + index.faces[faceIndex].trigramCount - shared)
+      if (shared[faceIndex]++ === 0) touched.push(faceIndex)
+  const shortlistSize = typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE
+  let candidates = touched
+  if (typed) {
+    const facesSharing = new Uint32Array(lineTrigrams.size + 1)
+    for (const faceIndex of touched) facesSharing[shared[faceIndex]]++
+    let minShared = lineTrigrams.size
+    let count = facesSharing[minShared]
+    while (minShared > 1 && count < shortlistSize) count += facesSharing[--minShared]
+    candidates = touched.filter((faceIndex) => shared[faceIndex] >= minShared)
+  }
+  const overlap = new Float64Array(index.faces.length)
+  for (const faceIndex of candidates)
+    overlap[faceIndex] = typed
+      ? shared[faceIndex] / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4
+      : shared[faceIndex] /
+        (lineTrigrams.size + index.faces[faceIndex].trigramCount - shared[faceIndex])
   const bestByName = new Map<
     number,
     { similarity: number; wholeName: boolean; face: string; printedName?: string }
   >()
-  for (const [faceIndex] of [...sharedTrigrams]
-    .sort((a, b) => overlap(b[0], b[1]) - overlap(a[0], a[1]))
-    .slice(0, typed ? TYPED_SHORTLIST_SIZE : SHORTLIST_SIZE)) {
+  const shortlist = candidates.sort((a, b) => overlap[b] - overlap[a]).slice(0, shortlistSize)
+  const keep = (faceIndex: number, similarity: number) => {
     const face = index.faces[faceIndex]
-    const score = {
-      similarity: typed ? typedSimilarity(key, face.key) : similarity(key, face.key),
-      wholeName: face.wholeName,
-      face: face.key,
-      printedName: face.printedName,
-    }
     const current = bestByName.get(face.nameIndex)
-    if (!current || score.similarity > current.similarity) bestByName.set(face.nameIndex, score)
+    if (!current || similarity > current.similarity)
+      bestByName.set(face.nameIndex, {
+        similarity,
+        wholeName: face.wholeName,
+        face: face.key,
+        printedName: face.printedName,
+      })
   }
+  let best = 0
+  for (const faceIndex of shortlist) {
+    const score = (typed ? typedSimilarity : similarity)(key, index.faces[faceIndex].key)
+    best = Math.max(best, score)
+    keep(faceIndex, score)
+  }
+  const words = key.split(" ")
+  if (typed && words.length > 1 && best < GOOD_IN_ORDER)
+    for (const faceIndex of shortlist)
+      keep(faceIndex, anyOrderSimilarity(words, index.faces[faceIndex].key))
   return [...bestByName]
     .map(([nameIndex, score]) => ({ nameIndex, ...score }))
     .sort((a, b) => b.similarity - a.similarity || Number(b.wholeName) - Number(a.wholeName))
@@ -181,14 +240,28 @@ export function closestNamesFromCardTop(
     .map(([nameIndex]) => index.names[nameIndex])
 }
 
-export function searchCardNames(index: CardNameIndex, query: string, limit: number) {
+export function searchCardNames(
+  index: CardNameIndex,
+  query: string,
+  limit: number,
+  preference?: (name: string) => number,
+) {
+  const key = matchKey(query)
   return rankedNames(index, query, true)
     .filter((match) => match.similarity >= MIN_TYPED_SIMILARITY)
+    .map((match) => {
+      const name = index.names[match.nameIndex]
+      const exact = match.wholeName && match.face === key
+      return { ...match, name, exact, preference: preference?.(name) ?? 0 }
+    })
     .sort(
       (a, b) =>
+        Number(b.exact) - Number(a.exact) ||
         b.similarity - a.similarity ||
-        index.names[a.nameIndex].length - index.names[b.nameIndex].length,
+        Number(b.wholeName) - Number(a.wholeName) ||
+        b.preference - a.preference ||
+        a.name.length - b.name.length,
     )
     .slice(0, limit)
-    .map(({ nameIndex }) => index.names[nameIndex])
+    .map(({ name }) => name)
 }

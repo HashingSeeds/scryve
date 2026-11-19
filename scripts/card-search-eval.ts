@@ -19,8 +19,8 @@ import {
 type Source = "app" | "web" | "written"
 type Case = { query: string; cards: string[]; source: Source; asked?: string }
 
-const FLOOR = 224
-const P95_BUDGET_MS = 25
+const FLOOR = 234
+const P95_BUDGET_MS = 10
 const TOP = 3
 const CACHE_HOURS = 12
 // why: Scryfall asks API clients to wait 50 to 100ms between requests.
