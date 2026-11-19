@@ -76,6 +76,41 @@ describe("parseFabRules", () => {
     expect(searchRules(rules!, "additional")[0]).toMatchObject({ kind: "term" })
   })
 
+  it("reads the unnumbered preface and glossary published since November 2026", () => {
+    const current = parseFabRules(
+      [
+        "﻿Preface",
+        "The version of this document is in the form MAJOR.MINOR.PATCH.",
+        "1 Game Concepts",
+        "1.0 General",
+        "1.0.1 The rules in this document apply to any game of Flesh and Blood.",
+        "Glossary",
+        "(1H)",
+        "A subtype of a weapon object that is equipped to a weapon zone.[8.2.1]",
+        "Copy",
+        "See Become.",
+        "Weapon ",
+        "type: A type of object that can be equipped to a weapon zone.[8.1.9] ",
+        "zone: A public zone that contains up to one weapon.[3.16]",
+        "Zone",
+        "A named collection of cards.[3]",
+      ].join("\r\n"),
+    )
+    expect(current?.chapters.map((chapter) => chapter.id)).toEqual(["1"])
+    expect(current?.glossary).toEqual([
+      {
+        term: "(1H)",
+        text: "A subtype of a weapon object that is equipped to a weapon zone.[8.2.1]",
+      },
+      { term: "Copy", text: "See Become." },
+      {
+        term: "Weapon",
+        text: "type: A type of object that can be equipped to a weapon zone.[8.1.9]\nzone: A public zone that contains up to one weapon.[3.16]",
+      },
+      { term: "Zone", text: "A named collection of cards.[3]" },
+    ])
+  })
+
   it("rejects a page that is not the rules", () => {
     expect(parseFabRules("<html>Not found</html>")).toBeUndefined()
   })
