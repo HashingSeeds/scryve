@@ -25,16 +25,103 @@ export function findRules(rules: ComprehensiveRules, id: string) {
 
 export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: "rule"; rule: Rule }
 
+const RULE_NUMBER = /^\d+(\.\d*[a-z]*)?$/
+const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9]+/g
+const STOPWORDS = new Set(
+  "a an and are as at be but by can could do does did doing for from had has have how i if in into is it its me my of on or our so than that the their them then there these they this to us vs was we were what when where which while who why will with would you your".split(
+    " ",
+  ),
+)
+
+// why: light suffix stripping so "attacking", "attacks", and "attacked" all meet "attack" without a stemming library.
+function stem(word: string) {
+  let base = word
+  if (base.length > 4 && base.endsWith("ies")) base = `${base.slice(0, -3)}y`
+  else if (base.length > 3 && base.endsWith("s") && !/(ss|us|is)$/.test(base)) base = base.slice(0, -1)
+  for (const suffix of ["ing", "ed"])
+    if (base.length > suffix.length + 2 && base.endsWith(suffix)) {
+      base = base.slice(0, -suffix.length)
+      if (/([b-df-hj-np-tv-z])\1$/.test(base) && !/(ll|ss|ff)$/.test(base)) base = base.slice(0, -1)
+      break
+    }
+  return base.length > 3 && base.endsWith("e") ? base.slice(0, -1) : base
+}
+
+function words(text: string) {
+  return text.toLowerCase().replace(/[’']/g, "").match(WORD) ?? []
+}
+
+type SearchIndex = { rules: Rule[]; postings: Map<string, number[]> }
+const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
+
+function searchIndex(source: ComprehensiveRules) {
+  const cached = indexes.get(source)
+  if (cached) return cached
+  const rules = source.chapters.flatMap((chapter) =>
+    chapter.sections.flatMap((section) => section.rules),
+  )
+  const postings = new Map<string, number[]>()
+  const stems = new Map<string, string>()
+  rules.forEach((rule, index) => {
+    const seen = new Set<string>()
+    for (const raw of words(rule.text)) {
+      let word = stems.get(raw)
+      if (word === undefined) stems.set(raw, (word = stem(raw)))
+      if (seen.has(word)) continue
+      seen.add(word)
+      const list = postings.get(word)
+      if (list) list.push(index)
+      else postings.set(word, [index])
+    }
+  })
+  const index = { rules, postings }
+  indexes.set(source, index)
+  return index
+}
+
+// why: the last word may be half typed, so it also matches as a prefix of any indexed word.
+function queryWords(query: string) {
+  const typed = words(query)
+  const kept = typed.filter((word) => !STOPWORDS.has(word))
+  const chosen = kept.length > 0 ? kept : typed
+  const partial = /[a-z0-9]$/i.test(query) ? chosen.at(-1) : undefined
+  return { stems: [...new Set(chosen.map(stem))], partial }
+}
+
+function matchesWord(candidate: string, wanted: string, partial: string | undefined) {
+  return candidate === wanted || (partial !== undefined && candidate.startsWith(partial))
+}
+
 export function searchRules(rules: ComprehensiveRules, query: string, limit = 50) {
   const needle = query.trim().toLowerCase()
   if (!needle) return []
+  if (RULE_NUMBER.test(needle))
+    return searchIndex(rules)
+      .rules.filter((rule) => rule.id.startsWith(needle))
+      .slice(0, limit)
+      .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
+  const { stems, partial } = queryWords(needle)
+  const lastStem = partial === undefined ? undefined : stem(partial)
   const terms: RuleSearchResult[] = rules.glossary
-    .filter((entry) => entry.term.toLowerCase().includes(needle))
+    .filter((entry) => {
+      const termWords = words(entry.term).map(stem)
+      return stems.every((wanted) =>
+        termWords.some((word) => matchesWord(word, wanted, wanted === lastStem ? partial : undefined)),
+      )
+    })
     .map((entry) => ({ kind: "term", entry }))
-  const matches: RuleSearchResult[] = rules.chapters
-    .flatMap((chapter) => chapter.sections.flatMap((section) => section.rules))
-    .filter((rule) => rule.id.startsWith(needle) || rule.text.toLowerCase().includes(needle))
-    .map((rule) => ({ kind: "rule", rule }))
+  const index = searchIndex(rules)
+  const scores = new Map<number, number>()
+  for (const wanted of stems) {
+    const hit = new Set<number>()
+    const prefix = wanted === lastStem ? partial : undefined
+    for (const [word, list] of index.postings)
+      if (matchesWord(word, wanted, prefix)) for (const at of list) hit.add(at)
+    for (const at of hit) scores.set(at, (scores.get(at) ?? 0) + 1)
+  }
+  const matches: RuleSearchResult[] = [...scores]
+    .sort(([a, scoreA], [b, scoreB]) => scoreB - scoreA || a - b)
+    .map(([at]) => ({ kind: "rule", rule: index.rules[at] }))
   return [...terms, ...matches].slice(0, limit)
 }
 
