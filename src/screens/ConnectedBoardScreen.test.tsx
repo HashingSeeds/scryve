@@ -206,7 +206,7 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("layout-tabletop").props.accessibilityState.selected).toBe(true)
   })
 
-  it("holds staged commander damage through the menu and sends it when a petal takes over the board", async () => {
+  it("holds staged commander damage with the menu closed and sends it at the check", async () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: {
@@ -216,15 +216,14 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-sword-seat-2"))
     fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
     openConnectedMenu()
-    openConnectedMenu()
+    expect(screen.queryByTestId("players-button")).toBeNull()
     expect(mockSubmitCommanderDamage).not.toHaveBeenCalled()
     expect(screen.getByTestId("commander-hit-seat-1")).toBeTruthy()
 
-    openConnectedMenu()
-    fireEvent.press(screen.getByTestId("players-button"))
+    fireEvent.press(screen.getByRole("button", { name: "Send commander damage from seat 2" }))
     await waitFor(() =>
       expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
         { toPlayerId: "player-2", delta: 1 },
@@ -243,8 +242,10 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
-    fireEvent.press(screen.getByTestId("commander-exit-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-sword-seat-2"))
+    fireEvent.press(
+      screen.getByRole("button", { name: "Done assigning commander damage from seat 2" }),
+    )
 
     expect(screen.queryByTestId("commander-hit-seat-1")).toBeNull()
     expect(mockSubmitCommanderDamage).not.toHaveBeenCalled()
@@ -548,12 +549,12 @@ describe("ConnectedBoardScreen", () => {
     }
     try {
       render(themed(<NearbyBoard partners={false} />))
-      fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
+      fireEvent.press(screen.getByTestId("commander-sword-seat-2"))
       expect(screen.getByTestId("commander-power-seat-2")).toHaveTextContent("2")
-      expect(screen.queryByTestId("commander-power-seat-2-partner")).toBeNull()
+      expect(screen.queryByTestId("commander-sit-seat-2-partner")).toBeNull()
 
       screen.rerender(themed(<NearbyBoard partners />))
-      expect(screen.getByTestId("commander-power-seat-2-partner")).toHaveTextContent("4")
+      expect(screen.getByTestId("commander-sit-seat-2-partner")).toHaveTextContent("4Kraum")
     } finally {
       commanders.mockRestore()
     }

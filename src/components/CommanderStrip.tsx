@@ -1,16 +1,7 @@
-import {
-  Fragment,
-  memo,
-  useEffect,
-  useRef,
-  useState,
-  type ComponentProps,
-  type ReactNode,
-} from "react"
+import { memo, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
-  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -22,24 +13,19 @@ import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { formatList } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
-import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground, contrastRatio } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
-import { BoardPressable } from "./BoardPressable"
-import {
-  PulseRing,
-  shadowReached,
-  TAKEOVER_LAYERS,
-  type CommanderFlood,
-} from "./CommanderDamageCardControls"
+import { shadowReached, TAKEOVER_LAYERS, type CommanderFlood } from "./CommanderDamageCardControls"
 import { floodGap, type CommanderBoardSeat } from "./commanderDamageLayout"
+import { menuCornerStep } from "./GameRadialMenu"
 import { overlayTint } from "./LifeControls"
 import {
   cornerOffset,
   type LifeCardEdge,
+  type LifeCardMenuCorner,
   type LifeCardScreenEdges,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
@@ -47,11 +33,10 @@ import {
 import { PlayerMark } from "./PlayerMark"
 import { seatIdentityMetrics } from "./SeatIdentity"
 import { Text } from "./Text"
-import { targetSlop } from "./touchTarget"
 
-// why: the own cell carries the seat's mark with its sword so the grid reads as the way to start an attack, and the cells are big enough for the sword to read; on a 4-player phone seat the grid still ends short of the − at the middle of its end.
-const DISC_SIZE = 26
-const COMPACT_DISC_SIZE = 22
+// why: on a 4-player phone seat the grid still ends short of the − at the middle of its end.
+const CELL_SIZE = 26
+const COMPACT_CELL_SIZE = 22
 
 export interface CommanderStripProps {
   seatNumber: number
@@ -64,19 +49,15 @@ export interface CommanderStripProps {
   split?: Record<PlayerId, readonly number[]>
   lethal: number
   foreground: string
-  /** why: the seat's own color, cut into its mark as the sword. */
-  cardColor: string
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
+  menuCorner?: LifeCardMenuCorner
   compact?: boolean
-  from?: number
-  disabled?: boolean
+  /** why: a team zone's names hold its top corners, so its grid keeps to the foot, `from` along it when centered in the team's row. */
+  foot?: { from?: number }
   attack?: CommanderStripAttack
-  source?: CommanderStripSource
-  markAnchor?: { x: number; y: number; size: number }
   onBoundsChange?: (bounds: LayoutRectangle) => void
-  onPress?: () => void
 }
 
 /** why: while a commander attacks this seat, the strip stays over the shadow with that attacker's total lit and the rest faded, and taps fall through to the hit target. The look eases in as the shadow's edge reaches the strip and back out as it drains, so the card passes the attack on until its flood has drained. With no `wave` the look is fully on. */
@@ -84,15 +65,6 @@ export type CommanderStripAttack = {
   attackerId: PlayerId
   wave?: SharedValue<number>
   flood?: CommanderFlood
-}
-
-/** why: the attacker's own grid finishes the attack it opened, so its own cell turns into the finish X, or the check that sends held hits. `flight` runs from 0 to 1 as the attack opens and back as it closes. */
-export type CommanderStripSource = {
-  active: boolean
-  flight: SharedValue<number>
-  submit: "send" | "done"
-  acted: boolean
-  onSubmit: () => void
 }
 
 export function commanderDamageDealers(
@@ -124,13 +96,14 @@ export function chipTotals(total: number, split?: readonly number[]) {
 
 export type CommanderDamageTier = "calm" | "significant" | "nearLethal"
 
-/** why: one attacker's total reads on its cell alone, a solid rim from half of lethal and a filled disc within five of it, both in the seat's own ink so they read on every seat color and a crowded grid gains no extra marks. */
+/** why: one attacker's total reads on its cell alone, a solid rim from half of lethal and a filled cell within five of it, both in the seat's own ink so they read on every seat color and a crowded grid gains no extra marks. */
 export function commanderDamageTier(total: number, lethal: number): CommanderDamageTier {
   if (total >= lethal - NEAR_LETHAL_MARGIN) return "nearLethal"
   if (total >= Math.ceil(lethal / 2)) return "significant"
   return "calm"
 }
 
+/** why: the grid mirrors the board, one square per seat, in the corner opposite the seat's name; partners that have both dealt damage share their square, cut across. */
 export const CommanderStrip = memo(function CommanderStrip({
   seatNumber,
   identity,
@@ -141,17 +114,13 @@ export const CommanderStrip = memo(function CommanderStrip({
   split,
   lethal,
   foreground,
-  cardColor,
   contentRotation,
   contentInsets,
   screenEdges,
+  menuCorner,
   compact,
-  from,
-  disabled,
+  foot,
   attack,
-  source,
-  markAnchor,
-  onPress,
   onBoundsChange,
 }: CommanderStripProps) {
   const {
@@ -169,26 +138,22 @@ export const CommanderStrip = memo(function CommanderStrip({
       })
     }
   }, [stripBounds, mapBounds, onBoundsChange])
-  const disc = compact ? COMPACT_DISC_SIZE : DISC_SIZE
-  const ownMarkSize = Math.round(disc * OWN_MARK_SCALE)
+  const cell = compact ? COMPACT_CELL_SIZE : CELL_SIZE
   const pad = spacing.xxs
-  const cellGap = spacing.xxxs
-  const glyphRotation: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
+  const turned: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
   const dealt = commanderDamageDealers(players, ownerPlayerId, incoming)
   const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
     .sort((a, b) => a - b)
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
-  const corner = STRIP_CORNER[contentRotation]
-  const offsets = stripEdge(
-    corner,
-    seatIdentityMetrics(compact).edge - pad,
-    contentInsets,
+  const corner = (foot ? FOOT_CORNER : HEAD_CORNER)[contentRotation]
+  const offsets = stripEdge(corner, seatIdentityMetrics(compact).edge - pad, {
+    insets: contentInsets,
     screenEdges,
-    from,
-  )
+    from: foot?.from,
+    menu: foot ? 0 : menuCornerStep(menuCorner, corner[0], corner[1], compact),
+  })
   const attackerId = attack?.attackerId
   const flood = attack?.flood
-  const sourceShown = !!source
   const lit: Lit = {
     attacked: !!attackerId,
     wave: attack?.wave,
@@ -201,34 +166,11 @@ export const CommanderStrip = memo(function CommanderStrip({
           })
         : (flood?.discGap ?? 0),
   }
+  // why: a grid shown only for this attack eases in with the shadow and out as it drains.
   const attackOnly = dealt.length === 0
-  const grow: Grow = { attackOnly, lit, flight: source?.flight }
-  const chips = (playerId: PlayerId) =>
-    playerId === ownerPlayerId ? [0] : chipTotals(incoming[playerId] ?? 0, split?.[playerId])
-  const ownCell = ownCellCenter(boardRows, ownerPlayerId, chips, { disc, gap: cellGap, pad })
-  const flightFrom =
-    markAnchor && ownCell && stripBounds && mapBounds
-      ? {
-          x: markAnchor.x - (stripBounds.x + mapBounds.x + ownCell.x),
-          y: markAnchor.y - (stripBounds.y + mapBounds.y + ownCell.y),
-          scale: markAnchor.size / ownMarkSize,
-        }
-      : undefined
-  const measured = !!(stripBounds && mapBounds)
-  const flightStyle = useAnimatedStyle(() => {
-    const amount = grownAt(grow)
-    if (!flightFrom) return { opacity: measured ? 1 : 0, transform: [] }
-    return {
-      opacity: 1,
-      transform: [
-        { translateX: flightFrom.x * (1 - amount) },
-        { translateY: flightFrom.y * (1 - amount) },
-        { scale: flightFrom.scale + (1 - flightFrom.scale) * amount },
-      ],
-    }
-  })
-  if (attackOnly && !attackerId && !sourceShown) return null
+  if (attackOnly && !attackerId) return null
   const attackerName = players.find(({ id }) => id === attackerId)?.name
+  const chips = (playerId: PlayerId) => chipTotals(incoming[playerId] ?? 0, split?.[playerId])
   const sources = formatList(
     dealt.flatMap((player) =>
       chips(player.id).map((amount) =>
@@ -236,57 +178,33 @@ export const CommanderStrip = memo(function CommanderStrip({
       ),
     ),
   )
-  const finishing = source?.active
+  const radius = Math.round(cell * CELL_RADIUS)
 
   return (
     <Animated.View
       testID={`commander-strip-seat-${seatNumber}`}
       onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
-      pointerEvents={attackerId ? "none" : "box-none"}
+      pointerEvents="none"
       style={[
         themed($strip),
         offsets,
         { flexDirection: stripDirection(contentRotation) },
-        (attackerId || sourceShown) && $aboveShadow,
+        attackerId && $aboveShadow,
       ]}
     >
-      <BoardPressable
-        testID={
-          finishing ? `commander-exit-seat-${seatNumber}` : `commander-map-seat-${seatNumber}`
-        }
+      <Eased
+        testID={`commander-map-seat-${seatNumber}`}
         onLayout={(event) => setMapBounds(event.nativeEvent.layout)}
-        accessibilityRole={finishing || onPress ? "button" : undefined}
-        accessibilityLabel={
-          finishing
-            ? translate(`board:commander.submitAssigningFromSeat.${source.submit}`, {
-                seat: seatNumber,
-              })
-            : !onPress
-              ? translate("board:counters.seatItem", { identity, label: sources })
-              : dealt.length
-                ? translate("board:commander.assignFromWithDamage", { identity, sources })
-                : translate("board:commander.assignFrom", { identity })
-        }
-        accessibilityState={{ disabled: !!disabled && !finishing }}
         accessible={!attackerId}
-        disabled={finishing ? false : disabled || !onPress || !!attackerId || sourceShown}
-        // why: the grid's slop reaches only toward the card's edges, so it never takes touches from the − and + or the total.
-        hitSlop={
-          mapBounds
-            ? targetSlop(
-                mapBounds,
-                {
-                  [corner[0]]: offsets[corner[0]],
-                  [corner[1]]: offsets[corner[1]],
-                  [OPPOSITE[corner[0]]]: 0,
-                  [corner[2]]: 0,
-                },
-                8,
-              )
-            : 0
+        accessibilityLabel={
+          attackerId
+            ? undefined
+            : translate("board:counters.seatItem", { identity, label: sources })
         }
-        onPress={finishing ? source.onSubmit : onPress}
-        style={({ pressed }) => [themed($map), pressed && { opacity: 0.72 }]}
+        lit={lit}
+        rest={attackOnly ? 0 : 1}
+        attacked={1}
+        style={[themed($map), { padding: pad }]}
       >
         {boardRows.map((row, rowIndex) => (
           <View
@@ -299,7 +217,7 @@ export const CommanderStrip = memo(function CommanderStrip({
               const playerIndex = players.findIndex(({ id }) => id === playerId)
               const player = players[playerIndex]
               if (!player) return null
-              const size = { width: disc, height: disc }
+              const size = { width: cell, height: cell }
               if (playerId === ownerPlayerId)
                 return (
                   <Eased
@@ -307,159 +225,119 @@ export const CommanderStrip = memo(function CommanderStrip({
                     testID={`commander-own-seat-${seatNumber}`}
                     lit={lit}
                     rest={OWN_OPACITY}
-                    attacked={attackerId ? FADED_OPACITY : OWN_OPACITY}
-                    style={[themed($ownSeat), size, $aboveCells]}
+                    attacked={FADED_OPACITY}
+                    style={[$cell, size]}
                   >
-                    <Animated.View
-                      style={[$ownGlyph, { margin: (disc - ownMarkSize) / 2 }, flightStyle]}
-                    >
-                      <OwnGlyph
-                        seatNumber={playerIndex + 1}
-                        shape={player.shape}
-                        color={foreground}
-                        insetSwordColor={cardColor}
-                        rotation={contentRotation}
-                        size={ownMarkSize}
-                        grow={grow}
-                        finish={finishing ? source.submit : undefined}
-                      />
-                    </Animated.View>
-                    {finishing && source.acted ? (
-                      <PulseRing
-                        testID={`commander-finish-pulse-seat-${seatNumber}`}
-                        size={disc + 8}
-                        from={0.6}
-                        color={foreground}
-                      />
-                    ) : null}
+                    <PlayerMark
+                      seatNumber={playerIndex + 1}
+                      shape={player.shape}
+                      color={foreground}
+                      rotation={contentRotation}
+                      size={Math.round(cell * OWN_MARK_SCALE)}
+                    />
                   </Eased>
                 )
-              const ink = accessibleForeground(player.color)
               const attacking = playerId === attackerId
-              const mark = (
-                <PlayerMark
-                  seatNumber={playerIndex + 1}
-                  shape={player.shape}
-                  color={ink}
-                  rotation={contentRotation}
-                  size={Math.round(disc * 0.5)}
-                />
-              )
+              const totals = chips(playerId)
+              const partners = totals.length > 1
+              const half = partners ? (cell - HALF_GAP) / 2 : cell
+              const halves = totals.map((total, index) => {
+                const partner = index > 0
+                const tier = commanderDamageTier(total, lethal)
+                const filled = tier === "nearLethal"
+                const rim = tier === "calm" ? 1 : RIM_WIDTH
+                const ends = partners
+                  ? partner
+                    ? { borderBottomLeftRadius: radius, borderBottomRightRadius: radius }
+                    : { borderTopLeftRadius: radius, borderTopRightRadius: radius }
+                  : { borderRadius: radius }
+                return (
+                  <View
+                    key={index}
+                    testID={`commander-pip-seat-${seatNumber}-${playerId}${partner ? "-partner" : ""}`}
+                    accessible={attacking}
+                    accessibilityLabel={
+                      attacking
+                        ? translate("board:commander.totalFrom", {
+                            damage: total,
+                            name: attackerName,
+                          })
+                        : undefined
+                    }
+                    style={[
+                      $half,
+                      ends,
+                      {
+                        height: half,
+                        borderWidth: rim,
+                        borderColor:
+                          tier === "calm" ? overlayTint(foreground, RIM_ALPHA) : foreground,
+                        backgroundColor: filled ? foreground : player.color,
+                      },
+                      partners && (partner ? $cutTop : $cutBottom),
+                    ]}
+                  >
+                    <Text
+                      testID={
+                        attacking
+                          ? `commander-total-seat-${seatNumber}${partner ? "-partner" : ""}`
+                          : undefined
+                      }
+                      text={total}
+                      weight="bold"
+                      maxFontSizeMultiplier={1}
+                      style={[
+                        themed(compact ? $compactCount : $count),
+                        partners && (compact ? $compactPartnerCount : $partnerCount),
+                        {
+                          color: !filled
+                            ? accessibleForeground(player.color)
+                            : contrastRatio(player.color, foreground) >= FILLED_COUNT_CONTRAST
+                              ? player.color
+                              : accessibleForeground(foreground),
+                        },
+                        total > 99 && (compact ? $compactThreeDigits : $threeDigits),
+                        total === 0 && partners && $zeroHalf,
+                      ]}
+                    />
+                  </View>
+                )
+              })
+              const square = <View style={[size, partners && $partners, turned]}>{halves}</View>
               return (
-                <Fragment key={playerId}>
-                  {chips(playerId).map((total, index) => {
-                    const partner = index > 0
-                    const restOpacity = sourceShown ? FADED_OPACITY : total === 0 ? IDLE_OPACITY : 1
-                    const tier = commanderDamageTier(total, lethal)
-                    const restBorder =
-                      tier === "calm" ? overlayTint(foreground, RIM_ALPHA) : foreground
-                    const filled = tier === "nearLethal"
-                    const count = (
-                      <Text
-                        testID={
-                          attacking
-                            ? `commander-total-seat-${seatNumber}${partner ? "-partner" : ""}`
-                            : undefined
-                        }
-                        text={total}
-                        weight="bold"
-                        maxFontSizeMultiplier={1}
+                <Eased
+                  key={playerId}
+                  lit={lit}
+                  rest={1}
+                  attacked={attacking ? 1 : FADED_OPACITY}
+                  style={size}
+                >
+                  {attacking ? (
+                    <>
+                      <Eased
+                        testID={`commander-lit-seat-${seatNumber}`}
+                        lit={lit}
+                        rest={0}
+                        attacked={1}
                         style={[
-                          themed(compact ? $compactCount : $count),
-                          {
-                            color: !filled
-                              ? ink
-                              : contrastRatio(player.color, foreground) >= FILLED_COUNT_CONTRAST
-                                ? player.color
-                                : accessibleForeground(foreground),
-                          },
-                          total > 99 && (compact ? $compactThreeDigits : $threeDigits),
-                          glyphRotation,
+                          $litRing,
+                          { borderRadius: radius + LIT_GAP, borderColor: foreground },
                         ]}
                       />
-                    )
-                    const pip = (
-                      <Pip
-                        testID={`commander-pip-seat-${seatNumber}-${playerId}${partner ? "-partner" : ""}`}
-                        accessible={attacking}
-                        accessibilityLabel={
-                          attacking
-                            ? translate("board:commander.totalFrom", {
-                                damage: total,
-                                name: attackerName,
-                              })
-                            : undefined
-                        }
-                        lit={lit}
-                        rest={{ opacity: restOpacity, border: restBorder }}
-                        attacked={
-                          attacking
-                            ? { opacity: 1, border: foreground }
-                            : attackerId
-                              ? { opacity: FADED_OPACITY, border: restBorder }
-                              : { opacity: restOpacity, border: restBorder }
-                        }
-                        style={[
-                          themed($disc),
-                          size,
-                          { backgroundColor: filled ? foreground : player.color },
-                          tier !== "calm" && $tierDisc,
-                        ]}
-                      >
-                        {total > 0 ? (
-                          count
-                        ) : attacking ? (
-                          <>
-                            <Eased lit={lit} rest={1} attacked={0}>
-                              {mark}
-                            </Eased>
-                            <Eased lit={lit} rest={0} attacked={1} style={$overlaid}>
-                              {count}
-                            </Eased>
-                          </>
-                        ) : (
-                          mark
-                        )}
-                      </Pip>
-                    )
-                    return (
-                      <Grown key={index} grow={grow}>
-                        {attacking ? <Pop value={total}>{pip}</Pop> : pip}
-                      </Grown>
-                    )
-                  })}
-                </Fragment>
+                      <Pop value={totals.reduce((sum, total) => sum + total, 0)}>{square}</Pop>
+                    </>
+                  ) : (
+                    square
+                  )}
+                </Eased>
               )
             })}
           </View>
         ))}
-      </BoardPressable>
+      </Eased>
     </Animated.View>
   )
 }, structurallyEqual)
-
-/** why: uses the map's own disc, gap, and padding, since the flight lands before the cell reports its layout. Rows are centered, so a short row starts in by half its missing chips; a seat whose partners both dealt damage takes two. */
-function ownCellCenter(
-  rows: readonly (readonly CommanderBoardSeat[])[],
-  ownerPlayerId: PlayerId,
-  chips: (playerId: PlayerId) => readonly number[],
-  { disc, gap, pad }: { disc: number; gap: number; pad: number },
-) {
-  const widths = rows.map((row) => row.map(({ playerId }) => chips(playerId).length))
-  const length = (counts: readonly number[]) => counts.reduce((sum, count) => sum + count, 0)
-  const widest = Math.max(...widths.map(length))
-  const step = disc + gap
-  for (const [rowIndex, row] of rows.entries()) {
-    const column = row.findIndex(({ playerId }) => playerId === ownerPlayerId)
-    if (column < 0) continue
-    const before = length(widths[rowIndex].slice(0, column))
-    return {
-      x: pad + ((widest - length(widths[rowIndex])) * step) / 2 + before * step + disc / 2,
-      y: pad + rowIndex * step + disc / 2,
-    }
-  }
-  return undefined
-}
 
 // why: the small grid eases over more of the shadow's travel than its edge takes to cross the grid; a quick edge would flip it in one frame.
 const LIT_SPAN = 192
@@ -470,29 +348,6 @@ function litAt({ attacked, wave, flood, gap }: Lit) {
   "worklet"
   if (!wave) return attacked ? 1 : 0
   return flood ? shadowReached(flood, wave.value, gap, LIT_SPAN) : wave.value
-}
-
-type PipLook = { opacity: number; border: string }
-
-function Pip({
-  lit,
-  rest,
-  attacked,
-  style,
-  ...props
-}: ComponentProps<typeof Animated.View> & {
-  lit: Lit
-  rest: PipLook
-  attacked: PipLook
-}) {
-  const look = useAnimatedStyle(() => {
-    const amount = litAt(lit)
-    return {
-      opacity: rest.opacity + (attacked.opacity - rest.opacity) * amount,
-      borderColor: interpolateColor(amount, [0, 1], [rest.border, attacked.border]),
-    }
-  })
-  return <Animated.View {...props} style={[style, look]} />
 }
 
 function Eased({
@@ -524,60 +379,6 @@ function Pop({ value, children }: { value: number; children: ReactNode }) {
   return <Animated.View style={style}>{children}</Animated.View>
 }
 
-function OwnGlyph({
-  finish,
-  grow,
-  ...mark
-}: ComponentProps<typeof PlayerMark> & { grow: Grow; finish?: "send" | "done" }) {
-  const markStyle = useAnimatedStyle(() => ({
-    opacity: finish ? 1 - landedAt(grownAt(grow)) : 1,
-  }))
-  const finishStyle = useAnimatedStyle(() => ({ opacity: landedAt(grownAt(grow)) }))
-  return (
-    <>
-      <Animated.View style={markStyle}>
-        <PlayerMark {...mark} />
-      </Animated.View>
-      {finish ? (
-        <Animated.View
-          testID={`commander-exit-${finish === "send" ? "check" : "x"}-seat-${mark.seatNumber}`}
-          style={[$overlaid, finishStyle]}
-        >
-          <PlayerMark {...mark} closeIcon={finish === "done"} insetCheck={finish === "send"} />
-        </Animated.View>
-      ) : null}
-    </>
-  )
-}
-
-type Grow = { attackOnly: boolean; lit: Lit; flight?: SharedValue<number> }
-
-function grownAt({ attackOnly, lit, flight }: Grow) {
-  "worklet"
-  if (!attackOnly) return 1
-  return flight ? flight.value : litAt(lit)
-}
-
-// why: worklets capture their closure when the module loads, so constants they read are declared above them.
-const LANDED_FROM = 0.75
-
-function landedAt(amount: number) {
-  "worklet"
-  return Math.min(Math.max((amount - LANDED_FROM) / (1 - LANDED_FROM), 0), 1)
-}
-
-/** why: the other cells grow in around the landing mark rather than sitting there before it arrives. */
-function Grown({ grow, children }: { grow: Grow; children: ReactNode }) {
-  const style = useAnimatedStyle(() => {
-    const amount = Math.min(Math.max((grownAt(grow) - GROW_FROM) / (1 - GROW_FROM), 0), 1)
-    return {
-      opacity: amount,
-      transform: [{ scale: GROWN_START_SCALE + (1 - GROWN_START_SCALE) * amount }],
-    }
-  })
-  return <Animated.View style={style}>{children}</Animated.View>
-}
-
 function stripDirection(rotation: LifeCardContentRotation): ViewStyle["flexDirection"] {
   if (rotation === 90) return "column"
   if (rotation === -90) return "column-reverse"
@@ -585,35 +386,50 @@ function stripDirection(rotation: LifeCardContentRotation): ViewStyle["flexDirec
   return "row"
 }
 
-/** why: the grid takes the corner the seat's mark and name sit in: the edge, the side it starts from, and the side that bounds its run. */
-const OPPOSITE = { top: "bottom", bottom: "top", left: "right", right: "left" } as const
+type StripCorner = readonly [LifeCardEdge, LifeCardEdge, LifeCardEdge]
 
-const STRIP_CORNER = {
+/** why: the grid takes the corner it reads from: the edge, the side it starts from, and the side that bounds its run, in the card's own edges for each turn of its content. Seats keep it at the head, opposite the name; team zones keep it at the foot. */
+const HEAD_CORNER = {
+  0: ["top", "left", "right"],
+  180: ["bottom", "right", "left"],
+  90: ["right", "top", "bottom"],
+  [-90]: ["left", "bottom", "top"],
+} as const satisfies Record<LifeCardContentRotation, StripCorner>
+
+const FOOT_CORNER = {
   0: ["bottom", "left", "right"],
   180: ["top", "right", "left"],
   90: ["left", "top", "bottom"],
   [-90]: ["right", "bottom", "top"],
-} as const satisfies Record<LifeCardContentRotation, readonly LifeCardEdge[]>
+} as const satisfies Record<LifeCardContentRotation, StripCorner>
 
 export function commanderStripCorner(rotation: LifeCardContentRotation) {
-  const [edge, side] = STRIP_CORNER[rotation]
+  const [edge, side] = HEAD_CORNER[rotation]
   const [x, y] = edge === "left" || edge === "right" ? [edge, side] : [side, edge]
   return { x, y } as { x: "left" | "right"; y: "top" | "bottom" }
 }
 
 function stripEdge(
-  [edge, side, end]: (typeof STRIP_CORNER)[LifeCardContentRotation],
+  [edge, side, end]: StripCorner,
   gap: number,
-  insets?: LifeCardContentInsets,
-  screenEdges?: LifeCardScreenEdges,
-  from?: number,
+  {
+    insets,
+    screenEdges,
+    from,
+    menu,
+  }: {
+    insets?: LifeCardContentInsets
+    screenEdges?: LifeCardScreenEdges
+    from?: number
+    menu: number
+  },
 ): Partial<Record<LifeCardEdge, number>> {
   return {
     [edge]:
       from === undefined
         ? cornerOffset(gap, edge, side, insets, screenEdges)
         : gap + (insets?.[edge] ?? 0),
-    [side]: from ?? cornerOffset(gap, side, edge, insets, screenEdges),
+    [side]: from ?? cornerOffset(gap, side, edge, insets, screenEdges) + menu,
     [end]: gap + (insets?.[end] ?? 0),
   }
 }
@@ -625,10 +441,8 @@ const $strip: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
 })
 
-const $map: ThemedStyle<ViewStyle> = ({ spacing, radius }) => ({
+const $map: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
-  padding: spacing.xxs,
-  borderRadius: radius.md,
 })
 
 const $mapRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -637,53 +451,50 @@ const $mapRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
 })
 
-const $disc: ThemedStyle<ViewStyle> = () => ({
-  borderRadius: radius.full,
-  borderWidth: 1,
-  alignItems: "center",
-  justifyContent: "center",
-})
-
-const $tierDisc: ViewStyle = { borderWidth: 2.5 }
+const $cell: ViewStyle = { alignItems: "center", justifyContent: "center" }
+const $half: ViewStyle = { alignItems: "center", justifyContent: "center", overflow: "hidden" }
+const $partners: ViewStyle = { gap: 1 }
+// why: a partner half has no rim along the cut, so the pair reads as one square.
+const $cutTop: ViewStyle = { borderTopWidth: 0 }
+const $cutBottom: ViewStyle = { borderBottomWidth: 0 }
 
 const $count: ThemedStyle<TextStyle> = () => ({
-  fontSize: 16,
-  lineHeight: 20,
+  fontSize: 15,
+  lineHeight: 19,
   fontVariant: ["tabular-nums"],
 })
 
 const $compactCount: ThemedStyle<TextStyle> = () => ({
-  fontSize: 13,
-  lineHeight: 16,
+  fontSize: 12,
+  lineHeight: 15,
   fontVariant: ["tabular-nums"],
 })
 
+const $partnerCount: TextStyle = { fontSize: 11, lineHeight: 12 }
+const $compactPartnerCount: TextStyle = { fontSize: 9, lineHeight: 10 }
 const $threeDigits: TextStyle = { fontSize: 11 }
 const $compactThreeDigits: TextStyle = { fontSize: 9 }
+const $zeroHalf: TextStyle = { opacity: 0.4 }
 
-const $ownSeat: ThemedStyle<ViewStyle> = () => ({
-  alignItems: "center",
-  justifyContent: "center",
-})
-
-const $ownGlyph: ViewStyle = { alignItems: "center", justifyContent: "center" }
-// why: the landing mark flies over its neighbours.
-const $aboveCells: ViewStyle = { zIndex: 1 }
-const $overlaid: ViewStyle = {
+// why: the attacker's square gets a ring a step outside it, so it reads lit without changing the total's own rim.
+const LIT_GAP = 3
+const $litRing: ViewStyle = {
   ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
+  margin: -LIT_GAP,
+  borderWidth: 2,
 }
-const IDLE_OPACITY = 0.45
+
+// why: rounded squares, not discs, so a partner pair can share one cut across.
+const CELL_RADIUS = 0.27
+const HALF_GAP = 1
+const RIM_WIDTH = 2.5
 // why: lowest rim that keeps 3:1 against every seat color.
 const RIM_ALPHA = 0.75
-// why: the own cell is where the seat's mark lands, so it keeps the mark's muted look instead of fading like a cell.
+// why: the own cell keeps the mark's muted look.
 const OWN_OPACITY = 0.72
-// why: a mark's art fills about 55% of its box, so the box outgrows the cell for the art to match the discs beside it.
-const OWN_MARK_SCALE = 1.6
+// why: a mark's art fills about 55% of its box, so the box outgrows the cell for the art to match the squares beside it.
+const OWN_MARK_SCALE = 1.5
 const NEAR_LETHAL_MARGIN = 5
 const FILLED_COUNT_CONTRAST = 4.5
-const GROW_FROM = 0.35
-const GROWN_START_SCALE = 0.6
 const FADED_OPACITY = 0.3
 const $aboveShadow: ViewStyle = { zIndex: TAKEOVER_LAYERS.controls }

@@ -9,11 +9,10 @@ export type AttackState = {
   armed: PlayerId | null
   /** why: keyed by attacker and slot, and kept across attacks, so a commander's pumped power is still set the next time it attacks. */
   powers: Partial<Record<`${PlayerId}:${number}`, number>>
-  acted: boolean
   /** why: each defender's hits this attack, newest last, so undo takes back exactly the last hit rather than the current power. */
   hits: Partial<Record<PlayerId, readonly Hit[]>>
   staged: readonly AttackChange[]
-  /** why: commander slots sat out of this attack by tapping their names. They keep their number, so tapping again brings them back at the same power. */
+  /** why: partner slots sat out of this attack, by − at 1 or from the start. They keep their number, so tapping the box brings them back at the same power. */
   sitting: readonly number[]
 }
 
@@ -40,15 +39,14 @@ export type AttackCommit = {
 export const IDLE_ATTACK: AttackState = {
   armed: null,
   powers: {},
-  acted: false,
   hits: {},
   staged: [],
-  // why: a second partner starts each attack sat out, so a fresh hit lands on one commander; tapping its name brings it in at its printed power.
+  // why: a second partner starts each attack sat out, so a fresh hit lands on one commander; tapping its box brings it in at its printed power.
   sitting: [1],
 }
 
-/** why: a partner sits a hit out at 0, so one commander can carry the whole hit. A lone commander always hits for at least 1. */
-export const lowestPower = (partners: boolean) => (partners ? 0 : 1)
+/** why: every commander in an attack hits for at least 1; a partner leaves the attack instead of dropping to 0. */
+export const LOWEST_POWER = 1
 
 const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0)
 
@@ -91,13 +89,16 @@ export function attackView(state: AttackState, board: AttackBoard, to: PlayerId)
   const steps = commanders.map(({ power, total, sitting }) =>
     sitting ? 0 : Math.max(0, Math.min(power, MAX_COMMANDER_DAMAGE - total)),
   )
-  const lastSteps = hits.at(-1) ?? commanders.map(({ power }) => power)
+  // why: undo takes back only this attack's hits; earlier damage is the log's to fix.
+  const lastSteps = hits.at(-1) ?? []
   const takeBacks = commanders.map(({ total }, slot) => Math.min(lastSteps[slot] ?? 0, total))
   // why: a local hit lowers the defender's life as it lands; a buffered one waits for Send, so none of it is applied yet.
   const applied = board.buffered ? 0 : sum(commanders.map(({ landed }) => landed))
   return {
     commanders,
     steps,
+    // why: what each of this attack's hits dealt here, oldest first, so the defender sees what undo takes back.
+    hits: hits.map((steps) => sum(steps)),
     dealt: sum(steps),
     takeBacks,
     takeBack: sum(takeBacks),
@@ -129,16 +130,19 @@ export function reduceAttack(
     case "power": {
       if (!armed || !Number.isFinite(action.power)) return { state }
       const key = `${armed}:${action.slot}` as const
-      const lowest = lowestPower(board.commanders.length > 1)
-      const power = Math.min(MAX_COMMANDER_DAMAGE, Math.max(lowest, Math.trunc(action.power)))
+      const power = Math.min(MAX_COMMANDER_DAMAGE, Math.max(LOWEST_POWER, Math.trunc(action.power)))
       return { state: { ...state, powers: { ...state.powers, [key]: power } } }
     }
     case "sit": {
       if (!armed) return { state }
       const { slot } = action
-      const sitting = state.sitting.includes(slot)
+      const back = state.sitting.includes(slot)
+      const sitting = back
         ? state.sitting.filter((held) => held !== slot)
         : [...state.sitting, slot]
+      // why: the last commander in the attack stays in, so a hit always deals something.
+      const left = board.commanders.filter((_, held) => !sitting.includes(held)).length
+      if (!back && left === 0) return { state }
       return { state: { ...state, sitting } }
     }
     case "hit": {
@@ -175,7 +179,6 @@ function finish(state: AttackState): AttackResult {
     state: {
       ...state,
       armed: null,
-      acted: false,
       hits: {},
       staged: [],
       sitting: IDLE_ATTACK.sitting,
@@ -204,7 +207,7 @@ function land(
   })
   if (!changes.length && next === state.staged) return { state }
   return {
-    state: { ...state, staged: next, acted: true },
+    state: { ...state, staged: next },
     commit: changes.length ? { from, changes } : undefined,
   }
 }

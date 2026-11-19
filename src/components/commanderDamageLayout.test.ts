@@ -7,8 +7,8 @@ import {
   commanderReach,
   commanderTakeover,
   lifeInk,
+  DISC_FILL,
   outInk,
-  stackedReadout,
 } from "./commanderDamageLayout"
 
 const playerIds = (count: number): PlayerId[] =>
@@ -122,7 +122,7 @@ describe("commander damage board layout", () => {
     expect(disc).toBeLessThanOrEqual(115)
   })
 
-  it("rings two digits with room past their ink, centred where the digits sit", () => {
+  it("rings two digits with room past their ink inside the damage rings, centred where the digits sit", () => {
     const fontSize = 100
     const { disc, discOffset, cardDiscOffset } = commanderTakeover({
       card: { width: 420, height: 390 },
@@ -131,18 +131,9 @@ describe("commander damage board layout", () => {
       ink: lifeInk(fontSize, 2),
     })
     const ink = Math.hypot(2 * 0.64 * fontSize, 0.72 * fontSize) / 2
-    expect(disc - ink).toBeCloseTo(0.08 * fontSize)
+    expect(disc * DISC_FILL - ink).toBeCloseTo(0.08 * fontSize)
     expect(discOffset.y).toBeLessThan(0)
     expect(cardDiscOffset.x).toBeCloseTo(-discOffset.y)
     expect(cardDiscOffset.y).toBeCloseTo(0)
-  })
-
-  it("keeps a big life clear of its attack line by a share of the life's size", () => {
-    const fontSize = 200
-    const life = lifeInk(fontSize, 2)
-    const lineHeight = 0.72 * 26
-    const { scale, lifeShift, lineShift } = stackedReadout(fontSize, 2, "28 − 4".length)
-    const gap = lineShift - lineHeight / 2 - (lifeShift + (life.height * scale) / 2)
-    expect(gap).toBeCloseTo(0.1 * fontSize)
   })
 })

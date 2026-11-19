@@ -1,5 +1,4 @@
-import { fireEvent, render, within } from "@testing-library/react-native"
-import { makeMutable } from "react-native-reanimated"
+import { render, within } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
 import type { GamePlayer } from "@/features/game/types"
@@ -30,9 +29,7 @@ function renderStrip(props: Partial<CommanderStripProps> = {}) {
         incoming={{}}
         lethal={21}
         foreground="#FFFFFF"
-        cardColor="#41476E"
         contentRotation={0}
-        onPress={jest.fn()}
         {...props}
       />
     </ThemeProvider>,
@@ -47,9 +44,8 @@ describe("CommanderStrip", () => {
     expect(view.queryByTestId("commander-strip-seat-1")).toBeNull()
   })
 
-  it("shows the whole board, with the card's own seat holding its sword mark, and opens an attack when tapped", () => {
-    const onPress = jest.fn()
-    const view = renderStrip({ incoming: damaged, onPress })
+  it("shows the whole board, with the card's own seat holding its plain mark, and reads out the damage taken", () => {
+    const view = renderStrip({ incoming: damaged })
 
     const rows = view.getByTestId("commander-map-seat-1").children.map((row) =>
       typeof row === "string"
@@ -68,105 +64,73 @@ describe("CommanderStrip", () => {
       [`commander-pip-seat-1-${players[2].id}`],
     ])
     expect(
-      within(view.getByTestId("commander-own-seat-1", { includeHiddenElements: true })).getByTestId(
-        "player-mark-sword",
-        {
-          includeHiddenElements: true,
-        },
-      ),
-    ).toBeTruthy()
+      within(
+        view.getByTestId("commander-own-seat-1", { includeHiddenElements: true }),
+      ).queryByTestId("player-mark-sword", { includeHiddenElements: true }),
+    ).toBeNull()
     expect(
       view.getByTestId(`commander-pip-seat-1-${players[2].id}`, { includeHiddenElements: true }),
     ).toHaveTextContent("21")
-    const grid = view.getByRole("button", {
-      name: "Assign commander damage from Seat 1, Ada. Taken: 21 from Cy",
-    })
-    expect(view.getAllByRole("button")).toHaveLength(1)
-    fireEvent.press(grid)
-    expect(onPress).toHaveBeenCalledTimes(1)
+    expect(view.getByLabelText("Seat 1, Ada, 21 from Cy")).toBeTruthy()
+    expect(view.queryAllByRole("button")).toHaveLength(0)
   })
 
-  it("sits in the mark's corner, tucked into a screen corner but clear of a mid-edge notch", () => {
+  it("sits in the head corner, tucked into a screen corner but clear of a mid-edge notch", () => {
     const props = {
       incoming: damaged,
-      contentRotation: 180 as const,
       contentInsets: { top: 47, bottom: 0, left: 0, right: 0 },
     }
     const corner = renderStrip({
       ...props,
-      screenEdges: { top: true, bottom: false, left: false, right: true },
+      screenEdges: { top: true, bottom: false, left: true, right: false },
     })
-    expect(corner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 24, right: 12 })
+    expect(corner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 24, left: 12 })
     corner.unmount()
 
     const inner = renderStrip({
       ...props,
-      screenEdges: { top: true, bottom: false, left: true, right: false },
+      screenEdges: { top: true, bottom: false, left: false, right: true },
     })
     expect(inner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 59 })
   })
 
-  it("turns the attacker's own cell into the finish button, its mark showing an X", () => {
-    const onSubmit = jest.fn()
-    const view = renderStrip({
-      source: { active: true, flight: makeMutable(1), submit: "done", acted: false, onSubmit },
-    })
-    const finish = view.getByRole("button", {
-      name: "Done assigning commander damage from seat 1",
-    })
-    expect(finish).toBe(view.getByTestId("commander-exit-seat-1"))
-    expect(
-      within(
-        view.getByTestId("commander-exit-x-seat-1", { includeHiddenElements: true }),
-      ).getByTestId("player-mark-close", { includeHiddenElements: true }),
-    ).toBeTruthy()
-    fireEvent.press(finish)
-    expect(onSubmit).toHaveBeenCalledTimes(1)
+  it("steps along its edge by half the pentagon when the menu sits on its corner", () => {
+    const upright = renderStrip({ incoming: damaged, menuCorner: "topLeft" })
+    expect(upright.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 12, left: 52 })
+    upright.unmount()
+
+    const sideways = renderStrip({ incoming: damaged, contentRotation: 90, menuCorner: "topRight" })
+    expect(sideways.getByTestId("commander-strip-seat-1")).toHaveStyle({ right: 12, top: 52 })
+    sideways.unmount()
+
+    const elsewhere = renderStrip({ incoming: damaged, menuCorner: "bottomRight" })
+    expect(elsewhere.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 12, left: 12 })
   })
 
-  it("gives each partner its own chip once both have dealt damage, each ringed against lethal on its own", () => {
+  it("lights the attacker's square and labels its total while it attacks", () => {
+    const view = renderStrip({ attack: { attackerId: players[1].id } })
+    expect(view.getByTestId("commander-lit-seat-1")).toBeTruthy()
+    expect(view.getByLabelText("0 commander damage from Bo")).toBeTruthy()
+  })
+
+  it("cuts one square across for partners that have both dealt damage, each half tiered against lethal on its own", () => {
     const cy = players[2].id
     const view = renderStrip({ incoming: damaged, split: { [cy]: [21, 5] } })
-    const chip = (suffix: string) =>
+    const half = (suffix: string) =>
       view.getByTestId(`commander-pip-seat-1-${cy}${suffix}`, { includeHiddenElements: true })
-    expect(chip("")).toHaveTextContent("21")
-    expect(chip("-partner")).toHaveTextContent("5")
-    expect(chip("")).toHaveStyle({ borderWidth: 2.5 })
-    expect(chip("-partner")).toHaveStyle({ borderWidth: 1 })
-    view.getByRole("button", {
-      name: "Assign commander damage from Seat 1, Ada. Taken: 21 from Cy, 5 from Cy",
-    })
+    expect(half("")).toHaveTextContent("21")
+    expect(half("-partner")).toHaveTextContent("5")
+    // why: a 26pt square cut across by a 1pt gap.
+    expect(half("")).toHaveStyle({ height: 12.5, borderBottomWidth: 0 })
+    expect(half("-partner")).toHaveStyle({ height: 12.5, borderTopWidth: 0 })
+    expect(half("")).toHaveStyle({ borderWidth: 2.5, backgroundColor: "#FFFFFF" })
+    expect(half("-partner")).toHaveStyle({ borderWidth: 1, backgroundColor: "#3A7358" })
+    view.unmount()
 
-    view.rerender(
-      <ThemeProvider initialContext="dark">
-        <CommanderStrip
-          seatNumber={1}
-          identity="Seat 1, Ada"
-          ownerPlayerId={players[0].id}
-          players={players}
-          seats={seats}
-          incoming={damaged}
-          split={{ [cy]: [21, 0] }}
-          lethal={21}
-          foreground="#FFFFFF"
-          cardColor="#41476E"
-          contentRotation={0}
-        />
-      </ThemeProvider>,
-    )
+    const one = renderStrip({ incoming: damaged, split: { [cy]: [21, 0] } })
     expect(
-      view.queryByTestId(`commander-pip-seat-1-${cy}-partner`, { includeHiddenElements: true }),
+      one.queryByTestId(`commander-pip-seat-1-${cy}-partner`, { includeHiddenElements: true }),
     ).toBeNull()
-  })
-
-  it("keeps the grid's touch slop toward the card's edges, off the − and + and the total", () => {
-    const view = renderStrip({ incoming: damaged })
-    const map = view.getByTestId("commander-map-seat-1")
-    fireEvent(map, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 40, height: 40 } } })
-    expect(view.getByTestId("commander-map-seat-1").props.hitSlop).toMatchObject({
-      top: 0,
-      right: 0,
-    })
   })
 
   it("rims an attacker from half of lethal and fills its disc with the seat's ink within five of it", () => {

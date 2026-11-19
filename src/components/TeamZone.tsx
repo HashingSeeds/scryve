@@ -8,7 +8,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { BoardPressable } from "./BoardPressable"
 import { contentFrame, CounterChips, DICE_ONLY_SEAT, type SeatTable } from "./CounterChips"
 import type { SeatDiceBag } from "./DiceSeatOverlay"
-import { COMPACT_MENU_BUTTON_SIZE, MENU_BUTTON_SIZE } from "./GameRadialMenu"
+import { COMPACT_MENU_BUTTON_SIZE, MENU_BUTTON_SIZE, menuCornerStep } from "./GameRadialMenu"
 import {
   cornerOffset,
   type LifeCardContentInsets,
@@ -38,8 +38,6 @@ export type TeamSheetOwner = "zone" | 0 | 1
 
 const SIDES = ["left", "right"] as const
 type Side = (typeof SIDES)[number]
-
-const touches = (corner: LifeCardMenuCorner, edge: string) => corner.toLowerCase().includes(edge)
 
 export function TeamCorners({
   heads,
@@ -81,9 +79,7 @@ export function TeamCorners({
   const menuHalf = (compact ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE) / 2
   const inset = (side: Side, end: "top" | "bottom") =>
     cornerOffset(gap, edges[side], edges[end], contentInsets, screenEdges) +
-    (menuCorner && touches(menuCorner, edges[side]) && touches(menuCorner, edges[end])
-      ? menuHalf
-      : 0)
+    menuCornerStep(menuCorner, edges[end], edges[side], compact)
   const topMenu = menuEdgeCenter === edges.top ? menuHalf : 0
   const nameAlong = SIDES.map((side) => inset(side, "top"))
   const nameTop = SIDES.map((side) =>

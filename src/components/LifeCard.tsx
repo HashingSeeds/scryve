@@ -12,7 +12,6 @@ import Animated, {
   FadeIn,
   FadeOut,
   LayoutAnimationConfig,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -21,7 +20,7 @@ import Animated, {
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { CommanderBoardPlayer, LifeDelta, PlayerId } from "@/features/game/types"
-import { formatEquation, formatNumber } from "@/i18n/format"
+import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -33,7 +32,7 @@ import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 import { BoardPressable } from "./BoardPressable"
 import {
   ATTACK_SHADE,
-  DAMAGE_INK,
+  strikeRoom,
   CommanderDamageCardControls,
   shadowReached,
   SWAP_MS,
@@ -44,7 +43,6 @@ import {
   type ArmedCommander,
   type CommanderAttacker,
   type CommanderDamageCardMode,
-  attackerLayout,
   attackerLifeSlot,
 } from "./CommanderDamageCardControls"
 import {
@@ -55,12 +53,11 @@ import {
   OUT_CAUSE_GLYPH,
   OUT_LABEL,
   outInk,
-  stackedReadout,
   type CommanderBoardSeat,
   type CommanderFacing,
   type CommanderReach,
 } from "./commanderDamageLayout"
-import { CommanderStrip, commanderGridShown, commanderStripCorner } from "./CommanderStrip"
+import { CommanderStrip, commanderGridShown } from "./CommanderStrip"
 import {
   CounterChips,
   DICE_ONLY_SEAT,
@@ -70,6 +67,7 @@ import {
 } from "./CounterChips"
 import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
+import { menuCornerStep } from "./GameRadialMenu"
 import { CalculatorGlyph, LifeCalculator } from "./LifeCalculator"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
@@ -89,7 +87,6 @@ import {
   cornerStep,
   useCornerSlide,
   CUTOUT_ENDS_INSIDE_INSET,
-  SCREEN_CORNER_CLEARANCE,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardScreenEdges,
@@ -98,6 +95,7 @@ import {
 } from "./playerCardTypes"
 import { CONTENT_EDGES } from "./playerGridGeometry"
 import { MarkArt, PlayerMark } from "./PlayerMark"
+import { menuClearance } from "./pokemon/pokemonCardLayout"
 import {
   SeatIdentity,
   seatIdentityBottomGap,
@@ -105,6 +103,7 @@ import {
   seatIdentityMetrics,
   seatMarkArt,
 } from "./SeatIdentity"
+import { SeatSword } from "./SeatSword"
 import { TeamCorners, type TeamHead, type TeamSheetOwner } from "./TeamZone"
 import { Text } from "./Text"
 import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
@@ -130,14 +129,17 @@ export type LifeCardCommanderDamage = {
   onPower?: (power: number, index: number) => void
   facing?: CommanderFacing
   reach?: CommanderReach
+  /** why: what the next hit deals per commander, and in all. */
+  steps?: readonly number[]
   dealt?: number
+  /** why: each of this attack's hits on this seat, oldest first. */
+  hits?: readonly number[]
   takeBack?: number
   /** why: how much of this attack's damage the defender's life already shows, so its readout can name the life it started from. */
   applied?: number
   onSit?: (slot: number) => void
   onHit?: () => void
   onUndo?: () => void
-  acted?: boolean
   armBar?: { stagedTargets: number; onSend: () => void }
 }
 
@@ -179,12 +181,6 @@ export interface LifeCardProps {
 }
 
 /** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. PlayerGrid rebuilds plain props (insets, styles, commander data) each render, so they compare by content, and it keeps every callback's identity stable. */
-// why: the commander's share is colored, so the equation splits after its first number while its isolates still wrap both parts.
-function splitAttackEquation({ from, commander }: { from: number; commander: number }) {
-  const equation = formatEquation(from, "−", commander)
-  const split = equation.indexOf(formatNumber(from)) + formatNumber(from).length
-  return [equation.slice(0, split), equation.slice(split)] as const
-}
 
 export const LifeCard = memo(function LifeCard({
   playerId,
@@ -323,40 +319,8 @@ export const LifeCard = memo(function LifeCard({
   const causeGlyphShown =
     out?.cause === "counter" || !!(out?.cause === "commanderDamage" && out.attacker)
   const incoming = armedCommanders.reduce((sum, { landed = 0 }) => sum + landed, 0)
-  const attackParts =
-    defending && commanderDamage && incoming
-      ? { from: life + (commanderDamage.applied ?? 0), commander: incoming }
-      : undefined
-  // why: the line fades out with the last attack's numbers rather than going blank as it goes.
-  const lastAttack = useRef(attackParts)
-  if (attackParts) lastAttack.current = attackParts
-  const shownAttack = attackParts ?? lastAttack.current
-  const attackChars = shownAttack
-    ? formatNumber(shownAttack.from).length + formatNumber(shownAttack.commander).length + 3
-    : 0
-  const attackEquation = shownAttack ? splitAttackEquation(shownAttack) : ["", ""]
-  const stacked = stackedReadout(resolvedLifeFontSize, shownDigits, attackChars)
-  const lifeRise = lifeInk(resolvedLifeFontSize, shownDigits).y
-  const stack = useSharedValue(0)
-  const landed = !!attackParts
-  useEffect(() => {
-    stack.value = withTiming(landed ? 1 : 0, {
-      duration: motionDuration(reducedMotion, STACK_MS),
-      easing: Easing.out(Easing.cubic),
-    })
-  }, [landed, reducedMotion, stack])
-  const lifeStackStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateY: stack.value * (lifeRise + stacked.lifeShift - lifeRise * stacked.scale),
-      },
-      { scale: 1 - stack.value * (1 - stacked.scale) },
-    ],
-  }))
-  const incomingStyle = useAnimatedStyle(() => ({
-    opacity: stack.value,
-    transform: [{ translateY: lifeRise + stacked.lineShift + (1 - stack.value) * 6 }],
-  }))
+  // why: a connected attack holds its hits until it is sent, so the defender's total already counts them down as they land.
+  const held = defending && commanderDamage ? incoming - (commanderDamage.applied ?? 0) : 0
   const readoutInk = !out
     ? lifeInk(resolvedLifeFontSize, shownDigits)
     : out.cause === "life"
@@ -382,19 +346,63 @@ export const LifeCard = memo(function LifeCard({
           lifeFontSize: resolvedLifeFontSize,
           ink: readoutInk,
           reach: commanderDamage?.reach,
+          side: strikeRoom(compact),
         })
       : undefined
   const floodedBy = useCommanderTakeover(takeover, {
     id: armedCommanderId,
     color: commanderDamage?.attacker?.color,
   })
+  const trailingButtonSize = seatBagSize(compact)
+  const identityMetrics = seatIdentityMetrics(compact)
+  const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
+  const identityCorner = seatIdentityPlacement({
+    rotation: contentRotation,
+    cardSize,
+    gap: identityMetrics.edge,
+    insets: contentInsets,
+    screenEdges,
+    markHeight: markArt.height,
+    buttonSize: trailingButtonSize,
+  })
+  // why: an attacker's total shrinks into the head corner, clear of its power boxes, and grows back after, one number throughout, turning regular weight once it lands.
+  const lifeSlot =
+    commanderSeat && cardSize.width > 0
+      ? attackerLifeSlot({
+          space: sidewaysContent ? { width: cardSize.height, height: cardSize.width } : cardSize,
+          digits: shownDigits,
+          compact,
+          gap: identityMetrics.edge,
+          menu: menuCornerStep(
+            menuCorner,
+            CONTENT_TOP_EDGE[contentRotation],
+            CONTENT_LEFT_EDGE[contentRotation],
+            compact,
+          ),
+          foot: team
+            ? {
+                y:
+                  (sidewaysContent ? cardSize.width : cardSize.height) / 2 -
+                  Number(identityCorner.position.bottom ?? 0) -
+                  markArt.height / 2,
+                beside: identityMetrics.icon / 2 + identityMetrics.gap,
+              }
+            : undefined,
+        })
+      : undefined
+  // why: the attacker's power boxes sit between its life in the head corner, or a pentagon on its head edge, and its name row at the foot.
+  const attackerBands = lifeSlot
+    ? {
+        head: Math.max(
+          lifeSlot.band,
+          menuClearance(contentRotation, menuCorner, menuEdgeCenter).top,
+        ),
+        foot: Number(identityCorner.position.bottom ?? 0) + markArt.height,
+      }
+    : undefined
   // why: an attacker typing a power hides its own life total, which sits where the in-card keypad opens. A new attack starts with it shown.
   const [powerEditing, setPowerEditing] = useState(false)
   if (powerEditing && armedCommanderId !== commanderDamage?.ownerPlayerId) setPowerEditing(false)
-  const grid =
-    stripBounds && cardSize.width > 0
-      ? gridReach(stripBounds, cardSize, sidewaysContent)
-      : undefined
   const commanderCardMode: CommanderDamageCardMode | undefined =
     commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
@@ -404,10 +412,9 @@ export const LifeCard = memo(function LifeCard({
           mark: { color, shape, seatNumber },
           commanders: armedCommanders,
           onSit: commanderDamage.onSit ?? (() => {}),
-          acted: !!commanderDamage.acted,
           onPower: commanderDamage.onPower ?? (() => {}),
           onEditing: setPowerEditing,
-          grid,
+          bands: attackerBands,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
         }
       : commanderDamage && defending
@@ -418,12 +425,13 @@ export const LifeCard = memo(function LifeCard({
             attacker: commanderDamage.attacker,
             commanders: armedCommanders,
             lethal: commanderDamage.lethal,
+            life: life - held,
             facing: commanderDamage.facing ?? {},
-            stripCorner: commanderStripCorner(contentRotation),
             takeover,
             wave: floodedBy.wave,
-            acted: !!commanderDamage.acted,
+            steps: commanderDamage.steps ?? [],
             dealt: commanderDamage.dealt ?? 0,
+            hits: commanderDamage.hits ?? [],
             takeBack: commanderDamage.takeBack ?? 0,
             onHit: commanderDamage.onHit ?? (() => {}),
             onUndo: commanderDamage.onUndo ?? (() => {}),
@@ -478,21 +486,6 @@ export const LifeCard = memo(function LifeCard({
       : fitWave.value
     return { transform: [{ scale: 1 + (readoutFit - 1) * reached }] }
   })
-  // why: an attacker's total shrinks into its slot under the power boxes and grows back after, one number throughout, turning regular weight once it lands. The slot keeps the attack's partner count after it ends, so the total grows back from where it sat.
-  const [slotCommanders, setSlotCommanders] = useState(armedCommanders.length)
-  if (attackerSide && slotCommanders !== armedCommanders.length)
-    setSlotCommanders(armedCommanders.length)
-  const lifeSlot =
-    commanderSeat && cardSize.width > 0
-      ? attackerLifeSlot(
-          attackerLayout({
-            space: sidewaysContent ? { width: cardSize.height, height: cardSize.width } : cardSize,
-            count: slotCommanders,
-            compact,
-            grid,
-          }),
-        )
-      : undefined
   const toSlot = attackerSide && !!lifeSlot
   const [lifeInSlot, setLifeInSlot] = useState(false)
   if (lifeInSlot && !toSlot) setLifeInSlot(false)
@@ -505,8 +498,7 @@ export const LifeCard = memo(function LifeCard({
   const slotPose =
     toSlot && lifeSlot
       ? {
-          x: -lifeSlot.belowCardCenter * Math.round(Math.sin((contentRotation * Math.PI) / 180)),
-          y: lifeSlot.belowCardCenter * Math.round(Math.cos((contentRotation * Math.PI) / 180)),
+          ...turnedOffset(lifeSlot, contentRotation),
           scale: lifeSlot.fontSize / resolvedLifeFontSize,
         }
       : { x: 0, y: 0, scale: 1 }
@@ -525,21 +517,8 @@ export const LifeCard = memo(function LifeCard({
   const slotAt = {
     transform: [{ translateX: slotPose.x }, { translateY: slotPose.y }, { scale: slotPose.scale }],
   }
-  // why: the attacker's mark flies into its grid as the life total swaps for the power boxes, and back out after, so the grid stays up until the mark has landed home.
-  const sourceFlight = useSharedValue(attackerSide ? 1 : 0)
-  const [sourceLanding, setSourceLanding] = useState(false)
-  useEffect(() => {
-    if (attackerSide) setSourceLanding(true)
-    sourceFlight.value = withTiming(
-      attackerSide ? 1 : 0,
-      { duration: lifeFadeDuration },
-      (finished) => {
-        if (finished && !attackerSide) runOnJS(setSourceLanding)(false)
-      },
-    )
-  }, [attackerSide, lifeFadeDuration, sourceFlight])
-  // why: web lets a box-none child take touches under a parent set to none, so the fading mark's whole chain turns off to leave the X its taps.
-  const cornerTouches = attackerSide ? "none" : "box-none"
+  // why: while a seat attacks or defends, its mark and name show who it is and take no touches; the row stays open for the attacker's check.
+  const cornerTouches = commanderCardMode ? "none" : "box-none"
   const knock = useSharedValue(0)
   const defenderTotal =
     commanderCardMode?.kind === "target"
@@ -573,21 +552,20 @@ export const LifeCard = memo(function LifeCard({
   const lifeControlsShown =
     !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
-  const trailingButtonSize = seatBagSize(compact)
-  const sourceShown = attackerSide || sourceLanding
-  // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card.
+  // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card. The attacker's own grid steps aside for its power boxes.
   const commanderStripShown =
     commanderSeat &&
-    (!commanderCovers || defending || attackerSide) &&
+    !attackerSide &&
+    (!commanderCovers || defending) &&
     !tableSheetOpen &&
     !diceCovers &&
     commanderGridShown({
       players: commanderDamage.players ?? [],
       ownerPlayerId: commanderDamage.ownerPlayerId,
       incoming: commanderDamage.incoming,
-      attacked: !!stripAttackerId || sourceShown,
+      attacked: !!stripAttackerId,
     })
-  // why: a grid grown only for an attack is mid-flight to or from the mark while the − and + fade, so only a grid that stays slides the glyph at its end.
+  // why: a grid shown only for an attack fades with the − and +, so only a grid that stays slides the glyph clear of it.
   const stripStays =
     !!commanderDamage &&
     commanderStripShown &&
@@ -597,17 +575,6 @@ export const LifeCard = memo(function LifeCard({
       incoming: commanderDamage.incoming,
       attacked: false,
     })
-  const identityMetrics = seatIdentityMetrics(compact)
-  const markArt = seatMarkArt(shape ?? shapeForSeat(seatNumber), compact)
-  const identityCorner = seatIdentityPlacement({
-    rotation: contentRotation,
-    cardSize,
-    gap: identityMetrics.edge,
-    insets: contentInsets,
-    screenEdges,
-    markHeight: markArt.height,
-    buttonSize: trailingButtonSize,
-  })
   // why: a seat someone else holds keeps its own bag on its own device.
   const seatBag = ownership === "unowned" || frozen ? undefined : dice?.bag
   const rowCap = team
@@ -618,7 +585,7 @@ export const LifeCard = memo(function LifeCard({
   const [sharedRowWidth, setSharedRowWidth] = useState(0)
   const zoneRun = sidewaysContent ? cardSize.height : cardSize.width
   // why: during an attack the attacker's controls and the defender's disc lay out around a corner grid, so a team's grid leaves the centered row for its corner until the attack has drained.
-  const gridCentered = !!team && !shownCardMode && !sourceShown
+  const gridCentered = !!team && !shownCardMode
   const teamRow = team
     ? centeredRow(zoneRun, identityMetrics.gap, [
         diceChips?.length ? (identityRowAt?.width ?? 0) : 0,
@@ -660,41 +627,28 @@ export const LifeCard = memo(function LifeCard({
     if (nameRetracted && shownChipWidth > bareMarkRoom)
       setChipSize((size) => (size === "full" ? "number" : "pass"))
   }, [rowChip, nameRetracted, shownChipWidth, bareMarkRoom])
-  const markAnchor =
-    cardSize.width > 0
-      ? identityMarkCenter({
-          rotation: contentRotation,
-          cardSize,
-          left: Number(identityCorner.position.left ?? 0),
-          bottom: Number(identityCorner.position.bottom ?? 0),
-          art: markArt,
-          size: markArt.size,
-        })
-      : undefined
-  const nameFadeStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(commanderStripShown ? 0 : 1, { duration: lifeFadeDuration }),
-  }))
   const seatRun = Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width
-  // why: a name cut to a few letters reads worse than none, so in commander games short seats keep just their mark from the start; judged by seat length alone so seats of one size match.
+  // why: a name cut to a few letters reads worse than none, so in commander games short seats keep just their mark and sword from the start; judged by seat length alone so seats of one size match.
   const markOnly =
     commanderSeat &&
     seatRun > 0 &&
-    seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.icon - identityMetrics.gap <
+    seatRun / 2 - identityMetrics.edge * 2 - (identityMetrics.icon + identityMetrics.gap) * 2 <
       MIN_NAME_ROOM
+  // why: commander seats carry a sword after the name that starts an attack, and holds the check that ends it; a defender's row only says whose seat it is. A team zone starts attacks from its heads' marks, so its row holds only the check.
+  const swordShown = commanderSeat && (team ? attackerSide : !commanderCardMode || attackerSide)
+  const swordRoom = swordShown ? identityMetrics.icon + identityMetrics.gap : 0
+  const rowInk = floodedBy.takeover ? SHADOW_INK : foreground
   const seatIdentity = (
     <SeatIdentity
       seatNumber={seatNumber}
       playerName={displayName}
       shape={shape}
-      color={foreground}
+      color={rowInk}
       compact={compact}
-      insetSwordColor={commanderDamage ? color : undefined}
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
       markOnly={markOnly}
       nameRetracted={nameRetracted}
-      markHidden={commanderStripShown}
-      nameStyle={nameFadeStyle}
     />
   )
 
@@ -712,7 +666,7 @@ export const LifeCard = memo(function LifeCard({
   const lifeTotal = (...style: StyleProp<TextStyle>[]) => (
     <Text
       testID={`life-total-seat-${seatNumber}`}
-      text={shownLife}
+      text={shownLife - held}
       weight={lifeLanded ? "normal" : "bold"}
       accessible
       accessibilityLabel={translate("board:counters.seatItem", {
@@ -786,7 +740,7 @@ export const LifeCard = memo(function LifeCard({
           themed($content),
           readoutFitStyle,
           floodedBy.takeover && $aboveFlood,
-          sourceShown && $aboveAttackerControls,
+          attackerSide && $aboveAttackerControls,
         ]}
       >
         <Animated.View
@@ -841,29 +795,7 @@ export const LifeCard = memo(function LifeCard({
               testID={`life-upright-seat-${seatNumber}`}
               style={[$outReadout, contentRotationStyle]}
             >
-              <Animated.View style={[$outReadout, lifeStackStyle]}>
-                {lifeTotal(lifeFontStyle)}
-              </Animated.View>
-              {shownAttack ? (
-                <Animated.View pointerEvents="none" style={[$incomingSlot, incomingStyle]}>
-                  <Text
-                    testID={`life-incoming-seat-${seatNumber}`}
-                    weight="bold"
-                    accessible={false}
-                    maxFontSizeMultiplier={1}
-                    numberOfLines={1}
-                    style={[$outAmount, { color: foreground }]}
-                  >
-                    {attackEquation[0]}
-                    <Text
-                      text={attackEquation[1]}
-                      weight="bold"
-                      maxFontSizeMultiplier={1}
-                      style={[$outAmount, $hurtInk, { color: DAMAGE_INK }]}
-                    />
-                  </Text>
-                </Animated.View>
-              ) : null}
+              {lifeTotal(lifeFontStyle)}
             </View>
           )}
         </Animated.View>
@@ -884,7 +816,6 @@ export const LifeCard = memo(function LifeCard({
             foreground={foreground}
             contentRotation={contentRotation}
             contentInsets={contentInsets}
-            menuCorner={menuCorner}
             compact={compact}
             mode={shownCardMode}
             draining={!commanderCardMode}
@@ -947,49 +878,32 @@ export const LifeCard = memo(function LifeCard({
           split={stripSplit}
           lethal={commanderDamage.lethal}
           foreground={stripAttack ? SHADOW_INK : foreground}
-          cardColor={color}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           screenEdges={screenEdges}
+          menuCorner={menuCorner}
           compact={compact}
-          from={gridCentered ? teamRow?.starts[1] : undefined}
+          foot={team ? { from: gridCentered ? teamRow?.starts[1] : undefined } : undefined}
           attack={stripAttack}
-          source={
-            sourceShown
-              ? {
-                  active: attackerSide,
-                  flight: sourceFlight,
-                  submit: commanderCardMode?.kind === "source" ? commanderCardMode.submit : "done",
-                  acted: !!commanderDamage.acted,
-                  onSubmit:
-                    commanderCardMode?.kind === "source" ? commanderCardMode.onSubmit : () => {},
-                }
-              : undefined
-          }
-          markAnchor={markAnchor}
-          disabled={!!disabled || sittingOut}
-          onPress={commanderDamage.onPressSword}
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {cornerMeasured && (!commanderCovers || attackerSide) && !tableSheetOpen && !dice?.view ? (
+      {cornerMeasured && !tableSheetOpen && !dice?.view ? (
         // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
         <Animated.View
           key={contentRotation}
           testID={`life-corner-layer-seat-${seatNumber}`}
-          pointerEvents={cornerTouches}
-          aria-hidden={attackerSide}
-          accessibilityElementsHidden={attackerSide}
-          importantForAccessibility={attackerSide ? "no-hide-descendants" : "auto"}
+          pointerEvents="box-none"
           style={[
             themed($cornerLayer),
             identityCorner.layer,
             { transform: [{ rotate: `${contentRotation}deg` }] },
+            floodedBy.takeover && $aboveFlood,
           ]}
         >
           <Animated.View
             testID={`life-identity-row-seat-${seatNumber}`}
-            pointerEvents={cornerTouches}
+            pointerEvents="box-none"
             layout={cornerSlide}
             onLayout={({ nativeEvent: { layout } }) =>
               setIdentityRowAt((current) =>
@@ -1015,19 +929,15 @@ export const LifeCard = memo(function LifeCard({
               onLayout={({ nativeEvent: { layout } }) => {
                 if (!nameRetracted) setFullIdentityWidth(layout.width)
               }}
-              // why: the corner layer draws above the grid, so the hidden mark and name would swallow touches meant for the grid's lower chips.
-              pointerEvents={commanderStripShown ? "none" : cornerTouches}
+              pointerEvents={cornerTouches}
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
                 $cornerIdentity,
                 // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
-                commanderSeat && { maxWidth: identityCorner.position.maxWidth },
-                !team &&
-                  commanderStripShown &&
-                  stripBounds &&
-                  !!diceChips?.length && {
-                    minWidth: sidewaysContent ? stripBounds.height : stripBounds.width,
+                commanderSeat &&
+                  typeof identityCorner.position.maxWidth === "number" && {
+                    maxWidth: Math.max(identityCorner.position.maxWidth - swordRoom, 0),
                   },
               ]}
             >
@@ -1042,10 +952,10 @@ export const LifeCard = memo(function LifeCard({
                     { identity },
                   )}
                   accessibilityState={{ disabled: !!disabled || sittingOut }}
-                  accessible={!commanderStripShown}
-                  accessibilityElementsHidden={commanderStripShown}
-                  importantForAccessibility={commanderStripShown ? "no-hide-descendants" : "auto"}
-                  disabled={disabled || sittingOut || commanderStripShown}
+                  accessible={!commanderCardMode}
+                  accessibilityElementsHidden={!!commanderCardMode}
+                  importantForAccessibility={commanderCardMode ? "no-hide-descendants" : "auto"}
+                  disabled={disabled || sittingOut || !!commanderCardMode}
                   hitSlop={8}
                   onPress={commanderDamage.onPressSword}
                   style={({ pressed }) => pressed && { opacity: 0.72 }}
@@ -1056,11 +966,26 @@ export const LifeCard = memo(function LifeCard({
                 <View pointerEvents="none">{seatIdentity}</View>
               )}
             </View>
+            {swordShown && commanderDamage ? (
+              <SeatSword
+                seatNumber={seatNumber}
+                identity={identity}
+                color={rowInk}
+                size={identityMetrics.icon}
+                finish={
+                  commanderCardMode?.kind === "source"
+                    ? { submit: commanderCardMode.submit, onPress: commanderCardMode.onSubmit }
+                    : undefined
+                }
+                disabled={!!disabled || sittingOut}
+                onPress={commanderDamage.onPressSword}
+              />
+            ) : null}
             {diceChips?.length &&
             dice?.onPressChip &&
             !dice.view &&
             !editorOpen &&
-            !attackerSide ? (
+            !shownCardMode ? (
               <DiceChips
                 seatNumber={seatNumber}
                 playerName={displayName}
@@ -1248,7 +1173,6 @@ export function centeredRow(run: number, gap: number, widths: readonly number[])
   return { start, end: start + total, starts }
 }
 
-const STACK_MS = 260
 const KNOCKBACK = 12
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -1341,36 +1265,12 @@ const CONTENT_BOTTOM_EDGE = {
   [-90]: "right",
 } as const
 
-/** why: the row is laid out upright and centered on the card, then rotated, so its mark turns about the card center. */
-export function identityMarkCenter({
-  rotation,
-  cardSize,
-  left,
-  bottom,
-  art,
-  size,
-}: {
-  rotation: LifeCardContentRotation
-  cardSize: { width: number; height: number }
-  left: number
-  bottom: number
-  art: { width: number; height: number }
-  size: number
-}) {
-  const sideways = Math.abs(rotation) === 90
-  const frame = sideways
-    ? { width: cardSize.height, height: cardSize.width }
-    : { width: cardSize.width, height: cardSize.height }
-  const x = left + art.width / 2 - frame.width / 2
-  const y = frame.height - bottom - art.height / 2 - frame.height / 2
+/** why: an offset laid out in the seat's upright frame, turned with its content onto the card. */
+function turnedOffset({ x, y }: { x: number; y: number }, rotation: LifeCardContentRotation) {
   const turn = (rotation * Math.PI) / 180
   const cos = Math.round(Math.cos(turn))
   const sin = Math.round(Math.sin(turn))
-  return {
-    x: cardSize.width / 2 + x * cos - y * sin,
-    y: cardSize.height / 2 + x * sin + y * cos,
-    size,
-  }
+  return { x: x * cos - y * sin, y: x * sin + y * cos }
 }
 
 /** why: the layer swaps its sides before turning sideways; turned as is, the identity pokes past the card. */
@@ -1458,36 +1358,7 @@ const $lockedOverlay: ViewStyle = { zIndex: 9 }
 
 const $aboveOutOverlay: ViewStyle = { zIndex: 3 }
 
-/** why: how far a corner grid reaches in from the nearer end of each seat axis (width, and up from its foot). A grid in a screen corner sits further in, so every seat allows that clearance and attacker boxes match. */
-function gridReach(
-  bounds: LayoutRectangle,
-  card: { width: number; height: number },
-  sideways: boolean,
-) {
-  const along = (length: number, start: number, size: number) =>
-    Math.max(
-      start * 2 + size < length ? start + size : length - start,
-      size + SCREEN_CORNER_CLEARANCE,
-    )
-  return {
-    width: sideways
-      ? along(card.height, bounds.y, bounds.height)
-      : along(card.width, bounds.x, bounds.width),
-    height: sideways
-      ? along(card.width, bounds.x, bounds.width)
-      : along(card.height, bounds.y, bounds.height),
-  }
-}
-
 const $outReadout: ViewStyle = { width: "100%", alignItems: "center" }
-const $incomingSlot: ViewStyle = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  top: "50%",
-  marginTop: -OUT_CAUSE.lineHeight / 2,
-  alignItems: "center",
-}
 const $powerEditingHidden: ViewStyle = { opacity: 0 }
 
 const $outCause: ViewStyle = {
@@ -1496,13 +1367,6 @@ const $outCause: ViewStyle = {
   gap: OUT_CAUSE_GAP,
   height: OUT_CAUSE.lineHeight,
   marginTop: OUT_CAUSE.marginTop,
-}
-
-// why: red and orange digits sit on any seat's color, so a dark halo keeps them legible on a red or orange disc.
-const $hurtInk: TextStyle = {
-  textShadowColor: "rgba(0, 0, 0, 0.7)",
-  textShadowRadius: 4,
-  textShadowOffset: { width: 0, height: 0 },
 }
 
 const $outAmount: TextStyle = {

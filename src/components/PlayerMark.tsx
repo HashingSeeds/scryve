@@ -1,13 +1,10 @@
 import { memo, useId } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
-import Animated, { ZoomIn } from "react-native-reanimated"
+import { View } from "react-native"
 import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg"
 
-import { radius } from "@/theme/radius"
 import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
-import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
@@ -50,15 +47,11 @@ export interface PlayerMarkProps {
   shape?: PlayerMarkShape
   rotation?: LifeCardContentRotation
   insetSwordColor?: string
-  insetCheck?: boolean
-  closeIcon?: boolean
   foil?: boolean
   foilBackdrop?: string
   size?: number
   style?: StyleProp<ViewStyle>
 }
-
-const CLOSE_POP_MS = 200
 
 /** why: each mark is an SVG, and cards re-render around it on every life change with the same mark. */
 export const PlayerMark = memo(function PlayerMark({
@@ -67,8 +60,6 @@ export const PlayerMark = memo(function PlayerMark({
   shape: chosenShape,
   rotation = 0,
   insetSwordColor,
-  insetCheck = false,
-  closeIcon = false,
   foil = false,
   foilBackdrop,
   size = 44,
@@ -76,11 +67,9 @@ export const PlayerMark = memo(function PlayerMark({
 }: PlayerMarkProps) {
   const shape = chosenShape ?? shapeForSeat(seatNumber)
   const foilId = `foil-${useId().replace(/[^A-Za-z0-9]/g, "")}`
-  const reducedMotion = useReducedMotion()
   const rotationStyle: ViewStyle | undefined = rotation
     ? { transform: [{ rotate: `${rotation}deg` }] }
     : undefined
-  const closeEntering = reducedMotion === false ? ZoomIn.duration(CLOSE_POP_MS) : undefined
 
   return (
     <View
@@ -99,17 +88,8 @@ export const PlayerMark = memo(function PlayerMark({
           solid={!!insetSwordColor}
           testID={`player-mark-shape-${shape}`}
         />
-        {insetSwordColor && !closeIcon ? (
-          insetCheck ? (
-            <CheckInset shape={shape} color={insetSwordColor} />
-          ) : (
-            <SwordInset shape={shape} color={insetSwordColor} />
-          )
-        ) : null}
+        {insetSwordColor ? <SwordInset shape={shape} color={insetSwordColor} /> : null}
       </Svg>
-      {insetSwordColor && closeIcon ? (
-        <CloseIconOverlay shape={shape} color={insetSwordColor} entering={closeEntering} />
-      ) : null}
     </View>
   )
 }, structurallyEqual)
@@ -198,62 +178,10 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<PlayerMarkShape, Inset> = {
   tower: { centerX: 22, centerY: 24.5, size: 13 },
 }
 
-function CloseIconOverlay({
-  shape,
-  color,
-  entering,
-}: {
-  shape: PlayerMarkShape
-  color: string
-  entering: ReturnType<typeof ZoomIn.duration> | undefined
-}) {
-  const inset = SWORD_INSET_THAT_FITS_SHAPE[shape]
-  return (
-    <Animated.View
-      testID="player-mark-close"
-      entering={entering}
-      pointerEvents="none"
-      style={[
-        styles.closeIcon,
-        {
-          left: `${((inset.centerX - inset.size / 2) / 44) * 100}%`,
-          top: `${((inset.centerY - inset.size / 2) / 44) * 100}%`,
-          width: `${(inset.size / 44) * 100}%`,
-          height: `${(inset.size / 44) * 100}%`,
-        },
-      ]}
-    >
-      <View style={styles.closeIconPop}>
-        <View
-          style={[styles.closeBar, { backgroundColor: color, transform: [{ rotate: "45deg" }] }]}
-        />
-        <View
-          style={[styles.closeBar, { backgroundColor: color, transform: [{ rotate: "-45deg" }] }]}
-        />
-      </View>
-    </Animated.View>
-  )
-}
-
 function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
   return (
     <G testID="player-mark-sword" transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}>
       <SwordShapes color={color} />
-    </G>
-  )
-}
-
-function CheckInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
-  return (
-    <G testID="player-mark-check" transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}>
-      <Path
-        d="M4.5 12.5 9.5 17.5 19.5 6.5"
-        stroke={color}
-        strokeWidth={3.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
     </G>
   )
 }
@@ -430,21 +358,3 @@ function MarkShape({
       )
   }
 }
-
-const styles = StyleSheet.create({
-  closeBar: {
-    borderRadius: radius.full,
-    height: "20%",
-    left: "6%",
-    position: "absolute",
-    top: "40%",
-    width: "88%",
-  },
-  closeIcon: {
-    position: "absolute",
-  },
-  closeIconPop: {
-    height: "100%",
-    width: "100%",
-  },
-})

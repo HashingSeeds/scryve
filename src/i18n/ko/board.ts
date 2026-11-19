@@ -370,7 +370,6 @@ export default {
     amountFrom: "{{name}}: {{amount}}점",
     unknownAttacker: "커맨더",
     assignFrom: "{{identity}}의 커맨더 피해 지정",
-    assignFromWithDamage: "{{identity}}의 커맨더 피해 지정. 받은 피해: {{sources}}",
     assignFromStale: "{{identity}}의 커맨더 피해 지정, 최신 상태 아님",
   },
   outReason: {

@@ -417,7 +417,6 @@ export default {
     amountFrom: "{{amount}} من {{name}}",
     unknownAttacker: "القائد",
     assignFrom: "تعيين ضرر القائد من {{identity}}",
-    assignFromWithDamage: "تعيين ضرر القائد من {{identity}}. المأخوذ: {{sources}}",
     assignFromStale: "تعيين ضرر القائد من {{identity}}، قديم",
   },
   outReason: {

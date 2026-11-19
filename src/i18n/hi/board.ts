@@ -378,7 +378,6 @@ export default {
     amountFrom: "{{name}} से {{amount}}",
     unknownAttacker: "कमांडर",
     assignFrom: "{{identity}} से कमांडर डैमेज दें",
-    assignFromWithDamage: "{{identity}} से कमांडर डैमेज दें। मिला: {{sources}}",
     assignFromStale: "{{identity}} से कमांडर डैमेज दें, पुराना",
   },
   outReason: {

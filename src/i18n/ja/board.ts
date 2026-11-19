@@ -368,7 +368,6 @@ export default {
     amountFrom: "{{name}}から{{amount}}",
     unknownAttacker: "統率者",
     assignFrom: "{{identity}}からの統率者ダメージを記録する",
-    assignFromWithDamage: "{{identity}}からの統率者ダメージを記録する。受けた分：{{sources}}",
     assignFromStale: "{{identity}}からの統率者ダメージを記録する、情報が古い状態",
   },
   outReason: {

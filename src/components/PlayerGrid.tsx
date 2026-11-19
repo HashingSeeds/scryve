@@ -28,7 +28,9 @@ import type { ThemedStyle } from "@/theme/types"
 import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
+import { strikeTint } from "./CommanderDamageCardControls"
 import { commanderBoardSeats, commanderFacing, commanderReach } from "./commanderDamageLayout"
+import { CommanderFlights } from "./CommanderFlights"
 import { counterOutReason, seatTableState } from "./CounterChips"
 import { CounterNameHostContext, useCounterNameBoard } from "./CounterNamePanel"
 import type { LifeCardDice } from "./DiceSeatOverlay"
@@ -582,7 +584,9 @@ export function PlayerGrid({
                   rotation: seatRotations.get(armedIndex),
                 },
                 commanders: strike?.commanders,
+                steps: strike?.steps,
                 dealt: strike?.dealt,
+                hits: strike?.hits,
                 takeBack: strike?.takeBack,
                 applied: strike?.applied,
                 onPower: stable(`power:${owner.id}`, (power: number, slot: number) =>
@@ -607,7 +611,6 @@ export function PlayerGrid({
                       })
                     : undefined,
                 onPressSword: sword,
-                acted: attack.acted,
                 onHit: stable(`hit:${owner.id}`, () =>
                   attack.dispatch({ type: "hit", to: owner.id }),
                 ),
@@ -757,88 +760,94 @@ export function PlayerGrid({
       importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
       style={[$frame, covered && $covered]}
     >
-      <Animated.View
-        testID="player-grid"
-        accessibilityLabel={translate(`board:grid.label.${systemId}`, { count: players.length })}
-        onLayout={measureBoard}
-        style={[
-          themed($grid),
-          topEdgeBand ? { paddingTop: topEdgeBand } : null,
-          style,
-          boardOrientation && $fixedGrid,
-          boardOrientation && {
-            width,
-            height,
-            transform: [
-              { translateX: -width / 2 },
-              { translateY: -height / 2 },
-              { rotate: `${boardRotation}deg` },
-            ],
-          },
-          nativeBoardStyle,
-          (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
-        ]}
+      <CommanderFlights
+        attacker={armedIndex >= 0 ? armedIndex + 1 : null}
+        rotationOf={(seat) => boardRotation + (seatRotations.get(seat - 1) ?? 0)}
+        color={armedPlayer ? strikeTint(armedPlayer.color) : "#FFFFFF"}
       >
-        {rows.map((row, rowIndex) => (
-          <View
-            key={rowIndex}
-            testID={`player-grid-row-${rowIndex}`}
-            style={[themed($row), { flex: rowFlexes[rowIndex] }]}
-            onLayout={nameBoard.onRowLayout(rowIndex)}
-          >
-            {row.map((slot, columnIndex) => {
-              if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex)
-              const index = seatedRows[rowIndex]?.[columnIndex]
-              const frame = frames[rowIndex]?.[columnIndex]
-              if (!frame || index === null || index === undefined) {
+        <Animated.View
+          testID="player-grid"
+          accessibilityLabel={translate(`board:grid.label.${systemId}`, { count: players.length })}
+          onLayout={measureBoard}
+          style={[
+            themed($grid),
+            topEdgeBand ? { paddingTop: topEdgeBand } : null,
+            style,
+            boardOrientation && $fixedGrid,
+            boardOrientation && {
+              width,
+              height,
+              transform: [
+                { translateX: -width / 2 },
+                { translateY: -height / 2 },
+                { rotate: `${boardRotation}deg` },
+              ],
+            },
+            nativeBoardStyle,
+            (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
+          ]}
+        >
+          {rows.map((row, rowIndex) => (
+            <View
+              key={rowIndex}
+              testID={`player-grid-row-${rowIndex}`}
+              style={[themed($row), { flex: rowFlexes[rowIndex] }]}
+              onLayout={nameBoard.onRowLayout(rowIndex)}
+            >
+              {row.map((slot, columnIndex) => {
+                if (slot !== null && teams) return renderTeamPanel(slot, rowIndex, columnIndex)
+                const index = seatedRows[rowIndex]?.[columnIndex]
+                const frame = frames[rowIndex]?.[columnIndex]
+                if (!frame || index === null || index === undefined) {
+                  return (
+                    <View
+                      key={`empty-${rowIndex}-${columnIndex}`}
+                      testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                      style={themed($cell)}
+                    />
+                  )
+                }
+                const player = players[index]
+                const seatNumber = index + 1
+                const {
+                  rotation: contentRotation,
+                  screenEdges,
+                  contentInsets,
+                  menuCorner,
+                  menuEdgeCenter,
+                } = frame
+                const corners = getScreenCornerSquaringStyle({
+                  rows,
+                  rowIndex,
+                  columnIndex,
+                  insets: Platform.OS === "web" ? insets : undefined,
+                })
                 return (
+                  // why: keyed by seat, not player id, so a rematch reuses cards; remounting every seat kept old native animation memory.
                   <View
-                    key={`empty-${rowIndex}-${columnIndex}`}
-                    testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                    key={table?.tableRules.pokemon ? player.id : `seat-${index}`}
+                    testID={`player-cell-seat-${seatNumber}`}
                     style={themed($cell)}
-                  />
+                    onLayout={nameBoard.onCellLayout(`seat-${index}`, rowIndex)}
+                  >
+                    <CounterNameHostContext.Provider value={nameBoard.hostFor(`seat-${index}`)}>
+                      {seatCard(index, {
+                        contentRotation,
+                        screenEdges,
+                        contentInsets,
+                        menuCorner,
+                        menuEdgeCenter,
+                        style: corners,
+                      })}
+                    </CounterNameHostContext.Provider>
+                  </View>
                 )
-              }
-              const player = players[index]
-              const seatNumber = index + 1
-              const {
-                rotation: contentRotation,
-                screenEdges,
-                contentInsets,
-                menuCorner,
-                menuEdgeCenter,
-              } = frame
-              const corners = getScreenCornerSquaringStyle({
-                rows,
-                rowIndex,
-                columnIndex,
-                insets: Platform.OS === "web" ? insets : undefined,
-              })
-              return (
-                // why: keyed by seat, not player id, so a rematch reuses cards; remounting every seat kept old native animation memory.
-                <View
-                  key={table?.tableRules.pokemon ? player.id : `seat-${index}`}
-                  testID={`player-cell-seat-${seatNumber}`}
-                  style={themed($cell)}
-                  onLayout={nameBoard.onCellLayout(`seat-${index}`, rowIndex)}
-                >
-                  <CounterNameHostContext.Provider value={nameBoard.hostFor(`seat-${index}`)}>
-                    {seatCard(index, {
-                      contentRotation,
-                      screenEdges,
-                      contentInsets,
-                      menuCorner,
-                      menuEdgeCenter,
-                      style: corners,
-                    })}
-                  </CounterNameHostContext.Provider>
-                </View>
-              )
-            })}
-          </View>
-        ))}
-        {nameBoard.panels}
-      </Animated.View>
+              })}
+            </View>
+          ))}
+          {nameBoard.panels}
+        </Animated.View>
+      </CommanderFlights>
     </View>
   )
 }

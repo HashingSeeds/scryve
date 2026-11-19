@@ -39,6 +39,7 @@ import {
   PENTAGON_RADIUS_SHARE,
 } from "./GameMenuButtonShape"
 import { Icon, type IconTypes } from "./Icon"
+import type { LifeCardEdge, LifeCardMenuCorner } from "./playerCardTypes"
 import { Text } from "./Text"
 
 export interface RadialMenuAction {
@@ -94,6 +95,18 @@ export interface RadialActionPose {
 
 export const MENU_BUTTON_SIZE = 80
 export const COMPACT_MENU_BUTTON_SIZE = 70
+
+/** why: the pentagon sits on the corner where seats meet, so a control in the corner of `edge` and `side` steps along `edge` by half the pentagon, the way corner controls step past a camera hole. */
+export function menuCornerStep(
+  menuCorner: LifeCardMenuCorner | undefined,
+  edge: LifeCardEdge,
+  side: LifeCardEdge,
+  compact?: boolean,
+) {
+  const corner = menuCorner?.toLowerCase()
+  if (!corner?.includes(edge) || !corner.includes(side)) return 0
+  return (compact ? COMPACT_MENU_BUTTON_SIZE : MENU_BUTTON_SIZE) / 2
+}
 const MENU_FALLBACK_ANIMATION_MS = 220
 
 const PENTAGON_SIDES = 5

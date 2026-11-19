@@ -138,8 +138,8 @@ export interface ReadoutInk {
 }
 
 const DISC_GAP = 6
-// why: the disc's ring matches the board's gutter between cards, and the damage arc runs along it.
-export const DISC_RING = 4
+// why: the disc's outer band holds the damage rings, so the readout fits the fill inside them.
+export const DISC_FILL = 0.82
 // why: a readout never shrinks past legibility, even if it then runs past a tiny card's disc.
 const MIN_FIT = 0.6
 // why: Rubik Bold digits ink about 0.64em wide and 0.72em tall, and the disc keeps clear of the ink box's corners by DISC_CLEARANCE.
@@ -161,30 +161,6 @@ export function lifeInk(fontSize: number, digits: number): ReadoutInk {
     width: Math.max(digits, 2) * DIGIT_INK_WIDTH * fontSize,
     height: DIGIT_INK_HEIGHT * fontSize,
     y: -DIGIT_RISE * fontSize,
-  }
-}
-
-// why: the gap under a defender's life scales with it, so a tablet's big total doesn't crowd its "34 − 4" line.
-const STACK_GAP = 0.1
-
-/** why: once an attack lands, a defender's life shrinks and rises to make room for its "34 − 4" line, inside the disc already drawn around the life alone, so the disc never jumps. `scale` is the life's new size; `lifeShift` and `lineShift` place the life's ink and the line's ink from where the life's ink sat. */
-export function stackedReadout(fontSize: number, digits: number, lineChars: number) {
-  const life = lifeInk(fontSize, digits)
-  const lineHeight = DIGIT_INK_HEIGHT * OUT_CAUSE.fontSize
-  const lineWidth = lineChars * DIGIT_INK_WIDTH * OUT_CAUSE.fontSize
-  const gap = Math.max(OUT_CAUSE_GAP, STACK_GAP * fontSize)
-  const room = Math.hypot(life.width, life.height)
-  const height = (scale: number) => life.height * scale + gap + lineHeight
-  let scale = 1
-  while (
-    scale > MIN_FIT &&
-    Math.hypot(Math.max(life.width * scale, lineWidth), height(scale)) > room
-  )
-    scale -= 0.02
-  return {
-    scale,
-    lifeShift: -(gap + lineHeight) / 2,
-    lineShift: (life.height * scale + gap) / 2,
   }
 }
 
@@ -234,16 +210,22 @@ export function commanderTakeover(input: {
   lifeFontSize: number
   ink: ReadoutInk
   reach?: CommanderReach
+  /** why: room the strike needs to the disc's left in the seat's upright view, kept on both sides so the disc stays centered and its hits have the same room to its right. */
+  side?: number
 }): CommanderTakeover {
-  const { card, rotation, lifeFontSize, ink, reach } = input
+  const { card, rotation, lifeFontSize, ink, reach, side = 0 } = input
   const sideways = Math.abs(rotation) === 90
   const content = sideways
     ? { width: card.height, height: card.width }
     : { width: card.width, height: card.height }
-  const needed = Math.hypot(ink.width, ink.height) / 2 + lifeFontSize * DISC_CLEARANCE
+  const needed = (Math.hypot(ink.width, ink.height) / 2 + lifeFontSize * DISC_CLEARANCE) / DISC_FILL
   const disc = Math.max(
     0,
-    Math.min(needed, Math.min(content.width, content.height) / 2 - DISC_GAP - Math.abs(ink.y)),
+    Math.min(
+      needed,
+      content.height / 2 - DISC_GAP - Math.abs(ink.y),
+      content.width / 2 - Math.max(DISC_GAP, side),
+    ),
   )
   const fit = needed > 0 ? Math.max(MIN_FIT, disc / needed) : 1
   // why: the readout shrinks about the card's center, so its ink center moves in with it.

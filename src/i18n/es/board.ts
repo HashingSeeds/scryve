@@ -396,7 +396,6 @@ export default {
     amountFrom: "{{amount}} de {{name}}",
     unknownAttacker: "Comandante",
     assignFrom: "Asignar daño de comandante desde {{identity}}",
-    assignFromWithDamage: "Asignar daño de comandante desde {{identity}}. Recibido: {{sources}}",
     assignFromStale: "Asignar daño de comandante desde {{identity}}, desactualizado",
   },
   outReason: {

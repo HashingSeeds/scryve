@@ -392,8 +392,6 @@ export default {
     amountFrom: "{{amount}} de {{name}}",
     unknownAttacker: "Commandant",
     assignFrom: "Attribuer des blessures de commandant infligées par {{identity}}",
-    assignFromWithDamage:
-      "Attribuer des blessures de commandant infligées par {{identity}}. Subies : {{sources}}",
     assignFromStale: "Attribuer des blessures de commandant infligées par {{identity}}, pas à jour",
   },
   outReason: {

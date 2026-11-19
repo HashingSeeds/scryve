@@ -61,10 +61,10 @@ const send: AttackAction = { type: "send" }
 const sit = (slot: number): AttackAction => ({ type: "sit", slot })
 
 describe("commander attack", () => {
-  it("lands a fresh partner attack on the first commander, splits it once the partner is brought in, and leaves a partner at 0 out", () => {
+  it("lands a fresh partner attack on the first commander, splits it once the partner is brought in, and leaves a partner sat out", () => {
     const board = attack({ commanders: [{ power: 2 }, { power: 4 }] })
     board.run(press(ada), hit(grace), sit(1), hit(grace))
-    board.run({ type: "power", slot: 0, power: 0 }, hit(grace))
+    board.run(sit(0), hit(grace))
 
     expect(board.commits).toEqual([
       [{ toPlayerId: grace, delta: 2 }],
@@ -77,15 +77,20 @@ describe("commander attack", () => {
     expect(board.view(grace).commanders.map(({ total }) => total)).toEqual([4, 8])
   })
 
-  it("undoes the last hit, then the current power, and stops at zero", () => {
+  it("undoes only this attack's hits, newest first, and leaves earlier damage to the log", () => {
     const board = attack({ recorded: { [commanderDamageKey(ada, grace)]: 2 } })
-    board.run(press(ada), { type: "power", slot: 0, power: 3 })
-    board.run(hit(grace), { type: "power", slot: 0, power: 2 }, undo(grace))
-    expect(board.view(grace).commanders[0].total).toBe(2)
+    board.run(press(ada), undo(grace))
+    expect(board.commits).toEqual([])
+    expect(board.view(grace).takeBack).toBe(0)
+
+    board.run({ type: "power", slot: 0, power: 3 }, hit(grace))
+    board.run({ type: "power", slot: 0, power: 5 }, hit(grace))
+    expect(board.view(grace)).toMatchObject({ hits: [3, 5], takeBack: 5 })
 
     board.run(undo(grace), undo(grace), undo(grace))
-    expect(board.commits.map((changes) => changes[0].delta)).toEqual([3, -3, -2])
-    expect(board.view(grace).takeBack).toBe(0)
+    expect(board.commits.map((changes) => changes[0].delta)).toEqual([3, 5, -5, -3])
+    expect(board.view(grace)).toMatchObject({ hits: [], takeBack: 0 })
+    expect(board.view(grace).commanders[0].total).toBe(2)
   })
 
   it("counts what this attack's hits landed, apart from earlier damage, until the attack ends", () => {
@@ -100,7 +105,7 @@ describe("commander attack", () => {
     expect(board.view(grace).commanders[0]).toMatchObject({ total: 7, landed: 0 })
   })
 
-  it("sits a partner in or out by its name, keeps its power for when it comes back, and sits the second partner out again next attack", () => {
+  it("sits a partner in or out, keeps its power for when it comes back, never sits out the last one in, and sits the second partner out again next attack", () => {
     const board = attack({ commanders: [{ power: 4 }, { power: 3 }] })
     board.run(press(ada), sit(1), sit(0), hit(grace))
     expect(board.commits).toEqual([[{ toPlayerId: grace, commander: PARTNER_COMMANDER, delta: 3 }]])
@@ -108,8 +113,11 @@ describe("commander attack", () => {
     board.run(sit(0), sit(1), hit(grace))
     expect(board.commits.at(-1)).toEqual([{ toPlayerId: grace, delta: 4 }])
 
-    board.run(sit(0), hit(katherine))
-    expect(board.view(katherine).dealt).toBe(0)
+    board.run(sit(0))
+    expect(board.view(katherine)).toMatchObject({
+      dealt: 4,
+      commanders: [{ sitting: false }, { sitting: true }],
+    })
     board.run(press(ada), press(ada))
     expect(board.view(grace)).toMatchObject({
       dealt: 4,
@@ -178,16 +186,12 @@ describe("commander attack", () => {
   it("sends the staged attack before another seat arms", () => {
     const board = attack({ buffered: true })
     board.run(press(ada))
-    expect(board.state()).toMatchObject({ armed: ada, acted: false })
-
-    board.run(hit(grace))
-    expect(board.state().acted).toBe(true)
-    board.run(press(katherine))
+    board.run(hit(grace), press(katherine))
     expect(board.commits).toEqual([[{ toPlayerId: grace, delta: 1 }]])
-    expect(board.state()).toMatchObject({ armed: katherine, acted: false })
+    expect(board.state()).toMatchObject({ armed: katherine, staged: [] })
   })
 
-  it("starts at the printed power, lets a partner reach 0 but a lone commander only 1, and keeps a typed power across attacks", () => {
+  it("starts at the printed power, keeps every commander at 1 or more, and keeps a typed power across attacks", () => {
     const board = attack({ commanders: [{ power: 3 }, { power: 5 }] })
     board.run(press(ada))
     expect(board.view(grace).commanders).toMatchObject([
@@ -198,7 +202,7 @@ describe("commander attack", () => {
     board.run({ type: "power", slot: 0, power: -2 }, { type: "power", slot: 1, power: 7.6 })
     board.run(send, press(ada))
     expect(board.view(grace).commanders).toEqual([
-      { name: undefined, power: 0, sitting: false, total: 0, landed: 0 },
+      { name: undefined, power: 1, sitting: false, total: 0, landed: 0 },
       { name: undefined, power: 7, sitting: true, total: 0, landed: 0 },
     ])
 

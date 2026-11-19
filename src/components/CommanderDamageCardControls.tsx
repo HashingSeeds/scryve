@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { Platform, StyleSheet, View } from "react-native"
 import Animated, {
   cancelAnimation,
@@ -8,7 +8,6 @@ import Animated, {
   FadeOut,
   LinearTransition,
   runOnJS,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -17,10 +16,11 @@ import Animated, {
   type EntryExitAnimationFunction,
   type SharedValue,
 } from "react-native-reanimated"
-import Svg, { Circle, Path } from "react-native-svg"
+import Svg, { Path } from "react-native-svg"
 
-import { lowestPower } from "@/features/game/commanderAttack"
+import { LOWEST_POWER } from "@/features/game/commanderAttack"
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
+import { formatSigned } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
@@ -28,16 +28,22 @@ import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { DISC_RING, type CommanderFacing, type CommanderTakeover } from "./commanderDamageLayout"
+import {
+  DIGIT_INK_HEIGHT,
+  DISC_FILL,
+  type CommanderFacing,
+  type CommanderTakeover,
+} from "./commanderDamageLayout"
+import { useCommanderFlights } from "./CommanderFlights"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import { overlayTint } from "./LifeControls"
-import type {
-  LifeCardContentInsets,
-  LifeCardContentRotation,
-  LifeCardEdge,
-  LifeCardMenuCorner,
+import {
+  getLifeLineHeight,
+  type LifeCardContentInsets,
+  type LifeCardContentRotation,
 } from "./playerCardTypes"
 import { COMPACT_KEY_HEIGHT, KEY_HEIGHT, PokemonKeypad } from "./pokemon/PokemonKeypad"
+import { Sword } from "./Sword"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -64,13 +70,16 @@ type AssignmentTarget = {
   attacker?: CommanderAttacker
   commanders: readonly ArmedCommander[]
   lethal: number
+  /** why: the life the defender shows, after this attack's hits, so the strike turns red when the next hit would end it. */
+  life: number
   facing: CommanderFacing
-  // why: the commander strip's corner, which undo keeps clear of.
-  stripCorner?: CommanderCorner
   takeover?: CommanderTakeover
   wave: SharedValue<number>
-  acted: boolean
+  /** why: what the next hit deals per commander, and in all. */
+  steps: readonly number[]
   dealt: number
+  /** why: each of this attack's hits here, oldest first. */
+  hits: readonly number[]
   takeBack: number
   onHit: () => void
   onUndo: () => void
@@ -82,10 +91,9 @@ type AssignmentSource = {
   submit: "done" | "send"
   mark?: CommanderAttacker
   commanders: readonly ArmedCommander[]
-  /** why: how far the commander grid reaches in from the seat's side and up from its foot, in upright space, so the boxes stay clear of it. */
-  grid?: { width: number; height: number }
+  /** why: how far the attacker's life reaches down from the seat's head and its name row up from its foot, in upright space, so the boxes sit between them. */
+  bands?: AttackerBands
   onSit: (slot: number) => void
-  acted: boolean
   onPower: (power: number, index: number) => void
   // why: the card's own life total sits where the keypad opens, so the card hides it while a power is being typed.
   onEditing: (editing: boolean) => void
@@ -100,7 +108,6 @@ export interface CommanderDamageCardControlsProps {
   foreground: string
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
-  menuCorner?: LifeCardMenuCorner
   compact?: boolean
   mode: CommanderDamageCardMode
   // why: a defender's last attack, kept up while the shadow drains so its ring fades as the shadow's edge passes it. Takes no touches.
@@ -125,7 +132,6 @@ export function CommanderDamageCardControls({
   foreground,
   contentRotation,
   contentInsets,
-  menuCorner,
   compact,
   mode,
   draining,
@@ -172,7 +178,6 @@ export function CommanderDamageCardControls({
           playerName={playerName}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
-          menuCorner={menuCorner}
           compact={compact}
           mode={mode}
         />
@@ -306,22 +311,10 @@ export function CommanderTakeoverBackdrop({
   floodColor: string
   defenderColor: string
 }) {
-  const {
-    theme: { colors },
-  } = useAppTheme()
-  const { flood, disc } = takeover
+  const { flood } = takeover
+  const fill = takeover.disc * DISC_FILL
   const discX = cardSize.width / 2 + takeover.cardDiscOffset.x
   const discY = cardSize.height / 2 + takeover.cardDiscOffset.y
-  const ringSize = (disc + DISC_RING) * 2
-  // why: the ring is the board's gutter around the disc, so a red-leaning color still stands off the flood.
-  const ring: ViewStyle = {
-    position: "absolute",
-    width: ringSize,
-    height: ringSize,
-    borderRadius: ringSize / 2,
-    borderWidth: DISC_RING,
-    borderColor: colors.board.background,
-  }
   const floodStyle = useAnimatedStyle(() => {
     if (!flood) return {}
     const by = shadowGrown(flood, wave.value)
@@ -332,10 +325,6 @@ export function CommanderTakeoverBackdrop({
       height: flood.card.height + by * 2,
     }
   })
-  // why: the ring darkens with the shadow under the disc, so it draws in as the soft edge passes over it.
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: flood ? shadowReached(flood, wave.value, flood.discGap) : 1,
-  }))
 
   return (
     <View
@@ -362,20 +351,16 @@ export function CommanderTakeoverBackdrop({
           style={[StyleSheet.absoluteFill, { backgroundColor: floodColor }]}
         />
       )}
-      <Animated.View
-        testID={`commander-ring-seat-${seatNumber}`}
-        style={[ring, { left: discX - ringSize / 2, top: discY - ringSize / 2 }, ringStyle]}
-      />
       <View
         testID={`commander-disc-seat-${seatNumber}`}
         style={[
           $absolute,
           {
-            left: discX - disc,
-            top: discY - disc,
-            width: disc * 2,
-            height: disc * 2,
-            borderRadius: disc,
+            left: discX - fill,
+            top: discY - fill,
+            width: fill * 2,
+            height: fill * 2,
+            borderRadius: fill,
             backgroundColor: defenderColor,
           },
         ]}
@@ -384,12 +369,12 @@ export function CommanderTakeoverBackdrop({
   )
 }
 
+/** why: a defender's card is one big hit target. Its disc carries a ring per attacking commander, segmented to lethal; to the reader's left a sword points at the disc with what a tap deals, and to its right each hit of this attack waits on an arc beside the undo that takes the newest back. */
 function DefenderControls({
   seatNumber,
   playerName,
   contentRotation,
   contentInsets,
-  menuCorner,
   compact,
   mode,
 }: {
@@ -397,26 +382,30 @@ function DefenderControls({
   playerName: string
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
-  menuCorner?: LifeCardMenuCorner
   compact?: boolean
   mode: AssignmentTarget
 }) {
-  const { themed, theme } = useAppTheme()
+  const { theme } = useAppTheme()
   const reducedMotion = useReducedMotion()
+  const motion = reducedMotion === false
   const flash = useSharedValue(0)
-  const { attacker, facing, takeover, commanders } = mode
-  const totals = commanders.map(({ total }) => total)
-  const struck = totals.reduce((sum, total) => sum + total, 0)
-  const previousStruck = useRef(struck)
-  const { dealt, takeBack } = mode
+  const lunge = useSharedValue(0)
+  const { attacker, takeover, commanders, steps, dealt, hits, takeBack } = mode
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
+  const tint = mixColorsInLinearLight(attackerColor, "#FFFFFF", TINT_SHARE)
+  const struck = hits.length
+  const previousStruck = useRef(struck)
 
   useEffect(() => {
     const previous = previousStruck.current
     previousStruck.current = struck
-    if (struck <= previous || reducedMotion !== false) return
+    if (struck <= previous || !motion) return
     flash.value = withSequence(withTiming(0.35, { duration: 60 }), withTiming(0, { duration: 260 }))
-  }, [flash, reducedMotion, struck])
+    lunge.value = withSequence(
+      withTiming(1, { duration: 90, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 170, easing: Easing.out(Easing.quad) }),
+    )
+  }, [flash, lunge, motion, struck])
 
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }))
 
@@ -425,8 +414,6 @@ function DefenderControls({
     mode.onHit()
   }
 
-  const undoCorner = freeCorner(menuCorner, facing, mode.stripCorner)
-  const inset = (edge: LifeCardEdge) => (contentInsets?.[edge] ?? 0) + theme.spacing.xxs
   const sideways = Math.abs(contentRotation) === 90
   const content = takeover?.content ?? { width: 0, height: 0 }
   const contentBox: ViewStyle = {
@@ -440,10 +427,19 @@ function DefenderControls({
   const disc = takeover?.disc ?? 0
   const discX = content.width / 2 + (takeover?.discOffset.x ?? 0)
   const discY = content.height / 2 + (takeover?.discOffset.y ?? 0)
-  const ring = (disc + DISC_RING) * 2
-  const lead = Math.max(...totals)
-  // why: earlier damage fills the arc bright; this attack's hits grow a faint stretch past it.
-  const before = Math.max(...commanders.map(({ total, landed = 0 }) => total - landed))
+  // why: one ring per commander that is attacking or has already hit this seat; a lone ring takes the whole band.
+  const live = commanders.flatMap((commander, slot) =>
+    steps[slot] > 0 || commander.total > 0 ? [{ ...commander, step: steps[slot] ?? 0 }] : [],
+  )
+  const reachesLethal = (total: number, step: number) => step > 0 && total + step >= mode.lethal
+  const lethal =
+    live.some(({ total, step }) => reachesLethal(total, step)) || mode.life - dealt <= 0
+  const strikeColor = lethal ? DAMAGE_INK : strikeTint(attackerColor)
+  const strikeFont = compact ? 24 : 30
+  const strikeSword = compact ? 28 : 34
+  const coin = compact ? 20 : 24
+  const coinRadius = disc + coin / 2 + COIN_GAP
+  const inset = contentInsets?.[contentEdge(contentRotation, "right")] ?? 0
 
   return (
     <>
@@ -466,46 +462,286 @@ function DefenderControls({
       />
       <View pointerEvents="none" style={contentBox}>
         {takeover ? (
-          <DamageArc
+          <DamageRings
             seatNumber={seatNumber}
-            size={ring}
-            fraction={Math.min(before, mode.lethal) / mode.lethal}
-            ghost={Math.min(lead, mode.lethal) / mode.lethal}
-            style={$centeredAt(discX - ring / 2, discY - ring / 2)}
+            disc={disc}
+            lethal={mode.lethal}
+            rings={live}
+            color={tint}
+            reachesLethal={reachesLethal}
+            style={{ left: discX - disc, top: discY - disc }}
           />
         ) : null}
-        {!mode.acted ? (
-          <View
-            style={[$centeredAt(discX - ring / 2, discY - ring / 2), { width: ring, height: ring }]}
-          >
-            <PulseRing
-              testID={`commander-target-pulse-seat-${seatNumber}`}
-              size={ring}
-              width={DISC_RING}
-              color={SHADOW_INK}
-            />
-          </View>
+        {takeover && dealt > 0 ? (
+          <Strike
+            seatNumber={seatNumber}
+            dealt={dealt}
+            color={strikeColor}
+            font={strikeFont}
+            sword={strikeSword}
+            lunge={lunge}
+            style={{
+              right: content.width - (discX - disc - STRIKE_GAP),
+              top: discY - strikeSword / 2,
+              height: strikeSword,
+            }}
+          />
         ) : null}
+        {takeover
+          ? hits.map((amount, index) => {
+              const angle = (hitAngle(index, hits.length) * Math.PI) / 180
+              return (
+                <Animated.View
+                  key={index}
+                  testID={`commander-hit-coin-seat-${seatNumber}`}
+                  entering={motion ? FadeIn.duration(160) : undefined}
+                  style={[
+                    $coin,
+                    {
+                      left: discX + coinRadius * Math.cos(angle) - coin / 2,
+                      top: discY + coinRadius * Math.sin(angle) - coin / 2,
+                      width: coin,
+                      height: coin,
+                      borderRadius: coin / 2,
+                      backgroundColor: tint,
+                      borderColor: deepShade(attackerColor),
+                    },
+                  ]}
+                >
+                  <Text
+                    text={amount}
+                    weight="bold"
+                    maxFontSizeMultiplier={1}
+                    style={[$coinText, { fontSize: coin * 0.46, lineHeight: coin * 0.6 }]}
+                  />
+                </Animated.View>
+              )
+            })
+          : null}
       </View>
-      {takeBack > 0 ? (
-        <BoardPressable
-          testID={`commander-undo-seat-${seatNumber}`}
-          accessibilityRole="button"
-          accessibilityLabel={translate("board:commander.undoHit", { damage: takeBack })}
-          onPress={mode.onUndo}
-          style={[
-            themed($undo),
-            {
-              [undoCorner.x]: inset(undoCorner.x),
-              [undoCorner.y]: inset(undoCorner.y),
-              transform: [{ rotate: `${contentRotation}deg` }],
-            },
-          ]}
-        >
-          <UndoGlyph size={compact ? 22 : 28} color={SHADOW_INK} />
-        </BoardPressable>
+      {takeBack > 0 && takeover ? (
+        <View pointerEvents="box-none" style={contentBox}>
+          <BoardPressable
+            testID={`commander-undo-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={translate("board:commander.undoHit", { damage: takeBack })}
+            onPress={mode.onUndo}
+            style={[$undo, { right: UNDO_INSET + inset, top: content.height / 2 - UNDO_SIZE / 2 }]}
+          >
+            <UndoGlyph size={compact ? 20 : 22} color={SHADOW_INK} />
+          </BoardPressable>
+        </View>
       ) : null}
     </>
+  )
+}
+
+/** why: the strike's sword and a two-digit hit, with a gap to the disc and the card's edge; the disc keeps this much room on each side. */
+export function strikeRoom(compact?: boolean) {
+  return compact ? 72 : 90
+}
+
+/** why: the strike and the blades that fly to it wear the attacker's color, light enough to read on the shadow. */
+export function strikeTint(color: string) {
+  return mixColorsInLinearLight(color, "#FFFFFF", STRIKE_SHARE)
+}
+
+/** why: hits keep their spot on the arc as more land until it is full; past that they close up so the arc never grows, and the newest sits on top. Angles are degrees clockwise from the reader's right. */
+export function hitAngle(index: number, count: number) {
+  const step = count > HIT_ARC / HIT_STEP + 1 ? HIT_ARC / (count - 1) : HIT_STEP
+  return -HIT_ARC / 2 + index * step
+}
+
+/** why: the card edge on the content's own side, for the content insets that keep a control off a notch. */
+function contentEdge(rotation: LifeCardContentRotation, side: "right") {
+  return ({ 0: "right", 180: "left", 90: "bottom", [-90]: "top" } as const)[rotation] ?? side
+}
+
+function DamageRings({
+  seatNumber,
+  disc,
+  lethal,
+  rings,
+  color,
+  reachesLethal,
+  style,
+}: {
+  seatNumber: number
+  disc: number
+  lethal: number
+  rings: readonly { total: number; step: number }[]
+  color: string
+  reachesLethal: (total: number, step: number) => boolean
+  style: ViewStyle
+}) {
+  const two = rings.length > 1
+  const band = disc * (1 - DISC_FILL)
+  const width = two ? band * 0.32 : band * 0.5
+  return (
+    <View testID={`commander-rings-seat-${seatNumber}`} style={[$absolute, style]}>
+      {rings.map(({ total, step }, index) => {
+        const radius = two
+          ? disc - band * 0.06 - width / 2 - index * (width + band * 0.12)
+          : disc - band * 0.12 - width / 2
+        const filled = Math.min(total, lethal)
+        const preview = Math.max(0, Math.min(step, lethal - filled))
+        const red = reachesLethal(total, step) || total >= lethal
+        return (
+          <SegmentRing
+            key={index}
+            testID={`commander-ring-seat-${seatNumber}${index ? "-partner" : ""}`}
+            size={disc * 2}
+            radius={radius}
+            width={width}
+            segments={lethal}
+            filled={filled}
+            preview={preview}
+            color={red ? DAMAGE_INK : color}
+          />
+        )
+      })}
+    </View>
+  )
+}
+
+/** why: one ring of `segments` arcs, clockwise from the top of the seat's upright view. The first `filled` are solid, the next `preview` breathe with the strike, and the rest are a faint track. */
+function SegmentRing({
+  testID,
+  size,
+  radius,
+  width,
+  segments,
+  filled,
+  preview,
+  color,
+}: {
+  testID: string
+  size: number
+  radius: number
+  width: number
+  segments: number
+  filled: number
+  preview: number
+  color: string
+}) {
+  const center = size / 2
+  const arc = (index: number) => {
+    const each = 360 / segments
+    const from = ((-90 + index * each + SEGMENT_GAP / 2) * Math.PI) / 180
+    const to = ((-90 + (index + 1) * each - SEGMENT_GAP / 2) * Math.PI) / 180
+    const point = (angle: number) =>
+      `${(center + radius * Math.cos(angle)).toFixed(2)} ${(center + radius * Math.sin(angle)).toFixed(2)}`
+    return `M${point(from)}A${radius} ${radius} 0 0 1 ${point(to)}`
+  }
+  const join = (from: number, to: number) =>
+    Array.from({ length: Math.max(0, to - from) }, (_, offset) => arc(from + offset)).join("")
+  return (
+    <View testID={testID} style={[$absolute, { width: size, height: size }]}>
+      <Svg width={size} height={size} style={$absolute}>
+        <Path
+          d={join(filled + preview, segments)}
+          stroke={SHADOW_INK}
+          strokeOpacity={TRACK_OPACITY}
+          strokeWidth={width}
+          fill="none"
+        />
+        <Path d={join(0, filled)} stroke={color} strokeWidth={width} fill="none" />
+      </Svg>
+      {preview > 0 ? (
+        <Breathing style={[$absolute, { width: size, height: size }]}>
+          <Svg width={size} height={size}>
+            <Path
+              testID={`${testID}-preview`}
+              d={join(filled, filled + preview)}
+              stroke={color}
+              strokeWidth={width}
+              fill="none"
+            />
+          </Svg>
+        </Breathing>
+      ) : null}
+    </View>
+  )
+}
+
+const BREATH_MS = 800
+
+/** why: what the next hit would fill breathes, in step with the strike's nudge, so it reads as a preview rather than damage dealt. */
+function Breathing({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
+  const reducedMotion = useReducedMotion()
+  const breath = useSharedValue(0)
+  useEffect(() => {
+    if (reducedMotion !== false) return
+    breath.value = withRepeat(
+      withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(breath)
+  }, [breath, reducedMotion])
+  const breathStyle = useAnimatedStyle(() => ({
+    opacity: reducedMotion !== false ? 0.5 : 0.95 - breath.value * 0.6,
+  }))
+  return <Animated.View style={[style, breathStyle]}>{children}</Animated.View>
+}
+
+/** why: the sword points at the disc with what a tap deals; it nudges toward the disc while it waits and lunges in when a hit lands. */
+function Strike({
+  seatNumber,
+  dealt,
+  color,
+  font,
+  sword,
+  lunge,
+  style,
+}: {
+  seatNumber: number
+  dealt: number
+  color: string
+  font: number
+  sword: number
+  lunge: SharedValue<number>
+  style: ViewStyle
+}) {
+  const reducedMotion = useReducedMotion()
+  const { anchor, inbound } = useCommanderFlights()
+  const waiting = inbound.has(seatNumber)
+  const nudge = useSharedValue(0)
+  useEffect(() => {
+    if (reducedMotion !== false) return
+    nudge.value = withRepeat(
+      withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(nudge)
+  }, [nudge, reducedMotion])
+  const swordStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: nudge.value * NUDGE + lunge.value * LUNGE }, { rotate: "90deg" }],
+  }))
+  // why: while its blade is in the air the strike waits for it, then shows where the blade lands.
+  const shownStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(waiting ? 0 : 1, { duration: waiting ? 0 : 160 }),
+  }))
+  return (
+    <Animated.View
+      testID={`commander-strike-seat-${seatNumber}`}
+      style={[$strike, style, shownStyle]}
+    >
+      <Text
+        testID={`commander-strike-amount-seat-${seatNumber}`}
+        text={formatSigned(-dealt)}
+        weight="bold"
+        maxFontSizeMultiplier={1}
+        numberOfLines={1}
+        style={[$strikeText, { color, fontSize: font, lineHeight: font * 1.15 }]}
+      />
+      <View ref={anchor("landing", seatNumber)} collapsable={false}>
+        <Animated.View style={swordStyle}>
+          <Sword size={sword} color={color} />
+        </Animated.View>
+      </View>
+    </Animated.View>
   )
 }
 
@@ -533,7 +769,7 @@ function AttackerControls({
     space,
     count: mode.commanders.length,
     compact,
-    grid: mode.grid,
+    bands: mode.bands,
   })
   const testSeats = partnerTestSeats(seatNumber)
   const cardColor = mode.mark?.color
@@ -545,6 +781,7 @@ function AttackerControls({
   const moved = motion ? LinearTransition.duration(EDIT_MS) : undefined
   const shown = motion ? FadeIn.duration(EDIT_MS) : undefined
   const hidden = motion ? FadeOut.duration(EDIT_MS / 2) : undefined
+  const inAttack = mode.commanders.filter(({ sitting }) => !sitting).length
 
   function edit(slot: number) {
     const closing = open?.slot === slot
@@ -556,9 +793,14 @@ function AttackerControls({
     setOpen(undefined)
     mode.onEditing(false)
   }
-  // why: a − or + on the box being typed into replaces what was typed, so the box shows the power the next hit deals.
+  // why: a − or + on the box being typed into replaces what was typed, so the box shows the power the next hit deals. A partner's − at 1 takes it out of the attack instead.
   function step(slot: number, power: number) {
     if (open?.slot === slot) setOpen({ slot, draft: "" })
+    if (power < LOWEST_POWER) {
+      if (open?.slot === slot) close()
+      mode.onSit(slot)
+      return
+    }
     mode.onPower(power, slot)
   }
   // why: each key sets the power at once, so a hit tapped while the keypad is open deals what was typed. It opens empty, so the first key replaces the power rather than adding to it.
@@ -594,6 +836,8 @@ function AttackerControls({
         partner={partners}
         power={power}
         sitting={!!sitting}
+        // why: the last commander in the attack stays in at 1.
+        leaves={partners && inAttack > 1}
         draft={open?.slot === index ? open.draft : undefined}
         onPower={(next) => step(index, next)}
         onEdit={() => edit(index)}
@@ -611,8 +855,8 @@ function AttackerControls({
       accessible={false}
       onPress={close}
       style={themed($attackerCenter)}
-      onLayout={({ nativeEvent: { layout: box } }) =>
-        setRoom({ width: box.width, height: box.height })
+      onLayout={({ nativeEvent: { layout: area } }) =>
+        setRoom({ width: area.width, height: area.height })
       }
     >
       <View
@@ -642,7 +886,6 @@ function AttackerControls({
             </Animated.View>
           </View>
         ) : (
-          // why: the card's own total moves into its slot (see attackerLifeSlot) rather than a second copy fading in.
           <View
             testID={`commander-boxes-seat-${seatNumber}`}
             style={[themed($commanderRow), { transform: [{ translateY: layout.boxesY }] }]}
@@ -700,294 +943,130 @@ export function keypadPlacement(
 }
 
 const UNIT_GAP = 16
-// why: a power box's number row is wide enough for its small − and + to sit at its ends, clear of the number.
-const BOX_RATIO = 2
-// why: the commander's name runs along the box's foot, under the number. It toggles the box in and out of the attack, so with its slop below it reaches about a 40pt touch target.
-const NAME_SHARE = 0.5
-const MIN_NAME = 32
-// why: the attacker's life sits at about half a number row, small enough to read as secondary.
-const LIFE_SHARE = 0.5
-const MIN_LIFE = 18
+// why: a power box's number row is wide enough for its sword, number, − and + to sit apart.
+const BOX_RATIO = 2.75
+// why: the commander's name runs along the box's foot, under the number.
+const NAME_SHARE = 0.4
+const MIN_NAME = 24
+// why: a box narrower than this leaves its − and + no room beside the number.
+const MIN_BOX_RATIO = 1.4
+const SMALLEST_BOX = 28
+// why: the name bar drops below MIN_NAME, and the number row below SMALLEST_BOX, only when a seat is too small for the boxes otherwise.
+const TIGHT_NAME = 18
+const TIGHT_BOX = 20
+const BOX_GAP = "md"
+// why: the boxes keep a little air from the life above them and the name row below.
+const BAND_GAP = 4
+const ATTACKER_COLUMN_GAP = "xxs"
 
-/** why: an attacker's power boxes take whichever placement gives them the most face while keeping at least UNIT_GAP from every edge of the seat and clear of the commander grid in its lower corner. Beside: the boxes and the attacker's life sit in one column centered on the card, narrowed on both sides to clear the grid. Above: the boxes use the full width over the grid, and the life sits larger in the band beside the grid. Partners share one row. Seats only get smaller from here (8 and 10 players), so the size comes from the room rather than a fixed minimum; the name bar stays a 32pt touch target until nothing else fits. `height` is the number row and `name` the row under it; `boxesY` and `lifeY` place the boxes' and the life's middles below the card's center, in the seat's upright space. */
+export type AttackerBands = { head: number; foot: number }
+
+/** why: an attacker's power boxes take the band between its life in the head corner and its name row at the foot, as large as fits with UNIT_GAP at the sides; partners share one row. Seats only get smaller from here (8 and 10 players), so the size comes from the room rather than a fixed minimum. `height` is the number row and `name` the row under it; `boxesY` places the boxes' middle below the card's center, in the seat's upright space. */
 export function attackerLayout({
   space,
   count,
   compact,
-  grid,
+  bands,
 }: {
   space: { width: number; height: number } | null
   count: number
   compact?: boolean
-  /** why: how far the commander grid reaches in from the seat's side and up from its foot. */
-  grid?: { width: number; height: number }
+  bands?: AttackerBands
 }) {
   const largest = compact ? 52 : 64
-  const placements: readonly Placement[] = grid?.height ? ["beside", "above"] : ["beside"]
-  const size = (height: number, nameFloor: number, placement: Placement) => {
-    const beside = placement === "beside"
-    const band = grid?.height ?? 0
-    const clear = beside ? (grid?.width ?? 0) : 0
+  const head = bands?.head ?? 0
+  const foot = bands?.foot ?? 0
+  const size = (height: number, nameFloor: number) => {
     const lane = space
-      ? (space.width - clear * 2 - UNIT_GAP * 2 - spacing[BOX_GAP] * (count - 1)) / count
+      ? (space.width - UNIT_GAP * 2 - spacing[BOX_GAP] * (count - 1)) / count
       : Infinity
-    const name = Math.max(nameFloor, Math.round(height * NAME_SHARE))
-    const life = Math.max(MIN_LIFE, Math.round(height * LIFE_SHARE))
-    const boxesHeight = height + name
     return {
       height,
-      width: Math.max(
-        0,
-        Math.floor(Math.min(lane, height * (beside ? BOX_RATIO : WIDE_BOX_RATIO))),
-      ),
-      name,
-      placement,
-      boxesHeight,
-      boxesY: beside ? -(spacing[ATTACKER_COLUMN_GAP] + life) / 2 : -band / 2,
-      lifeY: beside
-        ? (boxesHeight + spacing[ATTACKER_COLUMN_GAP]) / 2
-        : (space?.height ?? 0) / 2 - band / 2,
-      // why: above the grid, the life is centered beside it, so it shrinks to the room the grid leaves on both sides.
-      lifeFont: beside
-        ? life * 0.8
-        : Math.min(
-            band * BAND_LIFE_SHARE,
-            MAX_BAND_LIFE,
-            ((space?.width ?? 0) - ((grid?.width ?? 0) + UNIT_GAP / 2) * 2) /
-              (LIFE_DIGITS * DIGIT_ADVANCE),
-          ),
-      columnHeight: beside ? boxesHeight + spacing[ATTACKER_COLUMN_GAP] + life : boxesHeight,
+      width: Math.max(0, Math.floor(Math.min(lane, height * BOX_RATIO))),
+      name: Math.max(nameFloor, Math.round(height * NAME_SHARE)),
+      boxesY: (head - foot) / 2,
     }
   }
-  if (!space) return size(largest, MIN_NAME, "beside")
-  const fits = (layout: ReturnType<typeof size>) => {
-    if (layout.width < layout.height * MIN_BOX_RATIO) return false
-    if (layout.placement === "beside") return layout.columnHeight <= space.height - UNIT_GAP * 2
-    return (
-      layout.boxesHeight <= space.height - (grid?.height ?? 0) - UNIT_GAP * 2 &&
-      layout.lifeFont >= MIN_LIFE
-    )
-  }
+  if (!space) return size(largest, MIN_NAME)
+  const room = space.height - head - foot - BAND_GAP * 2
   for (const [nameFloor, smallest] of [
     [MIN_NAME, SMALLEST_BOX],
     [TIGHT_NAME, TIGHT_BOX],
   ]) {
-    const best = placements
-      .map((placement) => {
-        for (let height = largest; height >= smallest; height--) {
-          const layout = size(height, nameFloor, placement)
-          if (fits(layout)) return layout
-        }
-        return undefined
-      })
-      .filter((layout) => layout !== undefined)
-      .sort((a, b) => b.height * b.width - a.height * a.width)[0]
-    if (best) return best
+    for (let height = largest; height >= smallest; height--) {
+      const layout = size(height, nameFloor)
+      if (layout.width >= layout.height * MIN_BOX_RATIO && layout.height + layout.name <= room)
+        return layout
+    }
   }
-  return placements
-    .map((placement) => size(TIGHT_BOX, TIGHT_NAME, placement))
-    .sort((a, b) => b.height * b.width - a.height * a.width)[0]
+  return size(TIGHT_BOX, TIGHT_NAME)
 }
 
-type Placement = "beside" | "above"
-// why: a box narrower than this leaves its − and + no room beside the number.
-const MIN_BOX_RATIO = 1.4
-// why: above the grid, a short row has the seat's full width, so boxes stretch past BOX_RATIO.
-const WIDE_BOX_RATIO = 2.8
-const SMALLEST_BOX = 28
-// why: the name bar drops from 32pt, and the number row below SMALLEST_BOX, only when a seat is too small for the boxes otherwise.
-const TIGHT_NAME = 24
-const TIGHT_BOX = 20
-const BOX_GAP = "md"
-// why: in the band beside the grid the life reads larger, capped to stay secondary to the boxes.
-const BAND_LIFE_SHARE = 0.5
-const MAX_BAND_LIFE = 34
-const LIFE_DIGITS = 3
+// why: Rubik Bold digits ink about 0.64em wide.
+const DIGIT_INK_WIDTH = 0.64
 
-const ATTACKER_COLUMN_GAP = "xxs"
+/** why: a team zone's names hold both head corners and the pentagon its head's middle, so its life sits at the foot beside the check instead: `y` is the foot row's middle and `beside` how far the life's end stays left of the zone's middle. */
+export type AttackerLifeFoot = { y: number; beside: number }
 
-/** why: the attacker's life stays in view in regular weight so it never reads as the attack's target. */
-export function attackerLifeSlot(layout: ReturnType<typeof attackerLayout>) {
-  return { belowCardCenter: layout.lifeY, fontSize: layout.lifeFont }
+/** why: the attacker's life moves into its head corner, small and in regular weight, so it stays in view without reading as the attack's target. `x` and `y` place its middle from the card's center in the seat's upright space, `menu` steps it past a pentagon on that corner, and `band` is how far down from the head it reaches. */
+export function attackerLifeSlot({
+  space,
+  digits,
+  compact,
+  gap,
+  menu,
+  foot,
+}: {
+  space: { width: number; height: number }
+  digits: number
+  compact?: boolean
+  gap: number
+  menu: number
+  foot?: AttackerLifeFoot
+}) {
+  const fontSize = compact ? ATTACKER_LIFE_COMPACT : ATTACKER_LIFE
+  const width = digits * DIGIT_INK_WIDTH * fontSize
+  const height = DIGIT_INK_HEIGHT * fontSize
+  if (foot) return { fontSize, x: -foot.beside - width / 2, y: foot.y, band: 0 }
+  return {
+    fontSize,
+    x: -space.width / 2 + gap + menu + width / 2,
+    y: -space.height / 2 + gap + height / 2,
+    band: gap + getLifeLineHeight(fontSize) / 2 + height / 2,
+  }
 }
+
+const ATTACKER_LIFE = 26
+const ATTACKER_LIFE_COMPACT = 20
 
 const partnerTestSeats = (seatNumber: number) => [`${seatNumber}`, `${seatNumber}-partner`]
 
-const $centeredAt = (left: number, top: number): ViewStyle => ({ ...$absolute, left, top })
-
-const AnimatedPath = Animated.createAnimatedComponent(Path)
-// why: bright enough to read on the gutter ring over any shade.
+// why: bright enough to read on the shadow and on any seat's disc.
 export const DAMAGE_INK = "#FF4D5A"
-const TRACK_OPACITY = 0.18
-const GHOST_OPACITY = 0.4
-const FILL_MS = 520
-// why: the arc's stroke runs a pixel past the ring's outer edge, so its canvas bleeds past the ring's box to keep that edge unclipped.
-const ARC_BLEED = 1
-// why: a strip of the dark ring stays between the disc and the arc, so the arc reads on a red seat's disc as well as on the shadow.
-const ARC_SEAM = 1.5
-const ARC_WIDTH = DISC_RING - ARC_SEAM + ARC_BLEED
-// why: a single SVG arc cannot close on itself; stopping a hair short leaves a gap the round caps cover.
-const FULL_SWEEP = 0.9999
+const TRACK_OPACITY = 0.1
+// why: each lethal step reads as its own segment.
+const SEGMENT_GAP = 2.6
+// why: the attacker's light tint inks its rings and hits on the defender's shadow.
+const TINT_SHARE = 0.42
+const STRIKE_GAP = 6
+const STRIKE_SHARE = 0.78
+const NUDGE = 4
+const LUNGE = 20
+const COIN_GAP = 6
+// why: degrees of arc the hits on one seat may use, and how far apart they sit until it fills.
+const HIT_ARC = 70
+const HIT_STEP = 14
+const UNDO_SIZE = 56
+const UNDO_INSET = 4
 
-/** why: an open arc, not a dashed circle: the renderer owns the cap at a dash seam, and iOS draws it square. */
-function arcPath(center: number, radius: number, fraction: number) {
-  "worklet"
-  const angle = 2 * Math.PI * Math.min(fraction, FULL_SWEEP)
-  const x = center + radius * Math.sin(angle)
-  const y = center - radius * Math.cos(angle)
-  const large = angle > Math.PI ? 1 : 0
-  return `M ${center} ${center - radius} A ${radius} ${radius} 0 ${large} 1 ${x} ${y}`
-}
-
-/** why: damage toward lethal is a red arc filling a faint ring, clockwise from the top of the seat's upright view. `fraction` is damage from before this attack; `ghost` reaches as far as this attack dealt. */
-function DamageArc({
-  seatNumber,
-  size,
-  fraction,
-  ghost,
-  style,
-}: {
-  seatNumber: number
-  size: number
-  fraction: number
-  ghost: number
-  style: ViewStyle
-}) {
-  const reducedMotion = useReducedMotion()
-  const fill = useSharedValue(fraction)
-  const ahead = useSharedValue(ghost)
-  const radius = size / 2 - DISC_RING / 2
-  const arcRadius = size / 2 + ARC_BLEED - ARC_WIDTH / 2
-  const canvas = size + ARC_BLEED * 2
-  const center = canvas / 2
-
-  useEffect(() => {
-    const timing = {
-      duration: motionDuration(reducedMotion, FILL_MS),
-      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-    }
-    fill.value = withTiming(fraction, timing)
-    ahead.value = withTiming(ghost, timing)
-  }, [ahead, fill, fraction, ghost, reducedMotion])
-
-  // why: a round cap draws a dot even at zero length, so an empty arc hides.
-  const animatedProps = useAnimatedProps(() => ({
-    d: arcPath(center, arcRadius, fill.value),
-    strokeOpacity: fill.value > 0 ? 1 : 0,
-  }))
-  const ghostProps = useAnimatedProps(() => ({
-    d: arcPath(center, arcRadius, ahead.value),
-    strokeOpacity: ahead.value > fill.value ? GHOST_OPACITY : 0,
-  }))
-
-  return (
-    <Svg width={canvas} height={canvas} style={[style, $bleed]}>
-      <Circle
-        cx={center}
-        cy={center}
-        r={radius}
-        stroke={SHADOW_INK}
-        strokeOpacity={TRACK_OPACITY}
-        strokeWidth={DISC_RING}
-        fill="none"
-      />
-      {ghost > fraction ? (
-        <AnimatedPath
-          testID={`commander-hit-preview-seat-${seatNumber}`}
-          stroke={DAMAGE_INK}
-          strokeWidth={ARC_WIDTH}
-          strokeLinecap="round"
-          fill="none"
-          animatedProps={ghostProps}
-        />
-      ) : null}
-      <AnimatedPath
-        testID={`commander-progress-seat-${seatNumber}`}
-        stroke={DAMAGE_INK}
-        strokeWidth={ARC_WIDTH}
-        strokeLinecap="round"
-        fill="none"
-        animatedProps={animatedProps}
-      />
-    </Svg>
-  )
-}
-
-const $bleed: ViewStyle = { margin: -ARC_BLEED }
-
-const PULSE_MS = 1600
-const PULSES = 3
-const PEAK_OPACITY = 0.65
-
-export function pulseFrame(t: number, from: number) {
-  "worklet"
-  return { opacity: PEAK_OPACITY * Math.sin(Math.PI * t), scale: from + (1 - from) * t }
-}
-
-/** why: the board's one moving ring marks the next step: the targets' damage rings until the first hit, then the attacker's mark to finish. It centers on its parent, pulses a few times, and then fades out, so the cue never turns into noise. `size` is its full diameter; with reduced motion it holds still at that size. */
-export function PulseRing({
-  testID,
-  size,
-  from = 1,
-  width = 3,
-  color,
-}: {
-  testID: string
-  size: number
-  from?: number
-  width?: number
-  color: string
-}) {
-  const reducedMotion = useReducedMotion()
-  const beat = useSharedValue(0)
-
-  useEffect(() => {
-    if (reducedMotion !== false) return
-    beat.value = withRepeat(
-      withTiming(1, { duration: PULSE_MS, easing: Easing.out(Easing.quad) }),
-      PULSES,
-    )
-    return () => cancelAnimation(beat)
-  }, [reducedMotion, beat])
-
-  const ringStyle = useAnimatedStyle(() => {
-    if (reducedMotion !== false) return { opacity: PEAK_OPACITY }
-    const { opacity, scale } = pulseFrame(beat.value, from)
-    return { opacity, transform: [{ scale }] }
-  })
-
-  return (
-    <View pointerEvents="none" style={$pulseCenter}>
-      <Animated.View
-        testID={testID}
-        style={[
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: width,
-            borderColor: color,
-          },
-          ringStyle,
-        ]}
-      />
-    </View>
-  )
-}
-
-const $pulseCenter: ViewStyle = {
-  ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
-}
-
-/** why: a creature-style power box; its left and right ends lower and raise power, and tapping the number types one in. A partner at 0 sits the hit out and dims. */
+/** why: a creature-style power box; its left and right ends lower and raise power, and tapping the number types one in. A partner's − at 1 takes it out of the attack; out, the whole box dims at the power it keeps and a tap brings it back. */
 function PowerBox({
   suffix,
   name,
   partner,
   power,
   sitting,
+  leaves,
   draft,
   color,
   ink,
@@ -1005,6 +1084,7 @@ function PowerBox({
   partner: boolean
   power: number
   sitting: boolean
+  leaves: boolean
   draft?: string
   color: string
   ink: string
@@ -1019,14 +1099,71 @@ function PowerBox({
 }) {
   const editing = draft !== undefined
   const pressedTint = { backgroundColor: overlayTint(ink, 0.14) }
-  const lowest = lowestPower(partner)
+  const shownName = name ?? translate("board:commander.unnamed")
   // why: shrink the number to its row's middle so two digits fit a narrowed box instead of wrapping out of sight; the platform shrinks it further if the font runs wider than this estimate.
   const valueWidth = (width * VALUE_FLEX) / (VALUE_FLEX + HALF_FLEX * 2)
   const digits = Math.max(1, String(power).length)
-  const fontSize = Math.min(height * 0.62, valueWidth / (digits * DIGIT_ADVANCE))
+  const swordSize = Math.round(height * SWORD_SHARE)
+  const fontSize = Math.min(height * 0.62, (valueWidth - swordSize) / (digits * DIGIT_ADVANCE))
   const numberStyle = { color: ink, fontSize, lineHeight: height * 0.8 }
+  const nameFont = Math.round(Math.min(nameHeight * 0.55, height * 0.34))
+  const frame: ViewStyle = {
+    width,
+    height: height + nameHeight,
+    borderRadius: height * 0.22,
+    borderWidth: Math.max(2, height * 0.04),
+    borderColor: ring,
+    backgroundColor: color,
+  }
+  const nameText = (shownInk: string) => (
+    <Text
+      testID={`commander-name-seat-${suffix}`}
+      text={shownName}
+      weight="bold"
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.6}
+      maxFontSizeMultiplier={1}
+      style={[
+        $boxName,
+        // why: a line box close to the font's own height, since iOS sets a taller one's extra room above the text and the name sinks low in its bar.
+        {
+          color: shownInk,
+          fontSize: nameFont,
+          lineHeight: Math.round(nameFont * 1.2),
+          transform: [{ translateY: -nameFont * NAME_RISE }],
+        },
+      ]}
+    />
+  )
+
+  if (sitting)
+    return (
+      <BoardPressable
+        testID={`commander-sit-seat-${suffix}`}
+        accessibilityRole="switch"
+        accessibilityLabel={shownName}
+        accessibilityState={{ checked: false }}
+        onPress={onSit}
+        style={({ pressed }) => [$box, frame, $sittingOut, pressed && pressedTint]}
+      >
+        <View style={[$boxRow, $boxValue, { height }]}>
+          <Text
+            text={power}
+            weight="bold"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1}
+            style={numberStyle}
+          />
+        </View>
+        <View style={[$boxNameRow, { height: nameHeight, paddingHorizontal: height * 0.12 }]}>
+          {nameText(ink)}
+        </View>
+      </BoardPressable>
+    )
+
   const half = (step: 1 | -1) => {
-    const disabled = step < 0 ? power <= lowest : power >= MAX_COMMANDER_DAMAGE
+    const disabled = step < 0 ? power <= LOWEST_POWER && !leaves : power >= MAX_COMMANDER_DAMAGE
     const label =
       step < 0
         ? partner && name
@@ -1054,7 +1191,7 @@ function PowerBox({
           text={step < 0 ? "−" : "+"}
           maxFontSizeMultiplier={1}
           style={[
-            { color: ink, fontSize: height * 0.3, lineHeight: height * 0.4 },
+            { color: ink, fontSize: height * 0.4, lineHeight: height * 0.5 },
             disabled ? $boxGlyphDisabled : $boxGlyph,
           ]}
         />
@@ -1062,22 +1199,8 @@ function PowerBox({
     )
   }
 
-  const nameFont = Math.round(Math.min(nameHeight * 0.45, height * 0.34))
   return (
-    <View
-      style={[
-        $box,
-        {
-          width,
-          height: height + nameHeight,
-          borderRadius: height * 0.22,
-          borderWidth: Math.max(2, height * 0.04),
-          borderColor: ring,
-          backgroundColor: color,
-        },
-        (sitting || power === 0) && !editing && $sittingOut,
-      ]}
-    >
+    <View style={[$box, frame]}>
       <View style={[$boxRow, { height }]}>
         {half(-1)}
         <BoardPressable
@@ -1089,11 +1212,13 @@ function PowerBox({
           onPress={onEdit}
           style={({ pressed }) => [
             $boxValue,
+            $boxRow,
             editing && { backgroundColor: overlayTint(ink, 0.1) },
             pressed && pressedTint,
           ]}
         >
-          {/* why: the keypad opens empty with the current power dimmed in its place, so typing replaces it; closing empty keeps it. The box shows the power as the attack holds it, so a typed 0 on a lone commander reads as the 1 it deals. */}
+          <Sword size={swordSize} color={ink} />
+          {/* why: the keypad opens empty with the current power dimmed in its place, so typing replaces it; closing empty keeps it. */}
           <Text
             testID={editing ? `commander-power-input-seat-${suffix}` : undefined}
             text={power}
@@ -1107,47 +1232,19 @@ function PowerBox({
         </BoardPressable>
         {half(1)}
       </View>
-      <BoardPressable
-        testID={`commander-sit-seat-${suffix}`}
-        accessibilityRole="switch"
-        accessibilityLabel={name ?? translate("board:commander.unnamed")}
-        accessibilityState={{ checked: !sitting }}
-        // why: the box's border trims a few points off the strip, so its touch area reaches a little past the box's foot.
-        hitSlop={{ bottom: 8 }}
-        onPress={onSit}
-        style={({ pressed }) => [
+      <View
+        style={[
           $boxNameRow,
           {
             height: nameHeight,
             paddingHorizontal: height * 0.12,
             borderTopColor: overlayTint(ink, 0.35),
+            backgroundColor: bar,
           },
-          sitting
-            ? pressed && { backgroundColor: overlayTint(ink, 0.14) }
-            : { backgroundColor: bar, opacity: pressed ? 0.8 : 1 },
         ]}
       >
-        <Text
-          testID={`commander-name-seat-${suffix}`}
-          text={name ?? translate("board:commander.unnamed")}
-          weight="bold"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.6}
-          maxFontSizeMultiplier={1}
-          style={[
-            $boxName,
-            // why: a line box close to the font's own height, since iOS sets a taller one's extra room above the text and the name sinks low in its bar.
-            {
-              color: sitting ? ink : ring,
-              fontSize: nameFont,
-              lineHeight: Math.round(nameFont * 1.2),
-              transform: [{ translateY: -nameFont * NAME_RISE }],
-            },
-            sitting && $sittingName,
-          ]}
-        />
-      </BoardPressable>
+        {nameText(ring)}
+      </View>
     </View>
   )
 }
@@ -1164,35 +1261,6 @@ function UndoGlyph({ size, color }: { size: number; color: string }) {
       />
     </Svg>
   )
-}
-
-function cornerName(x: "left" | "right", y: "top" | "bottom"): LifeCardMenuCorner {
-  return `${y}${x === "left" ? "Left" : "Right"}`
-}
-
-const CORNERS = [
-  { x: "right", y: "bottom" },
-  { x: "left", y: "bottom" },
-  { x: "right", y: "top" },
-  { x: "left", y: "top" },
-] as const
-
-type CommanderCorner = { x: "left" | "right"; y: "top" | "bottom" }
-
-/** why: undo takes a corner clear of the menu and the strip, preferring the side away from the attacker; when the attacker's sides leave none, clearing the strip wins. */
-function freeCorner(
-  menuCorner: LifeCardMenuCorner | undefined,
-  facing: CommanderFacing,
-  strip?: CommanderCorner,
-) {
-  const open = CORNERS.filter(
-    ({ x, y }) => cornerName(x, y) !== menuCorner && !(strip?.x === x && strip.y === y),
-  )
-  const free = open.filter(({ x, y }) => x !== facing.x && y !== facing.y)
-  const awayFromMenu = free.find(
-    ({ x, y }) => menuCorner && !menuCorner.startsWith(y) && !menuCorner.toLowerCase().endsWith(x),
-  )
-  return awayFromMenu ?? free[0] ?? open[0] ?? CORNERS[0]
 }
 
 const $absolute: ViewStyle = { position: "absolute" }
@@ -1222,7 +1290,6 @@ const $boxNameRow: ViewStyle = {
   justifyContent: "center",
   borderTopWidth: StyleSheet.hairlineWidth,
 }
-const $sittingName: TextStyle = { textDecorationLine: "line-through" }
 const $boxName: TextStyle = {
   flexShrink: 1,
   textAlign: "center",
@@ -1243,14 +1310,14 @@ const $compactOverlay: ThemedStyle<ViewStyle> = ({ radius }) => ({
   borderRadius: radius.xxl,
 })
 
-const $undo: ThemedStyle<ViewStyle> = () => ({
+const $undo: ViewStyle = {
   position: "absolute",
-  width: 48,
-  height: 48,
+  width: UNDO_SIZE,
+  height: UNDO_SIZE,
   alignItems: "center",
   justifyContent: "center",
   opacity: 0.85,
-})
+}
 
 const $attackerCenter: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,
@@ -1269,4 +1336,26 @@ const $commanderRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing[BOX_GAP],
 })
 
-const $boxValue: ViewStyle = { flex: VALUE_FLEX, alignItems: "center", justifyContent: "center" }
+const $boxValue: ViewStyle = {
+  flex: VALUE_FLEX,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+}
+
+// why: the sword before a power reads as "hits for", sized to sit beside two digits.
+const SWORD_SHARE = 0.36
+const $coin: ViewStyle = {
+  position: "absolute",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 2,
+}
+const $coinText: TextStyle = { color: "#000000", fontVariant: ["tabular-nums"] }
+const $strike: ViewStyle = {
+  position: "absolute",
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "flex-end",
+}
+const $strikeText: TextStyle = { fontVariant: ["tabular-nums"] }

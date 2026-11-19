@@ -25,7 +25,7 @@ function Board(options: Partial<BoardChromeOptions> & { playerCount?: number }) 
       { kind: "players", label: "Players", onPress: jest.fn() },
       { kind: "end-game", label: "End", onPress: jest.fn() },
     ],
-    attack: { dispatch: jest.fn() },
+    attack: { armedPlayerId: null },
     ...rest,
   })
   return <GameBoard chrome={chrome} renderGrid={() => <View testID="grid" />} />
@@ -68,22 +68,6 @@ describe("GameBoard chrome", () => {
     expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
-  it("finishes an attack before an app destination leaves the board", () => {
-    const dispatch = jest.fn()
-    const onHistory = jest.fn(() => expect(dispatch).toHaveBeenCalledWith({ type: "send" }))
-    renderBoard({
-      attack: { dispatch },
-      onHistory,
-      onSettings: jest.fn(),
-      onSupport: jest.fn(),
-      onAccount: jest.fn(),
-    })
-    openMenu()
-    fireEvent.press(screen.getByTestId("utility-menu-button"))
-    fireEvent.press(screen.getByTestId("utility-history-button"))
-    expect(onHistory).toHaveBeenCalledTimes(1)
-  })
-
   it("gives Decks the rules petal when the game has no rules", () => {
     const onDecks = jest.fn()
     renderBoard({ onDecks })
@@ -93,21 +77,10 @@ describe("GameBoard chrome", () => {
     expect(onDecks).toHaveBeenCalledTimes(1)
   })
 
-  it("pauses an attack under the menu, and finishes it when a petal takes over the board", () => {
-    const dispatch = jest.fn()
-    renderBoard({
-      system: "mtg",
-      onRules: jest.fn(),
-      attack: { dispatch },
-    })
+  it("leaves the menu shut while an attack is open, so only its check ends it", () => {
+    renderBoard({ attack: { armedPlayerId: asPlayerId("player-1") } })
     openMenu()
-    openMenu()
-    openMenu()
-    fireEvent.press(screen.getByTestId("rules-button"))
-    expect(dispatch).not.toHaveBeenCalled()
-    openMenu()
-    fireEvent.press(screen.getByTestId("players-button"))
-    expect(dispatch).toHaveBeenCalledWith({ type: "send" })
+    expect(screen.queryByTestId("players-button")).toBeNull()
   })
 
   it("runs a game's own petal after closing the menu", () => {
