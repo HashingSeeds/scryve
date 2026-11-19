@@ -29,9 +29,9 @@ export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: 
 
 const BM25_K1 = 1.2
 const BM25_B = 0.75
-// why: a rule rarely repeats its section's subject, so the title stands in for it.
-const TITLE_WEIGHT = 3
 const TYPO_MIN_LENGTH = 5
+// why: words a rule inherits count less than its own, so the subrule that says them is the one a screen's result shows.
+const INHERITED_WEIGHT = 1
 const RULE_NUMBER = /^\d+(\.\d*[a-z]*)?$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9]+/g
 const STOPWORDS = new Set(
@@ -46,7 +46,8 @@ function stem(word: string) {
   if (/^.ie[sd]$/.test(base)) base = base.slice(0, -1)
   else if (base.length > 4 && /ie[sd]$/.test(base)) base = `${base.slice(0, -3)}y`
   else if (base.length === 5 && base.endsWith("ying")) base = `${base.slice(0, -4)}ie`
-  else if (base.length > 3 && base.endsWith("s") && !/(ss|us|is)$/.test(base)) base = base.slice(0, -1)
+  else if (base.length > 3 && base.endsWith("s") && !/(ss|us|is)$/.test(base))
+    base = base.slice(0, -1)
   for (const suffix of ["ing", "ed"])
     if (base.length > suffix.length + 2 && base.endsWith(suffix)) {
       base = base.slice(0, -suffix.length)
@@ -68,62 +69,87 @@ type SearchIndex = {
   average: number
   slang: Map<string, string[]>
   spellings: Map<string, string>
-  defined: { words: string[]; rules: number[] }[]
+  defined: { entry: GlossaryEntry; words: string[]; rules: number[] }[]
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
-function searchIndex(source: ComprehensiveRules) {
+export function searchIndex(source: ComprehensiveRules) {
   const cached = indexes.get(source)
   if (cached) return cached
   const sections = source.chapters.flatMap((chapter) => chapter.sections)
   const rules = sections.flatMap((section) => section.rules)
-  const byId = new Map(rules.map((rule) => [rule.id, rule]))
-  // why: a rule rarely repeats the subject of its section or, for a lettered subrule, of its base rule, so those words count as its own.
-  const context = sections.flatMap((section) =>
-    section.rules.map((rule) => {
-      const base = byId.get(rule.id.replace(/[a-z]+$/, ""))
-      return [...words(section.title), ...(base && base !== rule ? words(base.text) : [])]
-    }),
-  )
-  const postings = new Map<string, Postings>()
   const stems = new Map<string, string>()
-  const lengths = rules.map((rule, index) => {
-    const counts = new Map<string, number>()
-    const raws = words(rule.text)
-    for (const raw of [...raws, ...context[index]]) {
-      let word = stems.get(raw)
-      if (word === undefined) stems.set(raw, (word = stem(raw)))
-      counts.set(word, (counts.get(word) ?? 0) + 1)
+  const postings = new Map<string, Postings>()
+  const lists = new Map<string, Postings>()
+  // why: each spelling resolves to its stem's postings once, so indexing a word is a push, not a lookup.
+  const listsOf = (text: string) =>
+    words(text).map((raw) => {
+      let list = lists.get(raw)
+      if (list) return list
+      const word = stem(raw)
+      stems.set(raw, word)
+      list = postings.get(word)
+      if (!list) postings.set(word, (list = { rules: [], counts: [] }))
+      lists.set(raw, list)
+      return list
+    })
+  const texts = new Map(rules.map((rule) => [rule.id, listsOf(rule.text)]))
+  const lengths: number[] = []
+  // why: the screens a glossary citation can open, by the id it cites: a section, or a rule with its lettered subrules.
+  const screens = new Map<string, number[]>()
+  const screenOf = (id: string) => {
+    const screen = screens.get(id) ?? []
+    if (screen.length === 0) screens.set(id, screen)
+    return screen
+  }
+  for (const section of sections) {
+    const title = listsOf(section.title)
+    for (const rule of section.rules) {
+      const index = lengths.length
+      const own = texts.get(rule.id) ?? []
+      const baseId = rule.id.replace(/[a-z]+$/, "")
+      screenOf(section.id).push(index)
+      screenOf(baseId).push(index)
+      // why: a rule rarely repeats the subject of its section or, for a lettered subrule, of its base rule, so those words count as its own.
+      for (const [found, weight] of [
+        [own, 1],
+        [title, INHERITED_WEIGHT],
+        [baseId === rule.id ? [] : (texts.get(baseId) ?? []), INHERITED_WEIGHT],
+      ] as const)
+        for (const list of found)
+          if (list.rules[list.rules.length - 1] === index)
+            list.counts[list.counts.length - 1] += weight
+          else {
+            list.rules.push(index)
+            list.counts.push(weight)
+          }
+      lengths.push(own.length)
     }
-    for (const [word, count] of counts) {
-      const list = postings.get(word) ?? { rules: [], counts: [] }
-      if (list.rules.length === 0) postings.set(word, list)
-      list.rules.push(index)
-      list.counts.push(count)
-    }
-    return raws.length
-  })
+  }
   const average = lengths.reduce((sum, length) => sum + length, 0) / Math.max(1, rules.length)
   const slang = new Map(
-    Object.entries(source.slang ?? {}).map(([word, meaning]) => [stem(word), words(meaning).map(stem)]),
+    Object.entries(source.slang ?? {}).map(([word, meaning]) => [
+      stem(word),
+      words(meaning).map(stem),
+    ]),
   )
-  const at = new Map(rules.map((rule, position) => [rule, position]))
+  const known = new Set(rules.map((rule) => rule.id))
   // why: a glossary term names an idea, and the rules it cites are where that idea lives.
-  const defined = source.glossary.map((entry) => ({
-    words: words(entry.term)
-      .filter((word) => !STOPWORDS.has(word))
-      .map(stem),
-    rules: citedRules(source, entry).map((rule) => at.get(rule)!),
-  }))
+  const defined = source.glossary.map((entry) => {
+    const cited = source.references
+      ? ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")?.id
+      : undefined
+    return {
+      entry,
+      words: words(entry.term)
+        .filter((word) => !STOPWORDS.has(word))
+        .map(stem),
+      rules: (cited && screens.get(known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited)) || [],
+    }
+  })
   const index = { rules, postings, lengths, average, slang, spellings: stems, defined }
   indexes.set(source, index)
   return index
-}
-
-function citedRules(source: ComprehensiveRules, entry: GlossaryEntry) {
-  if (!source.references) return []
-  const cited = ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")
-  return (cited && findRules(source, cited.id)?.rules) || []
 }
 
 function idf(index: SearchIndex, list: Postings | undefined) {
@@ -155,7 +181,9 @@ function oneEditApart(a: string, b: string) {
     restA === restB ||
     a.slice(start) === b.slice(start + 1) ||
     a.slice(start + 1) === b.slice(start) ||
-    (a[start] === b[start + 1] && a[start + 1] === b[start] && a.slice(start + 2) === b.slice(start + 2))
+    (a[start] === b[start + 1] &&
+      a[start + 1] === b[start] &&
+      a.slice(start + 2) === b.slice(start + 2))
   )
 }
 
@@ -169,15 +197,16 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
       .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
   const { chosen, stems, partial } = queryWords(needle)
   const lastStem = partial === undefined ? undefined : stem(partial)
-  const terms: RuleSearchResult[] = rules.glossary
-    .filter((entry) => {
-      const termWords = words(entry.term).map(stem)
-      return stems.every((wanted) =>
-        termWords.some((word) => matchesWord(word, wanted, wanted === lastStem ? partial : undefined)),
-      )
-    })
-    .map((entry) => ({ kind: "term", entry }))
   const index = searchIndex(rules)
+  const terms: RuleSearchResult[] = index.defined
+    .filter((term) =>
+      stems.every((wanted) =>
+        term.words.some((word) =>
+          matchesWord(word, wanted, wanted === lastStem ? partial : undefined),
+        ),
+      ),
+    )
+    .map(({ entry }) => ({ kind: "term", entry }))
   const scores = new Map<number, number>()
   // why: a slang word weighs as one word however many words its meaning takes.
   const weights = new Map(stems.map((word) => [word, 1]))
