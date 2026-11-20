@@ -162,6 +162,8 @@ test("a shipped PR fixes the issues it closes and the ones that say it fixed the
         [
           issue(74, "## Already fixed by #72\n\nShips on the next promotion."),
           issue(75, "Regressed by #72"),
+          issue(78, "Still broken. This was not fixed by #72."),
+          issue(79, "Fixed by #72"),
           issue(76, "Fixed by #720"),
           issue(77, "fixed by #72", "someone/else"),
           {},
@@ -170,6 +172,6 @@ test("a shipped PR fixes the issues it closes and the ones that say it fixed the
       pr80: pr([issue(10)], []),
       pr81: null,
     }),
-    [10, 74],
+    [10, 74, 79],
   )
 })

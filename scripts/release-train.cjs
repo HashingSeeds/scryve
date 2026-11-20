@@ -200,7 +200,10 @@ const REPO = "HashingSeeds/scryve"
 function fixedIssues(repository) {
   const issues = Object.entries(repository).flatMap(([field, pr]) => {
     if (!pr) return []
-    const fixedBy = new RegExp(String.raw`\bfixed by #${field.slice(2)}\b`, "i")
+    const fixedBy = new RegExp(
+      String.raw`^(?:#+\s*)?(?:already\s+)?fixed by #${field.slice(2)}\b`,
+      "im",
+    )
     return [
       ...pr.closingIssuesReferences.nodes,
       ...pr.timelineItems.nodes
