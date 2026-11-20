@@ -936,11 +936,13 @@ export default defineSchema({
     awaitingStore: v.optional(v.union(v.literal("ios"), v.literal("android"))),
     unread: v.boolean(),
     updatedAt: v.number(),
+    rakazoPending: v.optional(v.literal(true)),
   })
     .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])
     .index("by_user_and_updated_at", ["userId", "updatedAt"])
     .index("by_issue_and_fixed_in", ["issue", "fixedIn"])
-    .index("by_awaiting_store", ["awaitingStore"]),
+    .index("by_awaiting_store", ["awaitingStore"])
+    .index("by_rakazo_pending", ["rakazoPending"]),
 
   feedbackMessages: defineTable({
     requestId: v.id("feedbackRequests"),

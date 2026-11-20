@@ -17,6 +17,8 @@ const app = defineApp({
     RESEND_API_KEY: v.optional(v.string()),
     MODERATION_ALERT_TO: v.optional(v.string()),
     MODERATION_ALERT_FROM: v.optional(v.string()),
+    RAKAZO_BRIDGE_SECRET: v.optional(v.string()),
+    RAKAZO_REPLY_TOKEN: v.optional(v.string()),
     YGO_IMAGE_BASE_URL: v.optional(v.string()),
   },
 })

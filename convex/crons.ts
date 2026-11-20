@@ -61,9 +61,10 @@ crons.interval(
 )
 crons.interval("prune old receipts", { hours: 24 }, internal.crons.pruneOldReceipts, {})
 crons.cron("send renewal reminders", "0 * * * *", internal.notifications.remindRenewals, {})
+// why: every deployment pays for each run, and Apollo's /apollo/events hook already delivers replies as they happen.
 crons.interval(
   "pull feedback answers from Apollo",
-  { minutes: 1 },
+  { minutes: 15 },
   internal.feedback.pullApollo,
   {},
 )

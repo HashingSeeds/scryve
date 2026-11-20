@@ -132,15 +132,50 @@ function sentryUrl(eventId: string) {
   return `https://matthew-chisolm.sentry.io/issues/?query=${eventId}`
 }
 
+function feedbackTitle(request: Doc<"feedbackRequests">) {
+  return clip(
+    `${request.kind === "bug" ? "Bug" : "Idea"}: ${request.body.split("\n")[0] ?? ""}`,
+    120,
+  )
+}
+
+function appLabel(request: Doc<"feedbackRequests">) {
+  return [request.appVersion, request.platform].filter(Boolean).join(" · ") || undefined
+}
+
+// why: the message window is bounded, so a count would stop changing on long threads; the newest player message's id always does.
+export function playerTurn(messages: Doc<"feedbackMessages">[]) {
+  return messages.findLast((message) => message.from === "player")?._id ?? "request"
+}
+
+export function rakazoItem({ request, messages, account }: FeedbackCardInput) {
+  const title = feedbackTitle(request)
+  const app = appLabel(request)
+  return {
+    requestId: request._id,
+    turn: playerTurn(messages),
+    kind: request.kind,
+    title,
+    from: account ?? "Anonymous",
+    ...(app ? { app } : {}),
+    ...(request.issue
+      ? { issue: `${ISSUES_URL}${request.issue}` }
+      : { fileIssue: newIssueUrl(request, title, app) }),
+    ...(request.sentryEventId ? { sentry: sentryUrl(request.sentryEventId) } : {}),
+    thread: [
+      { from: "player", body: request.body },
+      ...messages.slice(-6).map(({ from, body }) => ({ from, body })),
+    ],
+  }
+}
+
 export function feedbackCard({ request, messages, account }: FeedbackCardInput) {
-  const label = request.kind === "bug" ? "Bug" : "Idea"
   const lastPlayer = messages.findLast((message) => message.from === "player")
-  // why: the message window is bounded, so a count would stop changing on long threads; the newest player message's id always does.
-  const playerTurn = lastPlayer?._id ?? "request"
+  const turn = playerTurn(messages)
   const fix = request.fixedIn
   const awaitingTeam = (messages.at(-1)?.from ?? "player") === "player"
-  const title = clip(`${label}: ${request.body.split("\n")[0] ?? ""}`, 120)
-  const app = [request.appVersion, request.platform].filter(Boolean).join(" · ") || undefined
+  const title = feedbackTitle(request)
+  const app = appLabel(request)
   const thread = messages
     .slice(-6)
     .map((message) => `${message.from === "player" ? "Player" : "You"}: ${message.body}`)
@@ -152,7 +187,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
     kind: awaitingTeam ? "approval" : "update",
     phase: fix
       ? `fixed:${fix.commit.slice(0, 7)}:${request.awaitingStore ? "w" : "s"}:${Math.round(lastPlayer?._creationTime ?? request._creationTime)}`
-      : `player:${playerTurn}`,
+      : `player:${turn}`,
     push: "alert",
     // why: the lock screen and Expo's servers get only this line, never what the player wrote.
     pushText:
@@ -160,7 +195,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
         ? request.awaitingStore
           ? "Fix waiting on the store"
           : "Fix shipped, player told"
-        : playerTurn === "request"
+        : turn === "request"
           ? `New ${request.kind === "bug" ? "bug report" : "idea"}`
           : "Player replied",
     title,
