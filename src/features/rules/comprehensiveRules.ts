@@ -33,6 +33,7 @@ const BM25_B = 0.5
 const TYPO_MIN_LENGTH = 6
 const INHERITED_WEIGHT = 0.5
 const TERM_WEIGHT = 0.4
+const TERM_RESULT_WEIGHT = 3
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
 const STOPWORDS = new Set(
@@ -217,15 +218,24 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   const lastStem = partial === undefined ? undefined : stem(partial)
   const index = searchIndex(rules)
   const completions = completionsOf(index.spellings, partial)
-  const terms: RuleSearchResult[] = index.defined
-    .filter((term) =>
-      stems.every((wanted) =>
-        term.words.some((word) =>
-          matchesWord(word, wanted, wanted === lastStem ? completions : undefined),
-        ),
-      ),
-    )
-    .map(({ entry }) => ({ kind: "term", entry }))
+  const ranked: { result: RuleSearchResult; score: number }[] = []
+  terms: for (const term of index.defined) {
+    let score = 0
+    for (const wanted of stems) {
+      const word =
+        term.words.find((candidate) => candidate === wanted) ??
+        (wanted === lastStem
+          ? term.words.find((candidate) => matchesWord(candidate, wanted, completions))
+          : undefined)
+      if (word === undefined) continue terms
+      score +=
+        (idf(index, index.postings.get(word)) * Math.min(wanted.length, word.length)) / word.length
+    }
+    ranked.push({
+      result: { kind: "term", entry: term.entry },
+      score: (TERM_RESULT_WEIGHT * score * stems.length) / term.words.length,
+    })
+  }
   const scores = new Map<number, number>()
   const weights = new Map(stems.map((word) => [word, 1]))
   for (const meaning of stems.map((word) => index.slang.get(word) ?? []))
@@ -264,17 +274,19 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     for (const at of term.rules) scores.set(at, (scores.get(at) ?? 0) + bonus)
   }
   const screens = new Set<string>()
-  const matches: RuleSearchResult[] = [...scores]
-    .sort(([a, scoreA], [b, scoreB]) => scoreB - scoreA || a - b)
-    .map(([at]) => index.rules[at])
-    .filter((rule) => {
-      const screen = rule.id.replace(/[a-z]+$/, "")
-      if (screens.has(screen)) return false
-      screens.add(screen)
-      return true
-    })
-    .map((rule) => ({ kind: "rule", rule }))
-  return [...terms, ...matches].slice(0, limit)
+  for (const [at, score] of [...scores].sort(
+    ([a, scoreA], [b, scoreB]) => scoreB - scoreA || a - b,
+  )) {
+    const rule = index.rules[at]
+    const screen = rule.id.replace(/[a-z]+$/, "")
+    if (screens.has(screen)) continue
+    screens.add(screen)
+    ranked.push({ result: { kind: "rule", rule }, score })
+  }
+  return ranked
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ result }) => result)
 }
 
 export function ruleReferences(text: string, reference: RegExp) {
