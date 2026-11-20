@@ -22,7 +22,7 @@ type Case = {
   asked?: string
 }
 
-const FLOOR = { mtg: 426, fab: 62 }
+const FLOOR = { mtg: 427, fab: 62 }
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
 const TOP = 3
