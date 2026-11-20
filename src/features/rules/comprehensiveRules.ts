@@ -33,7 +33,6 @@ const BM25_B = 0.5
 const TYPO_MIN_LENGTH = 6
 const INHERITED_WEIGHT = 0.5
 const TERM_WEIGHT = 0.4
-const TERM_RESULT_WEIGHT = 3
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
 const STOPWORDS = new Set(
@@ -221,6 +220,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   const ranked: { result: RuleSearchResult; score: number }[] = []
   terms: for (const term of index.defined) {
     let score = 0
+    let named = term.words.length === stems.length
     for (const wanted of stems) {
       const word =
         term.words.find((candidate) => candidate === wanted) ??
@@ -228,12 +228,13 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
           ? term.words.find((candidate) => matchesWord(candidate, wanted, completions))
           : undefined)
       if (word === undefined) continue terms
+      named &&= word === wanted
       score +=
         (idf(index, index.postings.get(word)) * Math.min(wanted.length, word.length)) / word.length
     }
     ranked.push({
       result: { kind: "term", entry: term.entry },
-      score: (TERM_RESULT_WEIGHT * score * stems.length) / term.words.length,
+      score: named ? Infinity : (score * stems.length) / term.words.length,
     })
   }
   const scores = new Map<number, number>()

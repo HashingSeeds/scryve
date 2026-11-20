@@ -200,6 +200,7 @@ describe("searchRules ranking", () => {
     glossary: [
       { term: "Commander Tax", text: "The extra cost to cast a commander. See rule 903.8." },
       { term: "Declare Blockers Step", text: "Part of the turn. See rule 509." },
+      { term: "Commander", text: "A casual variant. See rule 903." },
     ],
     notice: [],
     slang: { wrath: "destroy all creatures" },
@@ -214,6 +215,7 @@ describe("searchRules ranking", () => {
   it("puts a glossary term first only when the search names it in full", () => {
     expect(ids("declare blockers step")[0]).toBe("Declare Blockers Step")
     expect(ids("blockers").indexOf("Declare Blockers Step")).toBeGreaterThan(0)
+    expect(ids("commander")[0]).toBe("Commander")
   })
 
   it("matches the words of a question and ranks the rule that has its rarest ones first", () => {
