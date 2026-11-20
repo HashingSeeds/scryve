@@ -87,7 +87,7 @@ describe("parseMagicRules", () => {
     expect(findRules(rules!, "100.1z")).toBeUndefined()
   })
 
-  it("searches glossary terms first, then rule numbers and text", () => {
+  it("searches glossary terms, rule numbers and text", () => {
     expect(
       searchRules(rules!, "ab").map((result) =>
         result.kind === "term" ? result.entry.term : result.rule.id,
@@ -199,6 +199,8 @@ describe("searchRules ranking", () => {
     ],
     glossary: [
       { term: "Commander Tax", text: "The extra cost to cast a commander. See rule 903.8." },
+      { term: "Declare Blockers Step", text: "Part of the turn. See rule 509." },
+      { term: "Commander", text: "A casual variant. See rule 903." },
     ],
     notice: [],
     slang: { wrath: "destroy all creatures" },
@@ -209,6 +211,12 @@ describe("searchRules ranking", () => {
     searchRules(rules, query).map((result) =>
       result.kind === "term" ? result.entry.term : result.rule.id,
     )
+
+  it("puts a glossary term first only when the search names it in full", () => {
+    expect(ids("declare blockers step")[0]).toBe("Declare Blockers Step")
+    expect(ids("blockers").indexOf("Declare Blockers Step")).toBeGreaterThan(0)
+    expect(ids("commander")[0]).toBe("Commander")
+  })
 
   it("matches the words of a question and ranks the rule that has its rarest ones first", () => {
     expect(ids("does deathtouch destroy creatures")[0]).toBe("702.2b")
