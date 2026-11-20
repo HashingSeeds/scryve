@@ -47,6 +47,8 @@ export function FeedbackConversation({
   const [includeAccount, setIncludeAccount] = useState(false)
   const [screenshots, setScreenshots] = useState<BugScreenshot[]>([])
   const [sentScreenshotUris, setSentScreenshotUris] = useState<string[]>([])
+  // why: the picker reads image bytes after it closes, and a send in that gap would leave them out.
+  const [picking, setPicking] = useState(false)
   const [outgoing, setOutgoing] = useState<string>()
   const [sending, setSending] = useState(false)
   const [sentry, setSentry] = useState<{ draft: string; eventId?: string }>()
@@ -95,7 +97,8 @@ export function FeedbackConversation({
 
   async function send() {
     const body = draft.trim()
-    if (!body || !key || !online || sending || (requestId !== undefined && !request)) return
+    if (!body || !key || !online || sending || picking || (requestId !== undefined && !request))
+      return
     const attached = screenshots
     setError(undefined)
     setSending(true)
@@ -135,7 +138,7 @@ export function FeedbackConversation({
       draft={draft}
       outgoing={outgoing}
       screenshotUris={screenshots.map((shot) => shot.uri)}
-      canAttach={screenshots.length < MAX_SCREENSHOTS}
+      canAttach={!picking && screenshots.length < MAX_SCREENSHOTS}
       sentScreenshotUris={sentScreenshotUris}
       signedIn={auth.isSignedIn}
       includeAccount={includeAccount}
@@ -145,11 +148,12 @@ export function FeedbackConversation({
       onKind={setKind}
       onDraft={setDraft}
       onSend={() => void send()}
-      onPickScreenshot={() =>
-        void pickScreenshots(screenshots).then(setScreenshots, () =>
-          setError(translate("feedback:suggest.screenshotFailed")),
-        )
-      }
+      onPickScreenshot={() => {
+        setPicking(true)
+        void pickScreenshots(screenshots)
+          .then(setScreenshots, () => setError(translate("feedback:suggest.screenshotFailed")))
+          .finally(() => setPicking(false))
+      }}
       onRemoveScreenshot={(index) =>
         setScreenshots((shots) => shots.filter((_, at) => at !== index))
       }
