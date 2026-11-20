@@ -22,7 +22,10 @@ type Case = {
   asked?: string
 }
 
-const FLOOR = { mtg: 427, fab: 62 }
+// why: nobody tunes search against the held-out cases, so their score shows whether a change helps questions it never saw. Reading them to fix a miss turns them into practice cases.
+const SETS = { practice: "", heldout: ".heldout" }
+type CaseSet = keyof typeof SETS
+const FLOOR = { mtg: { practice: 427, heldout: 97 }, fab: { practice: 62, heldout: 22 } }
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
 const TOP = 3
@@ -33,8 +36,14 @@ const { values } = parseArgs({
     misses: { type: "boolean", default: false },
     system: { type: "string" },
     cases: { type: "string" },
+    record: { type: "string" },
+    against: { type: "string" },
   },
 })
+const before: Record<string, string[]> = values.against
+  ? JSON.parse(readFileSync(values.against, "utf8"))
+  : {}
+const answered: Record<string, string[]> = {}
 
 async function rulesText(source: TextRules) {
   const dir = path.join(tmpdir(), "scryve-rules-search-eval")
@@ -74,10 +83,18 @@ function percent(count: number, total: number) {
   return `${count}/${total} (${total ? Math.round((count / total) * 100) : 0}%)`
 }
 
-async function evaluate(system: System, file: string) {
-  const source = GAME_RULES[system]
-  const rules = source.parse(await rulesText(source))
-  if (!rules) throw new Error(`${system}: the downloaded rules no longer parse`)
+function lengthOf(query: string) {
+  const count = query.trim().split(/\s+/).length
+  return count <= 2 ? "1-2 words" : count <= 4 ? "3-4 words" : "5+ words"
+}
+
+function evaluate(
+  system: System,
+  set: CaseSet,
+  file: string,
+  source: TextRules,
+  rules: ComprehensiveRules,
+) {
   const cases: Case[] = JSON.parse(readFileSync(file, "utf8"))
   const problems: string[] = []
   const seen = new Set<string>()
@@ -97,7 +114,8 @@ async function evaluate(system: System, file: string) {
   }
 
   const timings: number[] = []
-  const bySource = new Map<Source, { passed: number; total: number }>()
+  const groups = new Map<string, { passed: number; total: number }>()
+  const hits: string[] = []
   const misses: string[] = []
   let passed = 0
   let inTop = 0
@@ -115,9 +133,14 @@ async function evaluate(system: System, file: string) {
     const screens = results.map((result) => screenOpenedBy(rules, source, result))
     const rank = rankOf(screens, entry.rules)
     const hit = rank >= 0 && rank < entry.rules.length
-    const tally = bySource.get(entry.source) ?? { passed: 0, total: 0 }
-    bySource.set(entry.source, { passed: tally.passed + (hit ? 1 : 0), total: tally.total + 1 })
-    if (hit) passed++
+    for (const group of [entry.source, lengthOf(entry.query)]) {
+      const tally = groups.get(group) ?? { passed: 0, total: 0 }
+      groups.set(group, { passed: tally.passed + (hit ? 1 : 0), total: tally.total + 1 })
+    }
+    if (hit) {
+      passed++
+      hits.push(entry.query)
+    }
     if (rank >= 0 && rank < TOP) inTop++
     if (results.length === 0) empty++
     if (phrased.has(entry.query.trim().toLowerCase())) {
@@ -137,14 +160,25 @@ async function evaluate(system: System, file: string) {
   const sorted = timings.toSorted((a, b) => a - b)
   const p95 = percentile(sorted, 0.95)
   console.log(
-    `${system}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
+    `${system} ${set}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
   )
   console.log(
-    `  ${[...bySource].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}${copied.total ? ` · same as a shipped phrasing ${percent(copied.passed, copied.total)}` : ""}`,
+    `  ${[...groups].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}${copied.total ? ` · same as a shipped phrasing ${percent(copied.passed, copied.total)}` : ""}`,
   )
-  if (values.misses) console.log(misses.join("\n"))
-  if (!values.cases && passed < FLOOR[system])
-    problems.push(`answered ${passed}, below the floor of ${FLOOR[system]}`)
+  const key = `${system} ${set}`
+  answered[key] = hits
+  if (before[key]) {
+    const was = new Set(before[key])
+    const now = new Set(hits)
+    const lost = before[key].filter((query) => !now.has(query))
+    console.log(
+      `  against ${values.against}: gained ${hits.filter((query) => !was.has(query)).length} · lost ${lost.length}`,
+    )
+    if (set === "practice") for (const query of lost) console.log(`  lost: ${query}`)
+  }
+  if (values.misses && set === "practice") console.log(misses.join("\n"))
+  if (!values.cases && passed < FLOOR[system][set])
+    problems.push(`answered ${passed}, below the floor of ${FLOOR[system][set]}`)
   if (p95 > P95_BUDGET_MS) problems.push(`p95 ${p95.toFixed(2)}ms is over ${P95_BUDGET_MS}ms`)
   for (const problem of problems) console.log(`  fail: ${problem}`)
   return problems.length === 0
@@ -158,12 +192,20 @@ async function main() {
     (system) => !values.system || values.system === system,
   )
   let ok = true
-  for (const system of systems)
-    ok =
-      (await evaluate(
-        system,
-        values.cases ?? path.join(__dirname, "rules-search", `${system}.json`),
-      )) && ok
+  for (const system of systems) {
+    const source = GAME_RULES[system]
+    const rules = source.parse(await rulesText(source))
+    if (!rules) throw new Error(`${system}: the downloaded rules no longer parse`)
+    const sets = (Object.keys(SETS) as CaseSet[]).filter(
+      (set) => !values.cases || set === "practice",
+    )
+    for (const set of sets) {
+      const file =
+        values.cases ?? path.join(__dirname, "rules-search", `${system}${SETS[set]}.json`)
+      ok = evaluate(system, set, file, source, rules) && ok
+    }
+  }
+  if (values.record) writeFileSync(values.record, JSON.stringify(answered))
   if (!ok) process.exitCode = 1
 }
 
