@@ -35,7 +35,7 @@ const feedback = {
     removeScreenshot: "Remove screenshot",
     selectedScreenshot: "Selected screenshot",
     screenshotFailed: "Couldn't add that screenshot. Try another image.",
-    // One line above the composer. <privacy> links to the Privacy Policy.
+    // Small line under the prompt, before anything is sent. <privacy> links to the Privacy Policy.
     // fr: "it" is the message: "Une IA peut nous aider à le lire."
     notice: "Any language works. AI may help us read it. <privacy>Privacy</privacy>",
     includeAccount: "Include my account",

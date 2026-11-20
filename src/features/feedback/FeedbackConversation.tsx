@@ -9,7 +9,8 @@ import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import {
   appVersion,
   captureBugReport,
-  pickScreenshot,
+  MAX_SCREENSHOTS,
+  pickScreenshots,
   type BugScreenshot,
 } from "@/features/feedback/bugReport"
 import { feedbackErrorMessage } from "@/features/feedback/errors"
@@ -44,8 +45,8 @@ export function FeedbackConversation({
   const [kind, setKind] = useState(initialKind)
   const [draft, setDraft] = useState(initialMessage)
   const [includeAccount, setIncludeAccount] = useState(false)
-  const [screenshot, setScreenshot] = useState<BugScreenshot | null>(null)
-  const [sentScreenshotUri, setSentScreenshotUri] = useState<string>()
+  const [screenshots, setScreenshots] = useState<BugScreenshot[]>([])
+  const [sentScreenshotUris, setSentScreenshotUris] = useState<string[]>([])
   const [outgoing, setOutgoing] = useState<string>()
   const [sending, setSending] = useState(false)
   const [sentry, setSentry] = useState<{ draft: string; eventId?: string }>()
@@ -69,16 +70,12 @@ export function FeedbackConversation({
       void markRead({ key, requestId: request._id }).catch(() => undefined)
   }, [key, request, unread, markRead])
 
-  async function startThread(body: string, attached: BugScreenshot | null) {
+  async function startThread(body: string, attached: BugScreenshot[]) {
     if (!key) return
-    const sentryDraft = [body, attached?.uri ?? ""].join("\n")
+    const sentryDraft = [body, ...attached.map((shot) => shot.uri)].join("\n")
     let sentryEventId = sentry?.draft === sentryDraft ? sentry.eventId : undefined
-    if ((kind === "bug" || attached) && sentry?.draft !== sentryDraft) {
-      sentryEventId = captureBugReport({
-        kind,
-        body,
-        ...(attached ? { screenshot: attached } : {}),
-      })
+    if ((kind === "bug" || attached.length > 0) && sentry?.draft !== sentryDraft) {
+      sentryEventId = captureBugReport({ kind, body, screenshots: attached })
       setSentry({ draft: sentryDraft, eventId: sentryEventId })
     }
     const created = await submit({
@@ -99,14 +96,14 @@ export function FeedbackConversation({
   async function send() {
     const body = draft.trim()
     if (!body || !key || !online || sending || (requestId !== undefined && !request)) return
-    const attached = screenshot
+    const attached = screenshots
     setError(undefined)
     setSending(true)
     setOutgoing(body)
     setDraft("")
     if (!request) {
-      setScreenshot(null)
-      setSentScreenshotUri(attached?.uri)
+      setScreenshots([])
+      setSentScreenshotUris(attached.map((shot) => shot.uri))
     }
     try {
       if (request) await reply({ key, requestId: request._id, body })
@@ -122,8 +119,8 @@ export function FeedbackConversation({
       setOutgoing(undefined)
       setDraft((typed) => (typed.trim() ? `${body}\n\n${typed}` : body))
       if (!request) {
-        setScreenshot(attached)
-        setSentScreenshotUri(undefined)
+        setScreenshots(attached)
+        setSentScreenshotUris([])
       }
     } finally {
       if (mounted.current) setSending(false)
@@ -137,8 +134,9 @@ export function FeedbackConversation({
       kind={kind}
       draft={draft}
       outgoing={outgoing}
-      screenshot={screenshot}
-      sentScreenshotUri={sentScreenshotUri}
+      screenshotUris={screenshots.map((shot) => shot.uri)}
+      canAttach={screenshots.length < MAX_SCREENSHOTS}
+      sentScreenshotUris={sentScreenshotUris}
       signedIn={auth.isSignedIn}
       includeAccount={includeAccount}
       online={online}
@@ -148,14 +146,13 @@ export function FeedbackConversation({
       onDraft={setDraft}
       onSend={() => void send()}
       onPickScreenshot={() =>
-        void pickScreenshot().then(
-          (picked) => {
-            if (picked) setScreenshot(picked)
-          },
-          () => setError(translate("feedback:suggest.screenshotFailed")),
+        void pickScreenshots(screenshots).then(setScreenshots, () =>
+          setError(translate("feedback:suggest.screenshotFailed")),
         )
       }
-      onRemoveScreenshot={() => setScreenshot(null)}
+      onRemoveScreenshot={(index) =>
+        setScreenshots((shots) => shots.filter((_, at) => at !== index))
+      }
       onIncludeAccount={setIncludeAccount}
       onLinkAccount={() => {
         if (key && request)
