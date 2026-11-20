@@ -30,7 +30,7 @@ export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: 
 
 const BM25_K1 = 1.2
 const BM25_B = 0.5
-const TYPO_MIN_LENGTH = 5
+const TYPO_MIN_LENGTH = 6
 const INHERITED_WEIGHT = 0.5
 const TERM_WEIGHT = 0.4
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
