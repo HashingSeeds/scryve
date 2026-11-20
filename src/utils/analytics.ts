@@ -133,7 +133,7 @@ type Events = {
     peak_heat?: (typeof values.peak_heat)[number]
   } & Record<(typeof SCAN_COUNT_KEYS)[number], number>
   rules_search: { system: string; result_count: number; top_results: string; query?: string }
-  rules_opened: { system: string; rank: number; open_count: number }
+  rules_opened: { system: string; rank: number; open_count: number; rule: string; query: string }
   keyword_viewed: { system: string; rule: string }
   turns_game_ended: {
     turns_enabled: boolean
@@ -166,13 +166,13 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   sync_latency: ["transport", "role", "scope", ...LATENCY_KEYS],
   card_scan_completed: ["duration_ms", "peak_heat", ...SCAN_COUNT_KEYS],
   rules_search: ["system", "result_count", "top_results", "query"],
-  rules_opened: ["system", "rank", "open_count"],
+  rules_opened: ["system", "rank", "open_count", "rule", "query"],
   keyword_viewed: ["system", "rule"],
   turns_game_ended: ["turns_enabled", "pass_count", "player_count", "mode"],
 }
 
 const RULE_ID = /^\d{1,3}(\.\d{1,3}){0,2}[a-z]{0,2}$/
-const QUERY_LIMIT = 40
+const QUERY_LIMIT = 80
 
 let enabled = loadString(CONSENT_KEY) === "yes"
 let revision = 0
@@ -228,9 +228,8 @@ export function analyticsProperties(event: string, properties: Record<string, un
       if (ids.length <= 3 && ids.every((id) => id === "glossary" || RULE_ID.test(id)))
         result[key] = ids.join(",")
     } else if (key === "query") {
-      // why: only a search that found nothing says what was missing, so only its text is kept.
       const text = typeof value === "string" ? value.trim().toLowerCase().replace(/\s+/g, " ") : ""
-      if (properties.result_count === 0 && text) result[key] = text.slice(0, QUERY_LIMIT)
+      if (text) result[key] = text.slice(0, QUERY_LIMIT)
     } else if (BOOLEAN_KEYS.has(key)) {
       if (typeof value === "boolean") result[key] = value
     } else if (event === "deck_sync" && key === "action") {
