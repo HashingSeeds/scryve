@@ -189,60 +189,56 @@ function revertedPrs(message) {
   ].filter(Boolean)
 }
 
-function prNumbers(messages) {
-  const reverted = new Set(messages.flatMap(revertedPrs))
-  const shipped = messages.map((message) => prNumber(subjectOf(message)))
-  return [...new Set(shipped.filter((pr) => pr && !reverted.has(pr)))].map(Number)
+function revertedPrNumbers(messages) {
+  return new Set(messages.flatMap(revertedPrs).map(Number))
 }
 
 const REPO = "HashingSeeds/scryve"
+const FIX_LOOKBACK_MS = 30 * 24 * 60 * 60_000
 
-function fixedIssues(repository) {
-  const issues = Object.entries(repository).flatMap(([field, pr]) => {
-    if (!pr) return []
-    const fixedBy = new RegExp(
-      String.raw`^(?:#+\s*)?(?:already\s+)?fixed by #${field.slice(2)}\b`,
-      "im",
-    )
-    return [
-      ...pr.closingIssuesReferences.nodes,
-      ...pr.timelineItems.nodes
-        .map((event) => event.source)
-        .filter((issue) => issue?.number && fixedBy.test(issue.body)),
-    ]
-      .filter((issue) => issue.repository.nameWithOwner === REPO)
-      .map((issue) => issue.number)
-  })
-  return [...new Set(issues)]
+function completedIssues() {
+  const since = new Date(Date.now() - FIX_LOOKBACK_MS).toISOString().slice(0, 10)
+  const closer = "closer { __typename ... on PullRequest { number mergeCommit { oid } } }"
+  const query = `{ search(query: "repo:${REPO} is:issue is:closed reason:completed closed:>=${since}", type: ISSUE, first: 100) { nodes { ... on Issue { number closedAt timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { ${closer} } } } } } } }`
+  return JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`])).data.search.nodes
 }
 
-function closedIssues(prs) {
-  if (prs.length === 0) return []
-  const issue = "number repository { nameWithOwner }"
-  const fields = prs.map(
-    (pr) =>
-      `pr${pr}: pullRequest(number: ${pr}) { closingIssuesReferences(first: 20) { nodes { ${issue} } } timelineItems(itemTypes: [CROSS_REFERENCED_EVENT], first: 50) { nodes { ... on CrossReferencedEvent { source { ... on Issue { ${issue} body } } } } } }`,
-  )
-  const query = `{ repository(owner: "HashingSeeds", name: "scryve") { ${fields.join(" ")} } }`
-  return fixedIssues(
-    JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`])).data.repository,
-  )
+function fixedIssues(issues, { contains, committedAt, reverted }) {
+  return issues
+    .filter(({ closedAt, timelineItems }) => {
+      const closer = timelineItems.nodes[0]?.closer
+      if (!closer) return Date.parse(closedAt) < committedAt
+      return (
+        closer.__typename === "PullRequest" &&
+        !reverted.has(closer.number) &&
+        !!closer.mergeCommit &&
+        contains(closer.mergeCommit.oid)
+      )
+    })
+    .map((issue) => issue.number)
 }
 
 function shipFixes(candidate, messages) {
-  const prs = prNumbers(messages)
   let args
   try {
-    const issues = closedIssues(prs)
+    const issues = fixedIssues(completedIssues(), {
+      contains: (commit) => isAncestor(commit, candidate.commit),
+      committedAt: Date.parse(git("show", "-s", "--format=%cI", candidate.commit)),
+      reverted: revertedPrNumbers(messages),
+    })
     if (issues.length === 0) return
     args = { commit: candidate.commit, issues, runtimes: candidate.runtimes }
     run("pnpm", ["exec", "convex", "run", "feedback:shipFixes", JSON.stringify(args)])
-    console.log(`Marked feedback fixed for ${issues.map((issue) => `#${issue}`).join(", ")}`)
+    console.log(
+      `Told feedback linked to fixed issues ${issues.map((issue) => `#${issue}`).join(", ")}`,
+    )
   } catch (error) {
     const retry = args
-      ? `Rerun: pnpm exec convex run feedback:shipFixes '${JSON.stringify(args)}'`
-      : `Shipped PRs: ${prs.map((pr) => `#${pr}`).join(", ")}`
-    console.warn(`Promoted, but feedback was not marked fixed: ${error.message}. ${retry}`)
+      ? ` Rerun: pnpm exec convex run feedback:shipFixes '${JSON.stringify(args)}'`
+      : ""
+    console.warn(
+      `Promoted, but feedback was not told about fixes: ${error.message}.${retry} The next promotion also retries it.`,
+    )
   }
 }
 
@@ -348,7 +344,7 @@ module.exports = {
   fixedIssues,
   newIssues,
   pickRelease,
-  prNumbers,
+  revertedPrNumbers,
   releaseNotes,
   summarizeGroup,
 }

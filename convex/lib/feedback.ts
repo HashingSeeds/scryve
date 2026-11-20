@@ -125,10 +125,11 @@ function fixedMeta(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
 
 function newIssueUrl(request: Doc<"feedbackRequests">, title: string, app: string | undefined) {
   const body = [
-    clip(request.body, 1000),
+    clip(request.body, 900),
     "",
     ...(app ? [`Scryve ${app}`] : []),
     ...(request.sentryEventId ? [`Sentry: ${sentryUrl(request.sentryEventId)}`] : []),
+    `Feedback: ${request._id}`,
   ].join("\n")
   const labels = request.kind === "bug" ? "bug" : "enhancement"
   return `${ISSUES_URL}new?${new URLSearchParams({ title, body: body.trim(), labels })}`

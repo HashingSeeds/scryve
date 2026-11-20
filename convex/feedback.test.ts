@@ -701,6 +701,7 @@ describe("feedbackCard", () => {
     expect(new URL(url).href).toBe(url)
     expect(new URL(url).searchParams.get("labels")).toBe("bug")
     expect(new URL(url).searchParams.get("body")?.length).toBeLessThanOrEqual(1000)
+    expect(new URL(url).searchParams.get("body")).toMatch(/\nFeedback: r1$/)
   })
 
   it("links the issue once Matthew names it", () => {

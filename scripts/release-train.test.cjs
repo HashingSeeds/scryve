@@ -4,7 +4,7 @@ const { test } = require("node:test")
 const {
   fixedIssues,
   pickRelease,
-  prNumbers,
+  revertedPrNumbers,
   releaseNotes,
   summarizeGroup,
 } = require("./release-train.cjs")
@@ -123,9 +123,9 @@ test("backports on beta are never the train's candidate", () => {
   assert.equal(candidate.commit, "main")
 })
 
-test("shipped PRs come from squash subjects, minus reverted ones", () => {
+test("reverted PRs come from revert subjects, branches and bodies", () => {
   assert.deepEqual(
-    prNumbers([
+    revertedPrNumbers([
       "fix(decks): pasted cards match again (#303)",
       "chore: no PR",
       'Revert "fix(decks): pasted cards match again (#303)" (#305)\n\nReverts HashingSeeds/scryve#303',
@@ -141,37 +141,38 @@ test("shipped PRs come from squash subjects, minus reverted ones", () => {
       "feat(game): faster dice (#680)",
       'Merge pull request #681 from HashingSeeds/undo-dice\n\nRevert "feat(game): faster dice (#680)"',
     ]),
-    [305, 267, 310, 630, 641, 660, 661, 670, 681],
+    new Set([303, 264, 640, 680]),
   )
 })
 
-test("a shipped PR fixes the issues it closes and the ones that say it fixed them", () => {
-  const issue = (number, body, repo = "HashingSeeds/scryve") => ({
+test("an issue is fixed once the release has its closing PR, or was committed after a hand close", () => {
+  const byPr = (number, pr, oid) => ({
     number,
-    body,
-    repository: { nameWithOwner: repo },
+    closedAt: "2026-11-20T06:56:07Z",
+    timelineItems: {
+      nodes: [{ closer: { __typename: "PullRequest", number: pr, mergeCommit: { oid } } }],
+    },
   })
-  const pr = (closes, mentions) => ({
-    closingIssuesReferences: { nodes: closes },
-    timelineItems: { nodes: mentions.map((source) => ({ source })) },
+  const byHand = (number, closedAt) => ({
+    number,
+    closedAt,
+    timelineItems: { nodes: [{ closer: null }] },
   })
   assert.deepEqual(
-    fixedIssues({
-      pr72: pr(
-        [issue(10), issue(11, "", "someone/else")],
-        [
-          issue(74, "## Already fixed by #72\n\nShips on the next promotion."),
-          issue(75, "Regressed by #72"),
-          issue(78, "Still broken. This was not fixed by #72."),
-          issue(79, "Fixed by #72"),
-          issue(76, "Fixed by #720"),
-          issue(77, "fixed by #72", "someone/else"),
-          {},
-        ],
-      ),
-      pr80: pr([issue(10)], []),
-      pr81: null,
-    }),
-    [10, 74, 79],
+    fixedIssues(
+      [
+        byPr(1, 72, "shipped"),
+        byPr(2, 73, "later"),
+        byPr(3, 74, "shipped"),
+        byHand(4, "2026-11-20T10:00:00Z"),
+        byHand(5, "2026-11-20T14:00:00Z"),
+      ],
+      {
+        contains: (oid) => oid === "shipped",
+        committedAt: Date.parse("2026-11-20T12:00:00Z"),
+        reverted: new Set([74]),
+      },
+    ),
+    [1, 4],
   )
 })
