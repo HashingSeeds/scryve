@@ -690,7 +690,7 @@ describe("feedbackCard", () => {
     expect(card).toMatchObject({ kind: "update", phase: "player:m" })
   })
 
-  it("files a new issue with a canonical link under the issues prefix", () => {
+  it("files a new issue without the player's words", () => {
     const card = feedbackCard({
       request: { ...request, kind: "bug", body: `Crash: 50% & "more"…\n${"x".repeat(1500)}` },
       messages: [],
@@ -700,8 +700,9 @@ describe("feedbackCard", () => {
     expect(url.startsWith("https://github.com/HashingSeeds/scryve/issues/new?")).toBe(true)
     expect(new URL(url).href).toBe(url)
     expect(new URL(url).searchParams.get("labels")).toBe("bug")
-    expect(new URL(url).searchParams.get("body")?.length).toBeLessThanOrEqual(1000)
-    expect(new URL(url).searchParams.get("body")).toMatch(/^> Crash: .*\n> x+…\n\nFeedback: r1$/)
+    expect(new URL(url).searchParams.get("title")).toBe("Bug: ")
+    expect(new URL(url).searchParams.get("body")).toMatch(/^<!--.*-->\n\nFeedback: r1$/)
+    expect(url).not.toContain("Crash")
   })
 
   it("links the issue once Matthew names it", () => {
