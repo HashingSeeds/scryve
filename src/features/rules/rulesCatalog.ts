@@ -3,6 +3,7 @@ import type { ComprehensiveRules } from "./comprehensiveRules"
 import { FAB_RULE_REFERENCE, parseFabRules } from "./fabRules"
 import { magicKeyword, type KeywordRule } from "./magicKeywords"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
+import { MAGIC_PHRASINGS } from "./phrasings"
 import { FAB_SLANG, MAGIC_SLANG } from "./slang"
 import type { SYSTEMS, SystemId } from "../../../convex/lib/systems"
 
@@ -26,10 +27,9 @@ export type GameRules = TextRules | { kind: "link"; pageUrl: string }
 
 function searchable(
   rules: ComprehensiveRules | undefined,
-  slang: Record<string, string>,
-  references: RegExp,
+  search: Pick<ComprehensiveRules, "slang" | "phrasings" | "references">,
 ) {
-  return rules && { ...rules, slang, references }
+  return rules && { ...rules, ...search }
 }
 
 export const GAME_RULES = {
@@ -39,7 +39,12 @@ export const GAME_RULES = {
     pageUrl: "https://magic.wizards.com/en/rules",
     publisher: "Wizards of the Coast",
     cacheKey: "scryve.rules",
-    parse: (text) => searchable(parseMagicRules(text), MAGIC_SLANG, MAGIC_RULE_REFERENCE),
+    parse: (text) =>
+      searchable(parseMagicRules(text), {
+        slang: MAGIC_SLANG,
+        phrasings: MAGIC_PHRASINGS,
+        references: MAGIC_RULE_REFERENCE,
+      }),
     references: MAGIC_RULE_REFERENCE,
     keyword: magicKeyword,
     tableItemRules: {
@@ -59,7 +64,8 @@ export const GAME_RULES = {
     pageUrl: "https://rules.fabtcg.com/en/",
     publisher: "Legend Story Studios",
     cacheKey: "scryve.rules.fab",
-    parse: (text) => searchable(parseFabRules(text), FAB_SLANG, FAB_RULE_REFERENCE),
+    parse: (text) =>
+      searchable(parseFabRules(text), { slang: FAB_SLANG, references: FAB_RULE_REFERENCE }),
     references: FAB_RULE_REFERENCE,
     revalidate: true,
     tableItemRules: { marked: "9.3" } satisfies Partial<Record<FabTableItemId, string>>,

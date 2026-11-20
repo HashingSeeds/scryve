@@ -8,6 +8,7 @@ export type ComprehensiveRules = {
   glossary: GlossaryEntry[]
   notice: string[]
   slang?: Readonly<Record<string, string>>
+  phrasings?: Readonly<Record<string, readonly string[]>>
   references?: RegExp
 }
 
@@ -28,9 +29,10 @@ export function findRules(rules: ComprehensiveRules, id: string) {
 export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: "rule"; rule: Rule }
 
 const BM25_K1 = 1.2
-const BM25_B = 0.75
-const TYPO_MIN_LENGTH = 5
+const BM25_B = 0.5
+const TYPO_MIN_LENGTH = 6
 const INHERITED_WEIGHT = 0.5
+const TERM_WEIGHT = 0.4
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
 const STOPWORDS = new Set(
@@ -95,6 +97,9 @@ export function searchIndex(source: ComprehensiveRules) {
       return list
     })
   const texts = new Map(rules.map((rule) => [rule.id, listsOf(rule.text)]))
+  const phrasings = new Map(
+    Object.entries(source.phrasings ?? {}).map(([id, said]) => [id, listsOf(said.join(" "))]),
+  )
   const lengths: number[] = []
   const screens = new Map<string, number[]>()
   const screenOf = (id: string) => {
@@ -114,6 +119,7 @@ export function searchIndex(source: ComprehensiveRules) {
         [own, 1],
         [title, INHERITED_WEIGHT],
         [baseId === rule.id ? [] : (texts.get(baseId) ?? []), INHERITED_WEIGHT],
+        [phrasings.get(rule.id) ?? [], 1],
       ] as const)
         for (const list of found)
           if (list.rules[list.rules.length - 1] === index)
@@ -253,7 +259,8 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   const asked = new Set(stems)
   for (const term of index.defined) {
     if (term.words.length === 0 || !term.words.every((word) => asked.has(word))) continue
-    const bonus = term.words.reduce((sum, word) => sum + idf(index, index.postings.get(word)), 0)
+    const bonus =
+      TERM_WEIGHT * term.words.reduce((sum, word) => sum + idf(index, index.postings.get(word)), 0)
     for (const at of term.rules) scores.set(at, (scores.get(at) ?? 0) + bonus)
   }
   const screens = new Set<string>()
