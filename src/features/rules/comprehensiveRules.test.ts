@@ -202,6 +202,7 @@ describe("searchRules ranking", () => {
     ],
     notice: [],
     slang: { wrath: "destroy all creatures" },
+    phrasings: { "903.8": ["recast general"] },
     references: MAGIC_RULE_REFERENCE,
   }
   const ids = (query: string) =>
@@ -215,6 +216,10 @@ describe("searchRules ranking", () => {
 
   it("reads player slang as the rules' wording", () => {
     expect(ids("wrath")[0]).toBe("701.8b")
+  })
+
+  it("finds a rule by a player's phrasing that shares none of its words", () => {
+    expect(ids("recast general")[0]).toBe("903.8")
   })
 
   it("forgives one typo in a word the rules never use", () => {

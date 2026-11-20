@@ -22,7 +22,7 @@ type Case = {
   asked?: string
 }
 
-const FLOOR = { mtg: 151, fab: 60 }
+const FLOOR = { mtg: 364, fab: 60 }
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
 const TOP = 3
@@ -89,6 +89,12 @@ async function evaluate(system: System, file: string) {
       if (!findRules(rules, id)?.rules.some((rule) => rule.id === id))
         problems.push(`"${query}" names ${id}, which is not a rule in ${source.url}`)
   }
+  const phrased = new Set<string>()
+  for (const [id, said] of Object.entries(rules.phrasings ?? {})) {
+    if (!findRules(rules, id)?.rules.some((rule) => rule.id === id))
+      problems.push(`phrasings name ${id}, which is not a rule in ${source.url}`)
+    for (const phrase of said) phrased.add(phrase.trim().toLowerCase())
+  }
 
   const timings: number[] = []
   const bySource = new Map<Source, { passed: number; total: number }>()
@@ -96,6 +102,7 @@ async function evaluate(system: System, file: string) {
   let passed = 0
   let inTop = 0
   let empty = 0
+  const copied = { passed: 0, total: 0 }
   for (const entry of cases) {
     let results: RuleSearchResult[] = []
     let fastest = Infinity
@@ -113,6 +120,10 @@ async function evaluate(system: System, file: string) {
     if (hit) passed++
     if (rank >= 0 && rank < TOP) inTop++
     if (results.length === 0) empty++
+    if (phrased.has(entry.query.trim().toLowerCase())) {
+      copied.total++
+      if (hit) copied.passed++
+    }
     if (!hit) {
       const got = results
         .slice(0, 3)
@@ -129,7 +140,7 @@ async function evaluate(system: System, file: string) {
     `${system}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
   )
   console.log(
-    `  ${[...bySource].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}`,
+    `  ${[...bySource].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}${copied.total ? ` · same as a shipped phrasing ${percent(copied.passed, copied.total)}` : ""}`,
   )
   if (values.misses) console.log(misses.join("\n"))
   if (!values.cases && passed < FLOOR[system])

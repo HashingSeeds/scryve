@@ -8,6 +8,7 @@ export type ComprehensiveRules = {
   glossary: GlossaryEntry[]
   notice: string[]
   slang?: Readonly<Record<string, string>>
+  phrasings?: Readonly<Record<string, readonly string[]>>
   references?: RegExp
 }
 
@@ -95,6 +96,9 @@ export function searchIndex(source: ComprehensiveRules) {
       return list
     })
   const texts = new Map(rules.map((rule) => [rule.id, listsOf(rule.text)]))
+  const phrasings = new Map(
+    Object.entries(source.phrasings ?? {}).map(([id, said]) => [id, listsOf(said.join(" "))]),
+  )
   const lengths: number[] = []
   const screens = new Map<string, number[]>()
   const screenOf = (id: string) => {
@@ -114,6 +118,7 @@ export function searchIndex(source: ComprehensiveRules) {
         [own, 1],
         [title, INHERITED_WEIGHT],
         [baseId === rule.id ? [] : (texts.get(baseId) ?? []), INHERITED_WEIGHT],
+        [phrasings.get(rule.id) ?? [], 1],
       ] as const)
         for (const list of found)
           if (list.rules[list.rules.length - 1] === index)
