@@ -12,10 +12,12 @@ export interface PublicCloudConfig {
 export type CloudConfigResult =
   { configured: true; value: PublicCloudConfig } | { configured: false; message: string }
 
-function isHttpsUrl(value: string | undefined): value is string {
+// why: pnpm convex:local serves this worktree's backend over plain HTTP on loopback.
+function isConvexUrl(value: string | undefined): value is string {
   if (!value) return false
   try {
-    return new URL(value).protocol === "https:"
+    const url = new URL(value)
+    return url.protocol === "https:" || (url.protocol === "http:" && url.hostname === "127.0.0.1")
   } catch {
     return false
   }
@@ -41,7 +43,7 @@ export function validatePublicCloudConfig(
   const CLERK_KEY = env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()
   const CONVEX_URL = env.EXPO_PUBLIC_CONVEX_URL?.trim()
   const INVITE_ORIGIN = normalizeHttpsOrigin(env.EXPO_PUBLIC_INVITE_ORIGIN)
-  if (!isClerkPublishableKey(CLERK_KEY) || !isHttpsUrl(CONVEX_URL) || !INVITE_ORIGIN) {
+  if (!isClerkPublishableKey(CLERK_KEY) || !isConvexUrl(CONVEX_URL) || !INVITE_ORIGIN) {
     return {
       configured: false,
       message: translate("account:cloud.notConfigured"),

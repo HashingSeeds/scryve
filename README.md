@@ -64,7 +64,24 @@ chmod +x "$(git rev-parse --git-common-dir)/hooks/post-checkout"
 
 Contributors without the shared file can copy `.env.example` to `.env.local`.
 
+### Local Convex backend for this worktree
+
+`pnpm convex:local` runs a Convex backend of this worktree's own on this machine and
+pushes `convex/` to it on every change. It is not billed, and each worktree gets its own
+data and ports (from 3210). The first run downloads the backend and copies the
+project's preview default env vars onto it, which needs `npx convex login`. Once
+ready, it points this worktree's app at it in `.env.development.local`; serve the app
+with `pnpm start:expo`. `pnpm bots`, `pnpm event-bots`, and `pnpm dev:signin` use it.
+Its state lives in `.convex/`; delete that folder to start over.
+
+Simulators and web on this machine reach it, and so does an Android emulator after
+`adb reverse tcp:<port> tcp:<port>`. Anything else needs a preview.
+
 ### Convex preview for this worktree
+
+Use a cloud preview only for clients that can't reach this machine: PR preview
+builds, Revyl cloud simulators, and the Mac mini's physical devices. Pass
+`--preview <name>` to `pnpm bots` to play there.
 
 `pnpm preview:up` reads the Convex **preview deploy key** from 1Password
 (`CONVEX_PREVIEW_DEPLOY_KEY` in `.env.schema`), or from `CONVEX_DEPLOY_KEY` in the
