@@ -8,7 +8,7 @@ import {
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   getPlayerSlotFacings,
-} from "@/components/playerGridGeometry"
+} from "@/components/playerGridLayout"
 import { teamChipCrowded, teamGridLayout } from "@/components/teamGridGeometry"
 import { ThemeProvider } from "@/theme/context"
 

@@ -2,7 +2,7 @@ import { createContext } from "react"
 import type { ViewStyle } from "react-native"
 import { Easing, Keyframe, ReduceMotion } from "react-native-reanimated"
 
-import { EDGE_TAB } from "./playerGridGeometry"
+import { EDGE_TAB } from "./playerGridLayout"
 
 export type BoardEdge = "left" | "right" | "top" | "bottom"
 

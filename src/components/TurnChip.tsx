@@ -30,7 +30,7 @@ import {
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { CONTENT_EDGES } from "./playerGridGeometry"
+import { CONTENT_EDGES } from "./playerGridLayout"
 import { MarkArt } from "./PlayerMark"
 import { contentInsetsFor, rotatedLayerStyle } from "./pokemon/pokemonCardLayout"
 import { Text } from "./Text"

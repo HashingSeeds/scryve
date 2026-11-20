@@ -1,4 +1,4 @@
-import type { SeamNeighbor, SeamSide } from "@/components/playerGridGeometry"
+import type { SeamNeighbor, SeamSide } from "@/components/playerGridLayout"
 
 export type SeamItem = "plane" | "scheme" | "schemeDue" | "die"
 type Side = "left" | "right"

@@ -17,7 +17,7 @@ import {
   type LifeCardMenuEdge,
   type LifeCardScreenEdges,
 } from "./playerCardTypes"
-import { CONTENT_EDGES } from "./playerGridGeometry"
+import { CONTENT_EDGES } from "./playerGridLayout"
 import { SeatIdentity, seatIdentityLabel, seatIdentityMetrics } from "./SeatIdentity"
 import { isProMarkShape, type PlayerMarkShape } from "../../convex/lib/appearance"
 

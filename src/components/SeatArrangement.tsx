@@ -14,7 +14,7 @@ import { $tableDirection } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { getPlayerGridRowFlex, getPlayerGridRows } from "./playerGridGeometry"
+import { getPlayerGridRowFlex, getPlayerGridRows } from "./playerGridLayout"
 import { Text } from "./Text"
 import { usePlayerGridLayout } from "./usePlayerGridLayout"
 
