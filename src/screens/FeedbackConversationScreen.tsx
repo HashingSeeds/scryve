@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { Image, Pressable, View } from "react-native"
+import { Image, Keyboard, Pressable, View } from "react-native"
 import { Trans } from "react-i18next"
 import Svg, { Circle, Path, Rect } from "react-native-svg"
 
@@ -85,9 +85,10 @@ export function FeedbackConversationScreen({
     outgoing === undefined &&
     (!started || Boolean(request))
   const opened = started || outgoing !== undefined
-  // why: iOS keeps a multiline field's height when its text changes from outside, so the field is rebuilt when a send clears it or a failed send restores it.
-  const [field, setField] = useState({ build: 0, typed: draft })
-  if (draft !== field.typed) setField({ build: field.build + 1, typed: draft })
+  // why: iOS keeps a multiline field's height when its text changes from outside, so the field is rebuilt when a send clears it or a failed send restores it, keeping the keyboard only if it was up.
+  const [field, setField] = useState({ build: 0, typed: draft, focused: false })
+  if (draft !== field.typed)
+    setField({ build: field.build + 1, typed: draft, focused: Keyboard.isVisible() })
 
   return (
     <FeedbackLayout
@@ -134,7 +135,7 @@ export function FeedbackConversationScreen({
               )}
               <TextField
                 key={field.build}
-                autoFocus={field.build > 0}
+                autoFocus={field.focused}
                 dismissButton={false}
                 testID="feedback-composer"
                 placeholderTx={
@@ -146,7 +147,7 @@ export function FeedbackConversationScreen({
                 maxLength={2000}
                 value={draft}
                 onChangeText={(typed) => {
-                  setField(({ build }) => ({ build, typed }))
+                  setField((current) => ({ ...current, typed }))
                   onDraft(typed)
                 }}
                 containerStyle={$grow}

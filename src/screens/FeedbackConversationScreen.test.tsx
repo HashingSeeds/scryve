@@ -1,3 +1,4 @@
+import { Keyboard } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -100,6 +101,21 @@ describe("FeedbackConversationScreen", () => {
     fireEvent.press(loading.view.getByLabelText("Remove screenshot"))
     expect(loading.props.onSend).not.toHaveBeenCalled()
     expect(loading.props.onRemoveScreenshot).not.toHaveBeenCalled()
+  })
+
+  it("rebuilds the composer when a send changes its text, refocusing only if the keyboard was up", () => {
+    const { props, view } = renderConversation({ draft: "Crash on rotate" })
+    const rebuildWith = (draft: string, keyboardUp: boolean) => {
+      jest.spyOn(Keyboard, "isVisible").mockReturnValue(keyboardUp)
+      view.rerender(
+        <ThemeProvider initialContext="dark">
+          <FeedbackConversationScreen {...props} draft={draft} />
+        </ThemeProvider>,
+      )
+      return view.getByTestId("feedback-composer").props.autoFocus
+    }
+    expect(rebuildWith("", true)).toBe(true)
+    expect(rebuildWith("Crash on rotate", false)).toBe(false)
   })
 
   it("asks a question for each kind, and links the Privacy Policy", () => {
