@@ -114,6 +114,7 @@ export function FeedbackConversationScreen({
                       accessibilityRole="button"
                       accessibilityLabel={translate("feedback:suggest.removeScreenshot")}
                       hitSlop={10}
+                      disabled={picking}
                       containerStyle={themed($remove)}
                       onPress={() => onRemoveScreenshot(index)}
                     />

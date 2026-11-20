@@ -95,9 +95,11 @@ describe("FeedbackConversationScreen", () => {
     fireEvent.press(full.view.getByLabelText("Add screenshot"))
     expect(full.props.onPickScreenshot).not.toHaveBeenCalled()
 
-    const loading = renderConversation({ draft: "Crash", picking: true })
+    const loading = renderConversation({ draft: "Crash", screenshotUris: ["a.png"], picking: true })
     fireEvent.press(loading.view.getByLabelText("Send"))
+    fireEvent.press(loading.view.getByLabelText("Remove screenshot"))
     expect(loading.props.onSend).not.toHaveBeenCalled()
+    expect(loading.props.onRemoveScreenshot).not.toHaveBeenCalled()
   })
 
   it("asks a question for each kind, and links the Privacy Policy", () => {
