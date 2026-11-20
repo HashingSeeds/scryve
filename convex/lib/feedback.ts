@@ -108,6 +108,12 @@ export function fixedReply(
   return `${news} Restart Scryve to update. Still not there? Update from ${store}.`
 }
 
+export function trackedReply(request: Doc<"feedbackRequests">) {
+  return request.kind === "bug"
+    ? "We're tracking this bug. We'll tell you here when the fix is out."
+    : "We're tracking this idea. We'll tell you here when it ships."
+}
+
 function fixedMeta(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
   const where = request.awaitingStore
     ? `waiting on ${STORES[request.awaitingStore]}`

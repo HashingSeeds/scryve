@@ -396,7 +396,10 @@ describe("feedback", () => {
       )
 
       const thread = await t.query(api.feedback.thread, { key: ME, requestId })
-      expect(thread?.messages).toMatchObject([{ from: "team", body: "Shipping Friday." }])
+      expect(thread?.messages).toMatchObject([
+        { from: "team", body: "We're tracking this idea. We'll tell you here when it ships." },
+        { from: "team", body: "Shipping Friday." },
+      ])
       expect(await t.run(async (ctx) => (await ctx.db.get(requestId))?.issue)).toBe(42)
       expect(await t.query(api.feedback.rakazoPending, { secret: "bridge-secret" })).toHaveLength(1)
     } finally {
@@ -455,6 +458,18 @@ describe("feedback", () => {
     expect(await issue()).toBe(123)
     await apollo(t, requestId, "link_issue", "124")
     expect(await issue()).toBe(124)
+  })
+
+  it("tells the player once that their report is tracked, on the first link", async () => {
+    const t = makeConvexTest()
+    const requestId = await submit(t)
+    await apollo(t, requestId, "link_issue", "#123")
+    await apollo(t, requestId, "link_issue", "#124")
+    const thread = await t.query(api.feedback.thread, { key: ME, requestId })
+    expect(thread?.messages.map(({ from, body }) => ({ from, body }))).toEqual([
+      { from: "team", body: "We're tracking this idea. We'll tell you here when it ships." },
+    ])
+    expect(thread?.request.unread).toBe(true)
   })
 
   it("marks only unfixed requests linked to a shipped issue as fixed", async () => {

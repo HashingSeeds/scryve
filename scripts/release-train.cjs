@@ -195,21 +195,35 @@ function prNumbers(messages) {
   return [...new Set(shipped.filter((pr) => pr && !reverted.has(pr)))].map(Number)
 }
 
+const REPO = "HashingSeeds/scryve"
+
+function fixedIssues(repository) {
+  const issues = Object.entries(repository).flatMap(([field, pr]) => {
+    if (!pr) return []
+    const fixedBy = new RegExp(String.raw`\bfixed by #${field.slice(2)}\b`, "i")
+    return [
+      ...pr.closingIssuesReferences.nodes,
+      ...pr.timelineItems.nodes
+        .map((event) => event.source)
+        .filter((issue) => issue?.number && fixedBy.test(issue.body)),
+    ]
+      .filter((issue) => issue.repository.nameWithOwner === REPO)
+      .map((issue) => issue.number)
+  })
+  return [...new Set(issues)]
+}
+
 function closedIssues(prs) {
   if (prs.length === 0) return []
+  const issue = "number repository { nameWithOwner }"
   const fields = prs.map(
     (pr) =>
-      `pr${pr}: pullRequest(number: ${pr}) { closingIssuesReferences(first: 20) { nodes { number repository { nameWithOwner } } } }`,
+      `pr${pr}: pullRequest(number: ${pr}) { closingIssuesReferences(first: 20) { nodes { ${issue} } } timelineItems(itemTypes: [CROSS_REFERENCED_EVENT], first: 50) { nodes { ... on CrossReferencedEvent { source { ... on Issue { ${issue} body } } } } } }`,
   )
   const query = `{ repository(owner: "HashingSeeds", name: "scryve") { ${fields.join(" ")} } }`
-  const { data } = JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`]))
-  const issues = Object.values(data.repository).flatMap(
-    (pr) =>
-      pr?.closingIssuesReferences.nodes
-        .filter((issue) => issue.repository.nameWithOwner === "HashingSeeds/scryve")
-        .map((issue) => issue.number) ?? [],
+  return fixedIssues(
+    JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`])).data.repository,
   )
-  return [...new Set(issues)]
 }
 
 function shipFixes(candidate, messages) {
@@ -328,6 +342,7 @@ if (require.main === module) {
 
 module.exports = {
   BACKPORT_PREFIX,
+  fixedIssues,
   newIssues,
   pickRelease,
   prNumbers,

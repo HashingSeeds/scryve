@@ -1,7 +1,13 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { pickRelease, prNumbers, releaseNotes, summarizeGroup } = require("./release-train.cjs")
+const {
+  fixedIssues,
+  pickRelease,
+  prNumbers,
+  releaseNotes,
+  summarizeGroup,
+} = require("./release-train.cjs")
 
 const commits = (...subjects) =>
   subjects.map((subject, index) => ({ commit: `c${index}`, subject }))
@@ -136,5 +142,34 @@ test("shipped PRs come from squash subjects, minus reverted ones", () => {
       'Merge pull request #681 from HashingSeeds/undo-dice\n\nRevert "feat(game): faster dice (#680)"',
     ]),
     [305, 267, 310, 630, 641, 660, 661, 670, 681],
+  )
+})
+
+test("a shipped PR fixes the issues it closes and the ones that say it fixed them", () => {
+  const issue = (number, body, repo = "HashingSeeds/scryve") => ({
+    number,
+    body,
+    repository: { nameWithOwner: repo },
+  })
+  const pr = (closes, mentions) => ({
+    closingIssuesReferences: { nodes: closes },
+    timelineItems: { nodes: mentions.map((source) => ({ source })) },
+  })
+  assert.deepEqual(
+    fixedIssues({
+      pr72: pr(
+        [issue(10), issue(11, "", "someone/else")],
+        [
+          issue(74, "## Already fixed by #72\n\nShips on the next promotion."),
+          issue(75, "Regressed by #72"),
+          issue(76, "Fixed by #720"),
+          issue(77, "fixed by #72", "someone/else"),
+          {},
+        ],
+      ),
+      pr80: pr([issue(10)], []),
+      pr81: null,
+    }),
+    [10, 74],
   )
 })
