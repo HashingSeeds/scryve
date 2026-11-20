@@ -398,7 +398,7 @@ describe("feedback", () => {
       const thread = await t.query(api.feedback.thread, { key: ME, requestId })
       expect(thread?.messages).toMatchObject([{ from: "team", body: "Shipping Friday." }])
       expect(await t.run(async (ctx) => (await ctx.db.get(requestId))?.issue)).toBe(42)
-      expect(await t.query(api.feedback.rakazoPending, { secret: "bridge-secret" })).toEqual([])
+      expect(await t.query(api.feedback.rakazoPending, { secret: "bridge-secret" })).toHaveLength(1)
     } finally {
       delete process.env.RAKAZO_BRIDGE_SECRET
       delete process.env.RAKAZO_REPLY_TOKEN

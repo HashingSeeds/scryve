@@ -26,22 +26,23 @@ test("sends each turn, marks it delivered, and retries a failed one on the next 
   assert.deepEqual(marked, ["request"])
 })
 
-test("never sends the same turn twice at once", async () => {
+test("sends each turn once while the queue changes mid-send", async () => {
   let release
   const sent = []
   const bridge = createBridge({
     deliver: (_, key) => {
       sent.push(key)
-      return new Promise((resolve) => (release = resolve))
+      return key === "r1:a" ? new Promise((resolve) => (release = resolve)) : undefined
     },
     markDelivered: async () => {},
     log: () => {},
   })
-  const first = bridge.update([item("m1")])
-  await bridge.flush()
+  const first = bridge.update([item("a"), item("b")])
+  bridge.update([item("a"), item("b"), item("c")])
+  bridge.update([item("b"), item("c")])
   release()
   await first
-  assert.deepEqual(sent, ["r1:m1"])
+  assert.deepEqual(sent, ["r1:a", "r1:b", "r1:c"])
 })
 
 test("treats Rakazo's ignored delivery as a failure", async (t) => {

@@ -28,22 +28,25 @@ const TIMEOUT_MS = 15_000
 
 function createBridge({ deliver, markDelivered, log }) {
   let latest = []
-  const inFlight = new Set()
-  async function flush() {
-    for (const item of latest) {
-      const key = `${item.requestId}:${item.turn}`
-      if (inFlight.has(key)) continue
-      inFlight.add(key)
+  let draining = null
+  async function drain() {
+    const tried = new Set()
+    const keyOf = (item) => `${item.requestId}:${item.turn}`
+    for (let item; (item = latest.find((next) => !tried.has(keyOf(next))));) {
+      const key = keyOf(item)
+      tried.add(key)
       try {
         await deliver(item, key)
         await markDelivered(item)
         log(`Sent ${item.title} to Rakazo`)
       } catch (error) {
         log(`Couldn't send ${item.requestId}: ${error.message}. Retrying within a minute.`)
-      } finally {
-        inFlight.delete(key)
       }
     }
+  }
+  function flush() {
+    draining ??= drain().finally(() => (draining = null))
+    return draining
   }
   return {
     update(items) {

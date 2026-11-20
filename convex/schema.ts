@@ -936,7 +936,6 @@ export default defineSchema({
     awaitingStore: v.optional(v.union(v.literal("ios"), v.literal("android"))),
     unread: v.boolean(),
     updatedAt: v.number(),
-    // why: optional so requests written before the Rakazo bridge, and every answered one, carry no flag.
     rakazoPending: v.optional(v.literal(true)),
   })
     .index("by_sender_and_updated_at", ["senderHash", "updatedAt"])

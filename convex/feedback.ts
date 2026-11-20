@@ -457,7 +457,7 @@ async function answer(
   }
   const body = text.slice(0, FEEDBACK_LIMITS.message)
   await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
-  await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now(), rakazoPending: undefined })
+  await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now() })
   await postCard(ctx, request._id)
   await notifyFeedbackReply(ctx, request, body)
   return true
@@ -482,7 +482,6 @@ export const rakazoPending = query({
   },
 })
 
-// why: the player can reply while the bridge is sending, and clearing that newer turn would never forward it.
 export const rakazoDelivered = mutation({
   args: { secret: v.string(), requestId: v.id("feedbackRequests"), turn: v.string() },
   handler: async (ctx, { secret, requestId, turn }) => {
