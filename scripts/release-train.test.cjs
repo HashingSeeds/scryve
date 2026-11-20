@@ -145,12 +145,14 @@ test("reverted PRs come from revert subjects, branches and bodies", () => {
   )
 })
 
-test("an issue is fixed once the release has its closing PR, or was committed after a hand close", () => {
-  const byPr = (number, pr, oid) => ({
+test("an issue is fixed once the release ships its closing PR, or was committed after a hand close", () => {
+  const byPr = (number, pr) => ({
     number,
     closedAt: "2026-11-20T06:56:07Z",
     timelineItems: {
-      nodes: [{ closer: { __typename: "PullRequest", number: pr, mergeCommit: { oid } } }],
+      nodes: [
+        { closer: { __typename: "PullRequest", number: pr, mergeCommit: { oid: `m${pr}` } } },
+      ],
     },
   })
   const byHand = (number, closedAt) => ({
@@ -161,16 +163,14 @@ test("an issue is fixed once the release has its closing PR, or was committed af
   assert.deepEqual(
     fixedIssues(
       [
-        byPr(1, 72, "shipped"),
-        byPr(2, 73, "later"),
-        byPr(3, 74, "shipped"),
+        byPr(1, 72),
+        byPr(2, 73),
         byHand(4, "2026-11-20T10:00:00Z"),
         byHand(5, "2026-11-20T14:00:00Z"),
       ],
       {
-        contains: (oid) => oid === "shipped",
+        shipped: (pr) => pr.number === 72 && pr.mergeCommit.oid === "m72",
         committedAt: Date.parse("2026-11-20T12:00:00Z"),
-        reverted: new Set([74]),
       },
     ),
     [1, 4],

@@ -12,7 +12,8 @@ const fs = require("node:fs")
 const REQUEST_ID = /\b[0-9a-z]{31,37}\b/g
 
 function citedRequests(body) {
-  return [...new Set(body?.match(REQUEST_ID) ?? [])]
+  const ours = (body ?? "").split("\n").filter((line) => !line.trimStart().startsWith(">"))
+  return [...new Set(ours.join("\n").match(REQUEST_ID) ?? [])]
 }
 
 function main() {

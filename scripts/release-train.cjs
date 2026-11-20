@@ -189,6 +189,13 @@ function revertedPrs(message) {
   ].filter(Boolean)
 }
 
+function commitMessages(range) {
+  return git("log", "--first-parent", "--format=%B%x00", range)
+    .split("\0")
+    .map((message) => message.trim())
+    .filter(Boolean)
+}
+
 function revertedPrNumbers(messages) {
   return new Set(messages.flatMap(revertedPrs).map(Number))
 }
@@ -203,28 +210,27 @@ function completedIssues() {
   return JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`])).data.search.nodes
 }
 
-function fixedIssues(issues, { contains, committedAt, reverted }) {
+function fixedIssues(issues, { shipped, committedAt }) {
   return issues
     .filter(({ closedAt, timelineItems }) => {
       const closer = timelineItems.nodes[0]?.closer
       if (!closer) return Date.parse(closedAt) < committedAt
-      return (
-        closer.__typename === "PullRequest" &&
-        !reverted.has(closer.number) &&
-        !!closer.mergeCommit &&
-        contains(closer.mergeCommit.oid)
-      )
+      return closer.__typename === "PullRequest" && !!closer.mergeCommit && shipped(closer)
     })
     .map((issue) => issue.number)
 }
 
-function shipFixes(candidate, messages) {
+function shippedIn(commit) {
+  return ({ number, mergeCommit: { oid } }) =>
+    isAncestor(oid, commit) && !revertedPrNumbers(commitMessages(`${oid}..${commit}`)).has(number)
+}
+
+function shipFixes(candidate) {
   let args
   try {
     const issues = fixedIssues(completedIssues(), {
-      contains: (commit) => isAncestor(commit, candidate.commit),
+      shipped: shippedIn(candidate.commit),
       committedAt: Date.parse(git("show", "-s", "--format=%cI", candidate.commit)),
-      reverted: revertedPrNumbers(messages),
     })
     if (issues.length === 0) return
     args = { commit: candidate.commit, issues, runtimes: candidate.runtimes }
@@ -274,15 +280,7 @@ async function promote({ yes, soakMinutes }) {
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
   // why: read before the production push below, which moves PRODUCTION_REF to the candidate.
-  const messages = git(
-    "log",
-    "--first-parent",
-    "--format=%B%x00",
-    `${PRODUCTION_REF}..${candidate.commit}`,
-  )
-    .split("\0")
-    .map((message) => message.trim())
-    .filter(Boolean)
+  const messages = commitMessages(`${PRODUCTION_REF}..${candidate.commit}`)
   const subjects = messages.map((message) => message.split("\n")[0])
   for (const subject of subjects) console.log(`  ${subject}`)
 
@@ -313,7 +311,7 @@ async function promote({ yes, soakMinutes }) {
   console.log(
     `Promoted ${commit}: the app update is live and Pages is building the production web app.`,
   )
-  shipFixes(candidate, messages)
+  shipFixes(candidate)
 }
 
 async function main() {
