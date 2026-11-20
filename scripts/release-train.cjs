@@ -189,8 +189,8 @@ function revertedPrs(message) {
   ].filter(Boolean)
 }
 
-function commitMessages(range) {
-  return git("log", "--first-parent", "--format=%B%x00", range)
+function commitMessages(...args) {
+  return git("log", "--format=%B%x00", ...args)
     .split("\0")
     .map((message) => message.trim())
     .filter(Boolean)
@@ -280,7 +280,7 @@ async function promote({ yes, soakMinutes }) {
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
   // why: read before the production push below, which moves PRODUCTION_REF to the candidate.
-  const messages = commitMessages(`${PRODUCTION_REF}..${candidate.commit}`)
+  const messages = commitMessages("--first-parent", `${PRODUCTION_REF}..${candidate.commit}`)
   const subjects = messages.map((message) => message.split("\n")[0])
   for (const subject of subjects) console.log(`  ${subject}`)
 

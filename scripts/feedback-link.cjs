@@ -8,7 +8,6 @@
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 
-// why: Convex ids are lowercase base32; anything else that matches (a Sentry event id) comes back not_found.
 const REQUEST_ID = /\b[0-9a-z]{31,37}\b/g
 
 function citedRequests(body) {
