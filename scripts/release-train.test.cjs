@@ -1,7 +1,13 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { pickRelease, prNumbers, releaseNotes, summarizeGroup } = require("./release-train.cjs")
+const {
+  fixedIssues,
+  pickRelease,
+  revertedPrNumbers,
+  releaseNotes,
+  summarizeGroup,
+} = require("./release-train.cjs")
 
 const commits = (...subjects) =>
   subjects.map((subject, index) => ({ commit: `c${index}`, subject }))
@@ -117,9 +123,9 @@ test("backports on beta are never the train's candidate", () => {
   assert.equal(candidate.commit, "main")
 })
 
-test("shipped PRs come from squash subjects, minus reverted ones", () => {
+test("reverted PRs come from revert subjects, branches and bodies", () => {
   assert.deepEqual(
-    prNumbers([
+    revertedPrNumbers([
       "fix(decks): pasted cards match again (#303)",
       "chore: no PR",
       'Revert "fix(decks): pasted cards match again (#303)" (#305)\n\nReverts HashingSeeds/scryve#303',
@@ -135,6 +141,38 @@ test("shipped PRs come from squash subjects, minus reverted ones", () => {
       "feat(game): faster dice (#680)",
       'Merge pull request #681 from HashingSeeds/undo-dice\n\nRevert "feat(game): faster dice (#680)"',
     ]),
-    [305, 267, 310, 630, 641, 660, 661, 670, 681],
+    new Set([303, 264, 640, 680]),
+  )
+})
+
+test("an issue is fixed once the release ships its closing PR, or was committed after a hand close", () => {
+  const byPr = (number, pr) => ({
+    number,
+    closedAt: "2026-11-20T06:56:07Z",
+    timelineItems: {
+      nodes: [
+        { closer: { __typename: "PullRequest", number: pr, mergeCommit: { oid: `m${pr}` } } },
+      ],
+    },
+  })
+  const byHand = (number, closedAt) => ({
+    number,
+    closedAt,
+    timelineItems: { nodes: [{ closer: null }] },
+  })
+  assert.deepEqual(
+    fixedIssues(
+      [
+        byPr(1, 72),
+        byPr(2, 73),
+        byHand(4, "2026-11-20T10:00:00Z"),
+        byHand(5, "2026-11-20T14:00:00Z"),
+      ],
+      {
+        shipped: (pr) => pr.number === 72 && pr.mergeCommit.oid === "m72",
+        committedAt: Date.parse("2026-11-20T12:00:00Z"),
+      },
+    ),
+    [1, 4],
   )
 })

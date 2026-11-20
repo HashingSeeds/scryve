@@ -396,7 +396,10 @@ describe("feedback", () => {
       )
 
       const thread = await t.query(api.feedback.thread, { key: ME, requestId })
-      expect(thread?.messages).toMatchObject([{ from: "team", body: "Shipping Friday." }])
+      expect(thread?.messages).toMatchObject([
+        { from: "team", body: "We're tracking this idea. We'll tell you here when it ships." },
+        { from: "team", body: "Shipping Friday." },
+      ])
       expect(await t.run(async (ctx) => (await ctx.db.get(requestId))?.issue)).toBe(42)
       expect(await t.query(api.feedback.rakazoPending, { secret: "bridge-secret" })).toHaveLength(1)
     } finally {
@@ -455,6 +458,18 @@ describe("feedback", () => {
     expect(await issue()).toBe(123)
     await apollo(t, requestId, "link_issue", "124")
     expect(await issue()).toBe(124)
+  })
+
+  it("tells the player once that their report is tracked, on the first link", async () => {
+    const t = makeConvexTest()
+    const requestId = await submit(t)
+    await apollo(t, requestId, "link_issue", "#123")
+    await apollo(t, requestId, "link_issue", "#124")
+    const thread = await t.query(api.feedback.thread, { key: ME, requestId })
+    expect(thread?.messages.map(({ from, body }) => ({ from, body }))).toEqual([
+      { from: "team", body: "We're tracking this idea. We'll tell you here when it ships." },
+    ])
+    expect(thread?.request.unread).toBe(true)
   })
 
   it("marks only unfixed requests linked to a shipped issue as fixed", async () => {
@@ -675,7 +690,7 @@ describe("feedbackCard", () => {
     expect(card).toMatchObject({ kind: "update", phase: "player:m" })
   })
 
-  it("files a new issue with a canonical link under the issues prefix", () => {
+  it("files a new issue without the player's words", () => {
     const card = feedbackCard({
       request: { ...request, kind: "bug", body: `Crash: 50% & "more"…\n${"x".repeat(1500)}` },
       messages: [],
@@ -685,7 +700,9 @@ describe("feedbackCard", () => {
     expect(url.startsWith("https://github.com/HashingSeeds/scryve/issues/new?")).toBe(true)
     expect(new URL(url).href).toBe(url)
     expect(new URL(url).searchParams.get("labels")).toBe("bug")
-    expect(new URL(url).searchParams.get("body")?.length).toBeLessThanOrEqual(1000)
+    expect(new URL(url).searchParams.get("title")).toBe("Bug: ")
+    expect(new URL(url).searchParams.get("body")).toMatch(/^<!--.*-->\n\nFeedback: r1$/)
+    expect(url).not.toContain("Crash")
   })
 
   it("links the issue once Matthew names it", () => {

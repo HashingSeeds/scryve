@@ -189,43 +189,62 @@ function revertedPrs(message) {
   ].filter(Boolean)
 }
 
-function prNumbers(messages) {
-  const reverted = new Set(messages.flatMap(revertedPrs))
-  const shipped = messages.map((message) => prNumber(subjectOf(message)))
-  return [...new Set(shipped.filter((pr) => pr && !reverted.has(pr)))].map(Number)
+function commitMessages(...args) {
+  return git("log", "--format=%B%x00", ...args)
+    .split("\0")
+    .map((message) => message.trim())
+    .filter(Boolean)
 }
 
-function closedIssues(prs) {
-  if (prs.length === 0) return []
-  const fields = prs.map(
-    (pr) =>
-      `pr${pr}: pullRequest(number: ${pr}) { closingIssuesReferences(first: 20) { nodes { number repository { nameWithOwner } } } }`,
-  )
-  const query = `{ repository(owner: "HashingSeeds", name: "scryve") { ${fields.join(" ")} } }`
-  const { data } = JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`]))
-  const issues = Object.values(data.repository).flatMap(
-    (pr) =>
-      pr?.closingIssuesReferences.nodes
-        .filter((issue) => issue.repository.nameWithOwner === "HashingSeeds/scryve")
-        .map((issue) => issue.number) ?? [],
-  )
-  return [...new Set(issues)]
+function revertedPrNumbers(messages) {
+  return new Set(messages.flatMap(revertedPrs).map(Number))
 }
 
-function shipFixes(candidate, messages) {
-  const prs = prNumbers(messages)
+const REPO = "HashingSeeds/scryve"
+const FIX_LOOKBACK_MS = 30 * 24 * 60 * 60_000
+
+function completedIssues() {
+  const since = new Date(Date.now() - FIX_LOOKBACK_MS).toISOString().slice(0, 10)
+  const closer = "closer { __typename ... on PullRequest { number mergeCommit { oid } } }"
+  const query = `{ search(query: "repo:${REPO} is:issue is:closed reason:completed closed:>=${since}", type: ISSUE, first: 100) { nodes { ... on Issue { number closedAt timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { ${closer} } } } } } } }`
+  return JSON.parse(run("gh", ["api", "graphql", "-f", `query=${query}`])).data.search.nodes
+}
+
+function fixedIssues(issues, { shipped, committedAt }) {
+  return issues
+    .filter(({ closedAt, timelineItems }) => {
+      const closer = timelineItems.nodes[0]?.closer
+      if (!closer) return Date.parse(closedAt) < committedAt
+      return closer.__typename === "PullRequest" && !!closer.mergeCommit && shipped(closer)
+    })
+    .map((issue) => issue.number)
+}
+
+function shippedIn(commit) {
+  return ({ number, mergeCommit: { oid } }) =>
+    isAncestor(oid, commit) && !revertedPrNumbers(commitMessages(`${oid}..${commit}`)).has(number)
+}
+
+function shipFixes(candidate) {
   let args
   try {
-    const issues = closedIssues(prs)
+    const issues = fixedIssues(completedIssues(), {
+      shipped: shippedIn(candidate.commit),
+      committedAt: Date.parse(git("show", "-s", "--format=%cI", candidate.commit)),
+    })
     if (issues.length === 0) return
     args = { commit: candidate.commit, issues, runtimes: candidate.runtimes }
     run("pnpm", ["exec", "convex", "run", "feedback:shipFixes", JSON.stringify(args)])
-    console.log(`Marked feedback fixed for ${issues.map((issue) => `#${issue}`).join(", ")}`)
+    console.log(
+      `Told feedback linked to fixed issues ${issues.map((issue) => `#${issue}`).join(", ")}`,
+    )
   } catch (error) {
     const retry = args
-      ? `Rerun: pnpm exec convex run feedback:shipFixes '${JSON.stringify(args)}'`
-      : `Shipped PRs: ${prs.map((pr) => `#${pr}`).join(", ")}`
-    console.warn(`Promoted, but feedback was not marked fixed: ${error.message}. ${retry}`)
+      ? ` Rerun: pnpm exec convex run feedback:shipFixes '${JSON.stringify(args)}'`
+      : ""
+    console.warn(
+      `Promoted, but feedback was not told about fixes: ${error.message}.${retry} The next promotion also retries it.`,
+    )
   }
 }
 
@@ -261,15 +280,7 @@ async function promote({ yes, soakMinutes }) {
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
   // why: read before the production push below, which moves PRODUCTION_REF to the candidate.
-  const messages = git(
-    "log",
-    "--first-parent",
-    "--format=%B%x00",
-    `${PRODUCTION_REF}..${candidate.commit}`,
-  )
-    .split("\0")
-    .map((message) => message.trim())
-    .filter(Boolean)
+  const messages = commitMessages("--first-parent", `${PRODUCTION_REF}..${candidate.commit}`)
   const subjects = messages.map((message) => message.split("\n")[0])
   for (const subject of subjects) console.log(`  ${subject}`)
 
@@ -300,7 +311,7 @@ async function promote({ yes, soakMinutes }) {
   console.log(
     `Promoted ${commit}: the app update is live and Pages is building the production web app.`,
   )
-  shipFixes(candidate, messages)
+  shipFixes(candidate)
 }
 
 async function main() {
@@ -328,9 +339,10 @@ if (require.main === module) {
 
 module.exports = {
   BACKPORT_PREFIX,
+  fixedIssues,
   newIssues,
   pickRelease,
-  prNumbers,
+  revertedPrNumbers,
   releaseNotes,
   summarizeGroup,
 }

@@ -108,6 +108,12 @@ export function fixedReply(
   return `${news} Restart Scryve to update. Still not there? Update from ${store}.`
 }
 
+export function trackedReply(request: Doc<"feedbackRequests">) {
+  return request.kind === "bug"
+    ? "We're tracking this bug. We'll tell you here when the fix is out."
+    : "We're tracking this idea. We'll tell you here when it ships."
+}
+
 function fixedMeta(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
   const where = request.awaitingStore
     ? `waiting on ${STORES[request.awaitingStore]}`
@@ -117,15 +123,17 @@ function fixedMeta(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
   return `${fix.commit.slice(0, 7)} · ${where}`
 }
 
-function newIssueUrl(request: Doc<"feedbackRequests">, title: string, app: string | undefined) {
+// why: issues are public, so the player's words stay in their feedback and whoever files the issue describes it instead.
+function newIssueUrl(request: Doc<"feedbackRequests">, app: string | undefined) {
   const body = [
-    clip(request.body, 1000),
+    "<!-- Describe the problem in your own words. The player's text stays in their feedback. -->",
     "",
     ...(app ? [`Scryve ${app}`] : []),
     ...(request.sentryEventId ? [`Sentry: ${sentryUrl(request.sentryEventId)}`] : []),
+    `Feedback: ${request._id}`,
   ].join("\n")
-  const labels = request.kind === "bug" ? "bug" : "enhancement"
-  return `${ISSUES_URL}new?${new URLSearchParams({ title, body: body.trim(), labels })}`
+  const [title, labels] = request.kind === "bug" ? ["Bug: ", "bug"] : ["Idea: ", "enhancement"]
+  return `${ISSUES_URL}new?${new URLSearchParams({ title, body, labels })}`
 }
 
 function sentryUrl(eventId: string) {
@@ -160,7 +168,7 @@ export function rakazoItem({ request, messages, account }: FeedbackCardInput) {
     ...(app ? { app } : {}),
     ...(request.issue
       ? { issue: `${ISSUES_URL}${request.issue}` }
-      : { fileIssue: newIssueUrl(request, title, app) }),
+      : { fileIssue: newIssueUrl(request, app) }),
     ...(request.sentryEventId ? { sentry: sentryUrl(request.sentryEventId) } : {}),
     thread: [
       { from: "player", body: request.body },
@@ -228,7 +236,7 @@ export function feedbackCard({ request, messages, account }: FeedbackCardInput) 
         : {
             id: "file_issue",
             label: "File issue",
-            url: newIssueUrl(request, title, app),
+            url: newIssueUrl(request, app),
             repeat: true,
           },
       { id: "link_issue", label: "Link issue", input: "text", repeat: true },

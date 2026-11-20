@@ -1,4 +1,5 @@
 import { HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter"
+import type { WithoutSystemFields } from "convex/server"
 import { ConvexError, v, type Infer } from "convex/values"
 
 import { components, internal } from "./_generated/api"
@@ -29,6 +30,7 @@ import {
   playerTurn,
   rakazoItem,
   senderHash,
+  trackedReply,
 } from "./lib/feedback"
 import { notifyFeedbackReply } from "./lib/notifications"
 import { secretMatches } from "./lib/webhookSecret"
@@ -449,18 +451,29 @@ async function answer(
   if (action === "link_issue") {
     const issue = Number(ISSUE_NUMBER.exec(text)?.[1] ?? 0)
     if (issue === 0) return false
-    if (issue !== request.issue) {
-      await ctx.db.patch(request._id, { issue, fixedIn: undefined, awaitingStore: undefined })
+    if (issue === request.issue) return true
+    const linked = { issue, fixedIn: undefined, awaitingStore: undefined }
+    if (request.issue === undefined) await tellPlayer(ctx, request, trackedReply(request), linked)
+    else {
+      await ctx.db.patch(request._id, linked)
       await postCard(ctx, request._id)
     }
     return true
   }
-  const body = text.slice(0, FEEDBACK_LIMITS.message)
+  await tellPlayer(ctx, request, text.slice(0, FEEDBACK_LIMITS.message))
+  return true
+}
+
+async function tellPlayer(
+  ctx: MutationCtx,
+  request: Doc<"feedbackRequests">,
+  body: string,
+  patch: Partial<WithoutSystemFields<Doc<"feedbackRequests">>> = {},
+) {
   await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
-  await ctx.db.patch(request._id, { unread: true, updatedAt: Date.now() })
+  await ctx.db.patch(request._id, { ...patch, unread: true, updatedAt: Date.now() })
   await postCard(ctx, request._id)
   await notifyFeedbackReply(ctx, request, body)
-  return true
 }
 
 async function bridgeOnly(secret: string) {
@@ -555,16 +568,10 @@ async function tellFix(ctx: MutationCtx, request: Doc<"feedbackRequests">) {
     await postCard(ctx, request._id)
     return
   }
-  const body = fixedReply(request, reach)
-  await ctx.db.insert("feedbackMessages", { requestId: request._id, from: "team", body })
-  await ctx.db.patch(request._id, {
+  await tellPlayer(ctx, request, fixedReply(request, reach), {
     fixedIn: fix,
     awaitingStore: undefined,
-    unread: true,
-    updatedAt: Date.now(),
   })
-  await postCard(ctx, request._id)
-  await notifyFeedbackReply(ctx, request, body)
 }
 
 export const pullApollo = internalAction({
