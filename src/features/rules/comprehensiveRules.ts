@@ -29,7 +29,7 @@ export function findRules(rules: ComprehensiveRules, id: string) {
 export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: "rule"; rule: Rule }
 
 const BM25_K1 = 1.2
-const BM25_B = 0.75
+const BM25_B = 0.5
 const TYPO_MIN_LENGTH = 5
 const INHERITED_WEIGHT = 0.5
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
