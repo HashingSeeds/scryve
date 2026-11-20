@@ -1,6 +1,6 @@
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { Image, Pressable, View } from "react-native"
+import { Image, Keyboard, Pressable, View } from "react-native"
 import { Trans } from "react-i18next"
 import Svg, { Circle, Path, Rect } from "react-native-svg"
 
@@ -9,7 +9,6 @@ import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { Switch } from "@/components/Toggle/Switch"
-import type { BugScreenshot } from "@/features/feedback/bugReport"
 import { FeedbackLayout } from "@/features/feedback/FeedbackLayout"
 import type { FeedbackThread } from "@/features/feedback/status"
 import { formatDate, formatTime, joinParts } from "@/i18n/format"
@@ -27,8 +26,10 @@ export interface FeedbackConversationScreenProps {
   kind: SuggestKind
   draft: string
   outgoing?: string
-  screenshot: BugScreenshot | null
-  sentScreenshotUri?: string
+  screenshotUris: string[]
+  canAttach: boolean
+  picking: boolean
+  sentScreenshotUris: string[]
   signedIn: boolean
   includeAccount: boolean
   online: boolean
@@ -38,7 +39,7 @@ export interface FeedbackConversationScreenProps {
   onDraft: (draft: string) => void
   onSend: () => void
   onPickScreenshot: () => void
-  onRemoveScreenshot: () => void
+  onRemoveScreenshot: (index: number) => void
   onIncludeAccount: (included: boolean) => void
   onLinkAccount: () => void
   onSignIn: () => void
@@ -52,8 +53,10 @@ export function FeedbackConversationScreen({
   kind,
   draft,
   outgoing,
-  screenshot,
-  sentScreenshotUri,
+  screenshotUris,
+  canAttach,
+  picking,
+  sentScreenshotUris,
   signedIn,
   includeAccount,
   online,
@@ -76,8 +79,16 @@ export function FeedbackConversationScreen({
   const lastFromPlayer = messages.filter((message) => message.from === "player").at(-1)
   const firstIsLatest = !outgoing && !lastFromPlayer
   const canSend =
-    Boolean(draft.trim()) && online && outgoing === undefined && (!started || Boolean(request))
+    Boolean(draft.trim()) &&
+    online &&
+    !picking &&
+    outgoing === undefined &&
+    (!started || Boolean(request))
   const opened = started || outgoing !== undefined
+  // why: iOS keeps a multiline field's height when its text changes from outside, so the field is rebuilt when a send clears it or a failed send restores it, keeping the keyboard only if it was up.
+  const [field, setField] = useState({ build: 0, typed: draft, focused: false })
+  if (draft !== field.typed)
+    setField({ build: field.build + 1, typed: draft, focused: Keyboard.isVisible() })
 
   return (
     <FeedbackLayout
@@ -89,50 +100,43 @@ export function FeedbackConversationScreen({
         thread === null ? undefined : (
           <>
             {error ? <Text text={error} accessibilityRole="alert" size="xs" /> : null}
-            {screenshot ? (
-              <View style={themed($attachment)}>
-                <Image
-                  source={{ uri: screenshot.uri }}
-                  style={themed($thumbnail)}
-                  accessibilityLabel={translate("feedback:suggest.selectedScreenshot")}
-                />
-                <PressableIcon
-                  icon="x"
-                  size={16}
-                  accessibilityRole="button"
-                  accessibilityLabel={translate("feedback:suggest.removeScreenshot")}
-                  hitSlop={12}
-                  onPress={onRemoveScreenshot}
-                />
+            {screenshotUris.length > 0 ? (
+              <View style={themed($attachments)}>
+                {screenshotUris.map((uri, index) => (
+                  <View key={uri}>
+                    <Image
+                      source={{ uri }}
+                      style={themed($thumbnail)}
+                      accessibilityLabel={translate("feedback:suggest.selectedScreenshot")}
+                    />
+                    <PressableIcon
+                      icon="x"
+                      size={12}
+                      accessibilityRole="button"
+                      accessibilityLabel={translate("feedback:suggest.removeScreenshot")}
+                      hitSlop={10}
+                      disabled={picking}
+                      containerStyle={themed($remove)}
+                      onPress={() => onRemoveScreenshot(index)}
+                    />
+                  </View>
+                ))}
               </View>
             ) : null}
-            {opened ? null : (
-              <Text size="xs" tone="dim" style={$centered}>
-                <Trans
-                  i18nKey="feedback:suggest.notice"
-                  components={{
-                    privacy: (
-                      <Text
-                        size="xs"
-                        accessibilityRole="link"
-                        style={themed($link)}
-                        onPress={onOpenPrivacy}
-                      />
-                    ),
-                  }}
-                />
-              </Text>
-            )}
             <View style={themed($composer)}>
               {opened ? null : (
                 <ComposerButton
                   label={translate("feedback:suggest.addScreenshot")}
+                  disabled={!canAttach || picking}
                   onPress={onPickScreenshot}
                 >
                   <AttachGlyph />
                 </ComposerButton>
               )}
               <TextField
+                key={field.build}
+                autoFocus={field.focused}
+                dismissButton={false}
                 testID="feedback-composer"
                 placeholderTx={
                   opened
@@ -142,7 +146,10 @@ export function FeedbackConversationScreen({
                 multiline
                 maxLength={2000}
                 value={draft}
-                onChangeText={onDraft}
+                onChangeText={(typed) => {
+                  setField((current) => ({ ...current, typed }))
+                  onDraft(typed)
+                }}
                 containerStyle={$grow}
                 inputWrapperStyle={$inputWrapper}
                 style={$input}
@@ -186,6 +193,21 @@ export function FeedbackConversationScreen({
           ) : null}
           <View style={themed($prompt)}>
             <Text tx={`feedback:suggest.prompt.${kind}`} preset="subheading" style={$centered} />
+            <Text size="xs" tone="dim" style={$centered}>
+              <Trans
+                i18nKey="feedback:suggest.notice"
+                components={{
+                  privacy: (
+                    <Text
+                      size="xs"
+                      accessibilityRole="link"
+                      style={themed($link)}
+                      onPress={onOpenPrivacy}
+                    />
+                  ),
+                }}
+              />
+            </Text>
             {showOffline ? <OfflineNote /> : null}
           </View>
         </>
@@ -205,7 +227,7 @@ export function FeedbackConversationScreen({
             body={request.body}
             at={request.createdAt}
             status={firstIsLatest ? "sent" : undefined}
-            screenshotUri={sentScreenshotUri}
+            screenshotUris={sentScreenshotUris}
           />
           {messages.map((message) => (
             <Message
@@ -223,7 +245,7 @@ export function FeedbackConversationScreen({
           from="player"
           body={outgoing}
           status="sending"
-          screenshotUri={request ? undefined : sentScreenshotUri}
+          screenshotUris={request ? [] : sentScreenshotUris}
         />
       ) : null}
       {request && !outgoing ? (
@@ -245,13 +267,13 @@ function Message({
   body,
   at,
   status,
-  screenshotUri,
+  screenshotUris = [],
 }: {
   from: "player" | "team"
   body: string
   at?: number
   status?: "sending" | "sent"
-  screenshotUri?: string
+  screenshotUris?: string[]
 }) {
   const { themed } = useAppTheme()
   const mine = from === "player"
@@ -262,12 +284,17 @@ function Message({
   ])
   return (
     <View style={[themed($message), mine ? themed($mine) : themed($theirs)]}>
-      {screenshotUri ? (
-        <Image
-          source={{ uri: screenshotUri }}
-          style={themed($sentScreenshot)}
-          accessibilityLabel={translate("feedback:suggest.selectedScreenshot")}
-        />
+      {screenshotUris.length > 0 ? (
+        <View style={themed($attachments)}>
+          {screenshotUris.map((uri) => (
+            <Image
+              key={uri}
+              source={{ uri }}
+              style={themed($sentScreenshot)}
+              accessibilityLabel={translate("feedback:suggest.selectedScreenshot")}
+            />
+          ))}
+        </View>
       ) : null}
       <Text text={body} />
       <Text text={meta} size="xxs" style={themed(mine ? $muted : $team)} />
@@ -397,20 +424,35 @@ const $composerButton: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 const $filled: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.text })
-const $attachment: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $attachments: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
-  alignItems: "flex-start",
+  flexWrap: "wrap",
   gap: spacing.xs,
 })
 const $thumbnail: ThemedStyle<ImageStyle> = ({ colors, radius }) => ({
-  width: 48,
-  height: 48,
+  width: 56,
+  height: 56,
   borderRadius: radius.sm,
+  borderWidth: 1,
+  borderColor: colors.border,
   backgroundColor: colors.surfaceRaised,
 })
+const $remove: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: "absolute",
+  top: -6,
+  end: -6,
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: colors.surfaceRaised,
+  borderWidth: 1,
+  borderColor: colors.background,
+})
 const $sentScreenshot: ThemedStyle<ImageStyle> = ({ colors, radius }) => ({
-  width: 96,
-  height: 160,
+  width: 72,
+  height: 128,
   borderRadius: radius.sm,
   resizeMode: "cover",
   backgroundColor: colors.surface,

@@ -70,6 +70,8 @@ export interface TextFieldProps extends Omit<TextInputProps, "ref"> {
   LeftAccessory?: ComponentType<TextFieldAccessoryProps>
   /** why: `true` shows an x that empties the field; a function also runs after it empties. */
   clearable?: boolean | (() => void)
+  /** why: `false` drops the iOS keyboard button for a field whose screen dismisses the keyboard another way, such as dragging a chat. */
+  dismissButton?: boolean
 }
 
 export const TextField = forwardRef(function TextField(props: TextFieldProps, ref: Ref<TextInput>) {
@@ -87,6 +89,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     RightAccessory,
     LeftAccessory,
     clearable,
+    dismissButton = true,
     optional,
     HelperTextProps,
     LabelTextProps,
@@ -98,7 +101,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   const input = useRef<TextInput>(null)
   const multiline = TextInputProps.multiline ?? false
   const accessoryID = useId()
-  const dismissible = needsKeyboardDismiss(TextInputProps)
+  const dismissible = dismissButton && needsKeyboardDismiss(TextInputProps)
   // why: Fabric attaches an InputAccessoryView after native autoFocus, and iOS ignores an accessory set on an already focused field.
   const deferredFocus = dismissible && TextInputProps.autoFocus
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { Keyboard } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -32,7 +33,10 @@ function renderConversation(overrides: Partial<FeedbackConversationScreenProps> 
     thread: undefined,
     kind: "feature",
     draft: "",
-    screenshot: null,
+    screenshotUris: [],
+    canAttach: true,
+    picking: false,
+    sentScreenshotUris: [],
     signedIn: false,
     includeAccount: false,
     online: true,
@@ -80,6 +84,38 @@ describe("FeedbackConversationScreen", () => {
     const loading = renderConversation({ draft: "Please", started: true, thread: undefined })
     fireEvent.press(loading.view.getByLabelText("Send"))
     expect(loading.props.onSend).not.toHaveBeenCalled()
+  })
+
+  it("attaches several screenshots, removes the chosen one, and holds sends while they load", () => {
+    const { props, view } = renderConversation({ screenshotUris: ["a.png", "b.png"] })
+    expect(view.getAllByLabelText("Selected screenshot")).toHaveLength(2)
+    fireEvent.press(view.getAllByLabelText("Remove screenshot")[1]!)
+    expect(props.onRemoveScreenshot).toHaveBeenCalledWith(1)
+
+    const full = renderConversation({ canAttach: false })
+    fireEvent.press(full.view.getByLabelText("Add screenshot"))
+    expect(full.props.onPickScreenshot).not.toHaveBeenCalled()
+
+    const loading = renderConversation({ draft: "Crash", screenshotUris: ["a.png"], picking: true })
+    fireEvent.press(loading.view.getByLabelText("Send"))
+    fireEvent.press(loading.view.getByLabelText("Remove screenshot"))
+    expect(loading.props.onSend).not.toHaveBeenCalled()
+    expect(loading.props.onRemoveScreenshot).not.toHaveBeenCalled()
+  })
+
+  it("rebuilds the composer when a send changes its text, refocusing only if the keyboard was up", () => {
+    const { props, view } = renderConversation({ draft: "Crash on rotate" })
+    const rebuildWith = (draft: string, keyboardUp: boolean) => {
+      jest.spyOn(Keyboard, "isVisible").mockReturnValue(keyboardUp)
+      view.rerender(
+        <ThemeProvider initialContext="dark">
+          <FeedbackConversationScreen {...props} draft={draft} />
+        </ThemeProvider>,
+      )
+      return view.getByTestId("feedback-composer").props.autoFocus
+    }
+    expect(rebuildWith("", true)).toBe(true)
+    expect(rebuildWith("Crash on rotate", false)).toBe(false)
   })
 
   it("asks a question for each kind, and links the Privacy Policy", () => {

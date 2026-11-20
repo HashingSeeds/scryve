@@ -45,6 +45,7 @@ export function FeedbackLayout({
         style={$grow}
         contentContainerStyle={themed($content)}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={chat ? "on-drag" : undefined}
         scrollEventThrottle={16}
         onScroll={onScroll}
         ref={scroll}

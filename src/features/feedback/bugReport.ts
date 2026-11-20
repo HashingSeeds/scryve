@@ -5,7 +5,10 @@ import * as ImagePicker from "expo-image-picker"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
+export const MAX_SCREENSHOTS = 4
 const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
+// why: every screenshot rides one Sentry feedback envelope, which crosses the native bridge as base64 and must stay under Sentry's upload limits.
+const MAX_TOTAL_BYTES = 20 * 1024 * 1024
 
 export type BugScreenshot = {
   uri: string
@@ -17,10 +20,26 @@ export type BugScreenshot = {
 export const appVersion = () =>
   Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? undefined
 
-export async function pickScreenshot(): Promise<BugScreenshot | null> {
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 })
-  if (result.canceled || !result.assets[0]) return null
-  const asset = result.assets[0]
+export async function pickScreenshots(attached: BugScreenshot[]): Promise<BugScreenshot[]> {
+  const room = MAX_SCREENSHOTS - attached.length
+  if (room <= 0) return attached
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    quality: 1,
+    allowsMultipleSelection: room > 1,
+    selectionLimit: room,
+    orderedSelection: true,
+  })
+  if (result.canceled) return attached
+  // why: Android's legacy picker ignores the selection limit.
+  const picked = await Promise.all(result.assets.slice(0, room).map(readScreenshot))
+  const next = [...attached, ...picked]
+  if (next.reduce((total, shot) => total + shot.data.length, 0) > MAX_TOTAL_BYTES)
+    throw new Error("Screenshots too large")
+  return next
+}
+
+async function readScreenshot(asset: ImagePicker.ImagePickerAsset): Promise<BugScreenshot> {
   if (asset.fileSize && asset.fileSize > MAX_SCREENSHOT_BYTES)
     throw new Error("Screenshot too large")
   const data =
@@ -39,11 +58,11 @@ export async function pickScreenshot(): Promise<BugScreenshot | null> {
 export function captureBugReport({
   kind,
   body,
-  screenshot,
+  screenshots,
 }: {
   kind: "feature" | "bug"
   body: string
-  screenshot?: BugScreenshot
+  screenshots: BugScreenshot[]
 }) {
   if (!Sentry.getClient()) return undefined
   return Sentry.captureFeedback(
@@ -59,17 +78,11 @@ export function captureBugReport({
     },
     {
       includeReplay: false,
-      ...(screenshot
-        ? {
-            attachments: [
-              {
-                filename: screenshot.filename,
-                contentType: screenshot.contentType,
-                data: screenshot.data,
-              },
-            ],
-          }
-        : {}),
+      attachments: screenshots.map(({ filename, contentType, data }) => ({
+        filename,
+        contentType,
+        data,
+      })),
     },
   )
 }
