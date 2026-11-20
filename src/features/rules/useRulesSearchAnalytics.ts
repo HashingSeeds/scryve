@@ -25,7 +25,6 @@ export function useRulesSearchAnalytics(system: string, search: Search | undefin
       system: latest.current.system,
       result_count: settled.results.length,
       top_results: settled.results.slice(0, 3).join(","),
-      // why: analyticsProperties keeps the text only when nothing matched, shortened and lowercased.
       query: settled.query,
     })
   }).current
@@ -38,13 +37,16 @@ export function useRulesSearchAnalytics(system: string, search: Search | undefin
   }, [key, flush])
   useEffect(() => flush, [flush])
 
-  return (rank: number) => {
+  return (rank: number, rule: string) => {
+    const query = latest.current.search?.query ?? ""
     flush()
     opens.current += 1
     captureAnalytics("rules_opened", {
       system: latest.current.system,
       rank,
       open_count: opens.current,
+      rule,
+      query,
     })
   }
 }

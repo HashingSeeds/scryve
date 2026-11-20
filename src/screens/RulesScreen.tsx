@@ -156,7 +156,7 @@ export function RulesScreen({
     searching && rules ? { query, results: searchResults } : undefined,
   )
   const openResult = (id: string, index: number) => {
-    if (searching) searchOpened(index + 1)
+    if (searching) searchOpened(index + 1, id)
     onOpenRule(id)
   }
 

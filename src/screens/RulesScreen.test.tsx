@@ -124,7 +124,7 @@ it("lists rules you opened under Recent", () => {
   expect(view.getByTestId("rules-recent-509.1")).toBeTruthy()
 })
 
-it("reports a search once, numbers each result opened from it, and keeps only a fruitless query", () => {
+it("reports a search once, and each result opened from it with its rule and the search text", () => {
   const capture = jest.mocked(captureAnalytics)
   capture.mockClear()
   const view = renderRules()
@@ -138,8 +138,8 @@ it("reports a search once, numbers each result opened from it, and keeps only a 
       "rules_search",
       { system: "mtg", result_count: 2, top_results: "733.2,509.1a", query: "Block" },
     ],
-    ["rules_opened", { system: "mtg", rank: 2, open_count: 1 }],
-    ["rules_opened", { system: "mtg", rank: 1, open_count: 2 }],
+    ["rules_opened", { system: "mtg", rank: 2, open_count: 1, rule: "509.1a", query: "Block" }],
+    ["rules_opened", { system: "mtg", rank: 1, open_count: 2, rule: "733.2", query: "Block" }],
     ["rules_search", { system: "mtg", result_count: 0, top_results: "", query: "Banding" }],
   ])
 })
