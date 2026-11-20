@@ -98,13 +98,14 @@ function evaluate(
   const cases: Case[] = JSON.parse(readFileSync(file, "utf8"))
   const problems: string[] = []
   const seen = new Set<string>()
-  for (const { query, rules: wanted } of cases) {
+  for (const [at, { query, rules: wanted }] of cases.entries()) {
     const key = query.trim().toLowerCase()
-    if (seen.has(key)) problems.push(`duplicate query "${query}"`)
+    const named = set === "heldout" ? `case ${at + 1}` : `"${query}"`
+    if (seen.has(key)) problems.push(`${named} repeats an earlier query`)
     seen.add(key)
     for (const id of wanted.flat())
       if (!findRules(rules, id)?.rules.some((rule) => rule.id === id))
-        problems.push(`"${query}" names ${id}, which is not a rule in ${source.url}`)
+        problems.push(`${named} names ${id}, which is not a rule in ${source.url}`)
   }
   const phrased = new Set<string>()
   for (const [id, said] of Object.entries(rules.phrasings ?? {})) {
