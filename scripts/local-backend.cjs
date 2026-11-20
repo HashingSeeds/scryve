@@ -28,6 +28,8 @@ function cliEnv(env = process.env) {
   )
 }
 
+const envCopied = () => path.join(localDir(), "preview-env-copied")
+
 function readCredentials(directory = localDir()) {
   const file = path.join(directory, ".convex", "local", "default", "config.json")
   if (!fs.existsSync(file)) return undefined
@@ -99,13 +101,18 @@ function create() {
     process.stderr.write(`${result.stdout}${result.stderr}`)
     throw new Error("Could not create this worktree's local backend")
   }
+}
+
+function copyPreviewEnv() {
   const defaults = run(["env", "default", "list", "--type", "preview", "--project", PROJECT], "")
   run(["env", "set", "--force"], defaults)
+  fs.writeFileSync(envCopied(), "")
 }
 
 function main() {
   prepare()
   if (!readCredentials()) create()
+  if (!fs.existsSync(envCopied())) copyPreviewEnv()
 
   // why: the CLI stops its backend only on SIGINT, so it gets its own process group and exactly one SIGINT.
   const child = spawn(convex, ["dev"], {
