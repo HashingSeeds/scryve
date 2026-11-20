@@ -126,7 +126,7 @@ function fixedMeta(request: Doc<"feedbackRequests">, fix: FeedbackFix) {
 function newIssueUrl(request: Doc<"feedbackRequests">, title: string, app: string | undefined) {
   const body = [
     // why: the feedback link workflow skips quoted lines, so a request id a player typed can't relink someone else's feedback.
-    clip(request.body, 900).replace(/^/gm, "> "),
+    clip(request.body.replace(/^/gm, "> "), 900),
     "",
     ...(app ? [`Scryve ${app}`] : []),
     ...(request.sentryEventId ? [`Sentry: ${sentryUrl(request.sentryEventId)}`] : []),
