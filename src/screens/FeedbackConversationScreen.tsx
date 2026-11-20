@@ -28,6 +28,7 @@ export interface FeedbackConversationScreenProps {
   outgoing?: string
   screenshotUris: string[]
   canAttach: boolean
+  picking: boolean
   sentScreenshotUris: string[]
   signedIn: boolean
   includeAccount: boolean
@@ -54,6 +55,7 @@ export function FeedbackConversationScreen({
   outgoing,
   screenshotUris,
   canAttach,
+  picking,
   sentScreenshotUris,
   signedIn,
   includeAccount,
@@ -77,7 +79,11 @@ export function FeedbackConversationScreen({
   const lastFromPlayer = messages.filter((message) => message.from === "player").at(-1)
   const firstIsLatest = !outgoing && !lastFromPlayer
   const canSend =
-    Boolean(draft.trim()) && online && outgoing === undefined && (!started || Boolean(request))
+    Boolean(draft.trim()) &&
+    online &&
+    !picking &&
+    outgoing === undefined &&
+    (!started || Boolean(request))
   const opened = started || outgoing !== undefined
   // why: iOS keeps a multiline field's height when its text changes from outside, so the field is rebuilt when a send clears it or a failed send restores it.
   const [field, setField] = useState({ build: 0, typed: draft })
@@ -119,7 +125,7 @@ export function FeedbackConversationScreen({
               {opened ? null : (
                 <ComposerButton
                   label={translate("feedback:suggest.addScreenshot")}
-                  disabled={!canAttach}
+                  disabled={!canAttach || picking}
                   onPress={onPickScreenshot}
                 >
                   <AttachGlyph />

@@ -138,7 +138,8 @@ export function FeedbackConversation({
       draft={draft}
       outgoing={outgoing}
       screenshotUris={screenshots.map((shot) => shot.uri)}
-      canAttach={!picking && screenshots.length < MAX_SCREENSHOTS}
+      canAttach={screenshots.length < MAX_SCREENSHOTS}
+      picking={picking}
       sentScreenshotUris={sentScreenshotUris}
       signedIn={auth.isSignedIn}
       includeAccount={includeAccount}

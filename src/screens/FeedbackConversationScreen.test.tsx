@@ -34,6 +34,7 @@ function renderConversation(overrides: Partial<FeedbackConversationScreenProps> 
     draft: "",
     screenshotUris: [],
     canAttach: true,
+    picking: false,
     sentScreenshotUris: [],
     signedIn: false,
     includeAccount: false,
@@ -84,7 +85,7 @@ describe("FeedbackConversationScreen", () => {
     expect(loading.props.onSend).not.toHaveBeenCalled()
   })
 
-  it("attaches several screenshots, removes the chosen one, and stops at the limit", () => {
+  it("attaches several screenshots, removes the chosen one, and holds sends while they load", () => {
     const { props, view } = renderConversation({ screenshotUris: ["a.png", "b.png"] })
     expect(view.getAllByLabelText("Selected screenshot")).toHaveLength(2)
     fireEvent.press(view.getAllByLabelText("Remove screenshot")[1]!)
@@ -93,6 +94,10 @@ describe("FeedbackConversationScreen", () => {
     const full = renderConversation({ canAttach: false })
     fireEvent.press(full.view.getByLabelText("Add screenshot"))
     expect(full.props.onPickScreenshot).not.toHaveBeenCalled()
+
+    const loading = renderConversation({ draft: "Crash", picking: true })
+    fireEvent.press(loading.view.getByLabelText("Send"))
+    expect(loading.props.onSend).not.toHaveBeenCalled()
   })
 
   it("asks a question for each kind, and links the Privacy Policy", () => {
