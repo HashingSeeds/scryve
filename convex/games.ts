@@ -56,6 +56,7 @@ import {
   MAX_SNAPSHOT_LIFE,
   type CommanderSlot,
 } from "./lib/gameRules"
+import { gameSetupOf, insertGame } from "./lib/games/setup"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { playerGridLayoutValidator } from "./lib/layouts"
@@ -984,33 +985,35 @@ export const createLobby = mutation({
       throw new Error("Game identifier collision; retry")
     const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
     const now = Date.now()
-    const gameId = await ctx.db.insert("games", {
-      publicId: args.publicId,
-      hostUserId: user._id,
-      mode: "connected",
-      status: "lobby",
-      playerCount: args.playerCount,
-      startingLife: args.startingLife,
-      ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
-      ruleset,
-      ...(args.deckRequired === undefined || !attachesDecks(gameSystem)
-        ? {}
-        : { deckRequired: args.deckRequired }),
-      game: gameSystem,
-      system: gameSystem,
-      ...(format ? { format } : {}),
-      ...(args.variant ? { variant: args.variant } : {}),
-      ...(args.modeSetup ? { modeSetup: args.modeSetup } : {}),
-      ...(args.layout ? { layout: args.layout } : {}),
-      ...(args.matchBestOf ? { matchBestOf: args.matchBestOf } : {}),
-      ...(args.firstPlayerMode ? { firstPlayerMode: args.firstPlayerMode } : {}),
-      ...(args.freeMulligans && mulliganHandSize(gameSystem) !== undefined
-        ? { freeMulligans: args.freeMulligans }
-        : {}),
-      createdAt: now,
-      updatedAt: now,
-      eventSequence: 0,
-    })
+    const gameId = await insertGame(
+      ctx,
+      {
+        startingLife: args.startingLife,
+        lifeStep: args.lifeStep,
+        ruleset,
+        deckRequired: attachesDecks(gameSystem) ? args.deckRequired : undefined,
+        game: gameSystem,
+        system: gameSystem,
+        format,
+        variant: args.variant,
+        modeSetup: args.modeSetup,
+        layout: args.layout,
+        lifeEditing: undefined,
+        matchBestOf: args.matchBestOf,
+        firstPlayerMode: args.firstPlayerMode,
+        freeMulligans: mulliganHandSize(gameSystem) === undefined ? undefined : args.freeMulligans,
+      },
+      {
+        publicId: args.publicId,
+        hostUserId: user._id,
+        mode: "connected",
+        status: "lobby",
+        playerCount: args.playerCount,
+        createdAt: now,
+        updatedAt: now,
+        eventSequence: 0,
+      },
+    )
     await ctx.db.insert("gamePlayers", {
       gameId,
       seat: 1,
@@ -1490,26 +1493,36 @@ export const publishLocalGame = mutation({
     const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
     const now = Date.now()
     const expiresAt = now + INVITE_LIFETIME_MS
-    const gameId = await ctx.db.insert("games", {
-      publicId: args.publicId,
-      hostUserId: user._id,
-      mode: "connected",
-      status: "active",
-      playerCount: args.players.length,
-      startingLife: args.startingLife,
-      ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
-      ruleset,
-      game: gameSystem,
-      system: gameSystem,
-      ...(format ? { format } : {}),
-      ...(args.variant ? { variant: args.variant } : {}),
-      ...(args.layout ? { layout: args.layout } : {}),
-      ...(args.editsAnySeat ? { lifeEditing: "anyone" as const } : {}),
-      createdAt: now,
-      startedAt: now,
-      updatedAt: now,
-      eventSequence: 0,
-    })
+    const gameId = await insertGame(
+      ctx,
+      {
+        startingLife: args.startingLife,
+        lifeStep: args.lifeStep,
+        ruleset,
+        deckRequired: undefined,
+        game: gameSystem,
+        system: gameSystem,
+        format,
+        variant: args.variant,
+        modeSetup: undefined,
+        layout: args.layout,
+        lifeEditing: args.editsAnySeat ? "anyone" : undefined,
+        matchBestOf: args.match?.bestOf,
+        firstPlayerMode: undefined,
+        freeMulligans: undefined,
+      },
+      {
+        publicId: args.publicId,
+        hostUserId: user._id,
+        mode: "connected",
+        status: "active",
+        playerCount: args.players.length,
+        createdAt: now,
+        startedAt: now,
+        updatedAt: now,
+        eventSequence: 0,
+      },
+    )
     const mapping: { localId: string; playerId: Id<"gamePlayers">; seat: number }[] = []
     const playerIdsBySeat = new Map<number, Id<"gamePlayers">>()
     for (const player of resolvePlayerAppearances(
@@ -1761,25 +1774,37 @@ export const publishFinishedLocalGame = mutation({
         ),
       ),
     )
-    const gameId = await ctx.db.insert("games", {
-      publicId,
-      hostUserId: user._id,
-      mode: "local",
-      status: "active",
-      playerCount: players.length,
-      startingLife: args.startingLife,
-      ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
-      ruleset,
-      game: gameSystem,
-      system: gameSystem,
-      ...(format ? { format } : {}),
-      createdAt: args.startedAt,
-      startedAt: args.startedAt,
-      updatedAt: now,
-      // why: the device counted its own events; the summary reads this base plus per-seat counts.
-      eventSequence: args.eventCount,
-      ...(tracksMulligans ? { freeMulligans: args.freeMulligans } : {}),
-    })
+    const gameId = await insertGame(
+      ctx,
+      {
+        startingLife: args.startingLife,
+        lifeStep: args.lifeStep,
+        ruleset,
+        deckRequired: undefined,
+        game: gameSystem,
+        system: gameSystem,
+        format,
+        variant: undefined,
+        modeSetup: undefined,
+        layout: undefined,
+        lifeEditing: undefined,
+        matchBestOf: undefined,
+        firstPlayerMode: undefined,
+        freeMulligans: tracksMulligans ? args.freeMulligans : undefined,
+      },
+      {
+        publicId,
+        hostUserId: user._id,
+        mode: "local",
+        status: "active",
+        playerCount: players.length,
+        createdAt: args.startedAt,
+        startedAt: args.startedAt,
+        updatedAt: now,
+        // why: the device counted its own events; the summary reads this base plus per-seat counts.
+        eventSequence: args.eventCount,
+      },
+    )
     const playerIdsByLocalId = new Map<string, Id<"gamePlayers">>()
     for (const player of resolvePlayerAppearances(players, connectedMarkShapes(players.length))) {
       const deckLabel = deckLabels.get(player.localId)
@@ -3139,31 +3164,22 @@ async function startRematch(
   )
     throw new Error("Game identifier collision; retry")
   const now = Date.now()
-  const gameId = await ctx.db.insert("games", {
-    publicId: request.publicId,
-    hostUserId,
-    mode: "connected",
-    status: "active",
-    playerCount: players.length,
-    startingLife: finished.startingLife,
-    ...(finished.lifeStep === undefined ? {} : { lifeStep: finished.lifeStep }),
-    ruleset: finished.ruleset,
-    ...(finished.deckRequired === undefined ? {} : { deckRequired: finished.deckRequired }),
-    ...(finished.game === undefined ? {} : { game: finished.game }),
-    ...(finished.system === undefined ? {} : { system: finished.system }),
-    ...(finished.format === undefined ? {} : { format: finished.format }),
-    ...(finished.variant === undefined ? {} : { variant: finished.variant }),
-    ...(finished.modeSetup === undefined ? {} : { modeSetup: finished.modeSetup }),
-    ...(finished.layout === undefined ? {} : { layout: finished.layout }),
-    ...(finished.firstPlayerMode ? { firstPlayerMode: finished.firstPlayerMode } : {}),
-    ...(finished.freeMulligans ? { freeMulligans: finished.freeMulligans } : {}),
-    ...lifeEditingFor(players),
-    rematchOfGameId: finished._id,
-    createdAt: now,
-    startedAt: now,
-    updatedAt: now,
-    eventSequence: 0,
-  })
+  const gameId = await insertGame(
+    ctx,
+    { ...gameSetupOf(finished), lifeEditing: lifeEditingFor(players).lifeEditing },
+    {
+      publicId: request.publicId,
+      hostUserId,
+      mode: "connected",
+      status: "active",
+      playerCount: players.length,
+      rematchOfGameId: finished._id,
+      createdAt: now,
+      startedAt: now,
+      updatedAt: now,
+      eventSequence: 0,
+    },
+  )
   const game = (await ctx.db.get(gameId))!
   const roles = rolesFor(game, players.length)
   const decks = attachesDecks(gameDeckRules(game)[0])
