@@ -11,8 +11,18 @@ import { MAGIC_CARD_FILTERS } from "../../../convex/lib/systems"
 
 export const SCRYFALL_SYNTAX = /[:=<>!"()]|(^|\s)-|(^|\s)(and|or)(\s|$)/i
 export const NAME_MATCHES = 20
-const RARITIES = ["common", "uncommon", "rare", "mythic"]
 const LOCAL_RESULTS = 60
+const RARITIES = ["mythic", "rare", "uncommon", "common"]
+const UNRANKED = 1e9
+const BANNED_IN_COMMANDER_RANK = 0
+
+function popularityRank(card: MagicDatasetCard | undefined, knowsPopularity: boolean) {
+  const edhrecRank =
+    card?.edhrecRank ??
+    (knowsPopularity && card?.commanderLegality === "banned" ? BANNED_IN_COMMANDER_RANK : UNRANKED)
+  const rarity = RARITIES.indexOf(card?.rarity ?? "")
+  return edhrecRank * (RARITIES.length + 1) + (rarity < 0 ? RARITIES.length : rarity)
+}
 
 export type MagicCards = {
   cards: MagicDatasetCard[]
@@ -21,6 +31,7 @@ export type MagicCards = {
   keyStarts: Int32Array
   byName: Map<string, MagicDatasetCard>
   knowsLegality: boolean
+  knowsPopularity: boolean
 }
 
 export type MagicSearch = {
@@ -71,6 +82,7 @@ export function parseMagicCards(text: string): MagicCards {
     keyStarts,
     byName: new Map(cards.map((card) => [card.name, card])),
     knowsLegality: cards.some((card) => card.legalFormats !== undefined),
+    knowsPopularity: cards.some((card) => card.edhrecRank !== undefined),
   }
 }
 
@@ -140,7 +152,7 @@ export function localMagicSearch(
   const named = (
     nameIndex && words.length
       ? searchCardNames(nameIndex, search.text, NAME_MATCHES, (name) =>
-          RARITIES.indexOf(magicCards.byName.get(name)?.rarity ?? ""),
+          popularityRank(magicCards.byName.get(name), magicCards.knowsPopularity),
         )
       : []
   )
