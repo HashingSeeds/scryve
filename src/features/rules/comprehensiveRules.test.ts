@@ -205,7 +205,7 @@ describe("searchRules ranking", () => {
     ],
     notice: [],
     slang: { wrath: "destroy all creatures" },
-    phrasings: { "903.8": ["recast general"], "701.8a": ["block"] },
+    phrasings: { "903.8": ["recast general"], "701.8a": ["block", "when it blocks"] },
     generatedPhrasings: [
       "509.1b",
       "menace",
@@ -216,6 +216,10 @@ describe("searchRules ranking", () => {
       "general",
       "recast",
       "general",
+      "509.1a",
+      "red",
+      "701.8b",
+      "reducer",
     ],
     references: MAGIC_RULE_REFERENCE,
   }
@@ -247,10 +251,15 @@ describe("searchRules ranking", () => {
     expect(ids("again")[0]).toBe("903.8")
   })
 
-  it("opens the rule a search names word for word in a written phrasing, over generated words", () => {
+  it("opens the rule a search names word for word in a written phrasing, unless it is exactly a glossary term", () => {
     expect(ids("recast general")[0]).toBe("903.8")
     expect(ids("general recast")[0]).toBe("701.8a")
-    expect(ids("block")[0]).toBe("701.8a")
+    expect(ids("when it blocks")[0]).toBe("701.8a")
+    expect(ids("block")[0]).toBe("Block")
+  })
+
+  it("ranks a word typed in full over longer words it starts", () => {
+    expect(ids("red")[0]).toBe("509.1a")
   })
 
   it("forgives one typo in a word the rules never use", () => {

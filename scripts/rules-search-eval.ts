@@ -26,7 +26,7 @@ type Case = {
 // why: nobody tunes search against the held-out cases, so their score shows whether a change helps questions it never saw. Reading them to fix a miss turns them into practice cases.
 const SETS = { practice: "", heldout: ".heldout" }
 type CaseSet = keyof typeof SETS
-const FLOOR = { mtg: { practice: 413, heldout: 104 }, fab: { practice: 65, heldout: 22 } }
+const FLOOR = { mtg: { practice: 421, heldout: 105 }, fab: { practice: 65, heldout: 22 } }
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
 const TOP = 3

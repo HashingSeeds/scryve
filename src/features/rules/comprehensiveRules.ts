@@ -45,6 +45,7 @@ const BM25_B = 0.5
 const TYPO_MIN_LENGTH = 6
 const INHERITED_WEIGHT = 0.5
 const TERM_WEIGHT = 0.4
+const COMPLETION_WEIGHT = 0.5
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
 const STOPWORDS = new Set(
@@ -277,7 +278,8 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
         const norm = BM25_K1 * (1 - BM25_B + (BM25_B * index.lengths[at]) / index.average)
-        const score = (weight * rarity * count * (BM25_K1 + 1)) / (count + norm)
+        const typed = word === wanted ? 1 : COMPLETION_WEIGHT
+        const score = (typed * weight * rarity * count * (BM25_K1 + 1)) / (count + norm)
         if (score > (best.get(at) ?? 0)) best.set(at, score)
       })
     }
@@ -303,13 +305,13 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     ranked.push({ result: { kind: "rule", rule }, score })
   }
   const written = asWritten === undefined ? undefined : index.rules[asWritten]
+  const said = words(needle).join(" ")
+  const precedence = ({ result }: (typeof ranked)[number]) => {
+    if (result.kind === "term") return words(result.entry.term).join(" ") === said ? 2 : 0
+    return result.rule === written ? 1 : 0
+  }
   return ranked
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        Number(b.result.kind === "rule" && b.result.rule === written) -
-          Number(a.result.kind === "rule" && a.result.rule === written),
-    )
+    .sort((a, b) => b.score - a.score || precedence(b) - precedence(a))
     .slice(0, limit)
     .map(({ result }) => result)
 }
