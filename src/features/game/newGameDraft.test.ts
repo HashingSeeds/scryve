@@ -76,6 +76,30 @@ describe("initialGameDraft", () => {
     expect(draft.appearances[1].color).not.toBe(draft.appearances[0].color)
   })
 
+  it("a 2HG game's shared team colors split back into one color per seat once teams are off", () => {
+    const initialGame = createLocalGame({
+      startingLife: 60,
+      system: "mtg",
+      format: "commander",
+      teams: [
+        [0, 1],
+        [2, 3],
+      ],
+      players: [0, 0, 1, 1].map((color, seat) => ({
+        name: `Player ${seat + 1}`,
+        color: PLAYER_COLORS[color],
+      })),
+    })
+    const teamsOff = apply(initialGameDraft({ defaults: DEFAULT_LOCAL_SETTINGS, initialGame }), {
+      type: "chooseGameType",
+      gameType: { id: "commander", system: "mtg", format: "commander" },
+      confirmedFree: false,
+    })
+    expect(deriveGameSetup(teamsOff, local).teams).toBeUndefined()
+    const colors = teamsOff.appearances.slice(0, 4).map(({ color }) => color.toUpperCase())
+    expect(new Set(colors).size).toBe(4)
+  })
+
   it("replays a connected setup's variant", () => {
     const draft = initialGameDraft({
       defaults: NO_SYSTEM_SETTINGS,

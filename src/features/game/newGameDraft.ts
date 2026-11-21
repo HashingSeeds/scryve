@@ -81,7 +81,6 @@ export interface GameDraft {
   clockMode: ClockMode
   chosenClockMinutes: number | undefined
   hostOn: "cloud" | "nearby"
-  /** why: until a format is picked, switching modes loads that mode's last setup instead of carrying this one over. */
   formatPicked: boolean
 }
 
@@ -110,7 +109,6 @@ export type GameDraftAction =
   | { type: "changeAccount"; meSeat: number | undefined }
   | { type: "toggleMatch"; on: boolean }
 
-/** why: a 2HG game's teammates share a color, but each seat keeps its own so turning teams off leaves every seat distinct. */
 function ownColors(seats: PlayerAppearance[]) {
   const used = new Set<string>()
   return seats.map((appearance) => {
