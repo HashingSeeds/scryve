@@ -1334,6 +1334,20 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
   })
 
+  it("keeps a report in progress when the host abandons the game", () => {
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedPlayers()
+    fireEvent.press(screen.getByTestId("report-player-seat-2"))
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, status: "abandoned" },
+    }
+    screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.getByTestId("abandoned-game-dialog")).toBeTruthy()
+    expect(screen.getByTestId("submit-player-report-button")).toBeTruthy()
+  })
+
   it("opens the game log with this device's unsent change, and Undo takes it back", () => {
     connectedHarness.activeGames = []
     connectedHarness.runtime = {
