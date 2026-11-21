@@ -760,9 +760,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     (shown: BoardOverlay) => setOverlay((current) => (current === shown ? undefined : current)),
     [],
   )
-  // why: the host can abandon while a guest is mid-report, and replacing the Players dialog would drop the draft.
   const [abandonedOpen, setAbandonedOpen] = useState(false)
-  // why: a failed match end reopens over whatever the host opened after cancelling, which must stay mounted.
   const [matchEnding, setMatchEnding] = useState<"choosing" | "sending">()
   const [matchEndError, setMatchEndError] = useState<string>()
   const [leaving, setLeaving] = useState(false)
