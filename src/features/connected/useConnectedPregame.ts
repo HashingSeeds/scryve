@@ -135,7 +135,10 @@ function useRollsShown(rolls: Readonly<Record<string, number>> | undefined) {
   const key = rolls ? JSON.stringify(rolls) : undefined
   const [expired, setExpired] = useState<string>()
   useEffect(() => {
-    if (!key) return
+    if (!key) {
+      setExpired(undefined)
+      return
+    }
     const timer = setTimeout(() => setExpired(key), ROLLS_SHOWN_MS)
     return () => clearTimeout(timer)
   }, [key])

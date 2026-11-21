@@ -1569,6 +1569,32 @@ describe("ConnectedBoardScreen before play", () => {
     expect(firstChipShown).not.toContain(true)
   })
 
+  it("shows the roll again when an undone first change reopens pregame", () => {
+    jest.useFakeTimers()
+    withGame({
+      firstPlayer: { mode: "roll", playerId: "player-2", rolls: { "player-1": 4, "player-2": 17 } },
+    })
+    const unplayed = connectedHarness.runtime.projection.eventSequence
+    const { result, rerender } = renderHook(() => {
+      const { projection } = useConnectedGame("game-public", "owner")
+      if (!projection) throw new Error("the harness game has no projection")
+      return useConnectedPregame({
+        publicId: "game-public",
+        game: connectedBoardView(projection),
+        controlled: new Set(["player-1"]),
+        actions: actions(),
+      })
+    })
+    act(() => jest.advanceTimersByTime(2500))
+    expect(result.current.showsFirstChip("player-2")).toBe(true)
+
+    withGame({ eventSequence: unplayed + 1 })
+    rerender({})
+    withGame({ eventSequence: unplayed })
+    rerender({})
+    expect(result.current.showsFirstChip("player-2")).toBe(false)
+  })
+
   it("counts the free mulligan on top of a full hand, as the local board does", () => {
     const pregame = actions()
     withGame(
