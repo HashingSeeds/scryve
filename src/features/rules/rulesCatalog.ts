@@ -1,6 +1,7 @@
 // why: kept free of React Native so Node scripts can load the same rules the app does.
 import type { ComprehensiveRules } from "./comprehensiveRules"
 import { FAB_RULE_REFERENCE, parseFabRules } from "./fabRules"
+import { FAB_GENERATED_PHRASINGS, MAGIC_GENERATED_PHRASINGS } from "./generatedPhrasings"
 import { magicKeyword, type KeywordRule } from "./magicKeywords"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
 import { MAGIC_PHRASINGS } from "./phrasings"
@@ -27,7 +28,7 @@ export type GameRules = TextRules | { kind: "link"; pageUrl: string }
 
 function searchable(
   rules: ComprehensiveRules | undefined,
-  search: Pick<ComprehensiveRules, "slang" | "phrasings" | "references">,
+  search: Pick<ComprehensiveRules, "slang" | "phrasings" | "generatedPhrasings" | "references">,
 ) {
   return rules && { ...rules, ...search }
 }
@@ -43,6 +44,7 @@ export const GAME_RULES = {
       searchable(parseMagicRules(text), {
         slang: MAGIC_SLANG,
         phrasings: MAGIC_PHRASINGS,
+        generatedPhrasings: MAGIC_GENERATED_PHRASINGS,
         references: MAGIC_RULE_REFERENCE,
       }),
     references: MAGIC_RULE_REFERENCE,
@@ -65,7 +67,11 @@ export const GAME_RULES = {
     publisher: "Legend Story Studios",
     cacheKey: "scryve.rules.fab",
     parse: (text) =>
-      searchable(parseFabRules(text), { slang: FAB_SLANG, references: FAB_RULE_REFERENCE }),
+      searchable(parseFabRules(text), {
+        slang: FAB_SLANG,
+        generatedPhrasings: FAB_GENERATED_PHRASINGS,
+        references: FAB_RULE_REFERENCE,
+      }),
     references: FAB_RULE_REFERENCE,
     revalidate: true,
     tableItemRules: { marked: "9.3" } satisfies Partial<Record<FabTableItemId, string>>,

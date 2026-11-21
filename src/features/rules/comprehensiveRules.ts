@@ -9,7 +9,19 @@ export type ComprehensiveRules = {
   notice: string[]
   slang?: Readonly<Record<string, string>>
   phrasings?: Readonly<Record<string, readonly string[]>>
+  generatedPhrasings?: readonly string[]
   references?: RegExp
+}
+
+export function phrasingsOf(source: ComprehensiveRules) {
+  const phrasings = new Map(
+    Object.entries(source.phrasings ?? {}).map(([id, said]) => [id, [...said]]),
+  )
+  let said: string[] = []
+  for (const word of source.generatedPhrasings ?? [])
+    if (word.includes(".")) phrasings.set(word, (said = phrasings.get(word) ?? []))
+    else said.push(word)
+  return phrasings
 }
 
 export function findRules(rules: ComprehensiveRules, id: string) {
@@ -98,7 +110,7 @@ export function searchIndex(source: ComprehensiveRules) {
     })
   const texts = new Map(rules.map((rule) => [rule.id, listsOf(rule.text)]))
   const phrasings = new Map(
-    Object.entries(source.phrasings ?? {}).map(([id, said]) => [id, listsOf(said.join(" "))]),
+    [...phrasingsOf(source)].map(([id, said]) => [id, listsOf(said.join(" "))]),
   )
   const lengths: number[] = []
   const screens = new Map<string, number[]>()

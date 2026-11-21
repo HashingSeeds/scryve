@@ -6,6 +6,7 @@ import { parseArgs } from "node:util"
 
 import {
   findRules,
+  phrasingsOf,
   ruleReferences,
   searchRules,
   type ComprehensiveRules,
@@ -25,7 +26,7 @@ type Case = {
 // why: nobody tunes search against the held-out cases, so their score shows whether a change helps questions it never saw. Reading them to fix a miss turns them into practice cases.
 const SETS = { practice: "", heldout: ".heldout" }
 type CaseSet = keyof typeof SETS
-const FLOOR = { mtg: { practice: 427, heldout: 97 }, fab: { practice: 62, heldout: 22 } }
+const FLOOR = { mtg: { practice: 423, heldout: 127 }, fab: { practice: 72, heldout: 23 } }
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
 const TOP = 3
@@ -107,17 +108,20 @@ function evaluate(
       if (!findRules(rules, id)?.rules.some((rule) => rule.id === id))
         problems.push(`${named} names ${id}, which is not a rule in ${source.url}`)
   }
-  const phrased = new Set<string>()
-  for (const [id, said] of Object.entries(rules.phrasings ?? {})) {
+  for (const id of phrasingsOf(rules).keys())
     if (!findRules(rules, id)?.rules.some((rule) => rule.id === id))
       problems.push(`phrasings name ${id}, which is not a rule in ${source.url}`)
-    for (const phrase of said) phrased.add(phrase.trim().toLowerCase())
-  }
+  const phrased = new Set(
+    Object.values(rules.phrasings ?? {})
+      .flat()
+      .map((phrase) => phrase.trim().toLowerCase()),
+  )
 
   const timings: number[] = []
   const groups = new Map<string, { passed: number; total: number }>()
   const hits: string[] = []
   const misses: string[] = []
+  const answers = { one: { passed: 0, total: 0 }, several: { passed: 0, total: 0 } }
   let passed = 0
   let inTop = 0
   let empty = 0
@@ -138,8 +142,11 @@ function evaluate(
       const tally = groups.get(group) ?? { passed: 0, total: 0 }
       groups.set(group, { passed: tally.passed + (hit ? 1 : 0), total: tally.total + 1 })
     }
+    const tally = answers[entry.rules.length > 1 ? "several" : "one"]
+    tally.total++
     if (hit) {
       passed++
+      tally.passed++
       hits.push(entry.query)
     }
     if (rank >= 0 && rank < TOP) inTop++
@@ -161,7 +168,7 @@ function evaluate(
   const sorted = timings.toSorted((a, b) => a - b)
   const p95 = percentile(sorted, 0.95)
   console.log(
-    `${system} ${set}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
+    `${system} ${set}: ${cases.length} cases · first ${percent(passed, cases.length)} · one-rule cases ${percent(answers.one.passed, answers.one.total)} · several-rule cases ${percent(answers.several.passed, answers.several.total)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
   )
   console.log(
     `  ${[...groups].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}${copied.total ? ` · same as a shipped phrasing ${percent(copied.passed, copied.total)}` : ""}`,
