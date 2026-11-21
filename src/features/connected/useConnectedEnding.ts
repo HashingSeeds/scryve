@@ -178,7 +178,6 @@ export function useConnectedEnding({
       if (leaving) return
       setLeaving(true)
       setLeaveError(undefined)
-      // why: success navigates off the board, so the dialog stays busy instead of offering a second leave.
       try {
         await guestLeave()
       } catch (cause) {

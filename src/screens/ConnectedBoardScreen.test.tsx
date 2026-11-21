@@ -491,6 +491,9 @@ describe("ConnectedBoardScreen", () => {
 
     fireEvent.press(screen.getByTestId("confirm-connected-leave"))
     await waitFor(() => expect(onLeave).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId("confirm-connected-leave").props.accessibilityState.disabled).toBe(
+      true,
+    )
     expect(mockLeave).toHaveBeenLastCalledWith(
       expect.objectContaining({ publicId: "game-public", deviceId: expect.any(String) }),
     )
@@ -1479,8 +1482,13 @@ describe("ConnectedBoardScreen before play", () => {
     withGame({
       firstPlayer: { mode: "roll", playerId: "player-2", rolls: { "player-1": 4, "player-2": 17 } },
     })
+    jest.useFakeTimers()
     screen.rerender(themed(<PregameBoard pregame={pregame} />))
     expect(screen.getByTestId("dice-seat-1")).toHaveTextContent(/17/)
+    expect(screen.queryByTestId("dice-chip-1-first")).toBeNull()
+
+    act(() => jest.advanceTimersByTime(2500))
+    expect(screen.getByTestId("dice-chip-1-first")).toBeTruthy()
   })
 
   it("picks the tapped seat in a pick game", () => {

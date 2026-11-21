@@ -132,7 +132,6 @@ export function useConnectedPregame({
 
 const ROLLS_SHOWN_MS = 2500
 
-/** why: every device sees the server's roll arrive, and each shows it for a moment before the 1st chip. */
 function useRollsShown(rolls: Readonly<Record<string, number>> | undefined) {
   const key = rolls ? JSON.stringify(rolls) : undefined
   const [shown, setShown] = useState<string>()
