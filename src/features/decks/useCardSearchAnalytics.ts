@@ -37,7 +37,7 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
   const key = search ? searchKey(search) : ""
   useEffect(() => {
     clearTimeout(timer.current)
-    pending.current = latest.current.search
+    pending.current = key === counted.current ? undefined : latest.current.search
     if (pending.current) timer.current = setTimeout(flush, SETTLE_MS)
   }, [key, flush])
   useEffect(() => flush, [flush])
