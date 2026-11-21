@@ -66,6 +66,22 @@ describe("game setup", () => {
     await host.mutation(api.games.startGame, { publicId: "setup-lobby-game-000001" })
     const played = await storedSetup(t, "setup-lobby-game-000001")
     expect(Object.values(played)).not.toContain(undefined)
+    expect(played).toEqual({
+      startingLife: 40,
+      lifeStep: 5,
+      ruleset: "commander",
+      deckRequired: false,
+      game: "mtg",
+      system: "mtg",
+      format: "commander",
+      variant: "archenemy",
+      modeSetup: { archenemy: { seat: 2 }, planechase: { decks: ["pc12-chaos-reigns"] } },
+      layout: "even-grid",
+      lifeEditing: "anyone",
+      matchBestOf: 3,
+      firstPlayerMode: "pick",
+      freeMulligans: "first",
+    })
     await host.mutation(api.games.finishGame, {
       publicId: "setup-lobby-game-000001",
       rematch: {
