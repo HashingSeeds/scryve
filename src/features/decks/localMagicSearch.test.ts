@@ -206,3 +206,32 @@ test("the rarer card comes first among names that match equally", () => {
   })
   expect(found?.named.map((c) => c.name)).toEqual(["Rhystic Study", "Rhystic Cave"])
 })
+
+test("the most played card comes first among names that match equally, counting a Commander-banned card as most played", () => {
+  const cards = parseMagicCards(
+    JSON.stringify({
+      version: "1",
+      cards: [
+        card("Oko, the Trickster", { rarity: "mythic", edhrecRank: 17791 }),
+        card("Oko, Thief of Crowns", { rarity: "mythic", edhrecRank: 2104 }),
+        card("Oko, the Ringleader", { rarity: "mythic", commanderLegality: "banned" }),
+        card("Oko, Lorwyn Liege", { rarity: "mythic" }),
+        card("Oko, the Ringmaster", { rarity: "uncommon", edhrecRank: 2103 }),
+      ],
+    }),
+  )
+  const found = localMagicSearch(cards, cardNameIndex(cards.cards.map((c) => c.name)), {
+    text: "oko",
+    commander: false,
+    colors: [],
+    colorMatch: "exact",
+    filters: {},
+  })
+  expect(found?.named.map((c) => c.name)).toEqual([
+    "Oko, the Ringleader",
+    "Oko, the Ringmaster",
+    "Oko, Thief of Crowns",
+    "Oko, the Trickster",
+    "Oko, Lorwyn Liege",
+  ])
+})

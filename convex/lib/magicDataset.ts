@@ -9,6 +9,7 @@ export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRule
   toughness?: string
   /** why: absent means a file built before legality shipped, so search asks Scryfall instead of finding no legal cards. */
   legalFormats?: string[]
+  edhrecRank?: number
 }
 
 export type MagicDataset = { version: string; cards: MagicDatasetCard[] }
@@ -112,6 +113,7 @@ export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
       : { faceDetails: faceDetailsWithoutOracleText(faceDetails) }),
     ...(typeof raw.cmc === "number" ? { manaValue: raw.cmc } : {}),
     ...(toughness ? { toughness } : {}),
+    ...(typeof raw.edhrec_rank === "number" ? { edhrecRank: raw.edhrec_rank } : {}),
     legalFormats,
   }
 }
