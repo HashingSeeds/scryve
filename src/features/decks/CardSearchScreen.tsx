@@ -100,6 +100,7 @@ import {
 } from "./localMagicSearch"
 import { useCardDetails } from "./useCardDetails"
 import { useCardNameIndex } from "./useCardNameIndex"
+import { useCardSearchAnalytics } from "./useCardSearchAnalytics"
 import { useMagicCards } from "./useMagicCards"
 import { api } from "../../../convex/_generated/api"
 import {
@@ -791,6 +792,16 @@ export function CardSearch({
           ("scryfallId" in card && eligible(card) && matchesPickedColors(card) && !inDeck(card)),
       )
     : undefined
+  const searchPicked = useCardSearchAnalytics(
+    game,
+    text && !busy && catalogResults
+      ? { query: text, results: catalogResults.map((card) => card.name) }
+      : undefined,
+  )
+  function pick(card: SearchCard, index: number, to = section) {
+    searchPicked(index + 1, card.name)
+    add(card, to)
+  }
   const eligibleCommanders = choosingCommander
     ? commanderCards?.filter((card) => {
         const cached = cachedRules[cardDetailsKey(card, game)]
@@ -1143,12 +1154,12 @@ export function CardSearch({
               ) : null}
             </ResultSlot>
           }
-          renderItem={({ item: card }) => (
+          renderItem={({ item: card, index }) => (
             <ResultRow
               style={themed($result)}
               accessibilityRole={tapsRows ? "button" : undefined}
               accessibilityLabel={rowLabel(card)}
-              onPress={tapsRows ? () => add(card) : undefined}
+              onPress={tapsRows ? () => pick(card, index) : undefined}
             >
               <CardImage
                 game={game}
@@ -1173,10 +1184,10 @@ export function CardSearch({
                   style={$add}
                   accessibilityLabel={translate("decks:cardSearch.addCard", { card: card.name })}
                   tx="decks:cardSearch.add"
-                  onPress={() => add(card)}
+                  onPress={() => pick(card, index)}
                 />
               ) : null}
-              {!tapsRows ? sideAction(card, (to) => add(card, to)) : null}
+              {!tapsRows ? sideAction(card, (to) => pick(card, index, to)) : null}
             </ResultRow>
           )}
           ListFooterComponent={
