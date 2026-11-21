@@ -702,7 +702,6 @@ export function ConnectedBoardWithRuntime({
 type BoardOverlay =
   | "status"
   | "match"
-  | "matchEnd"
   | "finish"
   | "leave"
   | "players"
@@ -716,7 +715,6 @@ type BoardOverlay =
 const GRID_LOCKING_OVERLAYS: ReadonlySet<BoardOverlay> = new Set([
   "status",
   "match",
-  "matchEnd",
   "finish",
   "players",
   "inviteAfterPlayers",
@@ -764,7 +762,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   )
   // why: the host can abandon while a guest is mid-report, and replacing the Players dialog would drop the draft.
   const [abandonedOpen, setAbandonedOpen] = useState(false)
-  const [matchEndSending, setMatchEndSending] = useState(false)
+  // why: a failed match end reopens over whatever the host opened after cancelling, which must stay mounted.
+  const [matchEnding, setMatchEnding] = useState<"choosing" | "sending">()
   const [matchEndError, setMatchEndError] = useState<string>()
   const [leaving, setLeaving] = useState(false)
   const [leaveError, setLeaveError] = useState<string>()
@@ -1010,16 +1009,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     : undefined
   async function endMatch(outcomes: MatchSeatOutcome[]) {
     if (!onEndMatch) return
-    setMatchEndSending(true)
+    setMatchEnding("sending")
     setMatchEndError(undefined)
     try {
       await onEndMatch(matchSeats.map(({ seat }, index) => ({ seat, outcome: outcomes[index] })))
-      close("matchEnd")
+      setMatchEnding(undefined)
     } catch (cause) {
       setMatchEndError(convexErrorMessage(cause, translate("board:matchEnd.failed")))
-      setOverlay("matchEnd")
-    } finally {
-      setMatchEndSending(false)
+      setMatchEnding("choosing")
     }
   }
 
@@ -1362,6 +1359,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     inviteDialogOpen ||
     Boolean(inviteSheet.shown) ||
     abandonedOpen ||
+    matchEnding !== undefined ||
     (overlay !== undefined && GRID_LOCKING_OVERLAYS.has(overlay))
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
@@ -1685,8 +1683,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               disabled={!match.canEnd}
               accessibilityHint={translate("board:match.endHint")}
               onPress={() => {
+                close("match")
                 setMatchEndError(undefined)
-                setOverlay("matchEnd")
+                setMatchEnding("choosing")
               }}
             />
           ) : null}
@@ -1694,7 +1693,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         </MatchScoreDialog>
       ) : null}
 
-      {overlay === "matchEnd" && match ? (
+      {matchEnding && match ? (
         <MatchEndDialog
           score={{
             bestOf: match.bestOf,
@@ -1703,8 +1702,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             lastGameDrawn: false,
           }}
           failure={matchEndError}
-          busy={matchEndSending}
-          onClose={() => close("matchEnd")}
+          busy={matchEnding === "sending"}
+          onClose={() => setMatchEnding(undefined)}
           onEnd={(outcomes) => void endMatch(outcomes)}
         />
       ) : null}
