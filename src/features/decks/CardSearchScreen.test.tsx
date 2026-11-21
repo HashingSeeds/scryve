@@ -752,6 +752,18 @@ describe("with the device's card name list", () => {
     expect(captureAnalytics).not.toHaveBeenCalled()
   })
 
+  it("reports a pick from a filter-only search without an earlier search's text", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    await search(view, "id=r")
+    fireEvent.press(view.getByLabelText("Add Lightning Axe to deck"))
+    view.unmount()
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
+      ["card_search", { system: "mtg", result_count: 2, query: "" }],
+      ["card_picked", { system: "mtg", rank: 1, pick_count: 1, card: "Lightning Axe", query: "" }],
+    ])
+  })
+
   it("reports the same search again after the player clears it", async () => {
     const view = adder()
     await search(view, "lightnig bolt")

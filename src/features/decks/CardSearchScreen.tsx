@@ -259,7 +259,7 @@ export function CardSearch({
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
-  const [resultsQuery, setResultsQuery] = useState("")
+  const [resultsQuery, setResultsQuery] = useState<string>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
@@ -797,7 +797,7 @@ export function CardSearch({
     : undefined
   const searchPicked = useCardSearchAnalytics(
     game,
-    resultsQuery && !busy && catalogResults
+    resultsQuery !== undefined && !busy && catalogResults
       ? { query: resultsQuery, results: catalogResults.map((card) => card.name) }
       : undefined,
   )

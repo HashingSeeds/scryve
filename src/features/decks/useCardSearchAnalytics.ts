@@ -8,12 +8,9 @@ type Search = { query: string; results: readonly string[] }
 
 const searchKey = (search: Search) => `${search.query}\n${search.results.join("\n")}`
 
-/** why: search runs per keystroke, so it counts once typing settles, a card is picked, or the screen closes (typing past or clearing it first drops it, unless a card is picked from it); picks are numbered so a wrong first pick shows as a second one. */
 export function useCardSearchAnalytics(system: string, search: Search | undefined) {
   const latest = useRef({ system, search })
-  latest.current = { system, search }
   const shown = useRef(search)
-  if (search) shown.current = search
   const pending = useRef<Search | undefined>(undefined)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const picks = useRef(0)
@@ -35,6 +32,10 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
   }).current
 
   const key = search ? searchKey(search) : ""
+  useLayoutEffect(() => {
+    latest.current = { system, search }
+    if (search) shown.current = search
+  })
   useLayoutEffect(() => {
     clearTimeout(timer.current)
     pending.current = latest.current.search
