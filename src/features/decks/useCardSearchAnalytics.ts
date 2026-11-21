@@ -10,6 +10,8 @@ type Search = { query: string; results: readonly string[] }
 export function useCardSearchAnalytics(system: string, search: Search | undefined) {
   const latest = useRef({ system, search })
   latest.current = { system, search }
+  const shown = useRef(search)
+  if (search) shown.current = search
   const pending = useRef<Search | undefined>(undefined)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const picks = useRef(0)
@@ -37,7 +39,7 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
   useEffect(() => flush, [flush])
 
   return (rank: number, card: string) => {
-    const query = latest.current.search?.query ?? ""
+    const query = shown.current?.query ?? ""
     flush()
     picks.current += 1
     captureAnalytics("card_picked", {

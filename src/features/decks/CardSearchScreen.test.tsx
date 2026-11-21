@@ -740,6 +740,18 @@ describe("with the device's card name list", () => {
     ])
   })
 
+  it("drops a search the player typed past, even while the next one is still loading", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    mockAction.mockImplementation(() => new Promise(() => {}))
+    jest.useFakeTimers()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "lightnig bolts")
+    await act(async () => jest.advanceTimersByTime(2000))
+    jest.useRealTimers()
+    view.unmount()
+    expect(captureAnalytics).not.toHaveBeenCalled()
+  })
+
   it("drops name matches whose legality in the deck's format the device can't confirm", async () => {
     const view = adder("modern")
     expect(await search(view, "f:modern lightnig bolt")).toEqual([

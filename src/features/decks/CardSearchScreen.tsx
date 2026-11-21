@@ -797,7 +797,7 @@ export function CardSearch({
     : undefined
   const searchPicked = useCardSearchAnalytics(
     game,
-    resultsQuery && catalogResults
+    resultsQuery && !busy && catalogResults
       ? { query: resultsQuery, results: catalogResults.map((card) => card.name) }
       : undefined,
   )
