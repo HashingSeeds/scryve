@@ -259,6 +259,7 @@ export function CardSearch({
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
+  const [resultsQuery, setResultsQuery] = useState("")
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
@@ -587,6 +588,7 @@ export function CardSearch({
     setOfflineResults(undefined)
     if (answered) {
       setNameResults(answered.named)
+      setResultsQuery(text)
       setResults(answered.found)
       setBusy(false)
       return
@@ -618,6 +620,7 @@ export function CardSearch({
         if (!active) return
         const byName = new Map(named.map((card) => [card.name, card]))
         setNameResults(names.flatMap((name) => byName.get(name) ?? []))
+        setResultsQuery(text)
         setResults(found)
       } catch (cause) {
         if (!active) return
@@ -794,8 +797,8 @@ export function CardSearch({
     : undefined
   const searchPicked = useCardSearchAnalytics(
     game,
-    text && !busy && catalogResults
-      ? { query: text, results: catalogResults.map((card) => card.name) }
+    resultsQuery && catalogResults
+      ? { query: resultsQuery, results: catalogResults.map((card) => card.name) }
       : undefined,
   )
   function pick(card: SearchCard, index: number, to = section) {

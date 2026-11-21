@@ -727,12 +727,16 @@ describe("with the device's card name list", () => {
     await search(view, "id=r lightnig bolt")
     fireEvent.press(view.getByLabelText("Add Lightning Axe to deck"))
     fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "id=r lightnig bolts")
+    expect(view.getByLabelText("Searching…")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
     view.unmount()
     const query = "lightnig bolt"
     expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
       ["card_search", { system: "mtg", result_count: 2, query }],
       ["card_picked", { system: "mtg", rank: 2, pick_count: 1, card: "Lightning Axe", query }],
       ["card_picked", { system: "mtg", rank: 1, pick_count: 2, card: "Lightning Bolt", query }],
+      ["card_picked", { system: "mtg", rank: 1, pick_count: 3, card: "Lightning Bolt", query }],
     ])
   })
 

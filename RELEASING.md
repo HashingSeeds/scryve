@@ -247,7 +247,7 @@ search text lowercased and cut to 80 characters. Each result opened from a searc
 search so far, so `open_count` 2 or more means the first pick was wrong. A glossary term
 answers in place, so a search with no open is not always a miss. `keyword_viewed` fires when
 a Magic keyword on a card opens its definition, naming the keyword's rule id.
-Card search follows the same pattern for the card name a player types (filter terms left out):
+Card search follows the same pattern for the text a player types, minus the filter terms it reads:
 `card_search` carries the system, `result_count`, and `query`, and each result added or opened
 from it sends `card_picked` with its `rank`, the `card` name, the `query`, and `pick_count`.
 
