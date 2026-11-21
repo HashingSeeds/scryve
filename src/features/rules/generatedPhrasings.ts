@@ -1,5 +1,4 @@
 // why: a model wrote these from each rule's text alone, never from a search case, so the held-out cases still score questions search never saw. Regenerate them the same way when the rules change; never add words to answer a case.
-// why: one flat list of words, each rule's id before its own, so Hermes stores each word once. Whole phrasings cost the app about twice the bytes.
 
 // prettier-ignore
 export const MAGIC_GENERATED_PHRASINGS: readonly string[] = [
