@@ -82,6 +82,7 @@ const NUMBER_KEYS = new Set<string>([
   "result_count",
   "rank",
   "open_count",
+  "pick_count",
   ...GAME_SHAPE_NUMBER_KEYS,
   "attempt_count",
   "pass_count",
@@ -135,6 +136,8 @@ type Events = {
   rules_search: { system: string; result_count: number; top_results: string; query?: string }
   rules_opened: { system: string; rank: number; open_count: number; rule: string; query: string }
   keyword_viewed: { system: string; rule: string }
+  card_search: { system: string; result_count: number; query: string }
+  card_picked: { system: string; rank: number; pick_count: number; card: string; query: string }
   turns_game_ended: {
     turns_enabled: boolean
     pass_count: number
@@ -168,6 +171,8 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   rules_search: ["system", "result_count", "top_results", "query"],
   rules_opened: ["system", "rank", "open_count", "rule", "query"],
   keyword_viewed: ["system", "rule"],
+  card_search: ["system", "result_count", "query"],
+  card_picked: ["system", "rank", "pick_count", "card", "query"],
   turns_game_ended: ["turns_enabled", "pass_count", "player_count", "mode"],
 }
 
@@ -227,6 +232,8 @@ export function analyticsProperties(event: string, properties: Record<string, un
       const ids = typeof value === "string" ? value.split(",").filter(Boolean) : []
       if (ids.length <= 3 && ids.every((id) => id === "glossary" || RULE_ID.test(id)))
         result[key] = ids.join(",")
+    } else if (key === "card") {
+      if (typeof value === "string" && value) result[key] = value
     } else if (key === "query") {
       const text = typeof value === "string" ? value.trim().toLowerCase().replace(/\s+/g, " ") : ""
       if (text) result[key] = text.slice(0, QUERY_LIMIT)
