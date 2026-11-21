@@ -752,6 +752,23 @@ describe("with the device's card name list", () => {
     expect(captureAnalytics).not.toHaveBeenCalled()
   })
 
+  it("reports the same search again after the player clears it", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "")
+    await search(view, "lightnig bolt")
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    view.unmount()
+    const query = "lightnig bolt"
+    const searched = ["card_search", { system: "mtg", result_count: 3, query }]
+    const picked = [
+      "card_picked",
+      { system: "mtg", rank: 1, pick_count: 1, card: "Lightning Bolt", query },
+    ]
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([searched, picked, searched, picked])
+  })
+
   it("still reports a search typed past when the player picks from its results", async () => {
     const view = adder()
     await search(view, "lightnig bolt")

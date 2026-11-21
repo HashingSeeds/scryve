@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
 
 import { captureAnalytics } from "@/utils/analytics"
 
@@ -35,9 +35,9 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
   }).current
 
   const key = search ? searchKey(search) : ""
-  useEffect(() => {
+  useLayoutEffect(() => {
     clearTimeout(timer.current)
-    pending.current = key === counted.current ? undefined : latest.current.search
+    pending.current = latest.current.search
     if (pending.current) timer.current = setTimeout(flush, SETTLE_MS)
   }, [key, flush])
   useEffect(() => flush, [flush])
