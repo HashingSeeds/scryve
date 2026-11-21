@@ -1,4 +1,4 @@
-import type { ComponentProps, Dispatch, ReactNode } from "react"
+import type { ComponentProps, ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 
@@ -26,7 +26,6 @@ import {
   CLOCK_MODES,
   VARIANT_MIN_SEATS,
   type GameDraft,
-  type GameDraftAction,
   type GameDraftPatch,
   type GameSetupView,
 } from "@/features/game/newGameDraft"
@@ -340,7 +339,8 @@ export function SetupOptionsSheet({
   onDismissed,
   draft,
   setup,
-  dispatch,
+  onChange: set,
+  onToggleMatch,
   matchOffered,
   clockOffered,
 }: {
@@ -349,13 +349,13 @@ export function SetupOptionsSheet({
   onDismissed: () => void
   draft: GameDraft
   setup: GameSetupView
-  dispatch: Dispatch<GameDraftAction>
+  onChange: (patch: GameDraftPatch) => void
+  onToggleMatch: (on: boolean) => void
   matchOffered: boolean
   clockOffered: boolean
 }) {
   const { themed } = useAppTheme()
   const { matchBestOf } = setup
-  const set = (patch: GameDraftPatch) => dispatch({ type: "set", patch })
   return (
     <Sheet
       visible={visible}
@@ -378,7 +378,7 @@ export function SetupOptionsSheet({
                 { id: "on", label: translate("play:newGame.bestOf") },
               ]}
               selectedId={matchBestOf ? "on" : "off"}
-              onSelect={(value) => dispatch({ type: "toggleMatch", on: value === "on" })}
+              onSelect={(value) => onToggleMatch(value === "on")}
             />
             {matchBestOf ? (
               <SegmentedControl

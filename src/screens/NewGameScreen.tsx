@@ -182,6 +182,8 @@ const NEW_GAME_FIELDS = [
   "clockMode",
   "chosenClockMinutes",
 ] as const
+
+/** why: a recent row keeps no deck, so a game already holding one seeds the form itself. */
 function newestRecent(
   props: Pick<NewGameScreenProps, "localGame" | "initialGame" | "recentSetups" | "mode">,
 ) {
@@ -1105,7 +1107,8 @@ function NewGameForm({
         }
         draft={draft}
         setup={setup}
-        dispatch={dispatch}
+        onChange={set}
+        onToggleMatch={(on) => dispatch({ type: "toggleMatch", on })}
         matchOffered={matchOffered}
         clockOffered={!connectedMode && !localGame}
       />
