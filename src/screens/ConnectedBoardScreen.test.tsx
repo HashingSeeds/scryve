@@ -1,14 +1,24 @@
 import type { ComponentProps } from "react"
 import { Dimensions, Modal, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react-native"
 
+import { connectedBoardView } from "@/features/connected/boardView"
 import {
   ConnectedGameRepository,
   connectedDeploymentScope,
   loadNewestResumeGame,
 } from "@/features/connected/persistence"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
+import { useConnectedPregame } from "@/features/connected/useConnectedPregame"
 import * as seatCommander from "@/features/decks/seatCommander"
 
 import { ConnectedBoardScreen, ConnectedBoardWithRuntime } from "./ConnectedBoardScreen"
@@ -1537,6 +1547,41 @@ describe("ConnectedBoardScreen before play", () => {
     expect(screen.getByTestId("dice-seat-2")).toHaveTextContent(/^Keep 6\?Draw 7, bottom 1/)
     fireEvent.press(screen.getByTestId("mulligan-keep"))
     expect(pregame.keepHand).toHaveBeenCalledWith(1, 1)
+  })
+
+  it("shows a roll that arrives with its winner before the 1st chip", () => {
+    withGame({
+      firstPlayer: { mode: "roll", playerId: "player-2", rolls: { "player-1": 4, "player-2": 17 } },
+    })
+    const firstChipShown: boolean[] = []
+    renderHook(() => {
+      const { projection } = useConnectedGame("game-public", "owner")
+      if (!projection) throw new Error("the harness game has no projection")
+      const seat = useConnectedPregame({
+        publicId: "game-public",
+        game: connectedBoardView(projection),
+        controlled: new Set(["player-1"]),
+        actions: actions(),
+      })
+      firstChipShown.push(seat.showsFirstChip("player-2"))
+    })
+    expect(firstChipShown).not.toContain(true)
+  })
+
+  it("counts the free mulligan on top of a full hand, as the local board does", () => {
+    const pregame = actions()
+    withGame(
+      { freeMulligans: "first", firstPlayer: { mode: "pick", playerId: "player-2" } },
+      (player) =>
+        "playerId" in player && player.playerId === "player-1"
+          ? { ...player, deckVersionId: "deck" }
+          : player,
+    )
+    render(themed(<PregameBoard pregame={pregame} />))
+    layout()
+    for (let taken = 0; taken < 8; taken++) fireEvent.press(screen.getByTestId("mulligan-mulligan"))
+    fireEvent.press(screen.getByTestId("mulligan-keep"))
+    expect(pregame.keepHand).toHaveBeenCalledWith(1, 8)
   })
 
   it("keeps the mulligan step while turn 1 waits on the first player, and ends it at the first change", () => {
