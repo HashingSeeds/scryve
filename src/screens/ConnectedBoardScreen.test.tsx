@@ -1515,9 +1515,11 @@ describe("ConnectedBoardScreen before play", () => {
     withGame({ firstPlayer: { mode: "roll", chooser: { playerId: "player-2", reason: "loss" } } })
     render(themed(<PregameBoard pregame={actions()} />))
     layout()
+    expect(screen.queryByTestId("dice-seat-2")).toBeNull()
     fireEvent.press(screen.getByTestId("life-seat-2-1"))
     expect(mockChangeLife).toHaveBeenCalledWith("player-1", 1)
   })
+
   it("logs mulligans on this device's deck seat once first player is settled", () => {
     const pregame = actions()
     withGame(
