@@ -95,7 +95,7 @@ describe("initialGameDraft", () => {
       },
     })
     expect(draft).toMatchObject({ system: "mtg", playerCount: 5, treacheryChosen: true })
-    expect(deriveGameSetup(draft, connected).variant).toBe("treachery")
+    expect(deriveGameSetup(draft, connected).gameSetup.variant).toBe("treachery")
   })
 })
 
@@ -114,7 +114,7 @@ describe("gameDraftReducer", () => {
     })
   })
 
-  it("keeps a custom life within the same format and resets it on a new one", () => {
+  it("a new variant in the same format keeps a custom life", () => {
     const custom = apply(commanderPod(), { type: "set", patch: { startingLife: 33 } })
     const sameFormat = apply(custom, {
       type: "chooseGameType",
@@ -137,19 +137,19 @@ describe("gameDraftReducer", () => {
   })
 
   it("a default starting life follows the player count, a custom one stays", () => {
-    const pod = apply(commanderPod(), {
+    const brawl = apply(commanderPod(), {
       type: "chooseGameType",
-      gameType: standard,
+      gameType: { id: "brawl", system: "mtg", format: "brawl" },
       confirmedFree: false,
     })
-    expect(pod.startingLife).toBe(20)
+    expect(brawl.startingLife).toBe(30)
     expect(
-      apply(pod, { type: "choosePlayerCount", count: 2, confirmedFree: false }).startingLife,
-    ).toBe(20)
-    const custom = apply(pod, { type: "set", patch: { startingLife: 25 } })
-    expect(
-      apply(custom, { type: "choosePlayerCount", count: 3, confirmedFree: false }).startingLife,
+      apply(brawl, { type: "choosePlayerCount", count: 2, confirmedFree: false }).startingLife,
     ).toBe(25)
+    const custom = apply(brawl, { type: "set", patch: { startingLife: 33 } })
+    expect(
+      apply(custom, { type: "choosePlayerCount", count: 2, confirmedFree: false }).startingLife,
+    ).toBe(33)
   })
 
   it("leaving treachery's seat range turns treachery off", () => {
@@ -173,7 +173,14 @@ describe("gameDraftReducer", () => {
       { type: "choosePlayerCount", count: 3, confirmedFree: false },
     )
     expect(shrunk.modeChoices.archenemy).toBe("roll")
-    const grown = apply(shrunk, { type: "choosePlayerCount", count: 8, confirmedFree: true })
+    const clashing = shrunk.appearances.map((appearance, seat) =>
+      seat === 4 ? { ...appearance, color: shrunk.appearances[0].color } : appearance,
+    )
+    const grown = apply(
+      shrunk,
+      { type: "set", patch: { appearances: clashing } },
+      { type: "choosePlayerCount", count: 8, confirmedFree: true },
+    )
     const colors = grown.appearances.slice(0, 8).map(({ color }) => color.toUpperCase())
     expect(new Set(colors).size).toBe(8)
   })
@@ -255,8 +262,8 @@ describe("deriveGameSetup", () => {
       gameType: treachery,
       confirmedFree: false,
     })
-    expect(deriveGameSetup(draft, connected).variant).toBe("treachery")
-    expect(deriveGameSetup(draft, local).variant).toBeUndefined()
+    expect(deriveGameSetup(draft, connected).gameSetup.variant).toBe("treachery")
+    expect(deriveGameSetup(draft, local).gameSetup.variant).toBeUndefined()
   })
 
   it("defaults a match to one game for Commander and three for a duel", () => {
@@ -292,9 +299,9 @@ describe("deriveGameSetup", () => {
   it("carries planechase choices only where the system offers them", () => {
     const planes = { planar: "own", archenemy: "roll", schemes: "own" }
     const pod = apply(commanderPod(), { type: "set", patch: { modeChoices: planes } })
-    expect(deriveGameSetup(pod, local).modeSetup).toBeDefined()
+    expect(deriveGameSetup(pod, local).gameSetup.modeSetup).toBeDefined()
     const noSystem = { ...initialGameDraft({ defaults: NO_SYSTEM_SETTINGS }), modeChoices: planes }
-    expect(deriveGameSetup(noSystem, local).modeSetup).toBeUndefined()
+    expect(deriveGameSetup(noSystem, local).gameSetup.modeSetup).toBeUndefined()
   })
 
   it("forgets a claimed seat the player count no longer has", () => {
