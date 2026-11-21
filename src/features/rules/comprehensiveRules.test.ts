@@ -231,10 +231,9 @@ describe("searchRules ranking", () => {
     expect(ids("recast general")[0]).toBe("903.8")
   })
 
-  it("finds a rule by its generated words, kept with its written phrasings", () => {
+  it("finds a rule by its generated words, alongside its written phrasings", () => {
     expect(ids("menace")[0]).toBe("509.1b")
     expect(ids("again")[0]).toBe("903.8")
-    expect(ids("recast general")[0]).toBe("903.8")
   })
 
   it("forgives one typo in a word the rules never use", () => {
