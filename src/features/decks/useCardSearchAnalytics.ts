@@ -6,7 +6,9 @@ const SETTLE_MS = 1500
 
 type Search = { query: string; results: readonly string[] }
 
-/** why: search runs per keystroke, so it counts once typing settles, a card is picked, or the screen closes (clearing first drops it); picks are numbered so a wrong first pick shows as a second one. */
+const searchKey = (search: Search) => `${search.query}\n${search.results.join("\n")}`
+
+/** why: search runs per keystroke, so it counts once typing settles, a card is picked, or the screen closes (typing past or clearing it first drops it, unless a card is picked from it); picks are numbered so a wrong first pick shows as a second one. */
 export function useCardSearchAnalytics(system: string, search: Search | undefined) {
   const latest = useRef({ system, search })
   latest.current = { system, search }
@@ -15,6 +17,7 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
   const pending = useRef<Search | undefined>(undefined)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const picks = useRef(0)
+  const counted = useRef("")
 
   const flush = useRef(() => {
     clearTimeout(timer.current)
@@ -22,6 +25,7 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
     const settled = pending.current
     if (!settled) return
     pending.current = undefined
+    counted.current = searchKey(settled)
     picks.current = 0
     captureAnalytics("card_search", {
       system: latest.current.system,
@@ -30,7 +34,7 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
     })
   }).current
 
-  const key = search ? `${search.query}\n${search.results.join("\n")}` : ""
+  const key = search ? searchKey(search) : ""
   useEffect(() => {
     clearTimeout(timer.current)
     pending.current = latest.current.search
@@ -39,7 +43,8 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
   useEffect(() => flush, [flush])
 
   return (rank: number, card: string) => {
-    const query = shown.current?.query ?? ""
+    const picked = shown.current
+    if (picked && searchKey(picked) !== counted.current) pending.current = picked
     flush()
     picks.current += 1
     captureAnalytics("card_picked", {
@@ -47,7 +52,7 @@ export function useCardSearchAnalytics(system: string, search: Search | undefine
       rank,
       pick_count: picks.current,
       card,
-      query,
+      query: picked?.query ?? "",
     })
   }
 }

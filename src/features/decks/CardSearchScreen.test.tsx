@@ -752,6 +752,20 @@ describe("with the device's card name list", () => {
     expect(captureAnalytics).not.toHaveBeenCalled()
   })
 
+  it("still reports a search typed past when the player picks from its results", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    mockAction.mockImplementation(() => new Promise(() => {}))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "lightnig bolts")
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    view.unmount()
+    const query = "lightnig bolt"
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
+      ["card_search", { system: "mtg", result_count: 3, query }],
+      ["card_picked", { system: "mtg", rank: 1, pick_count: 1, card: "Lightning Bolt", query }],
+    ])
+  })
+
   it("drops name matches whose legality in the deck's format the device can't confirm", async () => {
     const view = adder("modern")
     expect(await search(view, "f:modern lightnig bolt")).toEqual([
