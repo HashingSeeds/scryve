@@ -712,7 +712,6 @@ function NewGameForm({
     }
   }
 
-  // why: decks load after mount, and each step below needs the previous one rendered: the format filters the deck list, and only a claimed seat can hold a deck.
   const wantedDeckId = useRef(initialDeckId)
   useEffect(() => {
     const wanted = wantedDeckId.current
