@@ -205,7 +205,17 @@ describe("searchRules ranking", () => {
     notice: [],
     slang: { wrath: "destroy all creatures" },
     phrasings: { "903.8": ["recast general"] },
-    generatedPhrasings: ["509.1b", "menace", "903.8", "again"],
+    generatedPhrasings: [
+      "509.1b",
+      "menace",
+      "903.8",
+      "again",
+      "701.8a",
+      "recast",
+      "general",
+      "recast",
+      "general",
+    ],
     references: MAGIC_RULE_REFERENCE,
   }
   const ids = (query: string) =>
@@ -234,6 +244,11 @@ describe("searchRules ranking", () => {
   it("finds a rule by its generated words, alongside its written phrasings", () => {
     expect(ids("menace")[0]).toBe("509.1b")
     expect(ids("again")[0]).toBe("903.8")
+  })
+
+  it("opens the rule a search names word for word in a written phrasing, over generated words", () => {
+    expect(ids("recast general")[0]).toBe("903.8")
+    expect(ids("general recast")[0]).toBe("701.8a")
   })
 
   it("forgives one typo in a word the rules never use", () => {

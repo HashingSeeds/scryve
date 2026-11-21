@@ -85,6 +85,7 @@ type SearchIndex = {
   average: number
   slang: Map<string, string[]>
   spellings: Map<string, string>
+  written: Map<string, number>
   defined: { entry: GlossaryEntry; words: string[]; rules: number[] }[]
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
@@ -113,6 +114,7 @@ export function searchIndex(source: ComprehensiveRules) {
     [...phrasingsOf(source)].map(([id, said]) => [id, listsOf(said.join(" "))]),
   )
   const lengths: number[] = []
+  const written = new Map<string, number>()
   const screens = new Map<string, number[]>()
   const screenOf = (id: string) => {
     const screen = screens.get(id) ?? []
@@ -127,6 +129,8 @@ export function searchIndex(source: ComprehensiveRules) {
       const baseId = rule.id.replace(/[a-z]+$/, "")
       screenOf(section.id).push(index)
       screenOf(baseId).push(index)
+      for (const phrase of source.phrasings?.[rule.id] ?? [])
+        written.set(words(phrase).join(" "), index)
       for (const [found, weight] of [
         [own, 1],
         [title, INHERITED_WEIGHT],
@@ -165,7 +169,7 @@ export function searchIndex(source: ComprehensiveRules) {
       rules: (cited && screens.get(known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited)) || [],
     }
   })
-  const index = { rules, postings, lengths, average, slang, spellings: stems, defined }
+  const index = { rules, postings, lengths, average, slang, spellings: stems, written, defined }
   indexes.set(source, index)
   return index
 }
@@ -286,6 +290,8 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
       TERM_WEIGHT * term.words.reduce((sum, word) => sum + idf(index, index.postings.get(word)), 0)
     for (const at of term.rules) scores.set(at, (scores.get(at) ?? 0) + bonus)
   }
+  const asWritten = index.written.get(words(needle).join(" "))
+  if (asWritten !== undefined) scores.set(asWritten, Infinity)
   const screens = new Set<string>()
   for (const [at, score] of [...scores].sort(
     ([a, scoreA], [b, scoreB]) => scoreB - scoreA || a - b,
