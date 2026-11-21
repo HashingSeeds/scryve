@@ -278,7 +278,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
         const norm = BM25_K1 * (1 - BM25_B + (BM25_B * index.lengths[at]) / index.average)
-        const typed = word === wanted ? 1 : COMPLETION_WEIGHT
+        const typed = near || word === wanted ? 1 : COMPLETION_WEIGHT
         const score = (typed * weight * rarity * count * (BM25_K1 + 1)) / (count + norm)
         if (score > (best.get(at) ?? 0)) best.set(at, score)
       })
