@@ -23,14 +23,16 @@
       "a62412bf6600ae8dad323cc9efadbfe0eecc0f3a504eaef5b9411382f108d8a6": 1,
       "c48bfa0dbc29cb77bf8353e31bd223521c5d18b51a6f9ce17ae60fff13a16ba6": 1
     },
-    "convex/games.ts": {
+    "convex/lib/games/lobby.ts": {
       "0f8d6704aceb673cbb1880f912f121752871753897edb99abdc64dc2c2424ea6": 1,
-      "56577b587581ab42f839dd083ae4b485641678db11d874b223290277010c3e31": 1,
       "8f7a0c645a7e9ba1349218c00e4d941952a66a7d01b62af0a044c5e9dad0045a": 1,
       "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1,
       "b19d57e5d3bf79cb9f4091cc9ec0b73c0b9fca515334b13c3ccc96d46cc22dde": 1,
       "efe483c6c8be86c35f5287e8fb2fbe3aa6c5ee759cfb17b086eb4c48dad022ce": 1,
       "f59307fa75bd457934a1db03d27c4ee840e3d4b1ecfd62f4e421124eba150e5c": 1
+    },
+    "convex/lib/games/localPublish.ts": {
+      "56577b587581ab42f839dd083ae4b485641678db11d874b223290277010c3e31": 1
     },
     "convex/lib/nameFilter.test.ts": {
       "12e45a9bc8a73fa49c2d2a631cd97efd35432f6a7d6a35144aad720f242a8522": 1,
