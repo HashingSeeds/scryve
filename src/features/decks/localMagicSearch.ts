@@ -16,9 +16,10 @@ const RARITIES = ["mythic", "rare", "uncommon", "common"]
 const UNRANKED = 1e9
 const BANNED_IN_COMMANDER_RANK = 0
 
-function popularityRank(card: MagicDatasetCard | undefined) {
+function popularityRank(card: MagicDatasetCard | undefined, knowsPopularity: boolean) {
   const edhrecRank =
-    card?.edhrecRank ?? (card?.commanderLegality === "banned" ? BANNED_IN_COMMANDER_RANK : UNRANKED)
+    card?.edhrecRank ??
+    (knowsPopularity && card?.commanderLegality === "banned" ? BANNED_IN_COMMANDER_RANK : UNRANKED)
   const rarity = RARITIES.indexOf(card?.rarity ?? "")
   return edhrecRank * (RARITIES.length + 1) + (rarity < 0 ? RARITIES.length : rarity)
 }
@@ -30,6 +31,7 @@ export type MagicCards = {
   keyStarts: Int32Array
   byName: Map<string, MagicDatasetCard>
   knowsLegality: boolean
+  knowsPopularity: boolean
 }
 
 export type MagicSearch = {
@@ -80,6 +82,7 @@ export function parseMagicCards(text: string): MagicCards {
     keyStarts,
     byName: new Map(cards.map((card) => [card.name, card])),
     knowsLegality: cards.some((card) => card.legalFormats !== undefined),
+    knowsPopularity: cards.some((card) => card.edhrecRank !== undefined),
   }
 }
 
@@ -149,7 +152,7 @@ export function localMagicSearch(
   const named = (
     nameIndex && words.length
       ? searchCardNames(nameIndex, search.text, NAME_MATCHES, (name) =>
-          popularityRank(magicCards.byName.get(name)),
+          popularityRank(magicCards.byName.get(name), magicCards.knowsPopularity),
         )
       : []
   )

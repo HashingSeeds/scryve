@@ -187,13 +187,14 @@ test("a malformed card file is refused", () => {
   expect(() => parseMagicCards(JSON.stringify({ version: "1", cards: [{ name: 1 }] }))).toThrow()
 })
 
-test("the rarer card comes first among names that match equally", () => {
+test("in a file without EDHREC ranks, the rarer card comes first among names that match equally", () => {
   const cards = parseMagicCards(
     JSON.stringify({
       version: "1",
       cards: [
         card("Rhystic Cave", { rarity: "uncommon" }),
         card("Rhystic Study", { rarity: "rare" }),
+        card("Rhystic Tutor", { rarity: "common", commanderLegality: "banned" }),
       ],
     }),
   )
@@ -204,7 +205,11 @@ test("the rarer card comes first among names that match equally", () => {
     colorMatch: "exact",
     filters: {},
   })
-  expect(found?.named.map((c) => c.name)).toEqual(["Rhystic Study", "Rhystic Cave"])
+  expect(found?.named.map((c) => c.name)).toEqual([
+    "Rhystic Study",
+    "Rhystic Cave",
+    "Rhystic Tutor",
+  ])
 })
 
 test("the most played card comes first among names that match equally, counting a Commander-banned card as most played", () => {
