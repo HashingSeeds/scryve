@@ -5,6 +5,7 @@ import type { ReactTestInstance } from "react-test-renderer"
 
 import { colors as darkColors } from "@/theme/colorsDark"
 import { ThemeProvider } from "@/theme/context"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { clearCardDetails, loadCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { cardNameIndex, type CardNameIndex } from "./cardNameMatch"
@@ -32,6 +33,11 @@ function barText(view: { getByTestId: (id: string) => ReactTestInstance }) {
     typeof node === "string" ? node : node.children.map(read).join("")
   return read(view.getByTestId("card-search-input"))
 }
+
+jest.mock("@/utils/analytics", () => ({
+  ...jest.requireActual("@/utils/analytics"),
+  captureAnalytics: jest.fn(),
+}))
 
 let mockNameIndex: CardNameIndex | undefined
 jest.mock("./useCardNameIndex", () => ({ useCardNameIndex: () => mockNameIndex }))
@@ -714,6 +720,79 @@ describe("with the device's card name list", () => {
       names: ["Lightning Bolt", "Lightning Blow", "Lightning Axe"],
       deviceId: expect.any(String),
     })
+  })
+
+  it("reports a search once, and each card picked from it with its rank and the search text", async () => {
+    const view = adder()
+    await search(view, "id=r lightnig bolt")
+    fireEvent.press(view.getByLabelText("Add Lightning Axe to deck"))
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "id=r lightnig bolts")
+    expect(view.getByLabelText("Searching…")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    view.unmount()
+    const query = "lightnig bolt"
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
+      ["card_search", { system: "mtg", result_count: 2, query }],
+      ["card_picked", { system: "mtg", rank: 2, pick_count: 1, card: "Lightning Axe", query }],
+      ["card_picked", { system: "mtg", rank: 1, pick_count: 2, card: "Lightning Bolt", query }],
+      ["card_picked", { system: "mtg", rank: 1, pick_count: 3, card: "Lightning Bolt", query }],
+    ])
+  })
+
+  it("drops a search the player typed past, even while the next one is still loading", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    mockAction.mockImplementation(() => new Promise(() => {}))
+    jest.useFakeTimers()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "lightnig bolts")
+    await act(async () => jest.advanceTimersByTime(2000))
+    jest.useRealTimers()
+    view.unmount()
+    expect(captureAnalytics).not.toHaveBeenCalled()
+  })
+
+  it("reports a pick from a filter-only search without an earlier search's text", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    await search(view, "id=r")
+    fireEvent.press(view.getByLabelText("Add Lightning Axe to deck"))
+    view.unmount()
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
+      ["card_search", { system: "mtg", result_count: 2, query: "" }],
+      ["card_picked", { system: "mtg", rank: 1, pick_count: 1, card: "Lightning Axe", query: "" }],
+    ])
+  })
+
+  it("reports the same search again after the player clears it", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "")
+    await search(view, "lightnig bolt")
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    view.unmount()
+    const query = "lightnig bolt"
+    const searched = ["card_search", { system: "mtg", result_count: 3, query }]
+    const picked = [
+      "card_picked",
+      { system: "mtg", rank: 1, pick_count: 1, card: "Lightning Bolt", query },
+    ]
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([searched, picked, searched, picked])
+  })
+
+  it("still reports a search typed past when the player picks from its results", async () => {
+    const view = adder()
+    await search(view, "lightnig bolt")
+    mockAction.mockImplementation(() => new Promise(() => {}))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "lightnig bolts")
+    fireEvent.press(view.getByLabelText("Add Lightning Bolt to deck"))
+    view.unmount()
+    const query = "lightnig bolt"
+    expect(jest.mocked(captureAnalytics).mock.calls).toEqual([
+      ["card_search", { system: "mtg", result_count: 3, query }],
+      ["card_picked", { system: "mtg", rank: 1, pick_count: 1, card: "Lightning Bolt", query }],
+    ])
   })
 
   it("drops name matches whose legality in the deck's format the device can't confirm", async () => {
