@@ -39,7 +39,6 @@ import {
 } from "@/features/connected/boardSyncSignal"
 import {
   connectedBoardView,
-  connectedStandingWinners,
   connectedTeams,
   connectedLives,
   connectedOutState,
@@ -66,21 +65,19 @@ import {
 import type { PeerLatency } from "@/features/connected/syncLatency"
 import { SyncStatsOverlay } from "@/features/connected/SyncStatsOverlay"
 import { treacheryRoleLabel, TreacheryRoleDialog } from "@/features/connected/TreacheryRoleDialog"
+import {
+  FINISH_BLOCKERS,
+  finishBlockerFor,
+  useConnectedEnding,
+  type EndMatch,
+  type FinishBlocker,
+} from "@/features/connected/useConnectedEnding"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
+import { useConnectedPregame, type PregameActions } from "@/features/connected/useConnectedPregame"
 import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { isSharedDeckKey } from "@/features/decks/sharedDecks"
-import {
-  CLAIM_CHIP,
-  MULLIGAN_RULE,
-  mulliganStep,
-  systemDice,
-  type DiceSeatChip,
-  type DiceSeatView,
-  type MulliganAction,
-  type TurnChipState,
-} from "@/features/game/dice"
+import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import { asPlayerId, matchContextLabel } from "@/features/game/domain"
-import { firstPlayerFlips } from "@/features/game/FirstPlayerChoice"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { MatchEndDialog } from "@/features/game/LocalMatchEndDialog"
@@ -103,14 +100,9 @@ import {
   teamName,
   teamValueLabel,
 } from "@/features/game/teams"
-import {
-  reportTurnsGame,
-  TurnDialog,
-  useChessMinutes,
-  useTurnsEnabled,
-} from "@/features/game/TurnDialog"
+import { TurnDialog, useChessMinutes, useTurnsEnabled } from "@/features/game/TurnDialog"
 import { PASS_UNDO_MS } from "@/features/game/turnTab"
-import type { CommanderSlot, GamePlayer, MatchSeatOutcome, PlayerId } from "@/features/game/types"
+import type { CommanderSlot, GamePlayer, PlayerId } from "@/features/game/types"
 import { useCommanderAttack } from "@/features/game/useCommanderAttack"
 import { NearbyPlayersDialog } from "@/features/lan/NearbyPlayersDialog"
 import { modeChipBeside } from "@/features/modes/modeChipBeside"
@@ -118,13 +110,12 @@ import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { bagWithPlane, modeSeamFor, teamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
-import type { TxKeyPath } from "@/i18n"
 import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $tableDirection, textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
-import { convexErrorMessage, isGameUnavailableError } from "@/utils/convexError"
+import { isGameUnavailableError } from "@/utils/convexError"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
@@ -133,7 +124,6 @@ import { useStructurallyStable } from "@/utils/useStructurallyStable"
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { shownMarkShape } from "../../convex/lib/appearance"
-import { mulliganHandSize } from "../../convex/lib/mulligans"
 import type { SystemId } from "../../convex/lib/systems"
 import { isTeamVariant } from "../../convex/lib/teamVariants"
 import { nextTurnSeat, sharesTurn, turnGroupOf, turnLead } from "../../convex/lib/turns"
@@ -322,16 +312,6 @@ type ConnectedBoardReadyProps = {
   pregame?: PregameActions
 }
 
-export interface PregameActions {
-  rollFirst: () => void
-  chooseFirst: (playerId: string) => void
-  keepHand: (seat: number, mulligans: number) => void
-}
-
-type EndMatch = (seats: { seat: number; outcome: MatchSeatOutcome }[]) => Promise<unknown>
-
-type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
-
 type ConnectedBoardReadyView = {
   game: ConnectedBoardView
   out: readonly string[]
@@ -368,16 +348,6 @@ function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
     ...(shownMarkShape(player) ? { shape: shownMarkShape(player) } : {}),
     seat: player.seat,
   }
-}
-
-function finishBlockerFor(runtime: ConnectedGameRuntime): FinishBlocker | undefined {
-  return runtime.connectionStatus === "offline"
-    ? FINISH_BLOCKERS.offline
-    : runtime.pending.length > 0
-      ? FINISH_BLOCKERS.sending
-      : runtime.failed.length > 0
-        ? FINISH_BLOCKERS.rejected
-        : undefined
 }
 
 const NO_LIVES: Readonly<Record<string, number>> = {}
@@ -760,21 +730,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     (shown: BoardOverlay) => setOverlay((current) => (current === shown ? undefined : current)),
     [],
   )
-  const [abandonedOpen, setAbandonedOpen] = useState(false)
-  const [matchEnding, setMatchEnding] = useState<"choosing" | "sending">()
-  const [matchEndError, setMatchEndError] = useState<string>()
-  const [leaving, setLeaving] = useState(false)
-  const [leaveError, setLeaveError] = useState<string>()
   const [inviteError, setInviteError] = useState<string>()
-  const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
-  const [drawSelected, setDrawSelected] = useState(false)
   const [layoutChoice, setLayoutChoice] = useState(() => loadLayoutChoice(publicId))
-  const finishSubmitInFlight = useRef(false)
-  const navigatedTerminal = useRef(false)
   const game = view.game
   const { syncSignal, offlineSince, finishBlocker } = view
-  const terminalStatus = game.status
-  const rematchPublicId = game.rematchPublicId
   const table = useContext(ConnectedTableContext)
   const turn = turns ? table?.table.turn : undefined
   const turnGroups = table?.table.turnGroups
@@ -801,50 +760,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     const expire = setTimeout(() => setPassUndo(undefined), PASS_UNDO_MS)
     return () => clearTimeout(expire)
   }, [passUndo])
-  const endedTurn = useRef(turn)
-  useLayoutEffect(() => {
-    endedTurn.current = turn
-  })
-  const leaveFinished = useCallback(() => {
-    if (rematchPublicId && onRematch) onRematch(rematchPublicId)
-    else onGameEnded?.(publicId)
-  }, [rematchPublicId, onRematch, onGameEnded, publicId])
   const tabOn = turns && turnsEnabled
-  const playerCount = game.players.length
-  useEffect(() => {
-    if (terminalStatus === "finished") {
-      if (navigatedTerminal.current) return
-      navigatedTerminal.current = true
-      reportTurnsGame({
-        turnsEnabled: tabOn,
-        turn: endedTurn.current,
-        playerCount,
-        mode: "connected",
-      })
-      leaveFinished()
-    } else if (terminalStatus === "abandoned" && !navigatedTerminal.current) {
-      setAbandonedOpen(true)
-    }
-  }, [terminalStatus, leaveFinished, tabOn, playerCount])
   const named = game.players.map(({ playerId, displayName }) => ({
     id: playerId,
     name: displayName,
   }))
-  function toggleWinner(playerId: string) {
-    setDrawSelected(false)
-    const team = teamMembers(named, turnGroups, playerId).map(({ id }) => id)
-    setWinnerPlayerIds((current) =>
-      current.includes(playerId)
-        ? current.filter((id) => !team.includes(id))
-        : [...current, ...team],
-    )
-  }
-
-  function selectDraw() {
-    setWinnerPlayerIds([])
-    setDrawSelected((current) => !current)
-  }
-
   const system = game.system
   const active = game.status === "active"
   const finished = game.status === "finished"
@@ -947,7 +867,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       return
     attackDispatch({ type: "press", playerId: player.id })
   }
-  const finishResultSelected = winnerPlayerIds.length > 0 || drawSelected
 
   const syncStatusText = boardSyncStatusText(syncSignal)
 
@@ -1005,44 +924,24 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         },
       })
     : undefined
-  async function endMatch(outcomes: MatchSeatOutcome[]) {
-    if (!onEndMatch) return
-    setMatchEnding("sending")
-    setMatchEndError(undefined)
-    try {
-      await onEndMatch(matchSeats.map(({ seat }, index) => ({ seat, outcome: outcomes[index] })))
-      setMatchEnding(undefined)
-    } catch (cause) {
-      setMatchEndError(convexErrorMessage(cause, translate("board:matchEnd.failed")))
-      setMatchEnding("choosing")
-    }
-  }
-
-  function leaveAbandonedGame() {
-    setAbandonedOpen(false)
-    if (onGameAbandoned) onGameAbandoned()
-    else onBack?.()
-  }
+  const { finish, leave, matchEnd, abandoned } = useConnectedEnding({
+    publicId,
+    game,
+    controls,
+    overlay: { open: setOverlay, close },
+    named,
+    turnGroups,
+    turnsReport: { turnsEnabled: tabOn, turn },
+    matchSeats,
+    onGameEnded,
+    onRematch,
+    onGameAbandoned,
+    onBack,
+    onLeave,
+    onEndMatch,
+  })
 
   const canEnd = active && game.isHost && !view.finishing
-  const leave = !game.isHost ? onLeave : undefined
-  async function confirmLeave() {
-    if (!leave || leaving) return
-    setLeaving(true)
-    setLeaveError(undefined)
-    // why: success navigates off the board, so the dialog stays busy instead of offering a second leave.
-    try {
-      await leave()
-    } catch (cause) {
-      setLeaveError(
-        convexErrorMessage(
-          cause,
-          cause instanceof Error ? cause.message : translate("connected:host.exitFailed"),
-        ),
-      )
-      setLeaving(false)
-    }
-  }
   const myRole = onRevealRole
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
@@ -1070,10 +969,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         ? {
             kind: "end-game",
             label: translate("connected:board.menu.leave"),
-            onPress: () => {
-              setLeaveError(undefined)
-              setOverlay("leave")
-            },
+            onPress: leave.open,
           }
         : {
             kind: "end-game",
@@ -1081,22 +977,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             detail: canEnd && finishBlocker ? translate(finishBlocker.petal) : undefined,
             blocked: canEnd && Boolean(finishBlocker),
             disabled: !canEnd,
-            onPress: () => {
-              const runtime = controls.current()
-              if (finishBlockerFor(runtime)) {
-                setOverlay("status")
-                return
-              }
-              const projection = runtime.status === "ready" ? runtime.projection : undefined
-              const outcome = projection?.treacheryOutcome
-              const standing =
-                projection && !outcome ? connectedStandingWinners(projection) : undefined
-              setDrawSelected(outcome?.kind === "draw")
-              setWinnerPlayerIds(
-                outcome?.kind === "win" ? outcome.winnerPlayerIds : (standing ?? []),
-              )
-              setOverlay("finish")
-            },
+            onPress: finish.open,
           },
     ],
     attack,
@@ -1193,68 +1074,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           onLongPress: () => setOverlay("turn"),
         }
       : undefined
-  const handSize = mulliganHandSize(system)
-  const { firstPlayer } = game
-  const firstPlayerId = firstPlayer?.playerId
-  const pregameOpen = active && !game.played && pregame !== undefined
-  const chooser = pregameOpen && !firstPlayerId ? firstPlayer?.chooser : undefined
-  const seatsInOrder = [...game.players].sort((left, right) => left.seat - right.seat)
-  const firstPlayerOffer: DiceSeatView | undefined =
-    pregameOpen && firstPlayer?.mode && !firstPlayerId && !chooser
-      ? firstPlayer.mode === "pick"
-        ? { kind: "pickOffer" }
-        : {
-            kind: "rollOffer",
-            tool: firstPlayerFlips(system, seatsInOrder.length) ? "coin" : systemDice(system).die,
-          }
-      : undefined
-  const rollsShown = useRollsShown(pregameOpen ? firstPlayer?.rolls : undefined)
-  const mulliganSeat =
-    pregameOpen &&
-    game.freeMulligans &&
-    handSize !== undefined &&
-    !isTeamVariant(game.variant) &&
-    !(firstPlayer?.mode && !firstPlayerId)
-      ? seatsInOrder.find(
-          (seat) =>
-            controlled.has(seat.playerId) && seat.deckVersionId && seat.mulligans === undefined,
-        )
-      : undefined
-  const draftKey = `${publicId}:${mulliganSeat?.playerId ?? ""}`
-  const [mulliganDraft, setMulliganDraft] = useState<{
-    key: string
-    taken: number
-    help: boolean
-    skipped: boolean
-  }>()
-  const mulligan =
-    mulliganDraft?.key === draftKey
-      ? mulliganDraft
-      : { key: draftKey, taken: 0, help: false, skipped: false }
-  function pregameView(playerId: string): DiceSeatView | undefined {
-    const rolls = rollsShown ? firstPlayer?.rolls : undefined
-    const rolled = rolls?.[playerId]
-    if (rolled !== undefined) {
-      const winner = firstPlayerId ?? firstPlayer?.chooser?.playerId
-      return {
-        kind: "rolloff",
-        die: systemDice(system).die,
-        value: rolled,
-        attempt: 1,
-        status: playerId !== winner ? "lost" : firstPlayerId ? "won" : "chooses",
-      }
-    }
-    if (firstPlayerOffer) return firstPlayerOffer
-    // why: a chooser on an app from before first player never answers, so other seats stay playable and the first change starts the game.
-    if (chooser)
-      return chooser.playerId === playerId && controlled.has(playerId)
-        ? { kind: "choice", reason: chooser.reason }
-        : undefined
-    if (playerId !== mulliganSeat?.playerId || mulligan.skipped || !game.freeMulligans) return
-    return handSize === undefined
-      ? undefined
-      : mulliganStep(mulligan.taken, game.freeMulligans, handSize, mulligan.help)
-  }
+  const pregameSeat = useConnectedPregame({
+    publicId,
+    game,
+    controlled,
+    actions: pregame,
+    onRules,
+  })
+  const firstPlayerId = game.firstPlayer?.playerId
   const autoTurn = useRef<string>(undefined)
   useEffect(() => {
     if (!turnsOn || turn || !firstPlayerId || !controlled.has(firstPlayerId)) return
@@ -1262,35 +1089,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     autoTurn.current = firstPlayerId
     table?.setTurn(firstPlayerId, firstPlayerId)
   }, [controlled, firstPlayerId, table, turn, turnsOn])
-  const firstPending = !!firstPlayerOffer || !!chooser
   const seatGrid = {
     ...dice.grid,
     bag: bagWithPlane(dice.grid.bag, boardModes),
-    seatFor: (player: GamePlayer) => dice.grid.seatFor(player) ?? pregameView(player.id),
+    seatFor: (player: GamePlayer) => dice.grid.seatFor(player) ?? pregameSeat.seatFor(player.id),
     onPressSeat: (player: GamePlayer) => {
-      if (!firstPlayerOffer || dice.grid.seatFor(player)) return dice.grid.onPressSeat(player)
-      if (firstPlayerOffer.kind === "rollOffer") return pregame?.rollFirst()
-      pregame?.chooseFirst(player.id)
+      if (!pregameSeat.pressOffer || dice.grid.seatFor(player)) return dice.grid.onPressSeat(player)
+      pregameSeat.pressOffer(player.id)
     },
     onChoose: (player: GamePlayer, order: "first" | "second") => {
-      if (!chooser) return dice.grid.onChoose(player, order)
-      const index = seatsInOrder.findIndex((seat) => seat.playerId === player.id)
-      const next = seatsInOrder[(index + 1) % seatsInOrder.length]
-      pregame?.chooseFirst(order === "first" ? player.id : (next?.playerId ?? player.id))
+      if (!pregameSeat.choose) return dice.grid.onChoose(player, order)
+      pregameSeat.choose(player.id, order)
     },
-    onMulligan: (action: MulliganAction) => {
-      if (action === "keep")
-        return mulliganSeat && pregame?.keepHand(mulliganSeat.seat, mulligan.taken)
-      if (action === "rule") return system && onRules?.(system, MULLIGAN_RULE)
-      setMulliganDraft({
-        ...mulligan,
-        ...(action === "mulligan" && handSize !== undefined
-          ? { taken: Math.min(handSize, mulligan.taken + 1) }
-          : {}),
-        ...(action === "skip" ? { skipped: true } : {}),
-        ...(action === "help" || action === "close" ? { help: action === "help" } : {}),
-      })
-    },
+    onMulligan: pregameSeat.mulligan,
     chipsFor: (player: GamePlayer): DiceSeatChip[] => {
       const chips = dice.grid.chipsFor(player)
       if (turnChip && sharesTurn(turnGroups, turnChip.turn.playerId, player.id))
@@ -1318,9 +1129,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             },
           },
         ]
-      const first: DiceSeatChip[] =
-        pregameOpen && player.id === firstPlayerId && !rollsShown ? [{ kind: "first" }] : []
-      return turnsOn && !turn && !firstPending && controlled.has(player.id)
+      const first: DiceSeatChip[] = pregameSeat.showsFirstChip(player.id) ? [{ kind: "first" }] : []
+      return turnsOn && !turn && !pregameSeat.choosingFirst && controlled.has(player.id)
         ? [...chips, ...first, CLAIM_CHIP]
         : [...chips, ...first]
     },
@@ -1356,8 +1166,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     chrome.layoutOpen ||
     inviteDialogOpen ||
     Boolean(inviteSheet.shown) ||
-    abandonedOpen ||
-    matchEnding !== undefined ||
+    abandoned.shown ||
+    matchEnd.shown ||
     (overlay !== undefined && GRID_LOCKING_OVERLAYS.has(overlay))
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
@@ -1681,9 +1491,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               disabled={!match.canEnd}
               accessibilityHint={translate("board:match.endHint")}
               onPress={() => {
-                close("match")
-                setMatchEndError(undefined)
-                setMatchEnding("choosing")
+                matchEnd.open()
               }}
             />
           ) : null}
@@ -1691,7 +1499,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         </MatchScoreDialog>
       ) : null}
 
-      {matchEnding && match ? (
+      {matchEnd.shown && match ? (
         <MatchEndDialog
           score={{
             bestOf: match.bestOf,
@@ -1699,17 +1507,17 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             draws: matchDraws,
             lastGameDrawn: false,
           }}
-          failure={matchEndError}
-          busy={matchEnding === "sending"}
-          onClose={() => setMatchEnding(undefined)}
-          onEnd={(outcomes) => void endMatch(outcomes)}
+          failure={matchEnd.error}
+          busy={matchEnd.sending}
+          onClose={matchEnd.dismiss}
+          onEnd={(outcomes) => void matchEnd.end(outcomes)}
         />
       ) : null}
 
-      {abandonedOpen && !inviteSheet.shown ? (
+      {abandoned.shown && !inviteSheet.shown ? (
         <DialogCard
           visible
-          onClose={() => setAbandonedOpen(false)}
+          onClose={abandoned.dismiss}
           origin={menuDialogOrigin}
           backdropTestID="abandoned-game-backdrop"
           backdropAccessibilityLabel={translate("connected:board.abandoned.dismiss")}
@@ -1724,7 +1532,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             style={themed($dialogText)}
           />
           <Text size="xs" tx="connected:board.abandoned.message" style={themed($muted)} />
-          <Button tx="connected:board.abandoned.leave" onPress={leaveAbandonedGame} />
+          <Button tx="connected:board.abandoned.leave" onPress={abandoned.leave} />
         </DialogCard>
       ) : null}
 
@@ -1759,8 +1567,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     (member) => game.players.find(({ playerId }) => playerId === member.id) ?? [],
                   )}
                   system={system}
-                  selected={winnerPlayerIds.includes(id)}
-                  onPress={() => toggleWinner(id)}
+                  selected={finish.winnerPlayerIds.includes(id)}
+                  onPress={() => finish.toggleWinner(id)}
                 />
               )
             })}
@@ -1768,8 +1576,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               tx="connected:board.finish.draw"
               accentColor={colors.palette.neutral400}
               Leading={({ color }) => <DrawMark color={color} />}
-              selected={drawSelected}
-              onPress={selectDraw}
+              selected={finish.drawSelected}
+              onPress={finish.toggleDraw}
             />
           </ScrollView>
           {view.finishError ? (
@@ -1788,40 +1596,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               tx={
                 view.finishing
                   ? "play:ending"
-                  : finishResultSelected
+                  : finish.resultSelected
                     ? "play:finish"
                     : "play:abandon"
               }
-              preset={finishResultSelected ? "primary" : "secondary"}
+              preset={finish.resultSelected ? "primary" : "secondary"}
               disabled={view.finishing || Boolean(finishBlocker)}
               style={themed($dialogAction)}
-              onPress={async () => {
-                if (finishSubmitInFlight.current) return
-                finishSubmitInFlight.current = true
-                try {
-                  const withResult = finishResultSelected
-                  const ended = withResult
-                    ? await controls.finish(
-                        winnerPlayerIds.length > 0
-                          ? { kind: "win" as const, winnerPlayerIds }
-                          : { kind: "draw" as const },
-                      )
-                    : await controls.abandon()
-                  if (!ended) return
-                  close("finish")
-                  if (withResult && onRematch) return
-                  navigatedTerminal.current = true
-                  if (withResult) {
-                    if (onGameEnded) setTimeout(() => onGameEnded(publicId), 0)
-                  } else if (onGameAbandoned) {
-                    setTimeout(onGameAbandoned, 0)
-                  } else if (onGameEnded) {
-                    setTimeout(() => onGameEnded(publicId), 0)
-                  }
-                } finally {
-                  finishSubmitInFlight.current = false
-                }
-              }}
+              onPress={() => void finish.submit()}
             />
           </View>
         </DialogCard>
@@ -1836,11 +1618,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           dialogTestID="connected-leave-confirmation"
           confirmTestID="confirm-connected-leave"
           cancelTestID="cancel-connected-leave"
-          busy={leaving}
+          busy={leave.busy}
           notice={
-            leaveError ? <AlertNote testID="connected-leave-error" text={leaveError} /> : null
+            leave.error ? <AlertNote testID="connected-leave-error" text={leave.error} /> : null
           }
-          onConfirm={confirmLeave}
+          onConfirm={leave.confirm}
           onClose={() => close("leave")}
         />
       ) : null}
@@ -1917,21 +1699,6 @@ const $dialogAction: ThemedStyle<ViewStyle> = ({ radius }) => ({
   minHeight: 48,
   borderRadius: radius.xl,
 })
-const FINISH_BLOCKERS = {
-  offline: {
-    petal: "connected:board.finishBlocker.offline.petal",
-    detail: "connected:board.finishBlocker.offline.detail",
-  },
-  sending: {
-    petal: "connected:board.finishBlocker.sending.petal",
-    detail: "connected:board.finishBlocker.sending.detail",
-  },
-  rejected: {
-    petal: "connected:board.finishBlocker.rejected.petal",
-    detail: "connected:board.finishBlocker.rejected.detail",
-  },
-} as const satisfies Record<string, { petal: TxKeyPath; detail: TxKeyPath }>
-
 function ConnectedLifeGrid({
   seats,
   outGame,
@@ -2094,18 +1861,3 @@ const $failure: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
   borderColor: colors.error,
   borderRadius: radius.xl,
 })
-
-const ROLLS_SHOWN_MS = 2500
-
-/** why: every device sees the server's roll arrive, and each shows it for a moment before the 1st chip. */
-function useRollsShown(rolls: Readonly<Record<string, number>> | undefined) {
-  const key = rolls ? JSON.stringify(rolls) : undefined
-  const [shown, setShown] = useState<string>()
-  useEffect(() => {
-    if (!key) return
-    setShown(key)
-    const timer = setTimeout(() => setShown(undefined), ROLLS_SHOWN_MS)
-    return () => clearTimeout(timer)
-  }, [key])
-  return key !== undefined && shown === key
-}
