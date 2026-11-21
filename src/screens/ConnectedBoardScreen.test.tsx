@@ -1565,6 +1565,7 @@ describe("ConnectedBoardScreen before play", () => {
       })
       firstChipShown.push(seat.showsFirstChip("player-2"))
     })
+    expect(firstChipShown.length).toBeGreaterThan(0)
     expect(firstChipShown).not.toContain(true)
   })
 
