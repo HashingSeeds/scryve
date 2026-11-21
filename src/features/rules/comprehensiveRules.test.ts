@@ -201,10 +201,11 @@ describe("searchRules ranking", () => {
       { term: "Commander Tax", text: "The extra cost to cast a commander. See rule 903.8." },
       { term: "Declare Blockers Step", text: "Part of the turn. See rule 509." },
       { term: "Commander", text: "A casual variant. See rule 903." },
+      { term: "Block", text: "To block an attacker. See rule 509.1." },
     ],
     notice: [],
     slang: { wrath: "destroy all creatures" },
-    phrasings: { "903.8": ["recast general"] },
+    phrasings: { "903.8": ["recast general"], "701.8a": ["block"] },
     generatedPhrasings: [
       "509.1b",
       "menace",
@@ -249,6 +250,7 @@ describe("searchRules ranking", () => {
   it("opens the rule a search names word for word in a written phrasing, over generated words", () => {
     expect(ids("recast general")[0]).toBe("903.8")
     expect(ids("general recast")[0]).toBe("701.8a")
+    expect(ids("block")[0]).toBe("701.8a")
   })
 
   it("forgives one typo in a word the rules never use", () => {

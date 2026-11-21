@@ -302,8 +302,14 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     screens.add(screen)
     ranked.push({ result: { kind: "rule", rule }, score })
   }
+  const written = asWritten === undefined ? undefined : index.rules[asWritten]
   return ranked
-    .sort((a, b) => b.score - a.score)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        Number(b.result.kind === "rule" && b.result.rule === written) -
+          Number(a.result.kind === "rule" && a.result.rule === written),
+    )
     .slice(0, limit)
     .map(({ result }) => result)
 }
