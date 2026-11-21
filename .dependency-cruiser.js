@@ -39,6 +39,7 @@ module.exports = {
           "(^|/)tsconfig\\.json$",
           "(^|/)(babel|webpack)\\.config\\.(js|cjs|mjs|ts|json)$",
           "features/auth/resourceCache\\.ts$", // Platform fallback selected by Metro
+          "features/rules/generatedPhrasings\\.ts$", // Platform fallback selected by Metro
           "src/app/\\+native-intent\\.tsx$", // Expo Router native-intent entry point
           "src/i18n/en/storefront\\.ts$", // Store and paywall copy, read only by scripts/i18n.cjs and scripts/store.cjs
         ],
