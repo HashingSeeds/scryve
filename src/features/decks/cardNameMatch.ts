@@ -244,7 +244,7 @@ export function searchCardNames(
   index: CardNameIndex,
   query: string,
   limit: number,
-  preference?: (name: string) => number,
+  popularityRank?: (name: string) => number,
 ) {
   const key = matchKey(query)
   return rankedNames(index, query, true)
@@ -252,14 +252,14 @@ export function searchCardNames(
     .map((match) => {
       const name = index.names[match.nameIndex]
       const exact = match.wholeName && match.face === key
-      return { ...match, name, exact, preference: preference?.(name) ?? 0 }
+      return { ...match, name, exact, rank: popularityRank?.(name) ?? 0 }
     })
     .sort(
       (a, b) =>
         Number(b.exact) - Number(a.exact) ||
         b.similarity - a.similarity ||
         Number(b.wholeName) - Number(a.wholeName) ||
-        b.preference - a.preference ||
+        a.rank - b.rank ||
         a.name.length - b.name.length,
     )
     .slice(0, limit)

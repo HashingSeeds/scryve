@@ -41,10 +41,11 @@ describe("magicDatasetCard", () => {
     ])
   })
 
-  it("keeps mana value, front-face toughness, and the deck formats the card is legal in", () => {
+  it("keeps mana value, front-face toughness, EDHREC rank, and the deck formats the card is legal in", () => {
     const result = magicDatasetCard({
       ...card,
       cmc: 1,
+      edhrec_rank: 2104,
       card_faces: [
         { ...card.card_faces[0], toughness: "1" },
         { ...card.card_faces[1], toughness: "1" },
@@ -59,6 +60,7 @@ describe("magicDatasetCard", () => {
     expect(result).toMatchObject({
       manaValue: 1,
       toughness: "1",
+      edhrecRank: 2104,
       legalFormats: ["modern", "vintage"],
     })
   })

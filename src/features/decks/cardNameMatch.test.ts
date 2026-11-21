@@ -109,8 +109,8 @@ describe("searchCardNames", () => {
       "Swords to Plowshares",
     ],
   ])("ranks %s", (_case, names, query, name) => {
-    const prefer = (candidate: string) => (candidate === name ? 0 : 1)
-    expect(searchCardNames(cardNameIndex(names), query, 3, prefer)[0]).toBe(name)
+    const rank = (candidate: string) => (candidate === name ? 1 : 0)
+    expect(searchCardNames(cardNameIndex(names), query, 3, rank)[0]).toBe(name)
   })
 
   it("finds nothing for text unlike any name", () => {
