@@ -76,7 +76,7 @@ type SearchIndex = {
   slang: Map<string, string[]>
   slangSpellings: Map<string, string>
   spellings: Map<string, string>
-  defined: { entry: GlossaryEntry; words: string[]; rules: number[]; opens: Rule[] }[]
+  defined: { entry: GlossaryEntry; words: string[]; rules: number[]; opens?: string }[]
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
@@ -149,15 +149,14 @@ export function searchIndex(source: ComprehensiveRules) {
     const cited = source.references
       ? ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")?.id
       : undefined
-    const screen =
-      (cited && screens.get(known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited)) || []
+    const opens = cited && known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited
     return {
       entry,
       words: words(entry.term)
         .filter((word) => !STOPWORDS.has(word))
         .map(stem),
-      rules: screen,
-      opens: cited && known.has(cited) ? screen.map((at) => rules[at]) : [],
+      rules: (opens && screens.get(opens)) || [],
+      opens: cited && known.has(cited) ? opens : undefined,
     }
   })
   const index = {
@@ -223,19 +222,17 @@ function oneEditApart(a: string, b: string) {
 export function searchRules(rules: ComprehensiveRules, query: string, limit = 50) {
   const needle = query.trim().toLowerCase()
   if (!needle) return []
-  if (RULE_NUMBER.test(needle)) {
-    const matches = searchIndex(rules)
+  if (RULE_NUMBER.test(needle))
+    return searchIndex(rules)
       .rules.filter((rule) => rule.id.startsWith(needle))
       .slice(0, limit)
       .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
-    if (matches.length > 0) return matches
-  }
   const { chosen, stems, partial } = queryWords(needle)
   if (stems.length === 0) return []
   const lastStem = partial === undefined ? undefined : stem(partial)
   const index = searchIndex(rules)
   const completions = completionsOf(index.spellings, partial)
-  const ranked: { result: RuleSearchResult; score: number; opens?: Rule[] }[] = []
+  const ranked: { result: RuleSearchResult; score: number; opens?: string }[] = []
   terms: for (const term of index.defined) {
     let score = 0
     let named = term.words.length === stems.length
@@ -308,12 +305,12 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     ranked.push({ result: { kind: "rule", rule }, score })
   }
   // why: a term that cites one rule opens that rule's screen, so the rule listed again below it would only spend a visible slot. A term citing a whole section keeps its rules listed.
-  const covered = new Set<Rule>()
+  const covered = new Set<string>()
   return ranked
     .sort((a, b) => b.score - a.score)
     .filter(({ result, opens }) => {
-      if (result.kind === "rule") return !covered.has(result.rule)
-      for (const rule of opens ?? []) covered.add(rule)
+      if (result.kind === "rule") return !covered.has(result.rule.id.replace(/[a-z]+$/, ""))
+      if (opens) covered.add(opens)
       return true
     })
     .slice(0, limit)

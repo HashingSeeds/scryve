@@ -190,7 +190,7 @@ describe("searchRules ranking", () => {
             id: "903",
             title: "Commander",
             rules: [
-              rule("903.3", "Each deck has a commander in 2hg."),
+              rule("903.3", "Each deck has a commander."),
               rule("903.8", "A player may cast a commander from the command zone for 2 more."),
             ],
           },
@@ -226,8 +226,7 @@ describe("searchRules ranking", () => {
     expect(ids("wrath")[0]).toBe("701.8b")
   })
 
-  it("finds text resembling a rule number and partially typed slang", () => {
-    expect(ids("2hg")).toContain("903.3")
+  it("reads partly typed slang as the rules' wording", () => {
     expect(ids("wrat")[0]).toBe("701.8b")
   })
 

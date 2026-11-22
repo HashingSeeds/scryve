@@ -179,7 +179,7 @@ function evaluate(
       copied.total++
       if (hit) copied.passed++
     }
-    if (!hit) {
+    if (!(SETS[set].typed ? survives : hit)) {
       const got = results
         .slice(0, 3)
         .map((result) => (result.kind === "rule" ? result.rule.id : `"${result.entry.term}"`))
