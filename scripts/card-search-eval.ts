@@ -30,6 +30,7 @@ const { values } = parseArgs({
   options: {
     misses: { type: "boolean", default: false },
     cases: { type: "string" },
+    cards: { type: "string" },
   },
 })
 
@@ -74,7 +75,9 @@ function percent(count: number, total: number) {
 
 async function main() {
   const magicCards = parseMagicCards(
-    await cached("cards.json", async () => (await download(MAGIC_DATASET_URL)).text()),
+    values.cards
+      ? readFileSync(values.cards, "utf8")
+      : await cached("cards.json", async () => (await download(MAGIC_DATASET_URL)).text()),
   )
   const nameIndex = catalogNameIndex(await nameCatalog())
   const file = values.cases ?? path.join(__dirname, "card-search", "mtg.json")
