@@ -424,6 +424,27 @@ it("keeps rule ids and shortened search text from rules lookups", () => {
   ).toEqual(expect.objectContaining({ rank: 2, open_count: 1, rule: "509.1a", query: "block" }))
 })
 
+it("keeps the picked card's name as written and the card search text shortened", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  expect(
+    analyticsProperties("card_picked", {
+      system: "mtg",
+      rank: 2,
+      pick_count: 1,
+      card: "Atraxa, Praetors' Voice",
+      query: " ATRAXA ",
+    }),
+  ).toEqual(
+    expect.objectContaining({
+      system: "mtg",
+      rank: 2,
+      pick_count: 1,
+      card: "Atraxa, Praetors' Voice",
+      query: "atraxa",
+    }),
+  )
+})
+
 it("sends local turn order coverage once per completed game without player or game ids", async () => {
   jest.useFakeTimers()
   global.fetch = fetchMock

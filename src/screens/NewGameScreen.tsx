@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useReducer, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
+import { Platform, TouchableOpacity, useWindowDimensions, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -14,54 +14,27 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { Header, HeaderBack } from "@/components/Header"
-import { OptionGrid } from "@/components/OptionGrid"
-import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
-import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
-import { SelectField } from "@/components/SelectField"
-import { Sheet } from "@/components/Sheet"
-import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { TeamPicker } from "@/components/TeamPicker"
 import { Text } from "@/components/Text"
-import { TextField } from "@/components/TextField"
-import { ValueField } from "@/components/ValueField"
 import type { NextPageState } from "@/features/async/remoteState"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ProSignInNote, useProSignIn } from "@/features/billing/ProSignIn"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
-import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
-import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { loadSharedDecks } from "@/features/decks/sharedDecks"
 import {
-  createLocalGame,
   hasLocalGameStarted,
   matchContextLabel,
-  MAX_PLAYER_NAME_LENGTH,
-  MAX_PLAYERS,
-  meSeatOf,
-  teamSeats,
   PLAYER_COLORS,
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
-import {
-  FirstPlayerChoice,
-  FreeMulligansChoice,
-  useFirstPlayerMode,
-  useFreeMulligans,
-} from "@/features/game/FirstPlayerChoice"
-import { GameTabs } from "@/features/game/GameTabs"
-import {
-  gameTypeDetail,
-  gameTypeId,
-  newGameTabs,
-  type GameTab,
-  type GameType,
-} from "@/features/game/gameTypes"
+import { useFirstPlayerMode, useFreeMulligans } from "@/features/game/FirstPlayerChoice"
+import { gameTypeId, newGameTabs, type GameTab, type GameType } from "@/features/game/gameTypes"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import {
@@ -70,28 +43,16 @@ import {
   type LocalSettings,
 } from "@/features/game/localPersistence"
 import {
-  defaultConnectedLayout,
-  playerGridLayoutForCount,
-  type PlayerGridLayoutVariant,
-} from "@/features/game/playerLayouts"
-import {
-  counterHeading,
-  counterValueLabel,
-  defaultStartingLife,
-  lifePresets,
-  NO_PLAY_SYSTEM,
-  playSystemFormat,
-  playSystemRules,
-  type PlaySystemId,
-} from "@/features/game/playSystems"
+  deriveGameSetup,
+  gameDraftReducer,
+  initialGameDraft,
+  type GameDraftPatch,
+} from "@/features/game/newGameDraft"
+import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
+import { counterValueLabel, NO_PLAY_SYSTEM, type PlaySystemId } from "@/features/game/playSystems"
 import type { ConnectedSetup, RecentSetup } from "@/features/game/recentSetups"
-import {
-  defaultRoundClockMinutes,
-  ROUND_CLOCK_MINUTES,
-  type RoundClockSetup,
-} from "@/features/game/roundClock"
+import { type RoundClockSetup } from "@/features/game/roundClock"
 import { teamColors } from "@/features/game/teams"
-import { TurnsChoice } from "@/features/game/TurnsChoice"
 import type {
   LocalGame,
   LocalGameResult,
@@ -100,16 +61,14 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 import type { LanSetup } from "@/features/lan/lanGame"
-import { modeChoicesOf, modeSetupOf, ModeSetupFields } from "@/features/modes/ModeSetupFields"
 import {
   deckChoiceId,
   localDeckChoices,
   pinDeckChoice,
   sharedDeckChoices,
   type DeckChoice,
-  type SelectedDeck,
 } from "@/features/stats/deckChoices"
-import { formatList, formatNumber, joinParts } from "@/i18n/format"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { endEdge, startEdge } from "@/theme/direction"
@@ -118,35 +77,24 @@ import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 
 import {
-  LOCAL_MARK_SHAPES,
-  PLAYER_COLOR_CHOICES,
+  AccountSeat,
+  defaultName,
+  GameSetupFields,
+  PlayerNames,
+  SetupOptionsSheet,
+  SetupStatusDialog,
+} from "./NewGameSections"
+import {
   PLAYER_MARK_SHAPES,
   PRO_MARK_SHAPES,
-  resolveAppearance,
   shapeForSeat,
   withoutProMarks,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
-import { isCommanderFormat } from "../../convex/lib/gameRules"
-import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
+import { type MatchBestOf } from "../../convex/lib/matchResults"
 import { mulliganHandSize } from "../../convex/lib/mulligans"
-import { nameFailsGate } from "../../convex/lib/nameFilter"
-import {
-  attachesDecks,
-  identitySection,
-  isSystemId,
-  startingValueRange,
-  systemDefinition,
-} from "../../convex/lib/systems"
-import { ARCHENEMY_MIN_SEATS, type ModeSetup } from "../../convex/lib/tableModes"
-import { isTeamPlayerCount, isTeamVariant, TWO_VS_TWO } from "../../convex/lib/teamVariants"
-import { isTreacheryPlayerCount, type GameVariant } from "../../convex/lib/treachery"
-import {
-  defaultTeamLife,
-  isValidTeams,
-  pairedTeams,
-  teamLifePresets,
-} from "../../convex/lib/twoHeadedGiant"
+import { attachesDecks, identitySection, isSystemId } from "../../convex/lib/systems"
+import { type ModeSetup } from "../../convex/lib/tableModes"
 
 export type NewGameMode = "local" | "connected"
 
@@ -219,8 +167,6 @@ export interface LocalConnectFeed {
   publish: (hostPlayerId: PlayerId) => void
 }
 
-const PLAYER_COUNTS = [2, 3, 4, 5, 6]
-const MORE_PLAYER_COUNTS = [7, 8, 9, 10]
 const NEW_GAME_FIELDS = [
   "system",
   "format",
@@ -236,29 +182,6 @@ const NEW_GAME_FIELDS = [
   "clockMode",
   "chosenClockMinutes",
 ] as const
-const VARIANT_MIN_SEATS = 4
-
-/** why: a 2HG game's teammates share a color, but each seat keeps its own so turning teams off leaves every seat distinct. */
-function ownColors(seats: PlayerAppearance[]) {
-  const used = new Set<string>()
-  return seats.map((appearance) => {
-    const color = used.has(appearance.color.toUpperCase())
-      ? (PLAYER_COLOR_CHOICES.find(
-          (choice) =>
-            !used.has(choice) && !seats.some(({ color }) => color.toUpperCase() === choice),
-        ) ?? appearance.color)
-      : appearance.color
-    used.add(color.toUpperCase())
-    return { ...appearance, color }
-  })
-}
-const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
-const CLOCK_MODES = [
-  { id: "off", labelTx: "play:newGame.clockOff" },
-  { id: "countdown", labelTx: "play:newGame.clockCountdown" },
-  { id: "stopwatch", labelTx: "play:newGame.clockStopwatch" },
-] as const
-type ClockMode = (typeof CLOCK_MODES)[number]["id"]
 
 /** why: a recent row keeps no deck, so a game already holding one seeds the form itself. */
 function newestRecent(
@@ -319,36 +242,30 @@ function NewGameForm({
   // why: the iPhone Duo's outer display reports its status bar only as a side inset, so the toggle steps in where it would run under it.
   const toggleOverhang = (inset: number) =>
     Math.max(inset - (width - Math.min(width, CONTENT_MAX_WIDTH)) / 2 - spacing.md, 0)
-  // why: until a format is picked, switching modes loads that mode's last setup instead of carrying this one over.
-  const [formatPicked, setFormatPicked] = useState(false)
-  const lobby = replaying?.mode === "connected" ? replaying.lobby : undefined
-  const [seedGame] = useState(() =>
-    replaying?.mode === "local" ? createLocalGame(replaying.game) : initialGame,
-  )
-  const [playerCount, setPlayerCount] = useState(
-    lobby?.playerCount ?? seedGame?.players.length ?? defaults.defaultPlayerCount,
-  )
-  const [chosenLayout, setChosenLayout] = useState<PlayerGridLayoutVariant | undefined>(
-    lobby?.layout ?? seedGame?.layout,
-  )
-  const [names, setNames] = useState<string[]>(() =>
-    Array.from({ length: MAX_PLAYERS }, (_, index) => seedGame?.players[index]?.name ?? ""),
-  )
-  const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
-    ownColors(
-      Array.from({ length: MAX_PLAYERS }, (_, index) => ({
-        color: seedGame?.players[index]?.color ?? PLAYER_COLORS[index],
-        shape:
-          seedGame?.players[index]?.shape ??
-          shapeForSeat(index + 1, seedGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
-      })),
-    ),
-  )
   const auth = useAuthAccess()
   const billing = useRevenueCat()
   // why: until RevenueCat answers, a Pro player's saved marks look unpaid; trading them then would save the downgrade.
   const confirmedFree =
     (auth.isLoaded && !auth.isSignedIn) || (billing.customerInfo !== null && !billing.isCountPro)
+  const [draft, dispatch] = useReducer(
+    gameDraftReducer,
+    { defaults, replaying, initialGame, defaultMeSeat: account?.defaultMeSeat },
+    initialGameDraft,
+  )
+  const { system, format, startingLife, playerCount, names, appearances, deck } = draft
+  const set = (patch: GameDraftPatch) => dispatch({ type: "set", patch })
+  const connectedMode = mode === "connected"
+  const setup = deriveGameSetup(draft, { connected: connectedMode })
+  const {
+    teamPlay,
+    teams,
+    layout,
+    typeId: selectedTypeId,
+    matchBestOf,
+    clock: clockSetup,
+    gameSetup,
+    effectiveMeSeat,
+  } = setup
   const ownAppearances = useMemo(
     () => (confirmedFree ? withoutProMarks(appearances) : appearances),
     [appearances, confirmedFree],
@@ -358,51 +275,8 @@ function NewGameForm({
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
-  const seed = lobby ?? seedGame
-  const initialSystem = seed ? seed.system : defaults.defaultSystem
-  const [system, setSystem] = useState<PlaySystemId | undefined>(initialSystem)
-  const [format, setFormat] = useState<string | undefined>(
-    () =>
-      seed?.format ??
-      (initialSystem ? playSystemFormat(initialSystem, defaults.defaultFormat) : undefined),
-  )
-  const [startingLife, setStartingLife] = useState(
-    seed?.startingLife ?? defaults.defaultStartingLife,
-  )
-  const [treacheryChosen, setTreacheryChosen] = useState(lobby?.variant === "treachery")
-  const seedModes = lobby ? lobby.modeSetup : seedGame?.modeSetup
-  const [archenemyChosen, setArchenemyChosen] = useState(
-    lobby ? lobby.variant === "archenemy" : seedModes?.archenemy !== undefined,
-  )
-  const [modeChoices, setModeChoices] = useState(() => modeChoicesOf(seedModes))
-  const [teamsChosen, setTeamsChosen] = useState(
-    isTeamVariant(lobby?.variant) || isTeamVariant(seedGame?.variant),
-  )
-  const [teamDraft, setTeamDraft] = useState<readonly (readonly number[])[]>(() =>
-    seedGame ? teamSeats(seedGame) : [],
-  )
-  const [lifeStep, setLifeStep] = useState(
-    seed?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
-  )
-  const teamVariant = systemDefinition(system)?.variants.find(isTeamVariant)
-  const teamPlay = teamsChosen ? teamVariant : undefined
-  const twoHeadedGiant = teamPlay === "twoHeadedGiant"
-  const seatIndexes = Array.from({ length: playerCount }, (_, index) => index)
-  const teams = !teamPlay
-    ? undefined
-    : isValidTeams(
-          teamDraft.map((team) => team.map(String)),
-          new Set(seatIndexes.map(String)),
-        )
-      ? teamDraft
-      : pairedTeams(seatIndexes)
-  const [teamColorDraft, setTeamColorDraft] = useState<readonly (string | undefined)[]>(() =>
-    isTeamVariant(seedGame?.variant)
-      ? teamSeats(seedGame).map(([lead]) => seedGame.players[lead]?.color)
-      : [],
-  )
   const [openTeam, setOpenTeam] = useState<number>()
-  const withTeamColors = (seats: PlayerAppearance[], chosen = teamColorDraft) => {
+  const withTeamColors = (seats: readonly PlayerAppearance[], chosen = draft.teamColorDraft) => {
     if (!teams) return seats
     const colors = teamColors(
       teams.map(([lead]) => seats[lead].color),
@@ -414,30 +288,10 @@ function NewGameForm({
     })
   }
   const seatAppearances = withTeamColors(ownAppearances)
-  const lifeOptions = twoHeadedGiant ? teamLifePresets(format) : lifePresets(system, format)
-  const claimedGame = replaying ? undefined : initialGame
-  const [meSeat, setMeSeat] = useState<number | undefined>(() =>
-    claimedGame && (claimedGame.account || hasLocalGameStarted(claimedGame))
-      ? meSeatOf(claimedGame)
-      : account?.defaultMeSeat,
-  )
   const guestDecks = useGuestDecks()
   const [sharedDecks] = useState(loadSharedDecks)
   const [pinning, setPinning] = useState(false)
   const pinningRef = useRef<symbol | undefined>(undefined)
-  const [deck, setDeck] = useState<SelectedDeck | undefined>(() => {
-    const chosen = claimedGame?.account
-    if (!claimedGame || (!chosen?.deckVersionId && !chosen?.deckKey)) return undefined
-    const seat = meSeatOf(claimedGame)
-    return {
-      versionId: chosen.deckVersionId,
-      deckKey: chosen.deckKey,
-      deckFingerprint: chosen.deckFingerprint,
-      system: claimedGame.system,
-      name: chosen.deckName ?? translate("play:newGame.deckFallbackName"),
-      startingValue: seat === undefined ? undefined : claimedGame.players[seat]?.startingLife,
-    }
-  })
   // why: a sign-out or account switch while this screen stays mounted must not hand the previous account's seat and deck to the new one.
   const seenOwnerId = useRef(account?.ownerId)
   useEffect(() => {
@@ -445,16 +299,8 @@ function NewGameForm({
     seenOwnerId.current = account?.ownerId
     pinningRef.current = undefined
     setPinning(false)
-    setMeSeat(account?.defaultMeSeat)
-    setDeck(undefined)
+    dispatch({ type: "changeAccount", meSeat: account?.defaultMeSeat })
   }, [account?.defaultMeSeat, account?.ownerId])
-  const [matchOn, setMatchOn] = useState(Boolean(seedGame?.match))
-  const [chosenBestOf, setChosenBestOf] = useState<MatchBestOf | undefined>(seedGame?.match?.bestOf)
-  const [clockMode, setClockMode] = useState<ClockMode>(seedGame?.clock?.setup.mode ?? "off")
-  const initialClock = seedGame?.clock?.setup
-  const [chosenClockMinutes, setChosenClockMinutes] = useState(
-    initialClock?.mode === "countdown" ? initialClock.minutes : undefined,
-  )
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
   const [edited, setEdited] = useState(false)
@@ -462,47 +308,12 @@ function NewGameForm({
   const [gameToExit, setGameToExit] = useState<ResumableGame>()
   const [exitingGameId, setExitingGameId] = useState<string>()
   const [pickingHostSeat, setPickingHostSeat] = useState(false)
-  const [hostOn, setHostOn] = useState<"cloud" | "nearby">("cloud")
-  const connectedMode = mode === "connected"
-  const nearbyMode = connectedMode && Boolean(onNearby) && hostOn === "nearby"
+  const nearbyMode = connectedMode && Boolean(onNearby) && draft.hostOn === "nearby"
   const cloudMode = connectedMode && !nearbyMode
-  const layout = playerGridLayoutForCount(
-    playerCount,
-    chosenLayout,
-    connectedMode ? defaultConnectedLayout(playerCount) : "auto",
-  )
-  const treacheryAvailable =
-    connectedMode && Boolean(systemDefinition(system)?.variants.includes("treachery"))
-  const treachery = treacheryAvailable && treacheryChosen
-  const planechaseAvailable = systemDefinition(system)?.planechase === true
-  const archenemy =
-    Boolean(systemDefinition(system)?.variants.includes("archenemy")) && archenemyChosen
-  const variant: GameVariant | undefined = treachery
-    ? "treachery"
-    : archenemy
-      ? "archenemy"
-      : teamPlay
-  const draft = {
-    system,
-    format,
-    startingLife,
-    lifeStep,
-    playerCount,
-    chosenLayout,
-    layout,
-    treacheryChosen,
-    teamsChosen,
-    teams,
-    deck,
-    matchOn,
-    chosenBestOf,
-    clockMode,
-    chosenClockMinutes,
-  }
-  type SetupDraft = typeof draft
-  const draftChanged = (from: SetupDraft) =>
-    NEW_GAME_FIELDS.some((field) => from[field] !== draft[field])
-  const optionsOpenedWith = useRef(draft)
+  const optionsDraft = { ...draft, layout, teams }
+  const draftChanged = (from: typeof optionsDraft) =>
+    NEW_GAME_FIELDS.some((field) => from[field] !== optionsDraft[field])
+  const optionsOpenedWith = useRef(optionsDraft)
   // why: iOS drops a modal presented while another dismisses, so the end prompt waits for the options sheet to close. Closing the prompt keeps the staged setup for the next New game.
   const [ending, setEnding] = useState<{ afterSheet?: boolean }>()
   const preparing = cloudMode && Boolean(connected?.status) && !connected?.ready
@@ -528,32 +339,7 @@ function NewGameForm({
       })),
     [seatAppearances, nameValidation.names],
   )
-  const effectiveMeSeat = meSeat !== undefined && meSeat < playerCount ? meSeat : undefined
-  const matchBestOf = matchOn
-    ? (chosenBestOf ?? (isCommanderFormat(system, format) || playerCount > 2 ? 1 : 3))
-    : undefined
   const matchOffered = connectedMode || !localGame
-  const clockMinutes = chosenClockMinutes ?? defaultRoundClockMinutes(system, matchBestOf)
-  const clockSetup: RoundClockSetup | undefined =
-    clockMode === "off"
-      ? undefined
-      : clockMode === "countdown"
-        ? { mode: "countdown", minutes: clockMinutes }
-        : { mode: "stopwatch" }
-  const selectedTypeId = gameTypeId(system, format, variant)
-  const modeSetup = planechaseAvailable
-    ? modeSetupOf(modeChoices, { archenemy, playerCount })
-    : undefined
-  const gameSetup = {
-    layout,
-    lifeStep,
-    ...(system && format ? { system, format } : {}),
-    ...(variant ? { variant } : {}),
-    ...(modeSetup ? { modeSetup } : {}),
-    ...(teams && !connectedMode
-      ? { teams, ...(teamPlay === TWO_VS_TWO ? { teamVariant: teamPlay } : {}) }
-      : {}),
-  }
   const gameTabs = useMemo(
     () =>
       newGameTabs({
@@ -631,46 +417,6 @@ function NewGameForm({
         : undefined,
     [account, deck, effectiveMeSeat, freeMulligans, tracksMulligans],
   )
-  // why: decks load after mount, and each step below needs the previous one rendered: the format filters the deck list, and only a claimed seat can hold a deck.
-  const wantedDeckId = useRef(initialDeckId)
-  useEffect(() => {
-    const wanted = wantedDeckId.current
-    if (!wanted || localGame || pinning) return
-    const choice = [
-      ...(deckList ?? []),
-      ...localDeckChoices(guestDecks),
-      ...sharedDeckChoices(sharedDecks),
-    ].find(
-      (candidate) =>
-        candidate.deckId === wanted ||
-        (candidate.sharedToken !== undefined && candidate.deckKey === wanted) ||
-        (candidate.localId !== undefined && guestDeckRouteId(candidate.localId) === wanted),
-    )
-    if (!choice || !isSystemId(choice.system)) {
-      if (account?.decks !== undefined) wantedDeckId.current = undefined
-      return
-    }
-    if (choice.system !== system || choice.format !== format) {
-      chooseGameType({
-        id: gameTypeId(choice.system, choice.format),
-        system: choice.system,
-        format: choice.format,
-      })
-      return
-    }
-    if (!attachesDecks(system)) {
-      wantedDeckId.current = undefined
-      return
-    }
-    if (!account) return
-    if (effectiveMeSeat === undefined) {
-      const seat = account.defaultMeSeat ?? 0
-      chooseMeSeat(String(seat < playerCount ? seat : 0))
-      return
-    }
-    wantedDeckId.current = undefined
-    void chooseDeck(deckChoiceId(choice))
-  })
   const localReady = validLife && nameValidation.valid && !deckLifeLoading
   const valid = nearbyMode
     ? validLife
@@ -709,12 +455,6 @@ function NewGameForm({
           ? () => onResumeConnected(singleBlockingConnected)
           : undefined
   const resume = localGame ? onBack : resumeConnected
-  const backStarts = !connectedMode && !gameBlocksStart && edited && localReady && !busy
-  function back() {
-    if (backStarts) void startLocal()
-    else (resume ?? onBack)()
-  }
-  useCloseOnBack(backStarts, back)
   const statusResumesMatch = !connectedMode && Boolean(localGame?.match)
 
   const hasStatusDetails = cloudMode
@@ -816,7 +556,7 @@ function NewGameForm({
   }
 
   function openOptions() {
-    optionsOpenedWith.current = draft
+    optionsOpenedWith.current = optionsDraft
     setOptionsOpen(true)
   }
 
@@ -838,49 +578,15 @@ function NewGameForm({
   function changeMode(next: NewGameMode) {
     onModeChange(next)
     const nextRecent = newestRecent({ localGame, recentSetups, mode: next })
-    if (nextRecent && !formatPicked) onReplay(nextRecent)
-  }
-
-  function toggleMatch(on: boolean) {
-    setMatchOn(on)
-    setChosenBestOf(undefined)
+    if (nextRecent && !draft.formatPicked) onReplay(nextRecent)
   }
 
   function chooseGameType(type: GameType) {
-    const nextTreachery = type.variant === "treachery"
-    const nextTeams = isTeamVariant(type.variant)
-    const nextCount =
-      (nextTreachery && !isTreacheryPlayerCount(playerCount)) ||
-      (isTeamVariant(type.variant) && !isTeamPlayerCount(type.variant, playerCount))
-        ? VARIANT_MIN_SEATS
-        : type.variant === "archenemy" && playerCount < ARCHENEMY_MIN_SEATS
-          ? ARCHENEMY_MIN_SEATS
-          : playerCount
-    const defaultLife =
-      type.variant === "twoHeadedGiant"
-        ? defaultTeamLife(type.format)
-        : defaultStartingLife(type.system, type.format, nextCount)
-    if (type.system !== system) {
-      setSystem(type.system)
-      setStartingLife(defaultLife)
-      setLifeStep(playSystemRules(type.system).counter.tapStep)
-    } else if (
-      Boolean(teamPlay) !== nextTeams ||
-      startingLife === defaultStartingLife(system, format, playerCount) ||
-      (twoHeadedGiant && startingLife === defaultTeamLife(format))
-    )
-      setStartingLife(defaultLife)
     if (type.system !== system || type.format !== format) {
       pinningRef.current = undefined
       setPinning(false)
-      setFormat(type.format)
-      setDeck(undefined)
     }
-    setTreacheryChosen(nextTreachery)
-    setArchenemyChosen(type.variant === "archenemy")
-    setTeamsChosen(nextTeams)
-    setFormatPicked(true)
-    if (nextCount !== playerCount) resizeSeats(nextCount)
+    dispatch({ type: "chooseGameType", gameType: type, confirmedFree })
   }
 
   // why: only the seat and deck pickers may claim a game; a rename must not move it to whoever is signed in now.
@@ -907,8 +613,7 @@ function NewGameForm({
     pinningRef.current = undefined
     setPinning(false)
     const seat = value === undefined ? undefined : Number(value)
-    setMeSeat(seat)
-    if (seat === undefined) setDeck(undefined)
+    dispatch({ type: "chooseMeSeat", seat })
     if (accountInput)
       savePlayers(seatAppearances, {
         ...accountInput,
@@ -934,7 +639,7 @@ function NewGameForm({
       ...choice,
       startingValue: choice.localId || choice.sharedToken ? choice.startingValue : undefined,
     }
-    setDeck(selected)
+    set({ deck: selected })
     setPlayerSaveError(undefined)
     try {
       if (!accountInput || !onSavePlayers || !initialGame) return
@@ -949,11 +654,13 @@ function NewGameForm({
           }
       if (pinningRef.current !== request || seenOwnerId.current !== accountInput.ownerId) return
       if (selected)
-        setDeck({ ...selected, deckKey: pinned.deckKey, deckFingerprint: pinned.deckFingerprint })
+        set({
+          deck: { ...selected, deckKey: pinned.deckKey, deckFingerprint: pinned.deckFingerprint },
+        })
       savePlayers(seatAppearances, { ...accountInput, ...pinned })
     } catch (cause) {
       if (pinningRef.current !== request) return
-      setDeck(previous)
+      set({ deck: previous })
       setPlayerSaveError(
         cause instanceof Error ? cause.message : translate("play:newGame.savePlayersFailed"),
       )
@@ -965,38 +672,58 @@ function NewGameForm({
     }
   }
 
+  const wantedDeckId = useRef(initialDeckId)
+  useEffect(() => {
+    const wanted = wantedDeckId.current
+    if (!wanted || localGame || pinning) return
+    const choice = [
+      ...(deckList ?? []),
+      ...localDeckChoices(guestDecks),
+      ...sharedDeckChoices(sharedDecks),
+    ].find(
+      (candidate) =>
+        candidate.deckId === wanted ||
+        (candidate.sharedToken !== undefined && candidate.deckKey === wanted) ||
+        (candidate.localId !== undefined && guestDeckRouteId(candidate.localId) === wanted),
+    )
+    if (!choice || !isSystemId(choice.system)) {
+      if (account?.decks !== undefined) wantedDeckId.current = undefined
+      return
+    }
+    if (choice.system !== system || choice.format !== format) {
+      chooseGameType({
+        id: gameTypeId(choice.system, choice.format),
+        system: choice.system,
+        format: choice.format,
+      })
+      return
+    }
+    if (!attachesDecks(system)) {
+      wantedDeckId.current = undefined
+      return
+    }
+    if (!account) return
+    if (effectiveMeSeat === undefined) {
+      const seat = account.defaultMeSeat ?? 0
+      chooseMeSeat(String(seat < playerCount ? seat : 0))
+      return
+    }
+    wantedDeckId.current = undefined
+    void chooseDeck(deckChoiceId(choice))
+  })
+  const backStarts = !connectedMode && !gameBlocksStart && edited && localReady && !busy
+  function back() {
+    if (backStarts) void startLocal()
+    else (resume ?? onBack)()
+  }
+  useCloseOnBack(backStarts, back)
+
   async function confirmExit() {
     if (!gameToExit || !connected?.exitGame) return
     setExitingGameId(gameToExit.publicId)
     const exited = await connected.exitGame(gameToExit)
     setExitingGameId(undefined)
     if (exited) setGameToExit(undefined)
-  }
-
-  function choosePlayerCount(value: number) {
-    if (!isTreacheryPlayerCount(value)) setTreacheryChosen(false)
-    if (!twoHeadedGiant && startingLife === defaultStartingLife(system, format, playerCount))
-      setStartingLife(defaultStartingLife(system, format, value))
-    resizeSeats(value)
-  }
-
-  function resizeSeats(value: number) {
-    if (value > playerCount)
-      setAppearances((current) => {
-        const next = confirmedFree ? withoutProMarks(current) : [...current]
-        for (let index = playerCount; index < value; index += 1)
-          next[index] = resolveAppearance({
-            preferred: current[index],
-            taken: next.slice(0, index),
-            seat: index + 1,
-            shapes: confirmedFree ? undefined : [...LOCAL_MARK_SHAPES, ...PRO_MARK_SHAPES],
-          })
-        return next
-      })
-    setModeChoices((current) =>
-      Number(current.archenemy) > value ? { ...current, archenemy: "roll" } : current,
-    )
-    setPlayerCount(value)
   }
 
   function openAppearancePicker(index: number, event?: GestureResponderEvent) {
@@ -1040,7 +767,7 @@ function NewGameForm({
           : appearanceDraft,
     )
     const next = confirmedFree ? withoutProMarks(drafted) : drafted
-    setAppearances(next)
+    set({ appearances: next })
     setEdited(true)
     savePlayers(withTeamColors(next))
     closeAppearancePicker()
@@ -1048,9 +775,9 @@ function NewGameForm({
 
   function chooseTeamColor(team: number, color: string) {
     const chosen = Array.from({ length: teams?.length ?? 0 }, (_, index) =>
-      index === team ? color : teamColorDraft[index],
+      index === team ? color : draft.teamColorDraft[index],
     )
-    setTeamColorDraft(chosen)
+    set({ teamColorDraft: chosen })
     setEdited(true)
     savePlayers(withTeamColors(ownAppearances, chosen))
   }
@@ -1094,92 +821,32 @@ function NewGameForm({
           backgroundColor={colors.surface}
           contentContainerStyle={themed($form)}
         >
-          <GameTabs
+          <GameSetupFields
+            draft={draft}
+            setup={setup}
             tabs={matchLocksSetup ? tabsLockedTo(gameTabs, selectedTypeId) : gameTabs}
-            selectedId={selectedTypeId}
-            detail={(type) =>
-              gameTypeDetail(
-                type,
-                type.variant ? Math.max(playerCount, VARIANT_MIN_SEATS) : playerCount,
-              )
+            connected={connectedMode}
+            lockedSummary={matchLocksSetup ? setupSummary : undefined}
+            optionsSummary={optionsSummary}
+            seatNames={seatNames}
+            mulligans={
+              connectedMulligans ? { rule: freeMulligans, onChange: setFreeMulligans } : undefined
             }
-            onChoose={pickGameType}
+            onChooseType={pickGameType}
+            onPlayerCount={(count) => {
+              dispatch({ type: "choosePlayerCount", count, confirmedFree })
+              setEdited(true)
+            }}
+            onStartingLife={(value) => {
+              set({ startingLife: value })
+              setEdited(true)
+            }}
+            onModeChoices={(next) => {
+              set({ modeChoices: next })
+              setEdited(true)
+            }}
+            onOpenOptions={openOptions}
           />
-
-          {matchLocksSetup ? (
-            <Text size="xs" text={setupSummary} style={themed($summaryText)} />
-          ) : (
-            <>
-              <OptionGrid
-                testID="player-count"
-                label={
-                  connectedMode
-                    ? translate("play:newGame.seats")
-                    : translate("play:newGame.players")
-                }
-                options={PLAYER_COUNTS}
-                more={treachery ? undefined : MORE_PLAYER_COUNTS}
-                value={playerCount}
-                isDisabled={
-                  treachery
-                    ? (count) => !isTreacheryPlayerCount(count)
-                    : archenemy
-                      ? (count) => count < ARCHENEMY_MIN_SEATS
-                      : teamPlay
-                        ? (count) => !isTeamPlayerCount(teamPlay, count)
-                        : undefined
-                }
-                onSelect={(value) => {
-                  choosePlayerCount(value)
-                  setEdited(true)
-                }}
-              />
-              {lifeOptions.length > 0 ? (
-                <OptionGrid
-                  testID="starting-counter"
-                  label={
-                    twoHeadedGiant ? translate("play:newGame.teamLife") : counterHeading(system)
-                  }
-                  options={lifeOptions}
-                  value={startingLife}
-                  custom={startingValueRange(system)}
-                  onSelect={(value) => {
-                    setStartingLife(value)
-                    setEdited(true)
-                  }}
-                />
-              ) : null}
-              <TurnsChoice />
-              <FirstPlayerChoice system={system} playerCount={playerCount} />
-              {connectedMulligans ? (
-                <FreeMulligansChoice rule={freeMulligans} onChange={setFreeMulligans} />
-              ) : null}
-              {planechaseAvailable ? (
-                <ModeSetupFields
-                  choices={modeChoices}
-                  archenemy={archenemy}
-                  seatNames={seatNames}
-                  onChange={(next) => {
-                    setModeChoices(next)
-                    setEdited(true)
-                  }}
-                />
-              ) : null}
-              <View style={themed($summaryRow)}>
-                <Text size="xs" text={optionsSummary} style={themed($summaryText)} />
-                <Button
-                  testID="setup-change-button"
-                  tx="play:newGame.moreOptions"
-                  accessibilityLabel={formatList([
-                    translate("play:newGame.moreOptions"),
-                    optionsSummary,
-                  ])}
-                  style={themed($changeButton)}
-                  onPress={openOptions}
-                />
-              </View>
-            </>
-          )}
 
           {connectedMode && onNearby ? (
             <View style={themed($section)}>
@@ -1191,8 +858,8 @@ function NewGameForm({
                   { id: "cloud", label: translate("play:newGame.cloud") },
                   { id: "nearby", label: translate("play:newGame.nearby") },
                 ]}
-                selectedId={hostOn}
-                onSelect={(value) => setHostOn(value === "nearby" ? "nearby" : "cloud")}
+                selectedId={draft.hostOn}
+                onSelect={(value) => set({ hostOn: value === "nearby" ? "nearby" : "cloud" })}
               />
             </View>
           ) : null}
@@ -1207,55 +874,17 @@ function NewGameForm({
           ) : null}
 
           {!connectedMode ? (
-            <View style={themed($section)}>
-              <Text tx="play:playerNames" preset="subheading" accessibilityRole="header" />
-              <View style={themed($nameList)}>
-                {players.map((player, index) => (
-                  <View key={index} style={themed($nameRow)}>
-                    <TouchableOpacity
-                      testID={`player-appearance-${index + 1}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={translate("play:newGame.changeAppearance", {
-                        name: player.name,
-                      })}
-                      activeOpacity={0.75}
-                      style={themed($appearanceButton)}
-                      onPress={(event) => openAppearancePicker(index, event)}
-                    >
-                      <PlayerMark
-                        seatNumber={index + 1}
-                        shape={player.shape}
-                        color={player.color}
-                        size={32}
-                      />
-                    </TouchableOpacity>
-                    <TextField
-                      testID={`player-name-${index + 1}`}
-                      value={names[index]}
-                      placeholder={defaultName(index)}
-                      accessibilityLabel={translate("play:newGame.nameForPlayer", {
-                        seat: index + 1,
-                      })}
-                      maxLength={MAX_PLAYER_NAME_LENGTH}
-                      status={nameValidation.errors[index] ? "error" : undefined}
-                      helper={
-                        nameValidation.errors[index] ??
-                        (nameFailsGate(names[index])
-                          ? translate("play:newGame.nameGateHelper", { name: defaultName(index) })
-                          : undefined)
-                      }
-                      containerStyle={themed($nameField)}
-                      onBlur={() => savePlayers()}
-                      onChangeText={(value) => {
-                        setEdited(true)
-                        setNames((current) =>
-                          current.map((name, i) => (i === index ? value : name)),
-                        )
-                      }}
-                    />
-                  </View>
-                ))}
-              </View>
+            <PlayerNames
+              players={players}
+              names={names}
+              errors={nameValidation.errors}
+              onOpenAppearance={openAppearancePicker}
+              onRename={(seat, name) => {
+                setEdited(true)
+                dispatch({ type: "rename", seat, name })
+              }}
+              onNameBlur={() => savePlayers()}
+            >
               {teams ? (
                 <TeamPicker
                   players={players}
@@ -1267,106 +896,59 @@ function NewGameForm({
                     onChange: chooseTeamColor,
                   }}
                   onSwap={(first, second) => {
-                    setTeamColorDraft(teams.map(([lead]) => seatAppearances[lead].color))
-                    setTeamDraft(
-                      teams.map((team) =>
-                        team.map((seat) =>
-                          seat === first ? second : seat === second ? first : seat,
-                        ),
-                      ),
-                    )
+                    dispatch({
+                      type: "swapSeats",
+                      first,
+                      second,
+                      teamColors: teams.map(([lead]) => seatAppearances[lead].color),
+                    })
                     setEdited(true)
                   }}
                 />
               ) : null}
               {account ? (
-                <View style={themed($accountSeat)}>
-                  <SelectField
-                    testID="me-seat"
-                    label={translate("play:newGame.thisIsMe")}
-                    field="thisIsMe"
-                    value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
-                    placeholder={translate("play:newGame.noSeat")}
-                    clearLabel={translate("play:newGame.noSeat")}
-                    disabled={pinning || matchLocked}
-                    options={players.map((player, index) => ({
-                      id: String(index),
-                      label: player.name,
-                    }))}
-                    onSelect={(value) => {
-                      setEdited(true)
-                      chooseMeSeat(value)
-                    }}
-                  />
-                  {effectiveMeSeat !== undefined && system && attachesDecks(system) ? (
-                    <SelectField
-                      testID="me-deck"
-                      label={translate("play:newGame.yourDeck")}
-                      field="yourDeck"
-                      value={deck ? deckChoiceId(deck) : undefined}
-                      placeholder={
-                        deckChoices.length === 0 && account.decks === "unavailable"
-                          ? translate("play:newGame.decksUnavailable")
-                          : deckChoices.length === 0 && account.decks === undefined
-                            ? translate("play:newGame.loadingDecks")
-                            : deckChoices.length === 0
-                              ? translate("play:newGame.noMatchingDecks")
-                              : translate("play:newGame.noDeck")
-                      }
-                      clearLabel={translate("play:newGame.noDeck")}
-                      disabled={
-                        pinning ||
-                        matchLocked ||
-                        (deckList === undefined && deckChoices.length === 0 && !deck)
-                      }
-                      options={[
-                        ...(deck &&
-                        !deckChoices.some((choice) => deckChoiceId(choice) === deckChoiceId(deck))
-                          ? [
-                              {
-                                id: deckChoiceId(deck)!,
-                                label: deck.name,
-                                accessory: deck.localId ? <DeviceGlyph /> : undefined,
-                                accessibilityLabel: deck.localId
-                                  ? translate("decks:stats.onDeviceLabel", { name: deck.name })
-                                  : undefined,
-                              },
-                            ]
-                          : []),
-                        ...deckChoices.map((choice) => ({
-                          id: deckChoiceId(choice)!,
-                          label: joinParts([
-                            choice.name,
-                            choice.versionLabel,
-                            choice.sharedToken ? translate("decks:shared.tag") : undefined,
-                          ]),
-                          accessory: choice.localId ? <DeviceGlyph /> : undefined,
-                          accessibilityLabel: choice.localId
-                            ? translate("decks:stats.onDeviceLabel", { name: choice.name })
-                            : undefined,
-                        })),
-                      ]}
-                      onSelect={(id) => {
-                        setEdited(true)
-                        void chooseDeck(id)
-                      }}
-                    />
-                  ) : null}
-                  {deck && tracksMulligans && effectiveMeSeat !== undefined ? (
-                    <FreeMulligansChoice
-                      rule={freeMulligans}
-                      onChange={(rule) => {
-                        setEdited(true)
-                        setFreeMulligans(rule)
-                        if (accountInput)
-                          savePlayers(seatAppearances, { ...accountInput, freeMulligans: rule })
-                      }}
-                    />
-                  ) : null}
-                </View>
+                <AccountSeat
+                  seatNames={nameValidation.names}
+                  meSeat={effectiveMeSeat}
+                  disabled={pinning || matchLocked}
+                  onSeat={(value) => {
+                    setEdited(true)
+                    chooseMeSeat(value)
+                  }}
+                  deckPicker={
+                    effectiveMeSeat !== undefined && system && attachesDecks(system)
+                      ? {
+                          deck,
+                          choices: deckChoices,
+                          decks: account.decks,
+                          disabled:
+                            pinning ||
+                            matchLocked ||
+                            (deckList === undefined && deckChoices.length === 0 && !deck),
+                          onChoose: (id) => {
+                            setEdited(true)
+                            void chooseDeck(id)
+                          },
+                        }
+                      : undefined
+                  }
+                  mulligans={
+                    deck && tracksMulligans && effectiveMeSeat !== undefined
+                      ? {
+                          rule: freeMulligans,
+                          onChange: (rule) => {
+                            setEdited(true)
+                            setFreeMulligans(rule)
+                            if (accountInput)
+                              savePlayers(seatAppearances, { ...accountInput, freeMulligans: rule })
+                          },
+                        }
+                      : undefined
+                  }
+                />
               ) : null}
               {playerSaveError ? <Text accessibilityRole="alert" text={playerSaveError} /> : null}
-            </View>
+            </PlayerNames>
           ) : null}
         </Screen>
         <BottomActionBar endsWithLink={Boolean(statusText || joinInFooter)} style={themed($footer)}>
@@ -1514,7 +1096,7 @@ function NewGameForm({
           </View>
         </BottomActionBar>
       </>
-      <Sheet
+      <SetupOptionsSheet
         visible={optionsOpen}
         onClose={closeOptions}
         onDismissed={() =>
@@ -1522,199 +1104,25 @@ function NewGameForm({
             current?.afterSheet ? { ...current, afterSheet: false } : current,
           )
         }
-        testID="setup-options-dialog"
-      >
-        <ScrollView
-          style={themed($sheetScroll)}
-          contentContainerStyle={themed([$sheetScrollContent, $statusDetails])}
-        >
-          {matchOffered ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="match-mode"
-                accessibilityLabel={translate("play:newGame.match")}
-                segments={[
-                  { id: "off", label: translate("play:newGame.singleGame") },
-                  { id: "on", label: translate("play:newGame.bestOf") },
-                ]}
-                selectedId={matchBestOf ? "on" : "off"}
-                onSelect={(value) => toggleMatch(value === "on")}
-              />
-              {matchBestOf ? (
-                <SegmentedControl
-                  testID="match-best-of"
-                  accessibilityLabel={translate("play:newGame.bestOf")}
-                  segments={MATCH_BEST_OF.map((bestOf) => ({
-                    id: String(bestOf),
-                    label: translate("play:newGame.bestOfCount", { bestOf }),
-                  }))}
-                  selectedId={String(matchBestOf)}
-                  onSelect={(value) =>
-                    setChosenBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
-                  }
-                />
-              ) : null}
-            </View>
-          ) : null}
-
-          {!connectedMode && !localGame ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.clock" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="clock-mode"
-                accessibilityLabel={translate("play:newGame.clock")}
-                segments={CLOCK_MODES.map(({ id, labelTx }) => ({
-                  id,
-                  label: translate(labelTx),
-                }))}
-                selectedId={clockMode}
-                onSelect={(value) => {
-                  const mode = CLOCK_MODES.find(({ id }) => id === value)?.id
-                  if (mode) setClockMode(mode)
-                }}
-              />
-              {clockMode === "countdown" ? (
-                <ValueField
-                  testID="clock-minutes"
-                  label={translate("play:newGame.minutesLeft")}
-                  value={clockMinutes}
-                  min={ROUND_CLOCK_MINUTES.min}
-                  max={ROUND_CLOCK_MINUTES.max}
-                  longStep={ROUND_CLOCK_MINUTES.step}
-                  onChange={setChosenClockMinutes}
-                />
-              ) : null}
-            </View>
-          ) : null}
-
-          <View style={themed($section)}>
-            <SelectField
-              testID="life-step"
-              label={translate("play:newGame.changeBy")}
-              field="changeBy"
-              value={String(lifeStep)}
-              options={LIFE_STEP_OPTIONS.map((step) => ({
-                id: String(step),
-                label: formatNumber(step),
-              }))}
-              onSelect={(value) => {
-                const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
-                if (next) setLifeStep(next)
-              }}
-            />
-          </View>
-
-          <View style={themed($section)}>
-            <Text tx="play:newGame.layout" preset="subheading" accessibilityRole="header" />
-            <PlayerLayoutPicker
-              playerCount={playerCount}
-              value={layout}
-              onChange={setChosenLayout}
-            />
-          </View>
-        </ScrollView>
-        <Button
-          testID="setup-options-done"
-          tx="common:done"
-          preset="primary"
-          onPress={closeOptions}
-        />
-      </Sheet>
-      <DialogCard
+        draft={draft}
+        setup={setup}
+        onChange={set}
+        onToggleMatch={(on) => dispatch({ type: "toggleMatch", on })}
+        matchOffered={matchOffered}
+        clockOffered={!connectedMode && !localGame}
+      />
+      <SetupStatusDialog
         visible={showStatus}
         onClose={() => setShowStatus(false)}
-        dialogTestID="setup-status-dialog"
-        accessibilityViewIsModal
-      >
-        <ScrollView
-          style={themed($sheetScroll)}
-          contentContainerStyle={themed([$sheetScrollContent, $statusDetails])}
-        >
-          {connectedMode && connected?.blockedReason ? (
-            <Text accessibilityRole="alert" size="xs" text={connected.blockedReason} tone="dim" />
-          ) : null}
-          {connectedMode && connected?.error ? (
-            <View style={themed($connectedError)}>
-              <Text
-                accessibilityRole="alert"
-                size="xs"
-                text={connected.error}
-                style={themed($footerNote)}
-              />
-              {connected.retry ? (
-                <Button
-                  testID="retry-connected-host-preparation"
-                  tx="common:tryAgain"
-                  style={themed($retryConnected)}
-                  onPress={connected.retry}
-                />
-              ) : null}
-            </View>
-          ) : null}
-          {connectedMode &&
-          connected &&
-          !connected.ready &&
-          !connected.error &&
-          connected.retry &&
-          connected.blockedReason &&
-          !connected.access ? (
-            <Button tx="play:newGame.retryConnection" onPress={connected.retry} />
-          ) : null}
-
-          {connectedGames.length ? (
-            <View style={themed($section)}>
-              <Text
-                tx="play:newGame.yourConnectedGames"
-                preset="subheading"
-                accessibilityRole="header"
-              />
-              {connectedGames.map((game) => (
-                <View key={game.publicId} style={themed($connectedGame)}>
-                  <ConnectedGameRow
-                    game={game}
-                    now={Date.now()}
-                    onPress={() => onResumeConnected?.(game)}
-                  />
-                  <TouchableOpacity
-                    testID={`${game.isHost ? "end" : "leave"}-connected-${game.publicId}`}
-                    accessibilityRole="button"
-                    disabled={busy || !connected?.ready}
-                    accessibilityState={{ disabled: busy || !connected?.ready }}
-                    style={themed($localEndAction)}
-                    onPress={() => {
-                      setShowStatus(false)
-                      setGameToExit(game)
-                    }}
-                  >
-                    <Text
-                      tx={
-                        game.isHost
-                          ? "play:newGame.endGameEllipsis"
-                          : "play:newGame.leaveGameEllipsis"
-                      }
-                      tone="dim"
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {connected?.exitError ? (
-                <Text
-                  accessibilityRole="alert"
-                  style={themed($footerNote)}
-                  text={connected.exitError}
-                />
-              ) : null}
-              {connected?.activeGamesNextPage?.status === "available" ? (
-                <Button tx="play:newGame.loadMore" onPress={connected.activeGamesNextPage.load} />
-              ) : connected?.activeGamesNextPage?.status === "loading" ? (
-                <Text size="xs" tone="dim" tx="play:newGame.loadingMoreGames" />
-              ) : null}
-            </View>
-          ) : null}
-        </ScrollView>
-        <Button tx="common:done" onPress={() => setShowStatus(false)} />
-      </DialogCard>
+        connectedMode={connectedMode}
+        connected={connected}
+        busy={busy}
+        onResumeConnected={onResumeConnected}
+        onExit={(game) => {
+          setShowStatus(false)
+          setGameToExit(game)
+        }}
+      />
       {gameToExit ? (
         <ConfirmDialog
           visible
@@ -1846,54 +1254,10 @@ function tabsLockedTo(tabs: readonly GameTab[], selectedId: string) {
   })
 }
 
-function defaultName(index: number) {
-  return translate("board:playerNames.default", { number: index + 1 })
-}
-
 const CONTENT_MAX_WIDTH = 720
-const MIN_NAME_ROW_WIDTH = 280
-
 const $root: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
 const $form: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-})
-const $summaryText: ThemedStyle<TextStyle> = ({ colors }) => ({ flex: 1, color: colors.textDim })
-const $changeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 40,
-  paddingVertical: spacing.xxs,
-})
-const $nameList: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  columnGap: spacing.md,
-  rowGap: spacing.sm,
-})
-const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  flexGrow: 1,
-  flexShrink: 1,
-  flexBasis: MIN_NAME_ROW_WIDTH,
-})
-const $connectedError: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $connectedGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $retryConnected: ThemedStyle<ViewStyle> = () => ({ minHeight: 40 })
-const $nameField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $accountSeat: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xs,
-  marginTop: spacing.xs,
-})
-const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
-  width: 44,
-  height: 44,
-  alignItems: "center",
-  justifyContent: "center",
-})
 const FOOTER_ROW_MAX_FONT_SCALE = 1.4
 const FOOTER_MAX_FONT_SCALE = 2
 const $footerButtonText = { maxFontSizeMultiplier: FOOTER_MAX_FONT_SCALE }
@@ -1915,14 +1279,6 @@ const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $footerAction: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $footerStack: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-
-const $localEndAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 44,
-  justifyContent: "center",
-  alignItems: "center",
-  paddingVertical: spacing.xs,
-})
 const $statusRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   height: BOTTOM_LINK_HEIGHT,
   flexDirection: "row",
@@ -1938,7 +1294,6 @@ const $statusText: ThemedStyle<TextStyle> = ({ colors }) => ({
   flex: 1,
   color: colors.textDim,
 })
-const $statusDetails: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $resumeAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexShrink: 1,
   paddingHorizontal: spacing.md,
