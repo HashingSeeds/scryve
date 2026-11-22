@@ -642,6 +642,58 @@ describe("ConnectedBoardScreen", () => {
     await waitFor(() => expect(screen.queryByTestId("end-match-dialog")).toBeNull())
   })
 
+  describe("while a match end is still sending", () => {
+    let rejectEnd: (cause: Error) => void = () => undefined
+    beforeEach(() => {
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: {
+          ...connectedHarness.runtime.projection,
+          isHost: true,
+          match: {
+            bestOf: 3 as const,
+            gameNumber: 2,
+            canEnd: true,
+            seats: connectedHarness.runtime.projection.players.map(({ seat }, index) => ({
+              seat,
+              gamesWon: index === 0 ? 1 : 0,
+              gamesDrawn: 0,
+            })),
+          },
+        },
+      }
+      mockEndMatch.mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectEnd = reject
+          }),
+      )
+      render(themed(<ConnectedBoardScreen publicId="game-public" />))
+      openConnectedMenu()
+      fireEvent.press(screen.getByTestId("game-menu-status-line"))
+      fireEvent.press(screen.getByTestId("end-match-button"))
+      fireEvent.press(screen.getByTestId("confirm-end-match-button"))
+      fireEvent.press(screen.getByTestId("end-match-backdrop"))
+    })
+
+    it("lets the host confirm again after cancelling", () => {
+      openConnectedMenu()
+      fireEvent.press(screen.getByTestId("game-menu-status-line"))
+      fireEvent.press(screen.getByTestId("end-match-button"))
+      expect(screen.getByTestId("confirm-end-match-button").props.accessibilityState.disabled).toBe(
+        false,
+      )
+    })
+
+    it("shows a failure without closing the log opened since", async () => {
+      openConnectedMenu()
+      fireEvent.press(screen.getByTestId("history-button"))
+      await act(async () => rejectEnd(new Error("Network unavailable")))
+      expect(screen.getByTestId("end-match-dialog")).toBeTruthy()
+      expect(screen.getByTestId("game-log-dialog")).toBeTruthy()
+    })
+  })
+
   it("follows the table to its rematch instead of the summary", () => {
     const onGameEnded = jest.fn()
     const onRematch = jest.fn()
@@ -1332,6 +1384,20 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByText("Leave"))
     expect(onGameAbandoned).toHaveBeenCalledTimes(1)
     expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
+  })
+
+  it("keeps a report in progress when the host abandons the game", () => {
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedPlayers()
+    fireEvent.press(screen.getByTestId("report-player-seat-2"))
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, status: "abandoned" },
+    }
+    screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.getByTestId("abandoned-game-dialog")).toBeTruthy()
+    expect(screen.getByTestId("submit-player-report-button")).toBeTruthy()
   })
 
   it("opens the game log with this device's unsent change, and Undo takes it back", () => {
