@@ -163,12 +163,11 @@ function evaluate(
       const tally = groups.get(group) ?? { passed: 0, total: 0 }
       groups.set(group, { passed: tally.passed + (hit ? 1 : 0), total: tally.total + 1 })
     }
-    if (hit) {
-      passed++
-      hits.push(entry.query)
-    }
+    const survives = set === "typing" && survivesTyping(rules, source, entry)
+    if (survives) survived++
+    if (hit) passed++
+    if (set === "typing" ? survives : hit) hits.push(entry.query)
     if (rank >= 0 && rank < TOP) inTop++
-    if (set === "typing" && survivesTyping(rules, source, entry)) survived++
     if (results.length === 0) empty++
     if (phrased.has(entry.query.trim().toLowerCase())) {
       copied.total++
