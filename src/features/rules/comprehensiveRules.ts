@@ -72,6 +72,7 @@ type SearchIndex = {
   lengths: number[]
   average: number
   slang: Map<string, string[]>
+  slangSpellings: Map<string, string>
   spellings: Map<string, string>
   defined: { entry: GlossaryEntry; words: string[]; rules: number[] }[]
 }
@@ -138,6 +139,7 @@ export function searchIndex(source: ComprehensiveRules) {
       words(meaning).map(stem),
     ]),
   )
+  const slangSpellings = new Map(Object.keys(source.slang ?? {}).map((word) => [word, stem(word)]))
   const known = new Set(rules.map((rule) => rule.id))
   for (const entry of source.glossary)
     for (const raw of words(entry.term)) if (!stems.has(raw)) stems.set(raw, stem(raw))
@@ -153,7 +155,16 @@ export function searchIndex(source: ComprehensiveRules) {
       rules: (cited && screens.get(known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited)) || [],
     }
   })
-  const index = { rules, postings, lengths, average, slang, spellings: stems, defined }
+  const index = {
+    rules,
+    postings,
+    lengths,
+    average,
+    slang,
+    slangSpellings,
+    spellings: stems,
+    defined,
+  }
   indexes.set(source, index)
   return index
 }
@@ -207,11 +218,13 @@ function oneEditApart(a: string, b: string) {
 export function searchRules(rules: ComprehensiveRules, query: string, limit = 50) {
   const needle = query.trim().toLowerCase()
   if (!needle) return []
-  if (RULE_NUMBER.test(needle))
-    return searchIndex(rules)
+  if (RULE_NUMBER.test(needle)) {
+    const matches = searchIndex(rules)
       .rules.filter((rule) => rule.id.startsWith(needle))
       .slice(0, limit)
       .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
+    if (matches.length > 0) return matches
+  }
   const { chosen, stems, partial } = queryWords(needle)
   if (stems.length === 0) return []
   const lastStem = partial === undefined ? undefined : stem(partial)
@@ -239,7 +252,11 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   }
   const scores = new Map<number, number>()
   const weights = new Map(stems.map((word) => [word, 1]))
-  for (const meaning of stems.map((word) => index.slang.get(word) ?? []))
+  const slang = new Set(stems)
+  if (partial !== undefined)
+    for (const [spelling, word] of index.slangSpellings)
+      if (spelling.startsWith(partial)) slang.add(word)
+  for (const meaning of [...slang].map((word) => index.slang.get(word) ?? []))
     for (const word of meaning) weights.set(word, (weights.get(word) ?? 0) + 1 / meaning.length)
   const spelled = new Map<string, Set<string>>()
   for (const raw of chosen) {
