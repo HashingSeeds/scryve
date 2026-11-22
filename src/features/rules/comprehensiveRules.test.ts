@@ -270,8 +270,10 @@ describe("searchRules ranking", () => {
     ).toEqual(["702.9"])
   })
 
-  it("lifts the rule a glossary term in the query cites", () => {
-    expect(ids("commander tax")).toEqual(["Commander Tax", "903.8", "903.3"])
+  it("omits rules whose screens are already opened by a higher-ranked glossary term", () => {
+    expect(ids("commander tax")).toEqual(["Commander Tax", "903.3"])
+    expect(ids("blockers")).toContain("509.1")
+    expect(ids("903.8")).toEqual(["903.8"])
   })
 
   it("goes straight to a rule number in either game's format, and finds nothing for punctuation", () => {

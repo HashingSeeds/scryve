@@ -74,7 +74,7 @@ type SearchIndex = {
   slang: Map<string, string[]>
   slangSpellings: Map<string, string>
   spellings: Map<string, string>
-  defined: { entry: GlossaryEntry; words: string[]; rules: number[] }[]
+  defined: { entry: GlossaryEntry; words: string[]; rules: number[]; opens: Rule[] }[]
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
@@ -147,12 +147,15 @@ export function searchIndex(source: ComprehensiveRules) {
     const cited = source.references
       ? ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")?.id
       : undefined
+    const screen =
+      (cited && screens.get(known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited)) || []
     return {
       entry,
       words: words(entry.term)
         .filter((word) => !STOPWORDS.has(word))
         .map(stem),
-      rules: (cited && screens.get(known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited)) || [],
+      rules: screen,
+      opens: cited && known.has(cited) ? screen.map((at) => rules[at]) : [],
     }
   })
   const index = {
@@ -230,7 +233,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   const lastStem = partial === undefined ? undefined : stem(partial)
   const index = searchIndex(rules)
   const completions = completionsOf(index.spellings, partial)
-  const ranked: { result: RuleSearchResult; score: number }[] = []
+  const ranked: { result: RuleSearchResult; score: number; opens?: Rule[] }[] = []
   terms: for (const term of index.defined) {
     let score = 0
     let named = term.words.length === stems.length
@@ -248,6 +251,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     ranked.push({
       result: { kind: "term", entry: term.entry },
       score: named ? Infinity : (score * stems.length) / term.words.length,
+      opens: term.opens,
     })
   }
   const scores = new Map<number, number>()
@@ -301,8 +305,15 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     screens.add(screen)
     ranked.push({ result: { kind: "rule", rule }, score })
   }
+  // why: a term that cites one rule opens that rule's screen, so the rule listed again below it would only spend a visible slot. A term citing a whole section keeps its rules listed.
+  const covered = new Set<Rule>()
   return ranked
     .sort((a, b) => b.score - a.score)
+    .filter(({ result, opens }) => {
+      if (result.kind === "rule") return !covered.has(result.rule)
+      for (const rule of opens ?? []) covered.add(rule)
+      return true
+    })
     .slice(0, limit)
     .map(({ result }) => result)
 }
