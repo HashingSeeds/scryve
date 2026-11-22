@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
+import { Platform, TouchableOpacity, useWindowDimensions, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -14,50 +14,27 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { Header, HeaderBack } from "@/components/Header"
-import { OptionGrid } from "@/components/OptionGrid"
-import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
-import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
-import { SelectField } from "@/components/SelectField"
-import { Sheet } from "@/components/Sheet"
-import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { TeamPicker } from "@/components/TeamPicker"
 import { Text } from "@/components/Text"
-import { TextField } from "@/components/TextField"
-import { ValueField } from "@/components/ValueField"
 import type { NextPageState } from "@/features/async/remoteState"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ProSignInNote, useProSignIn } from "@/features/billing/ProSignIn"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
-import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
-import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { loadSharedDecks } from "@/features/decks/sharedDecks"
 import {
   hasLocalGameStarted,
   matchContextLabel,
-  MAX_PLAYER_NAME_LENGTH,
   PLAYER_COLORS,
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
-import {
-  FirstPlayerChoice,
-  FreeMulligansChoice,
-  useFirstPlayerMode,
-  useFreeMulligans,
-} from "@/features/game/FirstPlayerChoice"
-import { GameTabs } from "@/features/game/GameTabs"
-import {
-  gameTypeDetail,
-  gameTypeId,
-  newGameTabs,
-  type GameTab,
-  type GameType,
-} from "@/features/game/gameTypes"
+import { useFirstPlayerMode, useFreeMulligans } from "@/features/game/FirstPlayerChoice"
+import { gameTypeId, newGameTabs, type GameTab, type GameType } from "@/features/game/gameTypes"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import {
@@ -66,24 +43,16 @@ import {
   type LocalSettings,
 } from "@/features/game/localPersistence"
 import {
-  CLOCK_MODES,
   deriveGameSetup,
   gameDraftReducer,
   initialGameDraft,
-  VARIANT_MIN_SEATS,
   type GameDraftPatch,
 } from "@/features/game/newGameDraft"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
-import {
-  counterHeading,
-  counterValueLabel,
-  NO_PLAY_SYSTEM,
-  type PlaySystemId,
-} from "@/features/game/playSystems"
+import { counterValueLabel, NO_PLAY_SYSTEM, type PlaySystemId } from "@/features/game/playSystems"
 import type { ConnectedSetup, RecentSetup } from "@/features/game/recentSetups"
-import { ROUND_CLOCK_MINUTES, type RoundClockSetup } from "@/features/game/roundClock"
+import { type RoundClockSetup } from "@/features/game/roundClock"
 import { teamColors } from "@/features/game/teams"
-import { TurnsChoice } from "@/features/game/TurnsChoice"
 import type {
   LocalGame,
   LocalGameResult,
@@ -92,7 +61,6 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 import type { LanSetup } from "@/features/lan/lanGame"
-import { ModeSetupFields } from "@/features/modes/ModeSetupFields"
 import {
   deckChoiceId,
   localDeckChoices,
@@ -100,7 +68,7 @@ import {
   sharedDeckChoices,
   type DeckChoice,
 } from "@/features/stats/deckChoices"
-import { formatList, formatNumber, joinParts } from "@/i18n/format"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { endEdge, startEdge } from "@/theme/direction"
@@ -109,24 +77,24 @@ import type { ThemedStyle } from "@/theme/types"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 
 import {
+  AccountSeat,
+  defaultName,
+  GameSetupFields,
+  PlayerNames,
+  SetupOptionsSheet,
+  SetupStatusDialog,
+} from "./NewGameSections"
+import {
   PLAYER_MARK_SHAPES,
   PRO_MARK_SHAPES,
   shapeForSeat,
   withoutProMarks,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
-import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
+import { type MatchBestOf } from "../../convex/lib/matchResults"
 import { mulliganHandSize } from "../../convex/lib/mulligans"
-import { nameFailsGate } from "../../convex/lib/nameFilter"
-import {
-  attachesDecks,
-  identitySection,
-  isSystemId,
-  startingValueRange,
-} from "../../convex/lib/systems"
-import { ARCHENEMY_MIN_SEATS, type ModeSetup } from "../../convex/lib/tableModes"
-import { isTeamPlayerCount } from "../../convex/lib/teamVariants"
-import { isTreacheryPlayerCount } from "../../convex/lib/treachery"
+import { attachesDecks, identitySection, isSystemId } from "../../convex/lib/systems"
+import { type ModeSetup } from "../../convex/lib/tableModes"
 
 export type NewGameMode = "local" | "connected"
 
@@ -199,8 +167,6 @@ export interface LocalConnectFeed {
   publish: (hostPlayerId: PlayerId) => void
 }
 
-const PLAYER_COUNTS = [2, 3, 4, 5, 6]
-const MORE_PLAYER_COUNTS = [7, 8, 9, 10]
 const NEW_GAME_FIELDS = [
   "system",
   "format",
@@ -216,7 +182,6 @@ const NEW_GAME_FIELDS = [
   "clockMode",
   "chosenClockMinutes",
 ] as const
-const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 
 /** why: a recent row keeps no deck, so a game already holding one seeds the form itself. */
 function newestRecent(
@@ -287,25 +252,20 @@ function NewGameForm({
     { defaults, replaying, initialGame, defaultMeSeat: account?.defaultMeSeat },
     initialGameDraft,
   )
-  const { system, format, startingLife, lifeStep, playerCount, names, appearances, deck } = draft
+  const { system, format, startingLife, playerCount, names, appearances, deck } = draft
   const set = (patch: GameDraftPatch) => dispatch({ type: "set", patch })
   const connectedMode = mode === "connected"
+  const setup = deriveGameSetup(draft, { connected: connectedMode })
   const {
     teamPlay,
-    twoHeadedGiant,
     teams,
     layout,
-    treachery,
-    archenemy,
-    planechaseAvailable,
     typeId: selectedTypeId,
     matchBestOf,
-    clockMinutes,
     clock: clockSetup,
     gameSetup,
-    lifeOptions,
     effectiveMeSeat,
-  } = deriveGameSetup(draft, { connected: connectedMode })
+  } = setup
   const ownAppearances = useMemo(
     () => (confirmedFree ? withoutProMarks(appearances) : appearances),
     [appearances, confirmedFree],
@@ -861,92 +821,32 @@ function NewGameForm({
           backgroundColor={colors.surface}
           contentContainerStyle={themed($form)}
         >
-          <GameTabs
+          <GameSetupFields
+            draft={draft}
+            setup={setup}
             tabs={matchLocksSetup ? tabsLockedTo(gameTabs, selectedTypeId) : gameTabs}
-            selectedId={selectedTypeId}
-            detail={(type) =>
-              gameTypeDetail(
-                type,
-                type.variant ? Math.max(playerCount, VARIANT_MIN_SEATS) : playerCount,
-              )
+            connected={connectedMode}
+            lockedSummary={matchLocksSetup ? setupSummary : undefined}
+            optionsSummary={optionsSummary}
+            seatNames={seatNames}
+            mulligans={
+              connectedMulligans ? { rule: freeMulligans, onChange: setFreeMulligans } : undefined
             }
-            onChoose={pickGameType}
+            onChooseType={pickGameType}
+            onPlayerCount={(count) => {
+              dispatch({ type: "choosePlayerCount", count, confirmedFree })
+              setEdited(true)
+            }}
+            onStartingLife={(value) => {
+              set({ startingLife: value })
+              setEdited(true)
+            }}
+            onModeChoices={(next) => {
+              set({ modeChoices: next })
+              setEdited(true)
+            }}
+            onOpenOptions={openOptions}
           />
-
-          {matchLocksSetup ? (
-            <Text size="xs" text={setupSummary} style={themed($summaryText)} />
-          ) : (
-            <>
-              <OptionGrid
-                testID="player-count"
-                label={
-                  connectedMode
-                    ? translate("play:newGame.seats")
-                    : translate("play:newGame.players")
-                }
-                options={PLAYER_COUNTS}
-                more={treachery ? undefined : MORE_PLAYER_COUNTS}
-                value={playerCount}
-                isDisabled={
-                  treachery
-                    ? (count) => !isTreacheryPlayerCount(count)
-                    : archenemy
-                      ? (count) => count < ARCHENEMY_MIN_SEATS
-                      : teamPlay
-                        ? (count) => !isTeamPlayerCount(teamPlay, count)
-                        : undefined
-                }
-                onSelect={(value) => {
-                  dispatch({ type: "choosePlayerCount", count: value, confirmedFree })
-                  setEdited(true)
-                }}
-              />
-              {lifeOptions.length > 0 ? (
-                <OptionGrid
-                  testID="starting-counter"
-                  label={
-                    twoHeadedGiant ? translate("play:newGame.teamLife") : counterHeading(system)
-                  }
-                  options={lifeOptions}
-                  value={startingLife}
-                  custom={startingValueRange(system)}
-                  onSelect={(value) => {
-                    set({ startingLife: value })
-                    setEdited(true)
-                  }}
-                />
-              ) : null}
-              <TurnsChoice />
-              <FirstPlayerChoice system={system} playerCount={playerCount} />
-              {connectedMulligans ? (
-                <FreeMulligansChoice rule={freeMulligans} onChange={setFreeMulligans} />
-              ) : null}
-              {planechaseAvailable ? (
-                <ModeSetupFields
-                  choices={draft.modeChoices}
-                  archenemy={archenemy}
-                  seatNames={seatNames}
-                  onChange={(next) => {
-                    set({ modeChoices: next })
-                    setEdited(true)
-                  }}
-                />
-              ) : null}
-              <View style={themed($summaryRow)}>
-                <Text size="xs" text={optionsSummary} style={themed($summaryText)} />
-                <Button
-                  testID="setup-change-button"
-                  tx="play:newGame.moreOptions"
-                  accessibilityLabel={formatList([
-                    translate("play:newGame.moreOptions"),
-                    optionsSummary,
-                  ])}
-                  style={themed($changeButton)}
-                  onPress={openOptions}
-                />
-              </View>
-            </>
-          )}
 
           {connectedMode && onNearby ? (
             <View style={themed($section)}>
@@ -974,53 +874,17 @@ function NewGameForm({
           ) : null}
 
           {!connectedMode ? (
-            <View style={themed($section)}>
-              <Text tx="play:playerNames" preset="subheading" accessibilityRole="header" />
-              <View style={themed($nameList)}>
-                {players.map((player, index) => (
-                  <View key={index} style={themed($nameRow)}>
-                    <TouchableOpacity
-                      testID={`player-appearance-${index + 1}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={translate("play:newGame.changeAppearance", {
-                        name: player.name,
-                      })}
-                      activeOpacity={0.75}
-                      style={themed($appearanceButton)}
-                      onPress={(event) => openAppearancePicker(index, event)}
-                    >
-                      <PlayerMark
-                        seatNumber={index + 1}
-                        shape={player.shape}
-                        color={player.color}
-                        size={32}
-                      />
-                    </TouchableOpacity>
-                    <TextField
-                      testID={`player-name-${index + 1}`}
-                      value={names[index]}
-                      placeholder={defaultName(index)}
-                      accessibilityLabel={translate("play:newGame.nameForPlayer", {
-                        seat: index + 1,
-                      })}
-                      maxLength={MAX_PLAYER_NAME_LENGTH}
-                      status={nameValidation.errors[index] ? "error" : undefined}
-                      helper={
-                        nameValidation.errors[index] ??
-                        (nameFailsGate(names[index])
-                          ? translate("play:newGame.nameGateHelper", { name: defaultName(index) })
-                          : undefined)
-                      }
-                      containerStyle={themed($nameField)}
-                      onBlur={() => savePlayers()}
-                      onChangeText={(value) => {
-                        setEdited(true)
-                        dispatch({ type: "rename", seat: index, name: value })
-                      }}
-                    />
-                  </View>
-                ))}
-              </View>
+            <PlayerNames
+              players={players}
+              names={names}
+              errors={nameValidation.errors}
+              onOpenAppearance={openAppearancePicker}
+              onRename={(seat, name) => {
+                setEdited(true)
+                dispatch({ type: "rename", seat, name })
+              }}
+              onNameBlur={() => savePlayers()}
+            >
               {teams ? (
                 <TeamPicker
                   players={players}
@@ -1043,93 +907,48 @@ function NewGameForm({
                 />
               ) : null}
               {account ? (
-                <View style={themed($accountSeat)}>
-                  <SelectField
-                    testID="me-seat"
-                    label={translate("play:newGame.thisIsMe")}
-                    field="thisIsMe"
-                    value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
-                    placeholder={translate("play:newGame.noSeat")}
-                    clearLabel={translate("play:newGame.noSeat")}
-                    disabled={pinning || matchLocked}
-                    options={players.map((player, index) => ({
-                      id: String(index),
-                      label: player.name,
-                    }))}
-                    onSelect={(value) => {
-                      setEdited(true)
-                      chooseMeSeat(value)
-                    }}
-                  />
-                  {effectiveMeSeat !== undefined && system && attachesDecks(system) ? (
-                    <SelectField
-                      testID="me-deck"
-                      label={translate("play:newGame.yourDeck")}
-                      field="yourDeck"
-                      value={deck ? deckChoiceId(deck) : undefined}
-                      placeholder={
-                        deckChoices.length === 0 && account.decks === "unavailable"
-                          ? translate("play:newGame.decksUnavailable")
-                          : deckChoices.length === 0 && account.decks === undefined
-                            ? translate("play:newGame.loadingDecks")
-                            : deckChoices.length === 0
-                              ? translate("play:newGame.noMatchingDecks")
-                              : translate("play:newGame.noDeck")
-                      }
-                      clearLabel={translate("play:newGame.noDeck")}
-                      disabled={
-                        pinning ||
-                        matchLocked ||
-                        (deckList === undefined && deckChoices.length === 0 && !deck)
-                      }
-                      options={[
-                        ...(deck &&
-                        !deckChoices.some((choice) => deckChoiceId(choice) === deckChoiceId(deck))
-                          ? [
-                              {
-                                id: deckChoiceId(deck)!,
-                                label: deck.name,
-                                accessory: deck.localId ? <DeviceGlyph /> : undefined,
-                                accessibilityLabel: deck.localId
-                                  ? translate("decks:stats.onDeviceLabel", { name: deck.name })
-                                  : undefined,
-                              },
-                            ]
-                          : []),
-                        ...deckChoices.map((choice) => ({
-                          id: deckChoiceId(choice)!,
-                          label: joinParts([
-                            choice.name,
-                            choice.versionLabel,
-                            choice.sharedToken ? translate("decks:shared.tag") : undefined,
-                          ]),
-                          accessory: choice.localId ? <DeviceGlyph /> : undefined,
-                          accessibilityLabel: choice.localId
-                            ? translate("decks:stats.onDeviceLabel", { name: choice.name })
-                            : undefined,
-                        })),
-                      ]}
-                      onSelect={(id) => {
-                        setEdited(true)
-                        void chooseDeck(id)
-                      }}
-                    />
-                  ) : null}
-                  {deck && tracksMulligans && effectiveMeSeat !== undefined ? (
-                    <FreeMulligansChoice
-                      rule={freeMulligans}
-                      onChange={(rule) => {
-                        setEdited(true)
-                        setFreeMulligans(rule)
-                        if (accountInput)
-                          savePlayers(seatAppearances, { ...accountInput, freeMulligans: rule })
-                      }}
-                    />
-                  ) : null}
-                </View>
+                <AccountSeat
+                  seatNames={nameValidation.names}
+                  meSeat={effectiveMeSeat}
+                  disabled={pinning || matchLocked}
+                  onSeat={(value) => {
+                    setEdited(true)
+                    chooseMeSeat(value)
+                  }}
+                  deckPicker={
+                    effectiveMeSeat !== undefined && system && attachesDecks(system)
+                      ? {
+                          deck,
+                          choices: deckChoices,
+                          decks: account.decks,
+                          disabled:
+                            pinning ||
+                            matchLocked ||
+                            (deckList === undefined && deckChoices.length === 0 && !deck),
+                          onChoose: (id) => {
+                            setEdited(true)
+                            void chooseDeck(id)
+                          },
+                        }
+                      : undefined
+                  }
+                  mulligans={
+                    deck && tracksMulligans && effectiveMeSeat !== undefined
+                      ? {
+                          rule: freeMulligans,
+                          onChange: (rule) => {
+                            setEdited(true)
+                            setFreeMulligans(rule)
+                            if (accountInput)
+                              savePlayers(seatAppearances, { ...accountInput, freeMulligans: rule })
+                          },
+                        }
+                      : undefined
+                  }
+                />
               ) : null}
               {playerSaveError ? <Text accessibilityRole="alert" text={playerSaveError} /> : null}
-            </View>
+            </PlayerNames>
           ) : null}
         </Screen>
         <BottomActionBar endsWithLink={Boolean(statusText || joinInFooter)} style={themed($footer)}>
@@ -1277,7 +1096,7 @@ function NewGameForm({
           </View>
         </BottomActionBar>
       </>
-      <Sheet
+      <SetupOptionsSheet
         visible={optionsOpen}
         onClose={closeOptions}
         onDismissed={() =>
@@ -1285,199 +1104,25 @@ function NewGameForm({
             current?.afterSheet ? { ...current, afterSheet: false } : current,
           )
         }
-        testID="setup-options-dialog"
-      >
-        <ScrollView
-          style={themed($sheetScroll)}
-          contentContainerStyle={themed([$sheetScrollContent, $statusDetails])}
-        >
-          {matchOffered ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.match" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="match-mode"
-                accessibilityLabel={translate("play:newGame.match")}
-                segments={[
-                  { id: "off", label: translate("play:newGame.singleGame") },
-                  { id: "on", label: translate("play:newGame.bestOf") },
-                ]}
-                selectedId={matchBestOf ? "on" : "off"}
-                onSelect={(value) => dispatch({ type: "toggleMatch", on: value === "on" })}
-              />
-              {matchBestOf ? (
-                <SegmentedControl
-                  testID="match-best-of"
-                  accessibilityLabel={translate("play:newGame.bestOf")}
-                  segments={MATCH_BEST_OF.map((bestOf) => ({
-                    id: String(bestOf),
-                    label: translate("play:newGame.bestOfCount", { bestOf }),
-                  }))}
-                  selectedId={String(matchBestOf)}
-                  onSelect={(value) =>
-                    set({ chosenBestOf: MATCH_BEST_OF.find((bestOf) => String(bestOf) === value) })
-                  }
-                />
-              ) : null}
-            </View>
-          ) : null}
-
-          {!connectedMode && !localGame ? (
-            <View style={themed($section)}>
-              <Text tx="play:newGame.clock" preset="subheading" accessibilityRole="header" />
-              <SegmentedControl
-                testID="clock-mode"
-                accessibilityLabel={translate("play:newGame.clock")}
-                segments={CLOCK_MODES.map(({ id, labelTx }) => ({
-                  id,
-                  label: translate(labelTx),
-                }))}
-                selectedId={draft.clockMode}
-                onSelect={(value) => {
-                  const mode = CLOCK_MODES.find(({ id }) => id === value)?.id
-                  if (mode) set({ clockMode: mode })
-                }}
-              />
-              {draft.clockMode === "countdown" ? (
-                <ValueField
-                  testID="clock-minutes"
-                  label={translate("play:newGame.minutesLeft")}
-                  value={clockMinutes}
-                  min={ROUND_CLOCK_MINUTES.min}
-                  max={ROUND_CLOCK_MINUTES.max}
-                  longStep={ROUND_CLOCK_MINUTES.step}
-                  onChange={(chosenClockMinutes) => set({ chosenClockMinutes })}
-                />
-              ) : null}
-            </View>
-          ) : null}
-
-          <View style={themed($section)}>
-            <SelectField
-              testID="life-step"
-              label={translate("play:newGame.changeBy")}
-              field="changeBy"
-              value={String(lifeStep)}
-              options={LIFE_STEP_OPTIONS.map((step) => ({
-                id: String(step),
-                label: formatNumber(step),
-              }))}
-              onSelect={(value) => {
-                const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
-                if (next) set({ lifeStep: next })
-              }}
-            />
-          </View>
-
-          <View style={themed($section)}>
-            <Text tx="play:newGame.layout" preset="subheading" accessibilityRole="header" />
-            <PlayerLayoutPicker
-              playerCount={playerCount}
-              value={layout}
-              onChange={(chosenLayout) => set({ chosenLayout })}
-            />
-          </View>
-        </ScrollView>
-        <Button
-          testID="setup-options-done"
-          tx="common:done"
-          preset="primary"
-          onPress={closeOptions}
-        />
-      </Sheet>
-      <DialogCard
+        draft={draft}
+        setup={setup}
+        onChange={set}
+        onToggleMatch={(on) => dispatch({ type: "toggleMatch", on })}
+        matchOffered={matchOffered}
+        clockOffered={!connectedMode && !localGame}
+      />
+      <SetupStatusDialog
         visible={showStatus}
         onClose={() => setShowStatus(false)}
-        dialogTestID="setup-status-dialog"
-        accessibilityViewIsModal
-      >
-        <ScrollView
-          style={themed($sheetScroll)}
-          contentContainerStyle={themed([$sheetScrollContent, $statusDetails])}
-        >
-          {connectedMode && connected?.blockedReason ? (
-            <Text accessibilityRole="alert" size="xs" text={connected.blockedReason} tone="dim" />
-          ) : null}
-          {connectedMode && connected?.error ? (
-            <View style={themed($connectedError)}>
-              <Text
-                accessibilityRole="alert"
-                size="xs"
-                text={connected.error}
-                style={themed($footerNote)}
-              />
-              {connected.retry ? (
-                <Button
-                  testID="retry-connected-host-preparation"
-                  tx="common:tryAgain"
-                  style={themed($retryConnected)}
-                  onPress={connected.retry}
-                />
-              ) : null}
-            </View>
-          ) : null}
-          {connectedMode &&
-          connected &&
-          !connected.ready &&
-          !connected.error &&
-          connected.retry &&
-          connected.blockedReason &&
-          !connected.access ? (
-            <Button tx="play:newGame.retryConnection" onPress={connected.retry} />
-          ) : null}
-
-          {connectedGames.length ? (
-            <View style={themed($section)}>
-              <Text
-                tx="play:newGame.yourConnectedGames"
-                preset="subheading"
-                accessibilityRole="header"
-              />
-              {connectedGames.map((game) => (
-                <View key={game.publicId} style={themed($connectedGame)}>
-                  <ConnectedGameRow
-                    game={game}
-                    now={Date.now()}
-                    onPress={() => onResumeConnected?.(game)}
-                  />
-                  <TouchableOpacity
-                    testID={`${game.isHost ? "end" : "leave"}-connected-${game.publicId}`}
-                    accessibilityRole="button"
-                    disabled={busy || !connected?.ready}
-                    accessibilityState={{ disabled: busy || !connected?.ready }}
-                    style={themed($localEndAction)}
-                    onPress={() => {
-                      setShowStatus(false)
-                      setGameToExit(game)
-                    }}
-                  >
-                    <Text
-                      tx={
-                        game.isHost
-                          ? "play:newGame.endGameEllipsis"
-                          : "play:newGame.leaveGameEllipsis"
-                      }
-                      tone="dim"
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {connected?.exitError ? (
-                <Text
-                  accessibilityRole="alert"
-                  style={themed($footerNote)}
-                  text={connected.exitError}
-                />
-              ) : null}
-              {connected?.activeGamesNextPage?.status === "available" ? (
-                <Button tx="play:newGame.loadMore" onPress={connected.activeGamesNextPage.load} />
-              ) : connected?.activeGamesNextPage?.status === "loading" ? (
-                <Text size="xs" tone="dim" tx="play:newGame.loadingMoreGames" />
-              ) : null}
-            </View>
-          ) : null}
-        </ScrollView>
-        <Button tx="common:done" onPress={() => setShowStatus(false)} />
-      </DialogCard>
+        connectedMode={connectedMode}
+        connected={connected}
+        busy={busy}
+        onResumeConnected={onResumeConnected}
+        onExit={(game) => {
+          setShowStatus(false)
+          setGameToExit(game)
+        }}
+      />
       {gameToExit ? (
         <ConfirmDialog
           visible
@@ -1609,54 +1254,10 @@ function tabsLockedTo(tabs: readonly GameTab[], selectedId: string) {
   })
 }
 
-function defaultName(index: number) {
-  return translate("board:playerNames.default", { number: index + 1 })
-}
-
 const CONTENT_MAX_WIDTH = 720
-const MIN_NAME_ROW_WIDTH = 280
-
 const $root: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
 const $form: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $summaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-})
-const $summaryText: ThemedStyle<TextStyle> = ({ colors }) => ({ flex: 1, color: colors.textDim })
-const $changeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 40,
-  paddingVertical: spacing.xxs,
-})
-const $nameList: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  columnGap: spacing.md,
-  rowGap: spacing.sm,
-})
-const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  flexGrow: 1,
-  flexShrink: 1,
-  flexBasis: MIN_NAME_ROW_WIDTH,
-})
-const $connectedError: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $connectedGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $retryConnected: ThemedStyle<ViewStyle> = () => ({ minHeight: 40 })
-const $nameField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $accountSeat: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xs,
-  marginTop: spacing.xs,
-})
-const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
-  width: 44,
-  height: 44,
-  alignItems: "center",
-  justifyContent: "center",
-})
 const FOOTER_ROW_MAX_FONT_SCALE = 1.4
 const FOOTER_MAX_FONT_SCALE = 2
 const $footerButtonText = { maxFontSizeMultiplier: FOOTER_MAX_FONT_SCALE }
@@ -1678,14 +1279,6 @@ const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $footerAction: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $footerStack: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-
-const $localEndAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 44,
-  justifyContent: "center",
-  alignItems: "center",
-  paddingVertical: spacing.xs,
-})
 const $statusRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   height: BOTTOM_LINK_HEIGHT,
   flexDirection: "row",
@@ -1701,7 +1294,6 @@ const $statusText: ThemedStyle<TextStyle> = ({ colors }) => ({
   flex: 1,
   color: colors.textDim,
 })
-const $statusDetails: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $resumeAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexShrink: 1,
   paddingHorizontal: spacing.md,
