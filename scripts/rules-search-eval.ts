@@ -23,9 +23,13 @@ type Case = {
 }
 
 // why: nobody tunes search against the held-out cases, so their score shows whether a change helps questions it never saw. Reading them to fix a miss turns them into practice cases.
-const SETS = { practice: "", heldout: ".heldout" }
+// why: a player types two or three words and starts over the moment the list is empty or wrong, so the typing cases (held-out questions cut to what a player types, written without seeing results) are scored at every keystroke, and their floor counts searches that survive the whole way.
+const SETS = { practice: "", heldout: ".heldout", typing: ".typing" }
 type CaseSet = keyof typeof SETS
-const FLOOR = { mtg: { practice: 427, heldout: 97 }, fab: { practice: 62, heldout: 22 } }
+const FLOOR = {
+  mtg: { practice: 427, heldout: 97, typing: 112 },
+  fab: { practice: 62, heldout: 22, typing: 21 },
+}
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
 const TOP = 3
@@ -75,6 +79,26 @@ function rankOf(screens: Set<string>[], wanted: Case["rules"]) {
   return ranks.includes(-1) ? -1 : Math.max(...ranks)
 }
 
+function survivesTyping(
+  rules: ComprehensiveRules,
+  source: TextRules,
+  { query, rules: wanted }: Case,
+) {
+  const typed = query.trim()
+  for (let end = 1; end <= typed.length; end++)
+    if (searchRules(rules, typed.slice(0, end), 1).length === 0) return false
+  const words = typed.split(/\s+/)
+  return words.every((_, at) => {
+    const shown = searchRules(rules, words.slice(0, at + 1).join(" "), TOP)
+    return (
+      rankOf(
+        shown.map((result) => screenOpenedBy(rules, source, result)),
+        wanted,
+      ) >= 0
+    )
+  })
+}
+
 function percentile(sorted: number[], p: number) {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]
 }
@@ -100,7 +124,7 @@ function evaluate(
   const seen = new Set<string>()
   for (const [at, { query, rules: wanted }] of cases.entries()) {
     const key = query.trim().toLowerCase()
-    const named = set === "heldout" ? `case ${at + 1}` : `"${query}"`
+    const named = set === "practice" ? `"${query}"` : `case ${at + 1}`
     if (seen.has(key)) problems.push(`${named} repeats an earlier query`)
     seen.add(key)
     for (const id of wanted.flat())
@@ -119,6 +143,7 @@ function evaluate(
   const hits: string[] = []
   const misses: string[] = []
   let passed = 0
+  let survived = 0
   let inTop = 0
   let empty = 0
   const copied = { passed: 0, total: 0 }
@@ -143,6 +168,7 @@ function evaluate(
       hits.push(entry.query)
     }
     if (rank >= 0 && rank < TOP) inTop++
+    if (set === "typing" && survivesTyping(rules, source, entry)) survived++
     if (results.length === 0) empty++
     if (phrased.has(entry.query.trim().toLowerCase())) {
       copied.total++
@@ -161,7 +187,7 @@ function evaluate(
   const sorted = timings.toSorted((a, b) => a - b)
   const p95 = percentile(sorted, 0.95)
   console.log(
-    `${system} ${set}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
+    `${system} ${set}: ${cases.length} cases · first ${percent(passed, cases.length)}${set === "typing" ? ` · survives typing ${percent(survived, cases.length)}` : ""} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
   )
   console.log(
     `  ${[...groups].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}${copied.total ? ` · same as a shipped phrasing ${percent(copied.passed, copied.total)}` : ""}`,
@@ -178,8 +204,9 @@ function evaluate(
     if (set === "practice") for (const query of lost) console.log(`  lost: ${query}`)
   }
   if (values.misses && set === "practice") console.log(misses.join("\n"))
-  if (!values.cases && passed < FLOOR[system][set])
-    problems.push(`answered ${passed}, below the floor of ${FLOOR[system][set]}`)
+  const scored = set === "typing" ? survived : passed
+  if (!values.cases && scored < FLOOR[system][set])
+    problems.push(`scored ${scored}, below the floor of ${FLOOR[system][set]}`)
   if (p95 > P95_BUDGET_MS) problems.push(`p95 ${p95.toFixed(2)}ms is over ${P95_BUDGET_MS}ms`)
   for (const problem of problems) console.log(`  fail: ${problem}`)
   return problems.length === 0
