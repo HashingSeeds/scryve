@@ -239,6 +239,24 @@ describe("searchRules ranking", () => {
     expect(ids("deathtuch")[0]).toBe("702.2")
   })
 
+  it("ranks a word typed in full over longer words it starts", () => {
+    const draw: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "1",
+          title: "Game Concepts",
+          sections: [
+            { id: "100", title: "General", rules: [rule("100.1", "Drawbacks.")] },
+            { id: "101", title: "Turns", rules: [rule("101.1", "Each player may draw a card.")] },
+          ],
+        },
+      ],
+      glossary: [],
+      notice: [],
+    }
+    expect(searchRules(draw, "draw")[0]).toMatchObject({ rule: { id: "101.1" } })
+  })
+
   it("lists one result per rule screen, shown by the subrule that says the words", () => {
     expect(ids("untapped blockers")).toEqual(["509.1a"])
   })

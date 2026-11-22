@@ -33,6 +33,8 @@ const BM25_B = 0.5
 const TYPO_MIN_LENGTH = 6
 const INHERITED_WEIGHT = 0.5
 const TERM_WEIGHT = 0.4
+// why: a player who has typed a whole word means that word, so longer words it only starts ("block" in "blockers") still match while typing but rank below it.
+const COMPLETION_WEIGHT = 0.3
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
 const STOPWORDS = new Set(
@@ -278,7 +280,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     const near = spelled.get(wanted)
     for (const [word, list] of index.postings) {
       if (!(near ? near.has(word) : matchesWord(word, wanted, prefix))) continue
-      const rarity = idf(index, list)
+      const rarity = idf(index, list) * (near || word === wanted ? 1 : COMPLETION_WEIGHT)
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
         const norm = BM25_K1 * (1 - BM25_B + (BM25_B * index.lengths[at]) / index.average)
