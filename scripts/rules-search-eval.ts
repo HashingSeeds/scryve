@@ -24,12 +24,18 @@ type Case = {
 
 // why: nobody tunes search against the held-out cases, so their score shows whether a change helps questions it never saw. Reading them to fix a miss turns them into practice cases.
 // why: a player types two or three words and starts over the moment the list is empty or wrong, so the typing cases (held-out questions cut to what a player types, written without seeing results) are scored at every keystroke, and their floor counts searches that survive the whole way.
-const SETS = { practice: "", heldout: ".heldout", typing: ".typing" }
+// why: the typing practice cases are practice questions cut the same way by other models, so search can be tuned for typing without spending the held-out typing cases.
+const SETS = {
+  "practice": { file: "", typed: false, tuned: true },
+  "heldout": { file: ".heldout", typed: false, tuned: false },
+  "typing practice": { file: ".typing-practice", typed: true, tuned: true },
+  "typing": { file: ".typing", typed: true, tuned: false },
+}
 type CaseSet = keyof typeof SETS
 const FLOOR = {
-  mtg: { practice: 427, heldout: 97, typing: 112 },
-  fab: { practice: 62, heldout: 22, typing: 21 },
-}
+  mtg: { "practice": 431, "heldout": 100, "typing practice": 276, "typing": 114 },
+  fab: { "practice": 62, "heldout": 22, "typing practice": 44, "typing": 24 },
+} satisfies Record<string, Record<CaseSet, number>>
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
 const TOP = 3
@@ -124,7 +130,7 @@ function evaluate(
   const seen = new Set<string>()
   for (const [at, { query, rules: wanted }] of cases.entries()) {
     const key = query.trim().toLowerCase()
-    const named = set === "practice" ? `"${query}"` : `case ${at + 1}`
+    const named = SETS[set].tuned ? `"${query}"` : `case ${at + 1}`
     if (seen.has(key)) problems.push(`${named} repeats an earlier query`)
     seen.add(key)
     for (const id of wanted.flat())
@@ -163,10 +169,10 @@ function evaluate(
       const tally = groups.get(group) ?? { passed: 0, total: 0 }
       groups.set(group, { passed: tally.passed + (hit ? 1 : 0), total: tally.total + 1 })
     }
-    const survives = set === "typing" && survivesTyping(rules, source, entry)
+    const survives = SETS[set].typed && survivesTyping(rules, source, entry)
     if (survives) survived++
     if (hit) passed++
-    if (set === "typing" ? survives : hit) hits.push(entry.query)
+    if (SETS[set].typed ? survives : hit) hits.push(entry.query)
     if (rank >= 0 && rank < TOP) inTop++
     if (results.length === 0) empty++
     if (phrased.has(entry.query.trim().toLowerCase())) {
@@ -186,7 +192,7 @@ function evaluate(
   const sorted = timings.toSorted((a, b) => a - b)
   const p95 = percentile(sorted, 0.95)
   console.log(
-    `${system} ${set}: ${cases.length} cases · first ${percent(passed, cases.length)}${set === "typing" ? ` · survives typing ${percent(survived, cases.length)}` : ""} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
+    `${system} ${set}: ${cases.length} cases · first ${percent(passed, cases.length)}${SETS[set].typed ? ` · survives typing ${percent(survived, cases.length)}` : ""} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
   )
   console.log(
     `  ${[...groups].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}${copied.total ? ` · same as a shipped phrasing ${percent(copied.passed, copied.total)}` : ""}`,
@@ -200,10 +206,10 @@ function evaluate(
     console.log(
       `  against ${values.against}: gained ${hits.filter((query) => !was.has(query)).length} · lost ${lost.length}`,
     )
-    if (set === "practice") for (const query of lost) console.log(`  lost: ${query}`)
+    if (SETS[set].tuned) for (const query of lost) console.log(`  lost: ${query}`)
   }
-  if (values.misses && set === "practice") console.log(misses.join("\n"))
-  const scored = set === "typing" ? survived : passed
+  if (values.misses && SETS[set].tuned) console.log(misses.join("\n"))
+  const scored = SETS[set].typed ? survived : passed
   if (!values.cases && scored < FLOOR[system][set])
     problems.push(`scored ${scored}, below the floor of ${FLOOR[system][set]}`)
   if (p95 > P95_BUDGET_MS) problems.push(`p95 ${p95.toFixed(2)}ms is over ${P95_BUDGET_MS}ms`)
@@ -228,7 +234,7 @@ async function main() {
     )
     for (const set of sets) {
       const file =
-        values.cases ?? path.join(__dirname, "rules-search", `${system}${SETS[set]}.json`)
+        values.cases ?? path.join(__dirname, "rules-search", `${system}${SETS[set].file}.json`)
       ok = evaluate(system, set, file, source, rules) && ok
     }
   }
