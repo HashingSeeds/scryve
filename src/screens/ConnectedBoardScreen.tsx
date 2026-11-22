@@ -699,6 +699,28 @@ export function ConnectedBoardWithRuntime({
   )
 }
 
+type BoardOverlay =
+  | "status"
+  | "match"
+  | "finish"
+  | "leave"
+  | "players"
+  // why: iOS can't present the invite sheet until the player actions Modal has faded out.
+  | "inviteAfterPlayers"
+  | "invite"
+  | "role"
+  | "turn"
+  | "log"
+
+const GRID_LOCKING_OVERLAYS: ReadonlySet<BoardOverlay> = new Set([
+  "status",
+  "match",
+  "finish",
+  "players",
+  "inviteAfterPlayers",
+  "role",
+])
+
 const ConnectedBoardReady = memo(function ConnectedBoardReady({
   publicId,
   initialInviteOpen,
@@ -731,25 +753,23 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const [statusOpen, setStatusOpen] = useState(false)
-  const [matchOpen, setMatchOpen] = useState(false)
+  const [overlay, setOverlay] = useState<BoardOverlay | undefined>(
+    initialInviteOpen ? "invite" : undefined,
+  )
+  const close = useCallback(
+    (shown: BoardOverlay) => setOverlay((current) => (current === shown ? undefined : current)),
+    [],
+  )
+  const [abandonedOpen, setAbandonedOpen] = useState(false)
   const [matchEnding, setMatchEnding] = useState<"choosing" | "sending">()
   const [matchEndError, setMatchEndError] = useState<string>()
-  const [confirmingFinish, setConfirmingFinish] = useState(false)
-  const [confirmingLeave, setConfirmingLeave] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [leaveError, setLeaveError] = useState<string>()
-  const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
-  const [roleOpen, setRoleOpen] = useState(false)
-  const [inviteOpen, setInviteOpen] = useState(initialInviteOpen ?? false)
-  // why: iOS can't present the invite sheet until the player actions Modal has faded out.
-  const [inviteAfterActions, setInviteAfterActions] = useState(false)
   const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
   const [layoutChoice, setLayoutChoice] = useState(() => loadLayoutChoice(publicId))
   const finishSubmitInFlight = useRef(false)
-  const [abandonedOpen, setAbandonedOpen] = useState(false)
   const navigatedTerminal = useRef(false)
   const game = view.game
   const { syncSignal, offlineSince, finishBlocker } = view
@@ -774,9 +794,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const [turnsEnabled] = useTurnsEnabled(localGameRepository)
   const [chessMinutes] = useChessMinutes(localGameRepository)
   const chessAppliedTo = useRef<string>(undefined)
-  const [turnOpen, setTurnOpen] = useState(false)
-  const [logOpen, setLogOpen] = useState(false)
-  const openLog = useCallback(() => setLogOpen(true), [])
+  const openLog = useCallback(() => setOverlay("log"), [])
   const [passUndo, setPassUndo] = useState<{ operationId: string; passerId: string }>()
   useEffect(() => {
     if (!passUndo) return
@@ -1046,7 +1064,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       {
         kind: "players",
         label: translate("connected:board.menu.players"),
-        onPress: () => setPlayerActionsOpen(true),
+        onPress: () => setOverlay("players"),
       },
       leave
         ? {
@@ -1054,7 +1072,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             label: translate("connected:board.menu.leave"),
             onPress: () => {
               setLeaveError(undefined)
-              setConfirmingLeave(true)
+              setOverlay("leave")
             },
           }
         : {
@@ -1066,7 +1084,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             onPress: () => {
               const runtime = controls.current()
               if (finishBlockerFor(runtime)) {
-                setStatusOpen(true)
+                setOverlay("status")
                 return
               }
               const projection = runtime.status === "ready" ? runtime.projection : undefined
@@ -1077,7 +1095,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               setWinnerPlayerIds(
                 outcome?.kind === "win" ? outcome.winnerPlayerIds : (standing ?? []),
               )
-              setConfirmingFinish(true)
+              setOverlay("finish")
             },
           },
     ],
@@ -1085,7 +1103,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     signal: boardSyncMenuSignal(syncSignal),
     statusLine:
       syncStatusText && syncSignal.kind !== "live"
-        ? { text: syncStatusText, tone: syncSignal.kind, onPress: () => setStatusOpen(true) }
+        ? { text: syncStatusText, tone: syncSignal.kind, onPress: () => setOverlay("status") }
         : match && matchLine
           ? {
               text: translate("board:match.statusLine", {
@@ -1093,7 +1111,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 bestOf: match.bestOf,
               }),
               tone: "caughtUp",
-              onPress: () => setMatchOpen(true),
+              onPress: () => setOverlay("match"),
             }
           : undefined,
     accountEntry,
@@ -1172,7 +1190,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             localGameRepository.notePass()
             passTo(next)
           },
-          onLongPress: () => setTurnOpen(true),
+          onLongPress: () => setOverlay("turn"),
         }
       : undefined
   const handSize = mulliganHandSize(system)
@@ -1318,34 +1336,29 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   useStoreReview(
     game.status === "finished" &&
       !menuOpen &&
-      !statusOpen &&
       !chrome.layoutOpen &&
-      !confirmingFinish &&
-      !playerActionsOpen,
+      overlay !== "status" &&
+      overlay !== "finish" &&
+      overlay !== "players",
   )
 
-  const inviteDialogOpen = invitation !== undefined && inviteOpen
+  const inviteDialogOpen = invitation !== undefined && overlay === "invite"
   const inviteSheet = useSheetPresence(inviteDialogOpen || undefined)
   // why: the invite sheet must stay mounted to animate out after its invitation is gone.
   const lastInvitation = useRef(invitation)
   if (invitation) lastInvitation.current = invitation
   const shownInvitation = lastInvitation.current
   useEffect(() => {
-    if (inviteOpen && invitation === undefined) setInviteOpen(false)
-  }, [inviteOpen, invitation])
+    if (overlay === "invite" && invitation === undefined) close("invite")
+  }, [overlay, invitation, close])
   const overlayOpen =
     menuOpen ||
-    statusOpen ||
     chrome.layoutOpen ||
-    confirmingFinish ||
-    playerActionsOpen ||
-    roleOpen ||
     inviteDialogOpen ||
-    inviteAfterActions ||
     Boolean(inviteSheet.shown) ||
     abandonedOpen ||
-    matchOpen ||
-    matchEnding !== undefined
+    matchEnding !== undefined ||
+    (overlay !== undefined && GRID_LOCKING_OVERLAYS.has(overlay))
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
     seat: player.seat,
@@ -1418,7 +1431,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         )}
       />
 
-      {turnOpen && table ? (
+      {overlay === "turn" && table ? (
         <TurnDialog
           turn={turn}
           seats={turnSeats}
@@ -1426,7 +1439,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             canPick: (playerId) => (turn ? myTurn : controlled.has(playerId)),
             onPick: (playerId) => {
               table.setTurn(actingSeat ?? playerId, playerId)
-              setTurnOpen(false)
+              close("turn")
             },
           }}
           onUndo={
@@ -1434,7 +1447,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               ? () => {
                   table.undoTurn(undoSeat, turn.operationId)
                   setPassUndo(undefined)
-                  setTurnOpen(false)
+                  close("turn")
                 }
               : undefined
           }
@@ -1442,11 +1455,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             const mine = turnSeats.find(({ playerId }) => controlled.has(playerId))
             return turn && mine ? (bankMs) => table.setBank(mine.playerId, bankMs) : undefined
           })()}
-          onClose={() => setTurnOpen(false)}
+          onClose={() => close("turn")}
         />
       ) : null}
 
-      {logOpen && logFeed ? (
+      {overlay === "log" && logFeed ? (
         <ConnectedLogDialog
           publicId={publicId}
           Feed={logFeed}
@@ -1462,14 +1475,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             table?.undoTurn(playerId, operationId)
             setPassUndo(undefined)
           }}
-          onClose={() => setLogOpen(false)}
+          onClose={() => close("log")}
         />
       ) : null}
 
       {inviteSheet.shown && shownInvitation ? (
         <Sheet
           visible={inviteSheet.visible}
-          onClose={() => setInviteOpen(false)}
+          onClose={() => close("invite")}
           onDismissed={inviteSheet.onDismissed}
           testID="invite-dialog"
         >
@@ -1480,14 +1493,14 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             onShare={() => void shareInvite()}
           />
           {inviteError ? <AlertNote text={inviteError} /> : null}
-          <Button tx="common:close" onPress={() => setInviteOpen(false)} />
+          <Button tx="common:close" onPress={() => close("invite")} />
         </Sheet>
       ) : null}
 
-      {statusOpen ? (
+      {overlay === "status" ? (
         <DialogCard
           visible
-          onClose={() => setStatusOpen(false)}
+          onClose={() => close("status")}
           origin={menuDialogOrigin}
           backdropTestID="connected-status-backdrop"
           backdropAccessibilityLabel={translate("connected:board.status.close")}
@@ -1595,56 +1608,45 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               />
             ) : null}
           </ScrollView>
-          <Button tx="common:close" onPress={() => setStatusOpen(false)} />
+          <Button tx="common:close" onPress={() => close("status")} />
         </DialogCard>
       ) : null}
 
-      {playerActionsOpen && !cloud ? (
+      {overlay === "players" && !cloud ? (
         <NearbyPlayersDialog
           players={reportablePlayers}
           awayPlayerIds={awayPlayerIds}
           origin={menuDialogOrigin}
-          onClose={() => setPlayerActionsOpen(false)}
+          onClose={() => close("players")}
           onRole={
             myRole
               ? () => {
-                  setPlayerActionsOpen(false)
-                  setRoleOpen(true)
+                  setOverlay("role")
                 }
               : undefined
           }
         />
       ) : null}
 
-      {(playerActionsOpen || inviteAfterActions) && cloud ? (
+      {(overlay === "players" || overlay === "inviteAfterPlayers") && cloud ? (
         <PlayerActionsDialog
-          visible={playerActionsOpen}
-          onDismissed={
-            inviteAfterActions
-              ? () => {
-                  setInviteAfterActions(false)
-                  setInviteOpen(true)
-                }
-              : undefined
-          }
+          visible={overlay === "players"}
+          onDismissed={overlay === "inviteAfterPlayers" ? () => setOverlay("invite") : undefined}
           publicId={publicId}
           players={reportablePlayers}
           origin={menuDialogOrigin}
-          onClose={() => setPlayerActionsOpen(false)}
+          onClose={() => close("players")}
           onRole={
             myRole
               ? () => {
-                  setPlayerActionsOpen(false)
-                  setRoleOpen(true)
+                  setOverlay("role")
                 }
               : undefined
           }
           onInvite={
             invitation
               ? () => {
-                  setPlayerActionsOpen(false)
-                  if (Platform.OS === "ios") setInviteAfterActions(true)
-                  else setInviteOpen(true)
+                  setOverlay(Platform.OS === "ios" ? "inviteAfterPlayers" : "invite")
                 }
               : undefined
           }
@@ -1652,7 +1654,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       ) : null}
 
       <ModesDialog modes={boardModes} />
-      {roleOpen && myRole?.role && onRevealRole ? (
+      {overlay === "role" && myRole?.role && onRevealRole ? (
         <TreacheryRoleDialog
           role={myRole.role}
           revealed={myRole.roleRevealed === true}
@@ -1660,17 +1662,17 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           online={roleRevealOnline}
           origin={menuDialogOrigin}
           onReveal={onRevealRole}
-          onClose={() => setRoleOpen(false)}
+          onClose={() => close("role")}
         />
       ) : null}
 
-      {matchOpen && match ? (
+      {overlay === "match" && match ? (
         <MatchScoreDialog
           bestOf={match.bestOf}
           gameNumber={match.gameNumber}
           seats={matchSeats}
           draws={matchDraws}
-          onClose={() => setMatchOpen(false)}
+          onClose={() => close("match")}
         >
           {game.isHost && onEndMatch ? (
             <Button
@@ -1679,13 +1681,13 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               disabled={!match.canEnd}
               accessibilityHint={translate("board:match.endHint")}
               onPress={() => {
-                setMatchOpen(false)
+                close("match")
                 setMatchEndError(undefined)
                 setMatchEnding("choosing")
               }}
             />
           ) : null}
-          <Button tx="common:close" onPress={() => setMatchOpen(false)} />
+          <Button tx="common:close" onPress={() => close("match")} />
         </MatchScoreDialog>
       ) : null}
 
@@ -1726,10 +1728,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         </DialogCard>
       ) : null}
 
-      {confirmingFinish ? (
+      {overlay === "finish" ? (
         <DialogCard
           visible
-          onClose={() => setConfirmingFinish(false)}
+          onClose={() => close("finish")}
           closeDisabled={view.finishing}
           origin={menuDialogOrigin}
           backdropTestID="connected-finish-backdrop"
@@ -1779,7 +1781,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               tx="common:cancel"
               disabled={view.finishing}
               style={themed($dialogAction)}
-              onPress={() => setConfirmingFinish(false)}
+              onPress={() => close("finish")}
             />
             <Button
               testID="confirm-connected-finish-button"
@@ -1806,7 +1808,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                       )
                     : await controls.abandon()
                   if (!ended) return
-                  setConfirmingFinish(false)
+                  close("finish")
                   if (withResult && onRematch) return
                   navigatedTerminal.current = true
                   if (withResult) {
@@ -1824,7 +1826,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           </View>
         </DialogCard>
       ) : null}
-      {confirmingLeave && leave ? (
+      {overlay === "leave" && leave ? (
         <ConfirmDialog
           visible
           title={translate("play:newGame.leaveGameTitle")}
@@ -1839,7 +1841,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             leaveError ? <AlertNote testID="connected-leave-error" text={leaveError} /> : null
           }
           onConfirm={confirmLeave}
-          onClose={() => setConfirmingLeave(false)}
+          onClose={() => close("leave")}
         />
       ) : null}
     </Screen>
