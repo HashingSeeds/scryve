@@ -10,7 +10,7 @@ import {
 } from "@/features/game/dice"
 import { firstPlayerFlips } from "@/features/game/FirstPlayerChoice"
 
-import { mulliganHandSize } from "../../../convex/lib/mulligans"
+import { maxMulligans, mulliganHandSize } from "../../../convex/lib/mulligans"
 import type { SystemId } from "../../../convex/lib/systems"
 import { isTeamVariant } from "../../../convex/lib/teamVariants"
 
@@ -117,8 +117,8 @@ export function useConnectedPregame({
       if (action === "rule") return system && onRules?.(system, MULLIGAN_RULE)
       setMulliganDraft({
         ...mulligan,
-        ...(action === "mulligan" && handSize !== undefined
-          ? { taken: Math.min(handSize, mulligan.taken + 1) }
+        ...(action === "mulligan" && handSize !== undefined && game.freeMulligans
+          ? { taken: Math.min(maxMulligans(game.freeMulligans, handSize), mulligan.taken + 1) }
           : {}),
         ...(action === "skip" ? { skipped: true } : {}),
         ...(action === "help" || action === "close" ? { help: action === "help" } : {}),
@@ -133,12 +133,14 @@ const ROLLS_SHOWN_MS = 2500
 
 function useRollsShown(rolls: Readonly<Record<string, number>> | undefined) {
   const key = rolls ? JSON.stringify(rolls) : undefined
-  const [shown, setShown] = useState<string>()
+  const [expired, setExpired] = useState<string>()
   useEffect(() => {
-    if (!key) return
-    setShown(key)
-    const timer = setTimeout(() => setShown(undefined), ROLLS_SHOWN_MS)
+    if (!key) {
+      setExpired(undefined)
+      return
+    }
+    const timer = setTimeout(() => setExpired(key), ROLLS_SHOWN_MS)
     return () => clearTimeout(timer)
   }, [key])
-  return key !== undefined && shown === key
+  return key !== undefined && expired !== key
 }
