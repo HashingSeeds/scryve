@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Keyboard, Pressable, StyleSheet, useWindowDimensions, View } from "react-native"
 import type { ViewStyle } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
@@ -46,6 +46,7 @@ export interface RulesSheetLayer {
   key: string
   render: (controls: {
     active: boolean
+    opened: boolean
     dragGesture: SheetDragGesture
     onOverscrollDismiss: () => void
   }) => ReactNode
@@ -71,6 +72,7 @@ export function RulesSheet({
   const reducedMotion = useReducedMotion()
   const sheetHeight = Math.round(windowHeight * SHEET_HEIGHT_RATIO)
   const translateY = useSharedValue(reducedMotion ? 0 : sheetHeight)
+  const [opened, setOpened] = useState(Boolean(reducedMotion))
   const interactiveBack = useSharedValue(0)
   const dismissing = useRef(false)
 
@@ -130,9 +132,14 @@ export function RulesSheet({
   useEffect(() => {
     if (reducedMotion) {
       translateY.set(0)
+      setOpened(true)
       return
     }
-    translateY.set(withTiming(0, { duration: SHEET_OPEN_MS, easing: IOS_EASE }))
+    translateY.set(
+      withTiming(0, { duration: SHEET_OPEN_MS, easing: IOS_EASE }, (finished) => {
+        if (finished) runOnJS(setOpened)(true)
+      }),
+    )
   }, [reducedMotion, translateY])
 
   const backdropStyle = useAnimatedStyle(() => ({
@@ -191,6 +198,7 @@ export function RulesSheet({
               layer={layer}
               index={index}
               active={index === activeIndex}
+              opened={opened}
               covered={index < activeIndex}
               directlyUnderTop={index === layers.length - 2}
               popping={layer.key === poppingKey}
@@ -212,6 +220,7 @@ function SheetLayerView({
   layer,
   index,
   active,
+  opened,
   covered,
   directlyUnderTop,
   popping,
@@ -225,6 +234,7 @@ function SheetLayerView({
   layer: RulesSheetLayer
   index: number
   active: boolean
+  opened: boolean
   covered: boolean
   directlyUnderTop: boolean
   popping: boolean
@@ -336,7 +346,7 @@ function SheetLayerView({
       importantForAccessibility={active ? "auto" : "no-hide-descendants"}
       style={[StyleSheet.absoluteFill, themed($layer), layerStyle]}
     >
-      {layer.render({ active, dragGesture, onOverscrollDismiss })}
+      {layer.render({ active, opened, dragGesture, onOverscrollDismiss })}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, $layerDim, dimStyle]} />
     </Animated.View>
   )
