@@ -1,7 +1,11 @@
 import {
+  definingRule,
+  excerptSegments,
   findRules,
-  matchExcerpt,
+  ruleContext,
+  rulePreviewText,
   ruleReferences,
+  ruleTopic,
   searchRules,
   type ComprehensiveRules,
 } from "./comprehensiveRules"
@@ -121,22 +125,33 @@ it("ruleReferences links rule numbers and bare sections named as rules", () => {
   ])
 })
 
-describe("matchExcerpt", () => {
+describe("excerptSegments", () => {
   it("starts a long rule near the match, at a word", () => {
     const text = `${"Blocking creatures ".repeat(5)}must be untapped.`
-    expect(matchExcerpt(text, "UNTAPPED", 20)).toEqual({
-      before: "…creatures must be ",
-      match: "untapped",
-      after: ".",
-    })
+    expect(excerptSegments(text, new Set(["untap"]), undefined, 20)).toEqual([
+      { text: "…", matched: false },
+      { text: "creatures must be ", matched: false },
+      { text: "untapped", matched: true },
+      { text: ".", matched: false },
+    ])
   })
 
-  it("keeps the whole text when the match is a rule number", () => {
-    expect(matchExcerpt("Trample is a static ability.", "702.19")).toEqual({
-      before: "Trample is a static ability.",
-      match: "",
-      after: "",
-    })
+  it("keeps short rules uncropped even when the match is near the end", () => {
+    const text = "A commander cast from the command zone costs an additional {2} (commander tax)."
+    expect(excerptSegments(text, new Set(["tax"]), undefined, 60)).toEqual([
+      {
+        text: "A commander cast from the command zone costs an additional {2} (commander ",
+        matched: false,
+      },
+      { text: "tax", matched: true },
+      { text: ").", matched: false },
+    ])
+  })
+
+  it("keeps the whole text unhighlighted when no terms were matched", () => {
+    expect(excerptSegments("Trample is a static ability.")).toEqual([
+      { text: "Trample is a static ability.", matched: false },
+    ])
   })
 })
 
@@ -317,14 +332,64 @@ describe("searchRules ranking", () => {
     expect(searchRules(fab, "???")).toEqual([])
   })
 
-  it("marks the first matched word in an excerpt", () => {
-    expect(matchExcerpt("The defending player chooses blockers.", "can my creature block")).toEqual(
-      {
-        before: "The defending player chooses ",
-        match: "blockers",
-        after: ".",
-      },
+  it("returns matched stems from searchRules so excerpts highlight query, slang, and +1/+1 terms", () => {
+    const hit = searchRules(rules, "wrath")[0]
+    expect(hit).toMatchObject({ kind: "rule", rule: { id: "701.8b" } })
+    const segments =
+      hit?.kind === "rule" ? excerptSegments(hit.rule.text, hit.matched, hit.partial) : []
+    expect(segments.filter((s) => s.matched).map((s) => s.text.toLowerCase())).toEqual([
+      "destroy",
+      "all",
+      "creatures",
+    ])
+
+    const ptSegments = excerptSegments("Put a +1/+1 counter on it.", new Set(["+1/+1", "counter"]))
+    expect(ptSegments.filter((s) => s.matched).map((s) => s.text)).toEqual(["+1/+1", "counter"])
+  })
+
+  it("picks the defining subrule over short boilerplate on concept queries, and keeps specific subrules on narrower queries", () => {
+    const keywords: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "7",
+          title: "Additional Rules",
+          sections: [
+            {
+              id: "702",
+              title: "Keyword Abilities",
+              rules: [
+                rule("702.19", "Trample"),
+                rule(
+                  "702.19a",
+                  "Trample is a static ability that modifies the rules for assigning an attacking creature's combat damage.",
+                ),
+                rule(
+                  "702.19g",
+                  "Multiple instances of trample on the same creature are redundant. Multiple instances of trample over planeswalkers are redundant.",
+                ),
+              ],
+            },
+          ],
+        },
+      ],
+      glossary: [],
+      notice: [],
+      references: MAGIC_RULE_REFERENCE,
+    }
+    const ruleIds = (q: string) =>
+      searchRules(keywords, q)
+        .filter((r) => r.kind === "rule")
+        .map((r) => r.rule.id)
+
+    expect(ruleIds("trample")).toEqual(["702.19a"])
+    expect(ruleIds("multiple trample")).toEqual(["702.19g"])
+    expect(ruleContext(keywords, "702.19g")?.topic).toBe("Trample")
+    expect(definingRule(ruleContext(keywords, "702.19")!.group).id).toBe("702.19a")
+
+    const fabHeading = rule("8.3.5", "Go again\nGo again is a special resolution ability.")
+    expect(ruleTopic(fabHeading)).toBe("Go again")
+    expect(rulePreviewText([fabHeading], fabHeading)).toBe(
+      "Go again is a special resolution ability.",
     )
-    expect(matchExcerpt("Put a +1/+1 counter on it.", "+1/+1 counters").match).toBe("+1/+1")
   })
 })

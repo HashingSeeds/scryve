@@ -12,21 +12,68 @@ export type ComprehensiveRules = {
   references?: RegExp
 }
 
-export function findRules(rules: ComprehensiveRules, id: string) {
-  const section = rules.chapters
-    .flatMap((chapter) => chapter.sections)
-    .find((candidate) => id === candidate.id || id.startsWith(`${candidate.id}.`))
-  if (!section) return undefined
-  if (id === section.id) return { section, rules: section.rules }
-  const base = id.replace(/[a-z]+$/, "")
-  const group = section.rules.filter(
-    (rule) =>
-      rule.id === base || (rule.id.startsWith(base) && /^[a-z]+$/.test(rule.id.slice(base.length))),
-  )
-  return group.some((rule) => rule.id === id) ? { section, rules: group } : undefined
+export type RuleContext = {
+  section: RuleSection
+  baseRule: Rule
+  topic?: string
+  group: Rule[]
+  rule?: Rule
 }
 
-export type RuleSearchResult = { kind: "term"; entry: GlossaryEntry } | { kind: "rule"; rule: Rule }
+export function findRules(rules: ComprehensiveRules, id: string) {
+  const index = searchIndex(rules)
+  const section = index.sectionById.get(id)
+  if (section) return { section, rules: section.rules }
+  const at = index.ruleIndexById.get(id)
+  if (at === undefined) return undefined
+  const baseId = id.replace(/[a-z]+$/, "")
+  return { section: index.sectionByRule[at], rules: index.groupByBase.get(baseId) ?? [] }
+}
+
+export function ruleTopic(rule: Rule): string | undefined {
+  const firstLine = rule.text.split("\n", 1)[0].trim()
+  return firstLine && !/[.:!?]/.test(firstLine) ? firstLine : undefined
+}
+
+function isHeadingOnlyRule(rule: Rule): boolean {
+  const topic = ruleTopic(rule)
+  return topic !== undefined && topic === rule.text.trim()
+}
+
+export function definingRule(group: readonly Rule[]): Rule {
+  return group.length > 1 && isHeadingOnlyRule(group[0]) ? group[1] : group[0]
+}
+
+export function rulePreviewText(group: readonly Rule[], rule: Rule): string {
+  if (group.length > 1 && isHeadingOnlyRule(rule)) return group[1].text
+  if (ruleTopic(rule) && rule.text.includes("\n"))
+    return rule.text.slice(rule.text.indexOf("\n") + 1).trim()
+  return rule.text
+}
+
+export function ruleContext(rules: ComprehensiveRules, id: string): RuleContext | undefined {
+  const index = searchIndex(rules)
+  const section = index.sectionById.get(id)
+  if (section) {
+    const first = section.rules[0]
+    return first ? { section, baseRule: first, group: section.rules } : undefined
+  }
+  const at = index.ruleIndexById.get(id)
+  if (at === undefined) return undefined
+  const baseRule = index.baseRuleByRule[at]
+  const baseId = baseRule.id.replace(/[a-z]+$/, "")
+  return {
+    section: index.sectionByRule[at],
+    baseRule,
+    topic: ruleTopic(baseRule),
+    group: index.groupByBase.get(baseId) ?? [index.rules[at]],
+    rule: index.rules[at],
+  }
+}
+
+export type RuleSearchResult =
+  | { kind: "term"; entry: GlossaryEntry }
+  | { kind: "rule"; rule: Rule; matched?: ReadonlySet<string>; partial?: string }
 
 const BM25_K1 = 1.2
 const BM25_B = 0.5
@@ -70,6 +117,12 @@ function words(text: string) {
 type Postings = { rules: number[]; counts: number[] }
 type SearchIndex = {
   rules: Rule[]
+  sectionByRule: RuleSection[]
+  baseRuleByRule: Rule[]
+  groupByBase: Map<string, Rule[]>
+  ruleIndexById: Map<string, number>
+  sectionById: Map<string, RuleSection>
+  phrasingRules: Set<number>
   postings: Map<string, Postings>
   lengths: number[]
   average: number
@@ -85,6 +138,12 @@ export function searchIndex(source: ComprehensiveRules) {
   if (cached) return cached
   const sections = source.chapters.flatMap((chapter) => chapter.sections)
   const rules = sections.flatMap((section) => section.rules)
+  const sectionById = new Map(sections.map((section) => [section.id, section]))
+  const ruleIndexById = new Map(rules.map((rule, index) => [rule.id, index]))
+  const sectionByRule: RuleSection[] = []
+  const baseRuleByRule: Rule[] = []
+  const groupByBase = new Map<string, Rule[]>()
+  const phrasingRules = new Set<number>()
   const stems = new Map<string, string>()
   const postings = new Map<string, Postings>()
   const lists = new Map<string, Postings>()
@@ -110,19 +169,28 @@ export function searchIndex(source: ComprehensiveRules) {
     if (screen.length === 0) screens.set(id, screen)
     return screen
   }
+  const baseRules = new Map<string, Rule>()
   for (const section of sections) {
     const title = listsOf(section.title)
     for (const rule of section.rules) {
       const index = lengths.length
       const own = texts.get(rule.id) ?? []
       const baseId = rule.id.replace(/[a-z]+$/, "")
+      if (rule.id === baseId) baseRules.set(baseId, rule)
+      sectionByRule.push(section)
+      baseRuleByRule.push(baseRules.get(baseId) ?? rule)
+      const group = groupByBase.get(baseId) ?? []
+      if (group.length === 0) groupByBase.set(baseId, group)
+      group.push(rule)
+      const rulePhrasings = phrasings.get(rule.id) ?? []
+      if (rulePhrasings.length > 0) phrasingRules.add(index)
       screenOf(section.id).push(index)
       screenOf(baseId).push(index)
       for (const [found, weight] of [
         [own, 1],
         [title, INHERITED_WEIGHT],
         [baseId === rule.id ? [] : (texts.get(baseId) ?? []), INHERITED_WEIGHT],
-        [phrasings.get(rule.id) ?? [], 1],
+        [rulePhrasings, 1],
       ] as const)
         for (const list of found)
           if (list.rules[list.rules.length - 1] === index)
@@ -159,8 +227,14 @@ export function searchIndex(source: ComprehensiveRules) {
       opens: cited && known.has(cited) ? opens : undefined,
     }
   })
-  const index = {
+  const index: SearchIndex = {
     rules,
+    sectionByRule,
+    baseRuleByRule,
+    groupByBase,
+    ruleIndexById,
+    sectionById,
+    phrasingRules,
     postings,
     lengths,
     average,
@@ -254,6 +328,8 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     })
   }
   const scores = new Map<number, number>()
+  const stemHits = new Map<number, number>()
+  const matched = new Set<string>()
   const weights = new Map(stems.map((word) => [word, 1]))
   const slang = new Set(stems)
   if (partial !== undefined)
@@ -277,6 +353,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     const near = spelled.get(wanted)
     for (const [word, list] of index.postings) {
       if (!(near ? near.has(word) : matchesWord(word, wanted, prefix))) continue
+      matched.add(word)
       const rarity = idf(index, list) * (near || word === wanted ? 1 : COMPLETION_WEIGHT)
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
@@ -285,7 +362,10 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
         if (score > (best.get(at) ?? 0)) best.set(at, score)
       })
     }
-    for (const [at, score] of best) scores.set(at, (scores.get(at) ?? 0) + score)
+    for (const [at, score] of best) {
+      scores.set(at, (scores.get(at) ?? 0) + score)
+      stemHits.set(at, (stemHits.get(at) ?? 0) + 1)
+    }
   }
   const asked = new Set(stems)
   for (const term of index.defined) {
@@ -302,7 +382,21 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     const screen = rule.id.replace(/[a-z]+$/, "")
     if (screens.has(screen)) continue
     screens.add(screen)
-    ranked.push({ result: { kind: "rule", rule }, score })
+    let representative = rule
+    if (rule.id !== screen && !index.phrasingRules.has(at)) {
+      const group = index.groupByBase.get(screen)
+      if (group && group.length > 1) {
+        const defining = definingRule(group)
+        const definingAt = index.ruleIndexById.get(defining.id)
+        if (
+          definingAt !== undefined &&
+          definingAt !== at &&
+          (stemHits.get(definingAt) ?? 0) >= (stemHits.get(at) ?? 0)
+        )
+          representative = defining
+      }
+    }
+    ranked.push({ result: { kind: "rule", rule: representative, matched, partial }, score })
   }
   // why: a term that cites one rule opens that rule's screen, so the rule listed again below it would only spend a visible slot. A term citing a whole section keeps its rules listed.
   const covered = new Set<string>()
@@ -338,29 +432,36 @@ export function adjacentSections(rules: ComprehensiveRules, id: string) {
   return { previous: index > 0 ? sections[index - 1] : undefined, next: sections.at(index + 1) }
 }
 
-function firstMatch(text: string, query: string) {
-  const at = text.toLowerCase().indexOf(query)
-  if (at >= 0) return { at, length: query.length }
-  if (RULE_NUMBER.test(query)) return undefined
-  const { stems, partial } = queryWords(query)
+export type ExcerptSegment = { text: string; matched: boolean }
+
+export function excerptSegments(
+  text: string,
+  matched?: ReadonlySet<string>,
+  partial?: string,
+  lead = 60,
+): ExcerptSegment[] {
+  if (!matched?.size && !partial) return [{ text, matched: false }]
+  const hits: { start: number; end: number }[] = []
   for (const token of text.matchAll(WORD)) {
     const raw = normalized(token[0])
-    if ((partial !== undefined && raw.startsWith(partial)) || stems.includes(stem(raw)))
-      return { at: token.index, length: token[0].length }
+    if (matched?.has(stem(raw)) || (partial !== undefined && raw.startsWith(partial)))
+      hits.push({ start: token.index, end: token.index + token[0].length })
   }
-  return undefined
-}
-
-export function matchExcerpt(text: string, query: string, lead = 60) {
-  const needle = query.trim().toLowerCase()
-  const found = needle ? firstMatch(text, needle) : undefined
-  if (!found) return { before: text, match: "", after: "" }
-  const { at, length } = found
-  const space = text.indexOf(" ", at - lead)
-  const start = at > lead && space >= 0 && space < at ? space + 1 : 0
-  return {
-    before: `${start > 0 ? "…" : ""}${text.slice(start, at)}`,
-    match: text.slice(at, at + length),
-    after: text.slice(at + length),
+  if (hits.length === 0) return [{ text, matched: false }]
+  const anchor = hits[0].start
+  const space = text.indexOf(" ", anchor - lead)
+  const start =
+    text.length > lead * 2 && anchor > lead && space >= 0 && space < anchor ? space + 1 : 0
+  const segments: ExcerptSegment[] = []
+  let cursor = start
+  if (start > 0) segments.push({ text: "…", matched: false })
+  for (const hit of hits) {
+    if (hit.end <= cursor) continue
+    const hitStart = Math.max(hit.start, cursor)
+    if (hitStart > cursor) segments.push({ text: text.slice(cursor, hitStart), matched: false })
+    segments.push({ text: text.slice(hitStart, hit.end), matched: true })
+    cursor = hit.end
   }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), matched: false })
+  return segments
 }

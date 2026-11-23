@@ -13,11 +13,14 @@ import { TextField } from "@/components/TextField"
 import type { BackAction } from "@/features/game/useBackToBoard"
 import {
   adjacentSections,
+  excerptSegments,
   findRules,
-  matchExcerpt,
+  ruleContext,
+  rulePreviewText,
   ruleReferences,
   searchRules,
   type ComprehensiveRules,
+  type ExcerptSegment,
   type GlossaryEntry,
   type Rule,
   type RuleChapter,
@@ -42,7 +45,14 @@ type Row =
   | { kind: "section"; key: string; section: RuleSection }
   | { kind: "recent"; key: string; id: string; title: string }
   | { kind: "term"; key: string; entry: GlossaryEntry }
-  | { kind: "result"; key: string; rule: Rule; title: string }
+  | {
+      kind: "result"
+      key: string
+      rule: Rule
+      topic?: string
+      title: string
+      segments: ExcerptSegment[]
+    }
   | { kind: "rule"; key: string; rule: Rule; target: boolean }
   | { kind: "all"; key: string; section: RuleSection }
   | { kind: "nav"; key: string; previous?: RuleSection; next?: RuleSection }
@@ -85,22 +95,28 @@ function homeRows(
   }: { tab: Tab; query: string; open: ReadonlySet<string>; recent: string[] },
 ): Row[] {
   if (query.trim())
-    return searchRules(rules, query).map((result) =>
-      result.kind === "term"
-        ? { kind: "term", key: `term-${result.entry.term}`, entry: result.entry }
-        : {
-            kind: "result",
-            key: result.rule.id,
-            rule: result.rule,
-            title: findRules(rules, result.rule.id)?.section.title ?? "",
-          },
-    )
+    return searchRules(rules, query).map((result): Row => {
+      if (result.kind === "term")
+        return { kind: "term", key: `term-${result.entry.term}`, entry: result.entry }
+      const context = ruleContext(rules, result.rule.id)
+      const text = rulePreviewText(context?.group ?? [result.rule], result.rule)
+      return {
+        kind: "result",
+        key: result.rule.id,
+        rule: result.rule,
+        topic: context?.topic,
+        title: context?.section.title ?? "",
+        segments: excerptSegments(text, result.matched, result.partial),
+      }
+    })
   if (tab === "glossary")
     return rules.glossary.map((entry) => ({ kind: "term", key: entry.term, entry }))
   if (tab === "recent")
     return recent.flatMap((id): Row[] => {
-      const section = findRules(rules, id)?.section
-      return section ? [{ kind: "recent", key: id, id, title: section.title }] : []
+      const context = ruleContext(rules, id)
+      return context
+        ? [{ kind: "recent", key: id, id, title: context.topic ?? context.section.title }]
+        : []
     })
   return rules.chapters.flatMap((chapter): Row[] => [
     { kind: "chapter", key: `chapter-${chapter.id}`, chapter, open: open.has(chapter.id) },
@@ -261,7 +277,7 @@ export function RulesScreen({
         )
       }
       case "result": {
-        const { before, match, after } = matchExcerpt(item.rule.text, query)
+        const showSection = item.title && item.title.toLowerCase() !== item.topic?.toLowerCase()
         return (
           <Pressable
             accessibilityRole="link"
@@ -271,12 +287,21 @@ export function RulesScreen({
           >
             <View style={themed($resultHeader)}>
               <Text size="sm" style={themed($link)} text={item.rule.id} />
-              <Text size="xs" tone="dim" numberOfLines={1} style={$flex} text={item.title} />
+              {item.topic ? (
+                <Text size="xs" weight="medium" numberOfLines={1} text={item.topic} />
+              ) : null}
+              {showSection ? (
+                <Text size="xs" tone="dim" numberOfLines={1} style={$flex} text={item.title} />
+              ) : null}
             </View>
             <Text size="xs" tone="dim" numberOfLines={3}>
-              {before}
-              {match ? <Text size="xs" weight="medium" text={match} /> : null}
-              {after}
+              {item.segments.map((segment, segmentIndex) =>
+                segment.matched ? (
+                  <Text key={segmentIndex} size="xs" weight="medium" text={segment.text} />
+                ) : (
+                  segment.text
+                ),
+              )}
             </Text>
           </Pressable>
         )

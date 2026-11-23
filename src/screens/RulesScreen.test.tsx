@@ -37,6 +37,23 @@ const mockRules: ComprehensiveRules = {
       title: "Additional Rules",
       sections: [
         {
+          id: "702",
+          title: "Keyword Abilities",
+          rules: [
+            { id: "702.19", text: "Trample", examples: [] },
+            {
+              id: "702.19a",
+              text: "Trample is a static ability that modifies combat damage.",
+              examples: [],
+            },
+            {
+              id: "702.19g",
+              text: "Multiple instances of trample on the same creature are redundant. Multiple instances of trample over planeswalkers are redundant.",
+              examples: [],
+            },
+          ],
+        },
+        {
           id: "733",
           title: "Handling Illegal Actions",
           rules: [
@@ -118,6 +135,21 @@ it("opens the rule a glossary entry cites from anywhere on its row", () => {
   expect(view.queryByTestId("rules-term-Illegal Target")).toBeNull()
 })
 
+it("shows keyword topic titles on search results and in Recent", () => {
+  const view = renderRules()
+  fireEvent.changeText(view.getByTestId("rules-search"), "trample")
+  expect(view.getByTestId("rule-702.19")).toBeTruthy()
+  expect(view.getAllByText("Trample").length).toBeGreaterThanOrEqual(2)
+  expect(view.getByText("Keyword Abilities")).toBeTruthy()
+  expect(view.getByText(/is a static ability that modifies combat damage/)).toBeTruthy()
+  view.unmount()
+
+  renderRules({ ruleId: "702.19" }).unmount()
+  const reopened = renderRules()
+  expect(reopened.getByTestId("rules-recent-702.19")).toBeTruthy()
+  expect(reopened.getByText("Trample")).toBeTruthy()
+})
+
 it("lists rules you opened under Recent", () => {
   renderRules({ ruleId: "509.1" }).unmount()
   const view = renderRules()
@@ -129,16 +161,16 @@ it("reports a search once, and each result opened from it with its rule and the 
   capture.mockClear()
   const view = renderRules()
   fireEvent.changeText(view.getByTestId("rules-search"), "Block")
-  fireEvent.press(view.getByTestId("rule-509.1a"))
+  fireEvent.press(view.getByTestId("rule-509.1"))
   fireEvent.press(view.getByTestId("rule-733.2"))
   fireEvent.changeText(view.getByTestId("rules-search"), "Banding")
   view.unmount()
   expect(capture.mock.calls).toEqual([
     [
       "rules_search",
-      { system: "mtg", result_count: 2, top_results: "733.2,509.1a", query: "Block" },
+      { system: "mtg", result_count: 2, top_results: "733.2,509.1", query: "Block" },
     ],
-    ["rules_opened", { system: "mtg", rank: 2, open_count: 1, rule: "509.1a", query: "Block" }],
+    ["rules_opened", { system: "mtg", rank: 2, open_count: 1, rule: "509.1", query: "Block" }],
     ["rules_opened", { system: "mtg", rank: 1, open_count: 2, rule: "733.2", query: "Block" }],
     ["rules_search", { system: "mtg", result_count: 0, top_results: "", query: "Banding" }],
   ])
