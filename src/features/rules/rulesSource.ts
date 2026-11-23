@@ -3,7 +3,7 @@ import { Platform } from "react-native"
 
 import { storage } from "@/utils/storage"
 
-import { searchIndexSteps, type ComprehensiveRules } from "./comprehensiveRules"
+import { prepareSearchIndex, type ComprehensiveRules } from "./comprehensiveRules"
 import type { TextRules } from "./gameRules"
 import { finish, runInSlices, type Sliced } from "./slices"
 
@@ -136,10 +136,11 @@ export function prefetchRules(
 ) {
   if (!canDownload) return
   setTimeout(() => {
+    const stored = () => runInSlices(storedRules(source, store)).then((loaded) => loaded?.rules)
     const rules = isCurrent(source, store)
-      ? runInSlices(storedRules(source, store)).then((stored) => stored?.rules)
-      : downloadRules(source, store, fetcher)
-    rules.then((next) => next && runInSlices(searchIndexSteps(next))).catch(() => {})
+      ? stored()
+      : downloadRules(source, store, fetcher).catch(stored)
+    rules.then((next) => next && prepareSearchIndex(next)).catch(() => {})
   }, BOARD_SETTLE_MS)
 }
 
@@ -168,7 +169,7 @@ export function useComprehensiveRules(source: TextRules) {
   }, [source, attempt])
   // why: when no board prepared the index, it builds while the rules show instead of on the first keystroke.
   useEffect(() => {
-    if (rules) void runInSlices(searchIndexSteps(rules))
+    if (rules) void prepareSearchIndex(rules)
   }, [rules])
   return {
     rules,

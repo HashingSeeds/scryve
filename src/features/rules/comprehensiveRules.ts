@@ -1,4 +1,4 @@
-import { finish, type Sliced } from "./slices"
+import { finish, runInSlices, type Sliced } from "./slices"
 
 export type Rule = { id: string; text: string; examples: string[] }
 export type RuleSection = { id: string; title: string; rules: Rule[] }
@@ -154,9 +154,15 @@ export function searchIndex(source: ComprehensiveRules) {
   return indexes.get(source) ?? finish(buildOf(source))
 }
 
-// why: a phone takes well over 100 ms to index the Magic rules, so a board builds the index ahead of Rules through these steps. A search before they finish completes the same build at once.
-export function* searchIndexSteps(source: ComprehensiveRules): Sliced<void> {
-  if (!indexes.has(source)) yield* buildOf(source)
+const preparing = new WeakMap<ComprehensiveRules, Promise<void>>()
+
+// why: a phone takes well over 100 ms to index the Magic rules, so a board builds the index ahead of Rules a few ms per frame. A search before it finishes completes the same build at once.
+export function prepareSearchIndex(source: ComprehensiveRules) {
+  const existing = preparing.get(source)
+  if (existing) return existing
+  const created = runInSlices(buildOf(source)).then(() => {})
+  preparing.set(source, created)
+  return created
 }
 
 function* buildSearchIndex(source: ComprehensiveRules): Sliced<SearchIndex> {

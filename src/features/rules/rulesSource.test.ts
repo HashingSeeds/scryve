@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react-native"
 
 import { storage } from "@/utils/storage"
 
+import * as comprehensiveRules from "./comprehensiveRules"
 import { GAME_RULES } from "./gameRules"
 import { downloadRules, loadStoredRules, prefetchRules, useComprehensiveRules } from "./rulesSource"
 
@@ -104,6 +105,29 @@ describe("prefetchRules", () => {
     expect(loadStoredRules(source, store)?.rules.effectiveDate).toBe("September 25, 2026")
     expect(source.parse).toHaveBeenCalledTimes(1)
     expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it("indexes a stored Flesh and Blood copy when the recheck fails offline", async () => {
+    const store = memoryStore()
+    store.set("scryve.rules.fab.url.v1", GAME_RULES.fab.url)
+    store.set(
+      "scryve.rules.fab.text.v1",
+      [
+        "1 Game Concepts",
+        "1.0 General",
+        "1.0.1 First.",
+        "1 Glossary",
+        "1.-1.3 Ability",
+        "Text.",
+      ].join("\n"),
+    )
+    const prepare = jest.spyOn(comprehensiveRules, "prepareSearchIndex")
+    prefetchRules(GAME_RULES.fab, store, async () => {
+      throw new Error("offline")
+    })
+    await jest.runAllTimersAsync()
+    expect(prepare).toHaveBeenCalledWith(loadStoredRules(GAME_RULES.fab, store)?.rules)
+    prepare.mockRestore()
   })
 })
 

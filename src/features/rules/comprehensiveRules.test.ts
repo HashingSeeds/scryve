@@ -6,7 +6,7 @@ import {
   rulePreviewText,
   ruleReferences,
   ruleTopic,
-  searchIndexSteps,
+  prepareSearchIndex,
   searchRules,
   type ComprehensiveRules,
 } from "./comprehensiveRules"
@@ -106,13 +106,11 @@ describe("parseMagicRules", () => {
     ).toEqual(["100.10", "100.10aa"])
   })
 
-  it("lets a search finish an index a board started building in slices", () => {
+  it("lets a search finish the index a board is preparing", async () => {
     const fresh = finish(parseMagicRules(SOURCE))!
-    const steps = searchIndexSteps(fresh)
-    steps.next()
-    steps.next()
+    const preparing = prepareSearchIndex(fresh)
     expect(searchRules(fresh, "100.10")).toEqual(searchRules(rules!, "100.10"))
-    expect(steps.next().done).toBe(true)
+    await expect(preparing).resolves.toBeUndefined()
   })
 })
 
