@@ -2,6 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { useFocusEffect } from "expo-router"
+import { GestureDetector } from "react-native-gesture-handler"
+import { useKeyboardState } from "react-native-keyboard-controller"
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Header, HeaderBack } from "@/components/Header"
 import { Icon } from "@/components/Icon"
@@ -31,10 +41,16 @@ import { recentRules, rememberRule } from "@/features/rules/recentRules"
 import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { useRulesSearchAnalytics } from "@/features/rules/useRulesSearchAnalytics"
 import { translate } from "@/i18n/translate"
+import type { SheetDragGesture } from "@/screens/RulesSheet"
 import { useAppTheme } from "@/theme/context"
 import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { openUrl } from "@/utils/openUrl"
+import { useReducedMotion } from "@/utils/useReducedMotion"
+
+const TABS_COLLAPSE_MS = 180
+const TABS_FALLBACK_HEIGHT = 44
+const TABS_EASE = Easing.bezier(0.32, 0.72, 0, 1)
 
 const TABS = ["recent", "contents", "glossary"] as const
 type Tab = (typeof TABS)[number]
@@ -63,9 +79,12 @@ export interface RulesScreenProps {
   ruleId?: string
   glossary?: boolean
   initialQuery?: string
-  back: BackAction
+  active?: boolean
+  sheet?: boolean
+  back?: BackAction
+  dragGesture?: SheetDragGesture
+  onOverscrollDismiss?: () => void
   onOpenRule: (id: string) => void
-  onReturnToGame?: () => void
   onCards?: () => void
 }
 
@@ -134,14 +153,23 @@ export function RulesScreen({
   ruleId,
   glossary,
   initialQuery,
+  active = true,
+  sheet = false,
   back,
+  dragGesture,
+  onOverscrollDismiss,
   onOpenRule,
-  onReturnToGame,
   onCards,
 }: RulesScreenProps) {
   const { theme, themed } = useAppTheme()
+  const insets = useSafeAreaInsets()
+  const reducedMotion = useReducedMotion()
+  const keyboard = useKeyboardState((state) => (state.isVisible ? state.height : 0))
   const { rules, failed, retry } = useComprehensiveRules(source)
   const [query, setQuery] = useState(initialQuery ?? "")
+  const [autoFocusSearch, setAutoFocusSearch] = useState(
+    () => !ruleId && !glossary && !initialQuery,
+  )
   const [recent, setRecent] = useState(() => recentRules(source.cacheKey))
   const [tab, setTab] = useState<Tab>(() =>
     glossary ? "glossary" : recent.length > 0 ? "recent" : "contents",
@@ -160,8 +188,20 @@ export function RulesScreen({
   )
   const targetIndex = rows.findIndex((row) => row.kind === "rule" && row.target)
   const list = useRef<FlatList<Row>>(null)
-  const scrolledToTarget = useRef(false)
+  const scrolledForRule = useRef<string | undefined>(undefined)
   const section = rules && ruleId ? findRules(rules, ruleId)?.section : undefined
+  useEffect(() => {
+    if (active && !ruleId) setRecent(recentRules(source.cacheKey))
+  }, [active, ruleId, source.cacheKey])
+  useEffect(() => {
+    setPeek(undefined)
+    scrolledForRule.current = undefined
+    if (ruleId) {
+      setAutoFocusSearch(false)
+    } else {
+      setRecent(recentRules(source.cacheKey))
+    }
+  }, [ruleId, source.cacheKey])
   useEffect(() => {
     if (section && ruleId) rememberRule(source.cacheKey, ruleId)
   }, [section, ruleId, source.cacheKey])
@@ -368,6 +408,177 @@ export function RulesScreen({
     </Pressable>
   )
 
+  const tabsOpen = useSharedValue(searching ? 0 : 1)
+  const tabsHeight = useSharedValue(TABS_FALLBACK_HEIGHT)
+  useEffect(() => {
+    const target = searching ? 0 : 1
+    if (reducedMotion) {
+      tabsOpen.set(target)
+      return
+    }
+    tabsOpen.set(withTiming(target, { duration: TABS_COLLAPSE_MS, easing: TABS_EASE }))
+  }, [reducedMotion, searching, tabsOpen])
+  const tabsGap = theme.spacing.sm
+  const tabsAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: tabsOpen.value,
+    maxHeight: interpolate(tabsOpen.value, [0, 1], [0, tabsHeight.value + tabsGap]),
+    paddingTop: interpolate(tabsOpen.value, [0, 1], [0, tabsGap]),
+  }))
+
+  const topBar = home ? (
+    <View style={themed($searchBar)}>
+      <TextField
+        testID="rules-search"
+        accessibilityLabel={translate("play:rules.search")}
+        placeholderTx="play:rules.search"
+        value={query}
+        onChangeText={setQuery}
+        autoFocus={autoFocusSearch}
+        autoCorrect={false}
+        autoCapitalize="none"
+        returnKeyType="search"
+        clearable
+      />
+      <Animated.View
+        pointerEvents={searching ? "none" : "auto"}
+        style={[$tabsClip, tabsAnimatedStyle]}
+      >
+        <View
+          onLayout={(event) => {
+            const measured = event.nativeEvent.layout.height
+            if (measured > 0) tabsHeight.set(measured)
+          }}
+        >
+          <SegmentedControl
+            testID="rules-tabs"
+            segments={TABS.map((id) => ({ id, label: translate(`play:rules.${id}`) }))}
+            selectedId={tab}
+            onSelect={(id) => setTab(TABS.find((candidate) => candidate === id) ?? tab)}
+          />
+        </View>
+      </Animated.View>
+    </View>
+  ) : (
+    <Header
+      title={title}
+      safeAreaEdges={sheet ? [] : ["top"]}
+      LeftActionComponent={back ? <HeaderBack testID="rules-back" {...back} /> : undefined}
+      rightTx={onCards ? "play:rules.cards" : undefined}
+      onRightPress={onCards}
+    />
+  )
+
+  const topChrome = dragGesture ? (
+    <GestureDetector gesture={dragGesture}>
+      <View>{topBar}</View>
+    </GestureDetector>
+  ) : (
+    topBar
+  )
+
+  const messageBody = !RULES_TEXT_IN_APP ? (
+    <View style={themed($message)}>
+      <Text size="sm" tx="play:rules.webOnly" txOptions={{ publisher: source.publisher }} />
+      {officialLink}
+    </View>
+  ) : !rules ? (
+    <View style={themed($message)}>
+      {failed ? (
+        <RetryableError
+          message={translate("play:rules.failed")}
+          onRetry={retry}
+          testID="rules-failed"
+        />
+      ) : (
+        <Text
+          size="sm"
+          tone="dim"
+          tx="play:rules.downloading"
+          txOptions={{ publisher: source.publisher }}
+        />
+      )}
+    </View>
+  ) : null
+
+  const listNode = rules ? (
+    <FlatList
+      key={ruleId ?? "home"}
+      ref={list}
+      testID="rules-list"
+      style={$flex}
+      data={rows}
+      extraData={peek}
+      initialNumToRender={Math.max(10, targetIndex + 1)}
+      onContentSizeChange={() => {
+        if (!ruleId || targetIndex <= 0 || scrolledForRule.current === ruleId) return
+        scrolledForRule.current = ruleId
+        list.current?.scrollToIndex({ index: targetIndex, animated: false })
+      }}
+      onScrollToIndexFailed={({ index }) =>
+        setTimeout(() => list.current?.scrollToIndex({ index, animated: false }), 50)
+      }
+      onScrollEndDrag={(event) => {
+        if (sheet && onOverscrollDismiss && event.nativeEvent.contentOffset.y < -65) {
+          onOverscrollDismiss()
+        }
+      }}
+      keyExtractor={(row) => row.key}
+      renderItem={renderRow}
+      automaticallyAdjustContentInsets={false}
+      contentInsetAdjustmentBehavior="never"
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      contentContainerStyle={[
+        themed($list),
+        sheet && { paddingBottom: Math.max(insets.bottom, keyboard) + theme.spacing.xl },
+      ]}
+      ListEmptyComponent={
+        <Text
+          size="sm"
+          tone="dim"
+          tx={
+            ruleId
+              ? "play:rules.notFound"
+              : searching
+                ? "play:rules.noResults"
+                : "play:rules.noRecent"
+          }
+        />
+      }
+      ListFooterComponent={
+        home && !searching && tab === "contents" ? (
+          <View style={themed($footer)}>
+            {rules.effectiveDate ? (
+              <Text
+                size="xs"
+                tone="dim"
+                tx="play:rules.effective"
+                txOptions={{ date: rules.effectiveDate }}
+              />
+            ) : null}
+            {officialLink}
+            {rules.notice.map((line) => (
+              <Text key={line} size="xxs" tone="dim" text={line} />
+            ))}
+          </View>
+        ) : null
+      }
+    />
+  ) : null
+
+  if (sheet) {
+    return (
+      <View style={$flex}>
+        {messageBody ?? (
+          <>
+            {topChrome}
+            {listNode}
+          </>
+        )}
+      </View>
+    )
+  }
+
   return (
     <Screen
       preset="fixed"
@@ -375,118 +586,20 @@ export function RulesScreen({
       backgroundColor={theme.colors.background}
       contentContainerStyle={$flex}
     >
-      <Header
-        title={title}
-        LeftActionComponent={<HeaderBack testID="rules-back" {...back} />}
-        rightTx={
-          ruleId && onReturnToGame
-            ? "common:appNavigation.game"
-            : onCards
-              ? "play:rules.cards"
-              : undefined
-        }
-        onRightPress={ruleId && onReturnToGame ? onReturnToGame : onCards}
-      />
-      {!RULES_TEXT_IN_APP ? (
-        <View style={themed($message)}>
-          <Text size="sm" tx="play:rules.webOnly" txOptions={{ publisher: source.publisher }} />
-          {officialLink}
-        </View>
-      ) : !rules ? (
-        <View style={themed($message)}>
-          {failed ? (
-            <RetryableError
-              message={translate("play:rules.failed")}
-              onRetry={retry}
-              testID="rules-failed"
-            />
-          ) : (
-            <Text
-              size="sm"
-              tone="dim"
-              tx="play:rules.downloading"
-              txOptions={{ publisher: source.publisher }}
-            />
-          )}
-        </View>
-      ) : (
-        <FlatList
-          ref={list}
-          testID="rules-list"
-          data={rows}
-          extraData={peek}
-          initialNumToRender={Math.max(10, targetIndex + 1)}
-          onContentSizeChange={() => {
-            if (targetIndex <= 0 || scrolledToTarget.current) return
-            scrolledToTarget.current = true
-            list.current?.scrollToIndex({ index: targetIndex, animated: false })
-          }}
-          onScrollToIndexFailed={({ index }) =>
-            setTimeout(() => list.current?.scrollToIndex({ index, animated: false }), 50)
-          }
-          keyExtractor={(row) => row.key}
-          renderItem={renderRow}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={themed($list)}
-          ListHeaderComponent={
-            home ? (
-              <View style={themed($listHeader)}>
-                <TextField
-                  testID="rules-search"
-                  accessibilityLabel={translate("play:rules.search")}
-                  placeholderTx="play:rules.search"
-                  value={query}
-                  onChangeText={setQuery}
-                  autoFocus={home && !glossary && !initialQuery}
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                  returnKeyType="search"
-                  clearable
-                />
-                {searching ? null : (
-                  <SegmentedControl
-                    testID="rules-tabs"
-                    segments={TABS.map((id) => ({ id, label: translate(`play:rules.${id}`) }))}
-                    selectedId={tab}
-                    onSelect={(id) => setTab(TABS.find((candidate) => candidate === id) ?? tab)}
-                  />
-                )}
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            <Text
-              size="sm"
-              tone="dim"
-              tx={
-                ruleId
-                  ? "play:rules.notFound"
-                  : searching
-                    ? "play:rules.noResults"
-                    : "play:rules.noRecent"
-              }
-            />
-          }
-          ListFooterComponent={
-            home && !searching && tab === "contents" ? (
-              <View style={themed($footer)}>
-                {rules.effectiveDate ? (
-                  <Text
-                    size="xs"
-                    tone="dim"
-                    tx="play:rules.effective"
-                    txOptions={{ date: rules.effectiveDate }}
-                  />
-                ) : null}
-                {officialLink}
-                {rules.notice.map((line) => (
-                  <Text key={line} size="xxs" tone="dim" text={line} />
-                ))}
-              </View>
-            ) : null
-          }
+      {home ? (
+        <Header
+          title={title}
+          safeAreaEdges={["top"]}
+          LeftActionComponent={back ? <HeaderBack testID="rules-back" {...back} /> : undefined}
+          rightTx={onCards ? "play:rules.cards" : undefined}
+          onRightPress={onCards}
         />
+      ) : null}
+      {messageBody ?? (
+        <>
+          {topBar}
+          {listNode}
+        </>
       )}
     </Screen>
   )
@@ -608,12 +721,13 @@ const $gutter: TextStyle = { width: 60, paddingTop: 2, fontVariant: ["tabular-nu
 const $caretOpen = { transform: [{ rotate: "90deg" }] }
 const $active: TextStyle = { textDecorationLine: "underline" }
 const $pressed: ViewStyle = { opacity: 0.7 }
+const $tabsClip: ViewStyle = { overflow: "hidden" }
 const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
   paddingBottom: spacing.xl,
 })
-const $listHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.sm,
+const $searchBar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingHorizontal: spacing.md,
   paddingBottom: spacing.xs,
 })
 const $message: ThemedStyle<ViewStyle> = ({ spacing }) => ({

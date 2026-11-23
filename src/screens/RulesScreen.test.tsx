@@ -89,7 +89,6 @@ function renderRules(
     initialQuery?: string
     backLabel?: string
     onOpenRule?: (id: string) => void
-    onReturnToGame?: () => void
   } = {},
 ) {
   return render(
@@ -99,7 +98,6 @@ function renderRules(
         system="mtg"
         back={{ label: props.backLabel ?? "Game", onPress: jest.fn() }}
         onOpenRule={props.onOpenRule ?? jest.fn()}
-        onReturnToGame={props.onReturnToGame}
         initialQuery={props.initialQuery}
         ruleId={props.ruleId}
       />
@@ -160,15 +158,9 @@ it("shows keyword topic titles on search results and in Recent", () => {
   expect(reopened.getByText("Trample")).toBeTruthy()
 })
 
-it("opens with an initial search query and offers a one-tap return to game from a nested rule", () => {
+it("opens with an initial search query", () => {
   const prefilled = renderRules({ initialQuery: "trample" })
   expect(prefilled.getByTestId("rule-702.19")).toBeTruthy()
-  prefilled.unmount()
-
-  const onReturnToGame = jest.fn()
-  const nested = renderRules({ ruleId: "702.19", backLabel: "Rules", onReturnToGame })
-  fireEvent.press(nested.getByLabelText("Game"))
-  expect(onReturnToGame).toHaveBeenCalledTimes(1)
 })
 
 it("lists rules you opened under Recent", () => {
