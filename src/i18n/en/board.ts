@@ -721,6 +721,15 @@ const board = {
     chessBank: "Time per player",
     chessMinutes: "{{minutes}} min",
     chessOff: "Off",
+    // Pause or resume the chess clock without changing whose turn it is.
+    pauseClock: "Pause clock",
+    resumeClock: "Resume clock",
+    // Short label on a non-active player's chess clock chip: tap to run their own clock while responding on someone else's turn.
+    respond: "Respond",
+    // Screen reader label for a non-active player's respond clock chip when idle.
+    respondHint: "Tap to run your clock while responding",
+    // Screen reader label for a non-active player's respond clock chip while their clock is running.
+    returnClockHint: "Tap to return the clock to the active player",
     roundClock: "Round clock",
     // The log divider at the start of each turn, as in "Turn 4 · Ada".
     divider: "Turn {{number}} · {{name}}",

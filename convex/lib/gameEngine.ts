@@ -628,7 +628,7 @@ export function changeTable(
         ? { toPlayerId: lifeChange.playerId, delta: lifeChange.delta }
         : action.kind === "turn.passed" && result.table.turn
           ? { toPlayerId: result.table.turn.playerId }
-          : "toPlayerId" in action
+          : "toPlayerId" in action && action.toPlayerId !== undefined
             ? { toPlayerId: action.toPlayerId }
             : actionDelta === undefined
               ? {}

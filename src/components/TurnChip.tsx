@@ -13,7 +13,7 @@ import Animated, {
 } from "react-native-reanimated"
 import Svg, { Path } from "react-native-svg"
 
-import type { TurnChipState } from "@/features/game/dice"
+import type { PriorityChipState, TurnChipState } from "@/features/game/dice"
 import { formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -136,7 +136,9 @@ export function TurnChip({
   // why: without a chess bank the chip counts turns, not time, so it never waits on a clock to start.
   const numbered = !turn.bank
   const waiting = turn.waiting && !numbered
-  const now = useNow(!waiting && !numbered)
+  const paused = !waiting && !numbered && (!!turn.paused || !!turn.priorityPlayerId)
+  const ticking = !waiting && !numbered && !paused
+  const now = useNow(ticking)
   const bank = bankLeft(turn, turn.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0
   const time = numbered
@@ -149,6 +151,7 @@ export function TurnChip({
   const nextName = next ? state.nameOf(next) : undefined
   const nextSeat = next ? state.seatOf?.(next) : undefined
   const split = !waiting && !outOfTime && !!nextSeat
+  const splitButtons = canPress && split && !!nextSeat && !numbered && !!state.onPause
   const passOnly = split && numbered && size === "pass"
   const nextInk = nextSeat ? accessibleForeground(nextSeat.color) : ink
   const label = [
@@ -164,6 +167,25 @@ export function TurnChip({
   ]
     .filter(Boolean)
     .join(". ")
+
+  const passSegmentContent =
+    split && nextSeat ? (
+      <>
+        {canPress && state.passLabelShown && size === "full" ? (
+          <Text
+            tx="board:turn.pass"
+            weight="semiBold"
+            style={[compact ? $compactWord : $word, { color: nextInk }]}
+          />
+        ) : null}
+        <ChevronGlyph color={nextInk} />
+        <MarkArt
+          shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
+          color={nextInk}
+          size={compact ? 18 : 20}
+        />
+      </>
+    ) : null
 
   const content = waiting ? (
     <>
@@ -184,19 +206,7 @@ export function TurnChip({
         <View
           style={[$passSegment, passOnly && $passSegmentAlone, { backgroundColor: nextSeat.color }]}
         >
-          {canPress && state.passLabelShown && size === "full" ? (
-            <Text
-              tx="board:turn.pass"
-              weight="semiBold"
-              style={[compact ? $compactWord : $word, { color: nextInk }]}
-            />
-          ) : null}
-          <ChevronGlyph color={nextInk} />
-          <MarkArt
-            shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
-            color={nextInk}
-            size={compact ? 18 : 20}
-          />
+          {passSegmentContent}
         </View>
       ) : null}
     </>
@@ -205,6 +215,7 @@ export function TurnChip({
   const shape: ViewStyle[] = [
     compact ? $compactChip : $chip,
     ...(split ? [$split] : []),
+    ...(splitButtons ? [$splitButtons] : []),
     ...(passOnly ? [$passOnly] : []),
     ...(outOfTime ? [{ backgroundColor: colors.error }] : []),
     ...(canPress ? [] : [$passive]),
@@ -216,6 +227,54 @@ export function TurnChip({
         {content}
       </View>
     )
+  if (splitButtons && nextSeat) {
+    return (
+      <View testID={`turn-chip-${seatNumber}`} style={shape}>
+        {passOnly ? null : (
+          <BoardPressable
+            testID={`turn-chip-clock-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={
+              paused ? translate("board:turn.resumeClock") : translate("board:turn.pauseClock")
+            }
+            accessibilityHint={translate("board:turn.longPressHint")}
+            hitSlop={{ top: 6, bottom: 6 }}
+            delayLongPress={450}
+            onPress={state.onPause}
+            onLongPress={state.onLongPress}
+            style={({ pressed }) => [$clockSegment, paused && $pausedSegment, pressed && $pressed]}
+          >
+            {paused ? <PlayGlyph color={ink} /> : <PauseGlyph color={ink} />}
+            <Text
+              text={time}
+              testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
+              weight="bold"
+              style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
+            />
+          </BoardPressable>
+        )}
+        <BoardPressable
+          testID={`turn-chip-pass-${seatNumber}`}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityHint={translate("board:turn.longPressHint")}
+          hitSlop={{ top: 6, bottom: 6 }}
+          delayLongPress={450}
+          onPress={() => next && state.onPass(next)}
+          onLongPress={state.onLongPress}
+          style={({ pressed }) => [
+            $passSegment,
+            $passSegmentFlush,
+            passOnly && $passSegmentAlone,
+            { backgroundColor: nextSeat.color },
+            pressed && $pressed,
+          ]}
+        >
+          {passSegmentContent}
+        </BoardPressable>
+      </View>
+    )
+  }
   return (
     <BoardPressable
       testID={`turn-chip-${seatNumber}`}
@@ -229,6 +288,79 @@ export function TurnChip({
         else if (next) state.onPass(next)
       }}
       onLongPress={state.onLongPress}
+      style={({ pressed }) => [...shape, pressed && $pressed]}
+    >
+      {content}
+    </BoardPressable>
+  )
+}
+
+export function PriorityChip({
+  state,
+  seatNumber,
+  foreground,
+  compact,
+}: {
+  state: PriorityChipState
+  seatNumber: number
+  foreground: string
+  compact?: boolean
+}) {
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const ticking = state.active && !state.turn.paused
+  const now = useNow(ticking)
+  const bank = bankLeft(state.turn, state.playerId, now)
+  const outOfTime = bank !== undefined && bank <= 0
+  const time = formatElapsed(Math.max(0, bank ?? 0))
+  const ink = outOfTime ? colors.board.text : foreground
+  const label = [
+    time,
+    state.canPress
+      ? state.active
+        ? translate("board:turn.returnClockHint")
+        : translate("board:turn.respondHint")
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(". ")
+  const shape: ViewStyle[] = [
+    compact ? $compactChip : $chip,
+    state.active ? $priorityActive : $priorityIdle,
+    ...(outOfTime ? [{ backgroundColor: colors.error }] : []),
+    ...(state.canPress ? [] : [$passive]),
+  ]
+  const content = (
+    <>
+      {state.active ? <PauseGlyph color={ink} /> : <PlayGlyph color={ink} />}
+      <Text
+        text={time}
+        weight="bold"
+        style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
+      />
+    </>
+  )
+  if (!state.canPress) {
+    return (
+      <View
+        testID={`priority-chip-${seatNumber}`}
+        accessible
+        accessibilityLabel={label}
+        style={shape}
+      >
+        {content}
+      </View>
+    )
+  }
+  return (
+    <BoardPressable
+      testID={`priority-chip-${seatNumber}`}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={{ top: 6, bottom: 6 }}
+      onPress={state.onToggle}
       style={({ pressed }) => [...shape, pressed && $pressed]}
     >
       {content}
@@ -345,6 +477,14 @@ function PlayGlyph({ color }: { color: string }) {
   )
 }
 
+function PauseGlyph({ color }: { color: string }) {
+  return (
+    <Svg width={10} height={10} viewBox="0 0 24 24">
+      <Path d="M6 4.5h4.5v15H6zM13.5 4.5H18v15h-4.5z" fill={color} />
+    </Svg>
+  )
+}
+
 function ChevronGlyph({ color }: { color: string }) {
   return (
     <Svg width={9} height={12} viewBox="0 0 9 12">
@@ -389,6 +529,16 @@ const $digits: TextStyle = { fontVariant: ["tabular-nums"] }
 const $word: TextStyle = { fontSize: 12, lineHeight: 15 }
 const $compactWord: TextStyle = { fontSize: 11, lineHeight: 14 }
 const $split: ViewStyle = { paddingRight: 0, overflow: "hidden" }
+const $splitButtons: ViewStyle = { paddingLeft: 0, gap: 0 }
+const $clockSegment: ViewStyle = {
+  alignSelf: "stretch",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 5,
+  paddingLeft: 12,
+  paddingRight: 10,
+}
+const $pausedSegment: ViewStyle = { opacity: 0.72 }
 const $passSegment: ViewStyle = {
   alignSelf: "stretch",
   flexDirection: "row",
@@ -398,7 +548,10 @@ const $passSegment: ViewStyle = {
   paddingRight: 12,
   marginLeft: 4,
 }
+const $passSegmentFlush: ViewStyle = { marginLeft: 0 }
 const $passOnly: ViewStyle = { paddingLeft: 0 }
 const $passSegmentAlone: ViewStyle = { marginLeft: 0, paddingLeft: 12 }
+const $priorityIdle: ViewStyle = { opacity: 0.55 }
+const $priorityActive: ViewStyle = { backgroundColor: "rgba(0,0,0,0.38)" }
 const $passive: ViewStyle = { opacity: 0.7 }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }

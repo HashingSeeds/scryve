@@ -78,8 +78,17 @@ export interface TurnChipState {
   passLabelShown: boolean
   onStart: () => void
   onPass: (nextPlayerId: string) => void
+  onPause?: () => void
   onLongPress: () => void
   beside?: ReactNode
+}
+
+export interface PriorityChipState {
+  turn: Turn
+  playerId: string
+  active: boolean
+  canPress: boolean
+  onToggle: () => void
 }
 
 export type DiceSeatChip =
@@ -87,6 +96,7 @@ export type DiceSeatChip =
   | { kind: "first" }
   | { kind: "claim" }
   | { kind: "turn"; state: TurnChipState }
+  | { kind: "priority"; state: PriorityChipState }
   | { kind: "undoPass"; onUndo: () => void }
 
 export const CLAIM_CHIP: DiceSeatChip = { kind: "claim" }

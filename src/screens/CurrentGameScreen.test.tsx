@@ -486,9 +486,33 @@ describe("CurrentGameScreen", () => {
     expect(repository.loadActiveGame()?.turn?.bank?.ms).toBe(20 * 60_000)
     expect(view.getByTestId("turn-chip-time")).toBeTruthy()
 
-    fireEvent.press(view.getByTestId("turn-chip-1"))
+    fireEvent.press(view.getByTestId("turn-chip-pass-1"))
     expect(repository.loadActiveGame()?.turn?.playerId).toBe(initial.players[1].id)
     expect(view.getByTestId("turn-chip-2")).toBeTruthy()
+  })
+
+  it("pauses from the clock side of the chess chip and lets another seat claim priority", () => {
+    const initial = game()
+    const repository = turnsOn()
+    repository.saveChessMinutes(20)
+    const view = renderGame(initial, repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    fireEvent.press(view.getByTestId("turn-chip-1"))
+
+    fireEvent.press(view.getByTestId("turn-chip-clock-1"))
+    expect(repository.loadActiveGame()?.turn?.paused).toBe(true)
+    expect(repository.loadActiveGame()?.turn?.playerId).toBe(initial.players[0].id)
+
+    fireEvent.press(view.getByTestId("turn-chip-clock-1"))
+    expect(repository.loadActiveGame()?.turn?.paused).toBeUndefined()
+
+    fireEvent.press(view.getByTestId("priority-chip-2"))
+    expect(repository.loadActiveGame()?.turn?.priorityPlayerId).toBe(initial.players[1].id)
+    expect(repository.loadActiveGame()?.turn?.playerId).toBe(initial.players[0].id)
+
+    fireEvent.press(view.getByTestId("priority-chip-2"))
+    expect(repository.loadActiveGame()?.turn?.priorityPlayerId).toBeUndefined()
   })
 
   it("says Pass on the turn chip until this device has passed three times", () => {

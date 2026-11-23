@@ -7,6 +7,8 @@ const turnFields = {
   operationId: v.string(),
   spent: v.optional(v.record(v.string(), v.number())),
   waiting: v.optional(v.literal(true)),
+  paused: v.optional(v.literal(true)),
+  priorityPlayerId: v.optional(v.string()),
 }
 
 export const previousTurnValidator = v.object(turnFields)
@@ -31,6 +33,12 @@ export const turnActionValidators = [
   v.object({ kind: v.literal("turn.undone"), playerId: v.string(), turnOperationId: v.string() }),
   v.object({ kind: v.literal("turn.clock"), playerId: v.string(), bankMs: v.optional(v.number()) }),
   v.object({ kind: v.literal("turn.started"), playerId: v.string() }),
+  v.object({ kind: v.literal("turn.paused"), playerId: v.string(), paused: v.boolean() }),
+  v.object({
+    kind: v.literal("turn.priority"),
+    playerId: v.string(),
+    toPlayerId: v.optional(v.string()),
+  }),
 ] as const
 
 export type Turn = Infer<typeof turnValidator>
@@ -69,9 +77,13 @@ const settled = ({ previous: _previous, bank: _bank, ...turn }: Turn): PreviousT
 
 const isBankMs = (ms: number) => Number.isInteger(ms) && ms >= 60_000 && ms <= MAX_BANK_MS
 
+export const clockOwner = (turn: Pick<Turn, "playerId" | "priorityPlayerId">) =>
+  turn.priorityPlayerId ?? turn.playerId
+
 function spentAfter(turn: Turn, now: number): Record<string, number> {
   const held = turnElapsed(turn, now)
-  return { ...turn.spent, [turn.playerId]: (turn.spent?.[turn.playerId] ?? 0) + held }
+  const owner = clockOwner(turn)
+  return { ...turn.spent, [owner]: (turn.spent?.[owner] ?? 0) + held }
 }
 
 function handOff(turn: Turn, toPlayerId: string, number: number, context: TurnContext): Turn {
@@ -87,10 +99,49 @@ function handOff(turn: Turn, toPlayerId: string, number: number, context: TurnCo
 }
 
 function withBank(turn: Turn, bankMs: number | undefined, now: number): Turn | null {
-  const { bank: _before, ...rest } = turn
+  const { bank: _before, paused: _paused, priorityPlayerId: _priority, ...rest } = turn
   if (bankMs === undefined) return rest
   if (!isBankMs(bankMs)) return null
-  return { ...rest, bank: { ms: bankMs, base: spentAfter(turn, now) } }
+  return {
+    ...rest,
+    ...(turn.paused ? { paused: true } : {}),
+    ...(turn.priorityPlayerId ? { priorityPlayerId: turn.priorityPlayerId } : {}),
+    bank: { ms: bankMs, base: spentAfter(turn, now) },
+  }
+}
+
+function withPaused(turn: Turn, paused: boolean, now: number): Turn | null {
+  if (!turn.bank || turn.waiting) return null
+  if (paused === !!turn.paused) return turn
+  if (paused) {
+    return {
+      ...turn,
+      startedAt: now,
+      spent: spentAfter(turn, now),
+      paused: true,
+    }
+  }
+  const { paused: _paused, ...running } = turn
+  return { ...running, startedAt: now }
+}
+
+function withPriority(
+  turn: Turn,
+  toPlayerId: string | undefined,
+  context: TurnContext,
+): Turn | null {
+  if (!turn.bank || turn.waiting) return null
+  if (toPlayerId !== undefined && !context.isSeat(toPlayerId)) return null
+  const lead = toPlayerId === undefined ? undefined : turnLead(context.groups, toPlayerId)
+  const next = lead === turn.playerId ? undefined : lead
+  if (next === turn.priorityPlayerId && !turn.paused) return turn
+  const { paused: _paused, priorityPlayerId: _before, ...base } = turn
+  return {
+    ...base,
+    startedAt: context.now,
+    spent: spentAfter(turn, context.now),
+    ...(next === undefined ? {} : { priorityPlayerId: next }),
+  }
 }
 
 /** why: one reducer for local games, the connected overlay, Convex, and a nearby host, so every device lands on the same turn. */
@@ -107,6 +158,10 @@ export function applyTurnAction(
   }
   if (action.kind === "turn.clock") return turn ? withBank(turn, action.bankMs, context.now) : null
   if (action.kind === "turn.started") return turn ? (startedTurn(turn, context.now) ?? turn) : null
+  if (action.kind === "turn.paused")
+    return turn ? withPaused(turn, action.paused, context.now) : null
+  if (action.kind === "turn.priority")
+    return turn ? withPriority(turn, action.toPlayerId, context) : null
   if (!context.isSeat(action.toPlayerId)) return null
   const to = turnLead(context.groups, action.toPlayerId)
   if (!turn) {
@@ -173,12 +228,12 @@ export function isValidTurnGroups(
   )
 }
 
-export const turnElapsed = (turn: Pick<Turn, "startedAt" | "waiting">, now: number) =>
-  turn.waiting ? 0 : Math.max(0, now - turn.startedAt)
+export const turnElapsed = (turn: Pick<Turn, "startedAt" | "waiting" | "paused">, now: number) =>
+  turn.waiting || turn.paused ? 0 : Math.max(0, now - turn.startedAt)
 
 export function turnTimeSpent(turn: Turn, playerId: string, now: number) {
   const before = turn.spent?.[playerId] ?? 0
-  return turn.playerId === playerId ? before + turnElapsed(turn, now) : before
+  return clockOwner(turn) === playerId ? before + turnElapsed(turn, now) : before
 }
 
 export function bankLeft(turn: Turn, playerId: string, now: number) {
@@ -205,6 +260,9 @@ function isPreviousTurn(value: unknown, playerIds: ReadonlySet<string>): value i
     Number.isFinite(turn.startedAt) &&
     typeof turn.operationId === "string" &&
     (turn.waiting === undefined || turn.waiting === true) &&
+    (turn.paused === undefined || turn.paused === true) &&
+    (turn.priorityPlayerId === undefined ||
+      (typeof turn.priorityPlayerId === "string" && playerIds.has(turn.priorityPlayerId))) &&
     (turn.spent === undefined ||
       (isRecordOfNumbers(turn.spent) && Object.keys(turn.spent).every((id) => playerIds.has(id))))
   )
@@ -229,6 +287,7 @@ export function remapTurn(turn: Turn, idOf: (playerId: string) => string): Turn 
   const remap = (step: PreviousTurn): PreviousTurn => ({
     ...step,
     playerId: idOf(step.playerId),
+    ...(step.priorityPlayerId ? { priorityPlayerId: idOf(step.priorityPlayerId) } : {}),
     ...(step.spent
       ? {
           spent: Object.fromEntries(

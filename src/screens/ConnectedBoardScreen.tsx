@@ -545,6 +545,8 @@ export function ConnectedBoardWithRuntime({
     undoTurn,
     setBank,
     startTurn,
+    pauseTurn,
+    setPriority,
     modeAction,
   } = runtime
   const table = useMemo(
@@ -569,6 +571,8 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      pauseTurn,
+      setPriority,
       modeAction,
     }),
     [
@@ -592,6 +596,8 @@ export function ConnectedBoardWithRuntime({
       undoTurn,
       setBank,
       startTurn,
+      pauseTurn,
+      setPriority,
       modeAction,
     ],
   )
@@ -1071,6 +1077,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             localGameRepository.notePass()
             passTo(next)
           },
+          onPause: () => {
+            if (!actingSeat) return
+            if (turn.priorityPlayerId) table?.setPriority(actingSeat, undefined)
+            else table?.pauseTurn(actingSeat, !turn.paused)
+          },
           onLongPress: () => setOverlay("turn"),
         }
       : undefined
@@ -1129,6 +1140,25 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             },
           },
         ]
+      if (turnChip && turn?.bank && !turn.waiting) {
+        const active =
+          !!turn.priorityPlayerId && sharesTurn(turnGroups, turn.priorityPlayerId, player.id)
+        const canPress = controlled.has(player.id) || (active && myTurn)
+        const actor = controlled.has(player.id) ? player.id : actingSeat
+        return [
+          ...chips,
+          {
+            kind: "priority",
+            state: {
+              turn,
+              playerId: turnLead(turnGroups, player.id),
+              active,
+              canPress,
+              onToggle: () => actor && table?.setPriority(actor, active ? undefined : player.id),
+            },
+          },
+        ]
+      }
       const first: DiceSeatChip[] = pregameSeat.showsFirstChip(player.id) ? [{ kind: "first" }] : []
       return turnsOn && !turn && !pregameSeat.choosingFirst && controlled.has(player.id)
         ? [...chips, ...first, CLAIM_CHIP]
@@ -1245,6 +1275,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         <TurnDialog
           turn={turn}
           seats={turnSeats}
+          onTogglePause={
+            turn?.bank && !turn.waiting && actingSeat
+              ? () => table.pauseTurn(actingSeat, !turn.paused)
+              : undefined
+          }
           pick={{
             canPick: (playerId) => (turn ? myTurn : controlled.has(playerId)),
             onPick: (playerId) => {

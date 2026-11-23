@@ -49,6 +49,8 @@ export interface TableActions {
   undoTurn: (playerId: string, turnOperationId: string) => string | null
   setBank: (playerId: string, bankMs: number | undefined) => string | null
   startTurn: (playerId: string) => string | null
+  pauseTurn: (playerId: string, paused: boolean) => string | null
+  setPriority: (playerId: string, toPlayerId?: string) => string | null
   modeAction: (action: ModeAction) => boolean
 }
 
@@ -157,6 +159,14 @@ export function createTableActions(
     undoTurn: (playerId, turnOperationId) =>
       run({ kind: "turn.undone", playerId, turnOperationId })?.operationId ?? null,
     startTurn: (playerId) => run({ kind: "turn.started", playerId })?.operationId ?? null,
+    pauseTurn: (playerId, paused) =>
+      run({ kind: "turn.paused", playerId, paused })?.operationId ?? null,
+    setPriority: (playerId, toPlayerId) =>
+      run({
+        kind: "turn.priority",
+        playerId,
+        ...(toPlayerId === undefined ? {} : { toPlayerId }),
+      })?.operationId ?? null,
     modeAction: (action) => run(action) !== null,
     setBank: (playerId, bankMs) =>
       run({ kind: "turn.clock", playerId, ...(bankMs === undefined ? {} : { bankMs }) })
