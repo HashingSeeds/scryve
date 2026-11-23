@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { Pressable, StyleSheet, View, type TextStyle, type ViewStyle } from "react-native"
+import { StyleSheet, View, type ViewStyle } from "react-native"
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -20,15 +20,8 @@ import Animated, {
 
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
-import {
-  commanderBeats,
-  commanderTempo,
-  floodTimeAt,
-  setCommanderTempo,
-  TEMPOS,
-} from "./commanderBeats"
+import { COMMANDER_BEATS, floodTimeAt } from "./commanderBeats"
 import { Sword } from "./Sword"
-import { Text } from "./Text"
 
 // why: worklets read these, so they are declared before the code that uses them.
 const FAN_SPREAD = 40
@@ -215,26 +208,8 @@ export function CommanderFlights({
             />
           ))}
         </View>
-        {__DEV__ ? <TempoSwitch /> : null}
       </View>
     </FlightsContext.Provider>
-  )
-}
-
-function TempoSwitch() {
-  const [tempo, setTempo] = useState(commanderTempo)
-  return (
-    <Pressable
-      testID="commander-tempo-switch"
-      onPress={() => {
-        const next = TEMPOS[(TEMPOS.indexOf(tempo) + 1) % TEMPOS.length]
-        setCommanderTempo(next)
-        setTempo(next)
-      }}
-      style={$tempoSwitch}
-    >
-      <Text text={`Tempo ${tempo}x`} style={$tempoText} />
-    </Pressable>
   )
 }
 
@@ -289,7 +264,7 @@ function plan(
   back: boolean,
   arrivals: ReadonlyMap<number, number>,
 ): Blade[] {
-  const { tuck, fan, flood, flight, hold } = commanderBeats()
+  const { tuck, fan, flood, flight, hold } = COMMANDER_BEATS
   const from = rotationOf(seat)
   const rides = [...landings.keys()].every((landing) => arrivals.has(landing))
   const aimed = [...landings].map(([landing, to]) => ({
@@ -435,15 +410,4 @@ function easeOut(k: number) {
 
 const $frame: ViewStyle = { flex: 1 }
 const $layer: ViewStyle = { ...StyleSheet.absoluteFill, zIndex: 50 }
-const $tempoSwitch: ViewStyle = {
-  position: "absolute",
-  top: 56,
-  alignSelf: "center",
-  zIndex: 60,
-  paddingHorizontal: 14,
-  paddingVertical: 10,
-  borderRadius: 999,
-  backgroundColor: "rgba(0,0,0,0.8)",
-}
-const $tempoText: TextStyle = { color: "#fff", fontSize: 14, fontWeight: "700" }
 const $blade: ViewStyle = { position: "absolute", left: 0, top: 0, width: BLADE, height: BLADE }

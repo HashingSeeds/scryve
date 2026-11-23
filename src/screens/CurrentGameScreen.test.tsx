@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
-import { commanderBeats } from "@/components/commanderBeats"
+import { COMMANDER_BEATS } from "@/components/commanderBeats"
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { PASS_UNDO_MS } from "@/features/game/turnTab"
@@ -1236,8 +1236,8 @@ describe("CurrentGameScreen", () => {
       expect(view.getByLabelText("7 commander damage from Ada")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-finish-seat-1"))
       // why: the attacker's life buttons come back once its life is back from its corner.
-      act(() => jest.advanceTimersByTime(commanderBeats().flood + commanderBeats().fan))
-      act(() => jest.advanceTimersByTime(commanderBeats().tuck))
+      act(() => jest.advanceTimersByTime(COMMANDER_BEATS.flood + COMMANDER_BEATS.fan))
+      act(() => jest.advanceTimersByTime(COMMANDER_BEATS.tuck))
       expect(view.getByTestId("life-seat-1-1")).toBeDisabled()
       expect(life(view, 2)).toBe("33")
       jest.useRealTimers()

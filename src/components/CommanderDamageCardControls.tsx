@@ -30,7 +30,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { commanderBeats, DRAIN_EASING, FLOOD_EASING } from "./commanderBeats"
+import { COMMANDER_BEATS, DRAIN_EASING, FLOOD_EASING } from "./commanderBeats"
 import {
   DIGIT_INK_HEIGHT,
   DISC_FILL,
@@ -136,7 +136,7 @@ export function CommanderDamageCardControls({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const source = mode.kind === "source"
-  const beats = commanderBeats()
+  const beats = COMMANDER_BEATS
   // why: the attacker's power boxes come in as its life tucks away, and go only once its blades are home.
   const swap = motionDuration(reducedMotion, source ? beats.tuck : SWAP_MS)
   const leaveAfter = source ? beats.flood + beats.fan : 0
@@ -247,7 +247,7 @@ export function useCommanderTakeover<Attacker>(
 ) {
   const reducedMotion = useReducedMotion()
   const active = !!takeover
-  const beats = commanderBeats()
+  const beats = COMMANDER_BEATS
   const duration = motionDuration(reducedMotion, beats.flood)
   // why: the shadow sets off as the attacker's blades leave the fan, and drains at once when the attack ends.
   const lead = active && duration ? beats.tuck + beats.fan : 0

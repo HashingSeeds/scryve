@@ -1,24 +1,13 @@
 import { Easing } from "react-native-reanimated"
 
-// why: a dev-only switch to try the attack's pace on a phone; the chosen tempo gets baked into the beats before merging.
-export const TEMPOS = [1, 1.25, 1.5] as const
-export type Tempo = (typeof TEMPOS)[number]
-let tempo: Tempo = 1.25
-export const commanderTempo = () => tempo
-export const setCommanderTempo = (next: Tempo) => {
-  tempo = next
-}
-
 /** why: an attack plays these beats in order and ending it plays them backwards: the attacker's life tucks into its corner, its blades fan out of its mark, then they fly as the shadow spreads, each landing as the shadow reaches its defender. */
-export function commanderBeats() {
-  return {
-    tuck: 240 * tempo,
-    fan: 260 * tempo,
-    flood: 950 * tempo,
-    // why: blades fly this long only when a defender has no shadow to ride.
-    flight: 420 * tempo,
-    hold: 60 * tempo,
-  }
+export const COMMANDER_BEATS = {
+  tuck: 300,
+  fan: 325,
+  flood: 1190,
+  // why: blades fly this long only when a defender has no shadow to ride.
+  flight: 525,
+  hold: 75,
 }
 
 const FLOOD_CURVE = [0.45, 0.05, 0.25, 1] as const

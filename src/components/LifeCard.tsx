@@ -30,7 +30,7 @@ import { startTapTiming } from "@/utils/tapTiming"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { commanderBeats } from "./commanderBeats"
+import { COMMANDER_BEATS } from "./commanderBeats"
 import {
   ATTACK_SHADE,
   sideRoom,
@@ -231,7 +231,7 @@ export const LifeCard = memo(function LifeCard({
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const cornerSlide = useCornerSlide()
-  const beats = commanderBeats()
+  const beats = COMMANDER_BEATS
   const lifeFadeDuration = motionDuration(reducedMotion, beats.tuck)
   // why: after an attack the life waits in its corner while the blades fly home and fold into the mark, then grows back last.
   const lifeReturnsAfter = lifeFadeDuration ? beats.flood + beats.fan : 0

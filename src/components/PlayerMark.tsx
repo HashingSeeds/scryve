@@ -8,7 +8,7 @@ import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
-import { commanderBeats } from "./commanderBeats"
+import { COMMANDER_BEATS } from "./commanderBeats"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { CheckShape, SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
@@ -216,7 +216,7 @@ function InsetSvg({ testID, children }: { testID: string; children: ReactNode })
 
 /** why: the check fades in while the blades fan out over the sword's spot, and fades as they fold back into it after Done; the sword itself swaps under a blade, so it needs no fade. */
 function InsetCheck({ color }: { color: string }) {
-  const { tuck, fan, flood } = commanderBeats()
+  const { tuck, fan, flood } = COMMANDER_BEATS
   const fade = motionDuration(useReducedMotion(), fan)
   return (
     <Animated.View
