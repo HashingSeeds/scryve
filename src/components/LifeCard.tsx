@@ -30,12 +30,12 @@ import { startTapTiming } from "@/utils/tapTiming"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { commanderBeats } from "./commanderBeats"
 import {
   ATTACK_SHADE,
   sideRoom,
   CommanderDamageCardControls,
   shadowReached,
-  SWAP_MS,
   CommanderTakeoverBackdrop,
   SHADOW_INK,
   TAKEOVER_LAYERS,
@@ -117,8 +117,6 @@ import {
 } from "./TurnChip"
 import { useSeatFill } from "./TurnSpotlight"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
-
-const LIFE_FADE_MS = SWAP_MS
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -233,7 +231,10 @@ export const LifeCard = memo(function LifeCard({
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const cornerSlide = useCornerSlide()
-  const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
+  const beats = commanderBeats()
+  const lifeFadeDuration = motionDuration(reducedMotion, beats.tuck)
+  // why: after an attack the life waits in its corner while the blades fly home and fold into the mark, then grows back last.
+  const lifeReturnsAfter = lifeFadeDuration ? beats.flood + beats.fan : 0
   const locked = !!out && out.cause !== "life"
   const frozen = disabled || locked
   const contentRotationStyle: TextStyle | undefined = contentRotation
@@ -498,16 +499,24 @@ export const LifeCard = memo(function LifeCard({
     return { transform: [{ scale: 1 + (readoutFit - 1) * reached }] }
   })
   const toSlot = attackerSide && !!lifeSlot
+  const [lifeHeld, setLifeHeld] = useState(false)
+  if (toSlot && !lifeHeld) setLifeHeld(true)
+  useEffect(() => {
+    if (toSlot || !lifeHeld) return
+    const back = setTimeout(() => setLifeHeld(false), lifeReturnsAfter)
+    return () => clearTimeout(back)
+  }, [toSlot, lifeHeld, lifeReturnsAfter])
+  const inSlot = toSlot || lifeHeld
   const [lifeInSlot, setLifeInSlot] = useState(false)
-  if (lifeInSlot && !toSlot) setLifeInSlot(false)
+  if (lifeInSlot && !inSlot) setLifeInSlot(false)
   useEffect(() => {
     if (!toSlot) return
     const landed = setTimeout(() => setLifeInSlot(true), lifeFadeDuration)
     return () => clearTimeout(landed)
   }, [toSlot, lifeFadeDuration])
-  const lifeLanded = toSlot && (lifeInSlot || !lifeFadeDuration)
+  const lifeLanded = inSlot && (lifeInSlot || !lifeFadeDuration)
   const slotPose =
-    toSlot && lifeSlot
+    inSlot && lifeSlot
       ? {
           ...turnedOffset(lifeSlot, contentRotation),
           scale: lifeSlot.fontSize / resolvedLifeFontSize,
@@ -561,7 +570,12 @@ export const LifeCard = memo(function LifeCard({
     ],
   }))
   const lifeControlsShown =
-    !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
+    !commanderCovers &&
+    !inSlot &&
+    !sittingOut &&
+    !tableSheetOpen &&
+    !diceCovers &&
+    ownership !== "unowned"
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
   // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card. The attacker's own grid steps aside for its power boxes.
   const commanderStripShown =

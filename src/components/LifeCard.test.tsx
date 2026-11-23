@@ -20,12 +20,12 @@ import { darkTheme } from "@/theme/theme"
 import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
 import * as reducedMotion from "@/utils/useReducedMotion"
 
+import { commanderBeats } from "./commanderBeats"
 import {
   ATTACK_SHADE,
   attackerLifeSlot,
   DAMAGE_INK,
   strikeTint,
-  TAKEOVER_MS,
 } from "./CommanderDamageCardControls"
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
@@ -423,7 +423,7 @@ describe("LifeCard", () => {
         nativeEvent: { layout: { width: 193, height: 420 } },
       })
       expect(view.getByTestId("commander-flood-seat-2")).toBeTruthy()
-      act(() => jest.advanceTimersByTime(TAKEOVER_MS))
+      act(() => jest.advanceTimersByTime(commanderBeats().flood))
       // why: the defender keeps its name over the shadow, but no sword to start an attack of its own.
       expect(view.getByTestId("player-name-seat-2", { includeHiddenElements: true })).toHaveStyle({
         color: "#FFFFFF",
@@ -438,7 +438,7 @@ describe("LifeCard", () => {
       expect(
         view.getByTestId("commander-card-mode-seat-2", { includeHiddenElements: true }),
       ).toHaveProp("pointerEvents", "none")
-      act(() => jest.advanceTimersByTime(TAKEOVER_MS))
+      act(() => jest.advanceTimersByTime(commanderBeats().flood))
       expect(view.queryByTestId("commander-takeover-seat-2")).toBeNull()
       expect(
         view.queryByTestId("commander-card-mode-seat-2", { includeHiddenElements: true }),

@@ -8,7 +8,7 @@ import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
-import { FAN_MS } from "./CommanderFlights"
+import { commanderBeats } from "./commanderBeats"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { CheckShape, SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
@@ -214,13 +214,14 @@ function InsetSvg({ testID, children }: { testID: string; children: ReactNode })
   )
 }
 
-/** why: the check fades in while the blades fan out over the sword's spot, and fades as Done sends them home; the sword itself swaps under a blade, so it needs no fade. */
+/** why: the check fades in while the blades fan out over the sword's spot, and fades as they fold back into it after Done; the sword itself swaps under a blade, so it needs no fade. */
 function InsetCheck({ color }: { color: string }) {
-  const fade = motionDuration(useReducedMotion(), FAN_MS)
+  const { tuck, fan, flood } = commanderBeats()
+  const fade = motionDuration(useReducedMotion(), fan)
   return (
     <Animated.View
-      entering={fade ? FadeIn.duration(fade) : undefined}
-      exiting={fade ? FadeOut.duration(fade / 2) : undefined}
+      entering={fade ? FadeIn.delay(tuck).duration(fade) : undefined}
+      exiting={fade ? FadeOut.delay(flood).duration(fade) : undefined}
       style={StyleSheet.absoluteFill}
     >
       <InsetSvg testID="player-mark-check">
