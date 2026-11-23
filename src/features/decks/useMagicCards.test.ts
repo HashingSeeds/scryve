@@ -13,10 +13,19 @@ jest.mock("./magicCardsFile", () => ({
 }))
 
 const META_KEY = "scryve.cards.mtg-dataset.v1"
-const file = (name: string, legal = true) =>
+const file = (name: string, missing?: "legalFormats" | "textKey") =>
   JSON.stringify({
     version: name,
-    cards: [{ scryfallId: name, oracleId: name, name, legalFormats: legal ? [] : undefined }],
+    cards: [
+      {
+        scryfallId: name,
+        oracleId: name,
+        name,
+        legalFormats: [],
+        textKey: "tap",
+        ...(missing && { [missing]: undefined }),
+      },
+    ],
   })
 const names = async (fetcher: jest.Mock) =>
   (await fetchMagicCards(fetcher)).cards.map((card) => card.name)
@@ -34,13 +43,16 @@ test("a saved file under a week old is read without asking the server", async ()
   expect(fetcher).not.toHaveBeenCalled()
 })
 
-test("a recent saved file without legality is revalidated at once", async () => {
-  mockSaved = file("Sol Ring", false)
-  saveString(META_KEY, JSON.stringify({ checkedAt: Date.now(), etag: "a" }))
-  const fetcher = jest.fn(async () => new Response(file("Sol Ring v2"), { status: 200 }))
-  expect(await names(fetcher)).toEqual(["Sol Ring v2"])
-  expect(fetcher).toHaveBeenCalledWith(MAGIC_DATASET_URL, { headers: { "If-None-Match": "a" } })
-})
+test.each(["legalFormats", "textKey"] as const)(
+  "a recent saved file without %s is revalidated at once",
+  async (missing) => {
+    mockSaved = file("Sol Ring", missing)
+    saveString(META_KEY, JSON.stringify({ checkedAt: Date.now(), etag: "a" }))
+    const fetcher = jest.fn(async () => new Response(file("Sol Ring v2"), { status: 200 }))
+    expect(await names(fetcher)).toEqual(["Sol Ring v2"])
+    expect(fetcher).toHaveBeenCalledWith(MAGIC_DATASET_URL, { headers: { "If-None-Match": "a" } })
+  },
+)
 
 test("an older saved file is revalidated with its ETag and kept on a 304", async () => {
   mockSaved = file("Sol Ring")

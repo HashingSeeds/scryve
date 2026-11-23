@@ -32,8 +32,8 @@ export async function fetchMagicCards(fetcher: typeof fetch = fetch): Promise<Ma
   const readSaved = meta && savedMagicCards()
   if (readSaved && Date.now() - meta.checkedAt < MAX_AGE_MS) {
     const saved = parseMagicCards(await readSaved())
-    // why: a file saved before legality was added sends every format search to Scryfall, so look for a newer one now.
-    if (saved.knowsLegality) return saved
+    // why: a file saved before legality or card text were added keeps those searches off the device, so look for a newer one now.
+    if (saved.knowsLegality && saved.textCards.length > 0) return saved
   }
   const response = await fetcher(
     MAGIC_DATASET_URL,
