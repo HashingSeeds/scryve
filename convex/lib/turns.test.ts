@@ -243,3 +243,73 @@ describe("turn groups", () => {
     expect(isValidTurnGroups("ada", table)).toBe(false)
   })
 })
+
+describe("chess clock pause and priority", () => {
+  const minute = 60_000
+  const started = () =>
+    play([
+      [{ kind: "turn.set", playerId: "ada", toPlayerId: "ada" }, 0],
+      [{ kind: "turn.clock", playerId: "ada", bankMs: 10 * minute }, 0],
+      [{ kind: "turn.started", playerId: "ada" }, 0],
+    ])!
+
+  it("pauses and resumes without draining time while paused", () => {
+    const running = started()
+    const paused = applyTurnAction(
+      running,
+      { kind: "turn.paused", playerId: "ada", paused: true },
+      at(minute),
+    )!
+    expect(paused.paused).toBe(true)
+    expect(bankLeft(paused, "ada", 5 * minute)).toBe(9 * minute)
+
+    const resumed = applyTurnAction(
+      paused,
+      { kind: "turn.paused", playerId: "ada", paused: false },
+      at(5 * minute),
+    )!
+    expect(resumed.paused).toBeUndefined()
+    expect(bankLeft(resumed, "ada", 6 * minute)).toBe(8 * minute)
+  })
+
+  it("bills time to a responding player when they claim priority, then returns it to the active player", () => {
+    const running = started()
+    const responding = applyTurnAction(
+      running,
+      { kind: "turn.priority", playerId: "bo", toPlayerId: "bo" },
+      at(minute),
+    )!
+    expect(responding.playerId).toBe("ada")
+    expect(responding.priorityPlayerId).toBe("bo")
+    expect(bankLeft(responding, "ada", 3 * minute)).toBe(9 * minute)
+    expect(bankLeft(responding, "bo", 3 * minute)).toBe(8 * minute)
+
+    const returned = applyTurnAction(
+      responding,
+      { kind: "turn.priority", playerId: "bo" },
+      at(3 * minute),
+    )!
+    expect(returned.priorityPlayerId).toBeUndefined()
+    expect(bankLeft(returned, "bo", 4 * minute)).toBe(8 * minute)
+    expect(bankLeft(returned, "ada", 4 * minute)).toBe(8 * minute)
+  })
+
+  it("clears priority and pause when the turn passes, crediting the responding player first", () => {
+    const running = started()
+    const responding = applyTurnAction(
+      running,
+      { kind: "turn.priority", playerId: "bo", toPlayerId: "bo" },
+      at(minute),
+    )!
+    const passed = applyTurnAction(
+      responding,
+      { kind: "turn.passed", playerId: "ada", toPlayerId: "bo" },
+      at(3 * minute),
+    )!
+    expect(passed.playerId).toBe("bo")
+    expect(passed.priorityPlayerId).toBeUndefined()
+    expect(passed.paused).toBeUndefined()
+    expect(bankLeft(passed, "ada", 4 * minute)).toBe(9 * minute)
+    expect(bankLeft(passed, "bo", 4 * minute)).toBe(7 * minute)
+  })
+})

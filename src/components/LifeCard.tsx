@@ -106,7 +106,14 @@ import {
 import { SeatSword } from "./SeatSword"
 import { TeamCorners, type TeamHead, type TeamSheetOwner } from "./TeamZone"
 import { Text } from "./Text"
-import { FadeOutSlot, RowChipSlot, TurnChip, UndoPassChip, type TurnChipSize } from "./TurnChip"
+import {
+  FadeOutSlot,
+  PriorityChip,
+  RowChipSlot,
+  TurnChip,
+  UndoPassChip,
+  type TurnChipSize,
+} from "./TurnChip"
 import { useSeatFill } from "./TurnSpotlight"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -218,6 +225,9 @@ export const LifeCard = memo(function LifeCard({
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
   const turnChip = diceChips?.flatMap((chip) => (chip.kind === "turn" ? [chip.state] : []))[0]
+  const priorityChip = diceChips?.flatMap((chip) =>
+    chip.kind === "priority" ? [chip.state] : [],
+  )[0]
   const undoPass = diceChips?.flatMap((chip) => (chip.kind === "undoPass" ? [chip.onUndo] : []))[0]
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
@@ -602,9 +612,10 @@ export const LifeCard = memo(function LifeCard({
   const teamBagBottom = teamRowBottom + (markArt.height - trailingButtonSize) / 2
   const rowTurnChip = !!turnChip && turnChipShown
   const rowUndo = !!undoPass && turnChipShown
+  const rowPriority = !!priorityChip && turnChipShown && !rowTurnChip && !rowUndo
   const bagReserve = seatBag ? trailingButtonSize + identityMetrics.gap : 0
   // why: on seats too short for the name and the chip, the name gives way so the chip never runs under the bag; the mark still says whose seat it is.
-  const rowChip = rowTurnChip || rowUndo
+  const rowChip = rowTurnChip || rowUndo || rowPriority
   // why: with the pentagon centered on the card's top edge the seam carries a mode's control instead (seamPlan's chipCrowdedBySeam), so it never shows twice or not at all.
   const modeBeside =
     menuEdgeCenter === CONTENT_EDGES[contentRotation].top ? undefined : turnChip?.beside
@@ -1003,7 +1014,7 @@ export const LifeCard = memo(function LifeCard({
                 }
               />
             ) : null}
-            {rowTurnChip || rowUndo ? (
+            {rowTurnChip || rowUndo || rowPriority ? (
               <RowChipSlot
                 testID={`turn-row-chip-seat-${seatNumber}`}
                 retracting={nameRetracted}
@@ -1032,6 +1043,14 @@ export const LifeCard = memo(function LifeCard({
                     foreground={foreground}
                     compact={compact}
                     onUndo={undoPass}
+                  />
+                ) : null}
+                {priorityChip && rowPriority ? (
+                  <PriorityChip
+                    state={priorityChip}
+                    seatNumber={seatNumber}
+                    foreground={foreground}
+                    compact={compact}
                   />
                 ) : null}
               </RowChipSlot>

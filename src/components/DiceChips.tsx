@@ -78,7 +78,8 @@ export function DiceChips({
       style={themed($row)}
     >
       {chips.map((chip) => {
-        if (chip.kind === "turn" || chip.kind === "undoPass") return null
+        if (chip.kind === "turn" || chip.kind === "undoPass" || chip.kind === "priority")
+          return null
         const key = chipKey(chip)
         const claim = chip.kind === "claim"
         const label =

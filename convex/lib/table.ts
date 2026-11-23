@@ -487,6 +487,7 @@ export function tableRelatedSeatId(action: TableAction, actor: PlayerTable) {
     return action.takerPlayerId
   if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
   if (action.kind === "turn.passed" || action.kind === "turn.set") return action.toPlayerId
+  if (action.kind === "turn.priority") return action.toPlayerId
   return undefined
 }
 

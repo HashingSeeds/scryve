@@ -80,7 +80,7 @@ import type { GameEndSource } from "@/utils/analytics"
 import { maxMulligans, mulliganHandSize } from "../../convex/lib/mulligans"
 import { outReason } from "../../convex/lib/outReason"
 import type { SystemId } from "../../convex/lib/systems"
-import { nextTurnSeat, sharesTurn } from "../../convex/lib/turns"
+import { nextTurnSeat, sharesTurn, turnLead } from "../../convex/lib/turns"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
@@ -369,6 +369,10 @@ export function CurrentGameScreen({
             turnsStore.notePass()
             passTo(next)
           },
+          onPause: () => {
+            if (turn.priorityPlayerId) runtime.tableRuntime.setPriority(turn.playerId, undefined)
+            else runtime.tableRuntime.pauseTurn(turn.playerId, !turn.paused)
+          },
           onLongPress: () => setTurnOpen(true),
         }
       : undefined
@@ -449,6 +453,24 @@ export function CurrentGameScreen({
         ]
       if (passUndo && sharesTurn(turnGroups, passUndo.passerId, player.id))
         return [...chips, { kind: "undoPass", onUndo: undoPass }]
+      if (turnChip && turn?.bank && !turn.waiting) {
+        const active =
+          !!turn.priorityPlayerId && sharesTurn(turnGroups, turn.priorityPlayerId, player.id)
+        return [
+          ...chips,
+          {
+            kind: "priority",
+            state: {
+              turn,
+              playerId: turnLead(turnGroups, player.id),
+              active,
+              canPress: true,
+              onToggle: () =>
+                runtime.tableRuntime.setPriority(player.id, active ? undefined : player.id),
+            },
+          },
+        ]
+      }
       return claiming ? [...chips, CLAIM_CHIP] : [...chips]
     },
     onPressChip: (player: GamePlayer, chip: DiceSeatChip) => {
@@ -622,6 +644,11 @@ export function CurrentGameScreen({
         <TurnDialog
           turn={turn}
           seats={turnSeats}
+          onTogglePause={
+            turn?.bank && !turn.waiting
+              ? () => runtime.tableRuntime.pauseTurn(turn.playerId, !turn.paused)
+              : undefined
+          }
           pick={
             !turn || casual
               ? {

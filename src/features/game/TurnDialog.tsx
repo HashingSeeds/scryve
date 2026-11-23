@@ -21,6 +21,7 @@ export interface TurnDialogProps {
   seats: readonly TurnSeat[]
   pick?: { canPick: (playerId: string) => boolean; onPick: (playerId: string) => void }
   onUndo?: () => void
+  onTogglePause?: () => void
   onBank?: (bankMs: number | undefined) => void
   onRoundClock?: () => void
   onClose: () => void
@@ -31,6 +32,7 @@ export function TurnDialog({
   seats,
   pick,
   onUndo,
+  onTogglePause,
   onBank,
   onRoundClock,
   onClose,
@@ -87,6 +89,13 @@ export function TurnDialog({
           <Text size="xs" tone="dim" tx="board:turn.eventPlay" />
         )}
         {onUndo ? <Button testID="turn-undo" tx="board:turn.undoPass" onPress={onUndo} /> : null}
+        {onTogglePause && turn?.bank && !turn.waiting ? (
+          <Button
+            testID="turn-pause-clock"
+            tx={turn.paused ? "board:turn.resumeClock" : "board:turn.pauseClock"}
+            onPress={onTogglePause}
+          />
+        ) : null}
         {onBank ? (
           <Choices
             tx="board:turn.chessBank"
