@@ -610,6 +610,18 @@ describe("CurrentGameScreen", () => {
     chipWidth(900)
     expect(view.getByTestId("turn-chip-time")).toHaveTextContent(/^(19|20)m$/)
     expect(view.getByTestId("turn-chip-pass-1").props.accessibilityLabel).toMatch(/\d+:\d{2}/)
+
+    const priorityWidth = (width: number) =>
+      fireEvent(view.getByTestId("turn-row-chip-seat-2"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width, height: 36 } },
+      })
+    fireEvent(view.getByTestId("life-identity-seat-2"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 2_000, height: 30 } },
+    })
+    priorityWidth(1_000)
+    priorityWidth(900)
+    expect(view.getByTestId("priority-chip-time-2")).toHaveTextContent(/^(19|20)m$/)
+    expect(view.getByTestId("priority-chip-2").props.accessibilityLabel).toMatch(/\d+:\d{2}/)
   })
 
   it("forgets who went first when the result is cleared before play", () => {
