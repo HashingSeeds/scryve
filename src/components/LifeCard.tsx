@@ -1097,6 +1097,7 @@ export const LifeCard = memo(function LifeCard({
                     seatNumber={seatNumber}
                     foreground={foreground}
                     compact={compact}
+                    size={chipSize}
                   />
                 ) : null}
               </RowChipSlot>

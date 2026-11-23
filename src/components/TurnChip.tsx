@@ -269,7 +269,7 @@ export function TurnChip({
               pressed && $pressed,
             ]}
           >
-            {paused ? <PlayGlyph color={ink} /> : <PauseGlyph color={ink} />}
+            {paused ? <PlayGlyph color={ink} /> : tight ? null : <PauseGlyph color={ink} />}
             <Text
               text={shownTime}
               testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
@@ -326,11 +326,13 @@ export function PriorityChip({
   seatNumber,
   foreground,
   compact,
+  size = "full",
 }: {
   state: PriorityChipState
   seatNumber: number
   foreground: string
   compact?: boolean
+  size?: TurnChipSize
 }) {
   const {
     themed,
@@ -340,7 +342,13 @@ export function PriorityChip({
   const now = useNow(ticking)
   const bank = bankLeft(state.turn, state.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0
-  const time = formatElapsed(Math.max(0, bank ?? 0))
+  const clockMs = Math.max(0, bank ?? 0)
+  const time = formatElapsed(clockMs)
+  const shownTime =
+    size === "pass" && clockMs >= WHOLE_MINUTES_FROM_MS
+      ? translate("board:turn.chipMinutes", { minutes: Math.floor(clockMs / 60_000) })
+      : time
+  const tight = size !== "full"
   const ink = outOfTime ? colors.board.text : foreground
   const label = [
     time,
@@ -354,15 +362,17 @@ export function PriorityChip({
     .join(". ")
   const shape: ViewStyle[] = [
     compact ? $compactChip : $chip,
+    ...(tight ? [$priorityTight] : []),
     state.active ? $priorityActive : $priorityIdle,
     ...(outOfTime ? [{ backgroundColor: colors.error }] : []),
     ...(state.canPress ? [] : [$passive]),
   ]
   const content = (
     <>
-      {state.active ? <PauseGlyph color={ink} /> : <PlayGlyph color={ink} />}
+      {state.active ? <PauseGlyph color={ink} /> : tight ? null : <PlayGlyph color={ink} />}
       <Text
-        text={time}
+        text={shownTime}
+        testID={`priority-chip-time-${seatNumber}`}
         weight="bold"
         style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
       />
@@ -579,8 +589,9 @@ const $passOnly: ViewStyle = { paddingLeft: 0 }
 const $passSegmentAlone: ViewStyle = { marginLeft: 0, paddingLeft: 12 }
 const $priorityIdle: ViewStyle = { opacity: 0.55 }
 const $priorityActive: ViewStyle = { backgroundColor: "rgba(0,0,0,0.38)" }
+const $priorityTight: ViewStyle = { paddingHorizontal: 8, gap: 4 }
 const $tightChip: ViewStyle = { paddingLeft: 8 }
-const $passSegmentTight: ViewStyle = { marginLeft: 0, paddingLeft: 6, paddingRight: 8 }
-const $clockSegmentTight: ViewStyle = { paddingLeft: 8, paddingRight: 6 }
+const $passSegmentTight: ViewStyle = { marginLeft: 0, paddingLeft: 5, paddingRight: 7 }
+const $clockSegmentTight: ViewStyle = { paddingLeft: 7, paddingRight: 5 }
 const $passive: ViewStyle = { opacity: 0.7 }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }
