@@ -536,6 +536,7 @@ export default {
     startHint: "탭하여 턴 타이머를 시작하세요",
     pass: "넘기기",
     chipNumber: "{{number}}턴",
+    chipMinutes: "{{minutes}}분",
     label: "{{number}}턴, {{name}}님",
     passHintTo: "탭하여 {{name}}님에게 넘기세요",
     outOfTime: "시간 초과",

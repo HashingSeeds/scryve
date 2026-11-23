@@ -627,7 +627,7 @@ export const LifeCard = memo(function LifeCard({
     typeof rowCap === "number"
       ? rowCap - bagReserve - markArt.width - identityMetrics.gap * 2
       : Number.POSITIVE_INFINITY
-  // why: at 8 to 10 seats even a bare mark leaves too little room, so the chip steps down from "Turn 3 | Pass › mark" to "3 › mark" to "› mark" instead of running over the mark and under the bag.
+  // why: at 8 to 10 seats even a bare mark leaves too little room, so the chip steps down (TurnChipSize) instead of running over the mark and under the bag.
   useEffect(() => {
     if (!rowChip) {
       setRowChipWidth(0)
