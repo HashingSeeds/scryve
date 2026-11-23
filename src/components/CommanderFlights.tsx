@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { Pressable, StyleSheet, View, type TextStyle, type ViewStyle } from "react-native"
+import { StyleSheet, View, type ViewStyle } from "react-native"
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -21,21 +21,15 @@ import Animated, {
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { Sword } from "./Sword"
-import { Text } from "./Text"
 
 // why: worklets read these, so they are declared before the code that uses them.
 const FLIGHT_MS = 420
+/** why: the blades fan out of the mark over this long, and the mark's check fades in over the same time. */
+export const FAN_MS = 260
+const HOLD_MS = 60
 const FAN_SPREAD = 40
 const FAN_REACH = 26
 const BLADE = 32
-
-// why: a dev-only switch to try three ways the blades leave the mark; keep the one that feels best and delete the rest before merging.
-const VARIANTS = [
-  { key: "A", label: "Fan as they draw", draw: 0, drawReach: 0, fan: 260, hold: 60 },
-  { key: "B", label: "Draw, fan, fling", draw: 140, drawReach: 16, fan: 220, hold: 60 },
-  { key: "C", label: "One throw", draw: 0, drawReach: 0, fan: 180, hold: 0 },
-] as const
-type Variant = (typeof VARIANTS)[number]
 
 type Point = { x: number; y: number }
 type Spot = Point & { size: number }
@@ -46,6 +40,8 @@ type Flights = {
   anchor: (kind: AnchorKind, seat: number) => (node: View | null) => void
   /** why: seats whose strike waits for its blade, so it shows once the blade lands. */
   inbound: ReadonlySet<number>
+  /** why: the attacker whose blades have not left its sword yet, so it keeps showing the sword until they cover it. */
+  waiting: number | null
   /** why: the seat whose blades are flying home, so its sword shows once they meet. */
   homeBound: number | null
 }
@@ -54,6 +50,7 @@ const NOWHERE = new Set<number>()
 const FlightsContext = createContext<Flights>({
   anchor: () => () => {},
   inbound: NOWHERE,
+  waiting: null,
   homeBound: null,
 })
 
@@ -62,7 +59,6 @@ export const useCommanderFlights = () => useContext(FlightsContext)
 type Blade = {
   seat: number
   home: Point
-  drawn: Point
   out: Point
   to: Point
   from: number
@@ -73,24 +69,25 @@ type Blade = {
   landed: number
   // why: the blade leaves at the size of the sword it comes from, small when that sword is inside a mark.
   start: number
-  draw: number
-  fan: number
   go: number
   end: number
   delay: number
   back: boolean
 }
 
-/** why: when a seat arms, its sword splits into one blade per defender, each fanning out where it rests and then flying to the sword beside that seat's disc, turning to face each reader as it travels; Done plays the same flight backwards, so every blade comes home together. `rotationOf` gives a seat's content rotation on the screen. */
+/** why: when a seat arms, its sword splits into one blade per defender, each fanning out of the mark and then flying to the sword beside that seat's disc, turning to face each reader as it travels; Done plays the same flight backwards, so every blade comes home together. `rotationOf` gives a seat's content rotation on the screen. */
 export function CommanderFlights({
   attacker,
   rotationOf,
   color,
+  homeColor,
   children,
 }: {
   attacker: number | null
   rotationOf: (seat: number) => number
   color: string
+  /** why: the sword in the attacker's mark is cut out in this color, so blades start and end looking like it. */
+  homeColor?: string
   children: ReactNode
 }) {
   const reducedMotion = useReducedMotion()
@@ -99,14 +96,14 @@ export function CommanderFlights({
   const refs = useRef(new Map<string, (node: View | null) => void>())
   const [blades, setBlades] = useState<readonly Blade[]>([])
   const [inbound, setInbound] = useState<ReadonlySet<number>>(NOWHERE)
-  const [homeBound, setHomeBound] = useState<number | null>(null)
+  // why: the seat whose sword has left its mark, set as its blades take over from it and cleared as they land back on it.
+  const [out, setOut] = useState<number | null>(null)
   const flight = useRef(0)
   // why: a team zone's check unmounts on Done, so its blades fly home to where they left from.
   const homes = useRef(new Map<number, Spot>())
-  const [variant, setVariant] = useState<Variant>(VARIANTS[0])
-  const latest = useRef({ rotationOf, color, variant })
+  const latest = useRef({ rotationOf, color, homeColor })
   useEffect(() => {
-    latest.current = { rotationOf, color, variant }
+    latest.current = { rotationOf, color, homeColor }
   })
 
   const anchor = useCallback((kind: AnchorKind, seat: number) => {
@@ -121,7 +118,7 @@ export function CommanderFlights({
     return ref
   }, [])
 
-  const [shownColor, setShownColor] = useState(color)
+  const [shownColor, setShownColor] = useState({ blade: color, home: homeColor })
   const previous = useRef(attacker)
   useEffect(() => {
     const before = previous.current
@@ -130,22 +127,23 @@ export function CommanderFlights({
     const run = ++flight.current
     setBlades([])
     setInbound(NOWHERE)
-    setHomeBound(null)
-    if (reducedMotion !== false) return
     const seat = attacker ?? before
-    if (seat === null) return
+    if (reducedMotion !== false || seat === null) {
+      setOut(attacker)
+      return
+    }
     const back = attacker === null
-    if (!back) setShownColor(latest.current.color)
+    if (!back) setShownColor({ blade: latest.current.color, home: latest.current.homeColor })
     // why: the defenders' strikes lay out in the commit that arms the attack, so the plan reads them a frame later.
     const frameId = requestAnimationFrame(() => {
       void measureAll(frame.current, seat, nodes.current, homes.current.get(seat)).then((spots) => {
-        if (!spots || run !== flight.current) return
-        homes.current.set(seat, spots.home)
-        const planned = plan(spots, seat, latest.current.rotationOf, back, latest.current.variant)
-        if (!planned.length) return
+        if (run !== flight.current) return
+        if (spots) homes.current.set(seat, spots.home)
+        const planned = spots ? plan(spots, seat, latest.current.rotationOf, back) : []
+        // why: the mark swaps in the same commit the blades appear over it, so the swap hides under them.
+        setOut(planned.length || !back ? seat : null)
         setBlades(planned)
-        setInbound(new Set(planned.map(({ seat: landing }) => landing)))
-        if (back) setHomeBound(seat)
+        if (planned.length) setInbound(new Set(planned.map(({ seat: landing }) => landing)))
       })
     })
     return () => cancelAnimationFrame(frameId)
@@ -154,7 +152,7 @@ export function CommanderFlights({
   const landed = useCallback((seat: number, back: boolean) => {
     setBlades((current) => {
       const left = current.filter((blade) => blade.seat !== seat)
-      if (back && !left.length) setHomeBound(null)
+      if (back && !left.length) setOut(null)
       return left
     })
     if (!back)
@@ -165,7 +163,12 @@ export function CommanderFlights({
       })
   }, [])
 
-  const value = useMemo(() => ({ anchor, inbound, homeBound }), [anchor, inbound, homeBound])
+  const waiting = attacker !== null && out !== attacker ? attacker : null
+  const homeBound = out !== null && out !== attacker ? out : null
+  const value = useMemo(
+    () => ({ anchor, inbound, waiting, homeBound }),
+    [anchor, inbound, waiting, homeBound],
+  )
   return (
     <FlightsContext.Provider value={value}>
       <View ref={frame} style={$frame} collapsable={false}>
@@ -175,20 +178,12 @@ export function CommanderFlights({
             <FlyingBlade
               key={`${blade.seat}:${blade.back}`}
               blade={blade}
-              color={shownColor}
+              color={shownColor.blade}
+              homeColor={shownColor.home}
               onLanded={landed}
             />
           ))}
         </View>
-        {__DEV__ ? (
-          <Pressable
-            testID="sword-variant-switch"
-            onPress={() => setVariant(VARIANTS[(VARIANTS.indexOf(variant) + 1) % VARIANTS.length])}
-            style={$variantSwitch}
-          >
-            <Text text={`Swords ${variant.key}: ${variant.label}`} style={$variantText} />
-          </Pressable>
-        ) : null}
       </View>
     </FlightsContext.Provider>
   )
@@ -243,15 +238,8 @@ function plan(
   seat: number,
   rotationOf: (seat: number) => number,
   back: boolean,
-  variant: Variant,
 ): Blade[] {
   const from = rotationOf(seat)
-  const up = (from * Math.PI) / 180
-  // why: variant B first pulls every blade straight out of the mark the way its sword points.
-  const drawn = {
-    x: home.x + variant.drawReach * Math.sin(up),
-    y: home.y - variant.drawReach * Math.cos(up),
-  }
   const aimed = [...landings].map(([landing, to]) => ({
     seat: landing,
     to,
@@ -268,15 +256,14 @@ function plan(
   const blades = aimed.map(({ seat: landing, to, reach, aim }, index) => {
     const tilt = toward(from, leans[index] - drift)
     const radians = (tilt * Math.PI) / 180
-    const go = variant.draw + variant.fan + (variant.hold ? variant.hold + reach * 0.25 : 0)
+    const go = FAN_MS + HOLD_MS + reach * 0.25
     const ahead = toward(tilt, aim)
     return {
       seat: landing,
       home,
-      drawn,
       out: {
-        x: drawn.x + FAN_REACH * Math.sin(radians),
-        y: drawn.y - FAN_REACH * Math.cos(radians),
+        x: home.x + FAN_REACH * Math.sin(radians),
+        y: home.y - FAN_REACH * Math.cos(radians),
       },
       to,
       from,
@@ -286,8 +273,6 @@ function plan(
       land: toward(ahead, rotationOf(landing) + 90),
       landed: to.size / BLADE,
       start: Math.min(1, home.size / BLADE),
-      draw: variant.draw,
-      fan: variant.fan,
       go,
       end: go + FLIGHT_MS,
       delay: 0,
@@ -302,10 +287,12 @@ function plan(
 function FlyingBlade({
   blade,
   color,
+  homeColor,
   onLanded,
 }: {
   blade: Blade
   color: string
+  homeColor?: string
   onLanded: (seat: number, back: boolean) => void
 }) {
   const { back, end, delay, seat } = blade
@@ -321,20 +308,16 @@ function FlyingBlade({
     )
   }, [back, delay, end, onLanded, seat, t])
   const style = useAnimatedStyle(() => {
-    const { home, drawn, out, to, from, tilt, ahead, land, landed, start, draw, fan, go } = blade
+    const { home, out, to, from, tilt, ahead, land, landed, start, go } = blade
     const now = t.value
     let point = home
     let angle = from
     let scale = 1
-    if (now <= draw) {
-      const k = easeOut(now / draw)
-      point = { x: home.x + (drawn.x - home.x) * k, y: home.y + (drawn.y - home.y) * k }
-      scale = start + (1 - start) * k
-    } else if (now <= draw + fan) {
-      const k = splay((now - draw) / fan)
-      point = { x: drawn.x + (out.x - drawn.x) * k, y: drawn.y + (out.y - drawn.y) * k }
+    if (now <= FAN_MS) {
+      const k = splay(now / FAN_MS)
+      point = { x: home.x + (out.x - home.x) * k, y: home.y + (out.y - home.y) * k }
       angle = from + (tilt - from) * k
-      if (!draw) scale = start + (1 - start) * Math.min(1, k)
+      scale = start + (1 - start) * Math.min(1, k)
     } else if (now <= go) {
       point = out
       angle = tilt
@@ -347,7 +330,6 @@ function FlyingBlade({
       scale = 1 + (landed - 1) * k
     }
     return {
-      opacity: Math.min(1, now / 40),
       transform: [
         { translateX: point.x - BLADE / 2 },
         { translateY: point.y - BLADE / 2 },
@@ -356,9 +338,16 @@ function FlyingBlade({
       ],
     }
   })
+  // why: each blade starts as the sword cut into the mark and takes the strike color as it fans out; home, it turns back.
+  const homeStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, t.value / FAN_MS) }))
   return (
     <Animated.View testID={`commander-blade-seat-${seat}`} style={[$blade, style]}>
       <Sword size={BLADE} color={color} />
+      {homeColor ? (
+        <Animated.View style={[StyleSheet.absoluteFill, homeStyle]}>
+          <Sword size={BLADE} color={homeColor} />
+        </Animated.View>
+      ) : null}
     </Animated.View>
   )
 }
@@ -382,15 +371,4 @@ function easeOut(k: number) {
 
 const $frame: ViewStyle = { flex: 1 }
 const $layer: ViewStyle = { ...StyleSheet.absoluteFill, zIndex: 50 }
-const $variantSwitch: ViewStyle = {
-  position: "absolute",
-  top: 56,
-  alignSelf: "center",
-  zIndex: 60,
-  paddingHorizontal: 14,
-  paddingVertical: 10,
-  borderRadius: 999,
-  backgroundColor: "rgba(0,0,0,0.8)",
-}
-const $variantText: TextStyle = { color: "#fff", fontSize: 14, fontWeight: "700" }
 const $blade: ViewStyle = { position: "absolute", left: 0, top: 0, width: BLADE, height: BLADE }

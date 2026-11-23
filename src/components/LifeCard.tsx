@@ -649,7 +649,7 @@ export const LifeCard = memo(function LifeCard({
   // why: a commander seat's mark carries the sword that starts an attack, and holds the check that ends it, so the attacker's thumb finds Done where it started; a defender's mark only says whose seat it is. A team zone starts attacks from its heads' marks, so its row holds only the check.
   const swordShown = commanderSeat && (team ? attackerSide : !commanderCardMode || attackerSide)
   const markSword = swordShown && !team && !!commanderDamage
-  const { anchor, homeBound } = useCommanderFlights()
+  const { anchor, waiting, homeBound } = useCommanderFlights()
   const rowInk = floodedBy.takeover ? SHADOW_INK : foreground
   const seatIdentity = (
     <SeatIdentity
@@ -658,7 +658,15 @@ export const LifeCard = memo(function LifeCard({
       shape={shape}
       color={rowInk}
       insetSwordColor={markSword ? color : undefined}
-      insetGlyph={attackerSide ? "check" : homeBound === seatNumber ? "none" : "sword"}
+      insetGlyph={
+        attackerSide
+          ? waiting === seatNumber
+            ? "sword"
+            : "check"
+          : homeBound === seatNumber
+            ? "none"
+            : "sword"
+      }
       insetRef={markSword ? anchor("home", seatNumber) : undefined}
       compact={compact}
       foil={foil && !!shape && isProMarkShape(shape)}

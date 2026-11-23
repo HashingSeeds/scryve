@@ -1,11 +1,14 @@
-import { memo, useId, type Ref } from "react"
+import { memo, useId, type ReactNode, type Ref } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { StyleSheet, View } from "react-native"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg"
 
 import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
+import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
+import { FAN_MS } from "./CommanderFlights"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { CheckShape, SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
@@ -94,16 +97,21 @@ export const PlayerMark = memo(function PlayerMark({
           solid={!!insetSwordColor}
           testID={`player-mark-shape-${shape}`}
         />
-        {insetSwordColor && insetGlyph !== "none" ? (
-          <InsetGlyph shape={shape} glyph={insetGlyph} color={insetSwordColor} />
-        ) : null}
       </Svg>
-      {insetRef ? (
+      {insetSwordColor ? (
         <View
           ref={insetRef}
           collapsable={false}
           style={insetBox(SWORD_INSET_THAT_FITS_SHAPE[shape], size)}
-        />
+        >
+          {insetGlyph === "sword" ? (
+            <InsetSvg testID="player-mark-sword">
+              <SwordShapes color={insetSwordColor} />
+            </InsetSvg>
+          ) : insetGlyph === "check" ? (
+            <InsetCheck color={insetSwordColor} />
+          ) : null}
+        </View>
       ) : null}
     </View>
   )
@@ -193,22 +201,32 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<PlayerMarkShape, Inset> = {
   tower: { centerX: 22, centerY: 24.5, size: 13 },
 }
 
-function InsetGlyph({
-  shape,
-  glyph,
-  color,
-}: {
-  shape: PlayerMarkShape
-  glyph: "sword" | "check"
-  color: string
-}) {
+function InsetSvg({ testID, children }: { testID: string; children: ReactNode }) {
   return (
-    <G
-      testID={`player-mark-${glyph}`}
-      transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}
+    <Svg
+      testID={testID}
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${SWORD_VIEW_BOX} ${SWORD_VIEW_BOX}`}
     >
-      {glyph === "sword" ? <SwordShapes color={color} /> : <CheckShape color={color} />}
-    </G>
+      {children}
+    </Svg>
+  )
+}
+
+/** why: the check fades in while the blades fan out over the sword's spot, and fades as Done sends them home; the sword itself swaps under a blade, so it needs no fade. */
+function InsetCheck({ color }: { color: string }) {
+  const fade = motionDuration(useReducedMotion(), FAN_MS)
+  return (
+    <Animated.View
+      entering={fade ? FadeIn.duration(fade) : undefined}
+      exiting={fade ? FadeOut.duration(fade / 2) : undefined}
+      style={StyleSheet.absoluteFill}
+    >
+      <InsetSvg testID="player-mark-check">
+        <CheckShape color={color} />
+      </InsetSvg>
+    </Animated.View>
   )
 }
 
@@ -221,10 +239,6 @@ function insetBox({ centerX, centerY, size }: Inset, markSize: number): ViewStyl
     width: size * scale,
     height: size * scale,
   }
-}
-
-function insetTransform({ centerX, centerY, size }: Inset) {
-  return `translate(${centerX - size / 2} ${centerY - size / 2}) scale(${size / SWORD_VIEW_BOX})`
 }
 
 const ROUNDED_STROKE = { strokeWidth: 2.5, strokeLinejoin: "round" } as const

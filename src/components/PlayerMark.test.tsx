@@ -90,9 +90,13 @@ describe("PlayerMark", () => {
       <PlayerMark seatNumber={seatNumber} color="#FFFFFF" insetSwordColor="#2F7D5F" />,
     )
 
-    const [scale, , , , offsetX, offsetY] = view.getByTestId("player-mark-sword", {
-      includeHiddenElements: true,
-    }).props.matrix as number[]
+    let inset = view.getByTestId("player-mark-sword", { includeHiddenElements: true })
+    while (inset.parent && StyleSheet.flatten(inset.props.style)?.position !== "absolute")
+      inset = inset.parent
+    const box = StyleSheet.flatten(inset.props.style)
+    const offsetX = Number(box.left)
+    const offsetY = Number(box.top)
+    const scale = Number(box.width) / 24
     const left = offsetX + scale * SWORD_GLYPH_BOUNDS.left
     const right = offsetX + scale * SWORD_GLYPH_BOUNDS.right
     const top = offsetY + scale * SWORD_GLYPH_BOUNDS.top
