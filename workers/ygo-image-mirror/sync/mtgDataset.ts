@@ -6,6 +6,7 @@ import {
   type MagicDataset,
   type MagicDatasetCard,
   magicDatasetCard,
+  magicTextIndex,
 } from "../../../convex/lib/magicDataset"
 import { objectRecord, SCRYFALL_BASE_URL, SCRYFALL_HEADERS } from "../../../convex/lib/scryfall"
 
@@ -72,7 +73,8 @@ export async function buildMagicDataset(fetcher: Fetch = fetch): Promise<MagicDa
     const card = magicDatasetCard(JSON.parse(line))
     if (card) cards.push(card)
   }
-  return { version, cards: cards.sort(compareCardNames) }
+  cards.sort(compareCardNames)
+  return { version, cards, textIndex: magicTextIndex(cards) }
 }
 
 export async function syncMagicDataset(options: SyncOptions) {

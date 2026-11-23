@@ -8,9 +8,10 @@ import { parseArgs } from "node:util"
 import { fetchCardNameCatalog } from "../convex/lib/cardNameCatalog"
 import { MAGIC_DATASET_URL } from "../convex/lib/magicDataset"
 import { objectRecord, SCRYFALL_BASE_URL, SCRYFALL_HEADERS } from "../convex/lib/scryfall"
-import { catalogNameIndex } from "../src/features/decks/cardNameMatch"
+import { type CardNameIndex, catalogNameIndex } from "../src/features/decks/cardNameMatch"
 import {
   localMagicSearch,
+  type MagicCards,
   parseMagicCards,
   readsOnDevice,
   type MagicSearch,
@@ -19,7 +20,11 @@ import {
 type Source = "app" | "web" | "written"
 type Case = { query: string; cards: string[]; source: Source; asked?: string }
 
-const FLOOR = 234
+// why: card text reaches the file with the first weekly build after text search ships, so until then the text cases are skipped, not failed.
+const SETS = [
+  { name: "mtg", file: "mtg.json", floor: 234, needsText: false },
+  { name: "mtg text", file: "mtg.text.json", floor: 16, needsText: true },
+]
 const P95_BUDGET_MS = 10
 const TOP = 3
 const CACHE_HOURS = 12
@@ -73,23 +78,22 @@ function percent(count: number, total: number) {
   return `${count}/${total} (${total ? Math.round((count / total) * 100) : 0}%)`
 }
 
-async function main() {
-  const magicCards = parseMagicCards(
-    values.cards
-      ? readFileSync(values.cards, "utf8")
-      : await cached("cards.json", async () => (await download(MAGIC_DATASET_URL)).text()),
-  )
-  const nameIndex = catalogNameIndex(await nameCatalog())
-  const file = values.cases ?? path.join(__dirname, "card-search", "mtg.json")
-  const cases: Case[] = JSON.parse(readFileSync(file, "utf8"))
-  const search = (text: string): MagicSearch => ({
-    text,
-    commander: false,
-    colors: [],
-    colorMatch: "exact",
-    filters: {},
-  })
+const search = (text: string): MagicSearch => ({
+  text,
+  commander: false,
+  colors: [],
+  colorMatch: "exact",
+  filters: {},
+})
 
+function evaluate(
+  name: string,
+  cases: Case[],
+  floor: number | undefined,
+  magicCards: MagicCards,
+  nameIndex: CardNameIndex,
+  timings: number[],
+) {
   const problems: string[] = []
   const seen = new Set<string>()
   for (const { query, cards } of cases) {
@@ -98,12 +102,12 @@ async function main() {
     seen.add(key)
     if (!readsOnDevice(magicCards, search(query)))
       problems.push(`"${query}" goes to Scryfall, not the device`)
-    for (const name of cards)
-      if (!magicCards.byName.has(name))
-        problems.push(`"${query}" names ${name}, which is not a card in ${MAGIC_DATASET_URL}`)
+    for (const card of cards)
+      if (!magicCards.byName.has(card))
+        problems.push(`"${query}" names ${card}, which is not a card in ${MAGIC_DATASET_URL}`)
   }
 
-  const timings: number[] = []
+  const start = timings.length
   const bySource = new Map<Source, { passed: number; total: number }>()
   const misses: string[] = []
   let passed = 0
@@ -118,12 +122,16 @@ async function main() {
       fastest = Math.min(fastest, performance.now() - start)
     }
     timings.push(fastest)
-    const named = new Set(result?.named.map((card) => card.name))
     const shown = [
-      ...named,
-      ...(result?.found ?? []).map((card) => card.name).filter((name) => !named.has(name)),
+      ...new Set(
+        [
+          ...(result?.named ?? []),
+          ...(result?.found ?? []),
+          ...(result?.text ?? []).map(({ card }) => card),
+        ].map((card) => card.name),
+      ),
     ]
-    const rank = shown.findIndex((name) => entry.cards.includes(name))
+    const rank = shown.findIndex((card) => entry.cards.includes(card))
     const tally = bySource.get(entry.source) ?? { passed: 0, total: 0 }
     bySource.set(entry.source, {
       passed: tally.passed + (rank === 0 ? 1 : 0),
@@ -138,20 +146,57 @@ async function main() {
       )
   }
 
-  const sorted = timings.toSorted((a, b) => a - b)
-  const p95 = percentile(sorted, 0.95)
+  const sorted = timings.slice(start).toSorted((a, b) => a - b)
   console.log(
-    `mtg: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${p95.toFixed(2)}ms`,
+    `${name}: ${cases.length} cases · first ${percent(passed, cases.length)} · top ${TOP} ${percent(inTop, cases.length)} · no results ${empty} · p50 ${percentile(sorted, 0.5).toFixed(2)}ms p95 ${percentile(sorted, 0.95).toFixed(2)}ms`,
   )
   console.log(
-    `  ${[...bySource].map(([name, tally]) => `${name} ${percent(tally.passed, tally.total)}`).join(" · ")}`,
+    `  ${[...bySource].map(([source, tally]) => `${source} ${percent(tally.passed, tally.total)}`).join(" · ")}`,
   )
   if (values.misses) console.log(misses.join("\n"))
-  if (!values.cases && passed < FLOOR)
-    problems.push(`ranked ${passed} first, below the floor of ${FLOOR}`)
-  if (p95 > P95_BUDGET_MS) problems.push(`p95 ${p95.toFixed(2)}ms is over ${P95_BUDGET_MS}ms`)
+  if (floor !== undefined && passed < floor)
+    problems.push(`ranked ${passed} first, below the floor of ${floor}`)
   for (const problem of problems) console.log(`  fail: ${problem}`)
-  if (problems.length) process.exitCode = 1
+  return problems.length === 0
+}
+
+async function main() {
+  const magicCards = parseMagicCards(
+    values.cards
+      ? readFileSync(values.cards, "utf8")
+      : await cached("cards.json", async () => (await download(MAGIC_DATASET_URL)).text()),
+  )
+  const nameIndex = catalogNameIndex(await nameCatalog())
+  const sets = values.cases
+    ? [
+        {
+          name: path.basename(values.cases),
+          file: values.cases,
+          floor: undefined,
+          needsText: false,
+        },
+      ]
+    : SETS.map((set) => ({ ...set, file: path.join(__dirname, "card-search", set.file) }))
+  let ok = true
+  const timings: number[] = []
+  for (const { name, file, floor, needsText } of sets) {
+    if (needsText && magicCards.textIndex.size === 0) {
+      console.log(`${name}: skipped, the card file has no text index yet`)
+      continue
+    }
+    const cases: Case[] = JSON.parse(readFileSync(file, "utf8"))
+    ok = evaluate(name, cases, floor, magicCards, nameIndex, timings) && ok
+  }
+  // why: a set of 17 cases has its slowest as its p95, so the budget holds across every case.
+  const p95 = percentile(
+    timings.toSorted((a, b) => a - b),
+    0.95,
+  )
+  if (p95 > P95_BUDGET_MS) {
+    console.log(`  fail: p95 across all cases ${p95.toFixed(2)}ms is over ${P95_BUDGET_MS}ms`)
+    ok = false
+  }
+  if (!ok) process.exitCode = 1
 }
 
 void main()
