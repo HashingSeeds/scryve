@@ -158,6 +158,7 @@ const preparing = new WeakMap<ComprehensiveRules, Promise<void>>()
 
 // why: a phone takes well over 100 ms to index the Magic rules, so a board builds the index ahead of Rules a few ms per frame. A search before it finishes completes the same build at once.
 export function prepareSearchIndex(source: ComprehensiveRules) {
+  if (indexes.has(source)) return Promise.resolve()
   const existing = preparing.get(source)
   if (existing) return existing
   const created = runInSlices(buildOf(source)).then(() => {})

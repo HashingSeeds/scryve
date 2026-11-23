@@ -7,6 +7,7 @@ import {
   ruleReferences,
   ruleTopic,
   prepareSearchIndex,
+  searchIndex,
   searchRules,
   type ComprehensiveRules,
 } from "./comprehensiveRules"
@@ -111,6 +112,13 @@ describe("parseMagicRules", () => {
     const preparing = prepareSearchIndex(fresh)
     expect(searchRules(fresh, "100.10")).toEqual(searchRules(rules!, "100.10"))
     await expect(preparing).resolves.toBeUndefined()
+  })
+
+  it("keeps an index a search already built", async () => {
+    const fresh = finish(parseMagicRules(SOURCE))!
+    const built = searchIndex(fresh)
+    await prepareSearchIndex(fresh)
+    expect(searchIndex(fresh)).toBe(built)
   })
 })
 
