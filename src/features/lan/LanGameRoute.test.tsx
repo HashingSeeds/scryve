@@ -11,7 +11,10 @@ const mockRouter = {
   replace: jest.fn(),
 }
 const mockRedirect = jest.fn((_props: { href: unknown }) => null)
-const mockBoard = jest.fn((_props: { onGameAbandoned: () => void }) => null)
+const mockBoard = jest.fn(
+  (_props: { onGameAbandoned: () => void; onRules?: (system: string, rule?: string) => void }) =>
+    null,
+)
 const mockStore = {
   state: { status: "idle" } as LanSessionState,
   listeners: new Set<() => void>(),
@@ -94,4 +97,16 @@ it("sends a guest who leaves a game the host ended straight to Play", () => {
     params: { destination: "play" },
   })
   expect(mockRouter.back).not.toHaveBeenCalled()
+})
+
+it("opens Rules from a nearby game board", () => {
+  mockStore.state = { role: "host", status: "connected", seatKey: "host", projection }
+  render(<LanGameRoute />)
+  const { onRules } = mockBoard.mock.calls[0][0]
+  expect(onRules).toBeDefined()
+  act(() => onRules?.("mtg", "903.8"))
+  expect(mockRouter.push).toHaveBeenCalledWith({
+    pathname: "/rules",
+    params: { system: "mtg", rule: "903.8" },
+  })
 })

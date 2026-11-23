@@ -5,6 +5,7 @@ import { lanPlayAvailable } from "@/features/lan/lanAvailability"
 import { lanSession, useLanSession } from "@/features/lan/lanSession"
 import { NearbyLogFeed } from "@/features/lan/NearbyLogFeed"
 import { useLanGame } from "@/features/lan/useLanGame"
+import { rulesHref } from "@/features/rules/gameRules"
 import { ConnectedBoardWithRuntime } from "@/screens/ConnectedBoardScreen"
 
 const backToLobby = () => (router.canGoBack() ? router.back() : router.replace("/lan"))
@@ -55,6 +56,7 @@ export default function LanGameRoute() {
       onGameAbandoned={leaveGame}
       onLeave={leaveGame}
       onBack={backToLobby}
+      onRules={(system, rule) => router.push(rulesHref(system, rule))}
       onSettings={() => router.push("/settings")}
       onSupport={() => router.push("/support")}
     />
