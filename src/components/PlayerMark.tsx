@@ -1,13 +1,16 @@
-import { memo, useId } from "react"
+import { memo, useId, type ReactNode, type Ref } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { StyleSheet, View } from "react-native"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg"
 
 import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
+import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
+import { COMMANDER_BEATS } from "./commanderBeats"
 import type { LifeCardContentRotation } from "./playerCardTypes"
-import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
+import { CheckShape, SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 /** why: shapes have different margins inside their 44 unit box, so align drawn edges, not boxes. */
@@ -47,6 +50,10 @@ export interface PlayerMarkProps {
   shape?: PlayerMarkShape
   rotation?: LifeCardContentRotation
   insetSwordColor?: string
+  /** why: an attacker's mark holds the check that ends the attack where its sword was, and shows neither while its blades are away. */
+  insetGlyph?: "sword" | "check" | "none"
+  /** why: blades leave from and come home to the inset, so CommanderFlights measures this box. */
+  insetRef?: Ref<View>
   foil?: boolean
   foilBackdrop?: string
   size?: number
@@ -60,6 +67,8 @@ export const PlayerMark = memo(function PlayerMark({
   shape: chosenShape,
   rotation = 0,
   insetSwordColor,
+  insetGlyph = "sword",
+  insetRef,
   foil = false,
   foilBackdrop,
   size = 44,
@@ -88,8 +97,22 @@ export const PlayerMark = memo(function PlayerMark({
           solid={!!insetSwordColor}
           testID={`player-mark-shape-${shape}`}
         />
-        {insetSwordColor ? <SwordInset shape={shape} color={insetSwordColor} /> : null}
       </Svg>
+      {insetSwordColor ? (
+        <View
+          ref={insetRef}
+          collapsable={false}
+          style={insetBox(SWORD_INSET_THAT_FITS_SHAPE[shape], size)}
+        >
+          {insetGlyph === "sword" ? (
+            <InsetSvg testID="player-mark-sword">
+              <SwordShapes color={insetSwordColor} />
+            </InsetSvg>
+          ) : insetGlyph === "check" ? (
+            <InsetCheck color={insetSwordColor} />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   )
 }, structurallyEqual)
@@ -178,16 +201,45 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<PlayerMarkShape, Inset> = {
   tower: { centerX: 22, centerY: 24.5, size: 13 },
 }
 
-function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
+function InsetSvg({ testID, children }: { testID: string; children: ReactNode }) {
   return (
-    <G testID="player-mark-sword" transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}>
-      <SwordShapes color={color} />
-    </G>
+    <Svg
+      testID={testID}
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${SWORD_VIEW_BOX} ${SWORD_VIEW_BOX}`}
+    >
+      {children}
+    </Svg>
   )
 }
 
-function insetTransform({ centerX, centerY, size }: Inset) {
-  return `translate(${centerX - size / 2} ${centerY - size / 2}) scale(${size / SWORD_VIEW_BOX})`
+/** why: the check fades in while the blades fan out over the sword's spot, and fades as they fold back into it after Done; the sword itself swaps under a blade, so it needs no fade. */
+function InsetCheck({ color }: { color: string }) {
+  const { tuck, fan, flood } = COMMANDER_BEATS
+  const fade = motionDuration(useReducedMotion(), fan)
+  return (
+    <Animated.View
+      entering={fade ? FadeIn.delay(tuck).duration(fade) : undefined}
+      exiting={fade ? FadeOut.delay(flood).duration(fade) : undefined}
+      style={StyleSheet.absoluteFill}
+    >
+      <InsetSvg testID="player-mark-check">
+        <CheckShape color={color} />
+      </InsetSvg>
+    </Animated.View>
+  )
+}
+
+function insetBox({ centerX, centerY, size }: Inset, markSize: number): ViewStyle {
+  const scale = markSize / MARK_VIEW_BOX
+  return {
+    position: "absolute",
+    left: (centerX - size / 2) * scale,
+    top: (centerY - size / 2) * scale,
+    width: size * scale,
+    height: size * scale,
+  }
 }
 
 const ROUNDED_STROKE = { strokeWidth: 2.5, strokeLinejoin: "round" } as const

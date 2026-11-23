@@ -20,14 +20,14 @@ import Animated, {
 
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
+import { COMMANDER_BEATS, floodTimeAt } from "./commanderBeats"
 import { Sword } from "./Sword"
 
 // why: worklets read these, so they are declared before the code that uses them.
-const FAN_MS = 260
-const FLIGHT_MS = 420
 const FAN_SPREAD = 40
 const FAN_REACH = 26
 const BLADE = 32
+const SETTLE_MS = 100
 
 type Point = { x: number; y: number }
 type Spot = Point & { size: number }
@@ -36,8 +36,12 @@ type AnchorKind = "home" | "landing"
 type Flights = {
   /** why: a ref for the spot a blade leaves from (the attacker's sword) or lands on (a defender's strike), by seat. */
   anchor: (kind: AnchorKind, seat: number) => (node: View | null) => void
+  /** why: a defender says how far the shadow grows before it reaches its disc, so its blade lands then. */
+  arrive: (seat: number, share: number) => void
   /** why: seats whose strike waits for its blade, so it shows once the blade lands. */
   inbound: ReadonlySet<number>
+  /** why: the attacker whose blades have not left its sword yet, so it keeps showing the sword until they cover it. */
+  waiting: number | null
   /** why: the seat whose blades are flying home, so its sword shows once they meet. */
   homeBound: number | null
 }
@@ -45,7 +49,9 @@ type Flights = {
 const NOWHERE = new Set<number>()
 const FlightsContext = createContext<Flights>({
   anchor: () => () => {},
+  arrive: () => {},
   inbound: NOWHERE,
+  waiting: null,
   homeBound: null,
 })
 
@@ -62,22 +68,35 @@ type Blade = {
   land: number
   // why: the blade lands at the size of the strike's own sword.
   landed: number
+  // why: the blade leaves at the size of the sword it comes from, small when that sword is inside a mark.
+  start: number
+  // why: the blade waits at home while the attacker's life tucks away, fans out, then flies from `go` for `flight`.
+  lead: number
+  fan: number
   go: number
+  flight: number
   end: number
   delay: number
+  // why: how long after the shadow's clock started this blade mounted.
+  skew: number
+  // why: the attack this blade belongs to, so a landing queued before a re-arm is ignored.
+  run: number
   back: boolean
 }
 
-/** why: when a seat arms, its sword splits into one blade per defender, each fanning out where it rests and then flying to the sword beside that seat's disc, turning to face each reader as it travels; Done plays the same flight backwards, so every blade comes home together. `rotationOf` gives a seat's content rotation on the screen. */
+/** why: when a seat arms, its sword splits into one blade per defender, each fanning out of the mark and then flying to the sword beside that seat's disc, turning to face each reader as it travels; Done plays the same flight backwards, so every blade comes home together. `rotationOf` gives a seat's content rotation on the screen. */
 export function CommanderFlights({
   attacker,
   rotationOf,
   color,
+  homeColor,
   children,
 }: {
   attacker: number | null
   rotationOf: (seat: number) => number
   color: string
+  /** why: the sword in the attacker's mark is cut out in this color, so blades start and end looking like it. */
+  homeColor?: string
   children: ReactNode
 }) {
   const reducedMotion = useReducedMotion()
@@ -86,13 +105,19 @@ export function CommanderFlights({
   const refs = useRef(new Map<string, (node: View | null) => void>())
   const [blades, setBlades] = useState<readonly Blade[]>([])
   const [inbound, setInbound] = useState<ReadonlySet<number>>(NOWHERE)
-  const [homeBound, setHomeBound] = useState<number | null>(null)
+  // why: the seat whose sword has left its mark, set as its blades take over from it and cleared as they land back on it.
+  const [out, setOut] = useState<number | null>(null)
   const flight = useRef(0)
+  const flying = useRef(0)
   // why: a team zone's check unmounts on Done, so its blades fly home to where they left from.
-  const homes = useRef(new Map<number, Point>())
-  const latest = useRef({ rotationOf, color })
+  const homes = useRef(new Map<number, Spot>())
+  const arrivals = useRef(new Map<number, number>())
+  const arrive = useCallback((seat: number, share: number) => {
+    arrivals.current.set(seat, share)
+  }, [])
+  const latest = useRef({ rotationOf, color, homeColor })
   useEffect(() => {
-    latest.current = { rotationOf, color }
+    latest.current = { rotationOf, color, homeColor }
   })
 
   const anchor = useCallback((kind: AnchorKind, seat: number) => {
@@ -107,7 +132,7 @@ export function CommanderFlights({
     return ref
   }, [])
 
-  const [shownColor, setShownColor] = useState(color)
+  const [shownColor, setShownColor] = useState({ blade: color, home: homeColor })
   const previous = useRef(attacker)
   useEffect(() => {
     const before = previous.current
@@ -116,42 +141,61 @@ export function CommanderFlights({
     const run = ++flight.current
     setBlades([])
     setInbound(NOWHERE)
-    setHomeBound(null)
-    if (reducedMotion !== false) return
     const seat = attacker ?? before
-    if (seat === null) return
+    if (reducedMotion !== false || seat === null) {
+      setOut(attacker)
+      return
+    }
     const back = attacker === null
-    if (!back) setShownColor(latest.current.color)
+    if (!back) setShownColor({ blade: latest.current.color, home: latest.current.homeColor })
+    // why: the shadow's clock starts in this commit, so blades that mount a few frames later start that far along.
+    const started = performance.now()
     // why: the defenders' strikes lay out in the commit that arms the attack, so the plan reads them a frame later.
     const frameId = requestAnimationFrame(() => {
       void measureAll(frame.current, seat, nodes.current, homes.current.get(seat)).then((spots) => {
-        if (!spots || run !== flight.current) return
-        homes.current.set(seat, spots.home)
-        const planned = plan(spots, seat, latest.current.rotationOf, back)
-        if (!planned.length) return
+        if (run !== flight.current) return
+        if (spots) homes.current.set(seat, spots.home)
+        const skew = performance.now() - started
+        const planned = spots
+          ? plan(spots, seat, latest.current.rotationOf, back, arrivals.current).map((blade) => ({
+              ...blade,
+              skew,
+              run,
+            }))
+          : []
+        // why: the mark swaps in the same commit the blades appear over it, so the swap hides under them.
+        setOut(planned.length || !back ? seat : null)
+        flying.current = planned.length
         setBlades(planned)
-        setInbound(new Set(planned.map(({ seat: landing }) => landing)))
-        if (back) setHomeBound(seat)
+        if (planned.length) setInbound(new Set(planned.map(({ seat: landing }) => landing)))
       })
     })
     return () => cancelAnimationFrame(frameId)
   }, [attacker, reducedMotion])
 
-  const landed = useCallback((seat: number, back: boolean) => {
-    setBlades((current) => {
-      const left = current.filter((blade) => blade.seat !== seat)
-      if (back && !left.length) setHomeBound(null)
-      return left
-    })
+  // why: the sword a blade lands on shows first and the blade lifts off it a few frames later, so the handover never shows a gap.
+  const landed = useCallback((seat: number, back: boolean, run: number) => {
+    if (run !== flight.current) return
+    flying.current -= 1
+    if (back && !flying.current) setOut(null)
     if (!back)
       setInbound((current) => {
         const left = new Set(current)
         left.delete(seat)
         return left
       })
+    setTimeout(() => {
+      if (run === flight.current)
+        setBlades((current) => current.filter((blade) => blade.seat !== seat))
+    }, SETTLE_MS)
   }, [])
 
-  const value = useMemo(() => ({ anchor, inbound, homeBound }), [anchor, inbound, homeBound])
+  const waiting = attacker !== null && out !== attacker ? attacker : null
+  const homeBound = out !== null && out !== attacker ? out : null
+  const value = useMemo(
+    () => ({ anchor, arrive, inbound, waiting, homeBound }),
+    [anchor, arrive, inbound, waiting, homeBound],
+  )
   return (
     <FlightsContext.Provider value={value}>
       <View ref={frame} style={$frame} collapsable={false}>
@@ -161,7 +205,8 @@ export function CommanderFlights({
             <FlyingBlade
               key={`${blade.seat}:${blade.back}`}
               blade={blade}
-              color={shownColor}
+              color={shownColor.blade}
+              homeColor={shownColor.home}
               onLanded={landed}
             />
           ))}
@@ -171,7 +216,7 @@ export function CommanderFlights({
   )
 }
 
-type Spots = { home: Point; landings: Map<number, Spot> }
+type Spots = { home: Spot; landings: Map<number, Spot> }
 
 function measureCenter(node: View) {
   return new Promise<Spot | null>((resolve) =>
@@ -189,7 +234,7 @@ async function measureAll(
   frame: View | null,
   seat: number,
   nodes: { home: Map<number, View>; landing: Map<number, View> },
-  lastHome?: Point,
+  lastHome?: Spot,
 ): Promise<Spots | null> {
   const home = nodes.home.get(seat)
   if (!frame || (!home && !lastHome)) return null
@@ -220,8 +265,11 @@ function plan(
   seat: number,
   rotationOf: (seat: number) => number,
   back: boolean,
+  arrivals: ReadonlyMap<number, number>,
 ): Blade[] {
+  const { tuck, fan, flood, flight, hold } = COMMANDER_BEATS
   const from = rotationOf(seat)
+  const rides = [...landings.keys()].every((landing) => arrivals.has(landing))
   const aimed = [...landings].map(([landing, to]) => ({
     seat: landing,
     to,
@@ -238,12 +286,18 @@ function plan(
   const blades = aimed.map(({ seat: landing, to, reach, aim }, index) => {
     const tilt = toward(from, leans[index] - drift)
     const radians = (tilt * Math.PI) / 180
-    const go = FAN_MS + 60 + reach * 0.25
+    // why: blades leave the fan together as the shadow sets off, each flying until the shadow reaches its defender.
+    const share = arrivals.get(landing)
+    const go = rides ? tuck + fan : tuck + fan + hold + reach * 0.25
+    const flies = rides && share !== undefined ? Math.max(1, flood * floodTimeAt(share)) : flight
     const ahead = toward(tilt, aim)
     return {
       seat: landing,
       home,
-      out: { x: home.x + FAN_REACH * Math.sin(radians), y: home.y - FAN_REACH * Math.cos(radians) },
+      out: {
+        x: home.x + FAN_REACH * Math.sin(radians),
+        y: home.y - FAN_REACH * Math.cos(radians),
+      },
       to,
       from,
       tilt,
@@ -251,53 +305,65 @@ function plan(
       // why: the landed blade lies across the defender's view, pointing at its disc.
       land: toward(ahead, rotationOf(landing) + 90),
       landed: to.size / BLADE,
+      start: Math.min(1, home.size / BLADE),
+      lead: tuck,
+      fan,
       go,
-      end: go + FLIGHT_MS,
+      flight: flies,
+      end: go + flies,
       delay: 0,
+      skew: 0,
+      run: 0,
       back,
     }
   })
-  const whole = Math.max(...blades.map(({ end }) => end))
-  // why: backwards, every blade starts so that all of them reach home together.
+  // why: backwards, the shadow drains from the start, so every blade leaves its defender as the shadow does and all reach home together.
+  const whole = rides ? tuck + fan + flood : Math.max(...blades.map(({ end }) => end))
   return back ? blades.map((blade) => ({ ...blade, delay: whole - blade.end })) : blades
 }
 
 function FlyingBlade({
   blade,
   color,
+  homeColor,
   onLanded,
 }: {
   blade: Blade
   color: string
-  onLanded: (seat: number, back: boolean) => void
+  homeColor?: string
+  onLanded: (seat: number, back: boolean, run: number) => void
 }) {
-  const { back, end, delay, seat } = blade
-  const t = useSharedValue(back ? end : 0)
+  const { back, end, delay, seat, skew, run } = blade
+  const first = back ? end : Math.min(skew, end)
+  const t = useSharedValue(first)
   useEffect(() => {
     const done = (finished?: boolean) => {
       "worklet"
-      if (finished) runOnJS(onLanded)(seat, back)
+      if (finished) runOnJS(onLanded)(seat, back, run)
     }
-    t.value = withDelay(
-      delay,
-      withTiming(back ? 0 : end, { duration: end, easing: Easing.linear }, done),
-    )
-  }, [back, delay, end, onLanded, seat, t])
+    const wait = back ? Math.max(0, delay - skew) : 0
+    const duration = back ? end : end - first
+    t.value = withDelay(wait, withTiming(back ? 0 : end, { duration, easing: Easing.linear }, done))
+  }, [back, delay, end, first, onLanded, run, seat, skew, t])
   const style = useAnimatedStyle(() => {
-    const { home, out, to, from, tilt, ahead, land, landed, go } = blade
+    const { home, out, to, from, tilt, ahead, land, landed, start, lead, fan, go, flight } = blade
     const now = t.value
     let point = home
     let angle = from
-    let scale = 1
-    if (now <= FAN_MS) {
-      const k = splay(now / FAN_MS)
+    let scale = start
+    if (now <= lead) {
+      // why: the blade rests as the sword in the mark while the attacker's life tucks away.
+    } else if (now <= lead + fan) {
+      const k = splay((now - lead) / fan)
       point = { x: home.x + (out.x - home.x) * k, y: home.y + (out.y - home.y) * k }
       angle = from + (tilt - from) * k
+      scale = start + (1 - start) * Math.min(1, k)
     } else if (now <= go) {
       point = out
       angle = tilt
+      scale = 1
     } else {
-      const k = Math.min(1, (now - go) / FLIGHT_MS)
+      const k = Math.min(1, (now - go) / flight)
       const travel = glide(k)
       point = { x: out.x + (to.x - out.x) * travel, y: out.y + (to.y - out.y) * travel }
       angle =
@@ -305,7 +371,6 @@ function FlyingBlade({
       scale = 1 + (landed - 1) * k
     }
     return {
-      opacity: Math.min(1, now / (end * 0.12)),
       transform: [
         { translateX: point.x - BLADE / 2 },
         { translateY: point.y - BLADE / 2 },
@@ -314,9 +379,18 @@ function FlyingBlade({
       ],
     }
   })
+  // why: each blade starts as the sword cut into the mark and takes the strike color as it fans out; home, it turns back.
+  const homeStyle = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(1, Math.max(0, (t.value - blade.lead) / blade.fan)),
+  }))
   return (
     <Animated.View testID={`commander-blade-seat-${seat}`} style={[$blade, style]}>
       <Sword size={BLADE} color={color} />
+      {homeColor ? (
+        <Animated.View style={[StyleSheet.absoluteFill, homeStyle]}>
+          <Sword size={BLADE} color={homeColor} />
+        </Animated.View>
+      ) : null}
     </Animated.View>
   )
 }

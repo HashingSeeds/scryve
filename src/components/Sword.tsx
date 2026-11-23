@@ -20,17 +20,23 @@ export function Sword({ size, color }: { size: number; color: string }) {
   )
 }
 
+export function CheckShape({ color }: { color: string }) {
+  return (
+    <Path
+      d="M5.52 11.68 9.4 15.56 18.68 6.28 20.52 8.12 9.4 19.24 3.68 13.52Z"
+      fill={color}
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinejoin="round"
+    />
+  )
+}
+
 /** why: drawn solid at Rubik Bold's stroke weight, with softened corners, so it reads as the app's own type rather than a system icon. */
 export function Check({ size, color }: { size: number; color: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        d="M5.52 11.68 9.4 15.56 18.68 6.28 20.52 8.12 9.4 19.24 3.68 13.52Z"
-        fill={color}
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinejoin="round"
-      />
+    <Svg width={size} height={size} viewBox={`0 0 ${SWORD_VIEW_BOX} ${SWORD_VIEW_BOX}`}>
+      <CheckShape color={color} />
     </Svg>
   )
 }

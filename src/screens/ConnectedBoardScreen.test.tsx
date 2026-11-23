@@ -226,7 +226,7 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-sword-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
     fireEvent.press(screen.getByTestId("commander-hit-seat-1"))
     openConnectedMenu()
     expect(screen.queryByTestId("players-button")).toBeNull()
@@ -252,7 +252,7 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-sword-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
     fireEvent.press(
       screen.getByRole("button", { name: "Done assigning commander damage from seat 2" }),
     )
@@ -562,7 +562,7 @@ describe("ConnectedBoardScreen", () => {
     }
     try {
       render(themed(<NearbyBoard partners={false} />))
-      fireEvent.press(screen.getByTestId("commander-sword-seat-2"))
+      fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
       expect(screen.getByTestId("commander-power-seat-2")).toHaveTextContent("2")
       expect(screen.queryByTestId("commander-sit-seat-2-partner")).toBeNull()
 

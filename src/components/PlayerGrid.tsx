@@ -771,6 +771,7 @@ export function PlayerGrid({
         attacker={armedCard >= 0 ? armedCard + 1 : null}
         rotationOf={(seat) => boardRotation + (seatRotations.get(seat - 1) ?? 0)}
         color={armedPlayer ? strikeTint(armedPlayer.color) : "#FFFFFF"}
+        homeColor={teams ? undefined : armedPlayer?.color}
       >
         <Animated.View
           testID="player-grid"

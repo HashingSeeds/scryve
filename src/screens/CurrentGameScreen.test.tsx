@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
+import { COMMANDER_BEATS } from "@/components/commanderBeats"
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { PASS_UNDO_MS } from "@/features/game/turnTab"
@@ -1112,7 +1113,7 @@ describe("CurrentGameScreen", () => {
       view.getByTestId(`life-total-seat-${seat}`, { includeHiddenElements: true }).props.children
 
     const armCommander = (view: ReturnType<typeof renderGame>, seat: number) => {
-      fireEvent.press(view.getByTestId(`commander-sword-seat-${seat}`))
+      fireEvent.press(view.getByTestId(`commander-mark-seat-${seat}`))
     }
 
     it("stays out of the way outside Commander", () => {
@@ -1217,6 +1218,7 @@ describe("CurrentGameScreen", () => {
     })
 
     it("lets an eliminated attacker still attack and take back its own hit", () => {
+      jest.useFakeTimers()
       const initial = commanderGame()
       initial.commanderDamage = {
         [commanderDamageKey(initial.players[0].id, initial.players[1].id)]: 7,
@@ -1233,8 +1235,12 @@ describe("CurrentGameScreen", () => {
       fireEvent.press(view.getByTestId("commander-undo-seat-2"))
       expect(view.getByLabelText("7 commander damage from Ada")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-finish-seat-1"))
+      // why: the attacker's life buttons come back once its life is back from its corner.
+      act(() => jest.advanceTimersByTime(COMMANDER_BEATS.flood + COMMANDER_BEATS.fan))
+      act(() => jest.advanceTimersByTime(COMMANDER_BEATS.tuck))
       expect(view.getByTestId("life-seat-1-1")).toBeDisabled()
       expect(life(view, 2)).toBe("33")
+      jest.useRealTimers()
     })
 
     it("marks 21 from one commander as eliminated and leaves the game running", () => {

@@ -30,12 +30,12 @@ import { startTapTiming } from "@/utils/tapTiming"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { COMMANDER_BEATS } from "./commanderBeats"
 import {
   ATTACK_SHADE,
   sideRoom,
   CommanderDamageCardControls,
   shadowReached,
-  SWAP_MS,
   CommanderTakeoverBackdrop,
   SHADOW_INK,
   TAKEOVER_LAYERS,
@@ -57,6 +57,7 @@ import {
   type CommanderFacing,
   type CommanderReach,
 } from "./commanderDamageLayout"
+import { useCommanderFlights } from "./CommanderFlights"
 import { CommanderStrip, commanderGridShown } from "./CommanderStrip"
 import {
   CounterChips,
@@ -116,8 +117,6 @@ import {
 } from "./TurnChip"
 import { useSeatFill } from "./TurnSpotlight"
 import { isProMarkShape, shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
-
-const LIFE_FADE_MS = SWAP_MS
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -232,7 +231,10 @@ export const LifeCard = memo(function LifeCard({
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const cornerSlide = useCornerSlide()
-  const lifeFadeDuration = motionDuration(reducedMotion, LIFE_FADE_MS)
+  const beats = COMMANDER_BEATS
+  const lifeFadeDuration = motionDuration(reducedMotion, beats.tuck)
+  // why: after an attack the life waits in its corner while the blades fly home and fold into the mark, then grows back last.
+  const lifeReturnsAfter = lifeFadeDuration ? beats.flood + beats.fan : 0
   const locked = !!out && out.cause !== "life"
   const frozen = disabled || locked
   const contentRotationStyle: TextStyle | undefined = contentRotation
@@ -497,16 +499,28 @@ export const LifeCard = memo(function LifeCard({
     return { transform: [{ scale: 1 + (readoutFit - 1) * reached }] }
   })
   const toSlot = attackerSide && !!lifeSlot
+  // why: after an attack the life stays tucked, then returns, and the grid and life buttons come back only once it has landed.
+  const [lifeAway, setLifeAway] = useState<"tucked" | "returning" | null>(null)
+  if (toSlot && lifeAway !== "tucked") setLifeAway("tucked")
+  useEffect(() => {
+    if (toSlot || !lifeAway) return
+    const next = setTimeout(
+      () => setLifeAway(lifeAway === "tucked" ? "returning" : null),
+      lifeAway === "tucked" ? lifeReturnsAfter : lifeFadeDuration,
+    )
+    return () => clearTimeout(next)
+  }, [toSlot, lifeAway, lifeReturnsAfter, lifeFadeDuration])
+  const inSlot = toSlot || lifeAway === "tucked"
   const [lifeInSlot, setLifeInSlot] = useState(false)
-  if (lifeInSlot && !toSlot) setLifeInSlot(false)
+  if (lifeInSlot && !inSlot) setLifeInSlot(false)
   useEffect(() => {
     if (!toSlot) return
     const landed = setTimeout(() => setLifeInSlot(true), lifeFadeDuration)
     return () => clearTimeout(landed)
   }, [toSlot, lifeFadeDuration])
-  const lifeLanded = toSlot && (lifeInSlot || !lifeFadeDuration)
+  const lifeLanded = inSlot && (lifeInSlot || !lifeFadeDuration)
   const slotPose =
-    toSlot && lifeSlot
+    inSlot && lifeSlot
       ? {
           ...turnedOffset(lifeSlot, contentRotation),
           scale: lifeSlot.fontSize / resolvedLifeFontSize,
@@ -560,12 +574,17 @@ export const LifeCard = memo(function LifeCard({
     ],
   }))
   const lifeControlsShown =
-    !commanderCovers && !sittingOut && !tableSheetOpen && !diceCovers && ownership !== "unowned"
+    !commanderCovers &&
+    !lifeAway &&
+    !sittingOut &&
+    !tableSheetOpen &&
+    !diceCovers &&
+    ownership !== "unowned"
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
-  // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card. The attacker's own grid steps aside for its power boxes.
+  // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card. The attacker's own grid steps aside for its power boxes until its life is back from its corner.
   const commanderStripShown =
     commanderSeat &&
-    !attackerSide &&
+    !lifeAway &&
     (!commanderCovers || defending) &&
     !tableSheetOpen &&
     !diceCovers &&
@@ -645,8 +664,10 @@ export const LifeCard = memo(function LifeCard({
     seatRun > 0 &&
     seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.icon - identityMetrics.gap <
       MIN_NAME_ROOM
-  // why: commander seats carry a sword after the name that starts an attack, and holds the check that ends it; a defender's row only says whose seat it is. A team zone starts attacks from its heads' marks, so its row holds only the check.
+  // why: a commander seat's mark carries the sword that starts an attack, and holds the check that ends it, so the attacker's thumb finds Done where it started; a defender's mark only says whose seat it is. A team zone starts attacks from its heads' marks, so its row holds only the check.
   const swordShown = commanderSeat && (team ? attackerSide : !commanderCardMode || attackerSide)
+  const markSword = swordShown && !team && !!commanderDamage
+  const { anchor, waiting, homeBound } = useCommanderFlights()
   const rowInk = floodedBy.takeover ? SHADOW_INK : foreground
   const seatIdentity = (
     <SeatIdentity
@@ -654,6 +675,17 @@ export const LifeCard = memo(function LifeCard({
       playerName={displayName}
       shape={shape}
       color={rowInk}
+      insetSwordColor={markSword ? color : undefined}
+      insetGlyph={
+        attackerSide
+          ? waiting === seatNumber
+            ? "sword"
+            : "check"
+          : homeBound === seatNumber
+            ? "none"
+            : "sword"
+      }
+      insetRef={markSword ? anchor("home", seatNumber) : undefined}
       compact={compact}
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
@@ -750,7 +782,7 @@ export const LifeCard = memo(function LifeCard({
           themed($content),
           readoutFitStyle,
           floodedBy.takeover && $aboveFlood,
-          attackerSide && $aboveAttackerControls,
+          (inSlot || !!lifeAway) && $aboveAttackerControls,
         ]}
       >
         <Animated.View
@@ -939,16 +971,30 @@ export const LifeCard = memo(function LifeCard({
               onLayout={({ nativeEvent: { layout } }) => {
                 if (!nameRetracted) setFullIdentityWidth(layout.width)
               }}
-              pointerEvents={cornerTouches}
+              pointerEvents={attackerSide ? "box-none" : cornerTouches}
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
                 $cornerIdentity,
-                // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit. The sword sits past it.
+                // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
                 commanderSeat && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
-              {team ? null : commanderDamage ? (
+              {team ? null : commanderCardMode?.kind === "source" ? (
+                <BoardPressable
+                  testID={`commander-finish-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate(
+                    `board:commander.submitAssigningFromSeat.${commanderCardMode.submit}`,
+                    { seat: seatNumber },
+                  )}
+                  hitSlop={8}
+                  onPress={commanderCardMode.onSubmit}
+                  style={({ pressed }) => pressed && { opacity: 0.72 }}
+                >
+                  {seatIdentity}
+                </BoardPressable>
+              ) : commanderDamage ? (
                 <BoardPressable
                   testID={`commander-mark-seat-${seatNumber}`}
                   accessibilityRole="button"
@@ -973,7 +1019,7 @@ export const LifeCard = memo(function LifeCard({
                 <View pointerEvents="none">{seatIdentity}</View>
               )}
             </View>
-            {swordShown && commanderDamage ? (
+            {team && swordShown && commanderDamage ? (
               <SeatSword
                 seatNumber={seatNumber}
                 identity={identity}

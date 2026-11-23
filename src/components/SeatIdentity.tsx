@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from "react"
+import { useState, type ComponentProps, type Ref } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from "react-native-reanimated"
@@ -62,6 +62,8 @@ export interface SeatIdentityProps {
   color: string
   compact?: boolean
   insetSwordColor?: string
+  insetGlyph?: "sword" | "check" | "none"
+  insetRef?: Ref<View>
   foil?: boolean
   staleSince?: number
   markOnly?: boolean
@@ -79,6 +81,8 @@ export function SeatIdentity({
   color,
   compact,
   insetSwordColor,
+  insetGlyph,
+  insetRef,
   foil,
   staleSince,
   markOnly,
@@ -97,6 +101,8 @@ export function SeatIdentity({
         shape={shape}
         color={color}
         insetSwordColor={insetSwordColor}
+        insetGlyph={insetGlyph}
+        insetRef={insetRef}
         foil={foil}
         size={art.size}
         style={[$mark, art.trim, markHidden && $hidden]}

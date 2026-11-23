@@ -6,10 +6,12 @@ import Animated, {
   Easing,
   FadeIn,
   FadeOut,
+  LayoutAnimationConfig,
   LinearTransition,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -28,6 +30,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { COMMANDER_BEATS, DRAIN_EASING, FLOOD_EASING } from "./commanderBeats"
 import {
   DIGIT_INK_HEIGHT,
   DISC_FILL,
@@ -114,12 +117,6 @@ export interface CommanderDamageCardControlsProps {
   draining?: boolean
 }
 
-// why: the shadow travels at a pace the eye can follow, so neighbours darken first and far seats after.
-export const TAKEOVER_MS = 950
-const TAKEOVER_EASING = Easing.bezier(0.45, 0.05, 0.25, 1)
-// why: closing is quicker than opening; the shadow pulls back slowly, then fast into the card.
-const DRAIN_MS = 620
-const DRAIN_EASING = Easing.bezier(0.7, 0, 0.7, 0.4)
 // why: spreading by the blur puts its solid core at the card's grown edge, so it fades smoothly over twice this distance.
 const FLOOD_BLUR = 24
 // why: the shadow starts at the attacker's card, so it swaps its life for power boxes quickly as the shadow leaves; everything else changes when the shadow arrives.
@@ -138,8 +135,11 @@ export function CommanderDamageCardControls({
 }: CommanderDamageCardControlsProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const swap = motionDuration(reducedMotion, SWAP_MS)
   const source = mode.kind === "source"
+  const beats = COMMANDER_BEATS
+  // why: the attacker's power boxes come in as its life tucks away, and go only once its blades are home.
+  const swap = motionDuration(reducedMotion, source ? beats.tuck : SWAP_MS)
+  const leaveAfter = source ? beats.flood + beats.fan : 0
   const progress = useSharedValue(swap ? 0 : 1)
   const wave = mode.kind === "target" ? mode.wave : undefined
   const flood = mode.kind === "target" ? mode.takeover?.flood : undefined
@@ -164,7 +164,7 @@ export function CommanderDamageCardControls({
       pointerEvents={draining ? "none" : undefined}
       accessibilityElementsHidden={draining}
       importantForAccessibility={draining ? "no-hide-descendants" : "auto"}
-      exiting={swap ? takeoverExit(source ? swap : swap / 2, source) : undefined}
+      exiting={swap ? takeoverExit(source ? swap : swap / 2, source, leaveAfter) : undefined}
       style={[
         themed($overlay),
         !source && $aboveFlood,
@@ -182,13 +182,16 @@ export function CommanderDamageCardControls({
           mode={mode}
         />
       ) : (
-        <AttackerControls
-          seatNumber={seatNumber}
-          foreground={foreground}
-          contentRotation={contentRotation}
-          compact={compact}
-          mode={mode}
-        />
+        // why: the power boxes leave with the panel after the blades are home, not on their own fades.
+        <LayoutAnimationConfig skipExiting>
+          <AttackerControls
+            seatNumber={seatNumber}
+            foreground={foreground}
+            contentRotation={contentRotation}
+            compact={compact}
+            mode={mode}
+          />
+        </LayoutAnimationConfig>
       )}
     </Animated.View>
   )
@@ -200,6 +203,11 @@ export type CommanderFlood = NonNullable<CommanderTakeover["flood"]>
 function shadowGrown(flood: CommanderFlood, wave: number) {
   "worklet"
   return -FLOOD_BLUR * 2 + wave * (flood.distance + FLOOD_BLUR * 2)
+}
+
+/** why: how far the flood has grown, from 0 to 1, when the shadow's soft edge is halfway over the disc, so the blade lands as the disc takes the shadow. */
+export function floodArrival(flood: CommanderFlood) {
+  return Math.min(1, (flood.discGap + FLOOD_BLUR) / (flood.distance + FLOOD_BLUR * 2))
 }
 
 /** why: 0 until the shadow's soft edge reaches a point `gap` away, 1 once its solid core covers it, or once it grows `span` past that if it still can. */
@@ -214,15 +222,19 @@ export function shadowReached(flood: CommanderFlood, wave: number, gap: number, 
   return Math.min(1, Math.max(0, edge / room))
 }
 
-function takeoverExit(duration: number, source: boolean): EntryExitAnimationFunction {
+function takeoverExit(
+  duration: number,
+  source: boolean,
+  after: number,
+): EntryExitAnimationFunction {
   return () => {
     "worklet"
     const timing = { duration, easing: Easing.in(Easing.quad) }
     return {
       initialValues: {},
       animations: {
-        opacity: withTiming(0, timing),
-        transform: [{ scale: withTiming(source ? SWAP_FROM : 1, timing) }],
+        opacity: withDelay(after, withTiming(0, timing)),
+        transform: [{ scale: withDelay(after, withTiming(source ? SWAP_FROM : 1, timing)) }],
       },
     }
   }
@@ -235,7 +247,10 @@ export function useCommanderTakeover<Attacker>(
 ) {
   const reducedMotion = useReducedMotion()
   const active = !!takeover
-  const duration = motionDuration(reducedMotion, active ? TAKEOVER_MS : DRAIN_MS)
+  const beats = COMMANDER_BEATS
+  const duration = motionDuration(reducedMotion, beats.flood)
+  // why: the shadow sets off as the attacker's blades leave the fan, and drains at once when the attack ends.
+  const lead = active && duration ? beats.tuck + beats.fan : 0
   const last = useRef({ takeover, attacker })
   useEffect(() => {
     if (takeover) last.current = { takeover, attacker }
@@ -257,10 +272,13 @@ export function useCommanderTakeover<Attacker>(
       else runOnJS(setDraining)(false)
     }
     wave.value = duration
-      ? withTiming(
-          active ? 1 : 0,
-          { duration, easing: active ? TAKEOVER_EASING : DRAIN_EASING },
-          done,
+      ? withDelay(
+          lead,
+          withTiming(
+            active ? 1 : 0,
+            { duration, easing: active ? FLOOD_EASING : DRAIN_EASING },
+            done,
+          ),
         )
       : active
         ? 1
@@ -269,7 +287,7 @@ export function useCommanderTakeover<Attacker>(
       setCovered(active)
       setDraining(false)
     }
-  }, [active, duration, wave])
+  }, [active, duration, lead, wave])
 
   // why: the render that ends an attack runs before the effect starts the drain, so the last takeover stays drawn through it instead of unmounting for a frame. A flood with no reach is a still fill with nothing to drain.
   const shown = takeover
@@ -391,6 +409,11 @@ function DefenderControls({
   const flash = useSharedValue(0)
   const lunge = useSharedValue(0)
   const { attacker, takeover, commanders, steps, dealt, hits, takeBack } = mode
+  const { arrive } = useCommanderFlights()
+  const floodShare = takeover?.flood ? floodArrival(takeover.flood) : undefined
+  useEffect(() => {
+    if (floodShare !== undefined) arrive(seatNumber, floodShare)
+  }, [arrive, floodShare, seatNumber])
   const attackerColor = attacker?.color ?? theme.colors.board.surfaceRaised
   const tint = mixColorsInLinearLight(attackerColor, "#FFFFFF", TINT_SHARE)
   const struck = hits.length
@@ -741,27 +764,24 @@ function Strike({
   const { anchor, inbound } = useCommanderFlights()
   const waiting = inbound.has(seatNumber)
   const nudge = useSharedValue(0)
+  // why: the sword holds still under its blade, so the blade hands over to it where it landed.
   useEffect(() => {
-    if (reducedMotion !== false) return
+    if (reducedMotion !== false || waiting) return
     nudge.value = withRepeat(
       withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     )
-    return () => cancelAnimation(nudge)
-  }, [nudge, reducedMotion])
+    return () => {
+      cancelAnimation(nudge)
+      nudge.value = 0
+    }
+  }, [nudge, reducedMotion, waiting])
   const swordStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: nudge.value * NUDGE + lunge.value * LUNGE }, { rotate: "90deg" }],
   }))
-  // why: while its blade is in the air the strike waits for it, then shows where the blade lands.
-  const shownStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(waiting ? 0 : 1, { duration: waiting ? 0 : 160 }),
-  }))
   return (
-    <Animated.View
-      testID={`commander-strike-seat-${seatNumber}`}
-      style={[$strike, style, shownStyle]}
-    >
+    <Animated.View testID={`commander-strike-seat-${seatNumber}`} style={[$strike, style]}>
       <Text
         testID={`commander-strike-amount-seat-${seatNumber}`}
         text={formatSigned(-dealt)}
@@ -771,7 +791,8 @@ function Strike({
         style={[$strikeText, { color, fontSize: font, lineHeight: font * 1.15 }]}
       />
       <View ref={anchor("landing", seatNumber)} collapsable={false}>
-        <Animated.View style={swordStyle}>
+        {/* why: while its blade is in the air the blade stands in for the strike's sword, swapping in the same commit; the amount comes and goes with the shadow, which the blade rides. */}
+        <Animated.View style={[swordStyle, waiting && $hidden]}>
           <Sword size={sword} color={color} />
         </Animated.View>
       </View>
@@ -1087,6 +1108,7 @@ const TINT_SHARE = 0.42
 const STRIKE_GAP = 6
 const STRIKE_SHARE = 0.78
 const NUDGE = 4
+const $hidden: ViewStyle = { opacity: 0 }
 const LUNGE = 20
 const COIN_GAP = 6
 // why: degrees of arc the hits on one seat may use, and how far apart they sit until it fills.
