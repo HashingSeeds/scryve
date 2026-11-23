@@ -113,7 +113,7 @@ export function TurnChipLayer({
   )
 }
 
-/** why: the row steps a chip down as room runs out. A count goes "Turn 3 | Pass › mark", "3 › mark", "› mark"; a clock goes "19:57 | Pass › mark", "19:57 ›", "19m ›"; Start goes to just ▶. */
+/** why: the row steps a chip down as room runs out. A count goes "Turn 3 | Pass › mark", "3 › mark", "› mark"; a clock goes "19:57 | Pass › mark", "19:57 ›", "19m ›"; Start goes to just ▶ at its first step, since a step that looks the same never measures again. */
 export type TurnChipSize = "full" | "number" | "pass"
 
 export function TurnChip({
@@ -202,7 +202,7 @@ export function TurnChip({
   const content = waiting ? (
     <>
       <PlayGlyph color={ink} />
-      {size === "pass" ? null : (
+      {size !== "full" ? null : (
         <Text tx="board:turn.start" weight="bold" style={[themed($value), { color: ink }]} />
       )}
     </>

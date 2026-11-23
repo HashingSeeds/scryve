@@ -603,10 +603,10 @@ describe("CurrentGameScreen", () => {
       nativeEvent: { layout: { x: 0, y: 0, width: 2_000, height: 30 } },
     })
     chipWidth(1_000)
-    chipWidth(900)
     expect(view.getByTestId("turn-chip-1")).not.toHaveTextContent("Start")
 
     fireEvent.press(view.getByTestId("life-seat-2-1"))
+    chipWidth(900)
     expect(view.getByTestId("turn-chip-time")).toHaveTextContent(/^(19|20)m$/)
     expect(view.getByTestId("turn-chip-1").props.accessibilityLabel).toMatch(/\d+:\d{2}/)
   })
