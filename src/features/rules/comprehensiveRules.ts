@@ -33,6 +33,8 @@ const BM25_B = 0.5
 const TYPO_MIN_LENGTH = 6
 const INHERITED_WEIGHT = 0.5
 const TERM_WEIGHT = 0.4
+// why: a player who has typed a whole word means that word, so longer words it only starts ("block" in "blockers") still match while typing but rank below it.
+const COMPLETION_WEIGHT = 0.3
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
 const STOPWORDS = new Set(
@@ -72,8 +74,9 @@ type SearchIndex = {
   lengths: number[]
   average: number
   slang: Map<string, string[]>
+  slangSpellings: Map<string, string>
   spellings: Map<string, string>
-  defined: { entry: GlossaryEntry; words: string[]; rules: number[] }[]
+  defined: { entry: GlossaryEntry; words: string[]; rules: number[]; opens?: string }[]
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
 
@@ -138,6 +141,7 @@ export function searchIndex(source: ComprehensiveRules) {
       words(meaning).map(stem),
     ]),
   )
+  const slangSpellings = new Map(Object.keys(source.slang ?? {}).map((word) => [word, stem(word)]))
   const known = new Set(rules.map((rule) => rule.id))
   for (const entry of source.glossary)
     for (const raw of words(entry.term)) if (!stems.has(raw)) stems.set(raw, stem(raw))
@@ -145,15 +149,26 @@ export function searchIndex(source: ComprehensiveRules) {
     const cited = source.references
       ? ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")?.id
       : undefined
+    const opens = cited && known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited
     return {
       entry,
       words: words(entry.term)
         .filter((word) => !STOPWORDS.has(word))
         .map(stem),
-      rules: (cited && screens.get(known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited)) || [],
+      rules: (opens && screens.get(opens)) || [],
+      opens: cited && known.has(cited) ? opens : undefined,
     }
   })
-  const index = { rules, postings, lengths, average, slang, spellings: stems, defined }
+  const index = {
+    rules,
+    postings,
+    lengths,
+    average,
+    slang,
+    slangSpellings,
+    spellings: stems,
+    defined,
+  }
   indexes.set(source, index)
   return index
 }
@@ -217,7 +232,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
   const lastStem = partial === undefined ? undefined : stem(partial)
   const index = searchIndex(rules)
   const completions = completionsOf(index.spellings, partial)
-  const ranked: { result: RuleSearchResult; score: number }[] = []
+  const ranked: { result: RuleSearchResult; score: number; opens?: string }[] = []
   terms: for (const term of index.defined) {
     let score = 0
     let named = term.words.length === stems.length
@@ -235,11 +250,16 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     ranked.push({
       result: { kind: "term", entry: term.entry },
       score: named ? Infinity : (score * stems.length) / term.words.length,
+      opens: term.opens,
     })
   }
   const scores = new Map<number, number>()
   const weights = new Map(stems.map((word) => [word, 1]))
-  for (const meaning of stems.map((word) => index.slang.get(word) ?? []))
+  const slang = new Set(stems)
+  if (partial !== undefined)
+    for (const [spelling, word] of index.slangSpellings)
+      if (spelling.startsWith(partial)) slang.add(word)
+  for (const meaning of [...slang].map((word) => index.slang.get(word) ?? []))
     for (const word of meaning) weights.set(word, (weights.get(word) ?? 0) + 1 / meaning.length)
   const spelled = new Map<string, Set<string>>()
   for (const raw of chosen) {
@@ -257,7 +277,7 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     const near = spelled.get(wanted)
     for (const [word, list] of index.postings) {
       if (!(near ? near.has(word) : matchesWord(word, wanted, prefix))) continue
-      const rarity = idf(index, list)
+      const rarity = idf(index, list) * (near || word === wanted ? 1 : COMPLETION_WEIGHT)
       list.rules.forEach((at, i) => {
         const count = list.counts[i]
         const norm = BM25_K1 * (1 - BM25_B + (BM25_B * index.lengths[at]) / index.average)
@@ -284,8 +304,15 @@ export function searchRules(rules: ComprehensiveRules, query: string, limit = 50
     screens.add(screen)
     ranked.push({ result: { kind: "rule", rule }, score })
   }
+  // why: a term that cites one rule opens that rule's screen, so the rule listed again below it would only spend a visible slot. A term citing a whole section keeps its rules listed.
+  const covered = new Set<string>()
   return ranked
     .sort((a, b) => b.score - a.score)
+    .filter(({ result, opens }) => {
+      if (result.kind === "rule") return !covered.has(result.rule.id.replace(/[a-z]+$/, ""))
+      if (opens) covered.add(opens)
+      return true
+    })
     .slice(0, limit)
     .map(({ result }) => result)
 }

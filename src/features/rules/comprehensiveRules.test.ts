@@ -226,12 +226,34 @@ describe("searchRules ranking", () => {
     expect(ids("wrath")[0]).toBe("701.8b")
   })
 
+  it("reads partly typed slang as the rules' wording", () => {
+    expect(ids("wrat")[0]).toBe("701.8b")
+  })
+
   it("finds a rule by a player's phrasing that shares none of its words", () => {
     expect(ids("recast general")[0]).toBe("903.8")
   })
 
   it("forgives one typo in a word the rules never use", () => {
     expect(ids("deathtuch")[0]).toBe("702.2")
+  })
+
+  it("ranks a word typed in full over longer words it starts", () => {
+    const draw: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "1",
+          title: "Game Concepts",
+          sections: [
+            { id: "100", title: "General", rules: [rule("100.1", "Drawbacks.")] },
+            { id: "101", title: "Turns", rules: [rule("101.1", "Each player may draw a card.")] },
+          ],
+        },
+      ],
+      glossary: [],
+      notice: [],
+    }
+    expect(searchRules(draw, "draw")[0]).toMatchObject({ rule: { id: "101.1" } })
   })
 
   it("lists one result per rule screen, shown by the subrule that says the words", () => {
@@ -265,8 +287,10 @@ describe("searchRules ranking", () => {
     ).toEqual(["702.9"])
   })
 
-  it("lifts the rule a glossary term in the query cites", () => {
-    expect(ids("commander tax")).toEqual(["Commander Tax", "903.8", "903.3"])
+  it("omits rules whose screens are already opened by a higher-ranked glossary term", () => {
+    expect(ids("commander tax")).toEqual(["Commander Tax", "903.3"])
+    expect(ids("blockers")).toContain("509.1")
+    expect(ids("903.8")).toEqual(["903.8"])
   })
 
   it("goes straight to a rule number in either game's format, and finds nothing for punctuation", () => {
