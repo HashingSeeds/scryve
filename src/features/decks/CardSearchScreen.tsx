@@ -259,6 +259,7 @@ export function CardSearch({
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
+  const [textExcerpts, setTextExcerpts] = useState<ReadonlyMap<string, string>>()
   const [resultsQuery, setResultsQuery] = useState<string>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
@@ -551,7 +552,12 @@ export function CardSearch({
       filters: picked,
     })
     const answered =
-      local && (offline || local.named.length || local.found.length || remoteQuery.length < 2)
+      local &&
+      (offline ||
+        local.named.length ||
+        local.found.length ||
+        local.text.length ||
+        remoteQuery.length < 2)
         ? local
         : undefined
     if (searchError?.retryAfterMs && !offline && !answered) return
@@ -586,10 +592,13 @@ export function CardSearch({
       return
     }
     setOfflineResults(undefined)
+    setTextExcerpts(
+      answered && new Map(answered.text.map(({ card, excerpt }) => [card.name, excerpt])),
+    )
     if (answered) {
       setNameResults(answered.named)
       setResultsQuery(text)
-      setResults(answered.found)
+      setResults([...answered.found, ...answered.text.map(({ card }) => card)])
       setBusy(false)
       return
     }
@@ -1178,6 +1187,14 @@ export function CardSearch({
                   tone="dim"
                   text={"scryfallId" in card ? card.typeLine : card.typeLabel}
                 />
+                {textExcerpts?.has(card.name) ? (
+                  <Text
+                    size="meta"
+                    tone="dim"
+                    numberOfLines={2}
+                    text={textExcerpts.get(card.name)}
+                  />
+                ) : null}
                 {choosingCommander && "scryfallId" in card ? (
                   <Text size="meta" tone="dim" text={cardColorIdentityLabel(card, card.name)} />
                 ) : null}

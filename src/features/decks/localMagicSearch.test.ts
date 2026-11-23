@@ -1,11 +1,12 @@
 import { cardNameIndex } from "./cardNameMatch"
 import { localMagicSearch, type MagicSearch, parseMagicCards } from "./localMagicSearch"
+import { compareCardNames, magicTextIndex } from "../../../convex/lib/magicDataset"
 
 const card = (name: string, fields: Record<string, unknown> = {}) => ({
   scryfallId: name,
   oracleId: name,
   name,
-  commanderEligibility: "ineligible",
+  commanderEligibility: "ineligible" as const,
   commanderLegality: "legal",
   colorIdentity: "",
   ...fields,
@@ -239,4 +240,126 @@ test("the most played card comes first among names that match equally, counting 
     "Oko, the Trickster",
     "Oko, Lorwyn Liege",
   ])
+})
+
+const textCards = [
+  card("Command Beacon", {
+    edhrecRank: 300,
+    textKey:
+      "t add c t sacrifice command beacon put your commander into your hand from the command zone",
+  }),
+  card("Mind Stone", { edhrecRank: 5, textKey: "t add c 1 t sacrifice mind stone draw a card" }),
+  card("Night's Whisper", { edhrecRank: 50, textKey: "you draw two cards and you lose 2 life" }),
+  card("Opal Palace", {
+    edhrecRank: 900,
+    textKey:
+      "t add one mana if you spend this mana to cast your commander it enters with an additional 1 1 counter on it for each time its been cast from the command zone this game",
+  }),
+  card("Phyrexian Arena", {
+    edhrecRank: 20,
+    textKey: "at the beginning of your upkeep you draw a card and you lose 1 life",
+  }),
+  card("Quick Draw", {
+    edhrecRank: 9000,
+    textKey: "target creature gets 1 2 until end of turn it cant be blocked",
+  }),
+]
+const searchText = (text: string, textIndex = magicTextIndex(textCards), cards = textCards) => {
+  const magic = parseMagicCards(JSON.stringify({ version: "1", cards, textIndex }))
+  const found = localMagicSearch(magic, undefined, {
+    text,
+    commander: false,
+    colors: [],
+    colorMatch: "exact",
+    filters: {},
+  })
+  return found && { found: found.found.map((c) => c.name), text: found.text }
+}
+
+test("cards printing the phrase follow the name matches, most played first, then cards holding every word", () => {
+  const found = searchText("Draw a card")
+  expect(found?.found).toEqual([])
+  expect(found?.text.map((match) => match.card.name)).toEqual([
+    "Mind Stone",
+    "Phyrexian Arena",
+    "Night's Whisper",
+  ])
+  expect(found?.text[0].excerpt).toBe("…t sacrifice mind stone draw a card")
+  expect(found?.text[1].excerpt).toBe("…of your upkeep you draw a card and you lose 1 life")
+})
+
+test("a card found by name is not listed again for its text", () => {
+  const found = searchText("draw")
+  expect(found?.found).toEqual(["Quick Draw"])
+  expect(found?.text.map((match) => match.card.name)).toEqual([
+    "Mind Stone",
+    "Phyrexian Arena",
+    "Night's Whisper",
+  ])
+})
+
+test("the word still being typed matches the words it starts", () => {
+  expect(searchText("draw a c")?.text.map((match) => match.card.name)).toEqual([
+    "Mind Stone",
+    "Phyrexian Arena",
+    "Night's Whisper",
+  ])
+})
+
+test("a word too common for the index is found by reading cards from the most played", () => {
+  const textIndex = { ...magicTextIndex(textCards), draw: "" }
+  expect(searchText("draw a card", textIndex)?.text.map((match) => match.card.name)).toEqual([
+    "Mind Stone",
+    "Phyrexian Arena",
+    "Night's Whisper",
+  ])
+})
+
+test("commander tax finds the cards about casting a commander from the command zone", () => {
+  expect(searchText("commander tax")?.text.map((match) => match.card.name)).toEqual([
+    "Command Beacon",
+    "Opal Palace",
+  ])
+})
+
+test("text search is off for a file without an index, or whose cards had to be sorted", () => {
+  expect(searchText("draw a card", {})?.text).toEqual([])
+  expect(
+    searchText("draw a card", magicTextIndex(textCards), textCards.toReversed())?.text,
+  ).toEqual([])
+})
+
+test("cards printing the phrase lead fuzzy name guesses, but never a name holding every typed word", () => {
+  const cards = [...textCards, card("You Lose Life", { textKey: "flying" })].sort(compareCardNames)
+  const magic = parseMagicCards(
+    JSON.stringify({ version: "1", cards, textIndex: magicTextIndex(cards) }),
+  )
+  const names = cardNameIndex(cards.map((c) => c.name))
+  const listed = (text: string) =>
+    localMagicSearch(magic, names, {
+      text,
+      commander: false,
+      colors: [],
+      colorMatch: "exact",
+      filters: {},
+    })?.named.map((c) => c.name)
+  expect(listed("you lose 1 life")).toEqual(["Phyrexian Arena", "You Lose Life"])
+  expect(listed("you lose")?.[0]).toBe("You Lose Life")
+  expect(listed("you lose")).not.toContain("Phyrexian Arena")
+})
+
+test("a curly apostrophe from an iPhone keyboard still searches on the device", () => {
+  expect(searchText("can’t be blocked")?.text.map((match) => match.card.name)).toEqual([
+    "Quick Draw",
+  ])
+})
+
+test("a Commander-banned card is not counted as most played among text matches", () => {
+  const cards = [
+    card("Library of Alexandria", { commanderLegality: "banned", textKey: "t draw a card" }),
+    card("Mind Stone", { edhrecRank: 5, textKey: "t sacrifice mind stone draw a card" }),
+  ]
+  expect(
+    searchText("draw a card", magicTextIndex(cards), cards)?.text.map((match) => match.card.name),
+  ).toEqual(["Mind Stone", "Library of Alexandria"])
 })

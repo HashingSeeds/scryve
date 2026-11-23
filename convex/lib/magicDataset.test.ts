@@ -1,4 +1,4 @@
-import { magicDatasetCard } from "./magicDataset"
+import { magicDatasetCard, magicTextIndex, textIndexCards } from "./magicDataset"
 
 const card = {
   id: "22222222-2222-2222-2222-222222222222",
@@ -23,6 +23,20 @@ const card = {
 }
 
 describe("magicDatasetCard", () => {
+  it("keeps the text of both faces once, as search words without reminder text", () => {
+    const result = magicDatasetCard({
+      ...card,
+      card_faces: [
+        {
+          ...card.card_faces[0],
+          oracle_text: "Cycling {2} ({2}, Discard this card: Draw a card.)",
+        },
+        { ...card.card_faces[1], oracle_text: "This spell can't be countered." },
+      ],
+    })
+    expect(result?.textKey).toBe("cycling 2 this spell cant be countered")
+  })
+
   it("drops every copy of the oracle text and the commander rules timestamp", () => {
     const result = magicDatasetCard(card)
     expect(result).not.toHaveProperty("oracleText")
@@ -96,5 +110,25 @@ describe("magicDatasetCard", () => {
     { all_parts: [{ component: "meld_part", name: card.name }] },
   ])("keeps real cards, including ones not yet legal: %o", (override) => {
     expect(magicDatasetCard({ ...card, ...override })).not.toBeNull()
+  })
+})
+
+describe("magicTextIndex", () => {
+  it("lists the cards holding each word, and leaves a word in over 4000 cards unlisted", () => {
+    const cards = [
+      { textKey: "draw a card" },
+      { textKey: "flying" },
+      { textKey: "draw two cards" },
+      ...Array.from({ length: 4001 }, () => ({ textKey: "flying" })),
+    ].map((fields, index) => ({
+      scryfallId: `${index}`,
+      oracleId: `${index}`,
+      name: `${index}`,
+      ...fields,
+    }))
+    const index = magicTextIndex(cards)
+    expect(textIndexCards(index.draw)).toEqual([0, 2])
+    expect(textIndexCards(index.cards)).toEqual([2])
+    expect(index.flying).toBe("")
   })
 })

@@ -10,9 +10,14 @@ export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRule
   /** why: absent means a file built before legality shipped, so search asks Scryfall instead of finding no legal cards. */
   legalFormats?: string[]
   edhrecRank?: number
+  textKey?: string
 }
 
-export type MagicDataset = { version: string; cards: MagicDatasetCard[] }
+export type MagicDataset = {
+  version: string
+  cards: MagicDatasetCard[]
+  textIndex?: Record<string, string>
+}
 
 /**
  * why: the dataset ships in this order, so the app only checks it on load instead of sorting
@@ -73,6 +78,43 @@ function outsidePaperDecks(raw: Record<string, unknown>) {
   return meldResult || (unusual && !paperLegal)
 }
 
+export function textSearchKey(text: string) {
+  // why: Unicode normalization costs about a millisecond a call on Hermes, and typed searches are ASCII.
+  const folded = /[^\x00-\x7f]/.test(text) ? text.normalize("NFD").replace(/\p{M}/gu, "") : text
+  return folded
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+const COMMON_WORD_CARDS = 4000
+
+/** why: building this from 600k words of card text takes seconds on a phone, so the weekly file ships each word's cards as base-36 gaps between indexes, or "" for a common word. */
+export function magicTextIndex(cards: readonly MagicDatasetCard[]): Record<string, string> {
+  const holders = new Map<string, number[]>()
+  cards.forEach((card, index) => {
+    for (const word of new Set(card.textKey?.split(" "))) {
+      const list = holders.get(word) ?? []
+      list.push(index)
+      holders.set(word, list)
+    }
+  })
+  return Object.fromEntries(
+    [...holders].map(([word, list]) => [
+      word,
+      list.length > COMMON_WORD_CARDS
+        ? ""
+        : list.map((index, at) => (index - (list[at - 1] ?? 0)).toString(36)).join(","),
+    ]),
+  )
+}
+
+export function textIndexCards(list: string) {
+  let index = 0
+  return list.split(",").map((gap) => (index += parseInt(gap, 36)))
+}
+
 function faceDetailsWithoutOracleText(faceDetails: string): string {
   const faces: unknown = JSON.parse(faceDetails)
   if (!Array.isArray(faces)) return faceDetails
@@ -93,7 +135,7 @@ export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
   const card = normalizeScryfallCard(raw)
   if (!card) return null
   const {
-    oracleText: _oracleText,
+    oracleText,
     commanderRulesUpdatedAt: _commanderRulesUpdatedAt,
     faceDetails,
     ...rest
@@ -102,6 +144,7 @@ export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
   const toughness = [firstFace?.toughness, raw.toughness].find(
     (value): value is string => typeof value === "string" && value.length > 0,
   )
+  const textKey = oracleText && textSearchKey(oracleText.replace(/ ?\([^()]*\)/g, ""))
   const legalities = objectRecord(raw.legalities)
   const legalFormats = LEGALITY_FORMATS.filter(
     (format) => legalities?.[format] === "legal" || legalities?.[format] === "restricted",
@@ -114,6 +157,7 @@ export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
     ...(typeof raw.cmc === "number" ? { manaValue: raw.cmc } : {}),
     ...(toughness ? { toughness } : {}),
     ...(typeof raw.edhrec_rank === "number" ? { edhrecRank: raw.edhrec_rank } : {}),
+    ...(textKey ? { textKey } : {}),
     legalFormats,
   }
 }

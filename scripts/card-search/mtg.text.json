@@ -1,0 +1,19 @@
+[
+  {"query": "commander tax", "cards": ["Command Beacon", "Opal Palace", "Myth Unbound", "Liesa, Shroud of Dusk"], "source": "written"},
+  {"query": "draw a card", "cards": ["Rhystic Study", "Mystic Remora", "Esper Sentinel", "Phyrexian Arena", "Mind Stone", "Solemn Simulacrum"], "source": "written"},
+  {"query": "sacrifice a creature", "cards": ["Ashnod's Altar", "Phyrexian Altar", "Viscera Seer", "Carrion Feeder", "Victimize", "Village Rites", "Phyrexian Tower"], "source": "written"},
+  {"query": "can't be countered", "cards": ["Cavern of Souls", "Dovin's Veto", "Delighted Halfling", "Rhythm of the Wild", "Allosaurus Shepherd"], "source": "written"},
+  {"query": "destroy all creatures", "cards": ["Wrath of God", "Damnation", "Austere Command", "Supreme Verdict", "Day of Judgment"], "source": "written"},
+  {"query": "search your library for a basic land", "cards": ["Evolving Wilds", "Rampant Growth", "Cultivate", "Kodama's Reach", "Terramorphic Expanse", "Fabled Passage"], "source": "written"},
+  {"query": "extra turn", "cards": ["Time Warp", "Time Walk", "Temporal Manipulation", "Nexus of Fate", "Final Fortune", "Expropriate"], "source": "written"},
+  {"query": "counter target spell", "cards": ["Counterspell", "Arcane Denial", "Mana Drain", "Force of Will"], "source": "written"},
+  {"query": "create a treasure", "cards": ["Smothering Tithe", "Dockside Extortionist", "Deadly Dispute", "Big Score", "Storm-Kiln Artist", "Black Market Connections"], "source": "written"},
+  {"query": "untap all lands", "cards": ["Wilderness Reclamation", "Sword of Feast and Famine", "Bear Umbra", "Nature's Will"], "source": "written"},
+  {"query": "return target creature to its owner's hand", "cards": ["Unsummon", "Snap", "Mystic Confluence"], "source": "written"},
+  {"query": "each opponent loses", "cards": ["Gray Merchant of Asphodel", "Zulaport Cutthroat", "Exsanguinate", "Mirkwood Bats", "Bastion of Remembrance"], "source": "written"},
+  {"query": "board wipe", "cards": ["Wrath of God", "Damnation", "Austere Command", "Farewell", "Supreme Verdict", "Blasphemous Act", "Toxic Deluge"], "source": "written"},
+  {"query": "exile target creature", "cards": ["Swords to Plowshares", "Path to Exile"], "source": "written"},
+  {"query": "add one mana of any color", "cards": ["Command Tower", "Arcane Signet", "Exotic Orchard", "Birds of Paradise"], "source": "written"},
+  {"query": "hexproof", "cards": ["Swiftfoot Boots", "Heroic Intervention"], "source": "written"},
+  {"query": "gain control of target creature", "cards": ["Act of Treason", "Threaten", "Captivating Vampire", "Flayer of Loyalties"], "source": "written"}
+]

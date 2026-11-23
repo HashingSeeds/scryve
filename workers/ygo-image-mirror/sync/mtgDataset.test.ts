@@ -44,6 +44,8 @@ describe("Magic dataset sync", () => {
     expect(uploaded.version).toBe(BULK.updated_at)
     expect(uploaded.cards.map((card: { name: string }) => card.name)).toEqual(["Card a", "Card b"])
     expect(uploaded.cards[0]).not.toHaveProperty("oracleText")
+    expect(uploaded.cards[0].textKey).toBe("text")
+    expect(uploaded.textIndex).toEqual({ text: "0,1" })
   })
 
   it("refuses to upload a short dataset and skips the upload on a dry run", async () => {
