@@ -39,6 +39,7 @@ import { shapeForSeat } from "../../convex/lib/appearance"
 import { bankLeft, turnElapsed } from "../../convex/lib/turns"
 
 const TICK_MS = 1_000
+const WHOLE_MINUTES_FROM_MS = 10 * 60_000
 /** why: half the largest (80pt) menu pentagon plus an 8pt gap, measured along the edge from the pentagon's center. */
 const MENU_HALF_RUN = 48
 const EDGE_GAP = 8
@@ -112,6 +113,7 @@ export function TurnChipLayer({
   )
 }
 
+/** why: the row steps a chip down as room runs out. A count goes "Turn 3 | Pass › mark", "3 › mark", "› mark"; a clock goes "19:57 | Pass › mark", "19:57 ›", "19m ›"; Start goes to just ▶ at its first step, since a step that looks the same never measures again. */
 export type TurnChipSize = "full" | "number" | "pass"
 
 export function TurnChip({
@@ -141,11 +143,16 @@ export function TurnChip({
   const now = useNow(ticking)
   const bank = bankLeft(turn, turn.playerId, now)
   const outOfTime = bank !== undefined && bank <= 0
-  const time = numbered
+  const clockMs = bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank)
+  const time = formatElapsed(clockMs)
+  // why: a clock can't drop its time like a count drops its number, so its smallest step drops the seconds while ten or more minutes are left.
+  const shownTime = numbered
     ? size !== "full"
       ? formatNumber(turn.number)
       : translate("board:turn.chipNumber", { number: turn.number })
-    : formatElapsed(bank === undefined ? turnElapsed(turn, now) : Math.max(0, bank))
+    : size === "pass" && clockMs >= WHOLE_MINUTES_FROM_MS
+      ? translate("board:turn.chipMinutes", { minutes: Math.floor(clockMs / 60_000) })
+      : time
   const ink = outOfTime ? colors.board.text : foreground
   const name = state.nameOf(turn.playerId) ?? ""
   const nextName = next ? state.nameOf(next) : undefined
@@ -153,6 +160,9 @@ export function TurnChip({
   const split = !waiting && !outOfTime && !!nextSeat
   const splitButtons = canPress && split && !!nextSeat && !numbered && !!state.onPause
   const passOnly = split && numbered && size === "pass"
+  // why: past the full step a clock chip drops the next player's mark; the pass segment's color still says who's next.
+  const nextMarkShown = numbered || size === "full"
+  const tight = split && !numbered && size === "pass"
   const nextInk = nextSeat ? accessibleForeground(nextSeat.color) : ink
   const label = [
     translate("board:turn.label", { number: turn.number, name }),
@@ -179,24 +189,28 @@ export function TurnChip({
           />
         ) : null}
         <ChevronGlyph color={nextInk} />
-        <MarkArt
-          shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
-          color={nextInk}
-          size={compact ? 18 : 20}
-        />
+        {nextMarkShown ? (
+          <MarkArt
+            shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
+            color={nextInk}
+            size={compact ? 18 : 20}
+          />
+        ) : null}
       </>
     ) : null
 
   const content = waiting ? (
     <>
       <PlayGlyph color={ink} />
-      <Text tx="board:turn.start" weight="bold" style={[themed($value), { color: ink }]} />
+      {size !== "full" ? null : (
+        <Text tx="board:turn.start" weight="bold" style={[themed($value), { color: ink }]} />
+      )}
     </>
   ) : (
     <>
       {passOnly ? null : (
         <Text
-          text={time}
+          text={shownTime}
           testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
           weight="bold"
           style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
@@ -204,7 +218,12 @@ export function TurnChip({
       )}
       {split && nextSeat ? (
         <View
-          style={[$passSegment, passOnly && $passSegmentAlone, { backgroundColor: nextSeat.color }]}
+          style={[
+            $passSegment,
+            passOnly && $passSegmentAlone,
+            tight && $passSegmentTight,
+            { backgroundColor: nextSeat.color },
+          ]}
         >
           {passSegmentContent}
         </View>
@@ -217,6 +236,7 @@ export function TurnChip({
     ...(split ? [$split] : []),
     ...(splitButtons ? [$splitButtons] : []),
     ...(passOnly ? [$passOnly] : []),
+    ...(tight && !splitButtons ? [$tightChip] : []),
     ...(outOfTime ? [{ backgroundColor: colors.error }] : []),
     ...(canPress ? [] : [$passive]),
   ]
@@ -242,11 +262,16 @@ export function TurnChip({
             delayLongPress={450}
             onPress={state.onPause}
             onLongPress={state.onLongPress}
-            style={({ pressed }) => [$clockSegment, paused && $pausedSegment, pressed && $pressed]}
+            style={({ pressed }) => [
+              $clockSegment,
+              tight && $clockSegmentTight,
+              paused && $pausedSegment,
+              pressed && $pressed,
+            ]}
           >
             {paused ? <PlayGlyph color={ink} /> : <PauseGlyph color={ink} />}
             <Text
-              text={time}
+              text={shownTime}
               testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
               weight="bold"
               style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
@@ -266,6 +291,7 @@ export function TurnChip({
             $passSegment,
             $passSegmentFlush,
             passOnly && $passSegmentAlone,
+            tight && $passSegmentTight,
             { backgroundColor: nextSeat.color },
             pressed && $pressed,
           ]}
@@ -553,5 +579,8 @@ const $passOnly: ViewStyle = { paddingLeft: 0 }
 const $passSegmentAlone: ViewStyle = { marginLeft: 0, paddingLeft: 12 }
 const $priorityIdle: ViewStyle = { opacity: 0.55 }
 const $priorityActive: ViewStyle = { backgroundColor: "rgba(0,0,0,0.38)" }
+const $tightChip: ViewStyle = { paddingLeft: 8 }
+const $passSegmentTight: ViewStyle = { marginLeft: 0, paddingLeft: 6, paddingRight: 8 }
+const $clockSegmentTight: ViewStyle = { paddingLeft: 8, paddingRight: 6 }
 const $passive: ViewStyle = { opacity: 0.7 }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }

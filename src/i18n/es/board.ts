@@ -580,6 +580,7 @@ export default {
     startHint: "Toca para iniciar el reloj de turno",
     pass: "Pasar",
     chipNumber: "Turno {{number}}",
+    chipMinutes: "{{minutes}} min",
     label: "Turno {{number}}, {{name}}",
     passHintTo: "Toca para pasar a {{name}}",
     outOfTime: "Sin tiempo",

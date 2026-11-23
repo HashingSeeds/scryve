@@ -576,6 +576,7 @@ export default {
     startHint: "Touchez pour démarrer le chrono du tour",
     pass: "Passer",
     chipNumber: "Tour {{number}}",
+    chipMinutes: "{{minutes}} min",
     label: "Tour {{number}}, {{name}}",
     passHintTo: "Touchez pour passer à {{name}}",
     outOfTime: "Temps écoulé",

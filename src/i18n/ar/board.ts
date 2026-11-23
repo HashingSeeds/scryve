@@ -628,6 +628,7 @@ export default {
     startHint: "اضغط لبدء مؤقت الدور",
     pass: "مرّر",
     chipNumber: "الدور {{number}}",
+    chipMinutes: "{{minutes}} د",
     label: "الدور {{number}}، {{name}}",
     passHintTo: "اضغط لتمرير الدور إلى {{name}}",
     outOfTime: "انتهى الوقت",

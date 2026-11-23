@@ -589,6 +589,28 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("turn-chip-1").props.accessibilityLabel).toMatch(/^Turn 1/)
   })
 
+  it("steps a chess clock chip down to whole minutes, and Start to its glyph, while a bare mark leaves too little room", () => {
+    const repository = turnsOn()
+    repository.saveChessMinutes(20)
+    const view = renderGame(game(), repository)
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("dice-chip-1-claim"))
+    const chipWidth = (width: number) =>
+      fireEvent(view.getByTestId("turn-row-chip-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width, height: 36 } },
+      })
+    fireEvent(view.getByTestId("life-identity-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 2_000, height: 30 } },
+    })
+    chipWidth(1_000)
+    expect(view.getByTestId("turn-chip-1")).not.toHaveTextContent("Start")
+
+    fireEvent.press(view.getByTestId("life-seat-2-1"))
+    chipWidth(900)
+    expect(view.getByTestId("turn-chip-time")).toHaveTextContent(/^(19|20)m$/)
+    expect(view.getByTestId("turn-chip-pass-1").props.accessibilityLabel).toMatch(/\d+:\d{2}/)
+  })
+
   it("forgets who went first when the result is cleared before play", () => {
     const rolls = [0.9, 0.1]
     jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)

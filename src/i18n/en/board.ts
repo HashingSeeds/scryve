@@ -700,6 +700,8 @@ const board = {
     pass: "Pass",
     // On the turn chip when there is no clock, as in "Turn 3". Very short.
     chipNumber: "Turn {{number}}",
+    // On a crowded turn chip, the whole minutes left on the player's chess clock, as in "19m". As short as possible.
+    chipMinutes: "{{minutes}}m",
     // Screen reader label for the turn chip, as in "Turn 4, Ada".
     label: "Turn {{number}}, {{name}}",
     passHintTo: "Tap to pass to {{name}}",
