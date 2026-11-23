@@ -1235,8 +1235,9 @@ describe("CurrentGameScreen", () => {
       fireEvent.press(view.getByTestId("commander-undo-seat-2"))
       expect(view.getByLabelText("7 commander damage from Ada")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-finish-seat-1"))
-      // why: the attacker's life buttons come back once its life has left its corner.
+      // why: the attacker's life buttons come back once its life is back from its corner.
       act(() => jest.advanceTimersByTime(commanderBeats().flood + commanderBeats().fan))
+      act(() => jest.advanceTimersByTime(commanderBeats().tuck))
       expect(view.getByTestId("life-seat-1-1")).toBeDisabled()
       expect(life(view, 2)).toBe("33")
       jest.useRealTimers()

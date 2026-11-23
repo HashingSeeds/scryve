@@ -499,14 +499,18 @@ export const LifeCard = memo(function LifeCard({
     return { transform: [{ scale: 1 + (readoutFit - 1) * reached }] }
   })
   const toSlot = attackerSide && !!lifeSlot
-  const [lifeHeld, setLifeHeld] = useState(false)
-  if (toSlot && !lifeHeld) setLifeHeld(true)
+  // why: after an attack the life stays tucked, then returns, and the grid and life buttons come back only once it has landed.
+  const [lifeAway, setLifeAway] = useState<"tucked" | "returning" | null>(null)
+  if (toSlot && lifeAway !== "tucked") setLifeAway("tucked")
   useEffect(() => {
-    if (toSlot || !lifeHeld) return
-    const back = setTimeout(() => setLifeHeld(false), lifeReturnsAfter)
-    return () => clearTimeout(back)
-  }, [toSlot, lifeHeld, lifeReturnsAfter])
-  const inSlot = toSlot || lifeHeld
+    if (toSlot || !lifeAway) return
+    const next = setTimeout(
+      () => setLifeAway(lifeAway === "tucked" ? "returning" : null),
+      lifeAway === "tucked" ? lifeReturnsAfter : lifeFadeDuration,
+    )
+    return () => clearTimeout(next)
+  }, [toSlot, lifeAway, lifeReturnsAfter, lifeFadeDuration])
+  const inSlot = toSlot || lifeAway === "tucked"
   const [lifeInSlot, setLifeInSlot] = useState(false)
   if (lifeInSlot && !inSlot) setLifeInSlot(false)
   useEffect(() => {
@@ -571,16 +575,16 @@ export const LifeCard = memo(function LifeCard({
   }))
   const lifeControlsShown =
     !commanderCovers &&
-    !inSlot &&
+    !lifeAway &&
     !sittingOut &&
     !tableSheetOpen &&
     !diceCovers &&
     ownership !== "unowned"
   const calculatorButtonShown = calculator && lifeControlsShown && !editorOpen && !frozen
-  // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card. The attacker's own grid steps aside for its power boxes.
+  // why: a defender keeps its strip through an attack, with the attacker's total lit, instead of moving the damage onto the card. The attacker's own grid steps aside for its power boxes until its life is back from its corner.
   const commanderStripShown =
     commanderSeat &&
-    !attackerSide &&
+    !lifeAway &&
     (!commanderCovers || defending) &&
     !tableSheetOpen &&
     !diceCovers &&
@@ -778,7 +782,7 @@ export const LifeCard = memo(function LifeCard({
           themed($content),
           readoutFitStyle,
           floodedBy.takeover && $aboveFlood,
-          attackerSide && $aboveAttackerControls,
+          inSlot && $aboveAttackerControls,
         ]}
       >
         <Animated.View

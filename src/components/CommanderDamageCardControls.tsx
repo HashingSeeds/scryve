@@ -6,6 +6,7 @@ import Animated, {
   Easing,
   FadeIn,
   FadeOut,
+  LayoutAnimationConfig,
   LinearTransition,
   runOnJS,
   useAnimatedStyle,
@@ -181,13 +182,16 @@ export function CommanderDamageCardControls({
           mode={mode}
         />
       ) : (
-        <AttackerControls
-          seatNumber={seatNumber}
-          foreground={foreground}
-          contentRotation={contentRotation}
-          compact={compact}
-          mode={mode}
-        />
+        // why: the power boxes leave with the panel after the blades are home, not on their own fades.
+        <LayoutAnimationConfig skipExiting>
+          <AttackerControls
+            seatNumber={seatNumber}
+            foreground={foreground}
+            contentRotation={contentRotation}
+            compact={compact}
+            mode={mode}
+          />
+        </LayoutAnimationConfig>
       )}
     </Animated.View>
   )
@@ -772,15 +776,12 @@ function Strike({
   const swordStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: nudge.value * NUDGE + lunge.value * LUNGE }, { rotate: "90deg" }],
   }))
-  // why: while its blade is in the air the strike waits for it, then shows where the blade lands.
+  // why: while its blade is in the air the blade stands in for the strike's sword; the amount comes and goes with the shadow, which the blade rides.
   const shownStyle = useAnimatedStyle(() => ({
     opacity: withTiming(waiting ? 0 : 1, { duration: waiting ? 0 : 160 }),
   }))
   return (
-    <Animated.View
-      testID={`commander-strike-seat-${seatNumber}`}
-      style={[$strike, style, shownStyle]}
-    >
+    <Animated.View testID={`commander-strike-seat-${seatNumber}`} style={[$strike, style]}>
       <Text
         testID={`commander-strike-amount-seat-${seatNumber}`}
         text={formatSigned(-dealt)}
@@ -790,7 +791,7 @@ function Strike({
         style={[$strikeText, { color, fontSize: font, lineHeight: font * 1.15 }]}
       />
       <View ref={anchor("landing", seatNumber)} collapsable={false}>
-        <Animated.View style={swordStyle}>
+        <Animated.View style={[swordStyle, shownStyle]}>
           <Sword size={sword} color={color} />
         </Animated.View>
       </View>
