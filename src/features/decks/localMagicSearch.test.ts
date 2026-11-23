@@ -1,6 +1,6 @@
 import { cardNameIndex } from "./cardNameMatch"
 import { localMagicSearch, type MagicSearch, parseMagicCards } from "./localMagicSearch"
-import { magicTextIndex } from "../../../convex/lib/magicDataset"
+import { compareCardNames, magicTextIndex } from "../../../convex/lib/magicDataset"
 
 const card = (name: string, fields: Record<string, unknown> = {}) => ({
   scryfallId: name,
@@ -330,10 +330,11 @@ test("text search is off for a file without an index, or whose cards had to be s
 })
 
 test("cards printing the phrase lead fuzzy name guesses, but never a name holding every typed word", () => {
+  const cards = [...textCards, card("You Lose Life", { textKey: "flying" })].sort(compareCardNames)
   const magic = parseMagicCards(
-    JSON.stringify({ version: "1", cards: textCards, textIndex: magicTextIndex(textCards) }),
+    JSON.stringify({ version: "1", cards, textIndex: magicTextIndex(cards) }),
   )
-  const names = cardNameIndex(textCards.map((c) => c.name))
+  const names = cardNameIndex(cards.map((c) => c.name))
   const listed = (text: string) =>
     localMagicSearch(magic, names, {
       text,
@@ -342,8 +343,9 @@ test("cards printing the phrase lead fuzzy name guesses, but never a name holdin
       colorMatch: "exact",
       filters: {},
     })?.named.map((c) => c.name)
-  expect(listed("draw a card")?.slice(0, 2)).toEqual(["Mind Stone", "Phyrexian Arena"])
-  expect(listed("quick draw")?.[0]).toBe("Quick Draw")
+  expect(listed("you lose 1 life")).toEqual(["Phyrexian Arena", "You Lose Life"])
+  expect(listed("you lose")?.[0]).toBe("You Lose Life")
+  expect(listed("you lose")).not.toContain("Phyrexian Arena")
 })
 
 test("a curly apostrophe from an iPhone keyboard still searches on the device", () => {
