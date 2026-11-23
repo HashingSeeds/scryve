@@ -192,8 +192,9 @@ async function main() {
     timings.toSorted((a, b) => a - b),
     0.95,
   )
+  console.log(`all: ${timings.length} cases · p95 ${p95.toFixed(2)}ms`)
   if (p95 > P95_BUDGET_MS) {
-    console.log(`  fail: p95 across all cases ${p95.toFixed(2)}ms is over ${P95_BUDGET_MS}ms`)
+    console.log(`  fail: p95 ${p95.toFixed(2)}ms is over ${P95_BUDGET_MS}ms`)
     ok = false
   }
   if (!ok) process.exitCode = 1

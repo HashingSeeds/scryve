@@ -259,7 +259,10 @@ const textCards = [
     edhrecRank: 20,
     textKey: "at the beginning of your upkeep you draw a card and you lose 1 life",
   }),
-  card("Quick Draw", { edhrecRank: 9000, textKey: "target creature gets 1 2 until end of turn" }),
+  card("Quick Draw", {
+    edhrecRank: 9000,
+    textKey: "target creature gets 1 2 until end of turn it cant be blocked",
+  }),
 ]
 const searchText = (text: string, textIndex = magicTextIndex(textCards), cards = textCards) => {
   const magic = parseMagicCards(JSON.stringify({ version: "1", cards, textIndex }))
@@ -324,4 +327,27 @@ test("text search is off for a file without an index, or whose cards had to be s
   expect(
     searchText("draw a card", magicTextIndex(textCards), textCards.toReversed())?.text,
   ).toEqual([])
+})
+
+test("cards printing the phrase lead fuzzy name guesses, but never a name holding every typed word", () => {
+  const magic = parseMagicCards(
+    JSON.stringify({ version: "1", cards: textCards, textIndex: magicTextIndex(textCards) }),
+  )
+  const names = cardNameIndex(textCards.map((c) => c.name))
+  const listed = (text: string) =>
+    localMagicSearch(magic, names, {
+      text,
+      commander: false,
+      colors: [],
+      colorMatch: "exact",
+      filters: {},
+    })?.named.map((c) => c.name)
+  expect(listed("draw a card")?.slice(0, 2)).toEqual(["Mind Stone", "Phyrexian Arena"])
+  expect(listed("quick draw")?.[0]).toBe("Quick Draw")
+})
+
+test("a curly apostrophe from an iPhone keyboard still searches on the device", () => {
+  expect(searchText("can’t be blocked")?.text.map((match) => match.card.name)).toEqual([
+    "Quick Draw",
+  ])
 })

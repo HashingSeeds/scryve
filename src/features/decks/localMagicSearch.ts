@@ -28,7 +28,7 @@ const BANNED_IN_COMMANDER_RANK = 0
  */
 const TEXT_CONCEPTS: Record<string, string[]> = {
   "commander tax": ["from the command zone"],
-  "board wipe": ["destroy all", "exile all"],
+  "board wipe": ["destroy all", "exile all creatures", "exile all nonland", "all creatures get"],
 }
 
 function popularityRank(card: MagicDatasetCard | undefined, knowsPopularity: boolean) {
@@ -143,7 +143,8 @@ export function readsOnDevice(
     magicCards &&
     (!search.filters.format?.length || magicCards.knowsLegality) &&
     !SCRYFALL_SYNTAX.test(search.text) &&
-    !/[^\p{ASCII}]/u.test(search.text),
+    // why: iPhone keyboards type a curly apostrophe, and "dovin’s veto" should not leave the device.
+    !/[^\p{ASCII}’]/u.test(search.text),
   )
 }
 
