@@ -194,6 +194,7 @@ type CardSearchProps = {
   deckCards?: DeckCard[]
   presentation?: "modal" | "screen"
   onGameChange?: (game: SystemId) => void
+  onOpenRules?: (options?: { query?: string; rule?: string }) => void
 }
 
 const GAME_OPTIONS = VISIBLE_SYSTEM_IDS.map((id) => ({ id, label: playSystemShortLabel(id) }))
@@ -215,6 +216,7 @@ export function CardSearch({
   deckCards,
   presentation = "modal",
   onGameChange,
+  onOpenRules,
 }: CardSearchProps) {
   const convex = useConvex()
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
@@ -240,6 +242,7 @@ export function CardSearch({
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
   const [candidate, setCandidate] = useState<DeckCard>()
   const candidateSheet = useSheetPresence(candidate)
+  const pendingRuleRef = useRef<string | undefined>(undefined)
   const shownCandidate = candidateSheet.shown
   const [candidateError, setCandidateError] = useState<string>()
   const candidateDetails = useCardDetails(
@@ -1213,7 +1216,16 @@ export function CardSearch({
           ListFooterComponent={
             <ResultSlot edge="below">
               {!busy && catalogResults?.length === 0 ? (
-                <Text tx="decks:cardSearch.noResults" />
+                <>
+                  <Text tx="decks:cardSearch.noResults" />
+                  {onOpenRules && text.length >= 2 ? (
+                    <TextAction
+                      testID="card-search-try-rules"
+                      tx="play:rules.search"
+                      onPress={() => onOpenRules({ query: text })}
+                    />
+                  ) : null}
+                </>
               ) : null}
               {catalogResults?.length && imageCredit ? (
                 <Text size="xxs" style={{ color: theme.colors.textDim }} text={imageCredit} />
@@ -1350,7 +1362,21 @@ export function CardSearch({
           onRetryDetails={candidateDetails.retryDetails}
           visible={candidateSheet.visible}
           onClose={() => setCandidate(undefined)}
-          onDismissed={candidateSheet.onDismissed}
+          onDismissed={() => {
+            candidateSheet.onDismissed()
+            const rule = pendingRuleRef.current
+            if (!rule) return
+            pendingRuleRef.current = undefined
+            onOpenRules?.({ rule })
+          }}
+          onOpenRule={
+            onOpenRules
+              ? (id) => {
+                  pendingRuleRef.current = id
+                  setCandidate(undefined)
+                }
+              : undefined
+          }
           showQuantity={false}
           onSetCommander={choosingCommander ? setCommander : undefined}
         />

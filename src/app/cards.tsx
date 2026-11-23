@@ -5,6 +5,7 @@ import { CardSearch } from "@/features/decks/CardSearchScreen"
 import { useDeckSearchHost, type DeckSearchHost } from "@/features/decks/deckSearchHost"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { playSystemFormat, playSystemId } from "@/features/game/playSystems"
+import { gameRules, RULES_TEXT_IN_APP, rulesHref } from "@/features/rules/gameRules"
 
 const leave = () => (router.canGoBack() ? router.back() : router.replace("/"))
 
@@ -15,6 +16,11 @@ export default function CardsRoute() {
   )
   const host = useDeckSearchHost(deckId)
   if (host) return <DeckCardsRoute key={host.game} host={host} />
+  const onOpenRules =
+    RULES_TEXT_IN_APP && gameRules(system)?.kind === "text"
+      ? (options?: { query?: string; rule?: string }) =>
+          router.push(rulesHref(system, options?.rule, options?.query))
+      : undefined
   return (
     <CardSearch
       key={system}
@@ -22,6 +28,7 @@ export default function CardsRoute() {
       format={playSystemFormat(system)}
       presentation="screen"
       onGameChange={setSystem}
+      onOpenRules={onOpenRules}
       onClose={leave}
     />
   )

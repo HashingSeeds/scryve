@@ -392,4 +392,39 @@ describe("searchRules ranking", () => {
       "Go again is a special resolution ability.",
     )
   })
+
+  it("matches rule numbers prefixed with rule/§ and prioritizes base rules on bare section numbers", () => {
+    expect(ids("rule 701.8")).toEqual(["701.8", "701.8a", "701.8b"])
+    expect(ids("§903.8")).toEqual(["903.8"])
+    expect(ids("701")).toEqual(["701.8", "701.8a", "701.8b"])
+    expect(ids("903")).toEqual(["903.3", "903.8"])
+
+    const multiBase: ComprehensiveRules = {
+      chapters: [
+        {
+          id: "7",
+          title: "Additional Rules",
+          sections: [
+            {
+              id: "702",
+              title: "Keyword Abilities",
+              rules: [
+                rule("702.2", "Deathtouch"),
+                rule("702.2a", "Deathtouch is a static ability."),
+                rule("702.3", "Defender"),
+              ],
+            },
+          ],
+        },
+      ],
+      glossary: [],
+      notice: [],
+      references: MAGIC_RULE_REFERENCE,
+    }
+    expect(
+      searchRules(multiBase, "702")
+        .filter((r) => r.kind === "rule")
+        .map((r) => r.rule.id),
+    ).toEqual(["702.2", "702.3", "702.2a"])
+  })
 })

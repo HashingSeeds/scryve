@@ -1,7 +1,7 @@
 import "react-native-url-polyfill/auto"
 
 import { useEffect, useMemo } from "react"
-import type { ViewStyle } from "react-native"
+import { Platform, type ViewStyle } from "react-native"
 import { AppMetrics, ObserveRoot } from "expo-observe"
 import {
   DarkTheme,
@@ -103,6 +103,16 @@ function Root() {
 const $root: ViewStyle = { flex: 1 }
 
 const BOARD_OPTIONS = { statusBarHidden: true, gestureEnabled: false }
+const RULES_SHEET_OPTIONS =
+  Platform.OS === "web"
+    ? undefined
+    : {
+        presentation: "transparentModal" as const,
+        animation: "none" as const,
+        gestureEnabled: false,
+        statusBarHidden: true,
+        contentStyle: { backgroundColor: "transparent" },
+      }
 
 function AppStack() {
   const { theme, themeContext } = useAppTheme()
@@ -125,6 +135,7 @@ function AppStack() {
         <Stack.Screen name="index" options={BOARD_OPTIONS} />
         <Stack.Screen name="game/current" options={BOARD_OPTIONS} />
         <Stack.Screen name="connected/game/[gameId]" options={BOARD_OPTIONS} />
+        <Stack.Screen name="rules" options={RULES_SHEET_OPTIONS} />
       </Stack>
     </NavigationThemeProvider>
   )
