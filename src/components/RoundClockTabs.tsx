@@ -14,7 +14,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
 import { EDGE_SLIDES, edgeStyle, type EdgeTab } from "./EdgeTabs"
-import { EDGE_TAB } from "./playerGridGeometry"
+import { EDGE_TAB } from "./playerGridLayout"
 import { Text } from "./Text"
 
 const BORDER = 4

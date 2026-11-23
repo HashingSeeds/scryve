@@ -26,7 +26,7 @@ import {
   getMenuSeamNeighbors,
   getPlayerGridRows,
   getPlayerSlotFacings,
-} from "@/components/playerGridGeometry"
+} from "@/components/playerGridLayout"
 import { RoundClockTabs } from "@/components/RoundClockTabs"
 import { seatIdentityMetrics } from "@/components/SeatIdentity"
 import { teamChipCrowded } from "@/components/teamGridGeometry"

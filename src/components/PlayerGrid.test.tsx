@@ -35,7 +35,7 @@ import {
   PlayerGrid,
   type PlayerGridProps,
 } from "./PlayerGrid"
-import { EDGE_TAB } from "./playerGridGeometry"
+import { EDGE_TAB } from "./playerGridLayout"
 import type { OutState } from "../../convex/lib/outReason"
 import { EMPTY_TABLE, type TableState } from "../../convex/lib/table"
 import { teamTableRules } from "../../convex/lib/twoHeadedGiant"

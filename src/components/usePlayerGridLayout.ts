@@ -2,7 +2,7 @@ import { useMemo } from "react"
 
 import { useWindowSpansHinge } from "@/utils/useWindowSpansHinge"
 
-import { getPlayerGridLayout } from "./playerGridGeometry"
+import { getPlayerGridLayout } from "./playerGridLayout"
 import { teamGridLayout } from "./teamGridGeometry"
 
 type LayoutInput = Omit<Parameters<typeof getPlayerGridLayout>[0], "spansHinge">

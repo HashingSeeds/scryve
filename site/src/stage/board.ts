@@ -4,7 +4,7 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
-} from "@/components/playerGridGeometry"
+} from "@/components/playerGridLayout"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, playTableRules, type PlaySystemId } from "@/features/game/playSystems"
 import { accessibleForeground } from "@/utils/colorContrast"

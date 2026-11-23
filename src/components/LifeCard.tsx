@@ -93,7 +93,7 @@ import {
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
-import { CONTENT_EDGES } from "./playerGridGeometry"
+import { CONTENT_EDGES } from "./playerGridLayout"
 import { MarkArt, PlayerMark } from "./PlayerMark"
 import { menuClearance } from "./pokemon/pokemonCardLayout"
 import {

@@ -12,7 +12,7 @@ import {
   getPlayerGridRowFlex,
   getPlayerGridRows,
   getPlayerSlotFacings,
-} from "./playerGridGeometry"
+} from "./playerGridLayout"
 
 type GridLayout = ReturnType<typeof getPlayerGridLayout>
 
