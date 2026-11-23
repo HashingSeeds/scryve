@@ -1,4 +1,5 @@
 import type { ComprehensiveRules, Rule, RuleChapter } from "./comprehensiveRules"
+import { trimmedLines, type Sliced } from "./slices"
 
 const CHAPTER = /^(\d)\. (.+)$/
 const SECTION = /^(\d{3})\. (.+)$/
@@ -16,12 +17,9 @@ function paragraphs(lines: string[]) {
   return groups.filter((group) => group.length > 0)
 }
 
-export function parseMagicRules(source: string): ComprehensiveRules | undefined {
-  const lines = source
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n|\u2028/)
-    .map((line) => line.trim())
-  const effectiveDate = lines.map((line) => EFFECTIVE.exec(line)?.[1]).find(Boolean)
+export function* parseMagicRules(source: string): Sliced<ComprehensiveRules | undefined> {
+  const lines = yield* trimmedLines(source)
+  const effectiveDate = EFFECTIVE.exec(lines.find((line) => EFFECTIVE.test(line)) ?? "")?.[1]
   const rulesStart = lines.indexOf("Credits") + 1
   const glossaryStart = lines.lastIndexOf("Glossary")
   const creditsStart = lines.lastIndexOf("Credits")
@@ -48,6 +46,7 @@ export function parseMagicRules(source: string): ComprehensiveRules | undefined 
     } else if (rule && line.startsWith("Example:")) rule.examples.push(line)
     else if (rule?.examples.length) rule.examples[rule.examples.length - 1] += `\n${line}`
     else if (rule) rule.text += `\n${line}`
+    yield
   }
   if (chapters.length === 0) return undefined
 

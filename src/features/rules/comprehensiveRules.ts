@@ -1,3 +1,5 @@
+import { finish, type Sliced } from "./slices"
+
 export type Rule = { id: string; text: string; examples: string[] }
 export type RuleSection = { id: string; title: string; rules: Rule[] }
 export type RuleChapter = { id: string; title: string; sections: RuleSection[] }
@@ -138,10 +140,26 @@ type SearchIndex = {
   defined: { entry: GlossaryEntry; words: string[]; rules: number[]; opens?: string }[]
 }
 const indexes = new WeakMap<ComprehensiveRules, SearchIndex>()
+const builds = new WeakMap<ComprehensiveRules, Sliced<SearchIndex>>()
+
+function buildOf(source: ComprehensiveRules) {
+  const existing = builds.get(source)
+  if (existing) return existing
+  const created = buildSearchIndex(source)
+  builds.set(source, created)
+  return created
+}
 
 export function searchIndex(source: ComprehensiveRules) {
-  const cached = indexes.get(source)
-  if (cached) return cached
+  return indexes.get(source) ?? finish(buildOf(source))
+}
+
+// why: a phone takes well over 100 ms to index the Magic rules, so a board builds the index ahead of Rules through these steps. A search before they finish completes the same build at once.
+export function* searchIndexSteps(source: ComprehensiveRules): Sliced<void> {
+  if (!indexes.has(source)) yield* buildOf(source)
+}
+
+function* buildSearchIndex(source: ComprehensiveRules): Sliced<SearchIndex> {
   const sections = source.chapters.flatMap((chapter) => chapter.sections)
   const rules = sections.flatMap((section) => section.rules)
   const sectionById = new Map(sections.map((section) => [section.id, section]))
@@ -164,10 +182,15 @@ export function searchIndex(source: ComprehensiveRules) {
       lists.set(raw, list)
       return list
     })
-  const texts = new Map(rules.map((rule) => [rule.id, listsOf(rule.text)]))
+  const texts = new Map<string, Postings[]>()
+  for (const rule of rules) {
+    texts.set(rule.id, listsOf(rule.text))
+    yield
+  }
   const phrasings = new Map(
     Object.entries(source.phrasings ?? {}).map(([id, said]) => [id, listsOf(said.join(" "))]),
   )
+  yield
   const lengths: number[] = []
   const screens = new Map<string, number[]>()
   const screenOf = (id: string) => {
@@ -206,6 +229,7 @@ export function searchIndex(source: ComprehensiveRules) {
             list.counts.push(weight)
           }
       lengths.push(own.length)
+      yield
     }
   }
   const average = lengths.reduce((sum, length) => sum + length, 0) / Math.max(1, rules.length)
@@ -219,20 +243,22 @@ export function searchIndex(source: ComprehensiveRules) {
   const known = new Set(rules.map((rule) => rule.id))
   for (const entry of source.glossary)
     for (const raw of words(entry.term)) if (!stems.has(raw)) stems.set(raw, stem(raw))
-  const defined = source.glossary.map((entry) => {
+  const defined: SearchIndex["defined"] = []
+  for (const entry of source.glossary) {
     const cited = source.references
       ? ruleReferences(entry.text, source.references).find((part) => typeof part !== "string")?.id
       : undefined
     const opens = cited && known.has(cited) ? cited.replace(/[a-z]+$/, "") : cited
-    return {
+    defined.push({
       entry,
       words: words(entry.term)
         .filter((word) => !STOPWORDS.has(word))
         .map(stem),
       rules: (opens && screens.get(opens)) || [],
       opens: cited && known.has(cited) ? opens : undefined,
-    }
-  })
+    })
+    yield
+  }
   const index: SearchIndex = {
     rules,
     sectionByRule,
@@ -250,6 +276,7 @@ export function searchIndex(source: ComprehensiveRules) {
     defined,
   }
   indexes.set(source, index)
+  builds.delete(source)
   return index
 }
 

@@ -6,10 +6,12 @@ import {
   rulePreviewText,
   ruleReferences,
   ruleTopic,
+  searchIndexSteps,
   searchRules,
   type ComprehensiveRules,
 } from "./comprehensiveRules"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
+import { finish } from "./slices"
 
 const SOURCE = [
   "﻿Magic: The Gathering Comprehensive Rules",
@@ -52,7 +54,7 @@ const SOURCE = [
 ].join("\r\n")
 
 describe("parseMagicRules", () => {
-  const rules = parseMagicRules(SOURCE)
+  const rules = finish(parseMagicRules(SOURCE))
 
   it("reads chapters, sections, rules, examples, glossary, and the closing notice", () => {
     expect(rules).toMatchObject({
@@ -77,7 +79,7 @@ describe("parseMagicRules", () => {
   })
 
   it("rejects text that is not the Comprehensive Rules", () => {
-    expect(parseMagicRules("<html>Not found</html>")).toBeUndefined()
+    expect(finish(parseMagicRules("<html>Not found</html>"))).toBeUndefined()
   })
 
   it("finds a rule with its lettered subrules, not its numeric neighbors", () => {
@@ -102,6 +104,15 @@ describe("parseMagicRules", () => {
         result.kind === "term" ? result.entry.term : result.rule.id,
       ),
     ).toEqual(["100.10", "100.10aa"])
+  })
+
+  it("lets a search finish an index a board started building in slices", () => {
+    const fresh = finish(parseMagicRules(SOURCE))!
+    const steps = searchIndexSteps(fresh)
+    steps.next()
+    steps.next()
+    expect(searchRules(fresh, "100.10")).toEqual(searchRules(rules!, "100.10"))
+    expect(steps.next().done).toBe(true)
   })
 })
 

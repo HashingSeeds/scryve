@@ -3,8 +3,9 @@ import { Platform } from "react-native"
 
 import { storage } from "@/utils/storage"
 
-import { searchIndex, type ComprehensiveRules } from "./comprehensiveRules"
+import { searchIndexSteps, type ComprehensiveRules } from "./comprehensiveRules"
 import type { TextRules } from "./gameRules"
+import { finish, runInSlices, type Sliced } from "./slices"
 
 type RulesStore = {
   getString(key: string): string | undefined
@@ -47,20 +48,28 @@ function isCurrent(source: TextRules, store: RulesStore) {
   )
 }
 
-export function loadStoredRules(source: TextRules, store: RulesStore = storage) {
+function* storedRules(source: TextRules, store: RulesStore): Sliced<Loaded | undefined> {
   const url = storedUrl(source, store)
   const cache = entries(loaded, store)
   const cached = cache.get(source.cacheKey)
   if (cached?.url === url) return cached
   try {
     const text = store.getString(`${source.cacheKey}.text.v1`)
-    const rules = url && text ? source.parse(text) : undefined
+    yield
+    const rules = url && text ? yield* source.parse(text) : undefined
     if (!url || !rules) return undefined
+    // why: Rules may have read its own copy while a board was still parsing in slices.
+    const meanwhile = cache.get(source.cacheKey)
+    if (meanwhile?.url === url) return meanwhile
     cache.set(source.cacheKey, { url, rules })
     return { url, rules }
   } catch {
     return undefined
   }
+}
+
+export function loadStoredRules(source: TextRules, store: RulesStore = storage) {
+  return finish(storedRules(source, store))
 }
 
 function validators(source: TextRules, store: RulesStore) {
@@ -76,7 +85,7 @@ function validators(source: TextRules, store: RulesStore) {
 }
 
 async function fetchRules(source: TextRules, store: RulesStore, fetcher: Fetcher) {
-  const stored = source.revalidate ? loadStoredRules(source, store) : undefined
+  const stored = source.revalidate ? await runInSlices(storedRules(source, store)) : undefined
   const conditional = stored?.url === source.url ? validators(source, store) : undefined
   const response = await (conditional ? fetcher(source.url, conditional) : fetcher(source.url))
   if (response.status === 304 && conditional && stored) {
@@ -85,7 +94,7 @@ async function fetchRules(source: TextRules, store: RulesStore, fetcher: Fetcher
   }
   if (!response.ok) throw new Error(`Rules download failed with ${response.status}`)
   const text = await response.text()
-  const rules = source.parse(text)
+  const rules = await runInSlices(source.parse(text))
   if (!rules) throw new Error("Rules download was not the official rules")
   try {
     store.set(`${source.cacheKey}.text.v1`, text)
@@ -117,14 +126,21 @@ export function downloadRules(
 
 // why: media.wizards.com and rules.fabtcg.com send no CORS header, so web links to the official page instead.
 const canDownload = Platform.OS !== "web"
+const BOARD_SETTLE_MS = 1000
 
+// why: parsing and indexing stalled the first Rules open of each launch by over 100 ms, so a board does both ahead of time, after its own first frames, a few ms per frame.
 export function prefetchRules(
   source: TextRules,
   store: RulesStore = storage,
   fetcher: Fetcher = fetch,
 ) {
-  if (!canDownload || isCurrent(source, store)) return
-  downloadRules(source, store, fetcher).catch(() => {})
+  if (!canDownload) return
+  setTimeout(() => {
+    const rules = isCurrent(source, store)
+      ? runInSlices(storedRules(source, store)).then((stored) => stored?.rules)
+      : downloadRules(source, store, fetcher)
+    rules.then((next) => next && runInSlices(searchIndexSteps(next))).catch(() => {})
+  }, BOARD_SETTLE_MS)
 }
 
 export function useComprehensiveRules(source: TextRules) {
@@ -150,11 +166,9 @@ export function useComprehensiveRules(source: TextRules) {
       active = false
     }
   }, [source, attempt])
-  // why: building the search index takes a phone a noticeable moment, so it starts once the rules show instead of on the first keystroke.
+  // why: when no board prepared the index, it builds while the rules show instead of on the first keystroke.
   useEffect(() => {
-    if (!rules) return
-    const timer = setTimeout(() => searchIndex(rules), 0)
-    return () => clearTimeout(timer)
+    if (rules) void runInSlices(searchIndexSteps(rules))
   }, [rules])
   return {
     rules,

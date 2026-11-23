@@ -12,6 +12,7 @@ import {
   type RuleSearchResult,
 } from "../src/features/rules/comprehensiveRules"
 import { GAME_RULES, type TextRules } from "../src/features/rules/rulesCatalog"
+import { finish } from "../src/features/rules/slices"
 
 type Source = "app" | "web" | "written"
 type Case = {
@@ -227,7 +228,7 @@ async function main() {
   let ok = true
   for (const system of systems) {
     const source = GAME_RULES[system]
-    const rules = source.parse(await rulesText(source))
+    const rules = finish(source.parse(await rulesText(source)))
     if (!rules) throw new Error(`${system}: the downloaded rules no longer parse`)
     const sets = (Object.keys(SETS) as CaseSet[]).filter(
       (set) => !values.cases || set === "practice",
