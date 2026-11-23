@@ -122,7 +122,11 @@ export function RulesSheet({
             runOnJS(dismiss)()
             return
           }
-          translateY.set(withSpring(0, SHEET_SPRING))
+          translateY.set(
+            withSpring(0, SHEET_SPRING, (finished) => {
+              if (finished) runOnJS(setOpened)(true)
+            }),
+          )
         }),
     [dismiss, translateY],
   )

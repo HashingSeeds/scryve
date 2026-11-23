@@ -194,8 +194,10 @@ export function RulesScreen({
   const loaded = Boolean(rules)
   // why: iOS blocks the UI thread over 100 ms to bring up the keyboard, so a sheet focuses search once it stops moving instead of hitching its slide.
   useEffect(() => {
-    if (sheet && sheetOpened && loaded && autoFocusSearch) searchField.current?.focus()
-  }, [sheet, sheetOpened, loaded, autoFocusSearch])
+    if (!sheet || !sheetOpened || !loaded || !autoFocusSearch) return
+    if (active) searchField.current?.focus()
+    setAutoFocusSearch(false)
+  }, [sheet, sheetOpened, loaded, autoFocusSearch, active])
   const scrolledForRule = useRef<string | undefined>(undefined)
   const section = rules && ruleId ? findRules(rules, ruleId)?.section : undefined
   useEffect(() => {
