@@ -764,21 +764,21 @@ function Strike({
   const { anchor, inbound } = useCommanderFlights()
   const waiting = inbound.has(seatNumber)
   const nudge = useSharedValue(0)
+  // why: the sword holds still under its blade, so the blade hands over to it where it landed.
   useEffect(() => {
-    if (reducedMotion !== false) return
+    if (reducedMotion !== false || waiting) return
     nudge.value = withRepeat(
       withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     )
-    return () => cancelAnimation(nudge)
-  }, [nudge, reducedMotion])
+    return () => {
+      cancelAnimation(nudge)
+      nudge.value = 0
+    }
+  }, [nudge, reducedMotion, waiting])
   const swordStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: nudge.value * NUDGE + lunge.value * LUNGE }, { rotate: "90deg" }],
-  }))
-  // why: while its blade is in the air the blade stands in for the strike's sword; the amount comes and goes with the shadow, which the blade rides.
-  const shownStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(waiting ? 0 : 1, { duration: waiting ? 0 : 160 }),
   }))
   return (
     <Animated.View testID={`commander-strike-seat-${seatNumber}`} style={[$strike, style]}>
@@ -791,7 +791,8 @@ function Strike({
         style={[$strikeText, { color, fontSize: font, lineHeight: font * 1.15 }]}
       />
       <View ref={anchor("landing", seatNumber)} collapsable={false}>
-        <Animated.View style={[swordStyle, shownStyle]}>
+        {/* why: while its blade is in the air the blade stands in for the strike's sword, swapping in the same commit; the amount comes and goes with the shadow, which the blade rides. */}
+        <Animated.View style={[swordStyle, waiting && $hidden]}>
           <Sword size={sword} color={color} />
         </Animated.View>
       </View>
@@ -1107,6 +1108,7 @@ const TINT_SHARE = 0.42
 const STRIKE_GAP = 6
 const STRIKE_SHARE = 0.78
 const NUDGE = 4
+const $hidden: ViewStyle = { opacity: 0 }
 const LUNGE = 20
 const COIN_GAP = 6
 // why: degrees of arc the hits on one seat may use, and how far apart they sit until it fills.

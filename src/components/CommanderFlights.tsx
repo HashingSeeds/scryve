@@ -34,6 +34,7 @@ import { Text } from "./Text"
 const FAN_SPREAD = 40
 const FAN_REACH = 26
 const BLADE = 32
+const SETTLE_MS = 100
 
 type Point = { x: number; y: number }
 type Spot = Point & { size: number }
@@ -112,6 +113,7 @@ export function CommanderFlights({
   // why: the seat whose sword has left its mark, set as its blades take over from it and cleared as they land back on it.
   const [out, setOut] = useState<number | null>(null)
   const flight = useRef(0)
+  const flying = useRef(0)
   // why: a team zone's check unmounts on Done, so its blades fly home to where they left from.
   const homes = useRef(new Map<number, Spot>())
   const arrivals = useRef(new Map<number, number>())
@@ -167,6 +169,7 @@ export function CommanderFlights({
           : []
         // why: the mark swaps in the same commit the blades appear over it, so the swap hides under them.
         setOut(planned.length || !back ? seat : null)
+        flying.current = planned.length
         setBlades(planned)
         if (planned.length) setInbound(new Set(planned.map(({ seat: landing }) => landing)))
       })
@@ -174,18 +177,21 @@ export function CommanderFlights({
     return () => cancelAnimationFrame(frameId)
   }, [attacker, reducedMotion])
 
+  // why: the sword a blade lands on shows first and the blade lifts off it a few frames later, so the handover never shows a gap.
   const landed = useCallback((seat: number, back: boolean) => {
-    setBlades((current) => {
-      const left = current.filter((blade) => blade.seat !== seat)
-      if (back && !left.length) setOut(null)
-      return left
-    })
+    const run = flight.current
+    flying.current -= 1
+    if (back && !flying.current) setOut(null)
     if (!back)
       setInbound((current) => {
         const left = new Set(current)
         left.delete(seat)
         return left
       })
+    setTimeout(() => {
+      if (run === flight.current)
+        setBlades((current) => current.filter((blade) => blade.seat !== seat))
+    }, SETTLE_MS)
   }, [])
 
   const waiting = attacker !== null && out !== attacker ? attacker : null
