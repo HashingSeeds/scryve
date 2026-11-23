@@ -32,7 +32,7 @@ module.exports = {
       preset: "jest-expo",
       cacheDirectory: "<rootDir>/.jest-cache",
       modulePathIgnorePatterns,
-      setupFiles: ["<rootDir>/test/setup.ts"],
+      setupFiles: ["<rootDir>/test/jestSetup.ts"],
       // why: Reanimated 4.6+ splits files into .native/.web variants and only the web ones run under Jest.
       resolver: "react-native-reanimated/jest/resolver",
       // why: scripts/*.test.cjs run under node --test (test:scripts); Jest 30 matches .cjs by default.
