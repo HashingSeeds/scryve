@@ -18,7 +18,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
-import { FrameProbe } from "@/devtools/FrameProbe"
+import { FrameProbe, frameProbeEnabled } from "@/devtools/FrameProbe"
 import { AccountDeletionSessionGuard } from "@/features/auth/AccountDeletionSessionGuard"
 import { CloudProviders } from "@/features/auth/AuthContext"
 import { LocalGameClaimPrompt } from "@/features/game/LocalGameClaimPrompt"
@@ -93,7 +93,7 @@ function Root() {
               <AppStack />
               <UpdateReadyToastWithForegroundChecks />
               <RestartCurtain />
-              {process.env.EXPO_PUBLIC_FRAME_PROBE === "1" && <FrameProbe />}
+              {frameProbeEnabled && <FrameProbe />}
             </KeyboardProvider>
           </SafeAreaProvider>
         </CloudProviders>

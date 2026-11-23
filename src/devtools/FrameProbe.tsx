@@ -1,27 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Pressable, type TextStyle, type ViewStyle } from "react-native"
-import { useFrameCallback, useSharedValue } from "react-native-reanimated"
+import Constants from "expo-constants"
+import { useFrameCallback, useSharedValue, type FrameInfo } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Text } from "@/components/Text"
 
 import { formatFrameStats, NO_FRAMES, recordFrame, type FrameStats } from "./frameStats"
 
+// why: the dev client variant keeps the probe out of store, preview, and beta bundles even if an EAS environment sets the flag.
+export const frameProbeEnabled =
+  process.env.EXPO_PUBLIC_FRAME_PROBE === "1" &&
+  Constants.expoConfig?.extra?.appVariant === "development"
+
 function readout(ui: FrameStats, js: FrameStats) {
   return `${formatFrameStats("ui", ui)}\n${formatFrameStats("js", js)}`
 }
 
-/** why: perf agents read these frame counters for the UI and JS threads, readable from an accessibility snapshot or a screenshot. Tap to reset. Mounted only when EXPO_PUBLIC_FRAME_PROBE=1; see .agents/skills/verify-perf. */
+/** why: perf agents read these frame counters for the UI and JS threads, readable from an accessibility snapshot or a screenshot. Tap to reset. Mounted only when frameProbeEnabled; see .agents/skills/verify-perf. */
 export function FrameProbe() {
   const insets = useSafeAreaInsets()
   const ui = useSharedValue(NO_FRAMES)
   const js = useRef(NO_FRAMES)
   const [text, setText] = useState(() => readout(NO_FRAMES, NO_FRAMES))
 
-  useFrameCallback(({ timestamp }) => {
-    "worklet"
-    ui.value = recordFrame(ui.value, timestamp)
-  })
+  const countUiFrame = useCallback(
+    ({ timestamp }: FrameInfo) => {
+      "worklet"
+      ui.value = recordFrame(ui.value, timestamp)
+    },
+    [ui],
+  )
+  useFrameCallback(countUiFrame)
 
   useEffect(() => {
     let frame = requestAnimationFrame(function tick(now) {

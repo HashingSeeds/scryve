@@ -77,7 +77,8 @@ command `device_open` gives you as `AD`.
 
 For frame numbers on any backend, iOS included, set `EXPO_PUBLIC_FRAME_PROBE=1` in the Metro
 command. It works in development and production mode (`--no-dev --minify`) on the dev client.
-Expo inlines the flag when it bundles, and store, preview, and beta bundles never set it.
+It also needs `APP_VARIANT=development`, so store, preview, and beta bundles never show it
+even if an EAS environment sets the flag.
 
 ```sh
 agent-device-mini up --app com.sowinghope.count.dev --scheme scryve-dev --udid <simulator> -- \
