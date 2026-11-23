@@ -14,6 +14,6 @@
   {"query": "board wipe", "cards": ["Wrath of God", "Damnation", "Austere Command", "Farewell", "Supreme Verdict", "Blasphemous Act", "Toxic Deluge"], "source": "written"},
   {"query": "exile target creature", "cards": ["Swords to Plowshares", "Path to Exile"], "source": "written"},
   {"query": "add one mana of any color", "cards": ["Command Tower", "Arcane Signet", "Exotic Orchard", "Birds of Paradise"], "source": "written"},
-  {"query": "hexproof", "cards": ["Swiftfoot Boots", "Heroic Intervention", "Lightning Greaves"], "source": "written"},
+  {"query": "hexproof", "cards": ["Swiftfoot Boots", "Heroic Intervention"], "source": "written"},
   {"query": "gain control of target creature", "cards": ["Act of Treason", "Threaten", "Captivating Vampire", "Flayer of Loyalties"], "source": "written"}
 ]

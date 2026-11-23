@@ -259,7 +259,6 @@ export function CardSearch({
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
-  /** why: a card found by its rules text shows the words it matched, so the player sees why it is listed. */
   const [textExcerpts, setTextExcerpts] = useState<ReadonlyMap<string, string>>()
   const [resultsQuery, setResultsQuery] = useState<string>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()

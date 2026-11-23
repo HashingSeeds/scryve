@@ -10,7 +10,6 @@ export type MagicDatasetCard = Omit<CardReference, "oracleText" | "commanderRule
   /** why: absent means a file built before legality shipped, so search asks Scryfall instead of finding no legal cards. */
   legalFormats?: string[]
   edhrecRank?: number
-  /** why: search reads the card's text as the words a player types, so the file ships only those words. */
   textKey?: string
 }
 
@@ -79,10 +78,6 @@ function outsidePaperDecks(raw: Record<string, unknown>) {
   return meldResult || (unusual && !paperLegal)
 }
 
-/**
- * why: rules text and typed searches reduce to the same lowercase words, so "can't" meets "cant"
- * and punctuation never splits a phrase.
- */
 export function textSearchKey(text: string) {
   // why: Unicode normalization costs about a millisecond a call on Hermes, and typed searches are ASCII.
   const folded = /[^\x00-\x7f]/.test(text) ? text.normalize("NFD").replace(/\p{M}/gu, "") : text
@@ -93,7 +88,6 @@ export function textSearchKey(text: string) {
     .trim()
 }
 
-/** why: a word in more cards than this turns up within the first few hundred most played cards, so its list would cost bytes without saving time. */
 const COMMON_WORD_CARDS = 4000
 
 /** why: building this from 600k words of card text takes seconds on a phone, so the weekly file ships each word's cards as base-36 gaps between indexes, or "" for a common word. */
@@ -150,7 +144,6 @@ export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
   const toughness = [firstFace?.toughness, raw.toughness].find(
     (value): value is string => typeof value === "string" && value.length > 0,
   )
-  // why: reminder text repeats what a keyword means, so dropping it saves 0.3 MB gzip and keeps a cycling card from matching "draw a card".
   const textKey = oracleText && textSearchKey(oracleText.replace(/ ?\([^()]*\)/g, ""))
   const legalities = objectRecord(raw.legalities)
   const legalFormats = LEGALITY_FORMATS.filter(

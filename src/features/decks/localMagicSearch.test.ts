@@ -353,3 +353,13 @@ test("a curly apostrophe from an iPhone keyboard still searches on the device", 
     "Quick Draw",
   ])
 })
+
+test("a Commander-banned card is not counted as most played among text matches", () => {
+  const cards = [
+    card("Library of Alexandria", { commanderLegality: "banned", textKey: "t draw a card" }),
+    card("Mind Stone", { edhrecRank: 5, textKey: "t sacrifice mind stone draw a card" }),
+  ]
+  expect(
+    searchText("draw a card", magicTextIndex(cards), cards)?.text.map((match) => match.card.name),
+  ).toEqual(["Mind Stone", "Library of Alexandria"])
+})

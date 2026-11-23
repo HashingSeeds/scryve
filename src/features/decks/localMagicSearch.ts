@@ -22,10 +22,6 @@ const RARITIES = ["mythic", "rare", "uncommon", "common"]
 const UNRANKED = 1e9
 const BANNED_IN_COMMANDER_RANK = 0
 
-/**
- * why: players search for a rule the cards never print ("commander tax"), so each such term maps
- * to the words the cards use. Add one only when an eval case shows the plain words miss.
- */
 const TEXT_CONCEPTS: Record<string, string[]> = {
   "commander tax": ["from the command zone"],
   "board wipe": ["destroy all", "exile all creatures", "exile all nonland", "all creatures get"],
@@ -47,7 +43,6 @@ export type MagicCards = {
   byName: Map<string, MagicDatasetCard>
   knowsLegality: boolean
   knowsPopularity: boolean
-  /** why: cards with text, most played first, so a text search stops at its first page of matches instead of reading every card. */
   textCards: Int32Array
   textRank: Int32Array
   textIndex: ReadonlyMap<string, string>
@@ -98,7 +93,6 @@ export function parseMagicCards(text: string): MagicCards {
   const keyStarts = new Int32Array(keys.length + 1)
   keys.forEach((key, index) => (keyStarts[index + 1] = keyStarts[index] + key.length + 1))
   const knowsPopularity = cards.some((card) => card.edhrecRank !== undefined)
-  // why: a name search lists a Commander-banned card as most played, but a text search wants cards to play, so it ranks by EDHREC alone.
   const ranks = cards.map((card) => popularityRank(card, false))
   const textCards = Int32Array.from(cards.keys())
     .filter((index) => cards[index].textKey !== undefined)
@@ -134,7 +128,7 @@ function matchesSearch(card: MagicDatasetCard, search: MagicSearch) {
   )
 }
 
-/** why: the card file holds only words of rules text and, in older files, no legality, so Scryfall syntax and some filters only Scryfall answers. */
+/** why: card files built before legality shipped have no legal formats, so a format search on them goes to Scryfall. */
 export function readsOnDevice(
   magicCards: MagicCards | undefined,
   search: Pick<MagicSearch, "text" | "filters">,
@@ -185,7 +179,6 @@ function wordsStarting(words: readonly string[], start: string) {
   return found
 }
 
-/** why: a word still being typed matches every word it starts; undefined means one is too common to list, so no list narrows the search. */
 function listsStarting(magicCards: MagicCards, word: string) {
   const lists = wordsStarting(magicCards.textWords, word).map(
     (each) => magicCards.textIndex.get(each) ?? "",
@@ -193,7 +186,6 @@ function listsStarting(magicCards: MagicCards, word: string) {
   return lists.includes("") ? undefined : lists
 }
 
-/** why: only the rarest word's cards are read; with only common words, reading from the most played card fills a page quickly, so a phone never reads all 30k texts for a common phrase. */
 function textPositions(
   magicCards: MagicCards,
   phrase: string,
@@ -212,7 +204,6 @@ function textPositions(
     )
     ?.flatMap(textIndexCards)
   const positions = rarest && Int32Array.from(rarest, (index) => textRank[index]).sort()
-  // why: with only common words this loop reads thousands of cards, so it builds no strings per card.
   const starts = [phrase, ...words].map((start) => ({ start, inside: ` ${start}` }))
   const holds = (text: string, { start, inside }: (typeof starts)[number]) =>
     text.startsWith(start) || text.includes(inside)
@@ -244,10 +235,6 @@ function excerpt(text: string, phrase: string) {
   return `${start ? "…" : ""}${text.slice(start, end < 0 ? undefined : end)}${end < 0 ? "" : "…"}`
 }
 
-/**
- * why: a phrase the card prints comes first, then cards holding every word in any order, so a
- * search for what a card does is never empty when cards plainly relate.
- */
 function cardsWithText(
   magicCards: MagicCards,
   search: MagicSearch,
@@ -286,7 +273,6 @@ function cardsWithText(
   })
 }
 
-/** why: `text` also holds any match lifted into `named`, so the screen can label it with the words it matched. */
 export function localMagicSearch(
   magicCards: MagicCards | undefined,
   nameIndex: CardNameIndex | undefined,
@@ -311,7 +297,6 @@ export function localMagicSearch(
     .flatMap((name) => magicCards.byName.get(name) ?? [])
     .filter((card) => matchesSearch(card, search))
   const found = cardsHoldingWords(magicCards, words, search)
-  // why: when no card name holds every typed word, the closest names are guesses ("commander tax" finds Ant-Man, Colony Commander), so cards printing the phrase lead.
   const guessed = found.length === 0
   const text = cardsWithText(
     magicCards,

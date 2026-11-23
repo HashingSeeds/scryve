@@ -20,7 +20,6 @@ import {
 type Source = "app" | "web" | "written"
 type Case = { query: string; cards: string[]; source: Source; asked?: string }
 
-// why: card text reaches the file with the first weekly build after text search ships, so until then the text cases are skipped, not failed.
 const SETS = [
   { name: "mtg", file: "mtg.json", floor: 234, needsText: false },
   { name: "mtg text", file: "mtg.text.json", floor: 16, needsText: true },
@@ -187,7 +186,6 @@ async function main() {
     const cases: Case[] = JSON.parse(readFileSync(file, "utf8"))
     ok = evaluate(name, cases, floor, magicCards, nameIndex, timings) && ok
   }
-  // why: a set of 17 cases has its slowest as its p95, so the budget holds across every case.
   const p95 = percentile(
     timings.toSorted((a, b) => a - b),
     0.95,
