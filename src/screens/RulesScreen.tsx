@@ -62,8 +62,10 @@ export interface RulesScreenProps {
   system: string
   ruleId?: string
   glossary?: boolean
+  initialQuery?: string
   back: BackAction
   onOpenRule: (id: string) => void
+  onReturnToGame?: () => void
   onCards?: () => void
 }
 
@@ -131,13 +133,15 @@ export function RulesScreen({
   system,
   ruleId,
   glossary,
+  initialQuery,
   back,
   onOpenRule,
+  onReturnToGame,
   onCards,
 }: RulesScreenProps) {
   const { theme, themed } = useAppTheme()
   const { rules, failed, retry } = useComprehensiveRules(source)
-  const [query, setQuery] = useState("")
+  const [query, setQuery] = useState(initialQuery ?? "")
   const [recent, setRecent] = useState(() => recentRules(source.cacheKey))
   const [tab, setTab] = useState<Tab>(() =>
     glossary ? "glossary" : recent.length > 0 ? "recent" : "contents",
@@ -374,8 +378,14 @@ export function RulesScreen({
       <Header
         title={title}
         LeftActionComponent={<HeaderBack testID="rules-back" {...back} />}
-        rightTx={onCards ? "play:rules.cards" : undefined}
-        onRightPress={onCards}
+        rightTx={
+          ruleId && onReturnToGame
+            ? "common:appNavigation.game"
+            : onCards
+              ? "play:rules.cards"
+              : undefined
+        }
+        onRightPress={ruleId && onReturnToGame ? onReturnToGame : onCards}
       />
       {!RULES_TEXT_IN_APP ? (
         <View style={themed($message)}>
@@ -428,6 +438,7 @@ export function RulesScreen({
                   placeholderTx="play:rules.search"
                   value={query}
                   onChangeText={setQuery}
+                  autoFocus={home && !glossary && !initialQuery}
                   autoCorrect={false}
                   autoCapitalize="none"
                   returnKeyType="search"

@@ -74,6 +74,7 @@ export interface CardFocusDialogProps {
   onIncrement?: () => void
   onDecrement?: () => void
   onSetCommander?: (color?: CommanderColor) => void
+  onOpenRule?: (id: string) => void
   visible: boolean
   onClose: () => void
   onDismissed: () => void
@@ -140,6 +141,7 @@ export function CardFocusDialog({
   onIncrement,
   onDecrement,
   onSetCommander,
+  onOpenRule,
   visible,
   onClose,
   onDismissed,
@@ -306,6 +308,7 @@ export function CardFocusDialog({
                 name={keyword.name}
                 rule={keywordRule}
                 onClose={() => setKeyword(undefined)}
+                onOpenRule={onOpenRule}
               />
             ) : null}
             {rulingsId ? <CardRulings scryfallId={rulingsId} /> : null}
@@ -342,6 +345,7 @@ export function CardFocusDialog({
                 rule={keywordRule}
                 anchor={keyword.anchor}
                 onClose={() => setKeyword(undefined)}
+                onOpenRule={onOpenRule}
                 onHeight={setPopoverHeight}
               />
             </>

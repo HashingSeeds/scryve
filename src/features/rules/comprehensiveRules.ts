@@ -83,6 +83,12 @@ const TERM_WEIGHT = 0.4
 // why: a player who has typed a whole word means that word, so longer words it only starts ("block" in "blockers") still match while typing but rank below it.
 const COMPLETION_WEIGHT = 0.3
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
+const RULE_NUMBER_PREFIX = /^(?:rules?\s+|§\s*|#\s*)/
+
+function normalizeRuleNumber(needle: string): string | undefined {
+  const stripped = needle.replace(RULE_NUMBER_PREFIX, "")
+  return RULE_NUMBER.test(stripped) ? stripped : undefined
+}
 const WORD = /[+-]?[\d*x]+\/[+-]?[\d*x]+|[a-z0-9][a-z0-9’']*/gi
 const STOPWORDS = new Set(
   "a an and are as at be but by can could do does did doing for from had has have how i if in into is it its me my of on or our so than that the their them then there these they this to us vs was we were what when where which while who why will with would you your".split(
@@ -296,11 +302,20 @@ function oneEditApart(a: string, b: string) {
 export function searchRules(rules: ComprehensiveRules, query: string, limit = 50) {
   const needle = query.trim().toLowerCase()
   if (!needle) return []
-  if (RULE_NUMBER.test(needle))
-    return searchIndex(rules)
-      .rules.filter((rule) => rule.id.startsWith(needle))
-      .slice(0, limit)
-      .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
+  const ruleNumber = normalizeRuleNumber(needle)
+  if (ruleNumber) {
+    const index = searchIndex(rules)
+    const matching = index.rules.filter((rule) => rule.id.startsWith(ruleNumber))
+    const bareSection = ruleNumber.replace(/\.$/, "")
+    if (index.sectionById.has(bareSection)) {
+      const baseOnly = matching.filter((rule) => !/[a-z]+$/.test(rule.id))
+      const subrules = matching.filter((rule) => /[a-z]+$/.test(rule.id))
+      return [...baseOnly, ...subrules]
+        .slice(0, limit)
+        .map((rule): RuleSearchResult => ({ kind: "rule", rule }))
+    }
+    return matching.slice(0, limit).map((rule): RuleSearchResult => ({ kind: "rule", rule }))
+  }
   const { chosen, stems, partial } = queryWords(needle)
   if (stems.length === 0) return []
   const lastStem = partial === undefined ? undefined : stem(partial)

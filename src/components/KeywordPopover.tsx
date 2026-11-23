@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
-import { PressableIcon } from "@/components/Icon"
+import { Icon, PressableIcon } from "@/components/Icon"
 import { Text } from "@/components/Text"
 import type { KeywordRule } from "@/features/rules/magicKeywords"
 import { translate } from "@/i18n/translate"
@@ -38,12 +38,14 @@ export function KeywordPopover({
   rule,
   anchor,
   onClose,
+  onOpenRule,
   onHeight,
 }: {
   name: string
   rule: KeywordRule
   anchor?: KeywordAnchor
   onClose: () => void
+  onOpenRule?: (id: string) => void
   onHeight?: (height: number) => void
 }) {
   const { theme, themed } = useAppTheme()
@@ -93,19 +95,34 @@ export function KeywordPopover({
             </View>
           ))
         : null}
-      {rules.length > 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          onPress={() => setExpanded((current) => !current)}
-          style={$toggle}
-        >
-          <Text
-            size="xs"
-            style={themed($link)}
-            tx={expanded ? "decks:cardFocus.hideRules" : "decks:cardFocus.showRules"}
-          />
-        </Pressable>
+      {rules.length > 0 || onOpenRule ? (
+        <View style={themed($actions)}>
+          {rules.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              onPress={() => setExpanded((current) => !current)}
+              style={$toggle}
+            >
+              <Text
+                size="xs"
+                style={themed($link)}
+                tx={expanded ? "decks:cardFocus.hideRules" : "decks:cardFocus.showRules"}
+              />
+            </Pressable>
+          ) : null}
+          {onOpenRule ? (
+            <Pressable
+              testID="card-focus-keyword-open-rules"
+              accessibilityRole="link"
+              onPress={() => onOpenRule(rule.id)}
+              style={$openLink}
+            >
+              <Text size="xs" style={themed($link)} tx="play:rules.title" />
+              <Icon icon="caretRight" size={14} color={theme.colors.tint} />
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </View>
   )
@@ -117,6 +134,18 @@ const $shrink: TextStyle = { flexShrink: 1 }
 const $rule: ViewStyle = { flexDirection: "row" }
 const $ruleId: TextStyle = { width: 80, fontVariant: ["tabular-nums"] }
 const $toggle: ViewStyle = { alignSelf: "flex-start", minHeight: 36, justifyContent: "center" }
+const $openLink: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  minHeight: 36,
+  gap: 2,
+}
+const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: spacing.md,
+})
 const $close: ViewStyle = {
   minWidth: 36,
   minHeight: 36,

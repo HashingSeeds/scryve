@@ -194,6 +194,7 @@ type CardSearchProps = {
   deckCards?: DeckCard[]
   presentation?: "modal" | "screen"
   onGameChange?: (game: SystemId) => void
+  onOpenRules?: (options?: { query?: string; rule?: string }) => void
 }
 
 const GAME_OPTIONS = VISIBLE_SYSTEM_IDS.map((id) => ({ id, label: playSystemShortLabel(id) }))
@@ -215,6 +216,7 @@ export function CardSearch({
   deckCards,
   presentation = "modal",
   onGameChange,
+  onOpenRules,
 }: CardSearchProps) {
   const convex = useConvex()
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
@@ -1196,7 +1198,16 @@ export function CardSearch({
           ListFooterComponent={
             <ResultSlot edge="below">
               {!busy && catalogResults?.length === 0 ? (
-                <Text tx="decks:cardSearch.noResults" />
+                <>
+                  <Text tx="decks:cardSearch.noResults" />
+                  {onOpenRules && text.length >= 2 ? (
+                    <TextAction
+                      testID="card-search-try-rules"
+                      tx="play:rules.search"
+                      onPress={() => onOpenRules({ query: text })}
+                    />
+                  ) : null}
+                </>
               ) : null}
               {catalogResults?.length && imageCredit ? (
                 <Text size="xxs" style={{ color: theme.colors.textDim }} text={imageCredit} />
@@ -1334,6 +1345,14 @@ export function CardSearch({
           visible={candidateSheet.visible}
           onClose={() => setCandidate(undefined)}
           onDismissed={candidateSheet.onDismissed}
+          onOpenRule={
+            onOpenRules
+              ? (id) => {
+                  setCandidate(undefined)
+                  onOpenRules({ rule: id })
+                }
+              : undefined
+          }
           showQuantity={false}
           onSetCommander={choosingCommander ? setCommander : undefined}
         />

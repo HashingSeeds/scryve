@@ -117,6 +117,18 @@ describe("CardFocusDialog", () => {
     ])
   })
 
+  it("opens the keyword rule in Rules when tapped from the keyword popover", () => {
+    const onOpenRule = jest.fn()
+    const view = renderDialog({
+      card: { ...card, game: "mtg" },
+      details: { ...details, oracleText: "Flying", keywords: "Flying" },
+      onOpenRule,
+    })
+    fireEvent.press(view.getByText("Flying"))
+    fireEvent.press(view.getByTestId("card-focus-keyword-open-rules"))
+    expect(onOpenRule).toHaveBeenCalledWith("702.9")
+  })
+
   it("closes a tapped keyword's definition when you tap outside it", () => {
     jest
       .spyOn(View.prototype, "measureInWindow")

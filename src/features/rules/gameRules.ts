@@ -24,8 +24,15 @@ export function useGameRules(system: unknown): GameRules | undefined {
   )
 }
 
-export function rulesHref(system: SystemId, rule?: string) {
-  return { pathname: "/rules", params: { system, ...(rule ? { rule } : {}) } } as const
+export function rulesHref(system: SystemId, rule?: string, query?: string) {
+  return {
+    pathname: "/rules",
+    params: {
+      system,
+      ...(rule ? { rule } : {}),
+      ...(query ? { query } : {}),
+    },
+  } as const
 }
 
 export function tableItemRulesOf(system: unknown) {

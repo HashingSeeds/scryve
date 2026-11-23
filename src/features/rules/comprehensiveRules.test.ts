@@ -392,4 +392,11 @@ describe("searchRules ranking", () => {
       "Go again is a special resolution ability.",
     )
   })
+
+  it("matches rule numbers prefixed with rule/§ and prioritizes base rules on bare section numbers", () => {
+    expect(ids("rule 701.8")).toEqual(["701.8", "701.8a", "701.8b"])
+    expect(ids("§903.8")).toEqual(["903.8"])
+    expect(ids("701")).toEqual(["701.8", "701.8a", "701.8b"])
+    expect(ids("903")).toEqual(["903.3", "903.8"])
+  })
 })
