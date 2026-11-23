@@ -57,6 +57,7 @@ import {
   type CommanderFacing,
   type CommanderReach,
 } from "./commanderDamageLayout"
+import { useCommanderFlights } from "./CommanderFlights"
 import { CommanderStrip, commanderGridShown } from "./CommanderStrip"
 import {
   CounterChips,
@@ -645,8 +646,10 @@ export const LifeCard = memo(function LifeCard({
     seatRun > 0 &&
     seatRun / 2 - identityMetrics.edge * 2 - identityMetrics.icon - identityMetrics.gap <
       MIN_NAME_ROOM
-  // why: commander seats carry a sword after the name that starts an attack, and holds the check that ends it; a defender's row only says whose seat it is. A team zone starts attacks from its heads' marks, so its row holds only the check.
+  // why: a commander seat's mark carries the sword that starts an attack, and holds the check that ends it, so the attacker's thumb finds Done where it started; a defender's mark only says whose seat it is. A team zone starts attacks from its heads' marks, so its row holds only the check.
   const swordShown = commanderSeat && (team ? attackerSide : !commanderCardMode || attackerSide)
+  const markSword = swordShown && !team && !!commanderDamage
+  const { anchor, homeBound } = useCommanderFlights()
   const rowInk = floodedBy.takeover ? SHADOW_INK : foreground
   const seatIdentity = (
     <SeatIdentity
@@ -654,6 +657,9 @@ export const LifeCard = memo(function LifeCard({
       playerName={displayName}
       shape={shape}
       color={rowInk}
+      insetSwordColor={markSword ? color : undefined}
+      insetGlyph={attackerSide ? "check" : homeBound === seatNumber ? "none" : "sword"}
+      insetRef={markSword ? anchor("home", seatNumber) : undefined}
       compact={compact}
       foil={foil && !!shape && isProMarkShape(shape)}
       staleSince={staleSince}
@@ -939,16 +945,30 @@ export const LifeCard = memo(function LifeCard({
               onLayout={({ nativeEvent: { layout } }) => {
                 if (!nameRetracted) setFullIdentityWidth(layout.width)
               }}
-              pointerEvents={cornerTouches}
+              pointerEvents={attackerSide ? "box-none" : cornerTouches}
               accessibilityElementsHidden={diceCovers}
               importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
               style={[
                 $cornerIdentity,
-                // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit. The sword sits past it.
+                // why: the half-run cap leaves the far corner to the seat's bag; without it the name runs to the row's limit.
                 commanderSeat && { maxWidth: identityCorner.position.maxWidth },
               ]}
             >
-              {team ? null : commanderDamage ? (
+              {team ? null : commanderCardMode?.kind === "source" ? (
+                <BoardPressable
+                  testID={`commander-finish-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate(
+                    `board:commander.submitAssigningFromSeat.${commanderCardMode.submit}`,
+                    { seat: seatNumber },
+                  )}
+                  hitSlop={8}
+                  onPress={commanderCardMode.onSubmit}
+                  style={({ pressed }) => pressed && { opacity: 0.72 }}
+                >
+                  {seatIdentity}
+                </BoardPressable>
+              ) : commanderDamage ? (
                 <BoardPressable
                   testID={`commander-mark-seat-${seatNumber}`}
                   accessibilityRole="button"
@@ -973,7 +993,7 @@ export const LifeCard = memo(function LifeCard({
                 <View pointerEvents="none">{seatIdentity}</View>
               )}
             </View>
-            {swordShown && commanderDamage ? (
+            {team && swordShown && commanderDamage ? (
               <SeatSword
                 seatNumber={seatNumber}
                 identity={identity}

@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { StyleSheet, View, type ViewStyle } from "react-native"
+import { Pressable, StyleSheet, View, type TextStyle, type ViewStyle } from "react-native"
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -21,13 +21,21 @@ import Animated, {
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { Sword } from "./Sword"
+import { Text } from "./Text"
 
 // why: worklets read these, so they are declared before the code that uses them.
-const FAN_MS = 260
 const FLIGHT_MS = 420
 const FAN_SPREAD = 40
 const FAN_REACH = 26
 const BLADE = 32
+
+// why: a dev-only switch to try three ways the blades leave the mark; keep the one that feels best and delete the rest before merging.
+const VARIANTS = [
+  { key: "A", label: "Fan as they draw", draw: 0, drawReach: 0, fan: 260, hold: 60 },
+  { key: "B", label: "Draw, fan, fling", draw: 140, drawReach: 16, fan: 220, hold: 60 },
+  { key: "C", label: "One throw", draw: 0, drawReach: 0, fan: 180, hold: 0 },
+] as const
+type Variant = (typeof VARIANTS)[number]
 
 type Point = { x: number; y: number }
 type Spot = Point & { size: number }
@@ -54,6 +62,7 @@ export const useCommanderFlights = () => useContext(FlightsContext)
 type Blade = {
   seat: number
   home: Point
+  drawn: Point
   out: Point
   to: Point
   from: number
@@ -62,6 +71,10 @@ type Blade = {
   land: number
   // why: the blade lands at the size of the strike's own sword.
   landed: number
+  // why: the blade leaves at the size of the sword it comes from, small when that sword is inside a mark.
+  start: number
+  draw: number
+  fan: number
   go: number
   end: number
   delay: number
@@ -89,10 +102,11 @@ export function CommanderFlights({
   const [homeBound, setHomeBound] = useState<number | null>(null)
   const flight = useRef(0)
   // why: a team zone's check unmounts on Done, so its blades fly home to where they left from.
-  const homes = useRef(new Map<number, Point>())
-  const latest = useRef({ rotationOf, color })
+  const homes = useRef(new Map<number, Spot>())
+  const [variant, setVariant] = useState<Variant>(VARIANTS[0])
+  const latest = useRef({ rotationOf, color, variant })
   useEffect(() => {
-    latest.current = { rotationOf, color }
+    latest.current = { rotationOf, color, variant }
   })
 
   const anchor = useCallback((kind: AnchorKind, seat: number) => {
@@ -127,7 +141,7 @@ export function CommanderFlights({
       void measureAll(frame.current, seat, nodes.current, homes.current.get(seat)).then((spots) => {
         if (!spots || run !== flight.current) return
         homes.current.set(seat, spots.home)
-        const planned = plan(spots, seat, latest.current.rotationOf, back)
+        const planned = plan(spots, seat, latest.current.rotationOf, back, latest.current.variant)
         if (!planned.length) return
         setBlades(planned)
         setInbound(new Set(planned.map(({ seat: landing }) => landing)))
@@ -166,12 +180,21 @@ export function CommanderFlights({
             />
           ))}
         </View>
+        {__DEV__ ? (
+          <Pressable
+            testID="sword-variant-switch"
+            onPress={() => setVariant(VARIANTS[(VARIANTS.indexOf(variant) + 1) % VARIANTS.length])}
+            style={$variantSwitch}
+          >
+            <Text text={`Swords ${variant.key}: ${variant.label}`} style={$variantText} />
+          </Pressable>
+        ) : null}
       </View>
     </FlightsContext.Provider>
   )
 }
 
-type Spots = { home: Point; landings: Map<number, Spot> }
+type Spots = { home: Spot; landings: Map<number, Spot> }
 
 function measureCenter(node: View) {
   return new Promise<Spot | null>((resolve) =>
@@ -189,7 +212,7 @@ async function measureAll(
   frame: View | null,
   seat: number,
   nodes: { home: Map<number, View>; landing: Map<number, View> },
-  lastHome?: Point,
+  lastHome?: Spot,
 ): Promise<Spots | null> {
   const home = nodes.home.get(seat)
   if (!frame || (!home && !lastHome)) return null
@@ -220,8 +243,15 @@ function plan(
   seat: number,
   rotationOf: (seat: number) => number,
   back: boolean,
+  variant: Variant,
 ): Blade[] {
   const from = rotationOf(seat)
+  const up = (from * Math.PI) / 180
+  // why: variant B first pulls every blade straight out of the mark the way its sword points.
+  const drawn = {
+    x: home.x + variant.drawReach * Math.sin(up),
+    y: home.y - variant.drawReach * Math.cos(up),
+  }
   const aimed = [...landings].map(([landing, to]) => ({
     seat: landing,
     to,
@@ -238,12 +268,16 @@ function plan(
   const blades = aimed.map(({ seat: landing, to, reach, aim }, index) => {
     const tilt = toward(from, leans[index] - drift)
     const radians = (tilt * Math.PI) / 180
-    const go = FAN_MS + 60 + reach * 0.25
+    const go = variant.draw + variant.fan + (variant.hold ? variant.hold + reach * 0.25 : 0)
     const ahead = toward(tilt, aim)
     return {
       seat: landing,
       home,
-      out: { x: home.x + FAN_REACH * Math.sin(radians), y: home.y - FAN_REACH * Math.cos(radians) },
+      drawn,
+      out: {
+        x: drawn.x + FAN_REACH * Math.sin(radians),
+        y: drawn.y - FAN_REACH * Math.cos(radians),
+      },
       to,
       from,
       tilt,
@@ -251,6 +285,9 @@ function plan(
       // why: the landed blade lies across the defender's view, pointing at its disc.
       land: toward(ahead, rotationOf(landing) + 90),
       landed: to.size / BLADE,
+      start: Math.min(1, home.size / BLADE),
+      draw: variant.draw,
+      fan: variant.fan,
       go,
       end: go + FLIGHT_MS,
       delay: 0,
@@ -284,15 +321,20 @@ function FlyingBlade({
     )
   }, [back, delay, end, onLanded, seat, t])
   const style = useAnimatedStyle(() => {
-    const { home, out, to, from, tilt, ahead, land, landed, go } = blade
+    const { home, drawn, out, to, from, tilt, ahead, land, landed, start, draw, fan, go } = blade
     const now = t.value
     let point = home
     let angle = from
     let scale = 1
-    if (now <= FAN_MS) {
-      const k = splay(now / FAN_MS)
-      point = { x: home.x + (out.x - home.x) * k, y: home.y + (out.y - home.y) * k }
+    if (now <= draw) {
+      const k = easeOut(now / draw)
+      point = { x: home.x + (drawn.x - home.x) * k, y: home.y + (drawn.y - home.y) * k }
+      scale = start + (1 - start) * k
+    } else if (now <= draw + fan) {
+      const k = splay((now - draw) / fan)
+      point = { x: drawn.x + (out.x - drawn.x) * k, y: drawn.y + (out.y - drawn.y) * k }
       angle = from + (tilt - from) * k
+      if (!draw) scale = start + (1 - start) * Math.min(1, k)
     } else if (now <= go) {
       point = out
       angle = tilt
@@ -305,7 +347,7 @@ function FlyingBlade({
       scale = 1 + (landed - 1) * k
     }
     return {
-      opacity: Math.min(1, now / (end * 0.12)),
+      opacity: Math.min(1, now / 40),
       transform: [
         { translateX: point.x - BLADE / 2 },
         { translateY: point.y - BLADE / 2 },
@@ -340,4 +382,15 @@ function easeOut(k: number) {
 
 const $frame: ViewStyle = { flex: 1 }
 const $layer: ViewStyle = { ...StyleSheet.absoluteFill, zIndex: 50 }
+const $variantSwitch: ViewStyle = {
+  position: "absolute",
+  top: 56,
+  alignSelf: "center",
+  zIndex: 60,
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderRadius: 999,
+  backgroundColor: "rgba(0,0,0,0.8)",
+}
+const $variantText: TextStyle = { color: "#fff", fontSize: 14, fontWeight: "700" }
 const $blade: ViewStyle = { position: "absolute", left: 0, top: 0, width: BLADE, height: BLADE }

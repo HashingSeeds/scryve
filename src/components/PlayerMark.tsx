@@ -1,4 +1,4 @@
-import { memo, useId } from "react"
+import { memo, useId, type Ref } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
 import { View } from "react-native"
 import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg"
@@ -7,7 +7,7 @@ import { relativeLuminance } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 
 import type { LifeCardContentRotation } from "./playerCardTypes"
-import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
+import { CheckShape, SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 /** why: shapes have different margins inside their 44 unit box, so align drawn edges, not boxes. */
@@ -47,6 +47,10 @@ export interface PlayerMarkProps {
   shape?: PlayerMarkShape
   rotation?: LifeCardContentRotation
   insetSwordColor?: string
+  /** why: an attacker's mark holds the check that ends the attack where its sword was, and shows neither while its blades are away. */
+  insetGlyph?: "sword" | "check" | "none"
+  /** why: blades leave from and come home to the inset, so CommanderFlights measures this box. */
+  insetRef?: Ref<View>
   foil?: boolean
   foilBackdrop?: string
   size?: number
@@ -60,6 +64,8 @@ export const PlayerMark = memo(function PlayerMark({
   shape: chosenShape,
   rotation = 0,
   insetSwordColor,
+  insetGlyph = "sword",
+  insetRef,
   foil = false,
   foilBackdrop,
   size = 44,
@@ -88,8 +94,17 @@ export const PlayerMark = memo(function PlayerMark({
           solid={!!insetSwordColor}
           testID={`player-mark-shape-${shape}`}
         />
-        {insetSwordColor ? <SwordInset shape={shape} color={insetSwordColor} /> : null}
+        {insetSwordColor && insetGlyph !== "none" ? (
+          <InsetGlyph shape={shape} glyph={insetGlyph} color={insetSwordColor} />
+        ) : null}
       </Svg>
+      {insetRef ? (
+        <View
+          ref={insetRef}
+          collapsable={false}
+          style={insetBox(SWORD_INSET_THAT_FITS_SHAPE[shape], size)}
+        />
+      ) : null}
     </View>
   )
 }, structurallyEqual)
@@ -178,12 +193,34 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<PlayerMarkShape, Inset> = {
   tower: { centerX: 22, centerY: 24.5, size: 13 },
 }
 
-function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
+function InsetGlyph({
+  shape,
+  glyph,
+  color,
+}: {
+  shape: PlayerMarkShape
+  glyph: "sword" | "check"
+  color: string
+}) {
   return (
-    <G testID="player-mark-sword" transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}>
-      <SwordShapes color={color} />
+    <G
+      testID={`player-mark-${glyph}`}
+      transform={insetTransform(SWORD_INSET_THAT_FITS_SHAPE[shape])}
+    >
+      {glyph === "sword" ? <SwordShapes color={color} /> : <CheckShape color={color} />}
     </G>
   )
+}
+
+function insetBox({ centerX, centerY, size }: Inset, markSize: number): ViewStyle {
+  const scale = markSize / MARK_VIEW_BOX
+  return {
+    position: "absolute",
+    left: (centerX - size / 2) * scale,
+    top: (centerY - size / 2) * scale,
+    width: size * scale,
+    height: size * scale,
+  }
 }
 
 function insetTransform({ centerX, centerY, size }: Inset) {

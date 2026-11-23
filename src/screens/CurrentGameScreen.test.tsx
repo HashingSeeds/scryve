@@ -1112,7 +1112,7 @@ describe("CurrentGameScreen", () => {
       view.getByTestId(`life-total-seat-${seat}`, { includeHiddenElements: true }).props.children
 
     const armCommander = (view: ReturnType<typeof renderGame>, seat: number) => {
-      fireEvent.press(view.getByTestId(`commander-sword-seat-${seat}`))
+      fireEvent.press(view.getByTestId(`commander-mark-seat-${seat}`))
     }
 
     it("stays out of the way outside Commander", () => {

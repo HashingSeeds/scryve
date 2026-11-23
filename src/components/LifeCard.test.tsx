@@ -428,7 +428,7 @@ describe("LifeCard", () => {
       expect(view.getByTestId("player-name-seat-2", { includeHiddenElements: true })).toHaveStyle({
         color: "#FFFFFF",
       })
-      expect(view.queryByTestId("commander-sword-seat-2")).toBeNull()
+      expect(view.queryByTestId("player-mark-sword", { includeHiddenElements: true })).toBeNull()
       expect(
         view.getByTestId("commander-mark-seat-2", { includeHiddenElements: true }),
       ).toBeDisabled()
@@ -443,7 +443,8 @@ describe("LifeCard", () => {
       expect(
         view.queryByTestId("commander-card-mode-seat-2", { includeHiddenElements: true }),
       ).toBeNull()
-      expect(view.getByTestId("commander-sword-seat-2")).toBeEnabled()
+      expect(view.getByTestId("commander-mark-seat-2")).toBeEnabled()
+      expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
     } finally {
       timing.mockRestore()
       motion.mockRestore()
@@ -799,7 +800,7 @@ describe("LifeCard", () => {
     ).toMatchObject({ width: 187, height: 158, left: -14.5, top: 14.5 })
   })
 
-  it("keeps a damaged seat's name and mark beside a head-corner grid, and opens an attack from the sword after the name", () => {
+  it("keeps a damaged seat's name and mark beside a head-corner grid, and opens an attack from the sword in its mark", () => {
     const onPressSword = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -833,7 +834,7 @@ describe("LifeCard", () => {
     })
     const corner = view.getByTestId("life-identity-row-seat-1")
     expect(StyleSheet.flatten(corner.props.style)).toMatchObject({ left: 16, bottom: 16 })
-    // why: the name keeps its half-run cap; the sword sits past it.
+    // why: the name keeps its half-run cap.
     expect(StyleSheet.flatten(view.getByTestId("life-identity-seat-1").props.style)).toMatchObject({
       maxWidth: 340 / 2 - 16 - 16,
     })
@@ -846,9 +847,9 @@ describe("LifeCard", () => {
       top: 59,
     })
     expect(view.getByTestId("commander-map-seat-1")).not.toHaveProp("onPress")
-    fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+    expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
-    expect(onPressSword).toHaveBeenCalledTimes(2)
+    expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
   it("steps a grid along its head edge past a pentagon on its corner", () => {
@@ -1068,11 +1069,9 @@ describe("LifeCard", () => {
     const total = StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style)
     expect(total.fontFamily).toBe("Rubik-Regular")
     expect(total.fontSize * scale).toBeCloseTo(slot.fontSize)
-    expect(view.queryByTestId("commander-sword-seat-1")).toBeNull()
     expect(view.queryByTestId("commander-strip-seat-1")).toBeNull()
-    expect(
-      view.getByTestId("commander-mark-seat-1", { includeHiddenElements: true }),
-    ).toBeDisabled()
+    expect(view.getByTestId("commander-finish-seat-1")).toBeEnabled()
+    expect(view.getByTestId("player-mark-check", { includeHiddenElements: true })).toBeTruthy()
     fireEvent.press(view.getByTestId("commander-power-up-seat-1"))
     fireEvent.press(view.getByTestId("commander-power-down-seat-1"))
     fireEvent(view.getByTestId("commander-attacker-seat-1"), "layout", {
