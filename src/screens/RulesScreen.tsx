@@ -586,7 +586,7 @@ export function RulesScreen({
       backgroundColor={theme.colors.background}
       contentContainerStyle={$flex}
     >
-      {home ? (
+      {home || messageBody ? (
         <Header
           title={title}
           safeAreaEdges={["top"]}

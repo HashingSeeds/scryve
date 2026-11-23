@@ -74,6 +74,10 @@ export function RulesSheet({
   const interactiveBack = useSharedValue(0)
   const dismissing = useRef(false)
 
+  const resetDismissing = useCallback(() => {
+    dismissing.current = false
+  }, [])
+
   const dismiss = useCallback(() => {
     if (dismissing.current) return
     dismissing.current = true
@@ -85,9 +89,10 @@ export function RulesSheet({
     translateY.set(
       withTiming(sheetHeight, { duration: SHEET_CLOSE_MS, easing: IOS_EASE }, (finished) => {
         if (finished) runOnJS(onDismiss)()
+        else runOnJS(resetDismissing)()
       }),
     )
-  }, [onDismiss, reducedMotion, sheetHeight, translateY])
+  }, [onDismiss, reducedMotion, resetDismissing, sheetHeight, translateY])
 
   useCloseOnBack(true, () => {
     if (layers.length > 1) {

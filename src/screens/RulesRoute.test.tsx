@@ -22,7 +22,12 @@ let mockParams: { system?: string; rule?: string } = {}
 let mockRulesShown = true
 
 jest.mock("expo-router", () => ({
-  router: { back: () => mockBack(), canGoBack: () => true, push: mockPush, replace: jest.fn() },
+  router: {
+    back: () => mockBack(),
+    canGoBack: () => true,
+    push: (...args: unknown[]) => mockPush(...args),
+    replace: jest.fn(),
+  },
   useLocalSearchParams: () => mockParams,
   useRoute: () => ({ key: "rules" }),
 }))

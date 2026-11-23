@@ -242,6 +242,7 @@ export function CardSearch({
   const imageCredit = systemDefinition(game)?.integration.rights.imageCredit
   const [candidate, setCandidate] = useState<DeckCard>()
   const candidateSheet = useSheetPresence(candidate)
+  const pendingRuleRef = useRef<string | undefined>(undefined)
   const shownCandidate = candidateSheet.shown
   const [candidateError, setCandidateError] = useState<string>()
   const candidateDetails = useCardDetails(
@@ -1344,12 +1345,18 @@ export function CardSearch({
           onRetryDetails={candidateDetails.retryDetails}
           visible={candidateSheet.visible}
           onClose={() => setCandidate(undefined)}
-          onDismissed={candidateSheet.onDismissed}
+          onDismissed={() => {
+            candidateSheet.onDismissed()
+            const rule = pendingRuleRef.current
+            if (!rule) return
+            pendingRuleRef.current = undefined
+            onOpenRules?.({ rule })
+          }}
           onOpenRule={
             onOpenRules
               ? (id) => {
+                  pendingRuleRef.current = id
                   setCandidate(undefined)
-                  onOpenRules({ rule: id })
                 }
               : undefined
           }
