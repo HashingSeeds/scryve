@@ -162,6 +162,7 @@ export function TurnChip({
   const passOnly = split && numbered && size === "pass"
   // why: past the full step a clock chip drops the next player's mark; the pass segment's color still says who's next.
   const nextMarkShown = numbered || size === "full"
+  const tight = split && !numbered && size === "pass"
   const nextInk = nextSeat ? accessibleForeground(nextSeat.color) : ink
   const label = [
     translate("board:turn.label", { number: turn.number, name }),
@@ -217,7 +218,12 @@ export function TurnChip({
       )}
       {split && nextSeat ? (
         <View
-          style={[$passSegment, passOnly && $passSegmentAlone, { backgroundColor: nextSeat.color }]}
+          style={[
+            $passSegment,
+            passOnly && $passSegmentAlone,
+            tight && $passSegmentTight,
+            { backgroundColor: nextSeat.color },
+          ]}
         >
           {passSegmentContent}
         </View>
@@ -230,6 +236,7 @@ export function TurnChip({
     ...(split ? [$split] : []),
     ...(splitButtons ? [$splitButtons] : []),
     ...(passOnly ? [$passOnly] : []),
+    ...(tight && !splitButtons ? [$tightChip] : []),
     ...(outOfTime ? [{ backgroundColor: colors.error }] : []),
     ...(canPress ? [] : [$passive]),
   ]
@@ -255,7 +262,12 @@ export function TurnChip({
             delayLongPress={450}
             onPress={state.onPause}
             onLongPress={state.onLongPress}
-            style={({ pressed }) => [$clockSegment, paused && $pausedSegment, pressed && $pressed]}
+            style={({ pressed }) => [
+              $clockSegment,
+              tight && $clockSegmentTight,
+              paused && $pausedSegment,
+              pressed && $pressed,
+            ]}
           >
             {paused ? <PlayGlyph color={ink} /> : <PauseGlyph color={ink} />}
             <Text
@@ -279,6 +291,7 @@ export function TurnChip({
             $passSegment,
             $passSegmentFlush,
             passOnly && $passSegmentAlone,
+            tight && $passSegmentTight,
             { backgroundColor: nextSeat.color },
             pressed && $pressed,
           ]}
@@ -566,5 +579,8 @@ const $passOnly: ViewStyle = { paddingLeft: 0 }
 const $passSegmentAlone: ViewStyle = { marginLeft: 0, paddingLeft: 12 }
 const $priorityIdle: ViewStyle = { opacity: 0.55 }
 const $priorityActive: ViewStyle = { backgroundColor: "rgba(0,0,0,0.38)" }
+const $tightChip: ViewStyle = { paddingLeft: 8 }
+const $passSegmentTight: ViewStyle = { marginLeft: 0, paddingLeft: 6, paddingRight: 8 }
+const $clockSegmentTight: ViewStyle = { paddingLeft: 8, paddingRight: 6 }
 const $passive: ViewStyle = { opacity: 0.7 }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }
