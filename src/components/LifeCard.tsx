@@ -782,7 +782,7 @@ export const LifeCard = memo(function LifeCard({
           themed($content),
           readoutFitStyle,
           floodedBy.takeover && $aboveFlood,
-          inSlot && $aboveAttackerControls,
+          (inSlot || !!lifeAway) && $aboveAttackerControls,
         ]}
       >
         <Animated.View

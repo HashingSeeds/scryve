@@ -79,6 +79,8 @@ type Blade = {
   delay: number
   // why: how long after the shadow's clock started this blade mounted.
   skew: number
+  // why: the attack this blade belongs to, so a landing queued before a re-arm is ignored.
+  run: number
   back: boolean
 }
 
@@ -158,6 +160,7 @@ export function CommanderFlights({
           ? plan(spots, seat, latest.current.rotationOf, back, arrivals.current).map((blade) => ({
               ...blade,
               skew,
+              run,
             }))
           : []
         // why: the mark swaps in the same commit the blades appear over it, so the swap hides under them.
@@ -171,8 +174,8 @@ export function CommanderFlights({
   }, [attacker, reducedMotion])
 
   // why: the sword a blade lands on shows first and the blade lifts off it a few frames later, so the handover never shows a gap.
-  const landed = useCallback((seat: number, back: boolean) => {
-    const run = flight.current
+  const landed = useCallback((seat: number, back: boolean, run: number) => {
+    if (run !== flight.current) return
     flying.current -= 1
     if (back && !flying.current) setOut(null)
     if (!back)
@@ -310,6 +313,7 @@ function plan(
       end: go + flies,
       delay: 0,
       skew: 0,
+      run: 0,
       back,
     }
   })
@@ -327,20 +331,20 @@ function FlyingBlade({
   blade: Blade
   color: string
   homeColor?: string
-  onLanded: (seat: number, back: boolean) => void
+  onLanded: (seat: number, back: boolean, run: number) => void
 }) {
-  const { back, end, delay, seat, skew } = blade
+  const { back, end, delay, seat, skew, run } = blade
   const first = back ? end : Math.min(skew, end)
   const t = useSharedValue(first)
   useEffect(() => {
     const done = (finished?: boolean) => {
       "worklet"
-      if (finished) runOnJS(onLanded)(seat, back)
+      if (finished) runOnJS(onLanded)(seat, back, run)
     }
     const wait = back ? Math.max(0, delay - skew) : 0
     const duration = back ? end : end - first
     t.value = withDelay(wait, withTiming(back ? 0 : end, { duration, easing: Easing.linear }, done))
-  }, [back, delay, end, first, onLanded, seat, skew, t])
+  }, [back, delay, end, first, onLanded, run, seat, skew, t])
   const style = useAnimatedStyle(() => {
     const { home, out, to, from, tilt, ahead, land, landed, start, lead, fan, go, flight } = blade
     const now = t.value
