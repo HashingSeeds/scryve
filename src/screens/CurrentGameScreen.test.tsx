@@ -608,7 +608,7 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-seat-2-1"))
     chipWidth(900)
     expect(view.getByTestId("turn-chip-time")).toHaveTextContent(/^(19|20)m$/)
-    expect(view.getByTestId("turn-chip-1").props.accessibilityLabel).toMatch(/\d+:\d{2}/)
+    expect(view.getByTestId("turn-chip-pass-1").props.accessibilityLabel).toMatch(/\d+:\d{2}/)
   })
 
   it("forgets who went first when the result is cleared before play", () => {
