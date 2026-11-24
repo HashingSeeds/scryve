@@ -12,6 +12,8 @@ const TRACKER_TITLE = "Comment review"
 const TRACKER_BODY =
   "Each comment below is a new `why:` comment that landed in main. Check `keep` and the entry hides itself. Check `drop` and an agent removes it with `pnpm comments:apply`; the entry hides once that removal reaches main."
 const MARKER_PATTERN = /^<!-- comment-review:([A-Za-z\d+/=]+) -->$/mu
+// why: GitHub refuses new comments on an issue past 2,500.
+const TRACKER_LIMIT = 2500
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"])
 const CONTEXT_BEFORE = 3
 const CONTEXT_AFTER = 6
@@ -280,8 +282,9 @@ function main(args) {
     }))
   }
 
-  const findTracker = ({ create }) => {
-    const issues = JSON.parse(
+  // why: a full tracker stays open so its pending entries can still be kept or dropped, and new ones go to the newest.
+  const openTrackers = () =>
+    JSON.parse(
       run("gh", [
         "issue",
         "list",
@@ -295,8 +298,11 @@ function main(args) {
         "number,title",
       ]),
     )
-    const existing = issues.find((issue) => issue.title === TRACKER_TITLE)
-    if (existing || !create) return existing?.number
+      .filter((issue) => issue.title === TRACKER_TITLE)
+      .map((issue) => issue.number)
+      .sort((a, b) => a - b)
+
+  const createTracker = () => {
     const url = run("gh", [
       "issue",
       "create",
@@ -316,7 +322,7 @@ function main(args) {
     return number
   }
 
-  const trackerEntries = (number) => {
+  const trackerComments = (number) => {
     const [owner, name] = repoName().split("/")
     return run("gh", [
       "api",
@@ -335,15 +341,17 @@ function main(args) {
     ])
       .split("\n")
       .filter(Boolean)
-      .flatMap((line) => {
-        const comment = JSON.parse(line)
-        const trusted =
-          comment.author?.login === "github-actions" ||
-          TRUSTED_ASSOCIATIONS.has(comment.authorAssociation)
-        const entry = trusted ? parseEntry(comment.body) : undefined
-        return entry ? [{ ...entry, id: comment.id, hidden: comment.isMinimized }] : []
-      })
+      .map((line) => JSON.parse(line))
   }
+
+  const toEntries = (comments) =>
+    comments.flatMap((comment) => {
+      const trusted =
+        comment.author?.login === "github-actions" ||
+        TRUSTED_ASSOCIATIONS.has(comment.authorAssociation)
+      const entry = trusted ? parseEntry(comment.body) : undefined
+      return entry ? [{ ...entry, id: comment.id, hidden: comment.isMinimized }] : []
+    })
 
   const hide = (id, classifier) =>
     run("gh", [
@@ -367,17 +375,25 @@ function main(args) {
     )
   } else if (command === "sync" && hasRange) {
     const posts = collect()
-    const number = findTracker({ create: posts.length > 0 })
-    if (!number) return
-    const entries = trackerEntries(number)
+    const trackers = openTrackers()
+    if (!trackers.length && !posts.length) return
+    const comments = trackers.map(trackerComments)
+    const entries = comments.flatMap(toEntries)
     const posted = new Set(entries.map(entryKey))
+    let number = trackers.at(-1)
+    let count = comments.at(-1)?.length ?? TRACKER_LIMIT
     for (const { entry, body } of posts) {
       if (posted.has(entryKey(entry))) continue
+      if (count >= TRACKER_LIMIT) {
+        number = createTracker()
+        count = 0
+      }
       run(
         "gh",
         ["api", `repos/${repoName()}/issues/${number}/comments`, "--input", "-"],
         JSON.stringify({ body }),
       )
+      count += 1
       process.stdout.write(`Queued ${entry.path}:${entry.line}\n`)
     }
     for (const entry of entries.filter(({ hidden }) => !hidden)) {
@@ -394,12 +410,13 @@ function main(args) {
       }
     }
   } else if (command === "apply") {
-    const number = findTracker({ create: false })
-    if (!number) throw new Error(`No open "${TRACKER_TITLE}" issue`)
+    const trackers = openTrackers()
+    if (!trackers.length) throw new Error(`No open "${TRACKER_TITLE}" issue`)
     const root = fs.realpathSync(run("git", ["rev-parse", "--show-toplevel"]).trim())
     let removed = 0
     let skipped = 0
-    for (const entry of trackerEntries(number).filter(({ hidden, drop }) => !hidden && drop)) {
+    const entries = trackers.map(trackerComments).flatMap(toEntries)
+    for (const entry of entries.filter(({ hidden, drop }) => !hidden && drop)) {
       try {
         const filename = path.join(root, entry.path)
         const result = removeBlock(fs.readFileSync(filename, "utf8"), entry.block, entry.path)
