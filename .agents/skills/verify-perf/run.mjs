@@ -4,11 +4,12 @@
 // agent-device-mini writes traces to --out paths there. See SKILL.md for setup.
 // Usage: run.mjs <out.json> [runs]
 import { execFileSync } from "node:child_process"
-import { createHash } from "node:crypto"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { homedir, tmpdir } from "node:os"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+
+import { queryLastRow, traceProcessor } from "./perfetto.mjs"
 
 const [out, runsArg = "10"] = process.argv.slice(2)
 if (!out) throw new Error("usage: run.mjs <out.json> [runs]")
@@ -19,25 +20,6 @@ const here = dirname(fileURLToPath(import.meta.url))
 const flows = join(here, "../../../.maestro/perf")
 const scenarios = ["LifeTaps", "MenuToggle"]
 
-// trace_processor reads the Perfetto traces. Pinned for the Mac mini (macOS arm64); set
-// TRACE_PROCESSOR to a trace_processor_shell binary elsewhere.
-const perfettoVersion = "v58.0"
-const perfettoSha256 = "af44b5187c763929f7d9ad05cc812b304c284e0a2eda2693b8d9689eb74e1842"
-async function traceProcessor() {
-  if (process.env.TRACE_PROCESSOR) return process.env.TRACE_PROCESSOR
-  const path = join(homedir(), ".cache/verify-perf", `trace_processor_shell-${perfettoVersion}`)
-  if (existsSync(path)) return path
-  if (`${process.platform}-${process.arch}` !== "darwin-arm64")
-    throw new Error("set TRACE_PROCESSOR to a trace_processor_shell binary for this machine")
-  const url = `https://commondatastorage.googleapis.com/perfetto-luci-artifacts/${perfettoVersion}/mac-arm64/trace_processor_shell`
-  const binary = Buffer.from(await (await fetch(url)).arrayBuffer())
-  if (createHash("sha256").update(binary).digest("hex") !== perfettoSha256)
-    throw new Error(`checksum mismatch for ${url}`)
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, binary)
-  chmodSync(path, 0o755)
-  return path
-}
 const tracer = await traceProcessor()
 
 const device = (...args) =>
@@ -69,15 +51,9 @@ SELECT
 FROM sched JOIN thread USING (utid) JOIN process USING (upid)
 WHERE process.pid = ${Number(pid)};`
 function cpu(trace, pid) {
-  const query = join(dirname(trace), "cpu.sql")
-  writeFileSync(query, cpuQuery(pid))
-  const rows = execFileSync(tracer, ["-q", query, trace], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  })
-  const [overwritten, jsMs, uiMs] = rows.trim().split("\n").at(-1).split(",").map(Number)
+  const [overwritten, jsMs, uiMs] = queryLastRow(tracer, trace, cpuQuery(pid)).map(Number)
   if (overwritten > 0) throw new Error(`${trace} outgrew the trace buffer; shorten the scenario`)
-  if (!(jsMs > 0)) throw new Error(`no JS thread CPU in ${trace}: ${rows}`)
+  if (!(jsMs > 0)) throw new Error(`no JS thread CPU in ${trace}`)
   return { jsCpuMs: Math.round(jsMs), uiCpuMs: Math.round(uiMs) }
 }
 

@@ -1,6 +1,6 @@
 ---
 name: verify-perf
-description: Use when a change could make the board slower on a phone (renders, animations, lists, sync), or to prove a perf fix with before and after numbers from a real device.
+description: Use when a change could make the board slower on a phone (renders, animations, lists, sync) or slow down app launch (native dependencies, startup work), or to prove a perf fix with before and after numbers from a real device.
 ---
 
 # Verify perf
@@ -100,8 +100,33 @@ label with `snapshot` before and after an action, waiting at least 500 ms after 
 read the same numbers from a screenshot. A snapshot itself can drop a few UI frames, so compare
 against an idle reset-and-read with no action between.
 
+## Launch times
+
+`launch.mjs` times cold and hot launches. Launch time depends on the native binary, so it compares
+two preview builds (release native code, dev Clerk and Convex), not two bundles on one dev client.
+Each run relaunches the app under a Perfetto trace, then sends it home and opens it again:
+
+- `Cold launchMs`: Android's launch time, from the tap to the first frame (`android_startups`).
+- `Cold interactiveMs`: process start until the app is interactive, from the startup metrics EAS
+  Observe reports from the field (`coldLaunchTime` plus `timeToInteractive`). Development and
+  preview builds log them as `scryve-launch {...}` (`src/devtools/launchTimes.ts`), and the script
+  reads that line from the session's app log.
+- `Hot launchMs`: Android's launch time when the process is still alive.
+
+1. Build a preview APK of each side from its worktree: `pnpm android:preview --build-path <path>`.
+2. Install the **before** APK (`agent-device-mini install com.sowinghope.count.preview <apk>`),
+   open it once, and get past first-run setup onto a board, so every launch lands on the same
+   screen.
+3. Run it on the mini, like `run.mjs`:
+   `AD="agent-device-mini --serial 25061JEGR08933" node .agents/skills/verify-perf/launch.mjs /tmp/launch-before.json`.
+4. Install the **after** APK over it (same EAS signing key, so the app keeps its data), and run
+   it again into `/tmp/launch-after.json`.
+5. `node .agents/skills/verify-perf/compare.mjs /tmp/launch-before.json /tmp/launch-after.json`.
+
+A local emulator works with the `agent-device` command `device_open` gives you as `AD`, but its
+absolute numbers say little about a phone.
+
 ## Not covered
 
-Connected and nearby play, cold launch (expo-observe reports it from the field), and where the
-CPU goes. When a metric regresses and you need to know why, take a trace by hand and open it in
-ui.perfetto.dev: `agent-device-mini perf trace start --kind perfetto --out <path>`.
+Connected and nearby play, iOS launch times, and where the CPU goes. When a metric regresses and
+you need to know why, take a trace by hand and open it in ui.perfetto.dev: `agent-device-mini perf trace start --kind perfetto --out <path>`.
