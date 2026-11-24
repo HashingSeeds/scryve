@@ -188,7 +188,7 @@ export function TurnChip({
             style={[compact ? $compactWord : $word, { color: nextInk }]}
           />
         ) : null}
-        <ChevronGlyph color={nextInk} />
+        <ChevronGlyph color={nextInk} compact={tight} />
         {nextMarkShown ? (
           <MarkArt
             shape={nextSeat.shape ?? shapeForSeat(nextSeat.seatNumber)}
@@ -233,6 +233,7 @@ export function TurnChip({
 
   const shape: ViewStyle[] = [
     compact ? $compactChip : $chip,
+    ...(tight ? [$tightChipHeight] : []),
     ...(split ? [$split] : []),
     ...(splitButtons ? [$splitButtons] : []),
     ...(passOnly ? [$passOnly] : []),
@@ -269,12 +270,20 @@ export function TurnChip({
               pressed && $pressed,
             ]}
           >
-            {paused ? <PlayGlyph color={ink} /> : tight ? null : <PauseGlyph color={ink} />}
+            {paused ? (
+              <PlayGlyph color={ink} size={tight ? 7 : 10} />
+            ) : tight ? null : (
+              <PauseGlyph color={ink} />
+            )}
             <Text
               text={shownTime}
               testID={outOfTime ? "turn-chip-out-of-time" : "turn-chip-time"}
               weight="bold"
-              style={[themed(compact ? $compactValue : $value), $digits, { color: ink }]}
+              style={[
+                themed(tight ? $tightValue : compact ? $compactValue : $value),
+                $digits,
+                { color: ink },
+              ]}
             />
           </BoardPressable>
         )}
@@ -505,9 +514,9 @@ function UndoGlyph({ color }: { color: string }) {
   )
 }
 
-function PlayGlyph({ color }: { color: string }) {
+function PlayGlyph({ color, size = 10 }: { color: string; size?: number }) {
   return (
-    <Svg width={10} height={10} viewBox="0 0 24 24">
+    <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path d="M7 4.5v15l12-7.5z" fill={color} />
     </Svg>
   )
@@ -521,9 +530,9 @@ function PauseGlyph({ color }: { color: string }) {
   )
 }
 
-function ChevronGlyph({ color }: { color: string }) {
+function ChevronGlyph({ color, compact }: { color: string; compact?: boolean }) {
   return (
-    <Svg width={9} height={12} viewBox="0 0 9 12">
+    <Svg width={compact ? 7 : 9} height={compact ? 10 : 12} viewBox="0 0 9 12">
       <Path
         d="M2 1.5 6.5 6 2 10.5"
         stroke={color}
@@ -559,8 +568,10 @@ const $chip: ViewStyle = {
   backgroundColor: "rgba(0,0,0,0.22)",
 }
 const $compactChip: ViewStyle = { ...$chip, minHeight: 32 }
+const $tightChipHeight: ViewStyle = { minHeight: 28 }
 const $value: ThemedStyle<TextStyle> = () => ({ fontSize: 15, lineHeight: 18 })
 const $compactValue: ThemedStyle<TextStyle> = () => ({ fontSize: 14, lineHeight: 17 })
+const $tightValue: ThemedStyle<TextStyle> = () => ({ fontSize: 12, lineHeight: 15 })
 const $digits: TextStyle = { fontVariant: ["tabular-nums"] }
 const $word: TextStyle = { fontSize: 12, lineHeight: 15 }
 const $compactWord: TextStyle = { fontSize: 11, lineHeight: 14 }
@@ -590,8 +601,8 @@ const $passSegmentAlone: ViewStyle = { marginLeft: 0, paddingLeft: 12 }
 const $priorityIdle: ViewStyle = { opacity: 0.55 }
 const $priorityActive: ViewStyle = { backgroundColor: "rgba(0,0,0,0.38)" }
 const $priorityTight: ViewStyle = { paddingHorizontal: 8, gap: 4 }
-const $tightChip: ViewStyle = { paddingLeft: 8 }
-const $passSegmentTight: ViewStyle = { marginLeft: 0, paddingLeft: 5, paddingRight: 7 }
-const $clockSegmentTight: ViewStyle = { paddingLeft: 7, paddingRight: 5 }
+const $tightChip: ViewStyle = { paddingLeft: 6 }
+const $passSegmentTight: ViewStyle = { marginLeft: 0, paddingLeft: 4, paddingRight: 5 }
+const $clockSegmentTight: ViewStyle = { paddingLeft: 5, paddingRight: 4, gap: 3 }
 const $passive: ViewStyle = { opacity: 0.7 }
 const $pressed: ViewStyle = { opacity: 0.6, transform: [{ scale: 0.94 }] }
