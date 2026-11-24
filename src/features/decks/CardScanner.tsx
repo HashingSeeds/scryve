@@ -482,7 +482,6 @@ export function CardScanner({
       finish: targetFinish,
       condition: last.condition,
     })
-    // why: a foil-only printing resolves to foil even without a star, so its finish must follow the printing.
     const nextFinish = refined.finish
     const finishChanged = nextFinish !== last.finish
     const nextPrinting = refined.printing
