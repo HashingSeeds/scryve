@@ -5,9 +5,10 @@
 //
 // Per run:
 // - Cold: relaunch the app under a Perfetto trace. `launchMs` is Android's own launch time, from
-//   the tap to the app's first frame (android_startups), which the splash screen holds until ready. `interactiveMs` is from process start until
-//   the app is interactive, from the app's own startup metrics (coldLaunchTime plus
-//   timeToInteractive, the ones EAS Observe reports) that src/devtools/launchTimes.ts logs.
+//   the tap to the app's first frame (android_startups), which the splash screen holds back.
+//   `interactiveMs` is from process start until the app is interactive, from the app's own
+//   startup metrics (coldLaunchTime plus timeToInteractive, the ones EAS Observe reports) that
+//   src/devtools/launchTimes.ts logs.
 // - Hot: send the app home, open it again under a trace. `launchMs` is the same Android measure.
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -80,6 +81,10 @@ try {
       device("logs", "clear", "--restart")
       times = await launchTimes()
     })
+    if (!Number.isFinite(times.coldLaunchTime) || !Number.isFinite(times.timeToInteractive))
+      throw new Error(
+        `no cold launch metrics in ${JSON.stringify(times)}; Android reports them from API 35`,
+      )
     samples.Cold.push({
       launchMs: launchMs(cold, "cold"),
       // why: the app reports its startup metrics in seconds.

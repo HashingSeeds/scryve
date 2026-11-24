@@ -107,15 +107,17 @@ two preview builds (release native code, dev Clerk and Convex), not two bundles 
 Each run relaunches the app under a Perfetto trace, then sends it home and opens it again:
 
 - `Cold launchMs`: Android's launch time, from the tap to the app's first frame
-  (`android_startups`). The splash screen holds that frame until the app is ready, so this runs
-  until the board is on screen and comes out longer than `interactiveMs`.
+  (`android_startups`), which the splash screen holds back until it hides.
 - `Cold interactiveMs`: process start until the app is interactive, from the startup metrics EAS
-  Observe reports from the field (`coldLaunchTime` plus `timeToInteractive`). Development and
-  preview builds log them as `scryve-launch {...}` (`src/devtools/launchTimes.ts`), and the script
-  reads that line from the session's app log.
+  Observe reports from the field (`coldLaunchTime` plus `timeToInteractive`), which Android
+  reports from API 35 (Android 15). Development and preview builds log them as
+  `scryve-launch {...}` (`src/devtools/launchTimes.ts`), and the script reads that line from the
+  session's app log.
 - `Hot launchMs`: Android's launch time when the process is still alive.
 
 1. Build a preview APK of each side from its worktree: `pnpm android:preview --build-path <path>`.
+   A side older than `src/devtools/launchTimes.ts` logs no launch times, so cherry-pick the
+   commit that added it first; it is JS only and leaves the native side as it was.
 2. Install the **before** APK (`agent-device-mini install com.sowinghope.count.preview <apk>`),
    open it once, and get past first-run setup onto a board, so every launch lands on the same
    screen.
