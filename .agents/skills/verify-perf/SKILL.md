@@ -106,7 +106,9 @@ against an idle reset-and-read with no action between.
 two preview builds (release native code, dev Clerk and Convex), not two bundles on one dev client.
 Each run relaunches the app under a Perfetto trace, then sends it home and opens it again:
 
-- `Cold launchMs`: Android's launch time, from the tap to the first frame (`android_startups`).
+- `Cold launchMs`: Android's launch time, from the tap to the app's first frame
+  (`android_startups`). The splash screen holds that frame until the app is ready, so this runs
+  until the board is on screen and comes out longer than `interactiveMs`.
 - `Cold interactiveMs`: process start until the app is interactive, from the startup metrics EAS
   Observe reports from the field (`coldLaunchTime` plus `timeToInteractive`). Development and
   preview builds log them as `scryve-launch {...}` (`src/devtools/launchTimes.ts`), and the script

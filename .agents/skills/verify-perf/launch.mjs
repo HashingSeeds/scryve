@@ -5,7 +5,7 @@
 //
 // Per run:
 // - Cold: relaunch the app under a Perfetto trace. `launchMs` is Android's own launch time, from
-//   the tap to the first frame (android_startups). `interactiveMs` is from process start until
+//   the tap to the app's first frame (android_startups), which the splash screen holds until ready. `interactiveMs` is from process start until
 //   the app is interactive, from the app's own startup metrics (coldLaunchTime plus
 //   timeToInteractive, the ones EAS Observe reports) that src/devtools/launchTimes.ts logs.
 // - Hot: send the app home, open it again under a trace. `launchMs` is the same Android measure.
