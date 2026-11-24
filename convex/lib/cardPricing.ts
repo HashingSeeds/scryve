@@ -264,30 +264,38 @@ export function priceCentsForFinish(
   source: PriceSource = "tcgplayer",
 ): number | undefined {
   if (!price) return undefined
+  const normalized = finish === "normal" ? "nonfoil" : finish
   let base: number | undefined
   if (source === "cardkingdom_buylist") {
     base =
-      finish === "foil" || finish === "etched"
-        ? (price.ckFoilBuylistCents ?? price.ckBuylistCents)
-        : (price.ckBuylistCents ?? price.ckFoilBuylistCents)
+      normalized === "foil"
+        ? price.ckFoilBuylistCents
+        : normalized === "nonfoil"
+          ? price.ckBuylistCents
+          : undefined
   } else if (source === "cardkingdom") {
     base =
-      finish === "foil" || finish === "etched"
-        ? (price.ckFoilCents ?? price.ckRetailCents)
-        : (price.ckRetailCents ?? price.ckFoilCents)
+      normalized === "foil"
+        ? price.ckFoilCents
+        : normalized === "nonfoil"
+          ? price.ckRetailCents
+          : undefined
   } else if (source === "cardmarket") {
     base =
-      finish === "foil" || finish === "etched"
-        ? (price.eurFoilCents ?? price.eurCents)
-        : (price.eurCents ?? price.eurFoilCents)
+      normalized === "foil"
+        ? price.eurFoilCents
+        : normalized === "nonfoil"
+          ? price.eurCents
+          : undefined
   } else {
-    if (finish === "etched") {
-      base = price.usdEtchedCents ?? price.usdFoilCents ?? price.usdCents
-    } else if (finish === "foil") {
-      base = price.usdFoilCents ?? price.usdEtchedCents ?? price.usdCents
-    } else {
-      base = price.usdCents ?? price.usdFoilCents ?? price.usdEtchedCents
-    }
+    base =
+      normalized === "etched"
+        ? price.usdEtchedCents
+        : normalized === "foil"
+          ? price.usdFoilCents
+          : normalized === "nonfoil"
+            ? price.usdCents
+            : undefined
   }
   if (base === undefined) return undefined
   const multiplier = CONDITION_MULTIPLIERS[condition as CardCondition] ?? 1

@@ -43,10 +43,14 @@ export interface ResolvedScanPrinting {
   price: PrintingPriceSummary
 }
 
-export function pricingDatasetOrigin(): string {
+export function pricingDatasetOrigins(): string[] {
   const override = process.env.EXPO_PUBLIC_PRICING_DATASET_BASE_URL?.trim()
-  if (override) return override.replace(/\/+$/, "")
-  return prereleaseBuild() ? PREVIEW_DATASET_ORIGIN : PROD_DATASET_ORIGIN
+  if (override) return [override.replace(/\/+$/, "")]
+  return prereleaseBuild() ? [PROD_DATASET_ORIGIN, PREVIEW_DATASET_ORIGIN] : [PROD_DATASET_ORIGIN]
+}
+
+export function pricingDatasetOrigin(): string {
+  return pricingDatasetOrigins()[0]
 }
 
 export function normalizePrintingName(name: string): string {
@@ -74,19 +78,30 @@ function metaKey(game: string, suffix: string): string {
   return `${game}:${suffix}`
 }
 
-async function fetchJsonWithEtag(
-  url: string,
+async function fetchJsonFromOrigins(
+  origins: readonly string[],
+  path: string,
   etag: string | undefined,
   fetcher: typeof fetch,
 ): Promise<{ status: "not_modified" } | { status: "ok"; data: unknown; etag?: string }> {
-  const response = await fetcher(url, etag ? { headers: { "If-None-Match": etag } } : undefined)
-  if (response.status === 304) return { status: "not_modified" }
-  if (!response.ok) throw new Error(`Catalog fetch failed (${response.status})`)
-  return {
-    status: "ok",
-    data: await response.json(),
-    etag: response.headers.get("etag") ?? undefined,
+  let lastStatus = 0
+  for (let index = 0; index < origins.length; index += 1) {
+    const url = `${origins[index]}${path}`
+    const response = await fetcher(url, etag ? { headers: { "If-None-Match": etag } } : undefined)
+    if (response.status === 304) return { status: "not_modified" }
+    if (response.ok) {
+      return {
+        status: "ok",
+        data: await response.json(),
+        etag: response.headers.get("etag") ?? undefined,
+      }
+    }
+    lastStatus = response.status
+    if (response.status !== 404 || index === origins.length - 1) {
+      throw new Error(`Catalog fetch failed (${lastStatus})`)
+    }
   }
+  throw new Error(`Catalog fetch failed (${lastStatus})`)
 }
 
 export async function syncCatalogPrintingsAndPrices(
@@ -96,7 +111,7 @@ export async function syncCatalogPrintingsAndPrices(
   if (!isScryfallSystem(game)) return { printingsUpdated: false, pricesUpdated: false }
   const fetcher = options.fetcher ?? fetch
   const now = options.now ?? Date.now()
-  const origin = pricingDatasetOrigin()
+  const origins = pricingDatasetOrigins()
 
   let printingsUpdated = false
   let pricesUpdated = false
@@ -107,7 +122,7 @@ export async function syncCatalogPrintingsAndPrices(
     const prevEtag = hasPrintings
       ? catalogDb.getMeta(metaKey(game, META_PRINTINGS_ETAG))
       : undefined
-    const response = await fetchJsonWithEtag(`${origin}${MTG_PRINTINGS_PATH}`, prevEtag, fetcher)
+    const response = await fetchJsonFromOrigins(origins, MTG_PRINTINGS_PATH, prevEtag, fetcher)
     if (response.status === "ok") {
       const pack = decodeMtgPrintingsPack(response.data)
       const rows: CatalogPrinting[] = pack.printings.map((item) => ({
@@ -125,7 +140,7 @@ export async function syncCatalogPrintingsAndPrices(
         imageUrl: item.imageUrl,
         smallImageUrl: item.smallImageUrl,
       }))
-      catalogDb.replacePrintings(game, rows, pack.version)
+      await catalogDb.replacePrintingsAsync(game, rows, pack.version)
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRINTINGS_ETAG), response.etag)
       printingsUpdated = true
     }
@@ -136,7 +151,7 @@ export async function syncCatalogPrintingsAndPrices(
   const hasPrices = catalogDb.countPrices(game) > 0
   if (options.force || !hasPrices || now - pricesCheckedAt >= PRICES_MAX_AGE_MS) {
     const prevEtag = hasPrices ? catalogDb.getMeta(metaKey(game, META_PRICES_ETAG)) : undefined
-    const response = await fetchJsonWithEtag(`${origin}${MTG_PRICES_PATH}`, prevEtag, fetcher)
+    const response = await fetchJsonFromOrigins(origins, MTG_PRICES_PATH, prevEtag, fetcher)
     if (response.status === "ok") {
       const pack = decodeMtgPricesPack(response.data)
       const updatedAt = new Date(pack.asOf).toISOString()
@@ -222,7 +237,7 @@ export async function syncCatalogPrintingsAndPrices(
           })
         }
       }
-      catalogDb.replacePrices(game, rows, updatedAt)
+      await catalogDb.replacePricesAsync(game, rows, updatedAt)
       catalogDb.setMeta(metaKey(game, META_PRICES_UPDATED_AT), updatedAt)
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRICES_ETAG), response.etag)
       pricesUpdated = true
@@ -246,19 +261,9 @@ function pickPriceCents(
   field: "retailCents" | "buylistCents",
 ): number | undefined {
   const sourceKey = source === "cardkingdom_buylist" ? "cardkingdom" : source
-  const matching = rows.filter((row) => row.source === sourceKey && row[field] !== undefined)
-  if (matching.length === 0) return undefined
-  const order: ("nonfoil" | "foil" | "etched")[] =
-    finish === "etched"
-      ? ["etched", "foil", "nonfoil"]
-      : finish === "foil"
-        ? ["foil", "etched", "nonfoil"]
-        : ["nonfoil", "foil", "etched"]
-  for (const candidate of order) {
-    const found = matching.find((row) => row.finish === candidate)
-    if (found?.[field] !== undefined) return found[field]
-  }
-  return matching[0]?.[field]
+  return rows.find(
+    (row) => row.source === sourceKey && row.finish === finish && row[field] !== undefined,
+  )?.[field]
 }
 
 export function summarizePrintingPrices(

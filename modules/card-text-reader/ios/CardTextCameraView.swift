@@ -56,6 +56,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
   private var lastSignature: [UInt8]?
   private var reading = false
   private var lastFrameAt = Date.distantPast
+  private var lastFallbackProbeAt = Date.distantPast
   private var lastCardAt = Date.distantPast
   private var outlined = false
   private var viewSize = CGSize.zero
@@ -103,6 +104,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       self.waitingForSwap = self.acceptedSignature != nil
       self.sawMotion = false
       self.stableFrames = 0
+      self.lastFallbackProbeAt = Date()
     }
   }
 
@@ -229,28 +231,34 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       if !sawMotion {
         if diffFromAccepted < motionThreshold {
           lastSignature = current
-          return
-        }
-        sawMotion = true
-        stableFrames = 0
-        lastSignature = current
-        return
-      }
-      let frameDiff = lastSignature.map { meanAbsDiff(current, $0) } ?? 255.0
-      lastSignature = current
-      if frameDiff < 10.0 {
-        stableFrames += 1
-        if stableFrames >= neededStable {
-          waitingForSwap = false
-          sawMotion = false
-          stableFrames = 0
-          pendingSceneChanged = true
+          if Date().timeIntervalSince(lastFallbackProbeAt) >= 0.6 {
+            lastFallbackProbeAt = Date()
+          } else {
+            return
+          }
         } else {
+          sawMotion = true
+          stableFrames = 0
+          lastSignature = current
           return
         }
       } else {
-        stableFrames = 0
-        return
+        let frameDiff = lastSignature.map { meanAbsDiff(current, $0) } ?? 255.0
+        lastSignature = current
+        if frameDiff < 10.0 {
+          stableFrames += 1
+          if stableFrames >= neededStable {
+            waitingForSwap = false
+            sawMotion = false
+            stableFrames = 0
+            pendingSceneChanged = true
+          } else {
+            return
+          }
+        } else {
+          stableFrames = 0
+          return
+        }
       }
     } else if let current = signature {
       lastSignature = current

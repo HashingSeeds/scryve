@@ -30,6 +30,12 @@ export interface CatalogDb {
   setMeta(key: string, value: string): void
   replacePrintings(game: string, rows: readonly CatalogPrinting[], version: string): void
   replacePrices(game: string, rows: readonly CatalogPrice[], updatedAt: string): void
+  replacePrintingsAsync(
+    game: string,
+    rows: readonly CatalogPrinting[],
+    version: string,
+  ): Promise<void>
+  replacePricesAsync(game: string, rows: readonly CatalogPrice[], updatedAt: string): Promise<void>
   getPrinting(game: string, printingId: string): CatalogPrinting | undefined
   findPrintingBySetNumber(
     game: string,

@@ -522,6 +522,12 @@ test("locks on 1 frame in bulk mode, scans duplicates on sceneChanged, and fires
   expect(scanHaptic).toHaveBeenLastCalledWith("hit")
 
   await finish(view)
-  expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Sol Ring"])
+  expect(addCards).toHaveBeenCalledWith(
+    ["Sol Ring", "Sol Ring"],
+    [
+      expect.objectContaining({ printingId: "lea-sol", setCode: "lea", collectorNumber: "269" }),
+      expect.objectContaining({ printingId: "cmm-sol", setCode: "cmm", collectorNumber: "410" }),
+    ],
+  )
   catalogDb.clearAll()
 })
