@@ -26,16 +26,18 @@ type Case = {
 // why: nobody tunes search against the held-out cases, so their score shows whether a change helps questions it never saw. Reading them to fix a miss turns them into practice cases.
 // why: a player types two or three words and starts over the moment the list is empty or wrong, so the typing cases (held-out questions cut to what a player types, written without seeing results) are scored at every keystroke, and their floor counts searches that survive the whole way.
 // why: the typing practice cases are practice questions cut the same way by other models, so search can be tuned for typing without spending the held-out typing cases.
+// why: the held-out questions come from forums where people go after they're stuck, so the easy cases (everyday questions from search autocomplete, also never tuned on) show whether common lookups still work.
 const SETS = {
   "practice": { file: "", typed: false, tuned: true },
   "heldout": { file: ".heldout", typed: false, tuned: false },
+  "easy": { file: ".easy", typed: false, tuned: false },
   "typing practice": { file: ".typing-practice", typed: true, tuned: true },
   "typing": { file: ".typing", typed: true, tuned: false },
 }
 type CaseSet = keyof typeof SETS
 const FLOOR = {
-  mtg: { "practice": 431, "heldout": 100, "typing practice": 276, "typing": 114 },
-  fab: { "practice": 62, "heldout": 22, "typing practice": 44, "typing": 24 },
+  mtg: { "practice": 431, "heldout": 100, "easy": 207, "typing practice": 276, "typing": 114 },
+  fab: { "practice": 62, "heldout": 22, "easy": 55, "typing practice": 44, "typing": 24 },
 } satisfies Record<string, Record<CaseSet, number>>
 type System = keyof typeof FLOOR
 const P95_BUDGET_MS = 10
