@@ -55,6 +55,14 @@ export type CardScan = { linesFromCardTop: string[]; photo: CardPhotoText; frami
 export type ScannedCardAdd =
   { imageUrl?: string } | { error: string; retryable?: boolean; retryAfterMs?: number }
 
+export type ScannedPrintingOverride = {
+  printingId?: string
+  setCode?: string
+  collectorNumber?: string
+  imageUrl?: string
+  smallImageUrl?: string
+}
+
 export type ScannedPrintingPayload = {
   id: number
   name: string
@@ -146,19 +154,24 @@ export function CardScanner({
   nameIndex: CardNameIndex | undefined
   singleton: boolean
   copiesInDeck: (name: string) => number
-  addCards: (names: string[]) => Promise<ScannedCardAdd[]>
+  addCards: (
+    names: string[],
+    overrides?: readonly (ScannedPrintingOverride | undefined)[],
+  ) => Promise<ScannedCardAdd[]>
   removeCard?: (name: string) => void
   onRead?: (scan: CardScan, match: string | undefined) => void
   onScanPrinting?: (scan: ScannedPrintingPayload) => void
   onUpdatePrinting?: (
     id: number,
     update: {
+      name: string
       printingId: string
       setCode: string
       collectorNumber: string
       finish: CardFinish
       condition: CardCondition
       imageUrl?: string
+      smallImageUrl?: string
       retailCents?: number
       buylistCents?: number
     },
@@ -260,7 +273,22 @@ export function CardScanner({
     clearTimeout(batchTimer.current)
     const batch = waiting.current.splice(0)
     if (!batch.length) return
-    const results = await addCardsRef.current(batch.map((card) => card.name))
+    const hasOverrides = batch.some((card) => Boolean(card.printingId))
+    const results = hasOverrides
+      ? await addCardsRef.current(
+          batch.map((card) => card.name),
+          batch.map((card) =>
+            card.printingId
+              ? {
+                  printingId: card.printingId,
+                  setCode: card.setCode,
+                  collectorNumber: card.collectorNumber,
+                  imageUrl: card.imageUrl,
+                }
+              : undefined,
+          ),
+        )
+      : await addCardsRef.current(batch.map((card) => card.name))
     batch.forEach((card, index) => {
       const result = results[index] ?? { error: translate("decks:cardScan.failed") }
       const retry = retries.current.get(card.id) ?? 0
@@ -855,12 +883,14 @@ export function CardScanner({
               buylistCents,
             })
             onUpdatePrinting?.(pickingPrinting.id, {
+              name: pickingPrinting.name,
               printingId: printing.printingId,
               setCode: printing.setCode,
               collectorNumber: printing.collectorNumber,
               finish: nextFinish,
               condition: nextCondition,
-              imageUrl: printing.smallImageUrl ?? printing.imageUrl,
+              imageUrl: printing.imageUrl,
+              smallImageUrl: printing.smallImageUrl,
               retailCents,
               buylistCents,
             })

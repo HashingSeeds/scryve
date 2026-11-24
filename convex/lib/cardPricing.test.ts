@@ -86,5 +86,7 @@ describe("cardPricing", () => {
     expect(priceCentsForFinish(price, "nonfoil", "NM", "cardkingdom")).toBe(249)
     expect(priceCentsForFinish(price, "foil", "NM", "cardkingdom_buylist")).toBe(275)
     expect(priceCentsForFinish(price, "nonfoil", "NM", "cardmarket")).toBe(150)
+    expect(priceCentsForFinish(price, "etched", "NM", "tcgplayer")).toBeUndefined()
+    expect(priceCentsForFinish(price, "foil", "NM", "cardmarket")).toBeUndefined()
   })
 })

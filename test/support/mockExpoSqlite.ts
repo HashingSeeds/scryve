@@ -74,6 +74,48 @@ function wrapDatabase(db: NodeSqliteDatabase) {
     closeSync() {
       // why: in-memory node:sqlite loses all rows on close, unlike on-disk expo-sqlite, so keep it open until __resetMockDatabases().
     },
+    async execAsync(source: string) {
+      db.exec(source)
+    },
+    async runAsync(source: string, ...args: unknown[]) {
+      const result = db.prepare(source).run(...normalizeParams(args))
+      return {
+        changes: Number(result.changes),
+        lastInsertRowId: Number(result.lastInsertRowid),
+      }
+    },
+    async prepareAsync(source: string) {
+      const stmt = db.prepare(source)
+      return {
+        async executeAsync(...args: unknown[]) {
+          const result = stmt.run(...normalizeParams(args))
+          return {
+            changes: Number(result.changes),
+            lastInsertRowId: Number(result.lastInsertRowid),
+          }
+        },
+        async finalizeAsync() {},
+      }
+    },
+    async withTransactionAsync(task: () => Promise<void>) {
+      if (inTransaction) {
+        await task()
+        return
+      }
+      inTransaction = true
+      db.exec("BEGIN")
+      try {
+        await task()
+        db.exec("COMMIT")
+      } catch (error) {
+        try {
+          db.exec("ROLLBACK")
+        } catch {}
+        throw error
+      } finally {
+        inTransaction = false
+      }
+    },
   }
 }
 

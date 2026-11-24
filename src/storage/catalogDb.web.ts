@@ -76,6 +76,14 @@ export const catalogDb: CatalogDb = {
     metaMap.set(`prices:${game}:updatedAt`, updatedAt)
   },
 
+  async replacePrintingsAsync(game, rows, version) {
+    this.replacePrintings(game, rows, version)
+  },
+
+  async replacePricesAsync(game, rows, updatedAt) {
+    this.replacePrices(game, rows, updatedAt)
+  },
+
   getPrinting(game, printingId) {
     return printingsByKey.get(printingKey(game, printingId))
   },

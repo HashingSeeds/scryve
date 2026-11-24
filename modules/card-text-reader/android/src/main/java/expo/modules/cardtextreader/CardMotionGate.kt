@@ -4,6 +4,7 @@ import kotlin.math.abs
 
 private const val SIG_COLS = 16
 private const val SIG_ROWS = 22
+private const val FALLBACK_PROBE_MS = 600L
 
 data class GateDecision(val shouldRead: Boolean, val sceneChanged: Boolean)
 
@@ -16,6 +17,7 @@ class CardMotionGate {
   private var waitingForSwap = false
   private var sawMotion = false
   private var stableFrames = 0
+  private var lastProbeAtMs = 0L
   private var acceptedSignature: IntArray? = null
   private var lastSignature: IntArray? = null
 
@@ -27,6 +29,7 @@ class CardMotionGate {
     waitingForSwap = acceptedSignature != null
     sawMotion = false
     stableFrames = 0
+    lastProbeAtMs = android.os.SystemClock.elapsedRealtime()
   }
 
   @Synchronized
@@ -34,6 +37,7 @@ class CardMotionGate {
     waitingForSwap = false
     sawMotion = false
     stableFrames = 0
+    lastProbeAtMs = 0L
     acceptedSignature = null
     lastSignature = null
   }
@@ -54,6 +58,11 @@ class CardMotionGate {
     if (!sawMotion) {
       lastSignature = current
       if (diffFromAccepted < motionThreshold) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastProbeAtMs >= FALLBACK_PROBE_MS) {
+          lastProbeAtMs = now
+          return GateDecision(shouldRead = true, sceneChanged = false)
+        }
         return GateDecision(shouldRead = false, sceneChanged = false)
       }
       sawMotion = true
