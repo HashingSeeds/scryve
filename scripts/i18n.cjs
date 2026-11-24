@@ -13,7 +13,7 @@ const MODEL = "claude-sonnet-5-5"
 const USD_PER_MILLION_TOKENS = { input: 2, output: 10 }
 const UNITS_PER_REQUEST = 100
 // why: translated like the app's copy but used outside it (RevenueCat, store listings), so no app bundle loads it.
-const OFF_APP_NAMESPACES = ["storefront"]
+const OFF_APP_NAMESPACES = ["permissions", "storefront"]
 
 const LOCALES = {
   es: "Spanish",

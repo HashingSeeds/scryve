@@ -10,7 +10,6 @@ export const namespaces = [
   "eventDisplay",
   "events",
   "feedback",
-  "permissions",
   "play",
   "systems",
 ]
