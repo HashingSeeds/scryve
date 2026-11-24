@@ -41,7 +41,11 @@ import {
 } from "./cardNameMatch"
 import { collectorHintFromCardBottom } from "./cardScan"
 import { CardScanStats } from "./CardScanStats"
-import { framedLinesFromCardTop, type ScanFraming } from "./cardTextLayout"
+import {
+  framedLinesFromCardBottom,
+  framedLinesFromCardTop,
+  type ScanFraming,
+} from "./cardTextLayout"
 import type { CardCondition, CardFinish } from "../../../convex/lib/cardPricing"
 import {
   CardTextCamera,
@@ -209,7 +213,9 @@ export function CardScanner({
   const landCountOpen = useRef(false)
   const countedLands = useRef(new Set<string>())
   const candidateName = useRef<string>(undefined)
-  const recentVotes = useRef<string[]>([])
+  const candidateBottomLines = useRef<string[]>([])
+  const recentVotes = useRef<(string | undefined)[]>([])
+  const emptyFrames = useRef(0)
   const nameInFrame = useRef<string>(undefined)
   const collectorInFrame = useRef<string>(undefined)
   const rejectedBySetLock = useRef(false)
@@ -373,31 +379,43 @@ export function CardScanner({
     if (closingRef.current || !view.current || !frame) return
     if (photo.sceneChanged) {
       candidateName.current = undefined
+      candidateBottomLines.current = []
       nameInFrame.current = undefined
       collectorInFrame.current = undefined
       recentVotes.current = []
+      emptyFrames.current = 0
     }
     const framing = { view: view.current, frame }
     const linesFromCardTop = framedLinesFromCardTop(photo, framing)
     const match = nameIndex ? nameFromCardTop(nameIndex, linesFromCardTop) : undefined
     if (linesFromCardTop.length) onRead?.({ linesFromCardTop, photo, framing }, match?.name)
     if (!linesFromCardTop.length) {
-      candidateName.current = undefined
-      nameInFrame.current = undefined
-      collectorInFrame.current = undefined
-      recentVotes.current = []
+      emptyFrames.current += 1
+      if (emptyFrames.current >= 2) {
+        candidateName.current = undefined
+        candidateBottomLines.current = []
+        nameInFrame.current = undefined
+        collectorInFrame.current = undefined
+        recentVotes.current = []
+      }
       setStatus("looking")
       return
     }
+    emptyFrames.current = 0
     if (!nameIndex || !match) {
-      candidateName.current = undefined
-      recentVotes.current = []
+      recentVotes.current = [...recentVotes.current.slice(-2), undefined]
       setStatus(nameIndex ? "unsure" : "loading")
       return
     }
-    const bottomHint = collectorHintFromCardBottom(
-      (photo.bottomLines ?? []).map((line) => line.text),
-    )
+    const frameBottomLines =
+      photo.bottomLines && photo.bottomLines.length > 0
+        ? photo.bottomLines.map((line) => line.text)
+        : framedLinesFromCardBottom(photo, framing)
+    const combinedBottomLines =
+      candidateName.current === match.name
+        ? [...candidateBottomLines.current, ...frameBottomLines]
+        : frameBottomLines
+    const bottomHint = collectorHintFromCardBottom(combinedBottomLines)
     const collectorKey =
       bottomHint.setCode && bottomHint.collectorNumber
         ? `${bottomHint.setCode}:${bottomHint.collectorNumber}`
@@ -407,6 +425,7 @@ export function CardScanner({
     )
     if (match.name === nameInFrame.current && !reprintSwapped) {
       candidateName.current = undefined
+      candidateBottomLines.current = []
       recentVotes.current = []
       return
     }
@@ -416,12 +435,14 @@ export function CardScanner({
       const votes = recentVotes.current.filter((entry) => entry === match.name).length
       if (votes < 2) {
         candidateName.current = match.name
+        candidateBottomLines.current = combinedBottomLines.slice(-12)
         prepareScanHaptics()
         setStatus("steady")
         return
       }
     }
     candidateName.current = undefined
+    candidateBottomLines.current = []
     recentVotes.current = []
     nameInFrame.current = match.name
     collectorInFrame.current = collectorKey

@@ -57,6 +57,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
   private var reading = false
   private var lastFrameAt = Date.distantPast
   private var lastFallbackProbeAt = Date.distantPast
+  private var motionStartedAt = Date.distantPast
   private var lastCardAt = Date.distantPast
   private var outlined = false
   private var viewSize = CGSize.zero
@@ -104,6 +105,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       self.waitingForSwap = self.acceptedSignature != nil
       self.sawMotion = false
       self.stableFrames = 0
+      self.motionStartedAt = Date.distantPast
       self.lastFallbackProbeAt = Date()
     }
   }
@@ -224,30 +226,38 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     imageSize = CGSize(width: CVPixelBufferGetHeight(buffer), height: CVPixelBufferGetWidth(buffer))
 
     let signature = sampleLumaSignature(buffer)
-    if waitingForSwap, let accepted = acceptedSignature, let current = signature {
-      let motionThreshold: Double = bulkMode ? 14.0 : 18.0
-      let neededStable = bulkMode ? 2 : 1
+    if bulkMode, waitingForSwap, let accepted = acceptedSignature, let current = signature {
+      let motionThreshold: Double = 14.0
+      let settleThreshold: Double = 14.0
+      let neededStable = 2
       let diffFromAccepted = meanAbsDiff(current, accepted)
+      let now = Date()
       if !sawMotion {
         if diffFromAccepted < motionThreshold {
           lastSignature = current
-          if Date().timeIntervalSince(lastFallbackProbeAt) >= 0.6 {
-            lastFallbackProbeAt = Date()
+          if now.timeIntervalSince(lastFallbackProbeAt) >= 0.6 {
+            lastFallbackProbeAt = now
           } else {
             return
           }
         } else {
           sawMotion = true
           stableFrames = 0
+          motionStartedAt = now
           lastSignature = current
           return
         }
       } else {
         let frameDiff = lastSignature.map { meanAbsDiff(current, $0) } ?? 255.0
         lastSignature = current
-        if frameDiff < 10.0 {
+        if frameDiff < settleThreshold {
           stableFrames += 1
           if stableFrames >= neededStable {
+            waitingForSwap = false
+            sawMotion = false
+            stableFrames = 0
+            pendingSceneChanged = true
+          } else if now.timeIntervalSince(motionStartedAt) >= 0.45 {
             waitingForSwap = false
             sawMotion = false
             stableFrames = 0
@@ -255,12 +265,20 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
           } else {
             return
           }
+        } else if now.timeIntervalSince(motionStartedAt) >= 0.45 {
+          waitingForSwap = false
+          sawMotion = false
+          stableFrames = 0
+          pendingSceneChanged = true
         } else {
           stableFrames = 0
           return
         }
       }
     } else if let current = signature {
+      waitingForSwap = false
+      sawMotion = false
+      stableFrames = 0
       lastSignature = current
     }
 

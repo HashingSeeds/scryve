@@ -234,5 +234,10 @@ describe("catalogSync", () => {
     )
     expect(lockedAlphaFoil.printing?.printingId).toBe("lea-sol")
     expect(lockedAlphaFoil.finish).toBe("nonfoil")
+
+    const candidateMatch = resolveScannedPrinting("mtg", "Sol Ring", {
+      candidateSetCodes: ["noise", "cmm"],
+    })
+    expect(candidateMatch.printing?.printingId).toBe("cmm-sol")
   })
 })

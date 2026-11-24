@@ -329,7 +329,14 @@ export function resolveScannedPrinting(
     ? allCandidates.filter((candidate) => candidate.setCode === lockedSet)
     : allCandidates
   const requestedFinish = normalizeFinish(options.finish ?? (hint.isFoilStar ? "foil" : "nonfoil"))
-  const preferredSet = lockedSet ?? hint.setCode?.toLowerCase()
+  const matchedCandidateSet =
+    !lockedSet && !hint.setCode && hint.candidateSetCodes?.length
+      ? hint.candidateSetCodes.find((code) =>
+          candidates.some((candidate) => candidate.setCode === code.toLowerCase()),
+        )
+      : undefined
+  const preferredSet =
+    lockedSet ?? hint.setCode?.toLowerCase() ?? matchedCandidateSet?.toLowerCase()
   const collector = hint.collectorNumber?.toLowerCase()
 
   const pickFrom = (pool: readonly CatalogPrinting[]) => {
