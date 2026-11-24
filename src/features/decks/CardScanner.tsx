@@ -114,11 +114,26 @@ const IN_FRAME_UPGRADE_WINDOW_MS = 2_500
 const PRINTING_EVIDENCE_RANK = { none: 0, setOrNumber: 1, setAndNumber: 2 } as const
 type PrintingEvidence = keyof typeof PRINTING_EVIDENCE_RANK
 
-// why: a set alone (or a set lock) can still match several printings, so only set plus number ends in-frame refinement.
-function printingEvidence(hint: CollectorHint, lockedSet: string): PrintingEvidence {
-  const setCode = hint.setCode || lockedSet
-  if (setCode && hint.collectorNumber) return "setAndNumber"
-  return setCode || hint.collectorNumber ? "setOrNumber" : "none"
+const collectorKey = (collectorNumber: string) =>
+  collectorNumber.toLowerCase().replace(/^0+/, "") || "0"
+
+// why: a misread number can fall back to another printing in the set, so set plus number only counts once the resolved printing carries both; until then later frames can still refine.
+function printingEvidence(
+  hint: CollectorHint,
+  lockedSet: string,
+  printing?: { setCode: string; collectorNumber: string },
+): PrintingEvidence {
+  const setCode = (hint.setCode || lockedSet).toLowerCase()
+  const number = hint.collectorNumber
+  const pinned = printing
+    ? Boolean(
+        number &&
+        printing.setCode === setCode &&
+        collectorKey(printing.collectorNumber) === collectorKey(number),
+      )
+    : Boolean(setCode && number)
+  if (pinned) return "setAndNumber"
+  return setCode || number ? "setOrNumber" : "none"
 }
 const FINISH_CYCLE: readonly CardFinish[] = ["nonfoil", "foil", "etched"]
 const CONDITION_CYCLE: readonly CardCondition[] = ["NM", "LP", "MP", "HP", "DMG"]
@@ -482,7 +497,10 @@ export function CardScanner({
       nextPrinting?.printingId &&
       nextPrinting.printingId !== last.printingId,
     )
-    const nextEvidence = wantsPrintingRefine && nextPrinting ? evidence : last.evidence
+    const nextEvidence =
+      wantsPrintingRefine && nextPrinting
+        ? printingEvidence(bottomHint, lockedSet, nextPrinting)
+        : last.evidence
     if (!finishChanged && !printingChanged) {
       lastAcceptedCard.current = { ...last, evidence: nextEvidence }
       return
@@ -697,7 +715,7 @@ export function CardScanner({
         retailCents: resolved.price.retailCents,
         buylistCents: resolved.price.buylistCents,
       },
-      printingEvidence(bottomHint, lockedSet),
+      printingEvidence(bottomHint, lockedSet, resolved.printing),
     )
   }
 

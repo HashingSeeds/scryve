@@ -1038,6 +1038,27 @@ test("with a set lock, a later collector number alone refines the printing", asy
   catalogDb.clearAll()
 })
 
+test("a misread collector number that falls back to another printing still lets a later read refine", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner("TMC")
+  collectorFrame("999/350 U")
+  collectorFrame("999/350 U")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
 test("a foil star with no collector number keeps the accepted printing", async () => {
   solRingPrintings(
     { id: "10e-sol", set: "10e", number: "320" },
