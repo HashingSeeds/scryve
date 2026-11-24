@@ -76,7 +76,7 @@ it("waits for the profile and billing, then retries on reconnect and account cha
   view.rerender(<RevenueCatSyncSession />)
   expect(mockSyncCurrent).toHaveBeenCalledTimes(2)
   expect(mockRefreshCustomerInfo).toHaveBeenCalledTimes(1)
-  expect(mockRefreshCustomerInfo).toHaveBeenCalledWith(true)
+  expect(mockRefreshCustomerInfo).toHaveBeenCalledWith()
   mockProfile = ready("user_b")
   view.rerender(<RevenueCatSyncSession />)
   expect(mockSyncCurrent).toHaveBeenCalledTimes(3)
@@ -136,7 +136,7 @@ it("retries a failed customer-info refresh after reconnect", async () => {
 
     await act(async () => jest.advanceTimersByTime(1_000))
     expect(mockRefreshCustomerInfo).toHaveBeenCalledTimes(2)
-    expect(mockRefreshCustomerInfo).toHaveBeenLastCalledWith(true)
+    expect(mockRefreshCustomerInfo).toHaveBeenLastCalledWith()
   } finally {
     jest.useRealTimers()
   }

@@ -28,7 +28,8 @@ function SyncEntitlements() {
     let timer: ReturnType<typeof setTimeout>
     let attempt = 0
     const refresh = async () => {
-      const info = await refreshCustomerInfo(true).catch(() => null)
+      // why: forcing would delete the SDK's saved CustomerInfo before fetching, so a failed fetch then an offline launch loses Pro. Unforced, the SDK returns its cache and refetches it in the background once stale.
+      const info = await refreshCustomerInfo().catch(() => null)
       if (cancelled) return
       if (info) wasOffline.current = false
       else timer = setTimeout(refresh, retryDelay(attempt++))
