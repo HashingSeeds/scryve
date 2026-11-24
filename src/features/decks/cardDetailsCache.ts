@@ -4,7 +4,7 @@ import type { FunctionReturnType } from "convex/server"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { localCardDb } from "@/storage/localDb"
-import { storage } from "@/utils/storage"
+import { onStorageClear, storage } from "@/utils/storage"
 
 import { readCardFaces } from "./cardFaces"
 import { cardDetailsKey, type DeckCard } from "./deckCards"
@@ -80,7 +80,7 @@ function readLegacyCardDetails(): Record<string, FocusedCardDetails> {
       try {
         const rows: { key: string; payload: string; accessedAt: number }[] = []
         for (const [key, value] of candidates) {
-          if (localCardDb.getCardDetail(key) !== undefined) continue
+          if (parseDetails(localCardDb.getCardDetail(key)) !== undefined) continue
           const preferred = pendingSqliteDetails.get(key) ?? value
           rows.push({ key, payload: JSON.stringify(preferred), accessedAt: nextAccessedAt() })
         }
@@ -130,6 +130,11 @@ function detailsFor(store: CardDetailStore): Map<string, FocusedCardDetails> {
 let cachedSqliteDetails: Record<string, FocusedCardDetails> | undefined
 let cachedSqliteRevision = -1
 const pendingSqliteDetails = new Map<string, FocusedCardDetails>()
+
+onStorageClear(() => {
+  pendingSqliteDetails.clear()
+  cachedSqliteDetails = undefined
+})
 
 function sqliteDetailsSnapshot(): Record<string, FocusedCardDetails> {
   const legacy = readLegacyCardDetails()
