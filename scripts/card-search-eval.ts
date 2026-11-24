@@ -21,7 +21,7 @@ type Source = "app" | "web" | "written"
 type Case = { query: string; cards: string[]; source: Source; asked?: string }
 
 const SETS = [
-  { name: "mtg", file: "mtg.json", floor: 234, needsText: false },
+  { name: "mtg", file: "mtg.json", floor: 238, needsText: false },
   { name: "mtg text", file: "mtg.text.json", floor: 16, needsText: true },
 ]
 const P95_BUDGET_MS = 10
