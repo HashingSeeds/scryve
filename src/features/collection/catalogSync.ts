@@ -307,12 +307,16 @@ export function resolveScannedPrinting(
   options: { setLock?: string; finish?: string; condition?: string } = {},
 ): ResolvedScanPrinting {
   const normalized = normalizePrintingName(name)
-  const candidates = catalogDb.findPrintingsByName(game, normalized)
-  const preferredSet = options.setLock?.toLowerCase() ?? hint.setCode?.toLowerCase()
+  const allCandidates = catalogDb.findPrintingsByName(game, normalized)
+  const lockedSet = options.setLock?.trim().toLowerCase()
+  const candidates = lockedSet
+    ? allCandidates.filter((candidate) => candidate.setCode === lockedSet)
+    : allCandidates
+  const preferredSet = lockedSet ?? hint.setCode?.toLowerCase()
   const collector = hint.collectorNumber?.toLowerCase()
 
   let printing: CatalogPrinting | undefined
-  if (hint.setCode && collector) {
+  if (hint.setCode && collector && (!lockedSet || hint.setCode.toLowerCase() === lockedSet)) {
     const exact = catalogDb.findPrintingBySetNumber(game, hint.setCode, collector)
     if (exact && exact.nameNormalized === normalized) printing = exact
   }
@@ -327,13 +331,15 @@ export function resolveScannedPrinting(
   if (!printing && collector) {
     printing = candidates.find((candidate) => candidate.collectorNumber === collector)
   }
-  printing ??= candidates[0]
+  if (!lockedSet) {
+    printing ??= candidates[0]
+  }
 
   const finish = options.finish ?? (hint.isFoilStar ? "foil" : "nonfoil")
   const price = printing
     ? lookupPrintingPrice(game, printing.printingId, finish, options.condition ?? "NM")
     : {}
-  return { printing, alternates: candidates, price }
+  return { printing, alternates: allCandidates, price }
 }
 
 const inFlightSyncs = new Map<

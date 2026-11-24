@@ -84,6 +84,22 @@ describe("catalogSync", () => {
     expect(resolvedLocked.printing?.printingId).toBe("scry-lea")
     expect(resolvedLocked.price.retailCents).toBe(45000)
 
+    const lockedOverridesFooter = resolveScannedPrinting(
+      "mtg",
+      "Sol Ring",
+      { setCode: "cmm", collectorNumber: "410" },
+      { setLock: "lea" },
+    )
+    expect(lockedOverridesFooter.printing?.printingId).toBe("scry-lea")
+
+    const lockedMissingSet = resolveScannedPrinting(
+      "mtg",
+      "Sol Ring",
+      { setCode: "cmm", collectorNumber: "410" },
+      { setLock: "fdn" },
+    )
+    expect(lockedMissingSet.printing).toBeUndefined()
+
     const lpPrice = lookupPrintingPrice("mtg", "scry-cmm", "nonfoil", "LP")
     expect(lpPrice.retailCents).toBe(Math.round(199 * 0.85))
     expect(lookupPrintingPrice("mtg", "scry-lea", "foil", "NM").retailCents).toBeUndefined()

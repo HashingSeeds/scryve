@@ -56,6 +56,7 @@ export type ScannedCardAdd =
   { imageUrl?: string } | { error: string; retryable?: boolean; retryAfterMs?: number }
 
 export type ScannedPrintingOverride = {
+  scanId?: number
   printingId?: string
   setCode?: string
   collectorNumber?: string
@@ -175,7 +176,7 @@ export function CardScanner({
       retailCents?: number
       buylistCents?: number
     },
-  ) => void
+  ) => boolean | void
   instantLocalLookup?: boolean
   sessionTotalCents?: number
   initialSetLock?: string
@@ -210,6 +211,7 @@ export function CardScanner({
   const candidateName = useRef<string>(undefined)
   const recentVotes = useRef<string[]>([])
   const nameInFrame = useRef<string>(undefined)
+  const collectorInFrame = useRef<string>(undefined)
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const lookups = useRef(new Map<number, Promise<ScannedCardAdd>>())
@@ -280,12 +282,13 @@ export function CardScanner({
           batch.map((card) =>
             card.printingId
               ? {
+                  scanId: card.id,
                   printingId: card.printingId,
                   setCode: card.setCode,
                   collectorNumber: card.collectorNumber,
                   imageUrl: card.imageUrl,
                 }
-              : undefined,
+              : { scanId: card.id },
           ),
         )
       : await addCardsRef.current(batch.map((card) => card.name))
@@ -368,6 +371,7 @@ export function CardScanner({
     if (photo.sceneChanged) {
       candidateName.current = undefined
       nameInFrame.current = undefined
+      collectorInFrame.current = undefined
       recentVotes.current = []
     }
     const framing = { view: view.current, frame }
@@ -377,6 +381,7 @@ export function CardScanner({
     if (!linesFromCardTop.length) {
       candidateName.current = undefined
       nameInFrame.current = undefined
+      collectorInFrame.current = undefined
       recentVotes.current = []
       setStatus("looking")
       return
@@ -387,7 +392,17 @@ export function CardScanner({
       setStatus(nameIndex ? "unsure" : "loading")
       return
     }
-    if (match.name === nameInFrame.current) return
+    const bottomHint = collectorHintFromCardBottom(
+      (photo.bottomLines ?? []).map((line) => line.text),
+    )
+    const collectorKey =
+      bottomHint.setCode && bottomHint.collectorNumber
+        ? `${bottomHint.setCode}:${bottomHint.collectorNumber}`
+        : undefined
+    const reprintSwapped = Boolean(
+      collectorKey && collectorInFrame.current && collectorKey !== collectorInFrame.current,
+    )
+    if (match.name === nameInFrame.current && !reprintSwapped) return
     const fastExact = match.similarity === 1 && (scanMode === "bulk" || Boolean(photo.cardCorners))
     if (!fastExact) {
       recentVotes.current = [...recentVotes.current.slice(-2), match.name]
@@ -402,14 +417,12 @@ export function CardScanner({
     candidateName.current = undefined
     recentVotes.current = []
     nameInFrame.current = match.name
+    collectorInFrame.current = collectorKey
     setAcceptedToken((token) => token + 1)
     setStatus("looking")
     const alternates = closestNamesFromCardTop(nameIndex, linesFromCardTop, ALTERNATE_COUNT + 1)
       .filter((name) => name !== match.name)
       .slice(0, ALTERNATE_COUNT)
-    const bottomHint = collectorHintFromCardBottom(
-      (photo.bottomLines ?? []).map((line) => line.text),
-    )
     const effectiveFinish: CardFinish = finishLocked
       ? finish
       : bottomHint.isFoilStar
@@ -872,29 +885,58 @@ export function CardScanner({
             retailCents,
             buylistCents,
           }) => {
-            updateCard(pickingPrinting.id, {
-              printingId: printing.printingId,
-              setCode: printing.setCode,
-              collectorNumber: printing.collectorNumber,
-              finish: nextFinish,
-              condition: nextCondition,
-              imageUrl: printing.smallImageUrl ?? printing.imageUrl,
-              retailCents,
-              buylistCents,
-            })
-            onUpdatePrinting?.(pickingPrinting.id, {
-              name: pickingPrinting.name,
-              printingId: printing.printingId,
-              setCode: printing.setCode,
-              collectorNumber: printing.collectorNumber,
-              finish: nextFinish,
-              condition: nextCondition,
-              imageUrl: printing.imageUrl,
-              smallImageUrl: printing.smallImageUrl,
-              retailCents,
-              buylistCents,
-            })
+            const target = pickingPrinting
             setPickingPrinting(undefined)
+            const queued = waiting.current.find((item) => item.id === target.id)
+            if (queued) {
+              queued.printingId = printing.printingId
+              queued.setCode = printing.setCode
+              queued.collectorNumber = printing.collectorNumber
+              queued.finish = nextFinish
+              queued.condition = nextCondition
+              queued.imageUrl = printing.smallImageUrl ?? printing.imageUrl
+              queued.retailCents = retailCents
+              queued.buylistCents = buylistCents
+              updateCard(target.id, {
+                printingId: printing.printingId,
+                setCode: printing.setCode,
+                collectorNumber: printing.collectorNumber,
+                finish: nextFinish,
+                condition: nextCondition,
+                imageUrl: printing.smallImageUrl ?? printing.imageUrl,
+                retailCents,
+                buylistCents,
+              })
+              return
+            }
+            const apply = async () => {
+              await lookups.current.get(target.id)
+              const accepted = onUpdatePrinting?.(target.id, {
+                name: target.name,
+                printingId: printing.printingId,
+                setCode: printing.setCode,
+                collectorNumber: printing.collectorNumber,
+                finish: nextFinish,
+                condition: nextCondition,
+                imageUrl: printing.imageUrl,
+                smallImageUrl: printing.smallImageUrl,
+                retailCents,
+                buylistCents,
+              })
+              if (accepted === false) return
+              updateCard(target.id, {
+                printingId: printing.printingId,
+                setCode: printing.setCode,
+                collectorNumber: printing.collectorNumber,
+                finish: nextFinish,
+                condition: nextCondition,
+                imageUrl: printing.smallImageUrl ?? printing.imageUrl,
+                retailCents,
+                buylistCents,
+              })
+            }
+            const task = apply().finally(() => corrections.current.delete(task))
+            corrections.current.add(task)
           }}
           onClose={() => setPickingPrinting(undefined)}
         />

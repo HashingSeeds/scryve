@@ -287,13 +287,11 @@ export const catalogDb: CatalogDb = {
     } finally {
       await stmt.finalizeAsync()
     }
-    await db.withTransactionAsync(async () => {
-      await db.runAsync("DELETE FROM printings WHERE game = ?", [game])
-      await db.runAsync(`INSERT INTO printings SELECT * FROM printings_staging WHERE game = ?`, [
-        game,
-      ])
-      await db.runAsync("DELETE FROM printings_staging WHERE game = ?", [game])
-      await db.runAsync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
+    db.withTransactionSync(() => {
+      db.runSync("DELETE FROM printings WHERE game = ?", [game])
+      db.runSync("INSERT INTO printings SELECT * FROM printings_staging WHERE game = ?", [game])
+      db.runSync("DELETE FROM printings_staging WHERE game = ?", [game])
+      db.runSync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
         `printings:${game}:version`,
         version,
       ])
@@ -330,11 +328,11 @@ export const catalogDb: CatalogDb = {
     } finally {
       await stmt.finalizeAsync()
     }
-    await db.withTransactionAsync(async () => {
-      await db.runAsync("DELETE FROM prices WHERE game = ?", [game])
-      await db.runAsync(`INSERT INTO prices SELECT * FROM prices_staging WHERE game = ?`, [game])
-      await db.runAsync("DELETE FROM prices_staging WHERE game = ?", [game])
-      await db.runAsync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
+    db.withTransactionSync(() => {
+      db.runSync("DELETE FROM prices WHERE game = ?", [game])
+      db.runSync("INSERT INTO prices SELECT * FROM prices_staging WHERE game = ?", [game])
+      db.runSync("DELETE FROM prices_staging WHERE game = ?", [game])
+      db.runSync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
         `prices:${game}:updatedAt`,
         updatedAt,
       ])
