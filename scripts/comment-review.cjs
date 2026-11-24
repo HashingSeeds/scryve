@@ -376,7 +376,6 @@ function main(args) {
   } else if (command === "sync" && hasRange) {
     const posts = collect()
     const trackers = openTrackers()
-    if (!trackers.length && !posts.length) return
     const comments = trackers.map(trackerComments)
     const entries = comments.flatMap(toEntries)
     const posted = new Set(entries.map(entryKey))
