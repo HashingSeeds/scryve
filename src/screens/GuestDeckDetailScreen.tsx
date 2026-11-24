@@ -279,6 +279,8 @@ export function GuestDeckDetailScreen({
     return result
   }
   const removeCard = (card: GuestCard) => edit({ type: "remove", card }, rules)
+  const replaceCard = (previous: GuestCard, next: GuestCard) =>
+    edit({ type: "replace", previous, next }, rules)
   const chooseCommander = (color?: GuestCard["commanderColor"]) => {
     if (!focusedCard) return
     setFocusedKey(undefined)
@@ -525,6 +527,7 @@ export function GuestDeckDetailScreen({
           deckId: guestDeckRouteId(localId),
           onAdd: (card) => keepSearchEdit(addCard(card)),
           onRemove: (card) => keepSearchEdit(removeCard(card)),
+          onReplace: (previous, next) => keepSearchEdit(replaceCard(previous, next)),
           cards: () => (draftRef.current ?? current).cards,
           subscribe: subscribeDraft,
         }}
