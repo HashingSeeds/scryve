@@ -116,8 +116,9 @@ type PrintingEvidence = keyof typeof PRINTING_EVIDENCE_RANK
 
 // why: a set alone (or a set lock) can still match several printings, so only set plus number ends in-frame refinement.
 function printingEvidence(hint: CollectorHint, lockedSet: string): PrintingEvidence {
-  if (hint.setCode && hint.collectorNumber) return "setAndNumber"
-  return hint.setCode || hint.collectorNumber || lockedSet ? "setOrNumber" : "none"
+  const setCode = hint.setCode || lockedSet
+  if (setCode && hint.collectorNumber) return "setAndNumber"
+  return setCode || hint.collectorNumber ? "setOrNumber" : "none"
 }
 const FINISH_CYCLE: readonly CardFinish[] = ["nonfoil", "foil", "etched"]
 const CONDITION_CYCLE: readonly CardCondition[] = ["NM", "LP", "MP", "HP", "DMG"]
@@ -512,6 +513,8 @@ export function CardScanner({
       retailCents: refined.price.retailCents,
       buylistCents: refined.price.buylistCents,
     }
+    const revision = (printingEditRevision.current.get(last.id) ?? 0) + 1
+    printingEditRevision.current.set(last.id, revision)
     const queued = waiting.current.find((item) => item.id === last.id)
     if (queued) {
       Object.assign(queued, scannerUpdate)
@@ -522,6 +525,7 @@ export function CardScanner({
     // why: an add already sent to the deck has no scan ID there until it settles, so wait for it like a manual correction does.
     const apply = async () => {
       await lookups.current.get(last.id)
+      if (printingEditRevision.current.get(last.id) !== revision) return
       const accepted = onUpdatePrinting(last.id, {
         name: matchName,
         printingId: nextPrinting.printingId,
@@ -534,7 +538,10 @@ export function CardScanner({
         retailCents: refined.price.retailCents,
         buylistCents: refined.price.buylistCents,
       })
-      if (accepted !== false) updateCard(last.id, scannerUpdate)
+      if (accepted !== false) return updateCard(last.id, scannerUpdate)
+      if (lastAcceptedCard.current?.id !== last.id) return
+      lastAcceptedCard.current = last
+      printingInFrame.current = last.printingId
     }
     const task = apply().finally(() => corrections.current.delete(task))
     corrections.current.add(task)

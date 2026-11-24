@@ -972,7 +972,7 @@ function collectorFrame(collector: string, extra: Partial<CardPhotoText> = {}) {
   )
 }
 
-function renderPrintingScanner() {
+function renderPrintingScanner(initialSetLock?: string) {
   const onScanPrinting = jest.fn()
   const onUpdatePrinting = jest.fn(() => true)
   const view = render(
@@ -985,6 +985,7 @@ function renderPrintingScanner() {
         addCards={async (names) => names.map(() => ({}))}
         onScanPrinting={onScanPrinting}
         onUpdatePrinting={onUpdatePrinting}
+        initialSetLock={initialSetLock}
         onClose={jest.fn()}
       />
     </ThemeProvider>,
@@ -1008,6 +1009,27 @@ test("a set-only read keeps refining until a collector number pins the printing"
   )
 
   collectorFrame("200/350 U TMC • EN")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("with a set lock, a later collector number alone refines the printing", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner("TMC")
+  collectorFrame("EN")
+  collectorFrame("EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U")
   await act(async () => {})
   expect(onUpdatePrinting).toHaveBeenLastCalledWith(
     expect.any(Number),
