@@ -168,11 +168,21 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     }
   }
 
-  private fun serializeLines(text: Text?, shiftX: Int, shiftY: Int, rotation: Int): List<Map<String, Any>> {
+  private fun serializeLines(
+    text: Text?,
+    shiftX: Int,
+    shiftY: Int,
+    rotation: Int,
+    foilBytes: ByteArray? = null,
+    foilRowStride: Int = 0,
+    foilWidth: Int = 0,
+    foilHeight: Int = 0,
+    isCroppedBand: Boolean = false,
+  ): List<Map<String, Any>> {
     if (text == null) return emptyList()
     return text.textBlocks.flatMap { block -> block.lines }.mapNotNull { line ->
       val box = line.boundingBox ?: return@mapNotNull null
-      mapOf(
+      val item = mutableMapOf<String, Any>(
         "text" to line.text,
         "x" to box.left + shiftX,
         "y" to box.top + shiftY,
@@ -182,6 +192,21 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
         "angle" to uprightAngle(line.angle + rotation),
         "confidence" to line.confidence,
       )
+      if (
+        foilBytes != null &&
+          detectFoilStarInLine(
+            line,
+            foilBytes,
+            foilRowStride,
+            foilWidth,
+            foilHeight,
+            rotation,
+            isCroppedBand,
+          )
+      ) {
+        item["foilStar"] = true
+      }
+      item
     }
   }
 
@@ -239,7 +264,17 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
               "width" to width,
               "height" to height,
               "lines" to serializeLines(topText, topCrop.uprightX, topCrop.uprightY, rotation),
-              "bottomLines" to serializeLines(bottomText, bottomCrop.uprightX, bottomCrop.uprightY, rotation),
+              "bottomLines" to serializeLines(
+                bottomText,
+                bottomCrop.uprightX,
+                bottomCrop.uprightY,
+                rotation,
+                foilBytes = bottomBytes,
+                foilRowStride = bottomCrop.width,
+                foilWidth = bottomCrop.width,
+                foilHeight = bottomCrop.height,
+                isCroppedBand = true,
+              ),
               "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
               "cardCorners" to card.corners.map { mapOf("x" to it.x, "y" to it.y) },
             )
@@ -253,6 +288,10 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
           }
         }
     } else {
+      val yPlane = frame.planes[0]
+      val yRowStride = yPlane.rowStride
+      val frameW = frame.width
+      val frameH = frame.height
       val input = InputImage.fromMediaImage(image, rotation)
       recognizer.process(input)
         .addOnSuccessListener { text ->
@@ -260,7 +299,17 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
           val photo = mutableMapOf<String, Any>(
             "width" to width,
             "height" to height,
-            "lines" to serializeLines(text, 0, 0, rotation),
+            "lines" to serializeLines(
+              text,
+              0,
+              0,
+              rotation,
+              foilBytes = plane,
+              foilRowStride = yRowStride,
+              foilWidth = frameW,
+              foilHeight = frameH,
+              isCroppedBand = false,
+            ),
             "bottomLines" to emptyList<Map<String, Any>>(),
             "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
           )

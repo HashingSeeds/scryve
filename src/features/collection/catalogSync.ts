@@ -364,6 +364,56 @@ export function valueCollectionEntries<
   return { items, totals: { cards, retailCents, buylistCents } }
 }
 
+function isSingleEditAway(a: string, b: string): boolean {
+  if (a === b) return false
+  const lenDiff = Math.abs(a.length - b.length)
+  if (lenDiff > 1) return false
+  if (a.length === b.length) {
+    let diffs = 0
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) {
+        diffs += 1
+        if (diffs > 1) return false
+      }
+    }
+    return diffs === 1
+  }
+  const shorter = a.length < b.length ? a : b
+  const longer = a.length < b.length ? b : a
+  let i = 0
+  let j = 0
+  let skipped = false
+  while (i < shorter.length && j < longer.length) {
+    if (shorter[i] === longer[j]) {
+      i += 1
+      j += 1
+    } else if (skipped) {
+      return false
+    } else {
+      skipped = true
+      j += 1
+    }
+  }
+  return true
+}
+
+function uniqueFuzzySetMatch(
+  code: string | undefined,
+  candidates: readonly CatalogPrinting[],
+): string | undefined {
+  if (!code || code.length < 3) return undefined
+  const lower = code.toLowerCase()
+  const uniqueSets = new Set(candidates.map((candidate) => candidate.setCode))
+  if (uniqueSets.has(lower)) return lower
+  let matched: string | undefined
+  for (const setCode of uniqueSets) {
+    if (setCode.length < 3 || !isSingleEditAway(lower, setCode)) continue
+    if (matched) return undefined
+    matched = setCode
+  }
+  return matched
+}
+
 export function resolveScannedPrinting(
   game: string,
   name: string,
@@ -383,8 +433,12 @@ export function resolveScannedPrinting(
           candidates.some((candidate) => candidate.setCode === code.toLowerCase()),
         )
       : undefined
+  const rawSet = lockedSet ?? hint.setCode?.toLowerCase() ?? matchedCandidateSet?.toLowerCase()
   const preferredSet =
-    lockedSet ?? hint.setCode?.toLowerCase() ?? matchedCandidateSet?.toLowerCase()
+    lockedSet ??
+    (rawSet && candidates.some((candidate) => candidate.setCode === rawSet)
+      ? rawSet
+      : uniqueFuzzySetMatch(rawSet, candidates))
   const collector = hint.collectorNumber?.toLowerCase()
 
   const pickFrom = (pool: readonly CatalogPrinting[]) => {

@@ -42,7 +42,7 @@ import {
 import { collectorHintFromCardBottom } from "./cardScan"
 import { CardScanStats } from "./CardScanStats"
 import {
-  framedLinesFromCardBottom,
+  framedLineObjectsFromCardBottom,
   framedLinesFromCardTop,
   type ScanFraming,
 } from "./cardTextLayout"
@@ -53,6 +53,7 @@ import {
   scanHaptic,
   type CardPhotoText,
   type CardScanMode,
+  type CardTextLine,
 } from "../../../modules/card-text-reader"
 
 export type CardScan = { linesFromCardTop: string[]; photo: CardPhotoText; framing: ScanFraming }
@@ -107,6 +108,8 @@ const ADD_BATCH_SIZE = 10
 const ADD_BATCH_WAIT_MS = 1500
 const HIT_THRESHOLD_CENTS = 500
 const BIG_HIT_THRESHOLD_CENTS = 2000
+const HANDHELD_REACCEPT_COOLDOWN_MS = 2_500
+const FOIL_UPGRADE_WINDOW_MS = 2_000
 const FINISH_CYCLE: readonly CardFinish[] = ["nonfoil", "foil", "etched"]
 const CONDITION_CYCLE: readonly CardCondition[] = ["NM", "LP", "MP", "HP", "DMG"]
 // why: Scryfall pauses lookups for 30 seconds after a 429, so the last waits outlast a pause.
@@ -214,10 +217,19 @@ export function CardScanner({
   const countedLands = useRef(new Set<string>())
   const candidateName = useRef<string>(undefined)
   const candidateBottomLines = useRef<string[]>([])
+  const candidateFoilStar = useRef(false)
   const recentVotes = useRef<(string | undefined)[]>([])
   const emptyFrames = useRef(0)
   const nameInFrame = useRef<string>(undefined)
   const printingInFrame = useRef<string>(undefined)
+  const recentAcceptedAtByName = useRef(new Map<string, number>())
+  const lastAcceptedCard = useRef<{
+    id: number
+    name: string
+    finish: CardFinish
+    condition: CardCondition
+    acceptedAt: number
+  }>(undefined)
   const rejectedBySetLock = useRef(false)
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -276,6 +288,7 @@ export function CardScanner({
     settleLookup.current.delete(card.id)
     if (!("error" in result)) return updateCard(card.id, { ...result, state: "added" })
     countedLands.current.delete(card.name)
+    recentAcceptedAtByName.current.delete(card.name)
     updateCard(card.id, { state: "failed" })
   }
 
@@ -337,9 +350,26 @@ export function CardScanner({
     )
     if (__DEV__) {
       const ms = Date.now() - lastAcceptedAt.current
-      console.log(`SCANACCEPT ${JSON.stringify({ name: card.name, ms })}`)
+      console.log(
+        `SCANACCEPT ${JSON.stringify({
+          name: card.name,
+          ms,
+          set: card.setCode,
+          num: card.collectorNumber,
+          finish: card.finish,
+          retailCents: card.retailCents,
+        })}`,
+      )
     }
-    lastAcceptedAt.current = Date.now()
+    const acceptedAt = Date.now()
+    lastAcceptedAt.current = acceptedAt
+    lastAcceptedCard.current = {
+      id,
+      name: card.name,
+      finish: card.finish,
+      condition: card.condition,
+      acceptedAt,
+    }
     setAdded((current) => [scanned, ...current])
     if (onScanPrinting) {
       onScanPrinting({
@@ -375,13 +405,37 @@ export function CardScanner({
       scan.peakHeat = heat
   }
 
+  function primaryFoilStar(lines: readonly CardTextLine[], preferredSet?: string): boolean {
+    if (lines.length === 0) return false
+    const collectorLines = lines.filter((line) => {
+      const parsed = collectorHintFromCardBottom([line.text])
+      return Boolean(parsed.setCode || parsed.language || line.foilStar)
+    })
+    if (collectorLines.length === 0) return false
+    const matchingSet = preferredSet
+      ? collectorLines.filter((line) => {
+          const parsed = collectorHintFromCardBottom([line.text])
+          return parsed.setCode === preferredSet.toLowerCase()
+        })
+      : []
+    const pool = matchingSet.length > 0 ? matchingSet : collectorLines
+    // why: pick the lowest line in the frame so a foil card peeking above cannot override this card's collector strip.
+    let primary = pool[0]
+    for (let i = 1; i < pool.length; i += 1) {
+      if (pool[i].y > primary.y) primary = pool[i]
+    }
+    return Boolean(primary.foilStar)
+  }
+
   function readText(photo: CardPhotoText) {
     if (closingRef.current || !view.current || !frame) return
     if (photo.sceneChanged) {
       candidateName.current = undefined
       candidateBottomLines.current = []
+      candidateFoilStar.current = false
       nameInFrame.current = undefined
       printingInFrame.current = undefined
+      recentAcceptedAtByName.current.clear()
       recentVotes.current = []
       emptyFrames.current = 0
     }
@@ -392,8 +446,10 @@ export function CardScanner({
     if (!linesFromCardTop.length) {
       emptyFrames.current += 1
       if (emptyFrames.current >= 2) {
+        if (nameInFrame.current) recentAcceptedAtByName.current.delete(nameInFrame.current)
         candidateName.current = undefined
         candidateBottomLines.current = []
+        candidateFoilStar.current = false
         nameInFrame.current = undefined
         printingInFrame.current = undefined
         recentVotes.current = []
@@ -407,28 +463,31 @@ export function CardScanner({
       setStatus(nameIndex ? "unsure" : "loading")
       return
     }
-    const frameBottomLines =
+    const frameBottomLineObjects =
       photo.bottomLines && photo.bottomLines.length > 0
-        ? photo.bottomLines.map((line) => line.text)
-        : framedLinesFromCardBottom(photo, framing)
+        ? photo.bottomLines
+        : framedLineObjectsFromCardBottom(photo, framing)
+    const frameBottomLines = frameBottomLineObjects.map((line) => line.text)
     const combinedBottomLines =
       candidateName.current === match.name
         ? [...candidateBottomLines.current, ...frameBottomLines]
         : frameBottomLines
     const bottomHint = collectorHintFromCardBottom(combinedBottomLines)
-    const effectiveFinish: CardFinish = finishLocked
-      ? finish
-      : bottomHint.isFoilStar
-        ? "foil"
-        : finish
+    const frameHasFoilStar = primaryFoilStar(frameBottomLineObjects, bottomHint.setCode)
+    const detectedFoilStar =
+      Boolean(bottomHint.isFoilStar) ||
+      frameHasFoilStar ||
+      (candidateName.current === match.name && candidateFoilStar.current)
+    const effectiveFinish: CardFinish = finishLocked ? finish : detectedFoilStar ? "foil" : finish
     const lockedSet = setLock.trim().toUpperCase()
     const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
       setLock: lockedSet || undefined,
       finish: effectiveFinish,
       condition,
     })
-    // why: only treat a same-name frame as a swapped reprint when OCR resolved to a distinct known printingId; raw OCR jitter would otherwise double-scan the card in place.
+    // why: handheld OCR occasionally drops a leading digit on extended-art printings (#169 -> #69), so reprint auto-swap stays bulk-only.
     const reprintSwapped = Boolean(
+      scanMode === "bulk" &&
       bottomHint.setCode &&
       bottomHint.collectorNumber &&
       resolved.printing?.printingId &&
@@ -436,10 +495,69 @@ export function CardScanner({
       resolved.printing.printingId !== printingInFrame.current,
     )
     if (match.name === nameInFrame.current && !reprintSwapped) {
+      const last = lastAcceptedCard.current
+      if (
+        last &&
+        last.name === match.name &&
+        last.finish === "nonfoil" &&
+        !finishLocked &&
+        frameHasFoilStar &&
+        Date.now() - last.acceptedAt <= FOIL_UPGRADE_WINDOW_MS
+      ) {
+        const foilResolved = resolveScannedPrinting(game, match.name, bottomHint, {
+          setLock: lockedSet || undefined,
+          finish: "foil",
+          condition: last.condition,
+        })
+        if (foilResolved.finish === "foil") {
+          lastAcceptedCard.current = { ...last, finish: "foil" }
+          const nextPrinting = foilResolved.printing
+          updateCard(last.id, {
+            finish: "foil",
+            ...(nextPrinting
+              ? {
+                  cardId: nextPrinting.cardId,
+                  printingId: nextPrinting.printingId,
+                  setCode: nextPrinting.setCode,
+                  collectorNumber: nextPrinting.collectorNumber,
+                  imageUrl: nextPrinting.smallImageUrl ?? nextPrinting.imageUrl,
+                }
+              : {}),
+            retailCents: foilResolved.price.retailCents,
+            buylistCents: foilResolved.price.buylistCents,
+          })
+          if (nextPrinting) {
+            onUpdatePrinting?.(last.id, {
+              name: match.name,
+              printingId: nextPrinting.printingId,
+              setCode: nextPrinting.setCode,
+              collectorNumber: nextPrinting.collectorNumber,
+              finish: "foil",
+              condition: last.condition,
+              imageUrl: nextPrinting.imageUrl,
+              smallImageUrl: nextPrinting.smallImageUrl,
+              retailCents: foilResolved.price.retailCents,
+              buylistCents: foilResolved.price.buylistCents,
+            })
+          }
+        }
+      }
       candidateName.current = undefined
       candidateBottomLines.current = []
+      candidateFoilStar.current = false
       recentVotes.current = []
       return
+    }
+    if (scanMode === "handheld") {
+      const lastSeenAt = recentAcceptedAtByName.current.get(match.name)
+      if (lastSeenAt !== undefined && Date.now() - lastSeenAt < HANDHELD_REACCEPT_COOLDOWN_MS) {
+        nameInFrame.current = match.name
+        candidateName.current = undefined
+        candidateBottomLines.current = []
+        candidateFoilStar.current = false
+        recentVotes.current = []
+        return
+      }
     }
     const fastExact = match.similarity === 1 && (scanMode === "bulk" || Boolean(photo.cardCorners))
     if (!fastExact) {
@@ -448,6 +566,7 @@ export function CardScanner({
       if (votes < 2) {
         candidateName.current = match.name
         candidateBottomLines.current = combinedBottomLines.slice(-12)
+        candidateFoilStar.current = detectedFoilStar
         prepareScanHaptics()
         setStatus("steady")
         return
@@ -455,9 +574,11 @@ export function CardScanner({
     }
     candidateName.current = undefined
     candidateBottomLines.current = []
+    candidateFoilStar.current = false
     recentVotes.current = []
     nameInFrame.current = match.name
     printingInFrame.current = resolved.printing?.printingId
+    recentAcceptedAtByName.current.set(match.name, Date.now())
     setAcceptedToken((token) => token + 1)
     setStatus("looking")
     const alternates = closestNamesFromCardTop(nameIndex, linesFromCardTop, ALTERNATE_COUNT + 1)

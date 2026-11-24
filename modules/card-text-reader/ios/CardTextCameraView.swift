@@ -409,6 +409,174 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     }
   }
 
+  private static let foilSetLangRegex = try? NSRegularExpression(
+    pattern: "\\b([A-Z0-9]{3,5})(\\s*[^A-Z0-9\\s]?\\s*)(EN|JA|JP|FR|DE|IT|ES|PT|KO|RU)(?:\\b|(?=[A-Z]))"
+  )
+  private static let ignoredSetTokens: Set<String> = [
+    "TM", "WOTC", "LLC", "INC", "USA", "CBS", "THE", "AND", "FOR", "ALL",
+    "EN", "JA", "JP", "FR", "DE", "IT", "ES", "PT", "KO", "RU",
+  ]
+
+  // why: Vision collapses the tiny M15+ foil star (`★`) into `*`/`+`/`•`. Sampling the luma pixels
+  // between the recognized set and language boxes separates the taller pointed star from the dot.
+  private func detectFoilStar(
+    _ buffer: CVPixelBuffer,
+    region: CGRect,
+    candidate: VNRecognizedText,
+    accurate: Bool
+  ) -> Bool {
+    let text = candidate.string
+    guard let regex = Self.foilSetLangRegex else { return false }
+    let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+    guard
+      let match = regex.firstMatch(in: text, range: nsRange),
+      let setRange = Range(match.range(at: 1), in: text),
+      let sepRange = Range(match.range(at: 2), in: text),
+      let langRange = Range(match.range(at: 3), in: text),
+      !Self.ignoredSetTokens.contains(String(text[setRange])),
+      let setRel = try? candidate.boundingBox(for: setRange)?.boundingBox,
+      let langRel = try? candidate.boundingBox(for: langRange)?.boundingBox
+    else { return false }
+
+    let toFull: (CGRect) -> CGRect = { r in
+      CGRect(
+        x: region.minX + r.minX * region.width,
+        y: region.minY + r.minY * region.height,
+        width: r.width * region.width,
+        height: r.height * region.height
+      )
+    }
+    let setBox = toFull(setRel)
+    let langBox = toFull(langRel)
+    guard langBox.minX > setBox.maxX, CVPixelBufferGetPlaneCount(buffer) > 0 else { return false }
+
+    CVPixelBufferLockBaseAddress(buffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+    guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) else { return false }
+    let bytes = base.assumingMemoryBound(to: UInt8.self)
+    let rowStride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
+    let bufW = CVPixelBufferGetWidthOfPlane(buffer, 0)
+    let bufH = CVPixelBufferGetHeightOfPlane(buffer, 0)
+    let capH = Double(setBox.height) * Double(bufW)
+    guard capH >= 11.0 else { return false }
+
+    func lumaAt(vx: CGFloat, vy: CGFloat) -> Int {
+      let bx = max(0, min(bufW - 1, Int(((1 - vy) * CGFloat(bufW - 1)).rounded())))
+      let by = max(0, min(bufH - 1, Int(((1 - vx) * CGFloat(bufH - 1)).rounded())))
+      return Int(bytes[by * rowStride + bx])
+    }
+
+    var refSamples: [Int] = []
+    let refMinX = max(0, setBox.minX - setBox.width * 0.1)
+    let refMaxX = min(1, setBox.maxX + setBox.width * 0.1)
+    let refMinY = max(0, setBox.minY - setBox.height * 0.25)
+    let refMaxY = min(1, setBox.maxY + setBox.height * 0.25)
+    let refStepsX = min(24, max(6, Int((refMaxX - refMinX) * CGFloat(bufH))))
+    let refStepsY = min(16, max(6, Int((refMaxY - refMinY) * CGFloat(bufW))))
+    for iy in 0..<refStepsY {
+      let vy = refMinY + (refMaxY - refMinY) * CGFloat(iy) / CGFloat(max(1, refStepsY - 1))
+      for ix in 0..<refStepsX {
+        let vx = refMinX + (refMaxX - refMinX) * CGFloat(ix) / CGFloat(max(1, refStepsX - 1))
+        refSamples.append(lumaAt(vx: vx, vy: vy))
+      }
+    }
+    refSamples.sort()
+    guard !refSamples.isEmpty else { return false }
+    let bg = refSamples[refSamples.count / 6]
+    let ink = refSamples[(refSamples.count * 9) / 10]
+    let contrast = ink - bg
+    guard contrast >= 18 else { return false }
+    let thresh = bg + Int(Double(contrast) * 0.45)
+
+    let gx0 = setBox.maxX
+    let gx1 = langBox.minX
+    let gy0 = max(0, min(setBox.minY, langBox.minY))
+    let gy1 = min(1, max(setBox.maxY, langBox.maxY))
+    let gapW = max(3, min(28, Int(((gx1 - gx0) * CGFloat(bufH)).rounded())))
+    let gapH = max(3, min(28, Int(((gy1 - gy0) * CGFloat(bufW)).rounded())))
+    var mask = [Bool](repeating: false, count: gapW * gapH)
+    for r in 0..<gapH {
+      let vy = gy1 - (gy1 - gy0) * CGFloat(r) / CGFloat(max(1, gapH - 1))
+      for c in 0..<gapW {
+        let vx = gx0 + (gx1 - gx0) * CGFloat(c) / CGFloat(max(1, gapW - 1))
+        mask[r * gapW + c] = lumaAt(vx: vx, vy: vy) >= thresh
+      }
+    }
+
+    var visited = [Bool](repeating: false, count: gapW * gapH)
+    var bestDist = Double.greatestFiniteMagnitude
+    var bestArea = 0
+    var bestH = 0
+    var bestTopWidth = 0
+    var bestMaxRowWidth = 0
+
+    for r in 0..<gapH {
+      for c in 0..<gapW {
+        let start = r * gapW + c
+        if !mask[start] || visited[start] { continue }
+        var queue = [start]
+        var head = 0
+        visited[start] = true
+        var minR = r
+        var maxR = r
+        var area = 0
+        var rowCounts = [Int](repeating: 0, count: gapH)
+        while head < queue.count {
+          let pos = queue[head]
+          head += 1
+          let cr = pos / gapW
+          let cc = pos % gapW
+          area += 1
+          if cr < minR { minR = cr }
+          if cr > maxR { maxR = cr }
+          rowCounts[cr] += 1
+          if cr > 0, mask[pos - gapW], !visited[pos - gapW] {
+            visited[pos - gapW] = true
+            queue.append(pos - gapW)
+          }
+          if cr + 1 < gapH, mask[pos + gapW], !visited[pos + gapW] {
+            visited[pos + gapW] = true
+            queue.append(pos + gapW)
+          }
+          if cc > 0, mask[pos - 1], !visited[pos - 1] {
+            visited[pos - 1] = true
+            queue.append(pos - 1)
+          }
+          if cc + 1 < gapW, mask[pos + 1], !visited[pos + 1] {
+            visited[pos + 1] = true
+            queue.append(pos + 1)
+          }
+        }
+        if minR == 0 || maxR == gapH - 1 { continue }
+        let cy = Double(minR + maxR) / 2.0
+        let dist = abs(cy - Double(gapH) / 2.0)
+        if dist < bestDist {
+          bestDist = dist
+          bestArea = area
+          bestH = maxR - minR + 1
+          bestTopWidth = rowCounts[minR]
+          var maxRw = 0
+          for rr in minR...maxR where rowCounts[rr] > maxRw { maxRw = rowCounts[rr] }
+          bestMaxRowWidth = maxRw
+        }
+      }
+    }
+
+    let sep = text[sepRange]
+    let sepIsStar = sep.contains("*") || sep.contains("★") || sep.contains("☆")
+    let hasBlob = bestArea > 0
+    let hRatio = hasBlob ? Double(bestH) / capH : 0.0
+    let areaRatio = hasBlob ? Double(bestArea) / (capH * capH) : 0.0
+    let hasSpire = hasBlob && bestH >= 6 && Double(bestTopWidth) <= Double(bestMaxRowWidth) * 0.5
+    let pixelStar = hasBlob && capH >= 12.0 && hRatio >= 0.37 && areaRatio >= 0.075 && hasSpire
+    let corroboratedStar =
+      accurate &&
+      sepIsStar &&
+      capH >= 12.0 &&
+      (!hasBlob || gapW <= 5 || (hRatio >= 0.30 && areaRatio >= 0.06))
+    return pixelStar || corroboratedStar
+  }
+
   private func recognize(
     _ buffer: CVPixelBuffer,
     region: CGRect,
@@ -436,7 +604,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
         height: inRegion.height * region.height)
       let dx = (observation.topRight.x - observation.topLeft.x) * region.width * width
       let dy = (observation.topLeft.y - observation.topRight.y) * region.height * height
-      return [
+      var item: [String: Any] = [
         "text": candidate.string,
         "x": box.minX * width,
         "y": (1 - box.maxY) * height,
@@ -445,6 +613,10 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
         "angle": atan2(dy, dx) * 180 / .pi,
         "confidence": Double(candidate.confidence),
       ]
+      if detectFoilStar(buffer, region: region, candidate: candidate, accurate: level == .accurate) {
+        item["foilStar"] = true
+      }
+      return item
     }
     return (lines, bestConfidence)
   }

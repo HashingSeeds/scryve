@@ -10,6 +10,7 @@ export type CardTextLine = {
   height: number
   angle: number
   confidence: number
+  foilStar?: boolean
 }
 
 type Point = { x: number; y: number }

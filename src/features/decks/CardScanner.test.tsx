@@ -21,6 +21,7 @@ jest.mock("../../../modules/card-text-reader", () => ({
 }))
 jest.mock("./cardTextLayout", () => ({
   framedLinesFromCardTop: (photo: CardPhotoText) => photo.lines.map((line) => line.text),
+  framedLineObjectsFromCardBottom: (photo: CardPhotoText) => photo.lines.slice(1),
   framedLinesFromCardBottom: (photo: CardPhotoText) =>
     photo.lines.slice(1).map((line) => line.text),
 }))
@@ -647,5 +648,91 @@ test("ignores a single empty frame so the same card is not double-scanned, and r
     ["Sol Ring"],
     [expect.objectContaining({ printingId: "trk-sol", setCode: "trk" })],
   )
+  catalogDb.clearAll()
+})
+
+test("blocks rapid A-B-A ping-pong without leaving frame and progressively upgrades foil on next frame", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "trk-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "trk",
+        setName: "Star Trek",
+        collectorNumber: "50",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+    ],
+    "v1",
+  )
+
+  const onScanPrinting = jest.fn()
+  const onUpdatePrinting = jest.fn()
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardScanner
+        game="mtg"
+        nameIndex={nameIndex}
+        singleton={false}
+        copiesInDeck={() => 0}
+        addCards={async (names) => names.map(() => ({}))}
+        onScanPrinting={onScanPrinting}
+        onUpdatePrinting={onUpdatePrinting}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  const layout = { x: 0, y: 0, width: 400, height: 700 }
+  for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+    fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+
+  show("Sol Ring", "TRK • EN")
+  show("Sol Ring", "TRK • EN")
+  expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: "Sol Ring", finish: "nonfoil" }),
+  )
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [
+          { text: "Sol Ring", x: 0, y: 100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        bottomLines: [
+          {
+            text: "TRK * EN",
+            x: 0,
+            y: 1100,
+            width: 100,
+            height: 20,
+            angle: 0,
+            confidence: 1,
+            foilStar: true,
+          },
+        ],
+      },
+    }),
+  )
+  expect(onUpdatePrinting).toHaveBeenCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ name: "Sol Ring", printingId: "trk-sol", finish: "foil" }),
+  )
+
+  show("Arcane Signet")
+  show("Arcane Signet")
+  expect(onScanPrinting).toHaveBeenCalledTimes(2)
+
+  show("Sol Ring")
+  show("Sol Ring")
+  expect(onScanPrinting).toHaveBeenCalledTimes(2)
   catalogDb.clearAll()
 })
