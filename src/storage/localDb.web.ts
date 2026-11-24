@@ -1,4 +1,4 @@
-import { storage } from "@/utils/storage"
+import { onStorageClear, storage } from "@/utils/storage"
 
 import type {
   CardDetailUpsert,
@@ -155,3 +155,7 @@ export const localCardDb: LocalCardDb = {
     this.clearCardDetails()
   },
 }
+
+onStorageClear(() => {
+  detailsRevision += 1
+})

@@ -1,5 +1,7 @@
 import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite"
 
+import { onStorageClear } from "@/utils/storage"
+
 import type {
   CardDetailUpsert,
   LocalCardDb,
@@ -203,3 +205,7 @@ export const localCardDb: LocalCardDb = {
     detailsRevision += 1
   },
 }
+
+onStorageClear(() => {
+  localCardDb.clearAll()
+})

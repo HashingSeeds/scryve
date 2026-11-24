@@ -100,6 +100,23 @@ describe("guest deck storage", () => {
     expect(storage.getString("decks.guest.v1")).toBeUndefined()
   })
 
+  it("keeps a deleted deck from returning when legacy-key cleanup fails", () => {
+    storage.set("decks.guest.v1", JSON.stringify(legacy))
+    const del = jest.spyOn(storage, "delete").mockImplementation(() => {
+      throw new Error("cleanup failed")
+    })
+    expect(loadGuestDecks()).toEqual([legacy])
+    expect(storage.getString("decks.guest.v1")).toBeDefined()
+
+    deleteGuestDeck(legacy.localId)
+    expect(loadGuestDecks()).toEqual([])
+    expect(storage.getString("decks.guest.v1")).toBeDefined()
+
+    del.mockRestore()
+    expect(loadGuestDecks()).toEqual([])
+    expect(storage.getString("decks.guest.v1")).toBeUndefined()
+  })
+
   it("does not clear an edited deck when an old import ack arrives", () => {
     const first = saveGuestDeck(deck, { now: 100 })
     const other = saveGuestDeck({ ...deck, name: "Other" }, { now: 100 })
