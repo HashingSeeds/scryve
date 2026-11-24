@@ -45,7 +45,7 @@ export interface DurableStringStorage {
   getString(key: string): string | undefined
   getAllKeys(): string[]
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
 }
 
 export interface DurableOutboxLimits {
@@ -406,7 +406,7 @@ export class DurableOutbox<
       const failed = this.codec.parseFailed(withoutProvenance(parsedJson(failedValue)))
       if (failedValue && failed) {
         if (this.codec.operationId(failed.action) === operationId && this.owns(failed.action)) {
-          if (action) this.storage.delete(pendingKey)
+          if (action) this.storage.remove(pendingKey)
           else this.quarantine(pendingKey, "pending", quarantined)
           continue
         }
@@ -449,7 +449,7 @@ export class DurableOutbox<
   }
 
   acknowledge(operationId: string): void {
-    this.storage.delete(this.pendingKey(operationId))
+    this.storage.remove(this.pendingKey(operationId))
     const index = this.index(this.keys.pendingIndex).filter(
       (candidate) => candidate !== operationId,
     )
@@ -501,7 +501,7 @@ export class DurableOutbox<
     const nextPending = pending.filter(
       (candidate) => this.codec.operationId(candidate) !== operationId,
     )
-    this.storage.delete(this.pendingKey(operationId))
+    this.storage.remove(this.pendingKey(operationId))
     this.storage.set(
       this.keys.pendingIndex,
       JSON.stringify(nextPending.map((candidate) => this.codec.operationId(candidate))),
@@ -563,7 +563,7 @@ export class DurableOutbox<
         ),
       })
     }
-    this.storage.delete(key)
+    this.storage.remove(key)
   }
 
   /** why: quarantine is otherwise silent; one report per load pass carries enough structure to write a recovering codec, never record values. */
@@ -578,7 +578,7 @@ export class DurableOutbox<
   }
 
   dismissFailed(operationId: string): void {
-    this.storage.delete(this.failedKey(operationId))
+    this.storage.remove(this.failedKey(operationId))
     const index = this.index(this.keys.failedIndex).filter((candidate) => candidate !== operationId)
     this.storage.set(this.keys.failedIndex, JSON.stringify(index))
   }
@@ -589,8 +589,8 @@ export class DurableOutbox<
         key.startsWith(this.keys.pendingRecordPrefix) ||
         key.startsWith(this.keys.failedRecordPrefix)
       )
-        this.storage.delete(key)
-    this.storage.delete(this.keys.pendingIndex)
-    this.storage.delete(this.keys.failedIndex)
+        this.storage.remove(key)
+    this.storage.remove(this.keys.pendingIndex)
+    this.storage.remove(this.keys.failedIndex)
   }
 }

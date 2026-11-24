@@ -1,6 +1,6 @@
-import { MMKV } from "react-native-mmkv"
+import { createMMKV } from "react-native-mmkv"
 
-export const storage = new MMKV()
+export const storage = createMMKV()
 
 export function loadString(key: string): string | null {
   try {
@@ -39,7 +39,7 @@ export function save(key: string, value: unknown): boolean {
 
 export function remove(key: string): void {
   try {
-    storage.delete(key)
+    storage.remove(key)
   } catch {}
 }
 

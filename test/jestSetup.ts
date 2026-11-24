@@ -62,6 +62,9 @@ jest.doMock("react-native", () => {
   )
 })
 
+// why: importing Nitro installs its native module, which Jest lacks. MMKV uses its in-memory mock under Jest and never reaches Nitro.
+jest.mock("react-native-nitro-modules", () => ({ NitroModules: {} }))
+
 // why: the native sheet has no Jest renderer; holdSheetDismissals() lets a test end its exit animation itself.
 jest.mock("@expo/ui/swift-ui", () => {
   const { createElement, Fragment, useEffect, useRef } =

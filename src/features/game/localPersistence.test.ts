@@ -784,7 +784,7 @@ describe("LocalGameRepository", () => {
       LOCAL_KEYS.historyIndex,
       JSON.stringify(index.map((game: object) => ({ ...game, system: "mtg" }))),
     )
-    storage.delete(LOCAL_KEYS.noSystemHistoryRepaired)
+    storage.remove(LOCAL_KEYS.noSystemHistoryRepaired)
 
     const history = new LocalGameRepository(storage).loadHistory()
 

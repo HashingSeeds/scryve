@@ -1,0 +1,342 @@
+diff --git a/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt b/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
+index c1e8a188c9502c2223ca53674e424d0c42ded96b..87b501ed7041de9d031b5b3f4b9f5efb31635453 100644
+--- a/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
++++ b/android/src/main/java/expo/modules/alternateappicons/ExpoAlternateAppIconsModule.kt
+@@ -1,7 +1,10 @@
+ package expo.modules.alternateappicons
+ 
++import android.app.Activity
++import android.app.Application
+ import android.content.ComponentName
+ import android.content.pm.PackageManager
++import android.os.Bundle
+ import expo.modules.kotlin.functions.Coroutine
+ import expo.modules.kotlin.modules.Module
+ import expo.modules.kotlin.modules.ModuleDefinition
+@@ -9,9 +12,36 @@ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.withContext
+ 
+ const val MAIN_ACTIVITY_NAME = "MainActivity"
+-const val DEFAULT_ALIAS_NAME = "MainActivityDefault"
+ 
++// Scryve patch: the running activity keeps the component it launched with, so reading the current
++// icon from it enabled every alias picked in one session and made a reset to the default a no-op.
++// Icons are now read from, and switched by, the launcher components' enabled state.
++// Disabling the component the app launched from makes Android close it, so a picked icon waits
++// until no activity of the app is started, and reads back as picked in the meantime.
+ class ExpoAlternateAppIconsModule : Module() {
++  private data class Pending(val icon: String?)
++
++  @Volatile private var pending: Pending? = null
++  private val startedActivities = mutableSetOf<Activity>()
++
++  private val lifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
++    override fun onActivityStarted(activity: Activity) {
++      startedActivities.add(activity)
++    }
++
++    override fun onActivityStopped(activity: Activity) {
++      startedActivities.remove(activity)
++      // A rotation stops the old activity before the new one starts.
++      if (startedActivities.isEmpty() && !activity.isChangingConfigurations) applyPending()
++    }
++
++    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
++    override fun onActivityResumed(activity: Activity) = Unit
++    override fun onActivityPaused(activity: Activity) = Unit
++    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
++    override fun onActivityDestroyed(activity: Activity) = Unit
++  }
++
+   override fun definition() = ModuleDefinition {
+     Name("ExpoAlternateAppIcons")
+ 
+@@ -19,105 +49,77 @@ class ExpoAlternateAppIconsModule : Module() {
+       "supportsAlternateIcons" to true
+     )
+ 
++    OnCreate {
++      application()?.registerActivityLifecycleCallbacks(lifecycleCallbacks)
++    }
++
++    OnDestroy {
++      application()?.unregisterActivityLifecycleCallbacks(lifecycleCallbacks)
++    }
++
+     Function("getAppIconName", this@ExpoAlternateAppIconsModule::getAppIconName)
+     AsyncFunction("setAlternateAppIcon").Coroutine(this@ExpoAlternateAppIconsModule::setAlternateAppIcon)
+   }
+ 
++  private fun application(): Application? = appContext.reactContext?.applicationContext as? Application
++
+   private fun getAppIconName(): String? {
+-    val pm = appContext.reactContext?.packageManager ?: return null
+-    val packageName = appContext.reactContext?.packageName ?: return null
+-
+-    try {
+-      // Query all activities to find the currently enabled one
+-      // Current activity will be MainActivity if opened from deep-link/shortcuts, is not reflect current app icon
+-      val packageInfo = pm.getPackageInfo(
+-        packageName, 
+-        PackageManager.GET_ACTIVITIES or PackageManager.GET_DISABLED_COMPONENTS
+-      )
+-      
+-      packageInfo.activities?.forEach { activityInfo ->
+-        val name = activityInfo.name.split('.').last()
+-        
+-        // Skip the base MainActivity (always enabled)
+-        if (name == MAIN_ACTIVITY_NAME) return@forEach
+-        
+-        if (name.startsWith(MAIN_ACTIVITY_NAME)) {
+-          val componentName = ComponentName(packageName, activityInfo.name)
+-          val state = pm.getComponentEnabledSetting(componentName)
+-          
+-          if (state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+-            if (name == DEFAULT_ALIAS_NAME) return null
+-            return name.substring(MAIN_ACTIVITY_NAME.length)
+-          } else if (name == DEFAULT_ALIAS_NAME && state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) {
+-            // Default alias is implicitly enabled at first
+-            return null
+-          }
+-        }
++    pending?.let { return it.icon }
++    return enabledIconName()
++  }
++
++  private fun enabledIconName(): String? {
++    val packageManager = appContext.reactContext?.packageManager ?: return null
++    return launcherComponents()
++      .firstOrNull {
++        getSimpleName(it) != MAIN_ACTIVITY_NAME &&
++          packageManager.getComponentEnabledSetting(it) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+       }
+-    } catch (e: Exception) {
+-      e.printStackTrace()
+-    }
+-    return null
++      ?.let(::retrieveIconNameFromComponent)
+   }
+ 
+   private suspend fun setAlternateAppIcon(icon: String?): String? = withContext(Dispatchers.Main) {
+-    val pm = appContext.reactContext?.packageManager ?: return@withContext icon
+-    val packageName = appContext.reactContext?.packageName ?: return@withContext icon
+-
+-    // Map null to "Default", targets MainActivityDefault
+-    val targetAliasName = if (icon == null || icon == "Default") {
+-      DEFAULT_ALIAS_NAME
+-    } else {
+-      "$MAIN_ACTIVITY_NAME$icon"
+-    }
++    if (launcherComponents().none { retrieveIconNameFromComponent(it) == icon })
++      throw IllegalArgumentException("Unknown app icon: $icon")
++    pending = if (icon == enabledIconName()) null else Pending(icon)
++    return@withContext icon
++  }
+ 
+-    try {
+-      val packageInfo = pm.getPackageInfo(
+-        packageName, 
+-        PackageManager.GET_ACTIVITIES or PackageManager.GET_DISABLED_COMPONENTS
+-      )
+-      
+-      // Prevent unknown icon failures
+-      val aliasActivities = packageInfo.activities?.filter { activityInfo ->
+-        val name = activityInfo.name.split('.').last()
+-        name != MAIN_ACTIVITY_NAME && name.startsWith(MAIN_ACTIVITY_NAME)
+-      }
+-      .orEmpty()
+-      val targetExists = aliasActivities.any {
+-        it.name.split('.').last() == targetAliasName
+-      }
+-      if (!targetExists) {
+-        throw IllegalArgumentException("Unknown app icon alias: $icon")
+-      }
++  private fun applyPending() {
++    val icon = pending ?: return
++    pending = null
++    val packageManager = appContext.reactContext?.packageManager ?: return
++    val components = launcherComponents()
++    val target = components.firstOrNull { retrieveIconNameFromComponent(it) == icon.icon } ?: return
+ 
+-      aliasActivities.forEach { activityInfo ->
+-        val name = activityInfo.name.split('.').last()
+-        
+-        // Never disable MainActivity
+-        if (name == MAIN_ACTIVITY_NAME) return@forEach
+-        
+-        val componentName = ComponentName(packageName, activityInfo.name)
+-
+-        // Enable the target, disable all other aliases
+-        if (name == targetAliasName) {
+-          pm.setComponentEnabledSetting(
+-            componentName,
+-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+-            PackageManager.DONT_KILL_APP
+-          )
+-        } else if (name.startsWith(MAIN_ACTIVITY_NAME)) {
+-          pm.setComponentEnabledSetting(
+-            componentName,
+-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+-            PackageManager.DONT_KILL_APP
+-          )
+-        }
++    packageManager.setComponentEnabledSetting(target, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
++    for (component in components) {
++      if (component != target) {
++        packageManager.setComponentEnabledSetting(component, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+       }
+-    } catch (e: Exception) {
+-      e.printStackTrace()
+     }
++  }
+ 
+-    return@withContext if (icon == "Default") null else icon
++  @Suppress("DEPRECATION")
++  private fun launcherComponents(): List<ComponentName> {
++    val context = appContext.reactContext ?: return emptyList()
++    val packageInfo = context.packageManager.getPackageInfo(
++      context.packageName,
++      PackageManager.GET_ACTIVITIES or PackageManager.MATCH_DISABLED_COMPONENTS
++    )
++    return packageInfo.activities.orEmpty()
++      .map { ComponentName(context.packageName, it.name) }
++      .filter { getSimpleName(it).startsWith(MAIN_ACTIVITY_NAME) }
+   }
+ 
++  private fun getSimpleName(component: ComponentName): String = component.className.split('.').last()
++
++  private fun retrieveIconNameFromComponent(component: ComponentName): String? =
++    with(getSimpleName(component)) {
++      when {
++        equals(MAIN_ACTIVITY_NAME) -> null
++        startsWith(MAIN_ACTIVITY_NAME) -> substring(MAIN_ACTIVITY_NAME.length)
++        else -> null
++      }
++    }
+ }
+diff --git a/plugin/build/android/withAndroidManifestUpdate.js b/plugin/build/android/withAndroidManifestUpdate.js
+index db709566cf5839973689115848994ecb6992aa47..948ba212aebc2fe53479ec7750dadc4fca19c6d7 100644
+--- a/plugin/build/android/withAndroidManifestUpdate.js
++++ b/plugin/build/android/withAndroidManifestUpdate.js
+@@ -3,41 +3,29 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.withAndroidManifestUpdate = withAndroidManifestUpdate;
+ const config_plugins_1 = require("@expo/config-plugins");
+ const utils_1 = require("../utils");
+-const { getMainApplicationOrThrow, getMainActivityOrThrow } = config_plugins_1.AndroidConfig.Manifest;
++const { getMainApplicationOrThrow } = config_plugins_1.AndroidConfig.Manifest;
+ const { default: renderIntentFilters, getIntentFilters } = config_plugins_1.AndroidConfig.IntentFilters;
++// Scryve patch: 11.0.0 moved the launcher from MainActivity to a new MainActivityDefault alias.
++// Launchers key home screen icons to the component, so every install on the default icon would
++// lose its home screen icon on update. MainActivity stays the default launcher, as in 8.0.0.
+ function withAndroidManifestUpdate(config, alternateIconNames) {
+     const intentFilters = getIntentFilters(config);
+     config = (0, config_plugins_1.withAndroidManifest)(config, (config) => {
+         const mainApplication = getMainApplicationOrThrow(config.modResults);
+-        const mainActivity = getMainActivityOrThrow(config.modResults);
+-        // Remove MAIN, LAUNCHER from the base MainActivity (not show icon, never be disabled)
+-        if (mainActivity['intent-filter']) {
+-            mainActivity['intent-filter'] = mainActivity['intent-filter'].filter((intentFilter) => {
+-                const isMain = intentFilter.action?.some((a) => a.$['android:name'] === 'android.intent.action.MAIN');
+-                const isLauncher = intentFilter.category?.some((c) => c.$['android:name'] === 'android.intent.category.LAUNCHER');
+-                return !(isMain && isLauncher);
+-            });
+-        }
+-        // Add default alias (default app icon, can safely be disabled)
+-        addActivityAliasToMainApplication(mainApplication, 'Default', intentFilters, true);
+-        // Add alternate aliases (alternate app icons)
+         for (const name of alternateIconNames) {
+-            if ((0, utils_1.toPascalCase)(name) === 'Default') {
+-                throw new Error('Alternate icon name "Default" is reserved.');
+-            }
+-            addActivityAliasToMainApplication(mainApplication, name, intentFilters, false);
++            addActivityAliasToMainApplication(mainApplication, name, intentFilters);
+         }
+         return config;
+     });
+     return config;
+ }
+-function addActivityAliasToMainApplication(mainApplication, iconName, intentFilters, isDefaultAlias = false) {
++function addActivityAliasToMainApplication(mainApplication, iconName, intentFilters) {
+     const activityAlias = {
+         $: {
+             'android:name': `.MainActivity${(0, utils_1.toPascalCase)(iconName)}`,
+-            'android:enabled': isDefaultAlias ? 'true' : 'false',
++            'android:enabled': 'false',
+             'android:exported': 'true',
+-            ...(!isDefaultAlias && { 'android:icon': `@mipmap/ic_launcher_${(0, utils_1.toSnakeCase)(iconName)}` }),
++            'android:icon': `@mipmap/ic_launcher_${(0, utils_1.toSnakeCase)(iconName)}`,
+             'android:targetActivity': '.MainActivity',
+         },
+         'intent-filter': [
+diff --git a/plugin/src/android/withAndroidManifestUpdate.ts b/plugin/src/android/withAndroidManifestUpdate.ts
+index 946ca2af6965ce9336f67b007ead10690829b802..7475c5c9db14f0e5a3278f678e79ebe424b3cdc3 100644
+--- a/plugin/src/android/withAndroidManifestUpdate.ts
++++ b/plugin/src/android/withAndroidManifestUpdate.ts
+@@ -5,7 +5,7 @@ import { toPascalCase, toSnakeCase } from '../utils';
+ 
+ type AndroidIntentFilters = NonNullable<Android['intentFilters']>;
+ 
+-const { getMainApplicationOrThrow, getMainActivityOrThrow } = AndroidConfig.Manifest;
++const { getMainApplicationOrThrow } = AndroidConfig.Manifest;
+ const { default: renderIntentFilters, getIntentFilters } = AndroidConfig.IntentFilters;
+ 
+ type ActivityAlias = AndroidConfig.Manifest.ManifestActivity;
+@@ -14,35 +14,17 @@ type ApplicationWithAliases = AndroidConfig.Manifest.ManifestApplication & {
+   ['activity-alias']?: ActivityAlias[];
+ };
+ 
+-export function withAndroidManifestUpdate(config: ExpoConfig, alternateIconNames: string[]) {
++export // Scryve patch: 11.0.0 moved the launcher from MainActivity to a new MainActivityDefault alias.
++// Launchers key home screen icons to the component, so every install on the default icon would
++// lose its home screen icon on update. MainActivity stays the default launcher, as in 8.0.0.
++function withAndroidManifestUpdate(config: ExpoConfig, alternateIconNames: string[]) {
+   const intentFilters = getIntentFilters(config);
+ 
+   config = withAndroidManifest(config, (config) => {
+-    const mainApplication = getMainApplicationOrThrow(config.modResults) as ApplicationWithAliases;
+-    const mainActivity = getMainActivityOrThrow(config.modResults);
++    const mainApplication = getMainApplicationOrThrow(config.modResults);
+ 
+-    // Remove MAIN, LAUNCHER from the base MainActivity (not show icon, never be disabled)
+-    if (mainActivity['intent-filter']) {
+-      mainActivity['intent-filter'] = mainActivity['intent-filter'].filter((intentFilter: any) => {
+-        const isMain = intentFilter.action?.some(
+-          (a: any) => a.$['android:name'] === 'android.intent.action.MAIN',
+-        );
+-        const isLauncher = intentFilter.category?.some(
+-          (c: any) => c.$['android:name'] === 'android.intent.category.LAUNCHER',
+-        );
+-        return !(isMain && isLauncher);
+-      });
+-    }
+-
+-    // Add default alias (default app icon, can safely be disabled)
+-    addActivityAliasToMainApplication(mainApplication, 'Default', intentFilters, true);
+-
+-    // Add alternate aliases (alternate app icons)
+     for (const name of alternateIconNames) {
+-      if (toPascalCase(name) === 'Default') {
+-        throw new Error('Alternate icon name "Default" is reserved.');
+-      }
+-      addActivityAliasToMainApplication(mainApplication, name, intentFilters, false);
++      addActivityAliasToMainApplication(mainApplication, name, intentFilters);
+     }
+ 
+     return config;
+@@ -55,14 +37,13 @@ function addActivityAliasToMainApplication(
+   mainApplication: ApplicationWithAliases,
+   iconName: string,
+   intentFilters?: AndroidIntentFilters,
+-  isDefaultAlias: boolean = false,
+ ) {
+   const activityAlias: ActivityAlias = {
+     $: {
+       'android:name': `.MainActivity${toPascalCase(iconName)}`,
+-      'android:enabled': isDefaultAlias ? 'true' : 'false',
++      'android:enabled': 'false',
+       'android:exported': 'true',
+-      ...(!isDefaultAlias && { 'android:icon': `@mipmap/ic_launcher_${toSnakeCase(iconName)}` }),
++      'android:icon': `@mipmap/ic_launcher_${toSnakeCase(iconName)}`,
+       'android:targetActivity': '.MainActivity',
+     },
+     'intent-filter': [

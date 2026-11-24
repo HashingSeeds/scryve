@@ -253,7 +253,7 @@ function migrateLegacyDeck(decks: GuestDeck[]) {
     return false
   }
   try {
-    storage.delete(LEGACY_GUEST_DECK_KEY)
+    storage.remove(LEGACY_GUEST_DECK_KEY)
     return true
   } catch {
     return false
@@ -302,7 +302,7 @@ function commit(decks: GuestDeck[], failure: string) {
   snapshot = decks
   if (pendingLegacy) {
     try {
-      storage.delete(LEGACY_GUEST_DECK_KEY)
+      storage.remove(LEGACY_GUEST_DECK_KEY)
       pendingLegacy = false
     } catch {}
   }
@@ -533,8 +533,8 @@ export function deleteGuestDeck(localId: string) {
 
 export function clearGuestDecks() {
   try {
-    storage.delete(GUEST_DECKS_KEY)
-    storage.delete(LEGACY_GUEST_DECK_KEY)
+    storage.remove(GUEST_DECKS_KEY)
+    storage.remove(LEGACY_GUEST_DECK_KEY)
   } catch {
     throw new GuestDeckStorageError(translate("decks:guestStorage.deleteAllFailed"))
   }

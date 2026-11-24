@@ -202,7 +202,7 @@ describe("deck metadata writes", () => {
     await flush()
     stop()
     const failedId = controller.getSnapshot().failures[0].action.operationId
-    jest.spyOn(local, "delete").mockImplementationOnce(() => {
+    jest.spyOn(local, "remove").mockImplementationOnce(() => {
       throw new Error("process interrupted")
     })
     expect(() => controller.reapplyFailure(failedId)).toThrow("process interrupted")

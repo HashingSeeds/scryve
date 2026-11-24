@@ -1,0 +1,26 @@
+diff --git a/lib/createMMKV/createMockMMKV.js b/lib/createMMKV/createMockMMKV.js
+index 9d1a92314a2af91056cc263a6a535c5dce4a9baf..488423d4e73800cc4d7b78827cee6718f4a7013b 100644
+--- a/lib/createMMKV/createMockMMKV.js
++++ b/lib/createMMKV/createMockMMKV.js
+@@ -24,7 +24,7 @@ export function createMockMMKV(config = { id: 'mmkv.default' }) {
+         isReadOnly: false,
+         isEncrypted: false,
+         clearAll: () => {
+-            const keysBefore = storage.keys();
++            const keysBefore = Array.from(storage.keys());
+             storage.clear();
+             // Notify all listeners for all keys that were cleared
+             for (const key of keysBefore) {
+diff --git a/src/createMMKV/createMockMMKV.ts b/src/createMMKV/createMockMMKV.ts
+index a0ee8f256bdb2b91a22bc121414ca050e3a36ff1..c0ddbb222d33fa650e1dac6453b12ce15fac20d4 100644
+--- a/src/createMMKV/createMockMMKV.ts
++++ b/src/createMMKV/createMockMMKV.ts
+@@ -31,7 +31,7 @@ export function createMockMMKV(
+     isReadOnly: false,
+     isEncrypted: false,
+     clearAll: () => {
+-      const keysBefore = storage.keys()
++      const keysBefore = Array.from(storage.keys())
+       storage.clear()
+       // Notify all listeners for all keys that were cleared
+       for (const key of keysBefore) {

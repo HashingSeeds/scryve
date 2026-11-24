@@ -491,7 +491,7 @@ export class ConnectedGameRepository {
     if (!isRecord(stored) || stored.schemaVersion !== 1) return null
     const projection = toConnectedProjection(stored)
     if (projection && projection.publicId !== gameId) {
-      this.storage.delete(key)
+      this.storage.remove(key)
       return null
     }
     return projection
@@ -580,7 +580,7 @@ export class ConnectedGameRepository {
     )
       return false
     outbox.clear()
-    this.storage.delete(CONNECTED_KEYS.projection(projection.publicId, this.ownerId))
+    this.storage.remove(CONNECTED_KEYS.projection(projection.publicId, this.ownerId))
     return true
   }
 
@@ -595,6 +595,6 @@ export class ConnectedGameRepository {
       if (!this.ownsActor(action) || !outbox.enqueue(action)) remaining.push(candidate)
     }
     if (remaining.length) this.storage.set(legacyKey, JSON.stringify(remaining))
-    else this.storage.delete(legacyKey)
+    else this.storage.remove(legacyKey)
   }
 }

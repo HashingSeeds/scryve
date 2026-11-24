@@ -23,7 +23,7 @@ function memoryStore(values = new Map<string, string>()): CardDetailStore {
     set: (key, value) => {
       values.set(key, value)
     },
-    delete: (key) => {
+    remove: (key) => {
       values.delete(key)
     },
   }
