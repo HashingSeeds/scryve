@@ -17,16 +17,10 @@ export function boardCornerRadii(
 ): CornerRadii | null {
   if (!display) return null
   const { radii } = display
-  if (display.frame === "upright") {
-    if (board.pinned) return radii
-    // why: an unpinned board turns with the window, and iOS knows only the upright corners, so only a display whose corners all match can be placed.
-    return radii.every((radius) => radius === radii[0]) ? radii : null
-  }
+  // why: iOS unpins only a window smaller than the screen (Split View, Stage Manager), whose corners are not the display's.
+  if (display.frame === "upright") return board.pinned ? radii : null
   if (!board.pinned) return radii
   const turns = ((((-board.holderAngle / 90) | 0) % 4) + 4) % 4
   const at = (corner: number) => radii[(corner + turns) % 4]
   return [at(0), at(1), at(2), at(3)]
 }
-
-export const concentricRadius = (radius: number | null, inset = 0) =>
-  radius === null ? null : Math.max(0, radius - inset)

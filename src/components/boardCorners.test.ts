@@ -1,4 +1,4 @@
-import { boardCornerRadii, concentricRadius } from "./boardCorners"
+import { boardCornerRadii } from "./boardCorners"
 import { getScreenCornerSquaringStyle } from "./PlayerGrid"
 import type { CornerRadii } from "../../modules/display-corners"
 
@@ -14,18 +14,14 @@ describe("boardCornerRadii", () => {
     expect(corners(180)).toEqual([3, 4, 1, 2])
   })
 
-  it("keeps iOS's upright corners on a pinned board, and only matching ones on an unpinned board", () => {
-    const duo: CornerRadii = [8, 59, 59, 8]
-    expect(
-      boardCornerRadii({ radii: duo, frame: "upright" }, { pinned: true, holderAngle: 90 }),
-    ).toBe(duo)
-    expect(
-      boardCornerRadii({ radii: duo, frame: "upright" }, { pinned: false, holderAngle: 0 }),
-    ).toBeNull()
+  it("keeps iOS's upright corners on a pinned board, and none on a windowed one", () => {
     const even: CornerRadii = [44, 44, 44, 44]
     expect(
-      boardCornerRadii({ radii: even, frame: "upright" }, { pinned: false, holderAngle: 0 }),
+      boardCornerRadii({ radii: even, frame: "upright" }, { pinned: true, holderAngle: 90 }),
     ).toBe(even)
+    expect(
+      boardCornerRadii({ radii: even, frame: "upright" }, { pinned: false, holderAngle: 0 }),
+    ).toBeNull()
     expect(boardCornerRadii(null, { pinned: true, holderAngle: 0 })).toBeNull()
   })
 })
@@ -35,17 +31,16 @@ describe("screen corner radii on cards", () => {
     [0, 1],
     [2, 3],
   ]
-  it("rounds each outer card corner to its display corner, one inset in under a top band", () => {
+  it("rounds each outer card corner to its display corner", () => {
     const style = (rowIndex: number, columnIndex: number) =>
       getScreenCornerSquaringStyle({
         rows,
         rowIndex,
         columnIndex,
         displayRadii: window,
-        topInset: 1,
       })
-    expect(style(0, 0)).toMatchObject({ borderTopLeftRadius: 0 })
-    expect(style(0, 1)).toMatchObject({ borderTopRightRadius: 1 })
+    expect(style(0, 0)).toMatchObject({ borderTopLeftRadius: 1 })
+    expect(style(0, 1)).toMatchObject({ borderTopRightRadius: 2 })
     expect(style(1, 1)).toMatchObject({ borderBottomRightRadius: 3 })
     expect(style(1, 0)).toMatchObject({ borderBottomLeftRadius: 4 })
     expect(style(1, 0)).not.toHaveProperty("borderTopLeftRadius")
@@ -63,6 +58,5 @@ describe("screen corner radii on cards", () => {
         displayRadii: [null, 2, 3, 4],
       }),
     ).toMatchObject({ borderTopLeftRadius: 0 })
-    expect(concentricRadius(10, 12)).toBe(0)
   })
 })
