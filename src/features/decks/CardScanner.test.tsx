@@ -1178,22 +1178,33 @@ test("refining to a foil-only printing saves it as foil", async () => {
   catalogDb.clearAll()
 })
 
-test("a star on another card's collector strip does not make this card foil", () => {
-  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
-  const { onScanPrinting } = renderPrintingScanner()
-  const strips = {
-    bottomLines: [
-      { text: "TMC • EN", x: 0, y: 1100, width: 100, height: 20, angle: 0, confidence: 1 },
-      { text: "NCC ★ EN", x: 0, y: 600, width: 100, height: 20, angle: 0, confidence: 1 },
-    ],
-  }
-  collectorFrame("", strips)
-  collectorFrame("", strips)
-  expect(onScanPrinting).toHaveBeenLastCalledWith(
-    expect.objectContaining({ printingId: "tmc-sol", finish: "nonfoil" }),
-  )
-  catalogDb.clearAll()
-})
+test.each([
+  ["after", false],
+  ["before", true],
+])(
+  "a star on another card's collector strip listed %s this card's does not make it foil",
+  (_order, otherFirst) => {
+    solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+    const { onScanPrinting } = renderPrintingScanner()
+    const own = { text: "TMC • EN", x: 0, y: 1100, width: 100, height: 20, angle: 0, confidence: 1 }
+    const other = {
+      text: "NCC ★ EN",
+      x: 0,
+      y: 600,
+      width: 100,
+      height: 20,
+      angle: 0,
+      confidence: 1,
+    }
+    const strips = { bottomLines: otherFirst ? [other, own] : [own, other] }
+    collectorFrame("", strips)
+    collectorFrame("", strips)
+    expect(onScanPrinting).toHaveBeenLastCalledWith(
+      expect.objectContaining({ printingId: "tmc-sol", finish: "nonfoil" }),
+    )
+    catalogDb.clearAll()
+  },
+)
 
 test("clearing the set lock lets a handheld card it rejected be added while still in frame", () => {
   solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })

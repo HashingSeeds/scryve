@@ -444,24 +444,16 @@ export function CardScanner({
       scan.peakHeat = heat
   }
 
-  function primaryFoilStar(lines: readonly CardTextLine[], preferredSet?: string): boolean {
-    if (lines.length === 0) return false
+  function primaryFoilStar(lines: readonly CardTextLine[]): boolean {
     const collectorLines = lines.filter((line) => {
       const parsed = collectorHintFromCardBottom([line.text])
       return Boolean(parsed.setCode || parsed.language || parsed.isFoilStar || line.foilStar)
     })
     if (collectorLines.length === 0) return false
-    const matchingSet = preferredSet
-      ? collectorLines.filter((line) => {
-          const parsed = collectorHintFromCardBottom([line.text])
-          return parsed.setCode === preferredSet.toLowerCase()
-        })
-      : []
-    const pool = matchingSet.length > 0 ? matchingSet : collectorLines
-    // why: pick the lowest line in the frame so a foil card peeking above cannot override this card's collector strip.
-    let primary = pool[0]
-    for (let i = 1; i < pool.length; i += 1) {
-      if (pool[i].y > primary.y) primary = pool[i]
+    // why: pick the lowest line in the frame so a foil card peeking above cannot override this card's collector strip; the parsed set hint can come from that card, so it must not steer the pick.
+    let primary = collectorLines[0]
+    for (let i = 1; i < collectorLines.length; i += 1) {
+      if (collectorLines[i].y > primary.y) primary = collectorLines[i]
     }
     return Boolean(primary.foilStar || collectorHintFromCardBottom([primary.text]).isFoilStar)
   }
@@ -631,7 +623,7 @@ export function CardScanner({
         ? [...candidateBottomLines.current, ...frameBottomLines]
         : frameBottomLines
     const bottomHint = collectorHintFromCardBottom(combinedBottomLines)
-    const frameHasFoilStar = primaryFoilStar(frameBottomLineObjects, bottomHint.setCode)
+    const frameHasFoilStar = primaryFoilStar(frameBottomLineObjects)
     const detectedFoilStar =
       frameHasFoilStar || (candidateName.current === match.name && candidateFoilStar.current)
     const effectiveFinish: CardFinish = finishLocked ? finish : detectedFoilStar ? "foil" : finish
