@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Compares two run.mjs results from the same device. A metric regresses when the after runs
+// Compares two run.mjs or launch.mjs results from the same device. Every metric is lower-is-better. A metric regresses when the after runs
 // are worse than the before runs with p <= 0.01 on an exact one-sided permutation test
 // (Mann-Whitney U over every relabeling), so run-to-run noise rarely fails a change.
 // Usage: compare.mjs <before.json> <after.json>. Exits 1 on a regression.
@@ -10,7 +10,6 @@ if (!before || !after) throw new Error("usage: compare.mjs <before.json> <after.
 if (before.device !== after.device)
   throw new Error(`different devices: ${before.device} and ${after.device}`)
 
-const lowerIsBetter = ["jsCpuMs", "uiCpuMs", "droppedFramePercent"]
 const threshold = 0.01
 
 const median = (values) => {
@@ -49,7 +48,8 @@ function pValue(was, now) {
 let regressed = false
 console.log(`${before.device}: metric, before median (range), after median (range), p, verdict`)
 for (const [scenario, runs] of Object.entries(after.samples)) {
-  for (const metric of lowerIsBetter) {
+  // why: frames counts what a scenario drew, which is not better or worse.
+  for (const metric of Object.keys(runs[0]).filter((key) => key !== "frames")) {
     const was = before.samples[scenario].map((sample) => sample[metric])
     const now = runs.map((sample) => sample[metric])
     const p = pValue(was, now)
