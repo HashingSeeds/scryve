@@ -222,7 +222,7 @@ export function CardScanner({
   const emptyFrames = useRef(0)
   const nameInFrame = useRef<string>(undefined)
   const printingInFrame = useRef<string>(undefined)
-  const recentAcceptedAtByName = useRef(new Map<string, number>())
+  const recentSeenAtByName = useRef(new Map<string, number>())
   const lastAcceptedCard = useRef<{
     id: number
     name: string
@@ -243,6 +243,8 @@ export function CardScanner({
   const corrections = useRef(new Set<Promise<void>>())
   const [closing, setClosing] = useState(false)
   const closingRef = useRef(false)
+  // why: native emits frames on its own clock; when JS falls behind, only the newest frame is worth reading.
+  const pendingPhoto = useRef<CardPhotoText>(undefined)
   const nextId = useRef(0)
   const lastAcceptedAt = useRef(Date.now())
   // why: retry timers outlive renders, so a retry after reconnecting must use the latest addCards.
@@ -290,7 +292,7 @@ export function CardScanner({
     settleLookup.current.delete(card.id)
     if (!("error" in result)) return updateCard(card.id, { ...result, state: "added" })
     countedLands.current.delete(card.name)
-    recentAcceptedAtByName.current.delete(card.name)
+    recentSeenAtByName.current.delete(card.name)
     updateCard(card.id, { state: "failed" })
   }
 
@@ -524,7 +526,7 @@ export function CardScanner({
       candidateFoilStar.current = false
       nameInFrame.current = undefined
       printingInFrame.current = undefined
-      if (scanMode === "bulk") recentAcceptedAtByName.current.clear()
+      if (scanMode === "bulk") recentSeenAtByName.current.clear()
       recentVotes.current = []
       emptyFrames.current = 0
     }
@@ -537,7 +539,7 @@ export function CardScanner({
       const fullyEmpty = photo.lines.length === 0 && (photo.bottomLines?.length ?? 0) === 0
       // why: brief sleeve glare can drop the title while bottom text stays visible; only a truly empty frame should unlock immediate repeat scans.
       if (fullyEmpty && emptyFrames.current >= 2) {
-        if (nameInFrame.current) recentAcceptedAtByName.current.delete(nameInFrame.current)
+        if (nameInFrame.current) recentSeenAtByName.current.delete(nameInFrame.current)
         candidateName.current = undefined
         candidateBottomLines.current = []
         candidateFoilStar.current = false
@@ -591,6 +593,8 @@ export function CardScanner({
       resolved.printing.printingId !== printingInFrame.current,
     )
     if (match.name === nameInFrame.current && !reprintSwapped) {
+      // why: the cooldown counts from the last sighting, so a card that stays peeking behind the next one never re-adds.
+      if (scanMode === "handheld") recentSeenAtByName.current.set(match.name, Date.now())
       maybeUpgradeLastAccepted(match.name, bottomHint, frameHasFoilStar, lockedSet)
       candidateName.current = undefined
       candidateBottomLines.current = []
@@ -599,8 +603,9 @@ export function CardScanner({
       return
     }
     if (scanMode === "handheld") {
-      const lastSeenAt = recentAcceptedAtByName.current.get(match.name)
+      const lastSeenAt = recentSeenAtByName.current.get(match.name)
       if (lastSeenAt !== undefined && Date.now() - lastSeenAt < HANDHELD_REACCEPT_COOLDOWN_MS) {
+        recentSeenAtByName.current.set(match.name, Date.now())
         nameInFrame.current = match.name
         maybeUpgradeLastAccepted(match.name, bottomHint, frameHasFoilStar, lockedSet)
         candidateName.current = undefined
@@ -629,7 +634,7 @@ export function CardScanner({
     recentVotes.current = []
     nameInFrame.current = match.name
     printingInFrame.current = resolved.printing?.printingId
-    recentAcceptedAtByName.current.set(match.name, Date.now())
+    recentSeenAtByName.current.set(match.name, Date.now())
     setAcceptedToken((token) => token + 1)
     setStatus("looking")
     const alternates = closestNamesFromCardTop(nameIndex, linesFromCardTop, ALTERNATE_COUNT + 1)
@@ -842,9 +847,21 @@ export function CardScanner({
               scanMode={scanMode}
               acceptedToken={acceptedToken}
               onText={(event) => {
-                count(event.nativeEvent)
-                readText(event.nativeEvent)
-                if (showStats) setLastPhoto(event.nativeEvent)
+                const photo = event.nativeEvent
+                count(photo)
+                const queued = pendingPhoto.current
+                pendingPhoto.current = queued?.sceneChanged
+                  ? { ...photo, sceneChanged: true }
+                  : photo
+                if (queued) return
+                // why: the timer runs after frames already queued behind this one, so a slow read skips stale frames instead of replaying them.
+                setTimeout(() => {
+                  const next = pendingPhoto.current
+                  pendingPhoto.current = undefined
+                  if (!next) return
+                  readText(next)
+                  if (showStats) setLastPhoto(next)
+                }, 0)
               }}
             />
             {showPrereleaseHud && !reviewing ? (

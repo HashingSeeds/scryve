@@ -4,7 +4,7 @@ import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite"
 import type { CatalogDb, CatalogPrice, CatalogPrinting } from "./catalogDbTypes"
 
 const CATALOG_DB_NAME = "scryve-catalog.db"
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 4
 const ASYNC_IMPORT_BATCH_SIZE = 2000
 const PRINTING_MULTI_INSERT_ROWS = 70
 const PRICE_MULTI_INSERT_ROWS = 110
@@ -51,10 +51,13 @@ function openCatalogNativeDb(): SQLiteDatabase {
         );
         CREATE INDEX IF NOT EXISTS idx_printings_set_num
           ON printings (game, set_code, collector_number);
-        CREATE INDEX IF NOT EXISTS idx_printings_card
-          ON printings (game, card_id);
-        CREATE INDEX IF NOT EXISTS idx_printings_name
-          ON printings (game, name_normalized);
+        -- why: lookups sort by set and number; without those columns here SQLite walks idx_printings_set_num over every printing instead.
+        DROP INDEX IF EXISTS idx_printings_card;
+        DROP INDEX IF EXISTS idx_printings_name;
+        CREATE INDEX IF NOT EXISTS idx_printings_card_order
+          ON printings (game, card_id, set_code, collector_number);
+        CREATE INDEX IF NOT EXISTS idx_printings_name_order
+          ON printings (game, name_normalized, set_code, collector_number);
         CREATE TABLE IF NOT EXISTS prices (
           game TEXT NOT NULL,
           printing_id TEXT NOT NULL,

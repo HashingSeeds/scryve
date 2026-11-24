@@ -11,9 +11,18 @@ import { CardScanner, type ScannedCardAdd } from "./CardScanner"
 import { scanHaptic, type CardPhotoText } from "../../../modules/card-text-reader"
 
 let mockOnText: ((event: { nativeEvent: CardPhotoText }) => void) | undefined
+let mockQueueText: typeof mockOnText
 jest.mock("../../../modules/card-text-reader", () => ({
-  CardTextCamera: (props: { onText: typeof mockOnText }) => {
-    mockOnText = props.onText
+  CardTextCamera: (props: { onText: NonNullable<typeof mockOnText> }) => {
+    mockQueueText = props.onText
+    // why: the scanner reads frames on a 0ms timer so it can skip stale ones; flush it so each frame reads synchronously.
+    mockOnText = (event) => {
+      const faked = "clock" in setTimeout
+      if (!faked) jest.useFakeTimers()
+      props.onText(event)
+      jest.advanceTimersByTime(0)
+      if (!faked) jest.useRealTimers()
+    }
     return null
   },
   scanHaptic: jest.fn(),
@@ -854,4 +863,71 @@ test("keeps card locked across title-glare frames that still show bottom text an
     }),
   )
   catalogDb.clearAll()
+})
+
+test("handheld cooldown counts from the last sighting, so a card peeking behind the next one is not re-added", () => {
+  jest.useFakeTimers()
+  try {
+    const onScanPrinting = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardScanner
+          game="mtg"
+          nameIndex={nameIndex}
+          singleton={false}
+          copiesInDeck={() => 0}
+          addCards={async (names) => names.map(() => ({}))}
+          onScanPrinting={onScanPrinting}
+          onClose={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    const layout = { x: 0, y: 0, width: 400, height: 700 }
+    for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+      fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+
+    show("Sol Ring")
+    show("Sol Ring")
+    act(() => jest.advanceTimersByTime(3_000))
+    show("Sol Ring")
+    show("Arcane Signet")
+    show("Arcane Signet")
+    expect(onScanPrinting.mock.calls.map(([scan]) => scan.name)).toEqual([
+      "Sol Ring",
+      "Arcane Signet",
+    ])
+
+    const pastCooldownSinceAddButNotSinceLastSeen = 2_000
+    act(() => jest.advanceTimersByTime(pastCooldownSinceAddButNotSinceLastSeen))
+    show("Sol Ring")
+    show("Sol Ring")
+    expect(onScanPrinting).toHaveBeenCalledTimes(2)
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("frames that arrive while a read is pending are skipped, so only the newest is read", () => {
+  jest.useFakeTimers()
+  try {
+    const { addCards } = renderScanner({ singleton: false })
+    const frame = {
+      width: 960,
+      height: 1280,
+      lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+    }
+    act(() => {
+      mockQueueText?.({ nativeEvent: frame })
+      mockQueueText?.({ nativeEvent: frame })
+      jest.advanceTimersByTime(0)
+    })
+    act(() => jest.advanceTimersByTime(1_500))
+    const queuedFramesCountedAsOneVote = !addCards.mock.calls.length
+    expect(queuedFramesCountedAsOneVote).toBe(true)
+    show("Sol Ring")
+    act(() => jest.advanceTimersByTime(1_500))
+    expect(addCards).toHaveBeenCalledWith(["Sol Ring"])
+  } finally {
+    jest.useRealTimers()
+  }
 })
