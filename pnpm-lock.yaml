@@ -51,7 +51,7 @@ importers:
         version: 3.6.0(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       '@legendapp/state':
         specifier: 3.0.0-beta.48
-        version: 3.0.0-beta.48(expo-sqlite@58.0.18(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react@19.3.0)
+        version: 3.0.0-beta.48(expo-sqlite@58.0.14(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.28.0
         version: 8.28.0(0d853978600984a8060ee260b2952186)
@@ -140,8 +140,8 @@ importers:
         specifier: ~58.0.11
         version: 58.0.11(@typescript/typescript6@6.0.2)(expo@58.0.19)
       expo-sqlite:
-        specifier: ~58.0.18
-        version: 58.0.18(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+        specifier: 58.0.14
+        version: 58.0.14(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       expo-store-review:
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))
@@ -5179,8 +5179,8 @@ packages:
     peerDependencies:
       expo: '*'
 
-  expo-sqlite@58.0.18:
-    resolution: {integrity: sha512-EbRG/tb4Q+M28sZUY+58TSRrj/bK3RBOoGG8xXeobOJnMuBCMhstoKZlTJpu79ydzqURO5TXdbVhqk9suh39rQ==}
+  expo-sqlite@58.0.14:
+    resolution: {integrity: sha512-OEZsNXYYOzWDkMORprUYRblJVfhO/TKloMWHm5bLzIhYMgs8UcdQZ/RFIMLQFciiaMoYZDsCZbveG47OKcDRXg==}
     peerDependencies:
       expo: '*'
       react: '*'
@@ -10531,11 +10531,11 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
       react-native: 0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
 
-  '@legendapp/state@3.0.0-beta.48(expo-sqlite@58.0.18(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react@19.3.0)':
+  '@legendapp/state@3.0.0-beta.48(expo-sqlite@58.0.14(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react@19.3.0)':
     dependencies:
       use-sync-external-store: 1.6.0(react@19.3.0)
     optionalDependencies:
-      expo-sqlite: 58.0.18(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+      expo-sqlite: 58.0.14(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
     transitivePeerDependencies:
       - react
 
@@ -13595,7 +13595,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-sqlite@58.0.18(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
+  expo-sqlite@58.0.14(expo@58.0.19)(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
     dependencies:
       await-lock: 2.2.2
       expo: 58.0.19(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(@typescript/typescript6@6.0.2)(bufferutil@4.1.0)(expo-router@58.0.26)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(patch_hash=203c6acecf3a6c264fb24de3ef4546f214cb8be96ca4d8fc937b6c6be045911d)(@babel/core@7.29.7)(@react-native/metro-config@0.88.0(@babel/core@7.29.7))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
