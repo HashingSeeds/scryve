@@ -1229,3 +1229,58 @@ test("clearing the set lock lets a handheld card it rejected be added while stil
   }
   catalogDb.clearAll()
 })
+
+const nameOutOfFrameStar = {
+  lines: [
+    {
+      text: "Legendary Artifact Creature",
+      x: 0,
+      y: 100,
+      width: 100,
+      height: 20,
+      angle: 0,
+      confidence: 1,
+    },
+  ],
+  bottomLines: [
+    { text: "100/350 U", x: 0, y: 1080, width: 100, height: 20, angle: 0, confidence: 1 },
+    {
+      text: "TMC * EN",
+      x: 0,
+      y: 1100,
+      width: 100,
+      height: 20,
+      angle: 0,
+      confidence: 1,
+      foilStar: true,
+    },
+  ],
+}
+
+test("a foil star seen while the name is out of frame upgrades the card its collector number pins", async () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("100/350 U TMC • EN")
+  collectorFrame("100/350 U TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(expect.objectContaining({ finish: "nonfoil" }))
+
+  collectorFrame("", nameOutOfFrameStar)
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a foil star seen just before the name is read makes the add foil", () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { onScanPrinting } = renderPrintingScanner()
+  collectorFrame("", nameOutOfFrameStar)
+  collectorFrame("100/350 U TMC • EN")
+  collectorFrame("100/350 U TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})

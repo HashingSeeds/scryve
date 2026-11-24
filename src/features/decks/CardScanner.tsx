@@ -246,6 +246,7 @@ export function CardScanner({
   const recentVotes = useRef<(string | undefined)[]>([])
   const emptyFrames = useRef(0)
   const blankFrames = useRef(0)
+  const starSeen = useRef<{ setCode: string; collectorNumber: string; at: number }>(undefined)
   const nameInFrame = useRef<string>(undefined)
   const printingInFrame = useRef<string>(undefined)
   const recentSeenAtByName = useRef(new Map<string, number>())
@@ -566,6 +567,38 @@ export function CardScanner({
     corrections.current.add(task)
   }
 
+  function starMatches(printing?: { setCode?: string; collectorNumber?: string }) {
+    const star = starSeen.current
+    return Boolean(
+      star &&
+      printing?.setCode &&
+      printing.collectorNumber &&
+      Date.now() - star.at <= IN_FRAME_UPGRADE_WINDOW_MS &&
+      printing.setCode.toLowerCase() === star.setCode &&
+      collectorKey(printing.collectorNumber) === star.collectorNumber,
+    )
+  }
+
+  // why: the star often shows only when the card tilts and its name leaves the frame, so the set and collector number on the starred strip identify the card instead.
+  function noteFoilStar(lines: readonly CardTextLine[], lockedSet: string) {
+    const hint = collectorHintFromCardBottom(lines.map((line) => line.text))
+    const setCode = (hint.setCode || lockedSet).toLowerCase()
+    if (!setCode || !hint.collectorNumber) return
+    starSeen.current = {
+      setCode,
+      collectorNumber: collectorKey(hint.collectorNumber),
+      at: Date.now(),
+    }
+    const last = lastAcceptedCard.current
+    if (last && starMatches(last))
+      maybeUpgradeLastAccepted(
+        last.name,
+        { setCode: last.setCode, collectorNumber: last.collectorNumber },
+        true,
+        lockedSet,
+      )
+  }
+
   function readText(photo: CardPhotoText) {
     if (closingRef.current || !view.current || !frame) return
     if (photo.sceneChanged) {
@@ -582,6 +615,13 @@ export function CardScanner({
     const framing = { view: view.current, frame }
     const linesFromCardTop = framedLinesFromCardTop(photo, framing)
     const match = nameIndex ? nameFromCardTop(nameIndex, linesFromCardTop) : undefined
+    const frameBottomLineObjects =
+      photo.bottomLines && photo.bottomLines.length > 0
+        ? photo.bottomLines
+        : framedLineObjectsFromCardBottom(photo, framing)
+    const frameHasFoilStar = primaryFoilStar(frameBottomLineObjects)
+    const lockedSet = setLock.trim().toUpperCase()
+    if (frameHasFoilStar) noteFoilStar(frameBottomLineObjects, lockedSet)
     if (linesFromCardTop.length) onRead?.({ linesFromCardTop, photo, framing }, match?.name)
     if (!linesFromCardTop.length) {
       emptyFrames.current += 1
@@ -612,26 +652,29 @@ export function CardScanner({
       setStatus(nameIndex ? "unsure" : "loading")
       return
     }
-    const frameBottomLineObjects =
-      photo.bottomLines && photo.bottomLines.length > 0
-        ? photo.bottomLines
-        : framedLineObjectsFromCardBottom(photo, framing)
     const frameBottomLines = frameBottomLineObjects.map((line) => line.text)
     const combinedBottomLines =
       candidateName.current === match.name
         ? [...candidateBottomLines.current, ...frameBottomLines]
         : frameBottomLines
     const bottomHint = collectorHintFromCardBottom(combinedBottomLines)
-    const frameHasFoilStar = primaryFoilStar(frameBottomLineObjects)
     const detectedFoilStar =
       frameHasFoilStar || (candidateName.current === match.name && candidateFoilStar.current)
     const effectiveFinish: CardFinish = finishLocked ? finish : detectedFoilStar ? "foil" : finish
-    const lockedSet = setLock.trim().toUpperCase()
-    const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
+    const firstResolved = resolveScannedPrinting(game, match.name, bottomHint, {
       setLock: lockedSet || undefined,
       finish: effectiveFinish,
       condition,
     })
+    const starredJustBefore =
+      !finishLocked && effectiveFinish !== "foil" && starMatches(firstResolved.printing)
+    const resolved = starredJustBefore
+      ? resolveScannedPrinting(game, match.name, bottomHint, {
+          setLock: lockedSet || undefined,
+          finish: "foil",
+          condition,
+        })
+      : firstResolved
     // why: handheld OCR occasionally drops a leading digit on extended-art printings (#169 -> #69), so reprint auto-swap stays bulk-only.
     const reprintSwapped = Boolean(
       scanMode === "bulk" &&
