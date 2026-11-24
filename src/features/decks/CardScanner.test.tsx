@@ -974,7 +974,7 @@ function collectorFrame(collector: string, extra: Partial<CardPhotoText> = {}) {
 
 function renderPrintingScanner(initialSetLock?: string) {
   const onScanPrinting = jest.fn()
-  const onUpdatePrinting = jest.fn(() => true)
+  const onUpdatePrinting = jest.fn((_id: number, _update: object): boolean => true)
   const view = render(
     <ThemeProvider initialContext="dark">
       <CardScanner
@@ -1052,6 +1052,47 @@ test("a misread collector number that falls back to another printing still lets 
 
   collectorFrame("200/350 U")
   await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a refinement the deck refuses rolls back to the shown printing so a later frame retries", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  onUpdatePrinting.mockReturnValueOnce(false)
+  collectorFrame("TMC • EN")
+  collectorFrame("TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U TMC • EN")
+  collectorFrame("", {
+    bottomLines: [
+      {
+        text: "200/350 U TMC * EN",
+        x: 0,
+        y: 1100,
+        width: 100,
+        height: 20,
+        angle: 0,
+        confidence: 1,
+        foilStar: true,
+      },
+    ],
+  })
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenCalledTimes(1)
+
+  collectorFrame("200/350 U TMC • EN")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenCalledTimes(2)
   expect(onUpdatePrinting).toHaveBeenLastCalledWith(
     expect.any(Number),
     expect.objectContaining({ printingId: "tmc-sol-ext" }),

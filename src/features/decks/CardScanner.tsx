@@ -558,8 +558,17 @@ export function CardScanner({
       })
       if (accepted !== false) return updateCard(last.id, scannerUpdate)
       if (lastAcceptedCard.current?.id !== last.id) return
-      lastAcceptedCard.current = last
-      printingInFrame.current = last.printingId
+      // why: the row only changes once the deck accepts, so it holds what the deck has; reset evidence so a later frame can retry.
+      const shown = addedRef.current.find((card) => card.id === last.id)
+      lastAcceptedCard.current = {
+        ...last,
+        printingId: shown?.printingId,
+        setCode: shown?.setCode,
+        collectorNumber: shown?.collectorNumber,
+        finish: shown?.finish ?? last.finish,
+        evidence: "none",
+      }
+      printingInFrame.current = shown?.printingId
     }
     const task = apply().finally(() => corrections.current.delete(task))
     corrections.current.add(task)
