@@ -63,6 +63,7 @@ export function ImportBuild({
   onFocus,
   onAdd,
   onRemove,
+  onReplace,
   imageFor,
   children,
 }: {
@@ -92,6 +93,7 @@ export function ImportBuild({
   onFocus: (card: DeckCard, sectionLabel: string) => void
   onAdd: (card: Card) => string | undefined
   onRemove: (card: Card) => void
+  onReplace?: (previous: Card, next: Card) => string | undefined
   imageFor?: (card: DeckCard) => string | undefined
   children?: ReactNode
 }) {
@@ -376,6 +378,7 @@ export function ImportBuild({
           commanderCards={shown}
           onClose={() => setSearch(undefined)}
           onRemove={onRemove}
+          onReplace={onReplace}
           onAdd={(card) => {
             if (search.fixing) {
               const replaceError = onReplaceProblem(search.fixing, card)

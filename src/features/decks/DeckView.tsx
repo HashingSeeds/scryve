@@ -411,6 +411,7 @@ export function DeckView({
           commanderCards={cards}
           onClose={() => setChoosingCommander(false)}
           onRemove={search.onRemove}
+          onReplace={search.onReplace}
           onAdd={(card) => {
             const addError = search.onAdd(card)
             if (!addError && isCommanderPick({ game, format }, card)) setChoosingCommander(false)
