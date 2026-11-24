@@ -30,7 +30,6 @@ import {
   ruleReferences,
   searchRules,
   type ComprehensiveRules,
-  type ExcerptSegment,
   type GlossaryEntry,
   type Rule,
   type RuleChapter,
@@ -61,14 +60,7 @@ type Row =
   | { kind: "section"; key: string; section: RuleSection }
   | { kind: "recent"; key: string; id: string; title: string }
   | { kind: "term"; key: string; entry: GlossaryEntry }
-  | {
-      kind: "result"
-      key: string
-      rule: Rule
-      topic?: string
-      title: string
-      segments: ExcerptSegment[]
-    }
+  | { kind: "result"; key: string; rule: Rule; matched?: ReadonlySet<string>; partial?: string }
   | { kind: "rule"; key: string; rule: Rule; target: boolean }
   | { kind: "all"; key: string; section: RuleSection }
   | { kind: "nav"; key: string; previous?: RuleSection; next?: RuleSection }
@@ -117,20 +109,11 @@ function homeRows(
   }: { tab: Tab; query: string; open: ReadonlySet<string>; recent: string[] },
 ): Row[] {
   if (query.trim())
-    return searchRules(rules, query).map((result): Row => {
-      if (result.kind === "term")
-        return { kind: "term", key: `term-${result.entry.term}`, entry: result.entry }
-      const context = ruleContext(rules, result.rule.id)
-      const text = rulePreviewText(context?.group ?? [result.rule], result.rule)
-      return {
-        kind: "result",
-        key: result.rule.id,
-        rule: result.rule,
-        topic: context?.topic,
-        title: context?.section.title ?? "",
-        segments: excerptSegments(text, result.matched, result.partial),
-      }
-    })
+    return searchRules(rules, query).map((result): Row =>
+      result.kind === "term"
+        ? { kind: "term", key: `term-${result.entry.term}`, entry: result.entry }
+        : { ...result, kind: "result", key: result.rule.id },
+    )
   if (tab === "glossary")
     return rules.glossary.map((entry) => ({ kind: "term", key: entry.term, entry }))
   if (tab === "recent")
@@ -331,7 +314,16 @@ export function RulesScreen({
         )
       }
       case "result": {
-        const showSection = item.title && item.title.toLowerCase() !== item.topic?.toLowerCase()
+        // why: a search lists up to 50 results, so each excerpt is built only when its row renders.
+        const context = rules && ruleContext(rules, item.rule.id)
+        const title = context?.section.title
+        const topic = context?.topic
+        const showSection = title && title.toLowerCase() !== topic?.toLowerCase()
+        const segments = excerptSegments(
+          rulePreviewText(context?.group ?? [item.rule], item.rule),
+          item.matched,
+          item.partial,
+        )
         return (
           <Pressable
             accessibilityRole="link"
@@ -341,15 +333,13 @@ export function RulesScreen({
           >
             <View style={themed($resultHeader)}>
               <Text size="sm" style={themed($link)} text={item.rule.id} />
-              {item.topic ? (
-                <Text size="xs" weight="medium" numberOfLines={1} text={item.topic} />
-              ) : null}
+              {topic ? <Text size="xs" weight="medium" numberOfLines={1} text={topic} /> : null}
               {showSection ? (
-                <Text size="xs" tone="dim" numberOfLines={1} style={$flex} text={item.title} />
+                <Text size="xs" tone="dim" numberOfLines={1} style={$flex} text={title} />
               ) : null}
             </View>
             <Text size="xs" tone="dim" numberOfLines={3}>
-              {item.segments.map((segment, segmentIndex) =>
+              {segments.map((segment, segmentIndex) =>
                 segment.matched ? (
                   <Text key={segmentIndex} size="xs" weight="medium" text={segment.text} />
                 ) : (
@@ -520,6 +510,8 @@ export function RulesScreen({
       data={rows}
       extraData={peek}
       initialNumToRender={Math.max(10, targetIndex + 1)}
+      // why: the default window spans all 50 results, so every keystroke re-rendered every one.
+      windowSize={searching ? 3 : undefined}
       onContentSizeChange={() => {
         if (!ruleId || targetIndex <= 0 || scrolledForRule.current === ruleId) return
         scrolledForRule.current = ruleId
