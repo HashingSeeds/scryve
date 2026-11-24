@@ -15,7 +15,6 @@ let mockQueueText: typeof mockOnText
 jest.mock("../../../modules/card-text-reader", () => ({
   CardTextCamera: (props: { onText: NonNullable<typeof mockOnText> }) => {
     mockQueueText = props.onText
-    // why: the scanner reads frames on a 0ms timer so it can skip stale ones; flush it so each frame reads synchronously.
     mockOnText = (event) => {
       const faked = "clock" in setTimeout
       if (!faked) jest.useFakeTimers()
@@ -913,22 +912,25 @@ test("frames that arrive while a read is pending are skipped, so only the newest
   jest.useFakeTimers()
   try {
     const { addCards } = renderScanner({ singleton: false })
-    const frame = {
-      width: 960,
-      height: 1280,
-      lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
-    }
+    const frame = (text: string) => ({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [{ text, x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+      },
+    })
     act(() => {
-      mockQueueText?.({ nativeEvent: frame })
-      mockQueueText?.({ nativeEvent: frame })
+      mockQueueText?.(frame("Sol Ring"))
+      mockQueueText?.(frame("Arcane Signet"))
+      mockQueueText?.(frame("Arcane Signet"))
       jest.advanceTimersByTime(0)
     })
     act(() => jest.advanceTimersByTime(1_500))
     const queuedFramesCountedAsOneVote = !addCards.mock.calls.length
     expect(queuedFramesCountedAsOneVote).toBe(true)
-    show("Sol Ring")
+    show("Arcane Signet")
     act(() => jest.advanceTimersByTime(1_500))
-    expect(addCards.mock.calls.map(([names]) => names)).toEqual([["Sol Ring"]])
+    expect(addCards.mock.calls.map(([names]) => names)).toEqual([["Arcane Signet"]])
   } finally {
     jest.useRealTimers()
   }
