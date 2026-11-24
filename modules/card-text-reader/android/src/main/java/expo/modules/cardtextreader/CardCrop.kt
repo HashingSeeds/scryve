@@ -17,8 +17,8 @@ data class SensorCrop(
   val uprightY: Int,
 )
 
-private const val TOP_BAND_SHARE = 0.24f
-private const val BOTTOM_BAND_SHARE = 0.20f
+private const val TOP_BAND_SHARE = 0.30f
+private const val BOTTOM_BAND_SHARE = 0.22f
 
 private fun cropRect(
   ux0: Float,

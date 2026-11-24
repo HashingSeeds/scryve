@@ -52,13 +52,42 @@ class Luma(
   fun fromFrame(x: Float, y: Float) = Point((x - originX) / step - 0.5f, (y - originY) / step - 0.5f)
 }
 
+/** why: reusing luma and gradient buffers avoids allocating ~1.5 MB of Large Object Space arrays per frame. */
+class CardDetectorScratch {
+  internal var lumaValues = FloatArray(0)
+  internal var gx = FloatArray(0)
+  internal var gy = FloatArray(0)
+  internal var tx = FloatArray(0)
+  internal var ty = FloatArray(0)
+
+  internal fun ensureLuma(size: Int): FloatArray {
+    if (lumaValues.size < size) lumaValues = FloatArray(size)
+    return lumaValues
+  }
+
+  internal fun ensureGradients(size: Int) {
+    if (gx.size < size) gx = FloatArray(size)
+    if (gy.size < size) gy = FloatArray(size)
+    if (tx.size < size) tx = FloatArray(size)
+    if (ty.size < size) ty = FloatArray(size)
+  }
+}
+
 /** why: turned upright by CameraX's clockwise `rotation`, so its pixels line up with the text recognizer's boxes. */
-fun lumaFromPlane(plane: ByteArray, rowStride: Int, width: Int, height: Int, rotation: Int, step: Int): Luma {
+fun lumaFromPlane(
+  plane: ByteArray,
+  rowStride: Int,
+  width: Int,
+  height: Int,
+  rotation: Int,
+  step: Int,
+  scratch: CardDetectorScratch? = null,
+): Luma {
   val cols = width / step
   val rows = height / step
   val sideways = rotation == 90 || rotation == 270
   val uprightWidth = if (sideways) rows else cols
-  val values = FloatArray(cols * rows)
+  val values = scratch?.ensureLuma(cols * rows) ?: FloatArray(cols * rows)
   // why: four reads per square instead of step², since reading every pixel was most of the cost.
   val half = step / 2
   for (y in 0 until rows) {
@@ -100,9 +129,10 @@ private class Line(val vertical: Boolean, val offset: Float, val slope: Float, v
 }
 
 private class Gradients(val width: Int, val height: Int, val x: FloatArray, val y: FloatArray) {
-  fun transposed(): Gradients {
-    val tx = FloatArray(x.size)
-    val ty = FloatArray(y.size)
+  fun transposed(scratch: CardDetectorScratch? = null): Gradients {
+    val size = width * height
+    val tx = scratch?.tx ?: FloatArray(size)
+    val ty = scratch?.ty ?: FloatArray(size)
     for (row in 0 until height) {
       for (col in 0 until width) {
         tx[col * height + row] = y[row * width + col]
@@ -123,11 +153,11 @@ private class Span(val start: Int, val end: Int) {
  * whose four sides lie on edges.
  */
 object CardDetector {
-  fun detect(luma: Luma, guide: Box?): CardDetection {
-    val gradients = sobel(luma)
+  fun detect(luma: Luma, guide: Box?, scratch: CardDetectorScratch? = null): CardDetection {
+    val gradients = sobel(luma, scratch)
     val (columns, rows) = searchArea(luma, guide)
     val verticals = findLines(gradients, columns, rows, vertical = true)
-    val horizontals = findLines(gradients.transposed(), rows, columns, vertical = false)
+    val horizontals = findLines(gradients.transposed(scratch), rows, columns, vertical = false)
     val minWidth = min(luma.width, luma.height) * 0.25f
     val quads = mutableListOf<List<Point>>()
     for ((left, right) in pairs(verticals)) {
@@ -182,11 +212,22 @@ object CardDetector {
     return Rectangle(corners, aspect, share, rejected)
   }
 
-  private fun sobel(luma: Luma): Gradients {
+  private fun sobel(luma: Luma, scratch: CardDetectorScratch? = null): Gradients {
     val w = luma.width
+    val size = w * luma.height
     val v = luma.values
-    val gx = FloatArray(v.size)
-    val gy = FloatArray(v.size)
+    val gx: FloatArray
+    val gy: FloatArray
+    if (scratch != null) {
+      scratch.ensureGradients(size)
+      gx = scratch.gx
+      gy = scratch.gy
+      gx.fill(0f, 0, size)
+      gy.fill(0f, 0, size)
+    } else {
+      gx = FloatArray(size)
+      gy = FloatArray(size)
+    }
     for (y in 1 until luma.height - 1) {
       for (x in 1 until w - 1) {
         val i = y * w + x

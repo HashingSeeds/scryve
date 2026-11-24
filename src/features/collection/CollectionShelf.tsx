@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { FlatList, Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import type { ImageStyle, ViewStyle } from "react-native"
 import * as Clipboard from "expo-clipboard"
@@ -15,6 +15,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { formatCurrency, joinParts } from "@/i18n/format"
 import { translate, translateForStorage } from "@/i18n/translate"
 import { catalogDb } from "@/storage/catalogDb"
+import { localCardDb } from "@/storage/localDb"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
@@ -64,6 +65,7 @@ export function CollectionShelf({
   const [tradeOpen, setTradeOpen] = useState(false)
   const [activeScanSession, setActiveScanSession] = useState<StoredBinder>()
   const [scanningSession, setScanningSession] = useState<StoredBinder>()
+  const scanEntryIdByScanId = useRef(new Map<number, string>())
   const [editingEntry, setEditingEntry] = useState<StoredCollectionEntry>()
   const [addCardOpen, setAddCardOpen] = useState(false)
   const [addCardQuery, setAddCardQuery] = useState("")
@@ -182,7 +184,7 @@ export function CollectionShelf({
     const printing = scan.printingId
       ? catalogDb.getPrinting(sessionGame, scan.printingId)
       : catalogDb.findPrintingsByName(sessionGame, normalizePrintingName(scan.name))[0]
-    addCollectionCard({
+    const saved = addCollectionCard({
       game: sessionGame,
       cardId: printing?.cardId ?? scan.cardId ?? `name:${normalizePrintingName(scan.name)}`,
       printingId:
@@ -197,6 +199,68 @@ export function CollectionShelf({
       imageUrl: printing?.imageUrl ?? scan.imageUrl,
       smallImageUrl: printing?.smallImageUrl ?? scan.imageUrl,
     })
+    scanEntryIdByScanId.current.set(scan.id, saved.id)
+  }
+
+  function handleUpdateScannedPrinting(
+    session: StoredBinder,
+    scanId: number,
+    update: {
+      name: string
+      printingId: string
+      setCode: string
+      collectorNumber: string
+      finish: CardFinish
+      condition: CardCondition
+      imageUrl?: string
+      smallImageUrl?: string
+    },
+  ) {
+    const entryId = scanEntryIdByScanId.current.get(scanId)
+    if (!entryId) return false
+    const sessionGame = session.game ?? game
+    const current = listCollectionEntries({ binderId: session.id }).find(
+      (entry) => entry.id === entryId,
+    )
+    if (!current) return false
+    const printing = catalogDb.getPrinting(sessionGame, update.printingId)
+    const nextCardId = printing?.cardId ?? current.cardId
+    let nextId: string | undefined
+    localCardDb.transaction(() => {
+      if (current.quantity > 1) {
+        updateCollectionEntry(current.id, { quantity: current.quantity - 1 })
+        const split = addCollectionCard({
+          game: sessionGame,
+          cardId: nextCardId,
+          printingId: update.printingId,
+          name: printing?.name ?? update.name,
+          setCode: update.setCode,
+          collectorNumber: update.collectorNumber,
+          finish: update.finish,
+          condition: update.condition,
+          language: current.language,
+          quantity: 1,
+          binderId: session.id,
+          imageUrl: update.imageUrl ?? printing?.imageUrl ?? current.imageUrl,
+          smallImageUrl: update.smallImageUrl ?? printing?.smallImageUrl ?? current.smallImageUrl,
+        })
+        nextId = split.id
+      } else {
+        const updated = updateCollectionEntry(current.id, {
+          cardId: nextCardId,
+          printingId: update.printingId,
+          setCode: update.setCode,
+          collectorNumber: update.collectorNumber,
+          finish: update.finish,
+          condition: update.condition,
+          imageUrl: update.imageUrl ?? printing?.imageUrl ?? current.imageUrl,
+          smallImageUrl: update.smallImageUrl ?? printing?.smallImageUrl ?? current.smallImageUrl,
+        })
+        nextId = updated?.id
+      }
+    })
+    if (nextId) scanEntryIdByScanId.current.set(scanId, nextId)
+    return Boolean(nextId)
   }
 
   const scanningTotalCents = useMemo(() => {
@@ -284,9 +348,13 @@ export function CollectionShelf({
             copiesInDeck={() => 0}
             addCards={async (names) => names.map(() => ({}))}
             onScanPrinting={(scan) => handleScanIntoSession(scanningSession, scan)}
+            onUpdatePrinting={(scanId, update) =>
+              handleUpdateScannedPrinting(scanningSession, scanId, update)
+            }
             sessionTotalCents={scanningTotalCents}
             initialSetLock={scanningSession.defaultSetCode}
             onClose={() => {
+              scanEntryIdByScanId.current.clear()
               const finished = scanningSession
               setScanningSession(undefined)
               setActiveScanSession(finished)
@@ -683,8 +751,12 @@ export function CollectionShelf({
           copiesInDeck={() => 0}
           addCards={async (names) => names.map(() => ({}))}
           onScanPrinting={(scan) => handleScanIntoSession(scanningSession, scan)}
+          onUpdatePrinting={(scanId, update) =>
+            handleUpdateScannedPrinting(scanningSession, scanId, update)
+          }
           sessionTotalCents={scanningTotalCents}
           onClose={() => {
+            scanEntryIdByScanId.current.clear()
             const finished = scanningSession
             setScanningSession(undefined)
             setActiveScanSession(finished)

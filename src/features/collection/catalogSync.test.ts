@@ -239,5 +239,34 @@ describe("catalogSync", () => {
       candidateSetCodes: ["noise", "cmm"],
     })
     expect(candidateMatch.printing?.printingId).toBe("cmm-sol")
+
+    catalogDb.replacePrintings(
+      "mtg",
+      [
+        {
+          game: "mtg",
+          printingId: "10e-mind",
+          cardId: "ora-mind",
+          name: "Mind Stone",
+          nameNormalized: "mind stone",
+          setCode: "10e",
+          collectorNumber: "335",
+          finishes: ["nonfoil"],
+        },
+        {
+          game: "mtg",
+          printingId: "40k-mind",
+          cardId: "ora-mind",
+          name: "Mind Stone",
+          nameNormalized: "mind stone",
+          setCode: "40k",
+          collectorNumber: "242",
+          finishes: ["nonfoil"],
+        },
+      ],
+      "v2",
+    )
+    const fuzzyMatch = resolveScannedPrinting("mtg", "Mind Stone", { setCode: "30k" })
+    expect(fuzzyMatch.printing?.printingId).toBe("40k-mind")
   })
 })

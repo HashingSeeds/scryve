@@ -11,9 +11,17 @@ import { CardScanner, type ScannedCardAdd } from "./CardScanner"
 import { scanHaptic, type CardPhotoText } from "../../../modules/card-text-reader"
 
 let mockOnText: ((event: { nativeEvent: CardPhotoText }) => void) | undefined
+let mockQueueText: typeof mockOnText
 jest.mock("../../../modules/card-text-reader", () => ({
-  CardTextCamera: (props: { onText: typeof mockOnText }) => {
-    mockOnText = props.onText
+  CardTextCamera: (props: { onText: NonNullable<typeof mockOnText> }) => {
+    mockQueueText = props.onText
+    mockOnText = (event) => {
+      const faked = "clock" in setTimeout
+      if (!faked) jest.useFakeTimers()
+      props.onText(event)
+      jest.advanceTimersByTime(0)
+      if (!faked) jest.useRealTimers()
+    }
     return null
   },
   scanHaptic: jest.fn(),
@@ -21,6 +29,7 @@ jest.mock("../../../modules/card-text-reader", () => ({
 }))
 jest.mock("./cardTextLayout", () => ({
   framedLinesFromCardTop: (photo: CardPhotoText) => photo.lines.map((line) => line.text),
+  framedLineObjectsFromCardBottom: (photo: CardPhotoText) => photo.lines.slice(1),
   framedLinesFromCardBottom: (photo: CardPhotoText) =>
     photo.lines.slice(1).map((line) => line.text),
 }))
@@ -647,5 +656,658 @@ test("ignores a single empty frame so the same card is not double-scanned, and r
     ["Sol Ring"],
     [expect.objectContaining({ printingId: "trk-sol", setCode: "trk" })],
   )
+  catalogDb.clearAll()
+})
+
+test("blocks rapid A-B-A ping-pong without leaving frame and progressively upgrades foil on next frame", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "trk-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "trk",
+        setName: "Star Trek",
+        collectorNumber: "50",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+    ],
+    "v1",
+  )
+
+  const onScanPrinting = jest.fn()
+  const onUpdatePrinting = jest.fn()
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardScanner
+        game="mtg"
+        nameIndex={nameIndex}
+        singleton={false}
+        copiesInDeck={() => 0}
+        addCards={async (names) => names.map(() => ({}))}
+        onScanPrinting={onScanPrinting}
+        onUpdatePrinting={onUpdatePrinting}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  const layout = { x: 0, y: 0, width: 400, height: 700 }
+  for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+    fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+
+  show("Sol Ring", "TRK • EN")
+  show("Sol Ring", "TRK • EN")
+  expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: "Sol Ring", finish: "nonfoil" }),
+  )
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [
+          { text: "Sol Ring", x: 0, y: 100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        bottomLines: [
+          {
+            text: "TRK * EN",
+            x: 0,
+            y: 1100,
+            width: 100,
+            height: 20,
+            angle: 0,
+            confidence: 1,
+            foilStar: true,
+          },
+        ],
+      },
+    }),
+  )
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ name: "Sol Ring", printingId: "trk-sol", finish: "foil" }),
+  )
+
+  show("Arcane Signet")
+  show("Arcane Signet")
+  expect(onScanPrinting).toHaveBeenCalledTimes(2)
+
+  show("Sol Ring")
+  show("Sol Ring")
+  expect(onScanPrinting).toHaveBeenCalledTimes(2)
+  catalogDb.clearAll()
+})
+
+test("keeps card locked across title-glare frames that still show bottom text and refines an un-hinted default printing", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "10e-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "10e",
+        setName: "Tenth Edition",
+        collectorNumber: "335",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+      {
+        game: "mtg",
+        printingId: "40k-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "40k",
+        setName: "Warhammer 40,000",
+        collectorNumber: "240",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+    ],
+    "v1",
+  )
+
+  const onScanPrinting = jest.fn()
+  const onUpdatePrinting = jest.fn()
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardScanner
+        game="mtg"
+        nameIndex={nameIndex}
+        singleton={false}
+        copiesInDeck={() => 0}
+        addCards={async (names) => names.map(() => ({}))}
+        onScanPrinting={onScanPrinting}
+        onUpdatePrinting={onUpdatePrinting}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  const layout = { x: 0, y: 0, width: 400, height: 700 }
+  for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+    fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+
+  show("Sol Ring")
+  show("Sol Ring")
+  expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: "Sol Ring", printingId: "10e-sol", finish: "nonfoil" }),
+  )
+
+  for (let i = 0; i < 2; i += 1) {
+    act(() =>
+      mockOnText?.({
+        nativeEvent: {
+          width: 960,
+          height: 1280,
+          lines: [],
+          bottomLines: [
+            {
+              text: "40K EN ARTIST",
+              x: 0,
+              y: 1100,
+              width: 100,
+              height: 20,
+              angle: 0,
+              confidence: 1,
+            },
+          ],
+        },
+      }),
+    )
+  }
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [
+          { text: "Sol Ring", x: 0, y: 100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        bottomLines: [
+          {
+            text: "40K * EN ARTIST",
+            x: 0,
+            y: 1100,
+            width: 100,
+            height: 20,
+            angle: 0,
+            confidence: 1,
+            foilStar: true,
+          },
+        ],
+      },
+    }),
+  )
+  expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenCalledWith(
+    expect.any(Number),
+    expect.objectContaining({
+      name: "Sol Ring",
+      printingId: "40k-sol",
+      setCode: "40k",
+      finish: "foil",
+    }),
+  )
+  catalogDb.clearAll()
+})
+
+test("handheld cooldown counts from the last sighting, so a card peeking behind the next one is not re-added", () => {
+  jest.useFakeTimers()
+  try {
+    const onScanPrinting = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardScanner
+          game="mtg"
+          nameIndex={nameIndex}
+          singleton={false}
+          copiesInDeck={() => 0}
+          addCards={async (names) => names.map(() => ({}))}
+          onScanPrinting={onScanPrinting}
+          onClose={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    const layout = { x: 0, y: 0, width: 400, height: 700 }
+    for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+      fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+
+    show("Sol Ring")
+    show("Sol Ring")
+    act(() => jest.advanceTimersByTime(3_000))
+    show("Sol Ring")
+    show("Arcane Signet")
+    show("Arcane Signet")
+    expect(onScanPrinting.mock.calls.map(([scan]) => scan.name)).toEqual([
+      "Sol Ring",
+      "Arcane Signet",
+    ])
+
+    const pastCooldownSinceAddButNotSinceLastSeen = 2_000
+    act(() => jest.advanceTimersByTime(pastCooldownSinceAddButNotSinceLastSeen))
+    show("Sol Ring")
+    show("Sol Ring")
+    expect(onScanPrinting).toHaveBeenCalledTimes(2)
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("frames that arrive while a read is pending are skipped, so only the newest is read", () => {
+  jest.useFakeTimers()
+  try {
+    const { addCards } = renderScanner({ singleton: false })
+    const frame = (text: string) => ({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [{ text, x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+      },
+    })
+    act(() => {
+      mockQueueText?.(frame("Sol Ring"))
+      mockQueueText?.(frame("Arcane Signet"))
+      mockQueueText?.(frame("Arcane Signet"))
+      jest.advanceTimersByTime(0)
+    })
+    act(() => jest.advanceTimersByTime(1_500))
+    const queuedFramesCountedAsOneVote = !addCards.mock.calls.length
+    expect(queuedFramesCountedAsOneVote).toBe(true)
+    show("Arcane Signet")
+    act(() => jest.advanceTimersByTime(1_500))
+    expect(addCards.mock.calls.map(([names]) => names)).toEqual([["Arcane Signet"]])
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+function solRingPrintings(
+  ...printings: { id: string; set: string; number: string; finishes?: string[] }[]
+) {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    printings.map(({ id, set, number, finishes = ["nonfoil", "foil"] }) => ({
+      game: "mtg",
+      printingId: id,
+      cardId: "ora-sol",
+      name: "Sol Ring",
+      nameNormalized: "sol ring",
+      setCode: set,
+      setName: set,
+      collectorNumber: number,
+      rarity: "uncommon",
+      finishes,
+    })),
+    "v1",
+  )
+}
+
+function collectorFrame(collector: string, extra: Partial<CardPhotoText> = {}) {
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [
+          { text: "Sol Ring", x: 0, y: 100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        bottomLines: [
+          { text: collector, x: 0, y: 1100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        ...extra,
+      },
+    }),
+  )
+}
+
+function renderPrintingScanner(initialSetLock?: string) {
+  const onScanPrinting = jest.fn()
+  const onUpdatePrinting = jest.fn((_id: number, _update: object): boolean => true)
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardScanner
+        game="mtg"
+        nameIndex={nameIndex}
+        singleton={false}
+        copiesInDeck={() => 0}
+        addCards={async (names) => names.map(() => ({}))}
+        onScanPrinting={onScanPrinting}
+        onUpdatePrinting={onUpdatePrinting}
+        initialSetLock={initialSetLock}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  const layout = { x: 0, y: 0, width: 400, height: 700 }
+  for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+    fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+  return { view, onScanPrinting, onUpdatePrinting }
+}
+
+test("a set-only read keeps refining until a collector number pins the printing", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("TMC • EN")
+  collectorFrame("TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U TMC • EN")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("with a set lock, a later collector number alone refines the printing", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner("TMC")
+  collectorFrame("EN")
+  collectorFrame("EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a misread collector number that falls back to another printing still lets a later read refine", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner("TMC")
+  collectorFrame("999/350 U")
+  collectorFrame("999/350 U")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a refinement the deck refuses rolls back to the shown printing so a later frame retries", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  onUpdatePrinting.mockReturnValueOnce(false)
+  collectorFrame("TMC • EN")
+  collectorFrame("TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U TMC • EN")
+  collectorFrame("", {
+    bottomLines: [
+      {
+        text: "200/350 U TMC * EN",
+        x: 0,
+        y: 1100,
+        width: 100,
+        height: 20,
+        angle: 0,
+        confidence: 1,
+        foilStar: true,
+      },
+    ],
+  })
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenCalledTimes(1)
+
+  collectorFrame("200/350 U TMC • EN")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenCalledTimes(2)
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a foil star with no collector number keeps the accepted printing", async () => {
+  solRingPrintings(
+    { id: "10e-sol", set: "10e", number: "320" },
+    { id: "tmc-sol", set: "tmc", number: "59" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("059/350 U TMC • EN")
+  collectorFrame("059/350 U TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("", {
+    bottomLines: [
+      { text: "*", x: 0, y: 1100, width: 10, height: 20, angle: 0, confidence: 1, foilStar: true },
+    ],
+  })
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("blank text frames while the card is still outlined do not unlock a handheld re-add", () => {
+  jest.useFakeTimers()
+  try {
+    const { addCards } = renderScanner({ singleton: false })
+    show("Sol Ring")
+    show("Sol Ring")
+    const outlinedButUnread = {
+      width: 960,
+      height: 1280,
+      lines: [],
+      cardCorners: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 },
+      ],
+    }
+    act(() => mockOnText?.({ nativeEvent: outlinedButUnread }))
+    act(() => mockOnText?.({ nativeEvent: outlinedButUnread }))
+    show("Sol Ring")
+    show("Sol Ring")
+    act(() => jest.advanceTimersByTime(1_500))
+    expect(addCards.mock.calls.flatMap(([names]) => names)).toEqual(["Sol Ring"])
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test("refining to a foil-only printing saves it as foil", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-foil", set: "tmc", number: "200", finishes: ["foil"] },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("TMC • EN")
+  collectorFrame("TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol", finish: "nonfoil" }),
+  )
+
+  collectorFrame("200/350 U TMC • EN")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-foil", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test.each([
+  ["after", false],
+  ["before", true],
+])(
+  "a star on another card's collector strip listed %s this card's does not make it foil",
+  (_order, otherFirst) => {
+    solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+    const { onScanPrinting } = renderPrintingScanner()
+    const own = { text: "TMC • EN", x: 0, y: 1100, width: 100, height: 20, angle: 0, confidence: 1 }
+    const other = {
+      text: "NCC ★ EN",
+      x: 0,
+      y: 600,
+      width: 100,
+      height: 20,
+      angle: 0,
+      confidence: 1,
+    }
+    const strips = { bottomLines: otherFirst ? [other, own] : [own, other] }
+    collectorFrame("", strips)
+    collectorFrame("", strips)
+    expect(onScanPrinting).toHaveBeenLastCalledWith(
+      expect.objectContaining({ printingId: "tmc-sol", finish: "nonfoil" }),
+    )
+    catalogDb.clearAll()
+  },
+)
+
+test("clearing the set lock lets a handheld card it rejected be added while still in frame", () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { view, addCards } = renderScanner({ singleton: false })
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.changeText(view.getByTestId("card-scan-set-lock-input"), "FDN")
+  fireEvent.press(view.getAllByText("Done").at(-1)!)
+  show("Sol Ring")
+  show("Sol Ring")
+  expect(view.getByText("Sol Ring isn't in FDN.")).toBeTruthy()
+
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.press(view.getByText("Clear set lock"))
+  jest.useFakeTimers()
+  try {
+    show("Sol Ring")
+    show("Sol Ring")
+    act(() => jest.advanceTimersByTime(1_500))
+    expect(addCards.mock.calls.flatMap(([names]) => names)).toEqual(["Sol Ring"])
+  } finally {
+    jest.useRealTimers()
+  }
+  catalogDb.clearAll()
+})
+
+const nameOutOfFrameStar = {
+  lines: [
+    {
+      text: "Legendary Artifact Creature",
+      x: 0,
+      y: 100,
+      width: 100,
+      height: 20,
+      angle: 0,
+      confidence: 1,
+    },
+  ],
+  bottomLines: [
+    { text: "100/350 U", x: 0, y: 1080, width: 100, height: 20, angle: 0, confidence: 1 },
+    {
+      text: "TMC * EN",
+      x: 0,
+      y: 1100,
+      width: 100,
+      height: 20,
+      angle: 0,
+      confidence: 1,
+      foilStar: true,
+    },
+  ],
+}
+
+test("a foil star seen while the name is out of frame upgrades the card its collector number pins", async () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("100/350 U TMC • EN")
+  collectorFrame("100/350 U TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(expect.objectContaining({ finish: "nonfoil" }))
+
+  collectorFrame("", nameOutOfFrameStar)
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a foil star seen just before the name is read makes the add foil", () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { onScanPrinting } = renderPrintingScanner()
+  collectorFrame("", nameOutOfFrameStar)
+  collectorFrame("100/350 U TMC • EN")
+  collectorFrame("100/350 U TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("in bulk mode a new card on the stand does not inherit the last card's foil star", () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { view, onScanPrinting } = renderPrintingScanner()
+  fireEvent.press(view.getByTestId("card-scan-mode"))
+  collectorFrame("", {
+    bottomLines: [
+      { text: "100/350 U", x: 0, y: 1080, width: 100, height: 20, angle: 0, confidence: 1 },
+      {
+        text: "TMC * EN",
+        x: 0,
+        y: 1100,
+        width: 100,
+        height: 20,
+        angle: 0,
+        confidence: 1,
+        foilStar: true,
+      },
+    ],
+  })
+  expect(onScanPrinting).toHaveBeenLastCalledWith(expect.objectContaining({ finish: "foil" }))
+
+  collectorFrame("100/350 U TMC • EN", { sceneChanged: true })
+  expect(onScanPrinting).toHaveBeenCalledTimes(2)
+  expect(onScanPrinting).toHaveBeenLastCalledWith(expect.objectContaining({ finish: "nonfoil" }))
   catalogDb.clearAll()
 })
