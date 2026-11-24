@@ -1,7 +1,9 @@
 import type { ReactNode } from "react"
 import { Alert, Platform } from "react-native"
-import { act, renderHook, waitFor } from "@testing-library/react-native"
+import { act, render, renderHook, waitFor } from "@testing-library/react-native"
 import Purchases from "react-native-purchases"
+
+import type { ConnectedProfileState } from "@/features/connected/useConnectedProfile"
 
 import {
   hasFoil,
@@ -10,6 +12,7 @@ import {
   RevenueCatProvider,
   useRevenueCat,
 } from "./RevenueCatContext"
+import { RevenueCatSyncSession } from "./RevenueCatSyncSession"
 import { presentCountProPaywall } from "./revenueCatUi"
 
 const customerInfo = {
@@ -73,6 +76,12 @@ jest.mock("react-native-purchases", () => {
     },
   }
 })
+let mockProfile: ConnectedProfileState
+jest.mock("convex/react", () => ({ useAction: () => jest.fn().mockResolvedValue({}) }))
+jest.mock("@/features/connected/useConnectedProfile", () => ({
+  ConnectedProfileProvider: ({ children }: { children: ReactNode }) => children,
+  useConnectedProfile: () => mockProfile,
+}))
 jest.mock("./revenueCatUi", () => ({
   presentCountProPaywall: jest.fn().mockResolvedValue("purchased"),
   presentCountCustomerCenter: jest.fn().mockResolvedValue(undefined),
@@ -307,7 +316,7 @@ describe("RevenueCatProvider", () => {
     expect(result.current.isCountPro).toBe(true)
   })
 
-  it("forces fresh customer info after reconnect to remove revoked Pro access", async () => {
+  it("forced refreshes replace cached Pro with the server's answer", async () => {
     const { result } = renderHook(() => useRevenueCat(), { wrapper })
     await waitFor(() => expect(result.current.isCountPro).toBe(true))
     purchasesMock.getCustomerInfo.mockResolvedValue(revokedCustomerInfo)
@@ -340,6 +349,60 @@ describe("RevenueCatProvider", () => {
     await waitFor(() => expect(Purchases.logIn).toHaveBeenCalledWith("user_456"))
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.isCountPro).toBe(false)
+  })
+})
+
+describe("offline Pro", () => {
+  // why: models the native SDK with RevenueCat unreachable: getCustomerInfo serves the saved CustomerInfo and invalidating deletes it.
+  let savedCustomerInfo: typeof customerInfo | null
+  const offline = { code: "10", message: "offline" }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    savedCustomerInfo = customerInfo
+    purchasesMock.isConfigured.mockResolvedValue(false)
+    purchasesMock.getOfferings.mockRejectedValue(offline)
+    purchasesMock.getCustomerInfo.mockImplementation(async () => {
+      if (savedCustomerInfo) return savedCustomerInfo
+      throw offline
+    })
+    purchasesMock.invalidateCustomerInfoCache.mockImplementation(async () => {
+      savedCustomerInfo = null
+    })
+  })
+
+  let isCountPro = false
+  function ProProbe() {
+    isCountPro = useRevenueCat().isCountPro
+    return null
+  }
+
+  function app(withSync: boolean) {
+    return (
+      <RevenueCatProvider apiKey="test_public" appUserID="user_123">
+        {withSync ? <RevenueCatSyncSession /> : null}
+        <ProProbe />
+      </RevenueCatProvider>
+    )
+  }
+
+  it("keeps Pro on the next offline launch after reconnecting while RevenueCat is unreachable", async () => {
+    mockProfile = { status: "offline", retry: jest.fn() }
+    const session = render(app(true))
+    await waitFor(() => expect(isCountPro).toBe(true))
+
+    mockProfile = {
+      status: "ready",
+      profile: { userId: "user_123", displayName: "Player" },
+      retry: jest.fn(),
+    }
+    session.rerender(app(true))
+    await waitFor(() => expect(purchasesMock.getCustomerInfo).toHaveBeenCalledTimes(2))
+    session.unmount()
+
+    isCountPro = false
+    render(app(false))
+    await waitFor(() => expect(isCountPro).toBe(true))
   })
 })
 
