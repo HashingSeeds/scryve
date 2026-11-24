@@ -11,6 +11,7 @@ import {
   MTG_PRICES_PATH,
   MTG_PRINTINGS_PATH,
   type CardCondition,
+  type CardFinish,
   type PriceSource,
 } from "../../../convex/lib/cardPricing"
 import { systemDefinition } from "../../../convex/lib/systems"
@@ -40,6 +41,7 @@ export interface PrintingPriceSummary {
 export interface ResolvedScanPrinting {
   printing?: CatalogPrinting
   alternates: CatalogPrinting[]
+  finish: CardFinish
   price: PrintingPriceSummary
 }
 
@@ -300,6 +302,20 @@ export function lookupPrintingPrice(
   return summarizePrintingPrices(rows, finish, condition)
 }
 
+function supportsFinish(printing: CatalogPrinting, finish: CardFinish): boolean {
+  return printing.finishes.length === 0 || printing.finishes.includes(finish)
+}
+
+function resolvePrintingFinish(
+  printing: CatalogPrinting | undefined,
+  requested: CardFinish,
+): CardFinish {
+  if (!printing || supportsFinish(printing, requested)) return requested
+  if (printing.finishes.includes("nonfoil")) return "nonfoil"
+  const first = printing.finishes[0]
+  return first === "foil" || first === "etched" ? first : "nonfoil"
+}
+
 export function resolveScannedPrinting(
   game: string,
   name: string,
@@ -312,34 +328,47 @@ export function resolveScannedPrinting(
   const candidates = lockedSet
     ? allCandidates.filter((candidate) => candidate.setCode === lockedSet)
     : allCandidates
+  const requestedFinish = normalizeFinish(options.finish ?? (hint.isFoilStar ? "foil" : "nonfoil"))
   const preferredSet = lockedSet ?? hint.setCode?.toLowerCase()
   const collector = hint.collectorNumber?.toLowerCase()
+
+  const pickFrom = (pool: readonly CatalogPrinting[]) => {
+    let found: CatalogPrinting | undefined
+    if (preferredSet && collector) {
+      found = pool.find(
+        (candidate) =>
+          candidate.setCode === preferredSet && candidate.collectorNumber === collector,
+      )
+    }
+    if (!found && preferredSet) {
+      found = pool.find((candidate) => candidate.setCode === preferredSet)
+    }
+    if (!found && collector) {
+      found = pool.find((candidate) => candidate.collectorNumber === collector)
+    }
+    if (!found && !lockedSet) {
+      found = pool[0]
+    }
+    return found
+  }
 
   let printing: CatalogPrinting | undefined
   if (hint.setCode && collector && (!lockedSet || hint.setCode.toLowerCase() === lockedSet)) {
     const exact = catalogDb.findPrintingBySetNumber(game, hint.setCode, collector)
     if (exact && exact.nameNormalized === normalized) printing = exact
   }
-  if (!printing && preferredSet && collector) {
-    printing = candidates.find(
-      (candidate) => candidate.setCode === preferredSet && candidate.collectorNumber === collector,
+  if (!printing) {
+    const matchingFinish = candidates.filter((candidate) =>
+      supportsFinish(candidate, requestedFinish),
     )
-  }
-  if (!printing && preferredSet) {
-    printing = candidates.find((candidate) => candidate.setCode === preferredSet)
-  }
-  if (!printing && collector) {
-    printing = candidates.find((candidate) => candidate.collectorNumber === collector)
-  }
-  if (!lockedSet) {
-    printing ??= candidates[0]
+    printing = pickFrom(matchingFinish) ?? pickFrom(candidates)
   }
 
-  const finish = options.finish ?? (hint.isFoilStar ? "foil" : "nonfoil")
+  const finish = resolvePrintingFinish(printing, requestedFinish)
   const price = printing
     ? lookupPrintingPrice(game, printing.printingId, finish, options.condition ?? "NM")
     : {}
-  return { printing, alternates: allCandidates, price }
+  return { printing, alternates: allCandidates, finish, price }
 }
 
 const inFlightSyncs = new Map<
@@ -358,18 +387,22 @@ export function ensureCatalogSynced(game: string) {
   return pending
 }
 
+function readCatalogSnapshot(game: string, supported: boolean) {
+  return {
+    game,
+    printingCount: supported ? catalogDb.countPrintings(game) : 0,
+    priceCount: supported ? catalogDb.countPrices(game) : 0,
+    updatedAt: supported ? catalogDb.getMeta(metaKey(game, META_PRICES_UPDATED_AT)) : undefined,
+  }
+}
+
 export function useCatalogSync(game: string, enabled = true) {
   const supported = isScryfallSystem(game)
   const [syncing, setSyncing] = useState(false)
-  const [printingCount, setPrintingCount] = useState(() =>
-    supported ? catalogDb.countPrintings(game) : 0,
-  )
-  const [priceCount, setPriceCount] = useState(() => (supported ? catalogDb.countPrices(game) : 0))
-  const [updatedAt, setUpdatedAt] = useState(() =>
-    supported ? catalogDb.getMeta(metaKey(game, META_PRICES_UPDATED_AT)) : undefined,
-  )
+  const [snapshot, setSnapshot] = useState(() => readCatalogSnapshot(game, supported))
 
   useEffect(() => {
+    setSnapshot(readCatalogSnapshot(game, supported))
     if (!enabled || !supported) {
       setSyncing(false)
       return
@@ -380,9 +413,7 @@ export function useCatalogSync(game: string, enabled = true) {
       .catch(() => {})
       .finally(() => {
         if (!active) return
-        setPrintingCount(catalogDb.countPrintings(game))
-        setPriceCount(catalogDb.countPrices(game))
-        setUpdatedAt(catalogDb.getMeta(metaKey(game, META_PRICES_UPDATED_AT)))
+        setSnapshot(readCatalogSnapshot(game, supported))
         setSyncing(false)
       })
     return () => {
@@ -390,12 +421,17 @@ export function useCatalogSync(game: string, enabled = true) {
     }
   }, [enabled, game, supported])
 
+  const current =
+    snapshot.game === game && supported
+      ? snapshot
+      : { game, printingCount: 0, priceCount: 0, updatedAt: undefined }
+
   return {
     supported,
     syncing,
-    ready: printingCount > 0,
-    printingCount,
-    priceCount,
-    updatedAt,
+    ready: current.printingCount > 0,
+    printingCount: current.printingCount,
+    priceCount: current.priceCount,
+    updatedAt: current.updatedAt,
   }
 }
