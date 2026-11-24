@@ -2,6 +2,7 @@ import { View } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
+import { catalogDb } from "@/storage/catalogDb"
 import { ThemeProvider } from "@/theme/context"
 import { captureAnalytics } from "@/utils/analytics"
 
@@ -421,4 +422,106 @@ test("the scanner hides detection details with Stats for nerds off", () => {
   const { view } = renderScanner({ singleton: true })
   show("Sol Ring")
   expect(view.queryByTestId("card-scan-stats")).toBeNull()
+})
+
+test("locks on 1 frame in bulk mode, scans duplicates on sceneChanged, and fires hit haptics for high-value printings", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "lea-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "lea",
+        setName: "Limited Edition Alpha",
+        collectorNumber: "269",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+      {
+        game: "mtg",
+        printingId: "cmm-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "cmm",
+        setName: "Commander Masters",
+        collectorNumber: "410",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+    ],
+    "v1",
+  )
+  catalogDb.replacePrices(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "lea-sol",
+        finish: "nonfoil",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 45000,
+        updatedAt: "2026-11-24T00:00:00Z",
+      },
+      {
+        game: "mtg",
+        printingId: "cmm-sol",
+        finish: "foil",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 850,
+        updatedAt: "2026-11-24T00:00:00Z",
+      },
+    ],
+    "2026-11-24T00:00:00Z",
+  )
+
+  const { view, addCards } = renderScanner({ singleton: false })
+  fireEvent.press(view.getByTestId("card-scan-mode"))
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+        bottomLines: [
+          {
+            text: "LEA • EN 269/302",
+            x: 0,
+            y: 1200,
+            width: 100,
+            height: 20,
+            angle: 0,
+            confidence: 1,
+          },
+        ],
+      },
+    }),
+  )
+  expect(scanHaptic).toHaveBeenLastCalledWith("bigHit")
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        sceneChanged: true,
+        lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+        bottomLines: [
+          { text: "CMM ★ EN 0410", x: 0, y: 1200, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+      },
+    }),
+  )
+  expect(scanHaptic).toHaveBeenLastCalledWith("hit")
+
+  await finish(view)
+  expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Sol Ring"])
+  catalogDb.clearAll()
 })

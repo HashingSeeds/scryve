@@ -96,6 +96,9 @@ export default {
       saveFailed: "No se pudo guardar tu elección. Inténtalo de nuevo.",
       unavailable:
         "Compartir el uso no está disponible en esta compilación. No se enviará ningún evento de PostHog.",
+      storeLinks: "Apoya a Scryve con enlaces de tiendas",
+      storeLinksHelper:
+        "Los enlaces salientes a TCGplayer y Card Kingdom pueden incluir una etiqueta de referido sin costo adicional.",
     },
     appInfo: {
       heading: "Información de la app",

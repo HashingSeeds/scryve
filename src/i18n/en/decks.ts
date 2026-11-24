@@ -499,6 +499,29 @@ const decks = {
     permissionDenied: "Camera access is denied. Enable it in system settings to scan cards.",
     allow: "Allow camera",
     openSettings: "Open settings",
+    torch: "Light",
+    handheld: "Handheld",
+    bulk: "Bulk",
+    setLock: "Set",
+    setLockAny: "Any set",
+    setLockTitle: "Lock scanner to a set",
+    setLockPlaceholder: "Set code (e.g. FDN, CMM)",
+    setLockClear: "Clear set lock",
+    changePrinting: "Printing",
+    finish: {
+      nonfoil: "Nonfoil",
+      foil: "Foil",
+      etched: "Etched",
+    },
+    condition: {
+      NM: "NM",
+      LP: "LP",
+      MP: "MP",
+      HP: "HP",
+      DMG: "DMG",
+    },
+    sessionTotal: "Session {{total}}",
+    buylistShort: "Buylist {{value}}",
     // Technical card detection details shown over the camera with "Stats for nerds" on. Keep labels very short.
     stats: {
       // {{state}} is one of the words below.
@@ -524,6 +547,31 @@ const decks = {
       // Rejected because it is too small to be the card.
       size: "too small",
     },
+  },
+
+  collection: {
+    pickPrinting: "Choose printing",
+    finishLabel: "Finish",
+    conditionLabel: "Condition",
+    noPrintings: "No printings cached yet.",
+    scanSession: "Scan session",
+    scanMore: "Scan more",
+    moveToBinder: "Move to binder",
+    buyOnTcgplayer: "Buy on TCGplayer",
+    tcgplayer: "TCGplayer",
+    cardKingdom: "Card Kingdom",
+    cardKingdomBuylist: "CK Buylist",
+    retailTotal: "Retail {{total}}",
+    buylistTotal: "Buylist {{total}}",
+    sortRecent: "Recent",
+    sortValue: "Highest value",
+    sortName: "Name",
+    emptySession: "No cards scanned in this session yet.",
+    movedToBinder_one: "Moved {{count}} entry.",
+    movedToBinder_other: "Moved {{count}} entries.",
+    mainLibrary: "Main library",
+    pricesUpdated: "Prices synced",
+    syncingPrices: "Syncing prices…",
   },
 
   deckLimit: {

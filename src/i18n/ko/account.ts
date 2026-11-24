@@ -94,6 +94,9 @@ export default {
       saveFailed: "선택을 저장할 수 없습니다. 다시 시도하세요.",
       unavailable:
         "이 빌드에서는 사용 데이터 공유를 사용할 수 없습니다. PostHog 이벤트가 전송되지 않습니다.",
+      storeLinks: "스토어 링크로 Scryve 후원",
+      storeLinksHelper:
+        "외부로 연결되는 티씨지플레이어와 카드 킹덤 링크에는 추가 비용 없이 추천 태그가 포함될 수 있습니다.",
     },
     appInfo: {
       heading: "앱 정보",

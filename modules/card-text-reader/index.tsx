@@ -20,17 +20,24 @@ export type CardRectangle = {
   rejected?: "shape" | "position" | "size"
 }
 
+export type CardScanMode = "handheld" | "bulk"
+
 export type CardPhotoText = {
   width: number
   height: number
   lines: CardTextLine[]
+  bottomLines?: CardTextLine[]
   cardCorners?: Point[]
+  sceneChanged?: boolean
   detection?: { rectangles: CardRectangle[]; thermal?: "nominal" | "fair" | "serious" | "critical" }
 }
 
 type CardTextCameraProps = ViewProps & {
   active: boolean
   guide?: Point & { width: number; height: number }
+  torch?: boolean
+  scanMode?: CardScanMode
+  acceptedToken?: number
   onText: (event: { nativeEvent: CardPhotoText }) => void
 }
 
@@ -38,7 +45,7 @@ type CardTextReaderModule = {
   haptic?: (kind: ScanHaptic) => Promise<void>
   prepareHaptics?: () => Promise<void>
 }
-type ScanHaptic = "added" | "skipped"
+export type ScanHaptic = "added" | "hit" | "bigHit" | "skipped"
 
 const nativeModule = requireOptionalNativeModule<CardTextReaderModule>("CardTextReader")
 
@@ -51,7 +58,11 @@ export function scanHaptic(kind: ScanHaptic) {
     ? nativeModule.haptic(kind)
     : kind === "skipped"
       ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      : kind === "bigHit"
+        ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        : kind === "hit"
+          ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+          : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
   void played.catch(() => undefined)
 }
 

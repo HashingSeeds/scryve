@@ -7,10 +7,10 @@ import Vision
 private let cameraFramesPerSecond: Int32 = 20
 private func secondsBetweenReads(_ state: ProcessInfo.ThermalState) -> TimeInterval {
   switch state {
-  case .nominal: 0.12
-  case .fair: 0.16
-  case .serious: 0.25
-  default: 0.4
+  case .nominal: 0.07
+  case .fair: 0.12
+  case .serious: 0.20
+  default: 0.35
   }
 }
 // why: hiding the outline the moment one read misses the card makes it flicker on a steady card,
@@ -24,6 +24,11 @@ private let minCardShareOfGuide: CGFloat = 0.4
 // are also card-like rectangles, but their shapes are further from it than a sleeve's.
 private let cardAspect: CGFloat = 63 / 88
 private let cardAspectTolerance: CGFloat = 0.07
+private let topBandShare: CGFloat = 0.24
+private let bottomBandShare: CGFloat = 0.20
+private let fastConfidenceFloor: Float = 0.65
+private let sigCols = 16
+private let sigRows = 22
 
 private enum Rejection: String {
   case shape, position, size
@@ -39,6 +44,16 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
   private let outline = CAShapeLayer()
   private let frames = DispatchQueue(label: "card-text-camera.frames")
   private let reads = DispatchQueue(label: "card-text-camera.reads")
+  private var device: AVCaptureDevice?
+  private var torchEnabled = false
+  private var bulkMode = false
+  private var acceptedToken = 0
+  private var waitingForSwap = false
+  private var sawMotion = false
+  private var stableFrames = 0
+  private var pendingSceneChanged = false
+  private var acceptedSignature: [UInt8]?
+  private var lastSignature: [UInt8]?
   private var reading = false
   private var lastFrameAt = Date.distantPast
   private var lastCardAt = Date.distantPast
@@ -59,12 +74,47 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     frames.async { [weak self] in self?.configure() }
   }
 
+  func setGuide(_ rect: CGRect?) {
+    frames.async { [weak self] in
+      self?.guide = rect
+      self?.applyFocusPoint()
+    }
+  }
+
+  func setTorch(_ on: Bool) {
+    frames.async { [weak self] in
+      guard let self else { return }
+      self.torchEnabled = on
+      self.applyTorch()
+    }
+  }
+
+  func setScanMode(_ mode: String) {
+    frames.async { [weak self] in
+      self?.bulkMode = (mode == "bulk")
+    }
+  }
+
+  func setAcceptedToken(_ token: Int) {
+    frames.async { [weak self] in
+      guard let self, token > self.acceptedToken else { return }
+      self.acceptedToken = token
+      self.acceptedSignature = self.lastSignature
+      self.waitingForSwap = self.acceptedSignature != nil
+      self.sawMotion = false
+      self.stableFrames = 0
+    }
+  }
+
   override func layoutSubviews() {
     super.layoutSubviews()
     previewLayer.frame = bounds
     outline.frame = bounds
     let size = bounds.size
-    frames.async { [weak self] in self?.viewSize = size }
+    frames.async { [weak self] in
+      self?.viewSize = size
+      self?.applyFocusPoint()
+    }
   }
 
   override func didMoveToWindow() {
@@ -72,16 +122,31 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     let visible = window != nil
     frames.async { [weak self] in
       guard let self else { return }
-      if visible, !self.session.isRunning { self.session.startRunning() }
-      if !visible, self.session.isRunning { self.session.stopRunning() }
+      if visible, !self.session.isRunning {
+        self.session.startRunning()
+        self.applyTorch()
+      }
+      if !visible, self.session.isRunning {
+        self.torchEnabled = false
+        self.applyTorch()
+        self.session.stopRunning()
+      }
     }
+  }
+
+  private func pickBackCamera() -> AVCaptureDevice? {
+    // why: triple/dual-wide virtual cameras auto-switch to macro when holding a card close.
+    return AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: .back)
+      ?? AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: .back)
+      ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
   }
 
   private func configure() {
     guard
-      let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+      let camera = pickBackCamera(),
       let input = try? AVCaptureDeviceInput(device: camera)
     else { return }
+    device = camera
     let output = AVCaptureVideoDataOutput()
     output.alwaysDiscardsLateVideoFrames = true
     output.setSampleBufferDelegate(self, queue: frames)
@@ -92,10 +157,51 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     if (try? camera.lockForConfiguration()) != nil {
       camera.activeVideoMinFrameDuration = CMTime(value: 1, timescale: cameraFramesPerSecond)
       camera.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: cameraFramesPerSecond)
+      if camera.isFocusModeSupported(.continuousAutoFocus) {
+        camera.focusMode = .continuousAutoFocus
+      }
+      if camera.isExposureModeSupported(.continuousAutoExposure) {
+        camera.exposureMode = .continuousAutoExposure
+      }
       camera.unlockForConfiguration()
     }
     session.commitConfiguration()
-    if window != nil { session.startRunning() }
+    applyFocusPoint()
+    if window != nil {
+      session.startRunning()
+      applyTorch()
+    }
+  }
+
+  private func applyTorch() {
+    guard let camera = device, camera.hasTorch else { return }
+    if (try? camera.lockForConfiguration()) != nil {
+      let desired: AVCaptureDevice.TorchMode = (torchEnabled && window != nil) ? .on : .off
+      if camera.isTorchModeSupported(desired) {
+        camera.torchMode = desired
+      }
+      camera.unlockForConfiguration()
+    }
+  }
+
+  private func applyFocusPoint() {
+    guard let camera = device, let guide, viewSize.width > 0, viewSize.height > 0 else { return }
+    let point = CGPoint(x: guide.midY / viewSize.height, y: 1 - guide.midX / viewSize.width)
+    if (try? camera.lockForConfiguration()) != nil {
+      if camera.isFocusPointOfInterestSupported {
+        camera.focusPointOfInterest = point
+        if camera.isFocusModeSupported(.continuousAutoFocus) {
+          camera.focusMode = .continuousAutoFocus
+        }
+      }
+      if camera.isExposurePointOfInterestSupported {
+        camera.exposurePointOfInterest = point
+        if camera.isExposureModeSupported(.continuousAutoExposure) {
+          camera.exposureMode = .continuousAutoExposure
+        }
+      }
+      camera.unlockForConfiguration()
+    }
   }
 
   func captureOutput(
@@ -111,10 +217,48 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     guard !reading, Date().timeIntervalSince(lastFrameAt) >= secondsBetweenReads(thermalState)
     else { return }
     lastFrameAt = Date()
-    reading = true
     // why: the back camera delivers landscape buffers; the scanner is locked to portrait,
     // so `.right` makes Vision read them upright and swaps width and height.
     imageSize = CGSize(width: CVPixelBufferGetHeight(buffer), height: CVPixelBufferGetWidth(buffer))
+
+    let signature = sampleLumaSignature(buffer)
+    if waitingForSwap, let accepted = acceptedSignature, let current = signature {
+      let motionThreshold: Double = bulkMode ? 14.0 : 18.0
+      let neededStable = bulkMode ? 2 : 1
+      let diffFromAccepted = meanAbsDiff(current, accepted)
+      if !sawMotion {
+        if diffFromAccepted < motionThreshold {
+          lastSignature = current
+          return
+        }
+        sawMotion = true
+        stableFrames = 0
+        lastSignature = current
+        return
+      }
+      let frameDiff = lastSignature.map { meanAbsDiff(current, $0) } ?? 255.0
+      lastSignature = current
+      if frameDiff < 10.0 {
+        stableFrames += 1
+        if stableFrames >= neededStable {
+          waitingForSwap = false
+          sawMotion = false
+          stableFrames = 0
+          pendingSceneChanged = true
+        } else {
+          return
+        }
+      } else {
+        stableFrames = 0
+        return
+      }
+    } else if let current = signature {
+      lastSignature = current
+    }
+
+    reading = true
+    let sceneChanged = pendingSceneChanged
+    pendingSceneChanged = false
     // why: looking for the card only on the frames that are read keeps the phone from heating up.
     let (card, rectangles) = detect(buffer)
     show(card)
@@ -123,9 +267,35 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
       "rectangles": rectangles, "thermal": heat(thermalState),
     ]
     reads.async { [weak self] in
-      self?.read(buffer, size: size, card: card, detection: detection)
+      self?.read(buffer, size: size, card: card, detection: detection, sceneChanged: sceneChanged)
       self?.frames.async { self?.reading = false }
     }
+  }
+
+  private func sampleLumaSignature(_ buffer: CVPixelBuffer) -> [UInt8]? {
+    guard CVPixelBufferGetPlaneCount(buffer) > 0 else { return nil }
+    CVPixelBufferLockBaseAddress(buffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+    guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) else { return nil }
+    let bytes = base.assumingMemoryBound(to: UInt8.self)
+    let rowStride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
+    let planeWidth = CVPixelBufferGetWidthOfPlane(buffer, 0)
+    let planeHeight = CVPixelBufferGetHeightOfPlane(buffer, 0)
+    guard planeWidth > sigCols, planeHeight > sigRows else { return nil }
+
+    var out = [UInt8](repeating: 0, count: sigCols * sigRows)
+    let xStart = planeWidth / 6
+    let xSpan = (planeWidth * 2) / 3
+    let yStart = planeHeight / 6
+    let ySpan = (planeHeight * 2) / 3
+    for row in 0..<sigRows {
+      let y = yStart + (row * ySpan) / sigRows
+      for col in 0..<sigCols {
+        let x = xStart + (col * xSpan) / sigCols
+        out[row * sigCols + col] = bytes[y * rowStride + x]
+      }
+    }
+    return out
   }
 
   private func detect(_ buffer: CVPixelBuffer) -> (VNRectangleObservation?, [[String: Any]]) {
@@ -213,21 +383,24 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     }
   }
 
-  private func read(
-    _ buffer: CVPixelBuffer, size: CGSize, card: VNRectangleObservation?, detection: [String: Any]
-  ) {
+  private func recognize(
+    _ buffer: CVPixelBuffer,
+    region: CGRect,
+    level: VNRequestTextRecognitionLevel,
+    size: CGSize
+  ) -> ([[String: Any]], Float) {
     let width = Double(size.width)
     let height = Double(size.height)
     let request = VNRecognizeTextRequest()
-    request.recognitionLevel = .accurate
+    request.recognitionLevel = level
     request.usesLanguageCorrection = false
-    // why: reading only the outlined card roughly halves the work of reading the whole frame.
-    let region = card.map(readRegion) ?? CGRect(x: 0, y: 0, width: 1, height: 1)
     request.regionOfInterest = region
     guard (try? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .right).perform([request])) != nil
-    else { return }
+    else { return ([], 0) }
+    var bestConfidence: Float = 0
     let lines: [[String: Any]] = (request.results ?? []).compactMap { observation in
       guard let candidate = observation.topCandidates(1).first else { return nil }
+      if candidate.confidence > bestConfidence { bestConfidence = candidate.confidence }
       // why: Vision reports text inside the region of interest relative to that region.
       let inRegion = observation.boundingBox
       let box = CGRect(
@@ -247,15 +420,71 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
         "confidence": Double(candidate.confidence),
       ]
     }
+    return (lines, bestConfidence)
+  }
+
+  private func read(
+    _ buffer: CVPixelBuffer,
+    size: CGSize,
+    card: VNRectangleObservation?,
+    detection: [String: Any],
+    sceneChanged: Bool
+  ) {
+    let width = Double(size.width)
+    let height = Double(size.height)
+    var topLines: [[String: Any]]
+    var bottomLines: [[String: Any]] = []
+
+    if let card {
+      let region = readRegion(card)
+      // why: reading only title + collector-bar bands skips rules/flavor text and cuts latency/heat.
+      let topBand = CGRect(
+        x: region.minX,
+        y: max(0, region.maxY - region.height * topBandShare),
+        width: region.width,
+        height: region.height * topBandShare
+      ).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+      let bottomBand = CGRect(
+        x: region.minX,
+        y: region.minY,
+        width: region.width,
+        height: region.height * bottomBandShare
+      ).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+      let (fastLines, bestConf) = recognize(buffer, region: topBand, level: .fast, size: size)
+      if fastLines.isEmpty || bestConf < fastConfidenceFloor {
+        topLines = recognize(buffer, region: topBand, level: .accurate, size: size).0
+      } else {
+        topLines = fastLines
+      }
+      bottomLines = recognize(buffer, region: bottomBand, level: .accurate, size: size).0
+    } else {
+      topLines = recognize(buffer, region: CGRect(x: 0, y: 0, width: 1, height: 1), level: .fast, size: size).0
+    }
+
     guard active else { return }
     var photo: [String: Any] = [
-      "width": width, "height": height, "lines": lines, "detection": detection,
+      "width": width,
+      "height": height,
+      "lines": topLines,
+      "bottomLines": bottomLines,
+      "detection": detection,
     ]
+    if sceneChanged { photo["sceneChanged"] = true }
     if let card {
       photo["cardCorners"] = corners(card).map { ["x": $0.x * width, "y": (1 - $0.y) * height] }
     }
     onText(photo)
   }
+}
+
+private func meanAbsDiff(_ a: [UInt8], _ b: [UInt8]) -> Double {
+  let count = min(a.count, b.count)
+  guard count > 0 else { return 255.0 }
+  var sum = 0
+  for i in 0..<count {
+    sum += abs(Int(a[i]) - Int(b[i]))
+  }
+  return Double(sum) / Double(count)
 }
 
 private func heat(_ state: ProcessInfo.ThermalState) -> String {

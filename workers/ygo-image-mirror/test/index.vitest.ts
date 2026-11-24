@@ -118,6 +118,8 @@ describe("Magic dataset", () => {
 
   afterEach(async () => {
     await env.YGO_IMAGES.delete("datasets/mtg/cards.json")
+    await env.YGO_IMAGES.delete("datasets/mtg/printings.json")
+    await env.YGO_IMAGES.delete("datasets/mtg/prices.json")
   })
 
   it("serves an uploaded dataset gzip-encoded with CORS and a daily cache", async () => {
@@ -141,6 +143,24 @@ describe("Magic dataset", () => {
     const missing = await worker.fetch(new Request(DATASET_URL), env)
     expect(missing.status).toBe(404)
     expect(missing.headers.get("cache-control")).toBe("no-store")
+  })
+
+  it("serves printings and prices datasets under the allowlisted paths", async () => {
+    for (const path of ["/datasets/mtg/printings.json", "/datasets/mtg/prices.json"]) {
+      const url = `https://images.example${path}`
+      const upload = await worker.fetch(
+        new Request(url, {
+          method: "PUT",
+          headers: { authorization: "Bearer test-token" },
+          body: DATASET,
+        }),
+        env,
+      )
+      expect(upload.status).toBe(200)
+      const fetched = await worker.fetch(new Request(url), env)
+      expect(fetched.status).toBe(200)
+      expect(fetched.headers.get("content-encoding")).toBe("gzip")
+    }
   })
 
   it("serves no other dataset key", async () => {
