@@ -591,6 +591,31 @@ function DeckDetailContent({
     return edit({ type: "add", card }, { game, format: deck.format })
   }
 
+  function replaceCard(previous: DeckCard, next: DeckCard): string | undefined {
+    if (knownDeleted || !deck) return undefined
+    ensureDraft()
+    let resolvedNext = next
+    const alreadyInDraft = latestDraft.current.cards.some(
+      (candidate) => printingKey(candidate) === printingKey(next),
+    )
+    const offlineNow = client ? !client.connectionState().isWebSocketConnected : offline
+    if (!alreadyInDraft && offlineNow && !isCommanderPick(deck, next)) {
+      const entry = offlineCardEntry(next)
+      if (!entry) {
+        const offlineError = translate("decks:detail.offlineCard")
+        setError(offlineError)
+        return offlineError
+      }
+      resolvedNext = {
+        ...entry.card,
+        quantity: next.quantity,
+        ...(next.section ? { section: next.section } : {}),
+        ...(next.board ? { board: next.board } : {}),
+      }
+    }
+    return edit({ type: "replace", previous, next: resolvedNext }, { game, format: deck.format })
+  }
+
   /**
    * The known-cards entry an offline add may draw from, or undefined when the card is
    * unknown. Entries must match the deck's game system, so a Magic printing never
@@ -1095,6 +1120,7 @@ function DeckDetailContent({
           offlineCandidates,
           onAdd: (card) => keepSearchEdit(addCard(card)),
           onRemove: (card) => keepSearchEdit(removeCard(card)),
+          onReplace: (previous, next) => keepSearchEdit(replaceCard(previous, next)),
           cards: () => (latestDraft.current.editing ? latestDraft.current.cards : displayCards),
           subscribe: subscribeDraft,
         }}

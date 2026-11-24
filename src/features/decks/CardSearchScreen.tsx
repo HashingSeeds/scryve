@@ -189,6 +189,10 @@ type CardSearchProps = {
   format: string
   onAdd?: AddCard
   onRemove?: (card: GuestDeckPayload["cards"][number]) => void
+  onReplace?: (
+    previous: GuestDeckPayload["cards"][number],
+    next: GuestDeckPayload["cards"][number],
+  ) => string | undefined
   onClose: () => void
   /**
    * The account's fully-cached cards to search while offline. Offline adds draw from
@@ -215,6 +219,7 @@ export function CardSearch({
   format,
   onAdd,
   onRemove,
+  onReplace,
   onClose,
   offlineCandidates,
   initialSection,
@@ -842,10 +847,9 @@ export function CardSearch({
       imageUrl: update.imageUrl ?? previous.imageUrl,
       smallImageUrl: update.smallImageUrl ?? update.imageUrl ?? previous.smallImageUrl,
     }
-    // why: validate and add the replacement before removing the original so an offline rejection never drops the scanned card.
-    const error = onAdd(updated)
+    const error = onReplace ? onReplace(previous, updated) : onAdd(updated)
     if (error) return false
-    onRemove?.(previous)
+    if (!onReplace) onRemove?.(previous)
     scannedEntries.current.set(update.name, updated)
     scannedEntriesById.current.set(id, updated)
     return true

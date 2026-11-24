@@ -505,6 +505,27 @@ export function CardScanner({
 
   async function replace(wrong: ScannedCard, name?: string) {
     setFixing(undefined)
+    const lockedSet = setLock.trim().toUpperCase()
+    const replacement = name
+      ? resolveScannedPrinting(
+          game,
+          name,
+          {},
+          {
+            setLock: lockedSet || undefined,
+            finish,
+            condition,
+          },
+        )
+      : undefined
+    if (name && lockedSet && !replacement?.printing) {
+      session.current.skipped += 1
+      scanHaptic("skipped")
+      setStatus({
+        error: translate("decks:cardScan.notInLockedSet", { card: name, set: lockedSet }),
+      })
+      return
+    }
     setAdded((current) => current.filter((card) => card.id !== wrong.id))
     const stillWaiting = waiting.current.findIndex((card) => card.id === wrong.id)
     const retryTimer = retryTimers.current.get(wrong.id)
@@ -519,30 +540,20 @@ export function CardScanner({
       if (result && !("error" in result)) removeCard?.(wrong.name)
     }
     if (name) {
-      const resolved = resolveScannedPrinting(
-        game,
-        name,
-        {},
-        {
-          setLock: setLock.trim() || undefined,
-          finish,
-          condition,
-        },
-      )
       accept({
         name,
         similarity: 1,
         alternates: [],
-        cardId: resolved.printing?.cardId,
-        printingId: resolved.printing?.printingId,
-        setCode: resolved.printing?.setCode,
-        collectorNumber: resolved.printing?.collectorNumber,
+        cardId: replacement?.printing?.cardId,
+        printingId: replacement?.printing?.printingId,
+        setCode: replacement?.printing?.setCode,
+        collectorNumber: replacement?.printing?.collectorNumber,
         finish,
         condition,
         language: "en",
-        imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
-        retailCents: resolved.price.retailCents,
-        buylistCents: resolved.price.buylistCents,
+        imageUrl: replacement?.printing?.smallImageUrl ?? replacement?.printing?.imageUrl,
+        retailCents: replacement?.price.retailCents,
+        buylistCents: replacement?.price.buylistCents,
       })
     }
   }
