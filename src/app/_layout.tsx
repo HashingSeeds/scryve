@@ -19,6 +19,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
 import { FrameProbe, frameProbeEnabled } from "@/devtools/FrameProbe"
+import { logLaunchTimes } from "@/devtools/launchTimes"
 import { AccountDeletionSessionGuard } from "@/features/auth/AccountDeletionSessionGuard"
 import { CloudProviders } from "@/features/auth/AuthContext"
 import { LocalGameClaimPrompt } from "@/features/game/LocalGameClaimPrompt"
@@ -73,6 +74,7 @@ function Root() {
     if (ready) {
       AppMetrics.markInteractive()
       initAnalytics()
+      logLaunchTimes()
     }
   }, [ready])
 
