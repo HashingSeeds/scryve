@@ -506,6 +506,7 @@ export default {
     tradeBehind: "{{delta}}の損",
     tradeCommit: "トレードを確定",
     tradeCommitted: "トレードをコレクションに保存しました。",
+    tradeInsufficientStock: "その状態の{{card}}は在庫が足りません。",
     tradeClear: "クリア",
     tradeScanGive: "渡すカードをスキャン",
     tradeScanReceive: "受け取るカードをスキャン",

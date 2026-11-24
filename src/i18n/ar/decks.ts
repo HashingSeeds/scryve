@@ -546,6 +546,7 @@ export default {
     tradeBehind: "الزيادة التي تعطيها: {{delta}}",
     tradeCommit: "تأكيد المبادلة",
     tradeCommitted: "تم حفظ المبادلة في مقتنياتك.",
+    tradeInsufficientStock: "عدد النسخ غير كافٍ من البطاقة {{card}} بهذه الحالة.",
     tradeClear: "مسح",
     tradeScanGive: "مسح ما تعطيه",
     tradeScanReceive: "مسح ما تستلمه",

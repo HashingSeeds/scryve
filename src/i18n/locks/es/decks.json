@@ -431,6 +431,7 @@
   "collection.tradeBehind": "0f7a83972d9a.595e1377d587",
   "collection.tradeCommit": "5fca7d9f3a45.1d83c43ac31a",
   "collection.tradeCommitted": "8f946daec007.c81f1d8c1a32",
+  "collection.tradeInsufficientStock": "24999d38781b.3fb4b31a715a",
   "collection.tradeClear": "2bfaf7c64988.a9dd1b9be17e",
   "collection.tradeScanGive": "7e9a2afbe9f6.c427d7a826d1",
   "collection.tradeScanReceive": "ffdfb6f157f5.8de28c579740",

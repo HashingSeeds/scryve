@@ -316,6 +316,54 @@ function resolvePrintingFinish(
   return first === "foil" || first === "etched" ? first : "nonfoil"
 }
 
+export interface ValuedCollectionEntry<
+  T extends { printingId: string; finish: string; condition: string; quantity: number },
+> {
+  entry: T
+  retailCents: number
+  buylistCents: number
+}
+
+export function valueCollectionEntries<
+  T extends { printingId: string; finish: string; condition: string; quantity: number },
+>(
+  game: string,
+  entries: readonly T[],
+): {
+  items: ValuedCollectionEntry<T>[]
+  totals: { cards: number; retailCents: number; buylistCents: number }
+} {
+  if (entries.length === 0) {
+    return { items: [], totals: { cards: 0, retailCents: 0, buylistCents: 0 } }
+  }
+  const pricesByPrinting = catalogDb.getPricesBatch(
+    game,
+    entries.map((entry) => entry.printingId),
+  )
+  const summaryCache = new Map<string, PrintingPriceSummary>()
+  const items: ValuedCollectionEntry<T>[] = new Array(entries.length)
+  let cards = 0
+  let retailCents = 0
+  let buylistCents = 0
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i]
+    const cacheKey = `${entry.printingId}\u0000${entry.finish}\u0000${entry.condition}`
+    let summary = summaryCache.get(cacheKey)
+    if (!summary) {
+      const rows = pricesByPrinting.get(entry.printingId)
+      summary = rows ? summarizePrintingPrices(rows, entry.finish, entry.condition) : {}
+      summaryCache.set(cacheKey, summary)
+    }
+    const unitRetail = summary.retailCents ?? 0
+    const unitBuylist = summary.buylistCents ?? 0
+    items[i] = { entry, retailCents: unitRetail, buylistCents: unitBuylist }
+    cards += entry.quantity
+    retailCents += unitRetail * entry.quantity
+    buylistCents += unitBuylist * entry.quantity
+  }
+  return { items, totals: { cards, retailCents, buylistCents } }
+}
+
 export function resolveScannedPrinting(
   game: string,
   name: string,

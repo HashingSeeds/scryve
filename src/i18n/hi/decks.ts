@@ -509,6 +509,7 @@ export default {
     tradeBehind: "आप {{delta}} ज़्यादा दे रहे हैं",
     tradeCommit: "ट्रेड पक्का करें",
     tradeCommitted: "ट्रेड आपके कलेक्शन में सेव हो गया।",
+    tradeInsufficientStock: "उस कंडीशन में {{card}} की कॉपियाँ काफ़ी नहीं हैं।",
     tradeClear: "साफ़ करें",
     tradeScanGive: "देने वाले कार्ड स्कैन करें",
     tradeScanReceive: "लेने वाले कार्ड स्कैन करें",

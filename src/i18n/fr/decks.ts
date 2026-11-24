@@ -540,6 +540,7 @@ export default {
     tradeBehind: "Vous donnez {{delta}} de plus",
     tradeCommit: "Valider l’échange",
     tradeCommitted: "Échange enregistré dans votre collection.",
+    tradeInsufficientStock: "Pas assez d’exemplaires de {{card}} dans cet état.",
     tradeClear: "Effacer",
     tradeScanGive: "Scanner ce que vous donnez",
     tradeScanReceive: "Scanner ce que vous recevez",

@@ -176,8 +176,7 @@ export function DeckView({
   const ownership = useMemo(() => {
     void collectionRevision
     if (!showOwnership) return undefined
-    const summary = computeDeckOwnership(game, shownCards)
-    return summary.ownedCards > 0 ? summary : undefined
+    return computeDeckOwnership(game, shownCards)
   }, [collectionRevision, game, showOwnership, shownCards])
   const issues = useDeckIssues(game, format, shownCards)
   const side = sideboardSection({ game, format })
