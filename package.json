@@ -97,7 +97,7 @@
     "buffer": "5.7.1",
     "convex": "1.42.3",
     "expo": "58.0.26",
-    "expo-alternate-app-icons": "^11.0.0",
+    "expo-alternate-app-icons": "11.0.0",
     "expo-application": "~58.1.2",
     "expo-auth-session": "58.0.19",
     "expo-build-properties": "~58.0.12",
