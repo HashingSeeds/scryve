@@ -31,7 +31,7 @@ export type StorableVersionCard = Omit<
 export interface DeckVersionCacheStorage {
   getString(key: string): string | undefined
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
 }
 
 export interface DeckVersionCacheSnapshot {
@@ -246,7 +246,7 @@ class ObservableStringStoragePersistence implements ObservablePersistPlugin {
   deleteTable(table: string, config: PersistOptions): void {
     const { local, table: byTable } = this.byTable(config)
     delete byTable[table]
-    local.delete(table)
+    local.remove(table)
   }
 
   /** Local-only persistence needs no metadata; no-op keeps storage byte-identical. */
@@ -266,7 +266,7 @@ class ObservableStringStoragePersistence implements ObservablePersistPlugin {
     const value = byTable[table]
     if (value === undefined || value === internal.symbolDelete) {
       delete byTable[table]
-      local.delete(table)
+      local.remove(table)
     } else {
       try {
         local.set(table, JSON.stringify(value))

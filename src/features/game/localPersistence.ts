@@ -143,7 +143,7 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
 export interface StringStorage {
   getString(key: string): string | undefined
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
 }
 
 /**
@@ -904,7 +904,7 @@ export class LocalGameRepository {
         ? { ...DEFAULT_LOCAL_SETTINGS, askWhatYouPlay: true }
         : DEFAULT_LOCAL_SETTINGS
     this.saveSettings(settings)
-    if (legacy) this.storage.delete(LOCAL_KEYS.legacySettings)
+    if (legacy) this.storage.remove(LOCAL_KEYS.legacySettings)
     return settings
   }
 
@@ -1053,7 +1053,7 @@ export class LocalGameRepository {
     }
     this.storage.set(LOCAL_KEYS.active, JSON.stringify(metadata))
     for (let index = chunkCount; index < (previous?.chunkCount ?? 0); index += 1) {
-      this.storage.delete(LOCAL_KEYS.activeEvents(index))
+      this.storage.remove(LOCAL_KEYS.activeEvents(index))
     }
   }
 
@@ -1188,9 +1188,9 @@ export class LocalGameRepository {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
     const chunkCount =
       isRecord(raw) && typeof raw.eventChunkCount === "number" ? raw.eventChunkCount : 0
-    this.storage.delete(LOCAL_KEYS.active)
+    this.storage.remove(LOCAL_KEYS.active)
     for (let index = 0; index < chunkCount; index += 1) {
-      this.storage.delete(LOCAL_KEYS.activeEvents(index))
+      this.storage.remove(LOCAL_KEYS.activeEvents(index))
     }
   }
 
@@ -1398,7 +1398,7 @@ export class LocalGameRepository {
   }
 
   savePendingMatchEnd(matchId: string | undefined): void {
-    if (matchId === undefined) this.storage.delete(LOCAL_KEYS.pendingMatchEnd)
+    if (matchId === undefined) this.storage.remove(LOCAL_KEYS.pendingMatchEnd)
     else this.storage.set(LOCAL_KEYS.pendingMatchEnd, matchId)
   }
 
@@ -1445,14 +1445,14 @@ export class LocalGameRepository {
     this.writeHistoryIndex(next)
     previous
       .filter(({ id }) => !next.some((game) => game.id === id))
-      .forEach(({ id }) => this.storage.delete(LOCAL_KEYS.historyDetail(id)))
+      .forEach(({ id }) => this.storage.remove(LOCAL_KEYS.historyDetail(id)))
   }
 
   private writeHistoryIndex(games: readonly LocalGameSummary[]): void {
     this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(games.filter((game) => !isWide(game))))
     const wide = games.filter(isWide)
     if (wide.length > 0) this.storage.set(LOCAL_KEYS.wideHistoryIndex, JSON.stringify(wide))
-    else this.storage.delete(LOCAL_KEYS.wideHistoryIndex)
+    else this.storage.remove(LOCAL_KEYS.wideHistoryIndex)
   }
 
   private readHistoryIndex(key: string): LocalGameSummary[] {

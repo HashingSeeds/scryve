@@ -99,7 +99,7 @@ describe("new local game route", () => {
     mockLocalConnectFeed = {}
     mockSignedInAs = undefined
     publishedReporter = undefined
-    storage.delete(LOCAL_KEYS.recentSetups)
+    storage.remove(LOCAL_KEYS.recentSetups)
   })
   afterEach(() => {
     localGameRepository.clearActiveGame()

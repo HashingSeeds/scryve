@@ -28,12 +28,12 @@ const syncedDeck = (revision: number, deleted = false) => ({
 
 describe("deck sync reads", () => {
   it("enables metadata hydration on a fresh device while respecting an explicit opt-out", () => {
-    storage.delete("scryve.decks.syncRead.v1")
+    storage.remove("scryve.decks.syncRead.v1")
     expect(isDeckSyncEnabled()).toBe(true)
 
     setDeckSyncEnabled(false)
     expect(isDeckSyncEnabled()).toBe(false)
-    storage.delete("scryve.decks.syncRead.v1")
+    storage.remove("scryve.decks.syncRead.v1")
   })
 
   it("does not restore cached deck ids from another deployment", () => {

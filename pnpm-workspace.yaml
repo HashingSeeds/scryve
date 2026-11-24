@@ -23,18 +23,22 @@ patchedDependencies:
   # A reused sign-in token is then refreshed far too late, expires, and the next mutation drops the
   # socket to re-authenticate. Still unfixed in 1.48.0.
   convex@1.42.3: js-patches/convex@1.42.3.patch
-  # expo-alternate-app-icons 8.0.0 reads the current Android icon from the launching activity, so
-  # switching twice left both icons enabled and a reset to the default did nothing. It also switched
-  # at once, which closed the app; the patch waits until the app is in the background.
-  expo-alternate-app-icons@8.0.0: patches/expo-alternate-app-icons@8.0.0.patch
-  # react-native-screens 4.30.0 misses the screens stack when expo-dev-launcher wraps it, so
+  # expo-alternate-app-icons 11.0.0 moves the Android launcher off MainActivity, which drops the home
+  # screen icon of every install on the default icon. The patch keeps 8.0.0's launcher layout, reads the
+  # current icon from component state, and switches it once the app is in the background, since
+  # disabling the component the app launched from closes it.
+  expo-alternate-app-icons@11.0.0: patches/expo-alternate-app-icons@11.0.0.patch
+  # react-native-mmkv 4.3.2's Jest mock clears its map before walking the keys it cleared, so
+  # clearAll() never notifies value listeners under Jest. Native MMKV does.
+  react-native-mmkv@4.3.2: js-patches/react-native-mmkv@4.3.2.patch
+  # react-native-screens 4.30.1 misses the screens stack when expo-dev-launcher wraps it, so
   # statusBarHidden is ignored in iOS dev builds.
-  react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch
+  react-native-screens@4.30.1: patches/react-native-screens@4.30.1.patch
   # react-native-tcp-socket 6.4.3 crashes iOS when a peer leaves before its connection is reported,
   # as guests do while a nearby host is in the background. Upstream fix: Rapsssito/react-native-tcp-socket#245.
   react-native-tcp-socket@6.4.3: patches/react-native-tcp-socket@6.4.3.patch
-  # react-native 0.88.0 spreads BridgelessUIManager into UIManager, which builds constants for
+  # react-native 0.88.1 spreads BridgelessUIManager into UIManager, which builds constants for
   # every native view manager at launch (~30ms on a Pixel 6a). JS-only patches live in js-patches/
   # because the native fingerprint hashes patches/, which would block OTA updates.
   # scripts/js-patches.test.cjs keeps native files and build scripts out of js-patches/.
-  react-native@0.88.0: js-patches/react-native@0.88.0.patch
+  react-native@0.88.1: js-patches/react-native@0.88.1.patch

@@ -41,7 +41,7 @@ describe("GameBoardStage on a pinned screen", () => {
     const renderGrid = jest.fn((_orientation: PlayerGridProps["boardOrientation"]) => (
       <View testID="grid" />
     ))
-    render(
+    const board = () => (
       <ThemeProvider initialContext="dark">
         <GameBoardStage
           playerCount={4}
@@ -49,13 +49,16 @@ describe("GameBoardStage on a pinned screen", () => {
           renderGrid={renderGrid}
           menu={{ open: false, actions: menuActions(), onToggle: jest.fn(), onClose: jest.fn() }}
         />
-      </ThemeProvider>,
+      </ThemeProvider>
     )
+    render(board())
 
     const insets = { top: 47, right: 0, bottom: 34, left: 0 }
     act(() =>
       mockNative.report?.({ pinned: true, holderAngle: 90, width: 390, height: 844, insets }),
     )
+    // why: Reanimated's mock reads a shared value only while rendering, so the turn the menu sets after its render shows on the next one.
+    screen.rerender(board())
 
     expect(renderGrid).toHaveBeenLastCalledWith(
       expect.objectContaining({

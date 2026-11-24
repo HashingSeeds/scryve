@@ -13,7 +13,7 @@ import { readsCardDetails } from "../../../convex/lib/deckRules"
 export interface CardDetailStore {
   getString(key: string): string | undefined
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
   addOnValueChangedListener?(listener: (key: string) => void): unknown
 }
 
@@ -92,7 +92,7 @@ export function readCardDetail(
 export function clearCardDetails(store: CardDetailStore = storage): void {
   sessionDetails.delete(store)
   try {
-    store.delete(DETAILS_KEY)
+    store.remove(DETAILS_KEY)
   } catch (error) {
     console.error("[card-details-cache] failed to clear", error)
   }

@@ -375,7 +375,7 @@ export function setAnalyticsEnabled(next: boolean, source: "first_use" | "settin
       storage
         .getAllKeys()
         .filter((key) => key.startsWith(SDK_PREFIX) || key === GAMES_KEY)
-        .forEach((key) => storage.delete(key))
+        .forEach((key) => storage.remove(key))
     } catch {}
     if (loading)
       cleanup = loading

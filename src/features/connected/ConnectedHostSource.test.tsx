@@ -17,7 +17,7 @@ jest.mock("@/utils/storage", () => ({
     set: (key: string, value: string) => {
       mockStorageValues.set(key, value)
     },
-    delete: (key: string) => {
+    remove: (key: string) => {
       mockStorageValues.delete(key)
     },
     getAllKeys: () => [...mockStorageValues.keys()],

@@ -25,7 +25,7 @@ class MemoryStorage implements StringStorage {
     this.mutate("set", key)
     this.values.set(key, value)
   }
-  delete(key: string) {
+  remove(key: string) {
     this.mutate("delete", key)
     this.values.delete(key)
   }
@@ -358,7 +358,7 @@ const olderBuild = {
       )
     }
     for (let index = chunkCount; index < previousChunkCount; index += 1) {
-      storage.delete(LOCAL_KEYS.activeEvents(index))
+      storage.remove(LOCAL_KEYS.activeEvents(index))
     }
   },
 }

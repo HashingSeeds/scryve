@@ -61,7 +61,7 @@ function isLines(value: unknown): value is SwapLine[] {
 export function saveMatchSwaps(matchId: string, swaps: MatchSwaps) {
   if (swaps.in.length || swaps.out.length)
     storage.set(KEY, JSON.stringify({ matchId, in: swaps.in, out: swaps.out }))
-  else storage.delete(KEY)
+  else storage.remove(KEY)
   listeners.forEach((listener) => listener())
 }
 
