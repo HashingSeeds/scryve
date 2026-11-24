@@ -731,6 +731,7 @@ test("blocks rapid A-B-A ping-pong without leaving frame and progressively upgra
       },
     }),
   )
+  await act(async () => {})
   expect(onUpdatePrinting).toHaveBeenCalledWith(
     expect.any(Number),
     expect.objectContaining({ name: "Sol Ring", printingId: "trk-sol", finish: "foil" }),
@@ -853,6 +854,7 @@ test("keeps card locked across title-glare frames that still show bottom text an
     }),
   )
   expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  await act(async () => {})
   expect(onUpdatePrinting).toHaveBeenCalledWith(
     expect.any(Number),
     expect.objectContaining({
@@ -926,7 +928,142 @@ test("frames that arrive while a read is pending are skipped, so only the newest
     expect(queuedFramesCountedAsOneVote).toBe(true)
     show("Sol Ring")
     act(() => jest.advanceTimersByTime(1_500))
-    expect(addCards).toHaveBeenCalledWith(["Sol Ring"])
+    expect(addCards.mock.calls.map(([names]) => names)).toEqual([["Sol Ring"]])
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+function solRingPrintings(...printings: { id: string; set: string; number: string }[]) {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    printings.map(({ id, set, number }) => ({
+      game: "mtg",
+      printingId: id,
+      cardId: "ora-sol",
+      name: "Sol Ring",
+      nameNormalized: "sol ring",
+      setCode: set,
+      setName: set,
+      collectorNumber: number,
+      rarity: "uncommon",
+      finishes: ["nonfoil", "foil"],
+    })),
+    "v1",
+  )
+}
+
+function collectorFrame(collector: string, extra: Partial<CardPhotoText> = {}) {
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [
+          { text: "Sol Ring", x: 0, y: 100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        bottomLines: [
+          { text: collector, x: 0, y: 1100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        ...extra,
+      },
+    }),
+  )
+}
+
+function renderPrintingScanner() {
+  const onScanPrinting = jest.fn()
+  const onUpdatePrinting = jest.fn(() => true)
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardScanner
+        game="mtg"
+        nameIndex={nameIndex}
+        singleton={false}
+        copiesInDeck={() => 0}
+        addCards={async (names) => names.map(() => ({}))}
+        onScanPrinting={onScanPrinting}
+        onUpdatePrinting={onUpdatePrinting}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  const layout = { x: 0, y: 0, width: 400, height: 700 }
+  for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+    fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+  return { onScanPrinting, onUpdatePrinting }
+}
+
+test("a set-only read keeps refining until a collector number pins the printing", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-ext", set: "tmc", number: "200" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("TMC • EN")
+  collectorFrame("TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("200/350 U TMC • EN")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-ext" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a foil star with no collector number keeps the accepted printing", async () => {
+  solRingPrintings(
+    { id: "10e-sol", set: "10e", number: "320" },
+    { id: "tmc-sol", set: "tmc", number: "59" },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("059/350 U TMC • EN")
+  collectorFrame("059/350 U TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol" }),
+  )
+
+  collectorFrame("", {
+    bottomLines: [
+      { text: "*", x: 0, y: 1100, width: 10, height: 20, angle: 0, confidence: 1, foilStar: true },
+    ],
+  })
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("blank text frames while the card is still outlined do not unlock a handheld re-add", () => {
+  jest.useFakeTimers()
+  try {
+    const { addCards } = renderScanner({ singleton: false })
+    show("Sol Ring")
+    show("Sol Ring")
+    const outlinedButUnread = {
+      width: 960,
+      height: 1280,
+      lines: [],
+      cardCorners: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 },
+      ],
+    }
+    act(() => mockOnText?.({ nativeEvent: outlinedButUnread }))
+    act(() => mockOnText?.({ nativeEvent: outlinedButUnread }))
+    show("Sol Ring")
+    show("Sol Ring")
+    act(() => jest.advanceTimersByTime(1_500))
+    expect(addCards.mock.calls.flatMap(([names]) => names)).toEqual(["Sol Ring"])
   } finally {
     jest.useRealTimers()
   }
