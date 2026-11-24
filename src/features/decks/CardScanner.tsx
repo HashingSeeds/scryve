@@ -448,7 +448,7 @@ export function CardScanner({
     if (lines.length === 0) return false
     const collectorLines = lines.filter((line) => {
       const parsed = collectorHintFromCardBottom([line.text])
-      return Boolean(parsed.setCode || parsed.language || line.foilStar)
+      return Boolean(parsed.setCode || parsed.language || parsed.isFoilStar || line.foilStar)
     })
     if (collectorLines.length === 0) return false
     const matchingSet = preferredSet
@@ -463,7 +463,7 @@ export function CardScanner({
     for (let i = 1; i < pool.length; i += 1) {
       if (pool[i].y > primary.y) primary = pool[i]
     }
-    return Boolean(primary.foilStar)
+    return Boolean(primary.foilStar || collectorHintFromCardBottom([primary.text]).isFoilStar)
   }
 
   function maybeUpgradeLastAccepted(
@@ -490,7 +490,9 @@ export function CardScanner({
       finish: targetFinish,
       condition: last.condition,
     })
-    const finishChanged = wantsFoilUpgrade && refined.finish === "foil"
+    // why: a foil-only printing resolves to foil even without a star, so its finish must follow the printing.
+    const nextFinish = refined.finish
+    const finishChanged = nextFinish !== last.finish
     const nextPrinting = refined.printing
     const printingChanged = Boolean(
       wantsPrintingRefine &&
@@ -505,7 +507,6 @@ export function CardScanner({
       lastAcceptedCard.current = { ...last, evidence: nextEvidence }
       return
     }
-    const nextFinish: CardFinish = finishChanged ? "foil" : last.finish
     lastAcceptedCard.current = {
       ...last,
       finish: nextFinish,
@@ -632,9 +633,7 @@ export function CardScanner({
     const bottomHint = collectorHintFromCardBottom(combinedBottomLines)
     const frameHasFoilStar = primaryFoilStar(frameBottomLineObjects, bottomHint.setCode)
     const detectedFoilStar =
-      Boolean(bottomHint.isFoilStar) ||
-      frameHasFoilStar ||
-      (candidateName.current === match.name && candidateFoilStar.current)
+      frameHasFoilStar || (candidateName.current === match.name && candidateFoilStar.current)
     const effectiveFinish: CardFinish = finishLocked ? finish : detectedFoilStar ? "foil" : finish
     const lockedSet = setLock.trim().toUpperCase()
     const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
@@ -1292,6 +1291,7 @@ export function CardScanner({
               onPress={() => {
                 setSetLock(setLockDraft.trim().toUpperCase())
                 if (rejectedBySetLock.current) {
+                  if (nameInFrame.current) recentSeenAtByName.current.delete(nameInFrame.current)
                   nameInFrame.current = undefined
                   printingInFrame.current = undefined
                   candidateName.current = undefined
@@ -1308,6 +1308,7 @@ export function CardScanner({
                   setSetLock("")
                   setSetLockDraft("")
                   if (rejectedBySetLock.current) {
+                    if (nameInFrame.current) recentSeenAtByName.current.delete(nameInFrame.current)
                     nameInFrame.current = undefined
                     printingInFrame.current = undefined
                     candidateName.current = undefined

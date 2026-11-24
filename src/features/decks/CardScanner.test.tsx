@@ -934,11 +934,13 @@ test("frames that arrive while a read is pending are skipped, so only the newest
   }
 })
 
-function solRingPrintings(...printings: { id: string; set: string; number: string }[]) {
+function solRingPrintings(
+  ...printings: { id: string; set: string; number: string; finishes?: string[] }[]
+) {
   catalogDb.clearAll()
   catalogDb.replacePrintings(
     "mtg",
-    printings.map(({ id, set, number }) => ({
+    printings.map(({ id, set, number, finishes = ["nonfoil", "foil"] }) => ({
       game: "mtg",
       printingId: id,
       cardId: "ora-sol",
@@ -948,7 +950,7 @@ function solRingPrintings(...printings: { id: string; set: string; number: strin
       setName: set,
       collectorNumber: number,
       rarity: "uncommon",
-      finishes: ["nonfoil", "foil"],
+      finishes,
     })),
     "v1",
   )
@@ -1151,4 +1153,66 @@ test("blank text frames while the card is still outlined do not unlock a handhel
   } finally {
     jest.useRealTimers()
   }
+})
+
+test("refining to a foil-only printing saves it as foil", async () => {
+  solRingPrintings(
+    { id: "tmc-sol", set: "tmc", number: "100" },
+    { id: "tmc-sol-foil", set: "tmc", number: "200", finishes: ["foil"] },
+  )
+  const { onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  collectorFrame("TMC • EN")
+  collectorFrame("TMC • EN")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol", finish: "nonfoil" }),
+  )
+
+  collectorFrame("200/350 U TMC • EN")
+  await act(async () => {})
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "tmc-sol-foil", finish: "foil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("a star on another card's collector strip does not make this card foil", () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { onScanPrinting } = renderPrintingScanner()
+  const strips = {
+    bottomLines: [
+      { text: "TMC • EN", x: 0, y: 1100, width: 100, height: 20, angle: 0, confidence: 1 },
+      { text: "NCC ★ EN", x: 0, y: 600, width: 100, height: 20, angle: 0, confidence: 1 },
+    ],
+  }
+  collectorFrame("", strips)
+  collectorFrame("", strips)
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "tmc-sol", finish: "nonfoil" }),
+  )
+  catalogDb.clearAll()
+})
+
+test("clearing the set lock lets a handheld card it rejected be added while still in frame", () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { view, addCards } = renderScanner({ singleton: false })
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.changeText(view.getByTestId("card-scan-set-lock-input"), "FDN")
+  fireEvent.press(view.getAllByText("Done").at(-1)!)
+  show("Sol Ring")
+  show("Sol Ring")
+  expect(view.getByText("Sol Ring isn't in FDN.")).toBeTruthy()
+
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.press(view.getByText("Clear set lock"))
+  jest.useFakeTimers()
+  try {
+    show("Sol Ring")
+    show("Sol Ring")
+    act(() => jest.advanceTimersByTime(1_500))
+    expect(addCards.mock.calls.flatMap(([names]) => names)).toEqual(["Sol Ring"])
+  } finally {
+    jest.useRealTimers()
+  }
+  catalogDb.clearAll()
 })
