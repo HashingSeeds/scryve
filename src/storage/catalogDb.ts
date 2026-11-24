@@ -4,8 +4,10 @@ import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite"
 import type { CatalogDb, CatalogPrice, CatalogPrinting } from "./catalogDbTypes"
 
 const CATALOG_DB_NAME = "scryve-catalog.db"
-const SCHEMA_VERSION = 2
-const ASYNC_IMPORT_BATCH_SIZE = 1000
+const SCHEMA_VERSION = 3
+const ASYNC_IMPORT_BATCH_SIZE = 2000
+const PRINTING_MULTI_INSERT_ROWS = 70
+const PRICE_MULTI_INSERT_ROWS = 110
 
 let cachedDb: SQLiteDatabase | undefined
 
@@ -64,9 +66,10 @@ function openCatalogNativeDb(): SQLiteDatabase {
           updated_at TEXT NOT NULL,
           PRIMARY KEY (game, printing_id, finish, source)
         );
-        CREATE INDEX IF NOT EXISTS idx_prices_printing
-          ON prices (game, printing_id);
-        CREATE TABLE IF NOT EXISTS printings_staging (
+        DROP INDEX IF EXISTS idx_prices_printing;
+        DROP TABLE IF EXISTS printings_staging;
+        DROP TABLE IF EXISTS prices_staging;
+        CREATE TABLE printings_staging (
           game TEXT NOT NULL,
           printing_id TEXT NOT NULL,
           card_id TEXT NOT NULL,
@@ -79,10 +82,9 @@ function openCatalogNativeDb(): SQLiteDatabase {
           finishes TEXT NOT NULL,
           tcgplayer_id INTEGER,
           image_url TEXT,
-          small_image_url TEXT,
-          PRIMARY KEY (game, printing_id)
+          small_image_url TEXT
         );
-        CREATE TABLE IF NOT EXISTS prices_staging (
+        CREATE TABLE prices_staging (
           game TEXT NOT NULL,
           printing_id TEXT NOT NULL,
           finish TEXT NOT NULL,
@@ -90,8 +92,7 @@ function openCatalogNativeDb(): SQLiteDatabase {
           currency TEXT NOT NULL,
           retail_cents INTEGER,
           buylist_cents INTEGER,
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY (game, printing_id, finish, source)
+          updated_at TEXT NOT NULL
         );
       `)
       db.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`)
@@ -254,18 +255,15 @@ export const catalogDb: CatalogDb = {
   async replacePrintingsAsync(game, rows, version) {
     const db = openCatalogNativeDb()
     await db.runAsync("DELETE FROM printings_staging WHERE game = ?", [game])
-    const stmt = await db.prepareAsync(
-      `INSERT OR REPLACE INTO printings_staging (
-        game, printing_id, card_id, name, name_normalized, set_code, set_name,
-        collector_number, rarity, finishes, tcgplayer_id, image_url, small_image_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    try {
-      for (let offset = 0; offset < rows.length; offset += ASYNC_IMPORT_BATCH_SIZE) {
-        const chunk = rows.slice(offset, offset + ASYNC_IMPORT_BATCH_SIZE)
-        await db.withTransactionAsync(async () => {
-          for (const row of chunk) {
-            await stmt.executeAsync([
+    for (let offset = 0; offset < rows.length; offset += ASYNC_IMPORT_BATCH_SIZE) {
+      const chunk = rows.slice(offset, offset + ASYNC_IMPORT_BATCH_SIZE)
+      await db.withTransactionAsync(async () => {
+        for (let i = 0; i < chunk.length; i += PRINTING_MULTI_INSERT_ROWS) {
+          const slice = chunk.slice(i, i + PRINTING_MULTI_INSERT_ROWS)
+          const placeholders = slice.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?,?)").join(",")
+          const params: (string | number | null)[] = []
+          for (const row of slice) {
+            params.push(
               row.game,
               row.printingId,
               row.cardId,
@@ -279,39 +277,48 @@ export const catalogDb: CatalogDb = {
               row.tcgplayerId ?? null,
               row.imageUrl ?? null,
               row.smallImageUrl ?? null,
-            ])
+            )
           }
-        })
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      }
-    } finally {
-      await stmt.finalizeAsync()
+          await db.runAsync(
+            `INSERT INTO printings_staging (
+              game, printing_id, card_id, name, name_normalized, set_code, set_name,
+              collector_number, rarity, finishes, tcgplayer_id, image_url, small_image_url
+            ) VALUES ${placeholders}`,
+            params,
+          )
+        }
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
     }
     db.withTransactionSync(() => {
       db.runSync("DELETE FROM printings WHERE game = ?", [game])
-      db.runSync("INSERT INTO printings SELECT * FROM printings_staging WHERE game = ?", [game])
+      db.runSync(
+        "INSERT OR REPLACE INTO printings SELECT * FROM printings_staging WHERE game = ?",
+        [game],
+      )
       db.runSync("DELETE FROM printings_staging WHERE game = ?", [game])
       db.runSync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
         `printings:${game}:version`,
         version,
       ])
     })
+    try {
+      db.execSync("PRAGMA wal_checkpoint(TRUNCATE);")
+    } catch {}
   },
 
   async replacePricesAsync(game, rows, updatedAt) {
     const db = openCatalogNativeDb()
     await db.runAsync("DELETE FROM prices_staging WHERE game = ?", [game])
-    const stmt = await db.prepareAsync(
-      `INSERT OR REPLACE INTO prices_staging (
-        game, printing_id, finish, source, currency, retail_cents, buylist_cents, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    try {
-      for (let offset = 0; offset < rows.length; offset += ASYNC_IMPORT_BATCH_SIZE) {
-        const chunk = rows.slice(offset, offset + ASYNC_IMPORT_BATCH_SIZE)
-        await db.withTransactionAsync(async () => {
-          for (const row of chunk) {
-            await stmt.executeAsync([
+    for (let offset = 0; offset < rows.length; offset += ASYNC_IMPORT_BATCH_SIZE) {
+      const chunk = rows.slice(offset, offset + ASYNC_IMPORT_BATCH_SIZE)
+      await db.withTransactionAsync(async () => {
+        for (let i = 0; i < chunk.length; i += PRICE_MULTI_INSERT_ROWS) {
+          const slice = chunk.slice(i, i + PRICE_MULTI_INSERT_ROWS)
+          const placeholders = slice.map(() => "(?,?,?,?,?,?,?,?)").join(",")
+          const params: (string | number | null)[] = []
+          for (const row of slice) {
+            params.push(
               row.game,
               row.printingId,
               row.finish,
@@ -320,23 +327,32 @@ export const catalogDb: CatalogDb = {
               row.retailCents ?? null,
               row.buylistCents ?? null,
               row.updatedAt,
-            ])
+            )
           }
-        })
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      }
-    } finally {
-      await stmt.finalizeAsync()
+          await db.runAsync(
+            `INSERT INTO prices_staging (
+              game, printing_id, finish, source, currency, retail_cents, buylist_cents, updated_at
+            ) VALUES ${placeholders}`,
+            params,
+          )
+        }
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
     }
     db.withTransactionSync(() => {
       db.runSync("DELETE FROM prices WHERE game = ?", [game])
-      db.runSync("INSERT INTO prices SELECT * FROM prices_staging WHERE game = ?", [game])
+      db.runSync("INSERT OR REPLACE INTO prices SELECT * FROM prices_staging WHERE game = ?", [
+        game,
+      ])
       db.runSync("DELETE FROM prices_staging WHERE game = ?", [game])
       db.runSync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
         `prices:${game}:updatedAt`,
         updatedAt,
       ])
     })
+    try {
+      db.execSync("PRAGMA wal_checkpoint(TRUNCATE);")
+    } catch {}
   },
 
   getPrinting(game, printingId) {

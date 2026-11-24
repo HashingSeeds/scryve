@@ -13,7 +13,7 @@ import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
-import { lookupPrintingPrice, normalizePrintingName } from "./catalogSync"
+import { lookupPrintingPrice, normalizePrintingName, useCatalogSync } from "./catalogSync"
 import type { CardCondition, CardFinish } from "../../../convex/lib/cardPricing"
 
 const FINISHES: readonly CardFinish[] = ["nonfoil", "foil", "etched"]
@@ -49,15 +49,17 @@ export function PrintingPickerSheet({
   onClose: () => void
 }) {
   const { themed, theme } = useAppTheme()
+  const { printingCount } = useCatalogSync(game, visible)
   const [finish, setFinish] = useState<CardFinish>(initialFinish)
   const [condition, setCondition] = useState<CardCondition>(initialCondition)
 
   const printings = useMemo(() => {
     if (!visible) return []
+    void printingCount
     const byId = cardId ? catalogDb.findPrintingsByCardId(game, cardId) : []
     if (byId.length > 0) return byId
     return catalogDb.findPrintingsByName(game, normalizePrintingName(cardName))
-  }, [visible, game, cardId, cardName])
+  }, [visible, game, cardId, cardName, printingCount])
 
   return (
     <Sheet visible={visible} onClose={onClose} testID="printing-picker-sheet">

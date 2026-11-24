@@ -219,6 +219,7 @@ export function CardScanner({
   const settleLookup = useRef(new Map<number, (result: ScannedCardAdd) => void>())
   const retries = useRef(new Map<number, number>())
   const retryTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>())
+  const printingEditRevision = useRef(new Map<number, number>())
   const corrections = useRef(new Set<Promise<void>>())
   const [closing, setClosing] = useState(false)
   const closingRef = useRef(false)
@@ -457,7 +458,7 @@ export function CardScanner({
       printingId: resolved.printing?.printingId,
       setCode: resolved.printing?.setCode ?? bottomHint.setCode,
       collectorNumber: resolved.printing?.collectorNumber ?? bottomHint.collectorNumber,
-      finish: effectiveFinish,
+      finish: resolved.finish,
       condition,
       language: bottomHint.language ?? "en",
       imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
@@ -555,7 +556,7 @@ export function CardScanner({
         printingId: replacement?.printing?.printingId,
         setCode: replacement?.printing?.setCode,
         collectorNumber: replacement?.printing?.collectorNumber,
-        finish: wrong.finish,
+        finish: replacement?.finish ?? wrong.finish,
         condition: wrong.condition,
         language: wrong.language,
         imageUrl: replacement?.printing?.smallImageUrl ?? replacement?.printing?.imageUrl,
@@ -931,6 +932,8 @@ export function CardScanner({
           }) => {
             const target = pickingPrinting
             setPickingPrinting(undefined)
+            const revision = (printingEditRevision.current.get(target.id) ?? 0) + 1
+            printingEditRevision.current.set(target.id, revision)
             const queued = waiting.current.find((item) => item.id === target.id)
             if (queued) {
               queued.printingId = printing.printingId
@@ -955,6 +958,7 @@ export function CardScanner({
             }
             const apply = async () => {
               await lookups.current.get(target.id)
+              if (printingEditRevision.current.get(target.id) !== revision) return
               if (!onUpdatePrinting) return
               const accepted = onUpdatePrinting(target.id, {
                 name: target.name,
@@ -969,6 +973,7 @@ export function CardScanner({
                 buylistCents,
               })
               if (accepted === false) return
+              if (printingEditRevision.current.get(target.id) !== revision) return
               updateCard(target.id, {
                 printingId: printing.printingId,
                 setCode: printing.setCode,

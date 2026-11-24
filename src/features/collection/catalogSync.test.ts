@@ -193,4 +193,46 @@ describe("catalogSync", () => {
     })
     expect(resolved.printing?.printingId).toBe("fdn-0002")
   })
+
+  it("prefers a printing supporting the requested finish and normalizes unsupported finishes", () => {
+    catalogDb.replacePrintings(
+      "mtg",
+      [
+        {
+          game: "mtg",
+          printingId: "lea-sol",
+          cardId: "ora-sol",
+          name: "Sol Ring",
+          nameNormalized: "sol ring",
+          setCode: "lea",
+          collectorNumber: "269",
+          finishes: ["nonfoil"],
+        },
+        {
+          game: "mtg",
+          printingId: "cmm-sol",
+          cardId: "ora-sol",
+          name: "Sol Ring",
+          nameNormalized: "sol ring",
+          setCode: "cmm",
+          collectorNumber: "410",
+          finishes: ["nonfoil", "foil"],
+        },
+      ],
+      "v1",
+    )
+
+    const foilScan = resolveScannedPrinting("mtg", "Sol Ring", {}, { finish: "foil" })
+    expect(foilScan.printing?.printingId).toBe("cmm-sol")
+    expect(foilScan.finish).toBe("foil")
+
+    const lockedAlphaFoil = resolveScannedPrinting(
+      "mtg",
+      "Sol Ring",
+      {},
+      { setLock: "lea", finish: "foil" },
+    )
+    expect(lockedAlphaFoil.printing?.printingId).toBe("lea-sol")
+    expect(lockedAlphaFoil.finish).toBe("nonfoil")
+  })
 })
