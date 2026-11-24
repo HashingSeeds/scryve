@@ -21,6 +21,8 @@ jest.mock("../../../modules/card-text-reader", () => ({
 }))
 jest.mock("./cardTextLayout", () => ({
   framedLinesFromCardTop: (photo: CardPhotoText) => photo.lines.map((line) => line.text),
+  framedLinesFromCardBottom: (photo: CardPhotoText) =>
+    photo.lines.slice(1).map((line) => line.text),
 }))
 jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 jest.mock("expo-camera", () => ({
@@ -81,6 +83,7 @@ function show(...texts: string[]) {
 function scan(...lines: string[]) {
   show(...lines)
   show(...lines)
+  show()
   show()
 }
 
@@ -383,7 +386,7 @@ test("Done reports how the scan went without naming any card", async () => {
     failed_count: 0,
     skipped_count: 1,
     fixed_count: 0,
-    read_count: 7,
+    read_count: 8,
     outlined_read_count: 1,
     peak_heat: "fair",
   })
@@ -593,6 +596,55 @@ test("blocks adding a card outside the locked set and allows re-arming identical
       expect.objectContaining({ printingId: "cmm-sol" }),
       expect.objectContaining({ printingId: "cmm-sol" }),
     ],
+  )
+  catalogDb.clearAll()
+})
+
+test("ignores a single empty frame so the same card is not double-scanned, and resolves set from full-frame bottom lines", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "pw26-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "pw26",
+        setName: "Promo",
+        collectorNumber: "1",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+      {
+        game: "mtg",
+        printingId: "trk-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "trk",
+        setName: "Star Trek",
+        collectorNumber: "50",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+    ],
+    "v1",
+  )
+
+  const { view, addCards } = renderScanner({ singleton: false })
+  show("Sol Ring", "TRK")
+  show("unreadable blur")
+  show("Sol Ring")
+  show()
+  show("Sol Ring", "TRK")
+  show("Sol Ring", "TRK")
+
+  await finish(view)
+  expect(addCards).toHaveBeenCalledWith(
+    ["Sol Ring"],
+    [expect.objectContaining({ printingId: "trk-sol", setCode: "trk" })],
   )
   catalogDb.clearAll()
 })

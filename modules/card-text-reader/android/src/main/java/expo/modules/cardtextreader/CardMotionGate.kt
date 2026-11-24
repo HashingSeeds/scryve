@@ -5,18 +5,22 @@ import kotlin.math.abs
 private const val SIG_COLS = 16
 private const val SIG_ROWS = 22
 private const val FALLBACK_PROBE_MS = 600L
+private const val MAX_MOTION_WAIT_MS = 450L
 
 data class GateDecision(val shouldRead: Boolean, val sceneChanged: Boolean)
 
 /**
- * why: pausing OCR while an accepted card stays stationary prevents thermal throttling, and
- * emitting sceneChanged once a new card settles lets duplicate copies scan back-to-back.
+ * why: in bulk/stand mode, pausing OCR while an accepted card stays stationary prevents thermal
+ * throttling, and emitting sceneChanged once a new card settles lets duplicate copies scan
+ * back-to-back. Handheld mode runs OCR continuously because natural hand motion keeps frame diffs
+ * high and would otherwise stall reads or emit false swap events.
  */
 class CardMotionGate {
   private var acceptedToken = 0
   private var waitingForSwap = false
   private var sawMotion = false
   private var stableFrames = 0
+  private var motionStartedAtMs = 0L
   private var lastProbeAtMs = 0L
   private var acceptedSignature: IntArray? = null
   private var lastSignature: IntArray? = null
@@ -29,6 +33,7 @@ class CardMotionGate {
     waitingForSwap = acceptedSignature != null
     sawMotion = false
     stableFrames = 0
+    motionStartedAtMs = 0L
     lastProbeAtMs = android.os.SystemClock.elapsedRealtime()
   }
 
@@ -37,6 +42,7 @@ class CardMotionGate {
     waitingForSwap = false
     sawMotion = false
     stableFrames = 0
+    motionStartedAtMs = 0L
     lastProbeAtMs = 0L
     acceptedSignature = null
     lastSignature = null
@@ -46,19 +52,23 @@ class CardMotionGate {
   fun evaluate(luma: Luma, bulkMode: Boolean): GateDecision {
     val current = sampleSignature(luma) ?: return GateDecision(shouldRead = true, sceneChanged = false)
     val accepted = acceptedSignature
-    if (!waitingForSwap || accepted == null) {
+    if (!bulkMode || !waitingForSwap || accepted == null) {
+      waitingForSwap = false
+      sawMotion = false
+      stableFrames = 0
       lastSignature = current
       return GateDecision(shouldRead = true, sceneChanged = false)
     }
 
-    val motionThreshold = if (bulkMode) 14.0 else 18.0
-    val neededStable = if (bulkMode) 2 else 1
+    val motionThreshold = 14.0
+    val settleThreshold = 14.0
+    val neededStable = 2
     val diffFromAccepted = meanAbsDiff(current, accepted)
+    val now = android.os.SystemClock.elapsedRealtime()
 
     if (!sawMotion) {
       lastSignature = current
       if (diffFromAccepted < motionThreshold) {
-        val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastProbeAtMs >= FALLBACK_PROBE_MS) {
           lastProbeAtMs = now
           return GateDecision(shouldRead = true, sceneChanged = false)
@@ -67,12 +77,13 @@ class CardMotionGate {
       }
       sawMotion = true
       stableFrames = 0
+      motionStartedAtMs = now
       return GateDecision(shouldRead = false, sceneChanged = false)
     }
 
     val frameDiff = lastSignature?.let { meanAbsDiff(current, it) } ?: 255.0
     lastSignature = current
-    if (frameDiff < 10.0) {
+    if (frameDiff < settleThreshold) {
       stableFrames += 1
       if (stableFrames >= neededStable) {
         waitingForSwap = false
@@ -82,6 +93,12 @@ class CardMotionGate {
       }
     } else {
       stableFrames = 0
+    }
+    if (now - motionStartedAtMs >= MAX_MOTION_WAIT_MS) {
+      waitingForSwap = false
+      sawMotion = false
+      stableFrames = 0
+      return GateDecision(shouldRead = true, sceneChanged = true)
     }
     return GateDecision(shouldRead = false, sceneChanged = false)
   }

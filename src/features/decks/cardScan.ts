@@ -3,6 +3,9 @@ const MANA_COSTS_AND_NUMBERS = /\{[^}]*\}|(?<![\p{L}\p{N}])\p{N}+(?![\p{L}\p{N}]
 const SET_CODE_LINE = /^(?:\p{Lu}{1,3}\s*)+$/u
 const COLLECTOR_RATIO = /\b0*([1-9]\d{0,3}[a-z]?)\s*\/\s*0*\d{1,4}\b/i
 const SET_AND_LANG = /\b([A-Z0-9]{3,5})\s*[•·★*.-]?\s*(EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT)\b/
+const SET_AND_GLUED_LANG =
+  /\b([A-Z0-9]{3,5})\s+[•·★*.-]?(EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT)(?=[A-Z])/
+const STANDALONE_SET_TOKEN = /\b([A-Z][A-Z0-9]{2,4})\b/g
 const SET_AND_NUMBER =
   /\b([A-Z][A-Z0-9]{2,4})\b(?:\s*[•·★*.-]?\s*(?:EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT|[CURMSLTBP]))?\s*[•·★*.#/-]?\s*0*([1-9]\d{0,3}[A-Z]?)\b/
 const COPYRIGHT_TAIL = /[©®].*$/
@@ -14,6 +17,11 @@ const IGNORED_SET_TOKENS = new Set([
   "LLC",
   "INC",
   "USA",
+  "CBS",
+  "THE",
+  "AND",
+  "FOR",
+  "ALL",
   "EN",
   "JA",
   "JP",
@@ -29,6 +37,7 @@ export const NAME_LINES_FROM_CARD_TOP = 2
 
 export type CollectorHint = {
   setCode?: string
+  candidateSetCodes?: string[]
   collectorNumber?: string
   language?: string
   isFoilStar?: boolean
@@ -43,6 +52,7 @@ export function collectorHintFromCardBottom(blocks: readonly string[]): Collecto
 
   const joined = raw.join("\n")
   let setCode: string | undefined
+  const candidateSetCodes = new Set<string>()
   let collectorNumber: string | undefined
   let language: string | undefined
   const isFoilStar = FOIL_STAR.test(joined) || undefined
@@ -51,10 +61,19 @@ export function collectorHintFromCardBottom(blocks: readonly string[]): Collecto
     const ratio = COLLECTOR_RATIO.exec(line)
     if (ratio && !collectorNumber) collectorNumber = ratio[1].toLowerCase()
 
-    const setLang = SET_AND_LANG.exec(line.toUpperCase())
+    const upper = line.toUpperCase()
+    const setLang = SET_AND_LANG.exec(upper) ?? SET_AND_GLUED_LANG.exec(upper)
     if (setLang && !IGNORED_SET_TOKENS.has(setLang[1])) {
       setCode ??= setLang[1].toLowerCase()
       language ??= setLang[2].toLowerCase()
+    }
+
+    const cleanedForTokens = line.replace(COPYRIGHT_TAIL, "").trim()
+    for (const tokenMatch of cleanedForTokens.matchAll(STANDALONE_SET_TOKEN)) {
+      const token = tokenMatch[1]
+      if (!IGNORED_SET_TOKENS.has(token)) {
+        candidateSetCodes.add(token.toLowerCase())
+      }
     }
   }
 
@@ -77,6 +96,9 @@ export function collectorHintFromCardBottom(blocks: readonly string[]): Collecto
 
   return {
     ...(setCode ? { setCode } : {}),
+    ...(!setCode && candidateSetCodes.size > 0
+      ? { candidateSetCodes: Array.from(candidateSetCodes) }
+      : {}),
     ...(collectorNumber ? { collectorNumber } : {}),
     ...(language ? { language } : {}),
     ...(isFoilStar ? { isFoilStar } : {}),

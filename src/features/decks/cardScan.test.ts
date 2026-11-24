@@ -70,6 +70,16 @@ describe("collectorHintFromCardBottom", () => {
     })
   })
 
+  it("parses glued set+language OCR and exposes standalone uppercase set candidates", () => {
+    expect(collectorHintFromCardBottom(["TRK ENZoLIAN Bonos"])).toEqual({
+      setCode: "trk",
+      language: "en",
+    })
+    expect(collectorHintFromCardBottom(["Stop tn", "with", "TRK"])).toEqual({
+      candidateSetCodes: ["trk"],
+    })
+  })
+
   it("returns empty object for empty or unreadable lines", () => {
     expect(collectorHintFromCardBottom(["", "Artist Name"])).toEqual({})
   })
