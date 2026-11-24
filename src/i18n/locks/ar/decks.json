@@ -351,6 +351,8 @@
   "cardScan.setLockTitle": "8861b4da7d21.3ad9ebc48148",
   "cardScan.setLockPlaceholder": "fb80f7905220.d9e489ef3919",
   "cardScan.setLockClear": "4070c05a97a2.0ac107b97158",
+  "cardScan.notInLockedSet": "95aa95121927.12aca1da3b24",
+  "cardScan.nextCopy": "6188597723e9.ecddde73053d",
   "cardScan.changePrinting": "6af8acc24305.30c17f6887e3",
   "cardScan.finish.nonfoil": "94c8585808b7.df62f33ad9df",
   "cardScan.finish.foil": "8f76f67111f3.a845930fda1a",

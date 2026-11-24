@@ -412,6 +412,8 @@ export default {
     setLockTitle: "스캐너를 세트에 고정",
     setLockPlaceholder: "세트 코드 (예: FDN, CMM)",
     setLockClear: "세트 고정 해제",
+    notInLockedSet: "{{card}}은(는) {{set}}에 없습니다.",
+    nextCopy: "다음 카드",
     changePrinting: "인쇄본",
     finish: {
       nonfoil: "논포일",

@@ -531,3 +531,68 @@ test("locks on 1 frame in bulk mode, scans duplicates on sceneChanged, and fires
   )
   catalogDb.clearAll()
 })
+
+test("blocks adding a card outside the locked set and allows re-arming identical copies in bulk mode", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "cmm-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "cmm",
+        setName: "Commander Masters",
+        collectorNumber: "410",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+    ],
+    "v1",
+  )
+
+  const { view, addCards } = renderScanner({ singleton: false })
+  fireEvent.press(view.getByTestId("card-scan-mode"))
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.changeText(view.getByTestId("card-scan-set-lock-input"), "FDN")
+  fireEvent.press(view.getAllByText("Done").at(-1)!)
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+      },
+    }),
+  )
+  expect(view.getByText("Sol Ring isn't in FDN.")).toBeTruthy()
+  expect(addCards).not.toHaveBeenCalled()
+
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.press(view.getByText("Clear set lock"))
+  fireEvent.press(view.getByTestId("card-scan-next-copy"))
+
+  const frame = {
+    nativeEvent: {
+      width: 960,
+      height: 1280,
+      lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+    },
+  }
+  act(() => mockOnText?.(frame))
+  fireEvent.press(view.getByTestId("card-scan-next-copy"))
+  act(() => mockOnText?.(frame))
+
+  await finish(view)
+  expect(addCards).toHaveBeenCalledWith(
+    ["Sol Ring", "Sol Ring"],
+    [
+      expect.objectContaining({ printingId: "cmm-sol" }),
+      expect.objectContaining({ printingId: "cmm-sol" }),
+    ],
+  )
+  catalogDb.clearAll()
+})

@@ -833,21 +833,19 @@ export function CardSearch({
       smallImageUrl?: string
     },
   ): boolean {
-    const previous = scannedEntriesById.current.get(id) ?? scannedEntries.current.get(update.name)
+    const previous = scannedEntriesById.current.get(id)
     if (!previous || !onAdd) return false
+    if (previous.scryfallId === update.printingId) return true
     const updated: GuestDeckPayload["cards"][number] = {
       ...previous,
       scryfallId: update.printingId,
       imageUrl: update.imageUrl ?? previous.imageUrl,
       smallImageUrl: update.smallImageUrl ?? update.imageUrl ?? previous.smallImageUrl,
     }
-    onRemove?.(previous)
+    // why: validate and add the replacement before removing the original so an offline rejection never drops the scanned card.
     const error = onAdd(updated)
-    if (error) {
-      // why: if the deck rejects the replacement (e.g. offline uncached printing), restore the original copy.
-      onAdd(previous)
-      return false
-    }
+    if (error) return false
+    onRemove?.(previous)
     scannedEntries.current.set(update.name, updated)
     scannedEntriesById.current.set(id, updated)
     return true
@@ -1440,7 +1438,11 @@ export function CardSearch({
           removeCard={onRemove ? removeScannedCard : undefined}
           onUpdatePrinting={onRemove ? updateScannedPrinting : undefined}
           onRead={__DEV__ ? recordScanRead : undefined}
-          onClose={() => setScanning(false)}
+          onClose={() => {
+            scannedEntries.current.clear()
+            scannedEntriesById.current.clear()
+            setScanning(false)
+          }}
         />
       ) : null}
       {shownCandidate ? (

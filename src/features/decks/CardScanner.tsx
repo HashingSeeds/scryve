@@ -275,21 +275,22 @@ export function CardScanner({
     clearTimeout(batchTimer.current)
     const batch = waiting.current.splice(0)
     if (!batch.length) return
-    const hasOverrides = batch.some((card) => Boolean(card.printingId))
-    const results = hasOverrides
+    const sendOverrides =
+      Boolean(onUpdatePrinting) || batch.some((card) => Boolean(card.printingId))
+    const results = sendOverrides
       ? await addCardsRef.current(
           batch.map((card) => card.name),
-          batch.map((card) =>
-            card.printingId
+          batch.map((card) => ({
+            scanId: card.id,
+            ...(card.printingId
               ? {
-                  scanId: card.id,
                   printingId: card.printingId,
                   setCode: card.setCode,
                   collectorNumber: card.collectorNumber,
                   imageUrl: card.imageUrl,
                 }
-              : { scanId: card.id },
-          ),
+              : {}),
+          })),
         )
       : await addCardsRef.current(batch.map((card) => card.name))
     batch.forEach((card, index) => {
@@ -428,11 +429,20 @@ export function CardScanner({
       : bottomHint.isFoilStar
         ? "foil"
         : finish
+    const lockedSet = setLock.trim().toUpperCase()
     const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
-      setLock: setLock.trim() || undefined,
+      setLock: lockedSet || undefined,
       finish: effectiveFinish,
       condition,
     })
+    if (lockedSet && !resolved.printing) {
+      session.current.skipped += 1
+      scanHaptic("skipped")
+      setStatus({
+        error: translate("decks:cardScan.notInLockedSet", { card: match.name, set: lockedSet }),
+      })
+      return
+    }
     accept({
       ...match,
       alternates,
@@ -648,6 +658,22 @@ export function CardScanner({
                     tx={scanMode === "bulk" ? "decks:cardScan.bulk" : "decks:cardScan.handheld"}
                   />
                 </TouchableOpacity>
+                {scanMode === "bulk" ? (
+                  <TouchableOpacity
+                    testID="card-scan-next-copy"
+                    accessibilityRole="button"
+                    style={$hudPill}
+                    onPress={() => {
+                      candidateName.current = undefined
+                      nameInFrame.current = undefined
+                      collectorInFrame.current = undefined
+                      recentVotes.current = []
+                      setStatus("looking")
+                    }}
+                  >
+                    <Text size="xs" weight="medium" style={$hudText} tx="decks:cardScan.nextCopy" />
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity
                   testID="card-scan-finish"
                   accessibilityRole="button"

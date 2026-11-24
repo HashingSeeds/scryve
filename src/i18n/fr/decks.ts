@@ -448,6 +448,8 @@ export default {
     setLockTitle: "Limiter le scanner à une extension",
     setLockPlaceholder: "Code d’extension (p. ex. FDN, CMM)",
     setLockClear: "Retirer la limite d’extension",
+    notInLockedSet: "{{card}} n’est pas dans {{set}}.",
+    nextCopy: "Exemplaire suivant",
     changePrinting: "Impression",
     finish: {
       nonfoil: "Non foil",

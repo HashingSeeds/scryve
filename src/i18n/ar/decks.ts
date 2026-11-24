@@ -453,6 +453,8 @@ export default {
     setLockTitle: "تقييد الماسح بتوسعة",
     setLockPlaceholder: "رمز التوسعة (مثل FDN وCMM)",
     setLockClear: "إزالة تقييد التوسعة",
+    notInLockedSet: "البطاقة {{card}} غير موجودة في التوسعة {{set}}.",
+    nextCopy: "النسخة التالية",
     changePrinting: "الإصدار",
     finish: {
       nonfoil: "عادية",
