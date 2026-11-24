@@ -72,15 +72,18 @@ export function SubscriptionControls() {
       ) : null}
 
       {!billing.configured ? (
-        <Text accessibilityRole="alert" size="xs" text={copy.notConfigured} />
+        <Text accessibilityRole="alert" size="xs" text={copy.notConfigured} style={$alert} />
       ) : null}
-      {billing.error ? <Text accessibilityRole="alert" size="xs" text={billing.error} /> : null}
+      {billing.error ? (
+        <Text accessibilityRole="alert" size="xs" text={billing.error} style={$alert} />
+      ) : null}
     </View>
   )
 }
 
 const $container: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
+  flexWrap: "wrap",
   alignItems: "center",
   gap: spacing.sm,
   minHeight: 64,
@@ -88,6 +91,8 @@ const $container: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $headingText: ViewStyle = { flex: 1 }
+// why: an alert sharing the row squeezes the heading to zero width, and its letters stack into a column taller than the screen.
+const $alert: TextStyle = { width: "100%" }
 const $button: ThemedStyle<ViewStyle> = () => ({
   minWidth: 112,
   minHeight: 44,
