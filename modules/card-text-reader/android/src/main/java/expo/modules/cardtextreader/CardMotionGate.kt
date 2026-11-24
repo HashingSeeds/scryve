@@ -97,7 +97,7 @@ class CardMotionGate {
       val y = yStart + (row * ySpan) / SIG_ROWS
       for (col in 0 until SIG_COLS) {
         val x = xStart + (col * xSpan) / SIG_COLS
-        out[row * SIG_COLS + col] = luma.samples[y * luma.width + x].toInt() and 0xff
+        out[row * SIG_COLS + col] = luma.values[y * luma.width + x].toInt() and 0xff
       }
     }
     return out
