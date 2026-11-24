@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
-import { Platform, useWindowDimensions, View } from "react-native"
+import { Platform, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -765,7 +765,7 @@ export function PlayerGrid({
       aria-hidden={covered}
       accessibilityElementsHidden={covered}
       importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
-      style={[$frame, covered && $covered]}
+      style={$frame}
     >
       <CommanderFlights
         attacker={armedCard >= 0 ? armedCard + 1 : null}
@@ -856,6 +856,7 @@ export function PlayerGrid({
           {nameBoard.panels}
         </Animated.View>
       </CommanderFlights>
+      {covered ? <View pointerEvents="none" style={themed($coverScrim)} /> : null}
     </View>
   )
 }
@@ -979,6 +980,11 @@ const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
 
 const $frame: ViewStyle = { flex: 1, width: "100%" }
-const $covered: ViewStyle = { opacity: 0.72 }
+// why: dims like opacity 0.72 over the screen background, without the full-board offscreen pass a group opacity costs on iOS.
+const $coverScrim: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  ...StyleSheet.absoluteFill,
+  backgroundColor: colors.background,
+  opacity: 0.28,
+})
 
 const $unmeasured: ViewStyle = { opacity: 0 }

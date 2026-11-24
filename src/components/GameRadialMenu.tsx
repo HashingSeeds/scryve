@@ -1,6 +1,6 @@
 import { type ComponentProps, memo, useEffect } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { Platform, StyleSheet, View } from "react-native"
 import Animated, {
   Easing,
   ReduceMotion,
@@ -150,6 +150,9 @@ const ATTENTION_POP_RISE_MS = 130
 const ATTENTION_POP_SETTLE_MS = 190
 // why: flat at the start, so a first web frame that lands before the start time cannot shrink the button.
 const POP_EASING = Easing.inOut(Easing.quad)
+const AnimatedText = Animated.createAnimatedComponent(Text)
+// why: on iOS an opacity on the whole action is a group opacity, an offscreen pass per action per frame, so each leaf fades instead. Android keeps the group fade, since elevation would lift a separate pill over its label.
+const FADE_LEAVES = Platform.OS === "ios"
 // why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
 const GATED_MOTION = ReduceMotion.Never
 const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
@@ -677,7 +680,7 @@ function RadialAction({
     const target = { x: poseX.value, y: poseY.value }
     const start = getRadialActionStart(target)
     return {
-      opacity: arrive.value,
+      opacity: FADE_LEAVES ? 1 : arrive.value,
       transform: [
         { translateX: start.x + (target.x - start.x) * arrive.value },
         { translateY: start.y + (target.y - start.y) * arrive.value },
@@ -688,6 +691,7 @@ function RadialAction({
       ],
     }
   })
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: FADE_LEAVES ? arrive.value : 1 }))
 
   return (
     <Animated.View
@@ -714,15 +718,29 @@ function RadialAction({
         accessibilityState={{ disabled: !!action.disabled }}
         style={({ pressed }) => [
           themed($action),
-          { backgroundColor: background },
+          !FADE_LEAVES && [themed($actionSurface), { backgroundColor: background }],
           (action.disabled || action.blocked) && themed($disabledAction),
           pressed && !action.disabled && themed($pressedAction),
         ]}
         onPress={action.onPress}
       >
+        {FADE_LEAVES ? (
+          <Animated.View
+            testID={`${action.kind}-pill`}
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              themed($actionSurface),
+              { backgroundColor: background },
+              fadeStyle,
+            ]}
+          />
+        ) : null}
         <View style={themed($actionTitle)}>
-          <Icon icon={ACTION_ICONS[action.kind]} size={ACTION_ICON_SIZE} color={foreground} />
-          <Text
+          <Animated.View style={fadeStyle}>
+            <Icon icon={ACTION_ICONS[action.kind]} size={ACTION_ICON_SIZE} color={foreground} />
+          </Animated.View>
+          <AnimatedText
             text={action.label}
             weight="bold"
             // why: web ignores adjustsFontSizeToFit, so a multi-word label without a detail line wraps instead of cutting off. One word keeps one line, or it would break mid-word.
@@ -730,16 +748,16 @@ function RadialAction({
             adjustsFontSizeToFit
             minimumFontScale={0.75}
             maxFontSizeMultiplier={1.2}
-            style={[themed($actionText), { color: foreground }]}
+            style={[themed($actionText), { color: foreground }, fadeStyle]}
           />
         </View>
         {action.detail ? (
-          <Text
+          <AnimatedText
             text={action.detail}
             size="xxs"
             numberOfLines={1}
             maxFontSizeMultiplier={1.1}
-            style={[themed($actionDetail), { color: foreground }]}
+            style={[themed($actionDetail), { color: foreground }, fadeStyle]}
           />
         ) : null}
       </BoardPressable>
@@ -799,11 +817,13 @@ const $actionAnchor: ThemedStyle<ViewStyle> = () => ({
   marginLeft: -ACTION_WIDTH / 2,
   marginTop: -ACTION_HEIGHT / 2,
 })
-const $action: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $action: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
   paddingHorizontal: 10,
+})
+const $actionSurface: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: ACTION_HEIGHT / 2,
   shadowColor: colors.gameMenu.shadow,
   shadowOffset: { width: 0, height: 4 },
