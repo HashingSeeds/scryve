@@ -119,4 +119,54 @@ describe("MTG printings and prices sync", () => {
       },
     ])
   })
+
+  it("rejects empty Card Kingdom pricelists before uploading either pack", async () => {
+    const bulkJsonl = JSON.stringify({
+      id: "scry-sol-1",
+      oracle_id: "ora-sol",
+      name: "Sol Ring",
+      set: "cmm",
+      set_name: "Commander Masters",
+      collector_number: "410",
+      rarity: "uncommon",
+      finishes: ["nonfoil"],
+      digital: false,
+      layout: "normal",
+      prices: { usd: "1.99" },
+    })
+
+    const uploads: string[] = []
+    const mockFetch: typeof fetch = jest.fn(async (input, init) => {
+      const url = typeof input === "string" ? input : input.toString()
+      if (url.endsWith("/bulk-data/default-cards")) {
+        return Response.json({
+          updated_at: "2026-11-24T10:00:00Z",
+          jsonl_download_uri: "https://data.scryfall.io/default-cards.jsonl.gz",
+        })
+      }
+      if (url === "https://data.scryfall.io/default-cards.jsonl.gz") {
+        return new Response(gzipSync(bulkJsonl))
+      }
+      if (url.includes("api.cardkingdom.com")) {
+        return Response.json({ data: [] })
+      }
+      if (init?.method === "PUT") {
+        uploads.push(url)
+        return Response.json({ ok: true })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+
+    await expect(
+      syncMtgPrintingsAndPrices({
+        mirrorBaseUrl: "https://preview.example",
+        mirrorToken: "secret-token",
+        minPrintings: 1,
+        minPrices: 1,
+        fetch: mockFetch,
+        report: () => {},
+      }),
+    ).rejects.toThrow("Card Kingdom pricelist")
+    expect(uploads).toEqual([])
+  })
 })

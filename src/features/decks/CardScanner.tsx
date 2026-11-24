@@ -159,7 +159,7 @@ export function CardScanner({
     names: string[],
     overrides?: readonly (ScannedPrintingOverride | undefined)[],
   ) => Promise<ScannedCardAdd[]>
-  removeCard?: (name: string) => void
+  removeCard?: (name: string, scanId?: number) => void
   onRead?: (scan: CardScan, match: string | undefined) => void
   onScanPrinting?: (scan: ScannedPrintingPayload) => void
   onUpdatePrinting?: (
@@ -212,6 +212,7 @@ export function CardScanner({
   const recentVotes = useRef<string[]>([])
   const nameInFrame = useRef<string>(undefined)
   const collectorInFrame = useRef<string>(undefined)
+  const rejectedBySetLock = useRef(false)
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const lookups = useRef(new Map<number, Promise<ScannedCardAdd>>())
@@ -403,7 +404,11 @@ export function CardScanner({
     const reprintSwapped = Boolean(
       collectorKey && collectorInFrame.current && collectorKey !== collectorInFrame.current,
     )
-    if (match.name === nameInFrame.current && !reprintSwapped) return
+    if (match.name === nameInFrame.current && !reprintSwapped) {
+      candidateName.current = undefined
+      recentVotes.current = []
+      return
+    }
     const fastExact = match.similarity === 1 && (scanMode === "bulk" || Boolean(photo.cardCorners))
     if (!fastExact) {
       recentVotes.current = [...recentVotes.current.slice(-2), match.name]
@@ -436,6 +441,7 @@ export function CardScanner({
       condition,
     })
     if (lockedSet && !resolved.printing) {
+      rejectedBySetLock.current = true
       session.current.skipped += 1
       scanHaptic("skipped")
       setStatus({
@@ -443,6 +449,7 @@ export function CardScanner({
       })
       return
     }
+    rejectedBySetLock.current = false
     accept({
       ...match,
       alternates,
@@ -513,8 +520,8 @@ export function CardScanner({
           {},
           {
             setLock: lockedSet || undefined,
-            finish,
-            condition,
+            finish: wrong.finish,
+            condition: wrong.condition,
           },
         )
       : undefined
@@ -537,7 +544,7 @@ export function CardScanner({
       settleLookup.current.delete(wrong.id)
     } else {
       const result = await lookups.current.get(wrong.id)
-      if (result && !("error" in result)) removeCard?.(wrong.name)
+      if (result && !("error" in result)) removeCard?.(wrong.name, wrong.id)
     }
     if (name) {
       accept({
@@ -548,9 +555,9 @@ export function CardScanner({
         printingId: replacement?.printing?.printingId,
         setCode: replacement?.printing?.setCode,
         collectorNumber: replacement?.printing?.collectorNumber,
-        finish,
-        condition,
-        language: "en",
+        finish: wrong.finish,
+        condition: wrong.condition,
+        language: wrong.language,
         imageUrl: replacement?.printing?.smallImageUrl ?? replacement?.printing?.imageUrl,
         retailCents: replacement?.price.retailCents,
         buylistCents: replacement?.price.buylistCents,
@@ -861,7 +868,7 @@ export function CardScanner({
                     <Text size="xs" style={{ color: theme.colors.textDim }} text={addedSummary} />
                   </View>
                 </TouchableOpacity>
-                {showPrereleaseHud ? (
+                {showPrereleaseHud && (onUpdatePrinting || last.state !== "added") ? (
                   <Button
                     testID="card-scan-printing"
                     tx="decks:cardScan.changePrinting"
@@ -948,7 +955,8 @@ export function CardScanner({
             }
             const apply = async () => {
               await lookups.current.get(target.id)
-              const accepted = onUpdatePrinting?.(target.id, {
+              if (!onUpdatePrinting) return
+              const accepted = onUpdatePrinting(target.id, {
                 name: target.name,
                 printingId: printing.printingId,
                 setCode: printing.setCode,
@@ -999,6 +1007,13 @@ export function CardScanner({
               tx="common:done"
               onPress={() => {
                 setSetLock(setLockDraft.trim().toUpperCase())
+                if (rejectedBySetLock.current) {
+                  nameInFrame.current = undefined
+                  collectorInFrame.current = undefined
+                  candidateName.current = undefined
+                  recentVotes.current = []
+                  rejectedBySetLock.current = false
+                }
                 setSetLockOpen(false)
               }}
             />
@@ -1008,6 +1023,13 @@ export function CardScanner({
                 onPress={() => {
                   setSetLock("")
                   setSetLockDraft("")
+                  if (rejectedBySetLock.current) {
+                    nameInFrame.current = undefined
+                    collectorInFrame.current = undefined
+                    candidateName.current = undefined
+                    recentVotes.current = []
+                    rejectedBySetLock.current = false
+                  }
                   setSetLockOpen(false)
                 }}
               />

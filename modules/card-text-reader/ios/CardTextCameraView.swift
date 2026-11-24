@@ -444,20 +444,38 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
     var bottomLines: [[String: Any]] = []
 
     if let card {
-      let region = readRegion(card)
-      // why: reading only title + collector-bar bands skips rules/flavor text and cuts latency/heat.
-      let topBand = CGRect(
-        x: region.minX,
-        y: max(0, region.maxY - region.height * topBandShare),
-        width: region.width,
-        height: region.height * topBandShare
-      ).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
-      let bottomBand = CGRect(
-        x: region.minX,
-        y: region.minY,
-        width: region.width,
-        height: region.height * bottomBandShare
-      ).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+      // why: derive title and collector bands along the card's oriented edges so tilted cards stay unclipped.
+      let tl = card.topLeft
+      let tr = card.topRight
+      let bl = card.bottomLeft
+      let br = card.bottomRight
+      let lerp: (CGPoint, CGPoint, CGFloat) -> CGPoint = { a, b, t in
+        CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t)
+      }
+      let boundingBand: ([CGPoint]) -> CGRect = { points in
+        let minX = points.map(\.x).min() ?? 0
+        let maxX = points.map(\.x).max() ?? 1
+        let minY = points.map(\.y).min() ?? 0
+        let maxY = points.map(\.y).max() ?? 1
+        return CGRect(
+          x: minX - readMargin,
+          y: minY - readMargin,
+          width: (maxX - minX) + readMargin * 2,
+          height: (maxY - minY) + readMargin * 2
+        ).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+      }
+      let topBand = boundingBand([
+        tl,
+        tr,
+        lerp(tl, bl, topBandShare),
+        lerp(tr, br, topBandShare),
+      ])
+      let bottomBand = boundingBand([
+        lerp(tl, bl, 1 - bottomBandShare),
+        lerp(tr, br, 1 - bottomBandShare),
+        bl,
+        br,
+      ])
       let (fastLines, bestConf) = recognize(buffer, region: topBand, level: .fast, size: size)
       if fastLines.isEmpty || bestConf < fastConfidenceFloor {
         topLines = recognize(buffer, region: topBand, level: .accurate, size: size).0

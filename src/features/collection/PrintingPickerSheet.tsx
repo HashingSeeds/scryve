@@ -101,14 +101,24 @@ export function PrintingPickerSheet({
             keyExtractor={(item) => item.printingId}
             style={$list}
             renderItem={({ item }) => {
-              const price = lookupPrintingPrice(game, item.printingId, finish, condition)
+              const supported = item.finishes.length === 0 || item.finishes.includes(finish)
+              const price = supported
+                ? lookupPrintingPrice(game, item.printingId, finish, condition)
+                : {}
               const selected = item.printingId === selectedPrintingId
               return (
                 <TouchableOpacity
                   testID={`printing-option-${item.printingId}`}
                   accessibilityRole="button"
-                  style={[themed($row), selected && themed($selectedRow)]}
-                  onPress={() =>
+                  accessibilityState={{ disabled: !supported }}
+                  disabled={!supported}
+                  style={[
+                    themed($row),
+                    selected && themed($selectedRow),
+                    !supported && $disabledRow,
+                  ]}
+                  onPress={() => {
+                    if (!supported) return
                     onPick({
                       printing: item,
                       finish,
@@ -116,7 +126,7 @@ export function PrintingPickerSheet({
                       retailCents: price.retailCents,
                       buylistCents: price.buylistCents,
                     })
-                  }
+                  }}
                 >
                   <CardImage
                     game={game}
@@ -178,5 +188,6 @@ const $selectedRow: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderColor: colors.tint,
   borderWidth: 1.5,
 })
+const $disabledRow: ViewStyle = { opacity: 0.45 }
 const $thumb: ImageStyle = { width: 38, height: 53 }
 const $meta: ViewStyle = { flex: 1 }

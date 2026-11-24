@@ -12,8 +12,13 @@ export interface StoreCardInput {
   quantity?: number
 }
 
-function readEnv(key: string): string | undefined {
-  const value = process.env[key]?.trim()
+function tcgplayerAffiliateUrl(): string | undefined {
+  const value = process.env.EXPO_PUBLIC_TCGPLAYER_AFFILIATE_URL?.trim()
+  return value ? value : undefined
+}
+
+function cardKingdomPartner(): string | undefined {
+  const value = process.env.EXPO_PUBLIC_CARDKINGDOM_PARTNER?.trim()
   return value ? value : undefined
 }
 
@@ -48,7 +53,7 @@ export function tcgplayerCardUrl(
     : `https://www.tcgplayer.com/search/magic/product?productLineName=magic&q=${encodeURIComponent(
         [card.name, card.setName ?? card.setCode].filter(Boolean).join(" "),
       )}`
-  return wrapAffiliateUrl(direct, readEnv("EXPO_PUBLIC_TCGPLAYER_AFFILIATE_URL"), useAffiliate)
+  return wrapAffiliateUrl(direct, tcgplayerAffiliateUrl(), useAffiliate)
 }
 
 export function tcgplayerMassEntryUrl(
@@ -65,7 +70,7 @@ export function tcgplayerMassEntryUrl(
     })
     .join("||")
   const direct = `https://www.tcgplayer.com/massentry?productline=Magic&c=${encodeURIComponent(encoded)}`
-  return wrapAffiliateUrl(direct, readEnv("EXPO_PUBLIC_TCGPLAYER_AFFILIATE_URL"), useAffiliate)
+  return wrapAffiliateUrl(direct, tcgplayerAffiliateUrl(), useAffiliate)
 }
 
 export function cardKingdomCardUrl(
@@ -77,7 +82,7 @@ export function cardKingdomCardUrl(
   const path = options.buylist
     ? `https://www.cardkingdom.com/purchasing/mtg_singles?filter[search]=mtg_advanced&filter[name]=${query}`
     : `https://www.cardkingdom.com/catalog/search?search=header&filter[name]=${query}`
-  const partner = readEnv("EXPO_PUBLIC_CARDKINGDOM_PARTNER")
+  const partner = cardKingdomPartner()
   if (!useAffiliate || !partner) return path
   return `${path}&partner=${encodeURIComponent(partner)}`
 }

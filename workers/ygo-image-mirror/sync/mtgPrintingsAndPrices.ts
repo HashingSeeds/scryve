@@ -97,7 +97,10 @@ export async function fetchCardKingdomPrices(
     throw new Error(`Card Kingdom pricelist failed with status ${response.status}`)
   }
   const payload = objectRecord(await response.json())
-  const items = Array.isArray(payload?.data) ? payload.data : []
+  if (!Array.isArray(payload?.data)) {
+    throw new Error("Card Kingdom pricelist is missing data array")
+  }
+  const items = payload.data
   for (const item of items) {
     const record = objectRecord(item)
     const scryfallId = record?.scryfall_id
@@ -115,6 +118,9 @@ export async function fetchCardKingdomPrices(
       if (buylist !== undefined) entry.buylistCents = buylist
     }
     byScryfallId.set(scryfallId, entry)
+  }
+  if (byScryfallId.size === 0) {
+    throw new Error("Card Kingdom pricelist returned no usable price entries")
   }
   return byScryfallId
 }

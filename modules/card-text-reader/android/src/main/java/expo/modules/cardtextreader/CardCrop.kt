@@ -69,6 +69,28 @@ fun cropAround(corners: List<Point>, sensorWidth: Int, sensorHeight: Int, rotati
   return cropRect(ux0, uy0, ux1, uy1, sensorWidth, sensorHeight, rotation)
 }
 
+private fun lerpPoint(a: Point, b: Point, t: Float) =
+  Point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+
+private fun cropAroundPoints(
+  points: List<Point>,
+  sensorWidth: Int,
+  sensorHeight: Int,
+  rotation: Int,
+  margin: Float,
+): SensorCrop {
+  val sideways = rotation == 90 || rotation == 270
+  val uprightWidth = if (sideways) sensorHeight else sensorWidth
+  val uprightHeight = if (sideways) sensorWidth else sensorHeight
+  val padX = uprightWidth * margin
+  val padY = uprightHeight * margin
+  val ux0 = (points.minOf { it.x } - padX).coerceIn(0f, uprightWidth.toFloat())
+  val ux1 = (points.maxOf { it.x } + padX).coerceIn(0f, uprightWidth.toFloat())
+  val uy0 = (points.minOf { it.y } - padY).coerceIn(0f, uprightHeight.toFloat())
+  val uy1 = (points.maxOf { it.y } + padY).coerceIn(0f, uprightHeight.toFloat())
+  return cropRect(ux0, uy0, ux1, uy1, sensorWidth, sensorHeight, rotation)
+}
+
 /** why: cropping only the title band and bottom collector-number band cuts ML Kit pixels ~60% and avoids rules text. */
 fun cropCardBands(
   corners: List<Point>,
@@ -77,6 +99,26 @@ fun cropCardBands(
   rotation: Int,
   margin: Float,
 ): Pair<SensorCrop, SensorCrop> {
+  if (corners.size >= 4) {
+    val tl = corners[0]
+    val tr = corners[1]
+    val br = corners[2]
+    val bl = corners[3]
+    val topPoints = listOf(
+      tl,
+      tr,
+      lerpPoint(tl, bl, TOP_BAND_SHARE),
+      lerpPoint(tr, br, TOP_BAND_SHARE),
+    )
+    val bottomPoints = listOf(
+      lerpPoint(tl, bl, 1f - BOTTOM_BAND_SHARE),
+      lerpPoint(tr, br, 1f - BOTTOM_BAND_SHARE),
+      bl,
+      br,
+    )
+    return cropAroundPoints(topPoints, sensorWidth, sensorHeight, rotation, margin) to
+      cropAroundPoints(bottomPoints, sensorWidth, sensorHeight, rotation, margin)
+  }
   val sideways = rotation == 90 || rotation == 270
   val uprightWidth = if (sideways) sensorHeight else sensorWidth
   val uprightHeight = if (sideways) sensorWidth else sensorHeight

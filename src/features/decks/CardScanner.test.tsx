@@ -162,7 +162,7 @@ test("Wrong card removes a card whose add was still in flight once it lands", as
     fireEvent.press(view.getByText("Remove it"))
     expect(removeCard).not.toHaveBeenCalled()
     await slow.land()
-    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring", 0)
   } finally {
     jest.useRealTimers()
   }
@@ -180,7 +180,7 @@ test("an earlier scanned card can be checked and removed from the review list", 
     expect(within(list).getByText("Sol Ring")).toBeTruthy()
     fireEvent.press(within(list).getAllByText("Wrong card")[1])
     await act(async () => fireEvent.press(view.getByText("Remove it")))
-    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring", 0)
     expect(within(list).queryByText("Sol Ring")).toBeNull()
   } finally {
     jest.useRealTimers()
@@ -216,7 +216,7 @@ test("Done keeps an alternate chosen while the wrong card was still being added"
     fireEvent.press(view.getByText("Done"))
     await act(async () => land())
     await act(async () => land())
-    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring", 0)
     expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Arcane Signet"])
     expect(onClose).toHaveBeenCalledTimes(1)
   } finally {
