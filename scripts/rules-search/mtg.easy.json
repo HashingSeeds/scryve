@@ -226,7 +226,7 @@
   {"query":"can i block with tapped creatures","rules":["509.1a"],"source":"web","url":"https://www.google.com/search?q=mtg+can+i+block+with+tapped+creatures","asked":"mtg can i block with tapped creatures"},
   {"query":"do you draw on first turn","rules":["103.8a"],"source":"web","url":"https://www.google.com/search?q=mtg+do+you+draw+on+first+turn","asked":"mtg do you draw on first turn"},
   {"query":"do you cast lands","rules":[["305.1","305.9"]],"source":"web","url":"https://www.google.com/search?q=mtg+do+you+cast+lands","asked":"mtg do you cast lands"},
-  {"query":"do you cast copies","rules":["707.10"],"source":"web","url":"https://www.google.com/search?q=mtg+do+you+cast+copies","asked":"mtg do you cast copies"},
+  {"query":"do you cast copies","rules":[["707.10","707.12"]],"source":"web","url":"https://www.google.com/search?q=mtg+do+you+cast+copies","asked":"mtg do you cast copies"},
   {"query":"do you own tokens","rules":["111.2"],"source":"web","url":"https://www.google.com/search?q=mtg+do+you+own+tokens","asked":"mtg do you own tokens"},
   {"query":"do you get lifelink when blocking","rules":[["702.15b","120.3f"]],"source":"web","url":"https://www.google.com/search?q=mtg+do+you+get+lifelink+when+blocking","asked":"mtg do you get lifelink when blocking"},
   {"query":"do you draw on first turn commander","rules":["103.8c"],"source":"web","url":"https://www.google.com/search?q=mtg+do+you+draw+on+first+turn+commander","asked":"mtg do you draw on first turn commander"},

@@ -36,7 +36,7 @@ const SETS = {
 }
 type CaseSet = keyof typeof SETS
 const FLOOR = {
-  mtg: { "practice": 431, "heldout": 100, "easy": 206, "typing practice": 276, "typing": 114 },
+  mtg: { "practice": 431, "heldout": 100, "easy": 207, "typing practice": 276, "typing": 114 },
   fab: { "practice": 62, "heldout": 22, "easy": 55, "typing practice": 44, "typing": 24 },
 } satisfies Record<string, Record<CaseSet, number>>
 type System = keyof typeof FLOOR
