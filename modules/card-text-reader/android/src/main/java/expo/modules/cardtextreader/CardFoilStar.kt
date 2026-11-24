@@ -166,6 +166,8 @@ fun detectFoilStarInLine(
       visited[start] = true
       var minR = r
       var maxR = r
+      var minC = c
+      var maxC = c
       var area = 0
       rowCounts.fill(0)
       while (head < tail) {
@@ -175,6 +177,8 @@ fun detectFoilStarInLine(
         area++
         if (cr < minR) minR = cr
         if (cr > maxR) maxR = cr
+        if (cc < minC) minC = cc
+        if (cc > maxC) maxC = cc
         rowCounts[cr]++
         if (cr > 0 && mask[pos - gapW] && !visited[pos - gapW]) {
           visited[pos - gapW] = true
@@ -193,7 +197,9 @@ fun detectFoilStarInLine(
           queue[tail++] = pos + 1
         }
       }
-      if (minR == 0 || maxR == gapH - 1) continue
+      // why: ML Kit's bounding boxes can sit 3-4 px off the ink, letting the adjacent set letter
+      // or 'E' of EN bleed into the left/right edge of gapBox; a real separator never touches the edges.
+      if (minR == 0 || maxR == gapH - 1 || minC == 0 || maxC == gapW - 1) continue
       val cy = (minR + maxR) / 2f
       val dist = abs(cy - gapH / 2f)
       if (dist < bestDist) {
@@ -211,13 +217,14 @@ fun detectFoilStarInLine(
   val hasBlob = bestArea > 0
   val hRatio = if (hasBlob) bestH / capH else 0f
   val areaRatio = if (hasBlob) bestArea / (capH * capH) else 0f
-  val hasSpire = hasBlob && bestH >= 5 && bestTopWidth <= bestMaxRowWidth * 0.5f
-  val pixelStar = hasBlob && capH >= 11f && hRatio >= 0.37f && areaRatio >= 0.075f && hasSpire
+  val hasSpire = hasBlob && bestH >= 7 && bestTopWidth <= bestMaxRowWidth * 0.5f
+  // why: below 18 px cap height on Android's 1280x960 sensor, a nonfoil bullet plus glare can mimic
+  // a 5 px spire, whereas ML Kit's '*' separator between set and language is clean at all sizes.
+  val pixelStar = hasBlob && capH >= 18f && hRatio >= 0.40f && areaRatio >= 0.085f && hasSpire
   val corroboratedStar =
-    isCroppedBand &&
-      found.sepIsStar &&
-      capH >= 11f &&
-      (!hasBlob || gapW <= 5 || (hRatio >= 0.30f && areaRatio >= 0.06f))
+    found.sepIsStar &&
+      capH >= 10f &&
+      (!hasBlob || gapW <= 5 || (hRatio >= 0.28f && areaRatio >= 0.05f))
   val isFoil = pixelStar || corroboratedStar
 
   if (Log.isLoggable("FoilProbe", Log.DEBUG)) {

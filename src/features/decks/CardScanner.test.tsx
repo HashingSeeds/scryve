@@ -736,3 +736,122 @@ test("blocks rapid A-B-A ping-pong without leaving frame and progressively upgra
   expect(onScanPrinting).toHaveBeenCalledTimes(2)
   catalogDb.clearAll()
 })
+
+test("keeps card locked across title-glare frames that still show bottom text and refines an un-hinted default printing", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "10e-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "10e",
+        setName: "Tenth Edition",
+        collectorNumber: "335",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+      {
+        game: "mtg",
+        printingId: "40k-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "40k",
+        setName: "Warhammer 40,000",
+        collectorNumber: "240",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+    ],
+    "v1",
+  )
+
+  const onScanPrinting = jest.fn()
+  const onUpdatePrinting = jest.fn()
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardScanner
+        game="mtg"
+        nameIndex={nameIndex}
+        singleton={false}
+        copiesInDeck={() => 0}
+        addCards={async (names) => names.map(() => ({}))}
+        onScanPrinting={onScanPrinting}
+        onUpdatePrinting={onUpdatePrinting}
+        onClose={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  const layout = { x: 0, y: 0, width: 400, height: 700 }
+  for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
+    fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
+
+  show("Sol Ring")
+  show("Sol Ring")
+  expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: "Sol Ring", printingId: "10e-sol", finish: "nonfoil" }),
+  )
+
+  for (let i = 0; i < 2; i += 1) {
+    act(() =>
+      mockOnText?.({
+        nativeEvent: {
+          width: 960,
+          height: 1280,
+          lines: [],
+          bottomLines: [
+            {
+              text: "40K EN ARTIST",
+              x: 0,
+              y: 1100,
+              width: 100,
+              height: 20,
+              angle: 0,
+              confidence: 1,
+            },
+          ],
+        },
+      }),
+    )
+  }
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [
+          { text: "Sol Ring", x: 0, y: 100, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+        bottomLines: [
+          {
+            text: "40K * EN ARTIST",
+            x: 0,
+            y: 1100,
+            width: 100,
+            height: 20,
+            angle: 0,
+            confidence: 1,
+            foilStar: true,
+          },
+        ],
+      },
+    }),
+  )
+  expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  expect(onUpdatePrinting).toHaveBeenCalledWith(
+    expect.any(Number),
+    expect.objectContaining({
+      name: "Sol Ring",
+      printingId: "40k-sol",
+      setCode: "40k",
+      finish: "foil",
+    }),
+  )
+  catalogDb.clearAll()
+})

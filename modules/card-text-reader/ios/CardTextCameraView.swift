@@ -519,6 +519,8 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
         visited[start] = true
         var minR = r
         var maxR = r
+        var minC = c
+        var maxC = c
         var area = 0
         var rowCounts = [Int](repeating: 0, count: gapH)
         while head < queue.count {
@@ -529,6 +531,8 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
           area += 1
           if cr < minR { minR = cr }
           if cr > maxR { maxR = cr }
+          if cc < minC { minC = cc }
+          if cc > maxC { maxC = cc }
           rowCounts[cr] += 1
           if cr > 0, mask[pos - gapW], !visited[pos - gapW] {
             visited[pos - gapW] = true
@@ -547,7 +551,7 @@ class CardTextCameraView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate
             queue.append(pos + 1)
           }
         }
-        if minR == 0 || maxR == gapH - 1 { continue }
+        if minR == 0 || maxR == gapH - 1 || minC == 0 || maxC == gapW - 1 { continue }
         let cy = Double(minR + maxR) / 2.0
         let dist = abs(cy - Double(gapH) / 2.0)
         if dist < bestDist {

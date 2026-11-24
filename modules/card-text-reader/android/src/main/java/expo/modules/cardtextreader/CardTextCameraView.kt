@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -35,6 +36,7 @@ import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
 // why: reading text is most of the phone's work, so reads slow down as it heats up.
@@ -46,7 +48,7 @@ private fun msBetweenReads(heat: String) = when (heat) {
 }
 private val ANALYSIS_SIZE = Size(1280, 960)
 private const val DETECTION_SHORT_SIDE = 200
-private const val READ_MARGIN = 0.03f
+private const val READ_MARGIN = 0.04f
 // why: hiding the outline the first frame the card is missed makes it flicker on a steady card,
 // but reads slow down when the phone is hot, so a count of misses would leave it up too long.
 private const val LOSE_CARD_AFTER_MS = 350L
@@ -68,11 +70,13 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
   private var lastFrameAt = 0L
   private var released = false
   private var plane = ByteArray(0)
+  private val detectorScratch = CardDetectorScratch()
   private var topNv21Buffer: ByteArray? = null
   private var bottomNv21Buffer: ByteArray? = null
   private var lastCardAt = 0L
   private var showingCard = false
   private var pendingSceneChanged = false
+  private var focusedGuide = false
 
   @Volatile var active = false
   @Volatile var torchEnabled = false
@@ -91,6 +95,32 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     addView(previewView, 0)
     addView(outline, 1)
     appContext.mainQueue.launch { bind(ProcessCameraProvider.awaitInstance(context)) }
+  }
+
+  fun setGuideBox(box: Box?) {
+    guide = box
+    if (!focusedGuide && box != null) {
+      appContext.mainQueue.launch { applyFocusPoint() }
+    }
+  }
+
+  private fun applyFocusPoint() {
+    val activeCamera = camera ?: return
+    val currentGuide = guide ?: return
+    if (released || width <= 0 || height <= 0) return
+    val density = resources.displayMetrics.density
+    val cx = (currentGuide.x + currentGuide.width / 2f) * density
+    val cy = (currentGuide.y + currentGuide.height / 2f) * density
+    val point = previewView.meteringPointFactory.createPoint(cx, cy)
+    // why: seed AF/AE on the card guide box then auto-cancel so continuous autofocus keeps tracking as a stack shrinks.
+    val action = FocusMeteringAction.Builder(
+      point,
+      FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE,
+    )
+      .setAutoCancelDuration(2, TimeUnit.SECONDS)
+      .build()
+    focusedGuide = true
+    activeCamera.cameraControl.startFocusAndMetering(action)
   }
 
   fun setTorch(on: Boolean) {
@@ -155,6 +185,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     camera?.cameraControl?.enableTorch(torchEnabled && !released)
     cameraProvider = provider
     useCases = group
+    applyFocusPoint()
   }
 
   private fun heat(): String {
@@ -329,13 +360,13 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     if (plane.size < buffer.remaining()) plane = ByteArray(buffer.remaining())
     buffer.get(plane, 0, buffer.remaining())
     val step = maxOf(1, minOf(frame.width, frame.height) / DETECTION_SHORT_SIDE)
-    return lumaFromPlane(plane, y.rowStride, frame.width, frame.height, rotation, step)
+    return lumaFromPlane(plane, y.rowStride, frame.width, frame.height, rotation, step, detectorScratch)
   }
 
   private fun findCard(luma: Luma, width: Int, height: Int): CardDetection {
     val cover = cover(width, height)
     val guide = guide?.let { guide -> cover?.toFrame(guide, resources.displayMetrics.density) }
-    val detection = CardDetector.detect(luma, guide)
+    val detection = CardDetector.detect(luma, guide, detectorScratch)
     val card = detection.card
     if (card != null && cover != null) {
       lastCardAt = SystemClock.elapsedRealtime()

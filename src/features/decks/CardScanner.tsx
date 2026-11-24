@@ -39,7 +39,7 @@ import {
   type CardNameIndex,
   type CardNameMatch,
 } from "./cardNameMatch"
-import { collectorHintFromCardBottom } from "./cardScan"
+import { collectorHintFromCardBottom, type CollectorHint } from "./cardScan"
 import { CardScanStats } from "./CardScanStats"
 import {
   framedLineObjectsFromCardBottom,
@@ -108,8 +108,8 @@ const ADD_BATCH_SIZE = 10
 const ADD_BATCH_WAIT_MS = 1500
 const HIT_THRESHOLD_CENTS = 500
 const BIG_HIT_THRESHOLD_CENTS = 2000
-const HANDHELD_REACCEPT_COOLDOWN_MS = 2_500
-const FOIL_UPGRADE_WINDOW_MS = 2_000
+const HANDHELD_REACCEPT_COOLDOWN_MS = 4_500
+const IN_FRAME_UPGRADE_WINDOW_MS = 2_500
 const FINISH_CYCLE: readonly CardFinish[] = ["nonfoil", "foil", "etched"]
 const CONDITION_CYCLE: readonly CardCondition[] = ["NM", "LP", "MP", "HP", "DMG"]
 // why: Scryfall pauses lookups for 30 seconds after a 429, so the last waits outlast a pause.
@@ -226,8 +226,10 @@ export function CardScanner({
   const lastAcceptedCard = useRef<{
     id: number
     name: string
+    printingId?: string
     finish: CardFinish
     condition: CardCondition
+    hasPrintingHint: boolean
     acceptedAt: number
   }>(undefined)
   const rejectedBySetLock = useRef(false)
@@ -333,7 +335,7 @@ export function CardScanner({
     })
   }
 
-  function add(card: Omit<ScannedCard, "id" | "state">) {
+  function add(card: Omit<ScannedCard, "id" | "state">, hasPrintingHint = true) {
     const id = nextId.current++
     const scanned: ScannedCard = {
       ...card,
@@ -366,8 +368,10 @@ export function CardScanner({
     lastAcceptedCard.current = {
       id,
       name: card.name,
+      printingId: card.printingId,
       finish: card.finish,
       condition: card.condition,
+      hasPrintingHint,
       acceptedAt,
     }
     setAdded((current) => [scanned, ...current])
@@ -427,6 +431,91 @@ export function CardScanner({
     return Boolean(primary.foilStar)
   }
 
+  function maybeUpgradeLastAccepted(
+    matchName: string,
+    bottomHint: CollectorHint,
+    frameHasFoilStar: boolean,
+    lockedSet: string,
+  ) {
+    const last = lastAcceptedCard.current
+    if (!last || last.name !== matchName) return
+    if (Date.now() - last.acceptedAt > IN_FRAME_UPGRADE_WINDOW_MS) return
+    const wantsFoilUpgrade = last.finish === "nonfoil" && !finishLocked && frameHasFoilStar
+    const hasFreshPrintingHint = Boolean(bottomHint.setCode || bottomHint.collectorNumber)
+    const wantsPrintingRefine = !last.hasPrintingHint && hasFreshPrintingHint
+    if (!wantsFoilUpgrade && !wantsPrintingRefine) return
+    const targetFinish: CardFinish = wantsFoilUpgrade ? "foil" : last.finish
+    const refined = resolveScannedPrinting(game, matchName, bottomHint, {
+      setLock: lockedSet || undefined,
+      finish: targetFinish,
+      condition: last.condition,
+    })
+    const finishChanged = wantsFoilUpgrade && refined.finish === "foil"
+    const nextPrinting = refined.printing
+    const printingChanged = Boolean(
+      wantsPrintingRefine &&
+      nextPrinting?.printingId &&
+      nextPrinting.printingId !== last.printingId,
+    )
+    if (!finishChanged && !printingChanged) {
+      if (wantsPrintingRefine && nextPrinting) {
+        lastAcceptedCard.current = { ...last, hasPrintingHint: true }
+      }
+      return
+    }
+    const nextFinish: CardFinish = finishChanged ? "foil" : last.finish
+    lastAcceptedCard.current = {
+      ...last,
+      finish: nextFinish,
+      printingId: nextPrinting?.printingId ?? last.printingId,
+      hasPrintingHint: last.hasPrintingHint || Boolean(wantsPrintingRefine && nextPrinting),
+    }
+    if (printingChanged && nextPrinting?.printingId) {
+      printingInFrame.current = nextPrinting.printingId
+    }
+    const queued = waiting.current.find((item) => item.id === last.id)
+    if (queued) {
+      queued.finish = nextFinish
+      if (nextPrinting) {
+        queued.cardId = nextPrinting.cardId
+        queued.printingId = nextPrinting.printingId
+        queued.setCode = nextPrinting.setCode
+        queued.collectorNumber = nextPrinting.collectorNumber
+        queued.imageUrl = nextPrinting.smallImageUrl ?? nextPrinting.imageUrl
+      }
+      queued.retailCents = refined.price.retailCents
+      queued.buylistCents = refined.price.buylistCents
+    }
+    updateCard(last.id, {
+      finish: nextFinish,
+      ...(nextPrinting
+        ? {
+            cardId: nextPrinting.cardId,
+            printingId: nextPrinting.printingId,
+            setCode: nextPrinting.setCode,
+            collectorNumber: nextPrinting.collectorNumber,
+            imageUrl: nextPrinting.smallImageUrl ?? nextPrinting.imageUrl,
+          }
+        : {}),
+      retailCents: refined.price.retailCents,
+      buylistCents: refined.price.buylistCents,
+    })
+    if (nextPrinting) {
+      onUpdatePrinting?.(last.id, {
+        name: matchName,
+        printingId: nextPrinting.printingId,
+        setCode: nextPrinting.setCode,
+        collectorNumber: nextPrinting.collectorNumber,
+        finish: nextFinish,
+        condition: last.condition,
+        imageUrl: nextPrinting.imageUrl,
+        smallImageUrl: nextPrinting.smallImageUrl,
+        retailCents: refined.price.retailCents,
+        buylistCents: refined.price.buylistCents,
+      })
+    }
+  }
+
   function readText(photo: CardPhotoText) {
     if (closingRef.current || !view.current || !frame) return
     if (photo.sceneChanged) {
@@ -435,7 +524,7 @@ export function CardScanner({
       candidateFoilStar.current = false
       nameInFrame.current = undefined
       printingInFrame.current = undefined
-      recentAcceptedAtByName.current.clear()
+      if (scanMode === "bulk") recentAcceptedAtByName.current.clear()
       recentVotes.current = []
       emptyFrames.current = 0
     }
@@ -445,13 +534,20 @@ export function CardScanner({
     if (linesFromCardTop.length) onRead?.({ linesFromCardTop, photo, framing }, match?.name)
     if (!linesFromCardTop.length) {
       emptyFrames.current += 1
-      if (emptyFrames.current >= 2) {
+      const fullyEmpty = photo.lines.length === 0 && (photo.bottomLines?.length ?? 0) === 0
+      // why: brief sleeve glare can drop the title while bottom text stays visible; only a truly empty frame should unlock immediate repeat scans.
+      if (fullyEmpty && emptyFrames.current >= 2) {
         if (nameInFrame.current) recentAcceptedAtByName.current.delete(nameInFrame.current)
         candidateName.current = undefined
         candidateBottomLines.current = []
         candidateFoilStar.current = false
         nameInFrame.current = undefined
         printingInFrame.current = undefined
+        recentVotes.current = []
+      } else if (!fullyEmpty && emptyFrames.current >= 3) {
+        candidateName.current = undefined
+        candidateBottomLines.current = []
+        candidateFoilStar.current = false
         recentVotes.current = []
       }
       setStatus("looking")
@@ -495,53 +591,7 @@ export function CardScanner({
       resolved.printing.printingId !== printingInFrame.current,
     )
     if (match.name === nameInFrame.current && !reprintSwapped) {
-      const last = lastAcceptedCard.current
-      if (
-        last &&
-        last.name === match.name &&
-        last.finish === "nonfoil" &&
-        !finishLocked &&
-        frameHasFoilStar &&
-        Date.now() - last.acceptedAt <= FOIL_UPGRADE_WINDOW_MS
-      ) {
-        const foilResolved = resolveScannedPrinting(game, match.name, bottomHint, {
-          setLock: lockedSet || undefined,
-          finish: "foil",
-          condition: last.condition,
-        })
-        if (foilResolved.finish === "foil") {
-          lastAcceptedCard.current = { ...last, finish: "foil" }
-          const nextPrinting = foilResolved.printing
-          updateCard(last.id, {
-            finish: "foil",
-            ...(nextPrinting
-              ? {
-                  cardId: nextPrinting.cardId,
-                  printingId: nextPrinting.printingId,
-                  setCode: nextPrinting.setCode,
-                  collectorNumber: nextPrinting.collectorNumber,
-                  imageUrl: nextPrinting.smallImageUrl ?? nextPrinting.imageUrl,
-                }
-              : {}),
-            retailCents: foilResolved.price.retailCents,
-            buylistCents: foilResolved.price.buylistCents,
-          })
-          if (nextPrinting) {
-            onUpdatePrinting?.(last.id, {
-              name: match.name,
-              printingId: nextPrinting.printingId,
-              setCode: nextPrinting.setCode,
-              collectorNumber: nextPrinting.collectorNumber,
-              finish: "foil",
-              condition: last.condition,
-              imageUrl: nextPrinting.imageUrl,
-              smallImageUrl: nextPrinting.smallImageUrl,
-              retailCents: foilResolved.price.retailCents,
-              buylistCents: foilResolved.price.buylistCents,
-            })
-          }
-        }
-      }
+      maybeUpgradeLastAccepted(match.name, bottomHint, frameHasFoilStar, lockedSet)
       candidateName.current = undefined
       candidateBottomLines.current = []
       candidateFoilStar.current = false
@@ -552,6 +602,7 @@ export function CardScanner({
       const lastSeenAt = recentAcceptedAtByName.current.get(match.name)
       if (lastSeenAt !== undefined && Date.now() - lastSeenAt < HANDHELD_REACCEPT_COOLDOWN_MS) {
         nameInFrame.current = match.name
+        maybeUpgradeLastAccepted(match.name, bottomHint, frameHasFoilStar, lockedSet)
         candidateName.current = undefined
         candidateBottomLines.current = []
         candidateFoilStar.current = false
@@ -594,20 +645,24 @@ export function CardScanner({
       return
     }
     rejectedBySetLock.current = false
-    accept({
-      ...match,
-      alternates,
-      cardId: resolved.printing?.cardId,
-      printingId: resolved.printing?.printingId,
-      setCode: resolved.printing?.setCode ?? bottomHint.setCode,
-      collectorNumber: resolved.printing?.collectorNumber ?? bottomHint.collectorNumber,
-      finish: resolved.finish,
-      condition,
-      language: bottomHint.language ?? "en",
-      imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
-      retailCents: resolved.price.retailCents,
-      buylistCents: resolved.price.buylistCents,
-    })
+    const hasPrintingHint = Boolean(bottomHint.setCode || bottomHint.collectorNumber || lockedSet)
+    accept(
+      {
+        ...match,
+        alternates,
+        cardId: resolved.printing?.cardId,
+        printingId: resolved.printing?.printingId,
+        setCode: resolved.printing?.setCode ?? bottomHint.setCode,
+        collectorNumber: resolved.printing?.collectorNumber ?? bottomHint.collectorNumber,
+        finish: resolved.finish,
+        condition,
+        language: bottomHint.language ?? "en",
+        imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
+        retailCents: resolved.price.retailCents,
+        buylistCents: resolved.price.buylistCents,
+      },
+      hasPrintingHint,
+    )
   }
 
   function skip(name: string) {
@@ -616,7 +671,7 @@ export function CardScanner({
     setStatus({ alreadyInDeck: name })
   }
 
-  function accept(card: Omit<ScannedCard, "id" | "state">) {
+  function accept(card: Omit<ScannedCard, "id" | "state">, hasPrintingHint = true) {
     if (BASIC_LANDS.has(card.name)) {
       if (countedLands.current.has(card.name)) return skip(card.name)
       const stillAdding = addedRef.current.filter(
@@ -637,7 +692,7 @@ export function CardScanner({
         ))
     )
       return skip(card.name)
-    add(card)
+    add(card, hasPrintingHint)
   }
 
   function addLands({ card, inDeck, count }: LandCount) {
@@ -1075,6 +1130,9 @@ export function CardScanner({
           }) => {
             const target = pickingPrinting
             setPickingPrinting(undefined)
+            if (lastAcceptedCard.current?.id === target.id) {
+              lastAcceptedCard.current = undefined
+            }
             const revision = (printingEditRevision.current.get(target.id) ?? 0) + 1
             printingEditRevision.current.set(target.id, revision)
             const queued = waiting.current.find((item) => item.id === target.id)
