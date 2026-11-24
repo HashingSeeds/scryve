@@ -443,6 +443,8 @@ export default {
     setLockTitle: "Fijar el escáner a una colección",
     setLockPlaceholder: "Código de colección (p. ej., FDN, CMM)",
     setLockClear: "Quitar la colección fijada",
+    notInLockedSet: "{{card}} no está en {{set}}.",
+    nextCopy: "Siguiente copia",
     changePrinting: "Edición",
     finish: {
       nonfoil: "Normal",

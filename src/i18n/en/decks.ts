@@ -507,6 +507,8 @@ const decks = {
     setLockTitle: "Lock scanner to a set",
     setLockPlaceholder: "Set code (e.g. FDN, CMM)",
     setLockClear: "Clear set lock",
+    notInLockedSet: "{{card}} isn't in {{set}}.",
+    nextCopy: "Next copy",
     changePrinting: "Printing",
     finish: {
       nonfoil: "Nonfoil",

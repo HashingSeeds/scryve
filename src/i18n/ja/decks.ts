@@ -416,6 +416,8 @@ export default {
     setLockTitle: "スキャナーをセットに固定",
     setLockPlaceholder: "セットコード（例：FDN、CMM）",
     setLockClear: "セットの固定を解除",
+    notInLockedSet: "{{card}}は{{set}}に含まれていません。",
+    nextCopy: "次の1枚",
     changePrinting: "収録版",
     finish: {
       nonfoil: "非Foil",

@@ -418,6 +418,8 @@ export default {
     setLockTitle: "स्कैनर को सेट पर लॉक करें",
     setLockPlaceholder: "सेट कोड (जैसे FDN, CMM)",
     setLockClear: "सेट लॉक हटाएँ",
+    notInLockedSet: "{{card}} {{set}} में नहीं है।",
+    nextCopy: "अगली कॉपी",
     changePrinting: "प्रिंटिंग",
     finish: {
       nonfoil: "नॉनफ़ॉइल",
