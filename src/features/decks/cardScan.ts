@@ -1,13 +1,14 @@
 const NAME_CHARACTERS = /[^\p{L}\p{N}\s'’,:!.&-]/gu
 const MANA_COSTS_AND_NUMBERS = /\{[^}]*\}|(?<![\p{L}\p{N}])\p{N}+(?![\p{L}\p{N}])/gu
 const SET_CODE_LINE = /^(?:\p{Lu}{1,3}\s*)+$/u
-const COLLECTOR_RATIO = /\b0*([1-9]\d{0,3}[a-z]?)\s*\/\s*0*\d{1,4}\b/i
+// why: denominator requires 2+ digits so creature power/toughness like 2/3 or 4/4 never parses as a collector ratio.
+const COLLECTOR_RATIO = /\b0*([1-9]\d{0,3}[a-z]?)\s*\/\s*0*[1-9]\d{1,3}\b/i
 const SET_AND_LANG = /\b([A-Z0-9]{3,5})\s*[•·★*.-]?\s*(EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT)\b/
 const SET_AND_GLUED_LANG =
   /\b([A-Z0-9]{3,5})\s+[•·★*.-]?(EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT)(?=[A-Z])/
 const STANDALONE_SET_TOKEN = /\b([A-Z][A-Z0-9]{2,4})\b/g
 const SET_AND_NUMBER =
-  /\b([A-Z][A-Z0-9]{2,4})\b(?:\s*[•·★*.-]?\s*(?:EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT|[CURMSLTBP]))?\s*[•·★*.#/-]?\s*0*([1-9]\d{0,3}[A-Z]?)\b/
+  /\b([A-Z][A-Z0-9]{2,4})\b(?:\s*[•·★*.-]?\s*(?:EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT|[CURMSLTBP]))?\s*[•·★*.#/-]?\s*0*([1-9]\d{0,3}[a-zA-Z]?)\b/
 const COPYRIGHT_TAIL = /[©®].*$/
 const STANDALONE_COLLECTOR = /\b(0\d{2,3}[a-z]?)\b/i
 const FOIL_STAR = /[★☆]/
@@ -61,8 +62,8 @@ export function collectorHintFromCardBottom(blocks: readonly string[]): Collecto
     const ratio = COLLECTOR_RATIO.exec(line)
     if (ratio && !collectorNumber) collectorNumber = ratio[1].toLowerCase()
 
-    const upper = line.toUpperCase()
-    const setLang = SET_AND_LANG.exec(upper) ?? SET_AND_GLUED_LANG.exec(upper)
+    // why: matching original uppercase avoids treating lowercase English rules text ("will defend", "stop it", "cards from") as set/language codes.
+    const setLang = SET_AND_LANG.exec(line) ?? SET_AND_GLUED_LANG.exec(line)
     if (setLang && !IGNORED_SET_TOKENS.has(setLang[1])) {
       setCode ??= setLang[1].toLowerCase()
       language ??= setLang[2].toLowerCase()
@@ -81,8 +82,7 @@ export function collectorHintFromCardBottom(blocks: readonly string[]): Collecto
     for (const line of raw) {
       const cleaned = line.replace(COPYRIGHT_TAIL, "").trim()
       if (!cleaned) continue
-      const upper = cleaned.toUpperCase()
-      const pair = SET_AND_NUMBER.exec(upper)
+      const pair = SET_AND_NUMBER.exec(cleaned)
       if (pair && !IGNORED_SET_TOKENS.has(pair[1])) {
         setCode ??= pair[1].toLowerCase()
         collectorNumber ??= pair[2].toLowerCase()

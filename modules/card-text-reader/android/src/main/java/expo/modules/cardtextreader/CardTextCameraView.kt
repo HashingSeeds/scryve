@@ -39,10 +39,10 @@ import kotlinx.coroutines.launch
 
 // why: reading text is most of the phone's work, so reads slow down as it heats up.
 private fun msBetweenReads(heat: String) = when (heat) {
-  "nominal" -> 70L
-  "fair" -> 120L
-  "serious" -> 200L
-  else -> 350L
+  "nominal" -> 120L
+  "fair" -> 180L
+  "serious" -> 280L
+  else -> 450L
 }
 private val ANALYSIS_SIZE = Size(1280, 960)
 private const val DETECTION_SHORT_SIDE = 200
@@ -50,8 +50,8 @@ private const val READ_MARGIN = 0.03f
 // why: hiding the outline the first frame the card is missed makes it flicker on a steady card,
 // but reads slow down when the phone is hot, so a count of misses would leave it up too long.
 private const val LOSE_CARD_AFTER_MS = 350L
-// why: frames are read at most about 14 a second, so 30 fps only heats the phone.
-private val CAMERA_FPS = Range(15, 20)
+// why: frames are read at most about 8 a second, so 30 fps only heats the phone.
+private val CAMERA_FPS = Range(12, 15)
 
 class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val onText by EventDispatcher()

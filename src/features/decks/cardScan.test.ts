@@ -80,6 +80,19 @@ describe("collectorHintFromCardBottom", () => {
     })
   })
 
+  it("ignores lowercase English rules text and creature power/toughness", () => {
+    expect(
+      collectorHintFromCardBottom([
+        "will defend",
+        "stop it",
+        "cards from",
+        "2/3",
+        "4/4",
+        "2026 Wizards of the Coast",
+      ]),
+    ).toEqual({})
+  })
+
   it("returns empty object for empty or unreadable lines", () => {
     expect(collectorHintFromCardBottom(["", "Artist Name"])).toEqual({})
   })

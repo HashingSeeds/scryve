@@ -4,13 +4,13 @@ import Vision
 
 // why: reading text is most of the phone's work, so reads slow down as it heats up, and the
 // camera runs at the rate frames are read rather than 30 fps.
-private let cameraFramesPerSecond: Int32 = 20
+private let cameraFramesPerSecond: Int32 = 15
 private func secondsBetweenReads(_ state: ProcessInfo.ThermalState) -> TimeInterval {
   switch state {
-  case .nominal: 0.07
-  case .fair: 0.12
-  case .serious: 0.20
-  default: 0.35
+  case .nominal: 0.12
+  case .fair: 0.18
+  case .serious: 0.28
+  default: 0.45
   }
 }
 // why: hiding the outline the moment one read misses the card makes it flicker on a steady card,
