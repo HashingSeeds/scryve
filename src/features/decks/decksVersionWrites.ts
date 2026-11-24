@@ -14,8 +14,8 @@ import {
 } from "@/features/sync/durableOutbox"
 import { createOutbox, type Outbox, type OutboxSender } from "@/features/sync/outbox"
 import { translate } from "@/i18n/translate"
+import { cardKvStorage } from "@/storage/cardStorage"
 import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
-import { storage } from "@/utils/storage"
 
 import { scopedOwnerId } from "./decksSync"
 import {
@@ -269,7 +269,7 @@ export type VersionWriteOutbox = Outbox<PendingVersionWrite, FailedVersionWrite>
 
 export function versionWriteOutbox(
   ownerId: string,
-  local: DurableStringStorage = storage,
+  local: DurableStringStorage = cardKvStorage,
   deploymentUrl?: string,
   sender?: OutboxSender<PendingVersionWrite>,
 ): VersionWriteOutbox {
@@ -315,7 +315,7 @@ export class DeckVersionWriteController {
   constructor(
     private readonly client: Pick<ConvexReactClient, "mutation">,
     readonly ownerId: string,
-    { storage: local = storage, deploymentUrl, now = Date.now }: VersionWriteOptions = {},
+    { storage: local = cardKvStorage, deploymentUrl, now = Date.now }: VersionWriteOptions = {},
   ) {
     this.now = now
     this.cache = new DeckVersionCacheRepository(ownerId, local, deploymentUrl)

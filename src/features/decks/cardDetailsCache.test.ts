@@ -1,3 +1,4 @@
+import { localCardDb } from "@/storage/localDb"
 import { storage } from "@/utils/storage"
 
 import {
@@ -33,7 +34,11 @@ const DETAILS_KEY = "scryve.cards.details.v1"
 const solRing = { oracleText: "{T}: Add {C}{C}.", typeLine: "Artifact" }
 
 describe("card details cache", () => {
-  beforeEach(() => mockPrefetch.mockClear())
+  beforeEach(() => {
+    mockPrefetch.mockClear()
+    storage.clearAll()
+    localCardDb.clearAll()
+  })
 
   it("round-trips warmed details and ignores corrupt payloads", () => {
     const store = memoryStore()
@@ -59,10 +64,40 @@ describe("card details cache", () => {
     expect(loadCardDetails(memoryStore(values))).toEqual(loadCardDetails(store))
   })
 
-  it("reparses after MMKV is wiped outside the cache", () => {
-    saveCardDetails({ ring: solRing })
-    storage.clearAll()
+  it("migrates legacy MMKV card details into SQLite and reflects external database clears", () => {
+    storage.set(DETAILS_KEY, JSON.stringify({ ring: solRing }))
+    expect(readCardDetail("ring")).toEqual(solRing)
+    expect(storage.getString(DETAILS_KEY)).toBeUndefined()
+    const listSpy = jest.spyOn(localCardDb, "listCardDetails")
+    expect(loadCardDetails()).toEqual({ ring: solRing })
+    expect(loadCardDetails()).toEqual({ ring: solRing })
+    expect(listSpy).toHaveBeenCalledTimes(1)
+    listSpy.mockRestore()
+    localCardDb.clearCardDetails()
     expect(loadCardDetails()).toEqual({})
+  })
+
+  it("keeps legacy and newly saved details readable in memory when SQLite writes fail and flushes them on recovery", () => {
+    storage.set(DETAILS_KEY, JSON.stringify({ ring: solRing }))
+    const upsert = jest.spyOn(localCardDb, "upsertCardDetails").mockImplementation(() => {
+      throw new Error("disk full")
+    })
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => {})
+    expect(readCardDetail("ring")).toEqual(solRing)
+    saveCardDetails({ bolt: { typeLine: "Instant" } })
+    expect(readCardDetail("bolt")).toEqual({ typeLine: "Instant" })
+    expect(loadCardDetails()).toEqual({ ring: solRing, bolt: { typeLine: "Instant" } })
+    upsert.mockRestore()
+
+    saveCardDetails({ island: { typeLine: "Land" } })
+    expect(loadCardDetails()).toEqual({
+      ring: solRing,
+      bolt: { typeLine: "Instant" },
+      island: { typeLine: "Land" },
+    })
+    expect(localCardDb.getCardDetail("bolt")).toBe('{"typeLine":"Instant"}')
+    expect(localCardDb.getCardDetail("island")).toBe('{"typeLine":"Land"}')
+    errorLog.mockRestore()
   })
 
   it("evicts the least recently saved details past 1,500 entries", () => {

@@ -1,5 +1,6 @@
 import { Platform } from "react-native"
 
+import { localCardDb } from "@/storage/localDb"
 import { storage } from "@/utils/storage"
 
 import {
@@ -38,6 +39,7 @@ describe("guest deck storage", () => {
   afterEach(() => jest.restoreAllMocks())
   beforeEach(() => {
     storage.clearAll()
+    localCardDb.clearAll()
     loadGuestDecks()
   })
 
@@ -54,7 +56,9 @@ describe("guest deck storage", () => {
     expect(edited.updatedAt).toBe(101)
     expect(loadGuestDeck(first.localId)?.deck.name).toBe("Updated")
     expect(loadGuestDeck(second.localId)).toEqual(second)
-    expect(storage.getString("decks.guest.v2")).toContain('"name":"Updated"')
+    expect(
+      localCardDb.listGuestDecks().find((row) => row.localId === first.localId)?.payload,
+    ).toContain('"name":"Updated"')
     expect(() => saveGuestDeck(deck, { localId: "another-deck" })).toThrow("does not match")
   })
 
@@ -66,11 +70,11 @@ describe("guest deck storage", () => {
     expect(saveGuestDeck(deck).localId).not.toBe(first.localId)
   })
 
-  it("migrates a v1 deck to the list without changing its identity", () => {
+  it("migrates a v1 deck from MMKV into SQLite without changing its identity", () => {
     storage.set("decks.guest.v1", JSON.stringify(legacy))
     expect(loadGuestDecks()).toEqual([legacy])
     expect(storage.getString("decks.guest.v1")).toBeUndefined()
-    expect(JSON.parse(storage.getString("decks.guest.v2") ?? "")).toEqual([legacy])
+    expect(localCardDb.listGuestDecks().map((row) => JSON.parse(row.payload))).toEqual([legacy])
     expect(loadGuestDecks()).toEqual([legacy])
   })
 
@@ -78,18 +82,19 @@ describe("guest deck storage", () => {
     const other = saveGuestDeck(deck)
     storage.set("decks.guest.v2", JSON.stringify([legacy, other]))
     storage.set("decks.guest.v1", JSON.stringify({ ...legacy, deck: deck }))
-    expect(loadGuestDecks()).toEqual([legacy, other])
+    expect(loadGuestDecks()).toEqual([other, legacy])
     expect(storage.getString("decks.guest.v1")).toBeUndefined()
+    expect(storage.getString("decks.guest.v2")).toBeUndefined()
   })
 
   it("keeps a v1 deck readable when the migration write fails, then migrates before writing", () => {
     storage.set("decks.guest.v1", JSON.stringify(legacy))
-    const set = jest.spyOn(storage, "set").mockImplementation(() => {
+    const upsert = jest.spyOn(localCardDb, "upsertGuestDeck").mockImplementation(() => {
       throw new Error("disk full")
     })
     expect(loadGuestDecks()).toEqual([legacy])
     expect(storage.getString("decks.guest.v1")).toBeDefined()
-    set.mockRestore()
+    upsert.mockRestore()
     deleteGuestDeck(legacy.localId)
     expect(loadGuestDecks()).toEqual([])
     expect(storage.getString("decks.guest.v1")).toBeUndefined()
@@ -129,16 +134,16 @@ describe("guest deck storage", () => {
     saveGuestDeck({ ...deck, name: "Edited" }, { localId: valid.localId })
     deleteGuestDeck(legacy.localId)
     expect(loadGuestDecks().map((entry) => entry.localId)).toEqual([valid.localId, saved.localId])
-    expect(JSON.parse(storage.getString("decks.guest.v2") ?? "")).toEqual(
+    expect(JSON.parse(localCardDb.getGuestMeta("unreadable") ?? "[]")).toEqual(
       expect.arrayContaining([invalid, { ...valid, deck }]),
     )
   })
 
   it("surfaces read failures before attempting a write", () => {
-    const read = jest.spyOn(storage, "getString").mockImplementation(() => {
+    const read = jest.spyOn(localCardDb, "listGuestDecks").mockImplementation(() => {
       throw new Error("disk unavailable")
     })
-    const write = jest.spyOn(storage, "set")
+    const write = jest.spyOn(localCardDb, "upsertGuestDeck")
     loadGuestDecks()
     expect(() => saveGuestDeck(deck)).toThrow("Unable to read")
     expect(write).not.toHaveBeenCalled()
@@ -148,16 +153,16 @@ describe("guest deck storage", () => {
 
   it("surfaces failed saves", () => {
     const first = saveGuestDeck(deck)
-    const saved = storage.getString("decks.guest.v2")
-    const set = jest.spyOn(storage, "set").mockImplementation(() => {
+    const saved = localCardDb.listGuestDecks()
+    const upsert = jest.spyOn(localCardDb, "upsertGuestDeck").mockImplementation(() => {
       throw new Error("disk full")
     })
     expect(() => saveGuestDeck({ ...deck, name: "Changed" }, { localId: first.localId })).toThrow(
       "Unable to save",
     )
-    expect(storage.getString("decks.guest.v2")).toBe(saved)
+    expect(localCardDb.listGuestDecks()).toEqual(saved)
     expect(loadGuestDecks()).toEqual([first])
-    set.mockRestore()
+    upsert.mockRestore()
   })
 
   it("defaults keys to localId and persists them through edits and reloads", () => {
@@ -183,18 +188,32 @@ describe("guest deck storage", () => {
   it("keeps another tab's deck when writing from a stale snapshot", () => {
     jest.replaceProperty(Platform, "OS", "web")
     const first = saveGuestDeck(deck)
-    storage.set("decks.guest.v2", JSON.stringify([first, legacy]))
+    localCardDb.upsertGuestDeck(legacy.localId, undefined, legacy.updatedAt, JSON.stringify(legacy))
 
     const second = saveGuestDeck({ ...deck, name: "Second" })
 
     expect(loadGuestDecks()).toEqual([first, legacy, second])
-    expect(JSON.parse(storage.getString("decks.guest.v2") ?? "")).toEqual([first, legacy, second])
+    expect(localCardDb.listGuestDecks().map((row) => JSON.parse(row.payload))).toEqual([
+      first,
+      legacy,
+      second,
+    ])
+  })
+
+  it("refuses to resurrect a deck another tab deleted on web", () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    const first = saveGuestDeck(deck)
+    localCardDb.deleteGuestDeck(first.localId)
+    expect(() =>
+      saveGuestDeck({ ...deck, name: "Stale edit" }, { localId: first.localId }),
+    ).toThrow("does not match")
+    expect(loadGuestDecks()).toEqual([])
   })
 
   it("uses the native snapshot for saves and acknowledgments without rereading storage", () => {
     jest.replaceProperty(Platform, "OS", "ios")
     const first = saveGuestDeck(deck, { now: 100 })
-    const read = jest.spyOn(storage, "getString")
+    const read = jest.spyOn(localCardDb, "listGuestDecks")
     const edited = saveGuestDeck({ ...deck, name: "Edited" }, { localId: first.localId })
     const second = saveGuestDeck(deck)
     expect(acknowledgeGuestDeckImport(edited.localId, edited.updatedAt)).toBe(true)
@@ -207,6 +226,7 @@ describe("guest deck storage", () => {
     const saved = saveGuestDeck(deck, { movedFromAccount: true })
     saveGuestDeck({ ...deck, name: "Edited" }, { localId: saved.localId })
     expect(loadGuestDecks()[0].movedFromAccount).toBe(true)
+    localCardDb.clearGuestDecks()
     storage.set("decks.guest.v2", JSON.stringify([{ ...saved, movedFromAccount: "yes" }]))
     expect(loadGuestDecks()).toEqual([])
   })
@@ -214,7 +234,7 @@ describe("guest deck storage", () => {
   describe("versions", () => {
     const bolt = [{ name: "Lightning Bolt", quantity: 4 }]
     const shock = [{ name: "Shock", quantity: 4 }]
-    const stored = () => JSON.parse(storage.getString("decks.guest.v2") ?? "[]")[0]
+    const stored = () => JSON.parse(localCardDb.listGuestDecks()[0]?.payload ?? "{}")
 
     it("reads a deck stored before versions as its only version, and saves it in that format", () => {
       storage.set("decks.guest.v2", JSON.stringify([{ ...legacy, deck: { ...deck, cards: bolt } }]))
@@ -245,11 +265,11 @@ describe("guest deck storage", () => {
     it("refuses a version past the limit and keeps the deck as it was", () => {
       const saved = saveGuestDeck({ ...deck, cards: bolt })
       addGuestDeckVersion(saved.localId, { name: "Tuned", cards: shock }, 2)
-      const before = storage.getString("decks.guest.v2")
+      const before = localCardDb.listGuestDecks()
       expect(() => addGuestDeckVersion(saved.localId, { name: "Third", cards: [] }, 2)).toThrow(
         "This deck holds up to 2 versions. Delete one to add another.",
       )
-      expect(storage.getString("decks.guest.v2")).toBe(before)
+      expect(localCardDb.listGuestDecks()).toEqual(before)
       expect(() =>
         addGuestDeckVersion(saved.localId, { name: "Third", cards: [] }, 5),
       ).not.toThrow()
@@ -318,11 +338,15 @@ it.each(["web", "ios"] as const)(
       jest.replaceProperty(Platform, "OS", platform)
       const { storage }: typeof import("@/utils/storage") = require("@/utils/storage")
       const {
+        localCardDb: isolatedDb,
+      }: typeof import("@/storage/localDb") = require("@/storage/localDb")
+      const {
         reportCrash,
         ErrorType,
       }: typeof import("@/utils/crashReporting") = require("@/utils/crashReporting")
       jest.mocked(reportCrash).mockClear()
       storage.clearAll()
+      isolatedDb.clearAll()
       storage.set("decks.guest.v2", "private deck content")
       const guest: typeof import("./guestDeck") = require("./guestDeck")
       expect(reportCrash).not.toHaveBeenCalled()
@@ -346,7 +370,7 @@ it.each(["web", "ios"] as const)(
           },
         )
       }
-      const read = jest.spyOn(storage, "getString").mockImplementation(() => {
+      const read = jest.spyOn(isolatedDb, "listGuestDecks").mockImplementation(() => {
         throw new Error("private deck content")
       })
       guest.loadGuestDecks()
@@ -363,7 +387,7 @@ it.each(["web", "ios"] as const)(
         },
       )
       guest.clearGuestDecks()
-      const write = jest.spyOn(storage, "set").mockImplementation(() => {
+      const write = jest.spyOn(isolatedDb, "upsertGuestDeck").mockImplementation(() => {
         throw new Error("private deck content")
       })
       expect(() => guest.saveGuestDeck(deck)).toThrow()
