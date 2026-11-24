@@ -217,7 +217,7 @@ export function CardScanner({
   const recentVotes = useRef<(string | undefined)[]>([])
   const emptyFrames = useRef(0)
   const nameInFrame = useRef<string>(undefined)
-  const collectorInFrame = useRef<string>(undefined)
+  const printingInFrame = useRef<string>(undefined)
   const rejectedBySetLock = useRef(false)
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -381,7 +381,7 @@ export function CardScanner({
       candidateName.current = undefined
       candidateBottomLines.current = []
       nameInFrame.current = undefined
-      collectorInFrame.current = undefined
+      printingInFrame.current = undefined
       recentVotes.current = []
       emptyFrames.current = 0
     }
@@ -395,7 +395,7 @@ export function CardScanner({
         candidateName.current = undefined
         candidateBottomLines.current = []
         nameInFrame.current = undefined
-        collectorInFrame.current = undefined
+        printingInFrame.current = undefined
         recentVotes.current = []
       }
       setStatus("looking")
@@ -416,12 +416,24 @@ export function CardScanner({
         ? [...candidateBottomLines.current, ...frameBottomLines]
         : frameBottomLines
     const bottomHint = collectorHintFromCardBottom(combinedBottomLines)
-    const collectorKey =
-      bottomHint.setCode && bottomHint.collectorNumber
-        ? `${bottomHint.setCode}:${bottomHint.collectorNumber}`
-        : undefined
+    const effectiveFinish: CardFinish = finishLocked
+      ? finish
+      : bottomHint.isFoilStar
+        ? "foil"
+        : finish
+    const lockedSet = setLock.trim().toUpperCase()
+    const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
+      setLock: lockedSet || undefined,
+      finish: effectiveFinish,
+      condition,
+    })
+    // why: only treat a same-name frame as a swapped reprint when OCR resolved to a distinct known printingId; raw OCR jitter would otherwise double-scan the card in place.
     const reprintSwapped = Boolean(
-      collectorKey && collectorInFrame.current && collectorKey !== collectorInFrame.current,
+      bottomHint.setCode &&
+      bottomHint.collectorNumber &&
+      resolved.printing?.printingId &&
+      printingInFrame.current &&
+      resolved.printing.printingId !== printingInFrame.current,
     )
     if (match.name === nameInFrame.current && !reprintSwapped) {
       candidateName.current = undefined
@@ -445,23 +457,12 @@ export function CardScanner({
     candidateBottomLines.current = []
     recentVotes.current = []
     nameInFrame.current = match.name
-    collectorInFrame.current = collectorKey
+    printingInFrame.current = resolved.printing?.printingId
     setAcceptedToken((token) => token + 1)
     setStatus("looking")
     const alternates = closestNamesFromCardTop(nameIndex, linesFromCardTop, ALTERNATE_COUNT + 1)
       .filter((name) => name !== match.name)
       .slice(0, ALTERNATE_COUNT)
-    const effectiveFinish: CardFinish = finishLocked
-      ? finish
-      : bottomHint.isFoilStar
-        ? "foil"
-        : finish
-    const lockedSet = setLock.trim().toUpperCase()
-    const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
-      setLock: lockedSet || undefined,
-      finish: effectiveFinish,
-      condition,
-    })
     if (lockedSet && !resolved.printing) {
       rejectedBySetLock.current = true
       session.current.skipped += 1
@@ -706,7 +707,7 @@ export function CardScanner({
                     onPress={() => {
                       candidateName.current = undefined
                       nameInFrame.current = undefined
-                      collectorInFrame.current = undefined
+                      printingInFrame.current = undefined
                       recentVotes.current = []
                       setStatus("looking")
                     }}
@@ -1035,7 +1036,7 @@ export function CardScanner({
                 setSetLock(setLockDraft.trim().toUpperCase())
                 if (rejectedBySetLock.current) {
                   nameInFrame.current = undefined
-                  collectorInFrame.current = undefined
+                  printingInFrame.current = undefined
                   candidateName.current = undefined
                   recentVotes.current = []
                   rejectedBySetLock.current = false
@@ -1051,7 +1052,7 @@ export function CardScanner({
                   setSetLockDraft("")
                   if (rejectedBySetLock.current) {
                     nameInFrame.current = undefined
-                    collectorInFrame.current = undefined
+                    printingInFrame.current = undefined
                     candidateName.current = undefined
                     recentVotes.current = []
                     rejectedBySetLock.current = false

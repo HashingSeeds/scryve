@@ -639,7 +639,8 @@ test("ignores a single empty frame so the same card is not double-scanned, and r
   show("Sol Ring")
   show()
   show("Sol Ring", "TRK")
-  show("Sol Ring", "TRK")
+  show("Sol Ring", "TRK", "will defend", "2/3")
+  show("Sol Ring", "TRK", "stop it", "2/3")
 
   await finish(view)
   expect(addCards).toHaveBeenCalledWith(

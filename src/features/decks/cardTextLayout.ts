@@ -5,7 +5,7 @@ type Point = { x: number; y: number }
 
 export type ScanFraming = { view: Size; frame: Size & { x: number; y: number } }
 
-const FRAME_MARGIN = 1.1
+const FRAME_MARGIN = 1.0
 
 function circularMeanRadians(lines: CardPhotoText["lines"]) {
   let sin = 0
