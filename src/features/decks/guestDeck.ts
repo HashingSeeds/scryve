@@ -4,8 +4,9 @@ import { randomUUID } from "expo-crypto"
 import type { FunctionArgs } from "convex/server"
 
 import { translate } from "@/i18n/translate"
+import { localCardDb } from "@/storage/localDb"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
-import { saveString, storage } from "@/utils/storage"
+import { storage } from "@/utils/storage"
 
 import type { api } from "../../../convex/_generated/api"
 import { DEFAULT_VERSION_NAME } from "../../../convex/lib/deckVersions"
@@ -18,6 +19,7 @@ import {
 
 const GUEST_DECKS_KEY = "decks.guest.v2"
 const LEGACY_GUEST_DECK_KEY = "decks.guest.v1"
+const UNREADABLE_META_KEY = "unreadable"
 const GUEST_ROUTE_PREFIX = "guest-"
 const CARD_STRING_FIELDS = [
   "game",
@@ -228,36 +230,93 @@ function parseStored<T>(raw: string, valid: (value: unknown) => value is T): T {
   return value
 }
 
-function readStore() {
-  const raw = readRaw(GUEST_DECKS_KEY)
-  const legacyRaw = readRaw(LEGACY_GUEST_DECK_KEY)
-  const { decks, unreadable } = partitionDecks(
-    raw === null ? [] : parseStored(raw, (value): value is unknown[] => Array.isArray(value)),
-  )
-  if (legacyRaw === null) return { decks, unreadable, legacy: false }
-  const legacy = parseStored(legacyRaw, isGuestDeck)
-  return {
-    decks: decks.some((deck) => deck.localId === legacy.localId) ? decks : [...decks, legacy],
-    unreadable,
-    legacy: true,
-  }
-}
-
-function serialize(decks: GuestDeck[]) {
-  return JSON.stringify([...decks, ...unreadable])
-}
-
-function migrateLegacyDeck(decks: GuestDeck[]) {
-  if (!saveString(GUEST_DECKS_KEY, serialize(decks))) {
-    reportStorageFailure("save")
-    return false
-  }
+function readDbRows() {
   try {
+    const rows = localCardDb.listGuestDecks()
+    const metaRaw = localCardDb.getGuestMeta(UNREADABLE_META_KEY)
+    return { rows, metaRaw }
+  } catch {
+    throw new GuestDeckStorageError(translate("decks:guestStorage.readFailed"), "read_failed")
+  }
+}
+
+function readStore() {
+  const { rows, metaRaw } = readDbRows()
+  const rawEntries: unknown[] = []
+  for (const row of rows) {
+    try {
+      rawEntries.push(JSON.parse(row.payload))
+    } catch {
+      rawEntries.push(row.payload)
+    }
+  }
+  const { decks, unreadable: rowUnreadable } = partitionDecks(rawEntries)
+  let savedUnreadable: unknown[] = []
+  if (metaRaw !== undefined) {
+    try {
+      const parsed: unknown = JSON.parse(metaRaw)
+      if (Array.isArray(parsed)) savedUnreadable = parsed
+    } catch {}
+  }
+  const mergedUnreadable = [...savedUnreadable, ...rowUnreadable]
+
+  const legacyV2Raw = readRaw(GUEST_DECKS_KEY)
+  const legacyV1Raw = readRaw(LEGACY_GUEST_DECK_KEY)
+  if (legacyV2Raw === null && legacyV1Raw === null) {
+    return { decks, unreadable: mergedUnreadable, legacy: false }
+  }
+
+  const mergedDecks = [...decks]
+  if (legacyV2Raw !== null) {
+    const parsedV2 = partitionDecks(
+      parseStored(legacyV2Raw, (value): value is unknown[] => Array.isArray(value)),
+    )
+    for (const deck of parsedV2.decks) {
+      if (!mergedDecks.some((existing) => existing.localId === deck.localId)) mergedDecks.push(deck)
+    }
+    mergedUnreadable.push(...parsedV2.unreadable)
+  }
+  if (legacyV1Raw !== null) {
+    const legacyDeck = parseStored(legacyV1Raw, isGuestDeck)
+    if (!mergedDecks.some((existing) => existing.localId === legacyDeck.localId))
+      mergedDecks.push(legacyDeck)
+  }
+  return { decks: mergedDecks, unreadable: mergedUnreadable, legacy: true }
+}
+
+function clearLegacyKeys() {
+  try {
+    storage.delete(GUEST_DECKS_KEY)
     storage.delete(LEGACY_GUEST_DECK_KEY)
     return true
   } catch {
     return false
   }
+}
+
+function persistUnreadable(entries: unknown[]) {
+  if (entries.length > 0) localCardDb.setGuestMeta(UNREADABLE_META_KEY, JSON.stringify(entries))
+  else localCardDb.deleteGuestMeta(UNREADABLE_META_KEY)
+}
+
+function migrateLegacyDecks(decks: GuestDeck[], unreadableEntries: unknown[]) {
+  try {
+    localCardDb.transaction(() => {
+      for (const deck of decks) {
+        localCardDb.upsertGuestDeck(
+          deck.localId,
+          deck.deckKey,
+          deck.updatedAt,
+          JSON.stringify(deck),
+        )
+      }
+      persistUnreadable(unreadableEntries)
+    })
+  } catch {
+    reportStorageFailure("save")
+    return false
+  }
+  return clearLegacyKeys()
 }
 
 let loadError: unknown
@@ -277,7 +336,7 @@ function readStored(): GuestDeck[] {
   }
   unreadable = store.unreadable
   if (unreadable.length > 0) reportStorageFailure("load", "unsupported")
-  pendingLegacy = store.legacy && !migrateLegacyDeck(store.decks)
+  pendingLegacy = store.legacy && !migrateLegacyDecks(store.decks, unreadable)
   return store.decks
 }
 
@@ -294,18 +353,59 @@ function writableDecks() {
   return decks
 }
 
-function commit(decks: GuestDeck[], failure: string) {
-  if (!saveString(GUEST_DECKS_KEY, serialize(decks))) {
+function commitUpsert(next: GuestDeck, decks: GuestDeck[], failure: string) {
+  try {
+    localCardDb.transaction(() => {
+      if (pendingLegacy) {
+        for (const deck of decks) {
+          localCardDb.upsertGuestDeck(
+            deck.localId,
+            deck.deckKey,
+            deck.updatedAt,
+            JSON.stringify(deck),
+          )
+        }
+        persistUnreadable(unreadable)
+      } else {
+        localCardDb.upsertGuestDeck(
+          next.localId,
+          next.deckKey,
+          next.updatedAt,
+          JSON.stringify(next),
+        )
+      }
+    })
+  } catch {
     reportStorageFailure("save")
     throw new GuestDeckStorageError(failure)
   }
   snapshot = decks
-  if (pendingLegacy) {
-    try {
-      storage.delete(LEGACY_GUEST_DECK_KEY)
-      pendingLegacy = false
-    } catch {}
+  if (pendingLegacy && clearLegacyKeys()) pendingLegacy = false
+  notify()
+}
+
+function commitDelete(localId: string, decks: GuestDeck[], failure: string) {
+  try {
+    localCardDb.transaction(() => {
+      if (pendingLegacy) {
+        for (const deck of decks) {
+          localCardDb.upsertGuestDeck(
+            deck.localId,
+            deck.deckKey,
+            deck.updatedAt,
+            JSON.stringify(deck),
+          )
+        }
+        persistUnreadable(unreadable)
+      }
+      localCardDb.deleteGuestDeck(localId)
+    })
+  } catch {
+    reportStorageFailure("save")
+    throw new GuestDeckStorageError(failure)
   }
+  snapshot = decks
+  if (pendingLegacy && clearLegacyKeys()) pendingLegacy = false
   notify()
 }
 
@@ -382,7 +482,8 @@ export function saveGuestDeck(
     versions,
   )
   if (!isGuestDeck(next)) throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
-  commit(
+  commitUpsert(
+    next,
     previous
       ? decks.map((candidate) => (candidate.localId === previous.localId ? next : candidate))
       : [...decks, next],
@@ -449,7 +550,8 @@ function changeVersions(
   const settled = bringing ? { ...next, bringing: bringing(next) } : next
   if (!isGuestDeck(settled))
     throw new GuestDeckStorageError(translate("decks:guestStorage.invalid"))
-  commit(
+  commitUpsert(
+    settled,
     decks.map((candidate) => (candidate.localId === localId ? settled : candidate)),
     translate("decks:guestStorage.saveFailed"),
   )
@@ -515,17 +617,18 @@ export function setGuestDeckBringing(localId: string, number: number) {
   const stored = decks.find((candidate) => candidate.localId === localId)
   if (!stored || !guestDeckVersions(stored).some((version) => version.number === number))
     throw new GuestDeckStorageError("Guest deck version does not exist.")
-  commit(
-    decks.map((candidate) =>
-      candidate.localId === localId ? { ...candidate, bringing: number } : candidate,
-    ),
+  const next = { ...stored, bringing: number }
+  commitUpsert(
+    next,
+    decks.map((candidate) => (candidate.localId === localId ? next : candidate)),
     translate("decks:guestStorage.saveFailed"),
   )
 }
 
 export function deleteGuestDeck(localId: string) {
   const decks = writableDecks()
-  commit(
+  commitDelete(
+    localId,
     decks.filter((deck) => deck.localId !== localId),
     translate("decks:guestStorage.deleteFailed"),
   )
@@ -533,6 +636,7 @@ export function deleteGuestDeck(localId: string) {
 
 export function clearGuestDecks() {
   try {
+    localCardDb.clearGuestDecks()
     storage.delete(GUEST_DECKS_KEY)
     storage.delete(LEGACY_GUEST_DECK_KEY)
   } catch {

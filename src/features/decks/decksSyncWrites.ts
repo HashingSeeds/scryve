@@ -15,8 +15,8 @@ import {
 import { createOutbox, type Outbox, type OutboxSender } from "@/features/sync/outbox"
 import { createSnapshotStore, type SnapshotStore } from "@/features/sync/snapshotStore"
 import { translate } from "@/i18n/translate"
+import { cardKvStorage } from "@/storage/cardStorage"
 import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
-import { storage } from "@/utils/storage"
 
 import {
   DeckSyncRepository,
@@ -156,7 +156,7 @@ export type DeckWriteOutbox = Outbox<PendingDeckWrite, FailedDeckWrite>
 
 export function deckWriteOutbox(
   ownerId: string,
-  local: DurableStringStorage = storage,
+  local: DurableStringStorage = cardKvStorage,
   deploymentUrl?: string,
   sender?: OutboxSender<PendingDeckWrite>,
 ): DeckWriteOutbox {
@@ -201,7 +201,7 @@ export class DeckMetadataWriteController {
   constructor(
     private readonly client: Pick<ConvexReactClient, "mutation">,
     readonly ownerId: string,
-    { storage: local = storage, deploymentUrl, now = Date.now, reads }: DeckWriteOptions = {},
+    { storage: local = cardKvStorage, deploymentUrl, now = Date.now, reads }: DeckWriteOptions = {},
   ) {
     this.now = now
     this.reads = reads
