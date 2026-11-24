@@ -116,9 +116,10 @@ describe("GameRadialMenu", () => {
     )
 
     actions.forEach((action) => {
-      const button = view.getByTestId(`${action.kind}-button`)
-      const style = StyleSheet.flatten(button.props.style)
-      expect(style.backgroundColor).toBe(theme.colors.gameMenu.actions[action.kind])
+      const pill = view.getByTestId(`${action.kind}-pill`)
+      expect(StyleSheet.flatten(pill.props.style).backgroundColor).toBe(
+        theme.colors.gameMenu.actions[action.kind],
+      )
     })
   })
 
