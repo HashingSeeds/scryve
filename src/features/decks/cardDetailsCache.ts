@@ -33,6 +33,14 @@ function isDetails(value: unknown): value is FocusedCardDetails {
   return Object.values(value).every((field) => field === undefined || typeof field === "string")
 }
 
+function sanitizeDetails(value: FocusedCardDetails): FocusedCardDetails {
+  const clean: Record<string, string> = {}
+  for (const [key, field] of Object.entries(value)) {
+    if (typeof field === "string") clean[key] = field
+  }
+  return clean as FocusedCardDetails
+}
+
 function parseDetails(raw: string | undefined): FocusedCardDetails | undefined {
   if (!raw) return undefined
   try {
@@ -62,15 +70,23 @@ function readLegacyCardDetails(): Record<string, FocusedCardDetails> {
   }
   const legacy: Record<string, FocusedCardDetails> = {}
   if (typeof parsed === "object" && parsed !== null) {
-    const rows: { key: string; payload: string; accessedAt: number }[] = []
+    const candidates: [string, FocusedCardDetails][] = []
     for (const [key, value] of Object.entries(parsed)) {
       if (!isDetails(value)) continue
       legacy[key] = value
-      rows.push({ key, payload: JSON.stringify(value), accessedAt: nextAccessedAt() })
+      candidates.push([key, value])
     }
-    if (rows.length > 0) {
+    if (candidates.length > 0) {
       try {
-        localCardDb.upsertCardDetails(rows, MAX_DETAILS_ENTRIES)
+        const rows: { key: string; payload: string; accessedAt: number }[] = []
+        for (const [key, value] of candidates) {
+          if (localCardDb.getCardDetail(key) !== undefined) continue
+          const preferred = pendingSqliteDetails.get(key) ?? value
+          rows.push({ key, payload: JSON.stringify(preferred), accessedAt: nextAccessedAt() })
+        }
+        if (rows.length > 0) {
+          localCardDb.upsertCardDetails(rows, MAX_DETAILS_ENTRIES)
+        }
       } catch (error) {
         console.error("[card-details-cache] failed to migrate legacy details", error)
         return legacy
@@ -120,6 +136,7 @@ function sqliteDetailsSnapshot(): Record<string, FocusedCardDetails> {
   const revision = localCardDb.cardDetailsRevision()
   if (cachedSqliteDetails && cachedSqliteRevision === revision) return cachedSqliteDetails
   const merged = new Map<string, FocusedCardDetails>(Object.entries(legacy))
+  let loadedFromDb = false
   try {
     for (const row of localCardDb.listCardDetails()) {
       const parsed = parseDetails(row.payload)
@@ -127,6 +144,7 @@ function sqliteDetailsSnapshot(): Record<string, FocusedCardDetails> {
       merged.delete(row.key)
       merged.set(row.key, parsed)
     }
+    loadedFromDb = true
   } catch (error) {
     console.error("[card-details-cache] failed to load", error)
   }
@@ -139,8 +157,10 @@ function sqliteDetailsSnapshot(): Record<string, FocusedCardDetails> {
     merged.delete(key)
   }
   const result = Object.fromEntries(merged)
-  cachedSqliteDetails = result
-  cachedSqliteRevision = revision
+  if (loadedFromDb) {
+    cachedSqliteDetails = result
+    cachedSqliteRevision = revision
+  }
   return result
 }
 
@@ -163,7 +183,7 @@ export function saveCardDetails(
     const combined = new Map(pendingSqliteDetails)
     for (const [key, value] of Object.entries(entries)) {
       combined.delete(key)
-      combined.set(key, value)
+      combined.set(key, sanitizeDetails(value))
     }
     for (const key of combined.keys()) {
       if (combined.size <= MAX_DETAILS_ENTRIES) break
@@ -189,7 +209,7 @@ export function saveCardDetails(
   const details = detailsFor(blobStore)
   for (const [key, value] of Object.entries(entries)) {
     details.delete(key)
-    details.set(key, value)
+    details.set(key, sanitizeDetails(value))
   }
   for (const key of details.keys()) {
     if (details.size <= MAX_DETAILS_ENTRIES) break

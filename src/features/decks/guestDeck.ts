@@ -20,6 +20,7 @@ import {
 const GUEST_DECKS_KEY = "decks.guest.v2"
 const LEGACY_GUEST_DECK_KEY = "decks.guest.v1"
 const UNREADABLE_META_KEY = "unreadable"
+const LEGACY_MIGRATED_META_KEY = "legacy_migrated"
 const GUEST_ROUTE_PREFIX = "guest-"
 const CARD_STRING_FIELDS = [
   "game",
@@ -234,14 +235,15 @@ function readDbRows() {
   try {
     const rows = localCardDb.listGuestDecks()
     const metaRaw = localCardDb.getGuestMeta(UNREADABLE_META_KEY)
-    return { rows, metaRaw }
+    const legacyMigrated = localCardDb.getGuestMeta(LEGACY_MIGRATED_META_KEY) === "1"
+    return { rows, metaRaw, legacyMigrated }
   } catch {
     throw new GuestDeckStorageError(translate("decks:guestStorage.readFailed"), "read_failed")
   }
 }
 
 function readStore() {
-  const { rows, metaRaw } = readDbRows()
+  const { rows, metaRaw, legacyMigrated } = readDbRows()
   const rawEntries: unknown[] = []
   for (const row of rows) {
     try {
@@ -259,6 +261,11 @@ function readStore() {
     } catch {}
   }
   const mergedUnreadable = [...savedUnreadable, ...rowUnreadable]
+
+  if (legacyMigrated) {
+    finishLegacyCleanup()
+    return { decks, unreadable: mergedUnreadable, legacy: false }
+  }
 
   const legacyV2Raw = readRaw(GUEST_DECKS_KEY)
   const legacyV1Raw = readRaw(LEGACY_GUEST_DECK_KEY)
@@ -294,6 +301,14 @@ function clearLegacyKeys() {
   }
 }
 
+function finishLegacyCleanup() {
+  if (!clearLegacyKeys()) return false
+  try {
+    localCardDb.deleteGuestMeta(LEGACY_MIGRATED_META_KEY)
+  } catch {}
+  return true
+}
+
 function persistUnreadable(entries: unknown[]) {
   if (entries.length > 0) localCardDb.setGuestMeta(UNREADABLE_META_KEY, JSON.stringify(entries))
   else localCardDb.deleteGuestMeta(UNREADABLE_META_KEY)
@@ -311,12 +326,13 @@ function migrateLegacyDecks(decks: GuestDeck[], unreadableEntries: unknown[]) {
         )
       }
       persistUnreadable(unreadableEntries)
+      localCardDb.setGuestMeta(LEGACY_MIGRATED_META_KEY, "1")
     })
   } catch {
     reportStorageFailure("save")
     return false
   }
-  return clearLegacyKeys()
+  return finishLegacyCleanup()
 }
 
 let loadError: unknown
@@ -366,6 +382,7 @@ function commitUpsert(next: GuestDeck, decks: GuestDeck[], failure: string) {
           )
         }
         persistUnreadable(unreadable)
+        localCardDb.setGuestMeta(LEGACY_MIGRATED_META_KEY, "1")
       } else {
         localCardDb.upsertGuestDeck(
           next.localId,
@@ -380,7 +397,7 @@ function commitUpsert(next: GuestDeck, decks: GuestDeck[], failure: string) {
     throw new GuestDeckStorageError(failure)
   }
   snapshot = decks
-  if (pendingLegacy && clearLegacyKeys()) pendingLegacy = false
+  if (pendingLegacy && finishLegacyCleanup()) pendingLegacy = false
   notify()
 }
 
@@ -397,6 +414,7 @@ function commitDelete(localId: string, decks: GuestDeck[], failure: string) {
           )
         }
         persistUnreadable(unreadable)
+        localCardDb.setGuestMeta(LEGACY_MIGRATED_META_KEY, "1")
       }
       localCardDb.deleteGuestDeck(localId)
     })
@@ -405,7 +423,7 @@ function commitDelete(localId: string, decks: GuestDeck[], failure: string) {
     throw new GuestDeckStorageError(failure)
   }
   snapshot = decks
-  if (pendingLegacy && clearLegacyKeys()) pendingLegacy = false
+  if (pendingLegacy && finishLegacyCleanup()) pendingLegacy = false
   notify()
 }
 
