@@ -1,6 +1,6 @@
 import { type ComponentProps, memo, useEffect } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { Platform, StyleSheet, View } from "react-native"
 import Animated, {
   Easing,
   ReduceMotion,
@@ -151,6 +151,8 @@ const ATTENTION_POP_SETTLE_MS = 190
 // why: flat at the start, so a first web frame that lands before the start time cannot shrink the button.
 const POP_EASING = Easing.inOut(Easing.quad)
 const AnimatedText = Animated.createAnimatedComponent(Text)
+// why: on iOS an opacity on the whole action is a group opacity, an offscreen pass per action per frame, so each leaf fades instead. Android keeps the group fade, since elevation would lift a separate pill over its label.
+const FADE_LEAVES = Platform.OS === "ios"
 // why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
 const GATED_MOTION = ReduceMotion.Never
 const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
@@ -678,6 +680,7 @@ function RadialAction({
     const target = { x: poseX.value, y: poseY.value }
     const start = getRadialActionStart(target)
     return {
+      opacity: FADE_LEAVES ? 1 : arrive.value,
       transform: [
         { translateX: start.x + (target.x - start.x) * arrive.value },
         { translateY: start.y + (target.y - start.y) * arrive.value },
@@ -688,8 +691,7 @@ function RadialAction({
       ],
     }
   })
-  // why: each leaf fades on its own; an opacity on the whole action is a group opacity, an offscreen pass per action per frame on iOS.
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: arrive.value }))
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: FADE_LEAVES ? arrive.value : 1 }))
 
   return (
     <Animated.View
@@ -716,16 +718,24 @@ function RadialAction({
         accessibilityState={{ disabled: !!action.disabled }}
         style={({ pressed }) => [
           themed($action),
+          !FADE_LEAVES && [themed($actionSurface), { backgroundColor: background }],
           (action.disabled || action.blocked) && themed($disabledAction),
           pressed && !action.disabled && themed($pressedAction),
         ]}
         onPress={action.onPress}
       >
-        <Animated.View
-          testID={`${action.kind}-pill`}
-          pointerEvents="none"
-          style={[themed($actionPill), { backgroundColor: background }, fadeStyle]}
-        />
+        {FADE_LEAVES ? (
+          <Animated.View
+            testID={`${action.kind}-pill`}
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              themed($actionSurface),
+              { backgroundColor: background },
+              fadeStyle,
+            ]}
+          />
+        ) : null}
         <View style={themed($actionTitle)}>
           <Animated.View style={fadeStyle}>
             <Icon icon={ACTION_ICONS[action.kind]} size={ACTION_ICON_SIZE} color={foreground} />
@@ -813,8 +823,7 @@ const $action: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
   paddingHorizontal: 10,
 })
-const $actionPill: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  ...StyleSheet.absoluteFill,
+const $actionSurface: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: ACTION_HEIGHT / 2,
   shadowColor: colors.gameMenu.shadow,
   shadowOffset: { width: 0, height: 4 },
