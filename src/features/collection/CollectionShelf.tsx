@@ -108,8 +108,9 @@ export function CollectionShelf({
   const valuedCollection = useMemo(() => {
     if (mode === "scans") return []
     void sync.priceCount
+    void sync.updatedAt
     return valueCollectionEntries(game, collectionEntries).items
-  }, [mode, game, collectionEntries, sync.priceCount])
+  }, [mode, game, collectionEntries, sync.priceCount, sync.updatedAt])
 
   const pricedEntries = useMemo(() => {
     if (mode === "scans") return []
@@ -144,6 +145,7 @@ export function CollectionShelf({
     if (mode !== "scans") return new Map<string, { count: number; retailCents: number }>()
     void revision
     void sync.priceCount
+    void sync.updatedAt
     const summaryById = new Map<string, { count: number; retailCents: number }>()
     for (const session of scanSessions) {
       const entries = listCollectionEntries({ binderId: session.id })
@@ -155,7 +157,7 @@ export function CollectionShelf({
       })
     }
     return summaryById
-  }, [mode, revision, sync.priceCount, scanSessions, game])
+  }, [mode, revision, sync.priceCount, sync.updatedAt, scanSessions, game])
 
   const quickAddMatches = useMemo(() => {
     const norm = normalizePrintingName(addCardQuery)
@@ -205,10 +207,11 @@ export function CollectionShelf({
     if (!scanningSession) return undefined
     void revision
     void sync.priceCount
+    void sync.updatedAt
     const sessionGame = scanningSession.game ?? game
     const entries = listCollectionEntries({ binderId: scanningSession.id })
     return valueCollectionEntries(sessionGame, entries).totals.retailCents
-  }, [scanningSession, revision, sync.priceCount, game])
+  }, [scanningSession, revision, sync.priceCount, sync.updatedAt, game])
 
   if (mode === "scans") {
     return (
@@ -661,6 +664,7 @@ export function CollectionShelf({
           initialCondition={editingEntry.condition as CardCondition}
           onPick={({ printing, finish, condition }) => {
             updateCollectionEntry(editingEntry.id, {
+              cardId: printing.cardId,
               printingId: printing.printingId,
               setCode: printing.setCode,
               collectorNumber: printing.collectorNumber,

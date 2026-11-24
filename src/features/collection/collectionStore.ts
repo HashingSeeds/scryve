@@ -175,6 +175,7 @@ export function updateCollectionEntry(
   patch: Partial<
     Pick<
       StoredCollectionEntry,
+      | "cardId"
       | "printingId"
       | "setCode"
       | "collectorNumber"

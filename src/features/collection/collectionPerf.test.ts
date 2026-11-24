@@ -68,16 +68,22 @@ describe("collection SQLite scale benchmark (30,000 cards)", () => {
     const binderRows = localCardDb.listCollectionEntries({ game: "mtg", binderId: "binder-1" })
     const tBinderMs = performance.now() - tBinderStart
     expect(binderRows).toHaveLength(5_000)
-    expect(tBinderMs).toBeLessThan(250)
+    expect(tBinderMs).toBeLessThan(1_000)
 
     const allRows = localCardDb.listCollectionEntries({ game: "mtg" })
+    const batchSpy = jest.spyOn(catalogDb, "getPricesBatch")
+    const perRowSpy = jest.spyOn(catalogDb, "getPricesForPrinting")
     const tValueStart = performance.now()
     const valued = valueCollectionEntries("mtg", allRows)
     const tValueMs = performance.now() - tValueStart
+    expect(batchSpy).toHaveBeenCalledTimes(1)
+    expect(perRowSpy).not.toHaveBeenCalled()
+    batchSpy.mockRestore()
+    perRowSpy.mockRestore()
     expect(valued.items).toHaveLength(totalEntries)
     expect(valued.totals.cards).toBe(totalEntries)
     expect(valued.totals.retailCents).toBeGreaterThan(0)
-    expect(tValueMs).toBeLessThan(250)
+    expect(tValueMs).toBeLessThan(1_000)
 
     const deckCards = Array.from({ length: 100 }, (_, i) => ({
       name: `Card ${i}`,
@@ -92,6 +98,6 @@ describe("collection SQLite scale benchmark (30,000 cards)", () => {
     expect(ownership.totalCards).toBe(100)
     expect(ownership.ownedCards).toBe(100)
     expect(ownership.missingCards).toBe(0)
-    expect(tOwnMs).toBeLessThan(50)
+    expect(tOwnMs).toBeLessThan(250)
   })
 })

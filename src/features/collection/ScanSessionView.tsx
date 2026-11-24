@@ -91,8 +91,10 @@ export function ScanSessionView({
 
   const binders = useMemo(() => {
     void revision
-    return listBinders("binder")
-  }, [revision])
+    return listBinders("binder").filter(
+      (binder) => !binder.game || !session.game || binder.game === session.game,
+    )
+  }, [revision, session.game])
 
   function handleMove(targetBinderId: string | undefined) {
     const moved = moveBinderEntries(session.id, targetBinderId)
@@ -297,6 +299,7 @@ export function ScanSessionView({
           initialCondition={editingPrinting.condition as CardCondition}
           onPick={({ printing, finish, condition }) => {
             updateCollectionEntry(editingPrinting.id, {
+              cardId: printing.cardId,
               printingId: printing.printingId,
               setCode: printing.setCode,
               collectorNumber: printing.collectorNumber,
