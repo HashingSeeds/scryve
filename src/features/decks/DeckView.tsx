@@ -12,6 +12,7 @@ import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
+import { useCatalogSync } from "@/features/collection/catalogSync"
 import { useCollectionRevision } from "@/features/collection/collectionStore"
 import { computeDeckOwnership } from "@/features/collection/deckOwnership"
 import { tcgplayerMassEntryUrl } from "@/features/collection/storeLinks"
@@ -173,11 +174,23 @@ export function DeckView({
   const shownCards = building ? cards : savedCards
   const collectionRevision = useCollectionRevision()
   const showOwnership = prereleaseBuild() && building && !cardsUnavailable && shownCards.length > 0
+  const catalogSync = useCatalogSync(game, showOwnership)
   const ownership = useMemo(() => {
     void collectionRevision
+    void catalogSync.printingCount
+    void catalogSync.priceCount
+    void catalogSync.updatedAt
     if (!showOwnership) return undefined
     return computeDeckOwnership(game, shownCards)
-  }, [collectionRevision, game, showOwnership, shownCards])
+  }, [
+    catalogSync.priceCount,
+    catalogSync.printingCount,
+    catalogSync.updatedAt,
+    collectionRevision,
+    game,
+    showOwnership,
+    shownCards,
+  ])
   const issues = useDeckIssues(game, format, shownCards)
   const side = sideboardSection({ game, format })
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
@@ -296,7 +309,7 @@ export function DeckView({
                     }
                   />
                 </View>
-                {ownership.missingCards > 0 ? (
+                {ownership.missingCards > 0 && catalogSync.supported ? (
                   <Button
                     testID="deck-buy-missing"
                     tx="decks:collection.buyMissing"

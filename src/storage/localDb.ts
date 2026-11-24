@@ -333,10 +333,12 @@ export const localCardDb: LocalCardDb = {
 
   deleteBinder(id) {
     const db = openNativeDb()
-    db.withTransactionSync(() => {
+    const run = () => {
       db.runSync("DELETE FROM collection_entries WHERE binder_id = ?", [id])
       db.runSync("DELETE FROM binders WHERE id = ?", [id])
-    })
+    }
+    if (db.isInTransactionSync()) run()
+    else db.withTransactionSync(run)
   },
 
   listCollectionEntries(filter = {}) {

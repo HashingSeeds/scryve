@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { FlatList, Modal, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
 
@@ -69,6 +69,16 @@ export function TradeCalculatorModal({
   const [committedMessage, setCommittedMessage] = useState<string>()
   const [tradeError, setTradeError] = useState<string>()
   const nameIndex = useCardNameIndex(game, deviceId, Boolean(scanningSide))
+
+  useEffect(() => {
+    setGiveItems([])
+    setReceiveItems([])
+    setSearch("")
+    setScanningSide(undefined)
+    setEditingItem(undefined)
+    setCommittedMessage(undefined)
+    setTradeError(undefined)
+  }, [game])
 
   const quickResults = useMemo(() => {
     const trimmed = normalizePrintingName(search)
@@ -296,10 +306,16 @@ export function TradeCalculatorModal({
           {quickResults.length > 0 ? (
             <View style={themed($quickList)}>
               {quickResults.map((printing) => {
+                const rowFinish: CardFinish =
+                  printing.finishes.length === 0 || printing.finishes.includes(DEFAULT_FINISH)
+                    ? DEFAULT_FINISH
+                    : printing.finishes[0] === "foil" || printing.finishes[0] === "etched"
+                      ? printing.finishes[0]
+                      : DEFAULT_FINISH
                 const price = lookupPrintingPrice(
                   game,
                   printing.printingId,
-                  DEFAULT_FINISH,
+                  rowFinish,
                   DEFAULT_CONDITION,
                 )
                 return (
@@ -314,8 +330,8 @@ export function TradeCalculatorModal({
                         name: printing.name,
                         setCode: printing.setCode,
                         collectorNumber: printing.collectorNumber,
-                        finish: "nonfoil",
-                        condition: "NM",
+                        finish: rowFinish,
+                        condition: DEFAULT_CONDITION,
                         unitPriceCents: price.retailCents ?? 0,
                         imageUrl: printing.imageUrl,
                         smallImageUrl: printing.smallImageUrl,
@@ -419,6 +435,7 @@ export function TradeCalculatorModal({
               const updated: TradeItem = {
                 ...source,
                 key: nextKey,
+                cardId: printing.cardId,
                 printingId: printing.printingId,
                 setCode: printing.setCode,
                 collectorNumber: printing.collectorNumber,
