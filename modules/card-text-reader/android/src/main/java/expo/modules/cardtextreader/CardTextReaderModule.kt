@@ -20,6 +20,18 @@ class CardTextReaderModule : Module() {
         }
       }
 
+      Prop("torch") { view: CardTextCameraView, torch: Boolean? ->
+        view.setTorch(torch ?: false)
+      }
+
+      Prop("scanMode") { view: CardTextCameraView, mode: String? ->
+        view.setScanMode(mode ?: "handheld")
+      }
+
+      Prop("acceptedToken") { view: CardTextCameraView, token: Int? ->
+        view.setAcceptedToken(token ?: 0)
+      }
+
       OnViewDestroys { view -> view.release() }
     }
   }

@@ -727,27 +727,65 @@ export function CardSearch({
   }
 
   async function addScannedCards(names: string[]): Promise<ScannedCardAdd[]> {
+    const resolved: (ScannedCardAdd | undefined)[] = new Array(names.length)
+    const missingIndexes: number[] = []
+    const missingNames: string[] = []
+
+    names.forEach((name, index) => {
+      const localCard = magicCards?.byName.get(name)
+      if (!localCard) {
+        missingIndexes.push(index)
+        missingNames.push(name)
+        return
+      }
+      const error = add(localCard)
+      if (error) {
+        resolved[index] = { error, retryable: offline }
+        return
+      }
+      scannedEntries.current.set(name, searchEntry(localCard))
+      if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: localCard.name, local: true })}`)
+      resolved[index] = { imageUrl: localCard.smallImageUrl ?? localCard.imageUrl }
+    })
+
+    if (missingNames.length === 0) {
+      return resolved.map((item) => item ?? { error: translate("decks:cardScan.addFailed") })
+    }
+
     try {
       if (!convex) throw new Error("Card search unavailable")
-      const { cards, lookupFailed } = await convex.action(api.cards.byNames, { names, deviceId })
+      const { cards, lookupFailed } = await convex.action(api.cards.byNames, {
+        names: missingNames,
+        deviceId,
+      })
       const byName = new Map(cards.map((card) => [card.name, card]))
-      return names.map((name) => {
+      missingIndexes.forEach((slot, idx) => {
+        const name = missingNames[idx]
         const card = byName.get(name)
-        if (!card)
-          return lookupFailed
+        if (!card) {
+          resolved[slot] = lookupFailed
             ? { error: translate("decks:cardScan.addFailed"), retryable: true }
             : { error: translate("decks:cardScan.notFound", { card: name }) }
+          return
+        }
         const error = add(card)
         // why: a deck refuses uncached cards while offline; a retry adds them once it reconnects.
-        if (error) return { error, retryable: offline }
+        if (error) {
+          resolved[slot] = { error, retryable: offline }
+          return
+        }
         scannedEntries.current.set(name, searchEntry(card))
         if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: card.name })}`)
-        return { imageUrl: card.smallImageUrl ?? card.imageUrl }
+        resolved[slot] = { imageUrl: card.smallImageUrl ?? card.imageUrl }
       })
+      return resolved.map((item) => item ?? { error: translate("decks:cardScan.addFailed") })
     } catch (cause) {
       const error = convexErrorMessage(cause, translate("decks:cardScan.addFailed"))
       const retryAfterMs = convexRetryAfterMs(cause)
-      return names.map(() => ({ error, retryable: true, retryAfterMs }))
+      missingIndexes.forEach((slot) => {
+        resolved[slot] = { error, retryable: true, retryAfterMs }
+      })
+      return resolved.map((item) => item ?? { error, retryable: true, retryAfterMs })
     }
   }
 
@@ -1334,6 +1372,7 @@ export function CardSearch({
             )
           }
           addCards={addScannedCards}
+          instantLocalLookup={Boolean(magicCards)}
           removeCard={onRemove ? removeScannedCard : undefined}
           onRead={__DEV__ ? recordScanRead : undefined}
           onClose={() => setScanning(false)}

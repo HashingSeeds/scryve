@@ -10,6 +10,7 @@ import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
 import { ValueField } from "@/components/ValueField"
+import { affiliateLinksEnabled, setAffiliateLinksEnabled } from "@/features/collection/storeLinks"
 import { MAX_PLAYERS, MIN_PLAYERS } from "@/features/game/domain"
 import { GameTypeList } from "@/features/game/GameTypeList"
 import { gameTypeDetail, gameTypeId, newGameTypes, type GameType } from "@/features/game/gameTypes"
@@ -23,6 +24,7 @@ import {
 } from "@/features/game/playSystems"
 import { RENEWAL_REMINDER_DAYS, type PushKind } from "@/features/notifications/prefs"
 import { copyDebugInfo, readAppInfo } from "@/features/updates/appInfo"
+import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { AppUpdateStatus } from "@/features/updates/AppUpdateStatus"
 import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
@@ -77,6 +79,7 @@ export function SettingsScreen({
   const [choosingGame, setChoosingGame] = useState(false)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle")
   const [sharing, setSharing] = useState(analyticsEnabled)
+  const [storeLinks, setStoreLinks] = useState(affiliateLinksEnabled)
   const [analyticsError, setAnalyticsError] = useState("")
   const update = (changes: Partial<LocalSettings>) => {
     const next = { ...settings, ...changes }
@@ -256,6 +259,18 @@ export function SettingsScreen({
       />
       {!analyticsConfigured() ? <Text size="xs" tx="account:settings.privacy.unavailable" /> : null}
       {analyticsError ? <Text accessibilityRole="alert" size="xs" text={analyticsError} /> : null}
+      {prereleaseBuild() ? (
+        <Switch
+          testID="store-links-switch"
+          labelTx="account:settings.privacy.storeLinks"
+          helperTx="account:settings.privacy.storeLinksHelper"
+          value={storeLinks}
+          onValueChange={(value) => {
+            setAffiliateLinksEnabled(value)
+            setStoreLinks(value)
+          }}
+        />
+      ) : null}
       {onOpenBlockedPlayers ? (
         <SettingsRow
           testID="settings-blocked-players"

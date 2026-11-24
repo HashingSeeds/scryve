@@ -19,6 +19,7 @@ export type CardNameIndex = {
     printedName?: string
   }[]
   facesByTrigram: Map<string, number[]>
+  exactByKey?: Map<string, number>
 }
 
 export type CardNameMatch = { name: string; similarity: number; printedName?: string }
@@ -86,14 +87,19 @@ export function cardNameIndex(
     faces.push({ key, nameIndex, wholeName: true, trigramCount: trigrams(key).size, printedName })
   }
   const facesByTrigram = new Map<string, number[]>()
+  const exactByKey = new Map<string, number>()
   faces.forEach((face, faceIndex) => {
+    const previous = exactByKey.get(face.key)
+    if (previous === undefined || (face.wholeName && !faces[previous].wholeName)) {
+      exactByKey.set(face.key, faceIndex)
+    }
     for (const gram of trigrams(face.key)) {
       const posting = facesByTrigram.get(gram)
       if (posting) posting.push(faceIndex)
       else facesByTrigram.set(gram, [faceIndex])
     }
   })
-  return { names, faces, facesByTrigram }
+  return { names, faces, facesByTrigram, exactByKey }
 }
 
 export function catalogNameIndex(catalog: { names: string; alternateNames: string }) {
@@ -139,11 +145,18 @@ function typedSimilarity(query: string, face: string) {
   return Math.max(similarity(query, face), bestSliceSimilarity(query, face))
 }
 
+let sharedScratch = new Uint16Array(0)
+let overlapScratch = new Float64Array(0)
+
 function rankedNames(index: CardNameIndex, line: string, typed = false) {
   const key = matchKey(line)
   if (key.length < 3) return []
   const lineTrigrams = trigrams(key)
-  const shared = new Uint16Array(index.faces.length)
+  if (sharedScratch.length < index.faces.length) {
+    sharedScratch = new Uint16Array(index.faces.length)
+    overlapScratch = new Float64Array(index.faces.length)
+  }
+  const shared = sharedScratch
   const touched: number[] = []
   for (const gram of lineTrigrams)
     for (const faceIndex of index.facesByTrigram.get(gram) ?? [])
@@ -158,7 +171,7 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
     while (minShared > 1 && count < shortlistSize) count += facesSharing[--minShared]
     candidates = touched.filter((faceIndex) => shared[faceIndex] >= minShared)
   }
-  const overlap = new Float64Array(index.faces.length)
+  const overlap = overlapScratch
   for (const faceIndex of candidates)
     overlap[faceIndex] = typed
       ? shared[faceIndex] / lineTrigrams.size - index.faces[faceIndex].trigramCount / 1e4
@@ -169,6 +182,7 @@ function rankedNames(index: CardNameIndex, line: string, typed = false) {
     { similarity: number; wholeName: boolean; face: string; printedName?: string }
   >()
   const shortlist = candidates.sort((a, b) => overlap[b] - overlap[a]).slice(0, shortlistSize)
+  for (const faceIndex of touched) shared[faceIndex] = 0
   const keep = (faceIndex: number, similarity: number) => {
     const face = index.faces[faceIndex]
     const current = bestByName.get(face.nameIndex)
@@ -200,6 +214,18 @@ export function firstUnambiguousCardName(
   lines: string[],
 ): CardNameMatch | undefined {
   for (const line of lines) {
+    const exactKey = matchKey(line)
+    const exactFaceIndex = exactKey.length >= 3 ? index.exactByKey?.get(exactKey) : undefined
+    if (exactFaceIndex !== undefined) {
+      const exactFace = index.faces[exactFaceIndex]
+      if (exactFace.wholeName) {
+        return {
+          name: index.names[exactFace.nameIndex],
+          similarity: 1,
+          ...(exactFace.printedName ? { printedName: exactFace.printedName } : {}),
+        }
+      }
+    }
     const [best, ...others] = rankedNames(index, line)
     const runnerUp = others.find((other) => other.face !== best?.face)
     if (!best || best.similarity < MIN_SIMILARITY) continue

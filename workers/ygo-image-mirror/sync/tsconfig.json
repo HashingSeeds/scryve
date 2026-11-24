@@ -9,5 +9,12 @@
     "target": "ES2022",
     "types": ["jest", "node"]
   },
-  "include": ["index.ts", "index.test.ts", "mtgDataset.ts", "mtgDataset.test.ts"]
+  "include": [
+    "index.ts",
+    "index.test.ts",
+    "mtgDataset.ts",
+    "mtgDataset.test.ts",
+    "mtgPrintingsAndPrices.ts",
+    "mtgPrintingsAndPrices.test.ts"
+  ]
 }

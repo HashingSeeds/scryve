@@ -98,6 +98,16 @@ export function formatPercent(ratio: number) {
   )
 }
 
+export function formatCurrency(cents: number, currency: "USD" | "EUR" = "USD") {
+  return pseudoDigits(
+    withMinusSign(
+      numberFormat({ style: "currency", currency, useGrouping: true }).format(
+        withoutNegativeZero(cents / 100),
+      ),
+    ),
+  )
+}
+
 export function formatRecord(...counts: readonly number[]) {
   return leftToRight(counts.map((count) => formatNumber(count)).join("-"))
 }

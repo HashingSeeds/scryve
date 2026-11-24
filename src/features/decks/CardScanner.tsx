@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react"
-import { FlatList, Linking, Modal, StyleSheet, TouchableOpacity, View } from "react-native"
+import {
+  FlatList,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native"
 import type { ImageStyle, LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { useCameraPermissions } from "expo-camera"
 import * as ScreenOrientation from "expo-screen-orientation"
@@ -12,8 +20,12 @@ import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { TextField } from "@/components/TextField"
+import { resolveScannedPrinting, useCatalogSync } from "@/features/collection/catalogSync"
+import { PrintingPickerSheet } from "@/features/collection/PrintingPickerSheet"
 import { LOCAL_KEYS, syncStatsEnabled } from "@/features/game/localPersistence"
-import { joinParts } from "@/i18n/format"
+import { prereleaseBuild } from "@/features/updates/appUpdate"
+import { formatCurrency, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -27,23 +39,50 @@ import {
   type CardNameIndex,
   type CardNameMatch,
 } from "./cardNameMatch"
+import { collectorHintFromCardBottom } from "./cardScan"
 import { CardScanStats } from "./CardScanStats"
 import { framedLinesFromCardTop, type ScanFraming } from "./cardTextLayout"
+import type { CardCondition, CardFinish } from "../../../convex/lib/cardPricing"
 import {
   CardTextCamera,
   prepareScanHaptics,
   scanHaptic,
   type CardPhotoText,
+  type CardScanMode,
 } from "../../../modules/card-text-reader"
 
 export type CardScan = { linesFromCardTop: string[]; photo: CardPhotoText; framing: ScanFraming }
 export type ScannedCardAdd =
   { imageUrl?: string } | { error: string; retryable?: boolean; retryAfterMs?: number }
 
+export type ScannedPrintingPayload = {
+  id: number
+  name: string
+  cardId?: string
+  printingId?: string
+  setCode?: string
+  collectorNumber?: string
+  finish: CardFinish
+  condition: CardCondition
+  language: string
+  imageUrl?: string
+  retailCents?: number
+  buylistCents?: number
+}
+
 type ScannedCard = CardNameMatch & {
   id: number
   alternates: string[]
   imageUrl?: string
+  cardId?: string
+  printingId?: string
+  setCode?: string
+  collectorNumber?: string
+  finish: CardFinish
+  condition: CardCondition
+  language: string
+  retailCents?: number
+  buylistCents?: number
   state: "adding" | "retrying" | "added" | "failed"
 }
 type ScanStatus =
@@ -53,6 +92,10 @@ type LandCount = { card: Omit<ScannedCard, "id" | "state">; inDeck: number; coun
 const ALTERNATE_COUNT = 5
 const ADD_BATCH_SIZE = 10
 const ADD_BATCH_WAIT_MS = 1500
+const HIT_THRESHOLD_CENTS = 500
+const BIG_HIT_THRESHOLD_CENTS = 2000
+const FINISH_CYCLE: readonly CardFinish[] = ["nonfoil", "foil", "etched"]
+const CONDITION_CYCLE: readonly CardCondition[] = ["NM", "LP", "MP", "HP", "DMG"]
 // why: Scryfall pauses lookups for 30 seconds after a 429, so the last waits outlast a pause.
 const RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000]
 const BASIC_LANDS = new Set([
@@ -92,6 +135,11 @@ export function CardScanner({
   addCards,
   removeCard,
   onRead,
+  onScanPrinting,
+  onUpdatePrinting,
+  instantLocalLookup = false,
+  sessionTotalCents,
+  initialSetLock,
   onClose,
 }: {
   game: string
@@ -101,11 +149,30 @@ export function CardScanner({
   addCards: (names: string[]) => Promise<ScannedCardAdd[]>
   removeCard?: (name: string) => void
   onRead?: (scan: CardScan, match: string | undefined) => void
+  onScanPrinting?: (scan: ScannedPrintingPayload) => void
+  onUpdatePrinting?: (
+    id: number,
+    update: {
+      printingId: string
+      setCode: string
+      collectorNumber: string
+      finish: CardFinish
+      condition: CardCondition
+      imageUrl?: string
+      retailCents?: number
+      buylistCents?: number
+    },
+  ) => void
+  instantLocalLookup?: boolean
+  sessionTotalCents?: number
+  initialSetLock?: string
   onClose: () => void
 }) {
   const [permission, requestPermission] = useCameraPermissions()
   const [settings] = useMMKVString(LOCAL_KEYS.settings, storage)
   const showStats = syncStatsEnabled(settings)
+  const showPrereleaseHud = prereleaseBuild()
+  useCatalogSync(game, showPrereleaseHud)
   const [lastPhoto, setLastPhoto] = useState<CardPhotoText>()
   const view = useRef<LayoutRectangle>(undefined)
   const [frame, setFrame] = useState<LayoutRectangle>()
@@ -113,11 +180,22 @@ export function CardScanner({
   const addedRef = useRef(added)
   const [status, setStatus] = useState<ScanStatus>("looking")
   const [fixing, setFixing] = useState<ScannedCard>()
+  const [pickingPrinting, setPickingPrinting] = useState<ScannedCard>()
   const [reviewing, setReviewing] = useState(false)
   const [landCount, setLandCount] = useState<LandCount>()
+  const [torch, setTorch] = useState(false)
+  const [scanMode, setScanMode] = useState<CardScanMode>("handheld")
+  const [finish, setFinish] = useState<CardFinish>("nonfoil")
+  const [finishLocked, setFinishLocked] = useState(false)
+  const [condition, setCondition] = useState<CardCondition>("NM")
+  const [setLock, setSetLock] = useState(initialSetLock?.toUpperCase() ?? "")
+  const [setLockOpen, setSetLockOpen] = useState(false)
+  const [setLockDraft, setSetLockDraft] = useState(initialSetLock?.toUpperCase() ?? "")
+  const [acceptedToken, setAcceptedToken] = useState(0)
   const landCountOpen = useRef(false)
   const countedLands = useRef(new Set<string>())
   const candidateName = useRef<string>(undefined)
+  const recentVotes = useRef<string[]>([])
   const nameInFrame = useRef<string>(undefined)
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -166,7 +244,7 @@ export function CardScanner({
   function queue(card: ScannedCard) {
     waiting.current.push(card)
     clearTimeout(batchTimer.current)
-    if (waiting.current.length >= ADD_BATCH_SIZE) void addWaitingCards()
+    if (instantLocalLookup || waiting.current.length >= ADD_BATCH_SIZE) void addWaitingCards()
     else batchTimer.current = setTimeout(() => void addWaitingCards(), ADD_BATCH_WAIT_MS)
   }
 
@@ -203,14 +281,44 @@ export function CardScanner({
   }
 
   function add(card: Omit<ScannedCard, "id" | "state">) {
-    const scanned = { ...card, id: nextId.current++, state: "adding" as const }
-    scanHaptic("added")
+    const id = nextId.current++
+    const scanned: ScannedCard = {
+      ...card,
+      id,
+      state: onScanPrinting ? "added" : "adding",
+    }
+    const priceCents = card.retailCents ?? 0
+    scanHaptic(
+      priceCents >= BIG_HIT_THRESHOLD_CENTS
+        ? "bigHit"
+        : priceCents >= HIT_THRESHOLD_CENTS
+          ? "hit"
+          : "added",
+    )
     if (__DEV__) {
       const ms = Date.now() - lastAcceptedAt.current
       console.log(`SCANACCEPT ${JSON.stringify({ name: card.name, ms })}`)
     }
     lastAcceptedAt.current = Date.now()
     setAdded((current) => [scanned, ...current])
+    if (onScanPrinting) {
+      onScanPrinting({
+        id,
+        name: card.name,
+        cardId: card.cardId,
+        printingId: card.printingId,
+        setCode: card.setCode,
+        collectorNumber: card.collectorNumber,
+        finish: card.finish,
+        condition: card.condition,
+        language: card.language,
+        imageUrl: card.imageUrl,
+        retailCents: card.retailCents,
+        buylistCents: card.buylistCents,
+      })
+      lookups.current.set(id, Promise.resolve({ imageUrl: card.imageUrl }))
+      return
+    }
     lookups.current.set(
       scanned.id,
       new Promise((resolve) => settleLookup.current.set(scanned.id, resolve)),
@@ -229,6 +337,11 @@ export function CardScanner({
 
   function readText(photo: CardPhotoText) {
     if (closingRef.current || !view.current || !frame) return
+    if (photo.sceneChanged) {
+      candidateName.current = undefined
+      nameInFrame.current = undefined
+      recentVotes.current = []
+    }
     const framing = { view: view.current, frame }
     const linesFromCardTop = framedLinesFromCardTop(photo, framing)
     const match = nameIndex ? nameFromCardTop(nameIndex, linesFromCardTop) : undefined
@@ -236,28 +349,63 @@ export function CardScanner({
     if (!linesFromCardTop.length) {
       candidateName.current = undefined
       nameInFrame.current = undefined
+      recentVotes.current = []
       setStatus("looking")
       return
     }
     if (!nameIndex || !match) {
       candidateName.current = undefined
+      recentVotes.current = []
       setStatus(nameIndex ? "unsure" : "loading")
       return
     }
     if (match.name === nameInFrame.current) return
-    if (match.name !== candidateName.current) {
-      candidateName.current = match.name
-      prepareScanHaptics()
-      setStatus("steady")
-      return
+    const fastExact = match.similarity === 1 && (scanMode === "bulk" || Boolean(photo.cardCorners))
+    if (!fastExact) {
+      recentVotes.current = [...recentVotes.current.slice(-2), match.name]
+      const votes = recentVotes.current.filter((entry) => entry === match.name).length
+      if (votes < 2) {
+        candidateName.current = match.name
+        prepareScanHaptics()
+        setStatus("steady")
+        return
+      }
     }
     candidateName.current = undefined
+    recentVotes.current = []
     nameInFrame.current = match.name
+    setAcceptedToken((token) => token + 1)
     setStatus("looking")
     const alternates = closestNamesFromCardTop(nameIndex, linesFromCardTop, ALTERNATE_COUNT + 1)
       .filter((name) => name !== match.name)
       .slice(0, ALTERNATE_COUNT)
-    accept({ ...match, alternates })
+    const bottomHint = collectorHintFromCardBottom(
+      (photo.bottomLines ?? []).map((line) => line.text),
+    )
+    const effectiveFinish: CardFinish = finishLocked
+      ? finish
+      : bottomHint.isFoilStar
+        ? "foil"
+        : finish
+    const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
+      setLock: setLock.trim() || undefined,
+      finish: effectiveFinish,
+      condition,
+    })
+    accept({
+      ...match,
+      alternates,
+      cardId: resolved.printing?.cardId,
+      printingId: resolved.printing?.printingId,
+      setCode: resolved.printing?.setCode ?? bottomHint.setCode,
+      collectorNumber: resolved.printing?.collectorNumber ?? bottomHint.collectorNumber,
+      finish: effectiveFinish,
+      condition,
+      language: bottomHint.language ?? "en",
+      imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
+      retailCents: resolved.price.retailCents,
+      buylistCents: resolved.price.buylistCents,
+    })
   }
 
   function skip(name: string) {
@@ -319,7 +467,33 @@ export function CardScanner({
       const result = await lookups.current.get(wrong.id)
       if (result && !("error" in result)) removeCard?.(wrong.name)
     }
-    if (name) accept({ name, similarity: 1, alternates: [] })
+    if (name) {
+      const resolved = resolveScannedPrinting(
+        game,
+        name,
+        {},
+        {
+          setLock: setLock.trim() || undefined,
+          finish,
+          condition,
+        },
+      )
+      accept({
+        name,
+        similarity: 1,
+        alternates: [],
+        cardId: resolved.printing?.cardId,
+        printingId: resolved.printing?.printingId,
+        setCode: resolved.printing?.setCode,
+        collectorNumber: resolved.printing?.collectorNumber,
+        finish,
+        condition,
+        language: "en",
+        imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
+        retailCents: resolved.price.retailCents,
+        buylistCents: resolved.price.buylistCents,
+      })
+    }
   }
 
   async function close() {
@@ -357,7 +531,22 @@ export function CardScanner({
     retryingCount ? translate("decks:cardScan.retryingCount", { count: retryingCount }) : "",
     failedCount ? translate("decks:cardScan.failedCount", { count: failedCount }) : "",
   ])
-  const scanning = Boolean(permission?.granted) && !fixing && !landCount && !closing && !reviewing
+  const scanning =
+    Boolean(permission?.granted) &&
+    !fixing &&
+    !pickingPrinting &&
+    !setLockOpen &&
+    !landCount &&
+    !closing &&
+    !reviewing
+
+  const lastDetails = last
+    ? joinParts([
+        last.setCode ? last.setCode.toUpperCase() : "",
+        last.collectorNumber ? `#${last.collectorNumber}` : "",
+        last.retailCents !== undefined ? formatCurrency(last.retailCents, "USD") : "",
+      ])
+    : ""
 
   return (
     <Modal visible animationType="slide" onRequestClose={() => void close()}>
@@ -381,12 +570,114 @@ export function CardScanner({
               style={StyleSheet.absoluteFill}
               active={scanning}
               guide={frame}
+              torch={torch}
+              scanMode={scanMode}
+              acceptedToken={acceptedToken}
               onText={(event) => {
                 count(event.nativeEvent)
                 readText(event.nativeEvent)
                 if (showStats) setLastPhoto(event.nativeEvent)
               }}
             />
+            {showPrereleaseHud && !reviewing ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={$hudScroll}
+                contentContainerStyle={$hudRow}
+              >
+                <TouchableOpacity
+                  testID="card-scan-torch"
+                  accessibilityRole="button"
+                  style={[$hudPill, torch && { backgroundColor: theme.colors.tint }]}
+                  onPress={() => setTorch((on) => !on)}
+                >
+                  <Text size="xs" weight="medium" style={$hudText} tx="decks:cardScan.torch" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="card-scan-mode"
+                  accessibilityRole="button"
+                  style={[$hudPill, scanMode === "bulk" && { backgroundColor: theme.colors.tint }]}
+                  onPress={() => setScanMode((mode) => (mode === "handheld" ? "bulk" : "handheld"))}
+                >
+                  <Text
+                    size="xs"
+                    weight="medium"
+                    style={$hudText}
+                    tx={scanMode === "bulk" ? "decks:cardScan.bulk" : "decks:cardScan.handheld"}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="card-scan-finish"
+                  accessibilityRole="button"
+                  style={[$hudPill, finish !== "nonfoil" && { backgroundColor: theme.colors.tint }]}
+                  onPress={() => {
+                    const next =
+                      FINISH_CYCLE[(FINISH_CYCLE.indexOf(finish) + 1) % FINISH_CYCLE.length]
+                    setFinish(next)
+                    setFinishLocked(next !== "nonfoil")
+                  }}
+                >
+                  <Text
+                    size="xs"
+                    weight="medium"
+                    style={$hudText}
+                    tx={`decks:cardScan.finish.${finish}`}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="card-scan-condition"
+                  accessibilityRole="button"
+                  style={[$hudPill, condition !== "NM" && { backgroundColor: theme.colors.tint }]}
+                  onPress={() =>
+                    setCondition(
+                      CONDITION_CYCLE[
+                        (CONDITION_CYCLE.indexOf(condition) + 1) % CONDITION_CYCLE.length
+                      ],
+                    )
+                  }
+                >
+                  <Text
+                    size="xs"
+                    weight="medium"
+                    style={$hudText}
+                    tx={`decks:cardScan.condition.${condition}`}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="card-scan-set-lock"
+                  accessibilityRole="button"
+                  style={[$hudPill, Boolean(setLock) && { backgroundColor: theme.colors.tint }]}
+                  onPress={() => {
+                    setSetLockDraft(setLock)
+                    setSetLockOpen(true)
+                  }}
+                >
+                  <Text
+                    size="xs"
+                    weight="medium"
+                    style={$hudText}
+                    text={
+                      setLock
+                        ? `${translate("decks:cardScan.setLock")}: ${setLock}`
+                        : translate("decks:cardScan.setLockAny")
+                    }
+                  />
+                </TouchableOpacity>
+                {sessionTotalCents !== undefined ? (
+                  <View style={$hudPill}>
+                    <Text
+                      size="xs"
+                      weight="medium"
+                      style={$hudText}
+                      text={translate("decks:cardScan.sessionTotal", {
+                        total: formatCurrency(sessionTotalCents, "USD"),
+                      })}
+                    />
+                  </View>
+                ) : null}
+              </ScrollView>
+            ) : null}
             <View style={$overlay} pointerEvents="none">
               <View style={$frame} onLayout={(event) => setFrame(event.nativeEvent.layout)} />
               <Text size="sm" style={$hint} text={statusText(status)} />
@@ -486,9 +777,19 @@ export function CardScanner({
                   />
                   <View style={$addedName}>
                     <Text weight="medium" numberOfLines={2} text={cardLabel(last)} />
+                    {lastDetails ? (
+                      <Text size="xs" style={{ color: theme.colors.tint }} text={lastDetails} />
+                    ) : null}
                     <Text size="xs" style={{ color: theme.colors.textDim }} text={addedSummary} />
                   </View>
                 </TouchableOpacity>
+                {showPrereleaseHud ? (
+                  <Button
+                    testID="card-scan-printing"
+                    tx="decks:cardScan.changePrinting"
+                    onPress={() => setPickingPrinting(last)}
+                  />
+                ) : null}
                 {removeCard ? (
                   <Button
                     testID="card-scan-wrong"
@@ -527,11 +828,108 @@ export function CardScanner({
           </View>
         </DialogCard>
       ) : null}
+      {pickingPrinting ? (
+        <PrintingPickerSheet
+          visible
+          game={game}
+          cardName={pickingPrinting.name}
+          cardId={pickingPrinting.cardId}
+          selectedPrintingId={pickingPrinting.printingId}
+          initialFinish={pickingPrinting.finish}
+          initialCondition={pickingPrinting.condition}
+          onPick={({
+            printing,
+            finish: nextFinish,
+            condition: nextCondition,
+            retailCents,
+            buylistCents,
+          }) => {
+            updateCard(pickingPrinting.id, {
+              printingId: printing.printingId,
+              setCode: printing.setCode,
+              collectorNumber: printing.collectorNumber,
+              finish: nextFinish,
+              condition: nextCondition,
+              imageUrl: printing.smallImageUrl ?? printing.imageUrl,
+              retailCents,
+              buylistCents,
+            })
+            onUpdatePrinting?.(pickingPrinting.id, {
+              printingId: printing.printingId,
+              setCode: printing.setCode,
+              collectorNumber: printing.collectorNumber,
+              finish: nextFinish,
+              condition: nextCondition,
+              imageUrl: printing.smallImageUrl ?? printing.imageUrl,
+              retailCents,
+              buylistCents,
+            })
+            setPickingPrinting(undefined)
+          }}
+          onClose={() => setPickingPrinting(undefined)}
+        />
+      ) : null}
+      {setLockOpen ? (
+        <DialogCard
+          visible
+          onClose={() => setSetLockOpen(false)}
+          backdropAccessibilityLabel={translate("common:close")}
+        >
+          <Text preset="subheading" tx="decks:cardScan.setLockTitle" />
+          <TextField
+            testID="card-scan-set-lock-input"
+            value={setLockDraft}
+            onChangeText={(value) => setSetLockDraft(value.toUpperCase().slice(0, 6))}
+            placeholder={translate("decks:cardScan.setLockPlaceholder")}
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+          <View style={$alternates}>
+            <Button
+              preset="primary"
+              tx="common:done"
+              onPress={() => {
+                setSetLock(setLockDraft.trim().toUpperCase())
+                setSetLockOpen(false)
+              }}
+            />
+            {setLock ? (
+              <Button
+                tx="decks:cardScan.setLockClear"
+                onPress={() => {
+                  setSetLock("")
+                  setSetLockDraft("")
+                  setSetLockOpen(false)
+                }}
+              />
+            ) : null}
+          </View>
+        </DialogCard>
+      ) : null}
     </Modal>
   )
 }
 
 const $screen: ViewStyle = { flex: 1 }
+const $hudScroll: ViewStyle = {
+  position: "absolute",
+  top: 10,
+  start: 0,
+  end: 0,
+  zIndex: 5,
+}
+const $hudRow: ViewStyle = {
+  flexDirection: "row",
+  gap: 8,
+  paddingHorizontal: 12,
+}
+const $hudPill: ViewStyle = {
+  backgroundColor: "rgba(0,0,0,0.62)",
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: radius.full,
+}
+const $hudText: TextStyle = { color: "#FFFFFF" }
 const $overlay: ViewStyle = {
   ...StyleSheet.absoluteFill,
   alignItems: "center",
