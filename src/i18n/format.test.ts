@@ -69,6 +69,25 @@ describe("format", () => {
     expect(i18n.t("x", { at, defaultValue: "{{at}}" })).toBe(
       formatDate(at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
     )
+    expect(translateForStorage("x" as never, { at, defaultValue: "{{at}}" })).toBe(
+      formatDate(at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+    )
+  })
+
+  it("formats storage dates with ASCII digits and without isolates or pseudo brackets", async () => {
+    const at = new Date(2026, 10, 16, 9, 5)
+    await inLanguage("ar-SA", () => {
+      const saved = translateForStorage("x" as never, { at, defaultValue: "{{at}}" })
+      expect(saved).not.toMatch(/[\u0660-\u0669\u200e\u200f\u2066-\u2069]/)
+      expect(saved).not.toContain("GMT")
+      expect(saved).toMatch(/[0-9]/)
+    })
+    await inLanguage(PSEUDO_LOCALE, () => {
+      const saved = translateForStorage("x" as never, { at, defaultValue: "{{at}}" })
+      expect(saved).not.toMatch(/[\u27e6\u27e7\u0660-\u0669]/)
+      expect(saved).not.toContain("GMT")
+      expect(saved).toMatch(/[0-9]/)
+    })
   })
 
   it("marks translated text and formatted numbers in the pseudo-locale", () =>

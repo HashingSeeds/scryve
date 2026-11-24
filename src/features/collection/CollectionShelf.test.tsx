@@ -12,6 +12,7 @@ import {
   listCollectionEntries,
 } from "./collectionStore"
 import { TradeCalculatorModal } from "./TradeCalculatorModal"
+import { encodeFinishes, encodeRarity } from "../../../convex/lib/cardPricing"
 
 jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn(async () => true),
@@ -165,5 +166,65 @@ describe("CollectionShelf", () => {
     expect(after.find((entry) => entry.condition === "LP")?.quantity).toBe(1)
     expect(after.find((entry) => entry.binderId === scanSession.id)?.quantity).toBe(2)
     expect(after.find((entry) => !entry.binderId && entry.condition === "NM")).toBeUndefined()
+  })
+
+  it("refreshes quick-add matches when initial catalog sync completes", async () => {
+    catalogDb.clearAll()
+    let releasePrintings!: () => void
+    const printingsReady = new Promise<void>((resolve) => {
+      releasePrintings = resolve
+    })
+    const originalFetch = global.fetch
+    global.fetch = jest.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString()
+      if (url.endsWith("/datasets/mtg/printings.json")) {
+        await printingsReady
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => ({
+            version: "2026-11-24",
+            sets: { cmm: "Commander Masters" },
+            rows: [
+              [
+                "cmm-410",
+                "ora-sol",
+                "Sol Ring",
+                "cmm",
+                "410",
+                encodeRarity("uncommon"),
+                encodeFinishes(["nonfoil", "foil"]),
+                504123,
+                "front/1/2/cmm.jpg",
+              ],
+            ],
+          }),
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({ version: "2026-11-24", asOf: 1_764_000_000_000, prices: {} }),
+      }
+    }) as unknown as typeof fetch
+
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <CollectionShelf mode="collection" />
+        </ThemeProvider>,
+      )
+
+      fireEvent.press(view.getByTestId("collection-add-card-button"))
+      fireEvent.changeText(view.getByTestId("collection-add-card-input"), "Sol Ring")
+      expect(view.queryByText("Sol Ring · CMM · #410")).toBeNull()
+
+      releasePrintings()
+      expect(await view.findByText("Sol Ring · CMM · #410")).toBeTruthy()
+    } finally {
+      global.fetch = originalFetch
+    }
   })
 })
