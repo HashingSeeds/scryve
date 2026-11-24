@@ -1,5 +1,6 @@
 import { findRules, ruleReferences, searchRules } from "./comprehensiveRules"
 import { FAB_RULE_REFERENCE, parseFabRules } from "./fabRules"
+import { finish } from "./slices"
 
 const SOURCE = [
   "﻿1 Preface",
@@ -34,7 +35,7 @@ const SOURCE = [
 ].join("\r\n")
 
 describe("parseFabRules", () => {
-  const rules = parseFabRules(SOURCE)
+  const rules = finish(parseFabRules(SOURCE))
 
   it("keeps rule chapters and leaves out the preface and acknowledgments", () => {
     expect(rules?.chapters.map(({ id, title }) => `${id} ${title}`)).toEqual([
@@ -77,24 +78,26 @@ describe("parseFabRules", () => {
   })
 
   it("reads the unnumbered preface and glossary published since November 2026", () => {
-    const current = parseFabRules(
-      [
-        "﻿Preface",
-        "The version of this document is in the form MAJOR.MINOR.PATCH.",
-        "1 Game Concepts",
-        "1.0 General",
-        "1.0.1 The rules in this document apply to any game of Flesh and Blood.",
-        "Glossary",
-        "(1H)",
-        "A subtype of a weapon object that is equipped to a weapon zone.[8.2.1]",
-        "Copy",
-        "See Become.",
-        "Weapon ",
-        "type: A type of object that can be equipped to a weapon zone.[8.1.9] ",
-        "zone: A public zone that contains up to one weapon.[3.16]",
-        "Zone",
-        "A named collection of cards.[3]",
-      ].join("\r\n"),
+    const current = finish(
+      parseFabRules(
+        [
+          "﻿Preface",
+          "The version of this document is in the form MAJOR.MINOR.PATCH.",
+          "1 Game Concepts",
+          "1.0 General",
+          "1.0.1 The rules in this document apply to any game of Flesh and Blood.",
+          "Glossary",
+          "(1H)",
+          "A subtype of a weapon object that is equipped to a weapon zone.[8.2.1]",
+          "Copy",
+          "See Become.",
+          "Weapon ",
+          "type: A type of object that can be equipped to a weapon zone.[8.1.9] ",
+          "zone: A public zone that contains up to one weapon.[3.16]",
+          "Zone",
+          "A named collection of cards.[3]",
+        ].join("\r\n"),
+      ),
     )
     expect(current?.chapters.map((chapter) => chapter.id)).toEqual(["1"])
     expect(current?.glossary).toEqual([
@@ -112,7 +115,7 @@ describe("parseFabRules", () => {
   })
 
   it("rejects a page that is not the rules", () => {
-    expect(parseFabRules("<html>Not found</html>")).toBeUndefined()
+    expect(finish(parseFabRules("<html>Not found</html>"))).toBeUndefined()
   })
 })
 

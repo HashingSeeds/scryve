@@ -73,6 +73,33 @@ command, open the dev client on
 `scryve-dev://expo-development-client/?url=<URL-encoded Metro URL>`, and pass the agent-device
 command `device_open` gives you as `AD`.
 
+## Frame probe
+
+For frame numbers on any backend, iOS included, set `EXPO_PUBLIC_FRAME_PROBE=1` in the Metro
+command. It works in development and production mode (`--no-dev --minify`) on the dev client.
+It also needs `APP_VARIANT=development`, so store, preview, and beta bundles never show it
+even if an EAS environment sets the flag.
+
+```sh
+agent-device-mini up --app com.sowinghope.count.dev --scheme scryve-dev --udid <simulator> -- \
+  sh -c 'set -a && . ./.env.development && . ./.env.local && set +a && EXPO_PUBLIC_FRAME_PROBE=1 APP_VARIANT=development npx expo start --dev-client --scheme scryve-dev --port "$METRO_PORT" --no-dev --minify --clear'
+```
+
+Drop `--no-dev --minify --clear` and the env sourcing for development mode. With the probe on, a
+small readout sits in the top-left corner of every screen, and its accessibility label reads:
+
+```
+frame-probe ui frames=479 dropped=24 hitches=11 max=111 js frames=494 dropped=11 hitches=6 max=73
+```
+
+`ui` counts Reanimated frame callbacks on the UI thread, `js` counts `requestAnimationFrame` on the
+JS thread. `dropped` is missed frame slots (a gap over 1.5 frames at 60 Hz), `hitches` is how many
+gaps missed any, and `max` is the longest gap in ms. Counters are cumulative and refresh every
+500 ms. Tap the readout (`press 'id="frame-probe"'`) to reset them, wait a second, then read the
+label with `snapshot` before and after an action, waiting at least 500 ms after it. On Revyl,
+read the same numbers from a screenshot. A snapshot itself can drop a few UI frames, so compare
+against an idle reset-and-read with no action between.
+
 ## Not covered
 
 Connected and nearby play, cold launch (expo-observe reports it from the field), and where the

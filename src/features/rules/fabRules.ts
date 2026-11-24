@@ -1,4 +1,5 @@
 import type { ComprehensiveRules, GlossaryEntry, Rule, RuleChapter } from "./comprehensiveRules"
+import { trimmedLines, type Sliced } from "./slices"
 
 const CHAPTER = /^(\d{1,2}) ([A-Z][^.]*)$/
 const SECTION = /^(\d{1,2}\.\d{1,2}) (.+)$/
@@ -13,7 +14,7 @@ const CHAPTER_MODES = new Map<string, "preface" | "glossary" | "credits">([
 
 export const FAB_RULE_REFERENCE = /\[(\d{1,2}\.\d{1,2}(?:\.\d{1,3}[a-z]{0,2})?)\]/g
 
-export function parseFabRules(source: string): ComprehensiveRules | undefined {
+export function* parseFabRules(source: string): Sliced<ComprehensiveRules | undefined> {
   const chapters: RuleChapter[] = []
   const glossary: GlossaryEntry[] = []
   const notice: string[] = []
@@ -22,8 +23,8 @@ export function parseFabRules(source: string): ComprehensiveRules | undefined {
   let entry: GlossaryEntry | undefined
   let numberedGlossary = false
 
-  for (const raw of source.replace(/^﻿/, "").split(/\r?\n/)) {
-    const line = raw.trim()
+  for (const line of yield* trimmedLines(source)) {
+    yield
     if (!line) continue
     const chapter = CHAPTER.exec(line)
     const heading = CHAPTER_MODES.get(chapter?.[2] ?? line)

@@ -5,6 +5,7 @@ import { magicKeyword, type KeywordRule } from "./magicKeywords"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
 import { MAGIC_PHRASINGS } from "./phrasings"
 import { FAB_SLANG, MAGIC_SLANG } from "./slang"
+import type { Sliced } from "./slices"
 import type { SYSTEMS, SystemId } from "../../../convex/lib/systems"
 
 type MagicTable = (typeof SYSTEMS)["mtg"]["table"]
@@ -17,7 +18,7 @@ export type TextRules = {
   pageUrl: string
   publisher: string
   cacheKey: string
-  parse: (text: string) => ComprehensiveRules | undefined
+  parse: (text: string) => Sliced<ComprehensiveRules | undefined>
   references: RegExp
   revalidate?: true
   keyword?: (rules: ComprehensiveRules, name: string) => KeywordRule | undefined
@@ -25,10 +26,11 @@ export type TextRules = {
 }
 export type GameRules = TextRules | { kind: "link"; pageUrl: string }
 
-function searchable(
-  rules: ComprehensiveRules | undefined,
+function* searchable(
+  parse: Sliced<ComprehensiveRules | undefined>,
   search: Pick<ComprehensiveRules, "slang" | "phrasings" | "references">,
-) {
+): Sliced<ComprehensiveRules | undefined> {
+  const rules = yield* parse
   return rules && { ...rules, ...search }
 }
 
