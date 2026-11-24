@@ -3,6 +3,7 @@ import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } fro
 import Animated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { BoardCornerRadiiContext, boardCornerRadii } from "@/components/boardCorners"
 import { TurnedBoardContext } from "@/components/BoardPressable"
 import { seatBagSize } from "@/components/CounterChips"
 import { CounterNameOpenContext } from "@/components/CounterNamePanel"
@@ -41,6 +42,7 @@ import type { RoundClock } from "./roundClock"
 import { clockwiseSlots } from "./turnTab"
 import { rotateGameBoardAnchor, useGameBoardOrientation } from "./useGameBoardOrientation"
 import { turnGroupOf, type TurnGroups } from "../../../convex/lib/turns"
+import { displayCorners } from "../../../modules/display-corners"
 import {
   SCREEN_PINNING_AVAILABLE,
   ScreenPinnedView,
@@ -176,6 +178,13 @@ function PinnedGameBoardStage({
   const [naming, setNaming] = useState(false)
   // why: a counter name panel covers the middle of the table, and these draw above the grid.
   const overlays = !naming || menu.open
+  const windowWidth = window.width
+  // why: Android measures the window's corners, which turn with it, so they are read again whenever the board's frame changes.
+  const cornerRadii = useMemo(
+    () => boardCornerRadii(displayCorners(), { pinned, holderAngle }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pinned, holderAngle, width, height, windowWidth],
+  )
 
   return (
     <View testID={testID} dir="ltr" style={$stage}>
@@ -185,7 +194,9 @@ function PinnedGameBoardStage({
             <EdgeTabsShownContext.Provider value={tabsShown}>
               <TurnSpotlightContext.Provider value={spotlight}>
                 <CounterNameOpenContext.Provider value={setNaming}>
-                  {renderGrid(boardOrientation)}
+                  <BoardCornerRadiiContext.Provider value={cornerRadii}>
+                    {renderGrid(boardOrientation)}
+                  </BoardCornerRadiiContext.Provider>
                 </CounterNameOpenContext.Provider>
               </TurnSpotlightContext.Provider>
             </EdgeTabsShownContext.Provider>
