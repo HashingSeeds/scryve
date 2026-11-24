@@ -86,7 +86,7 @@ export default function RulesRoute() {
           : undefined
         return {
           key: entry.key,
-          render: ({ active, dragGesture, onOverscrollDismiss }) => (
+          render: ({ active, opened, dragGesture, onOverscrollDismiss }) => (
             <RulesScreen
               source={source}
               system={activeSystem}
@@ -95,6 +95,7 @@ export default function RulesRoute() {
               initialQuery={index === 0 ? query : undefined}
               active={active}
               sheet
+              sheetOpened={opened}
               back={back}
               dragGesture={dragGesture}
               onOverscrollDismiss={onOverscrollDismiss}

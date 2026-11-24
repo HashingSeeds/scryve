@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react"
 import { FlatList, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { useFocusEffect } from "expo-router"
@@ -81,6 +81,7 @@ export interface RulesScreenProps {
   initialQuery?: string
   active?: boolean
   sheet?: boolean
+  sheetOpened?: boolean
   back?: BackAction
   dragGesture?: SheetDragGesture
   onOverscrollDismiss?: () => void
@@ -155,6 +156,7 @@ export function RulesScreen({
   initialQuery,
   active = true,
   sheet = false,
+  sheetOpened = false,
   back,
   dragGesture,
   onOverscrollDismiss,
@@ -188,6 +190,14 @@ export function RulesScreen({
   )
   const targetIndex = rows.findIndex((row) => row.kind === "rule" && row.target)
   const list = useRef<FlatList<Row>>(null)
+  const searchField = useRef<ComponentRef<typeof TextField>>(null)
+  const loaded = Boolean(rules)
+  // why: iOS blocks the UI thread over 100 ms to bring up the keyboard, so a sheet focuses search once it stops moving instead of hitching its slide.
+  useEffect(() => {
+    if (!sheet || !autoFocusSearch || (active && !(sheetOpened && loaded))) return
+    if (active) searchField.current?.focus()
+    setAutoFocusSearch(false)
+  }, [sheet, sheetOpened, loaded, autoFocusSearch, active])
   const scrolledForRule = useRef<string | undefined>(undefined)
   const section = rules && ruleId ? findRules(rules, ruleId)?.section : undefined
   useEffect(() => {
@@ -428,12 +438,13 @@ export function RulesScreen({
   const topBar = home ? (
     <View style={themed($searchBar)}>
       <TextField
+        ref={searchField}
         testID="rules-search"
         accessibilityLabel={translate("play:rules.search")}
         placeholderTx="play:rules.search"
         value={query}
         onChangeText={setQuery}
-        autoFocus={autoFocusSearch}
+        autoFocus={autoFocusSearch && !sheet}
         autoCorrect={false}
         autoCapitalize="none"
         returnKeyType="search"
