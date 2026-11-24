@@ -349,21 +349,19 @@ export const catalogDb: CatalogDb = {
 
   findPrintingBySetNumber(game, setCode, collectorNumber) {
     const normalizedSet = setCode.trim().toLowerCase()
-    const normalizedNumber = collectorNumber.trim().replace(/^0+/, "").toLowerCase()
+    const rawNumber = collectorNumber.trim().toLowerCase()
+    const normalizedNumber = rawNumber.replace(/^0+/, "") || "0"
     const db = openCatalogNativeDb()
     const exact = db.getFirstSync<RawPrintingRow>(
       "SELECT * FROM printings WHERE game = ? AND set_code = ? AND collector_number = ?",
-      [game, normalizedSet, collectorNumber.trim().toLowerCase()],
+      [game, normalizedSet, rawNumber],
     )
     if (exact) return hydratePrinting(exact)
-    if (normalizedNumber !== collectorNumber.trim().toLowerCase()) {
-      const trimmed = db.getFirstSync<RawPrintingRow>(
-        "SELECT * FROM printings WHERE game = ? AND set_code = ? AND collector_number = ?",
-        [game, normalizedSet, normalizedNumber],
-      )
-      if (trimmed) return hydratePrinting(trimmed)
-    }
-    return undefined
+    const fallback = db.getFirstSync<RawPrintingRow>(
+      "SELECT * FROM printings WHERE game = ? AND set_code = ? AND COALESCE(NULLIF(LTRIM(collector_number, '0'), ''), '0') = ?",
+      [game, normalizedSet, normalizedNumber],
+    )
+    return fallback ? hydratePrinting(fallback) : undefined
   },
 
   findPrintingsByName(game, nameNormalized) {

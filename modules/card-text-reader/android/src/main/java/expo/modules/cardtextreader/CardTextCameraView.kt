@@ -72,6 +72,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
   private var bottomNv21Buffer: ByteArray? = null
   private var lastCardAt = 0L
   private var showingCard = false
+  private var pendingSceneChanged = false
 
   @Volatile var active = false
   @Volatile var torchEnabled = false
@@ -201,6 +202,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     val height = if (sideways) frame.width else frame.height
     val luma = extractLuma(frame, rotation)
     val gate = motionGate.evaluate(luma, bulkMode)
+    if (gate.sceneChanged) pendingSceneChanged = true
     if (!gate.shouldRead) {
       frame.close()
       return
@@ -241,7 +243,10 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
               "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
               "cardCorners" to card.corners.map { mapOf("x" to it.x, "y" to it.y) },
             )
-            if (gate.sceneChanged) photo["sceneChanged"] = true
+            if (pendingSceneChanged) {
+              photo["sceneChanged"] = true
+              pendingSceneChanged = false
+            }
             onText(photo)
           } finally {
             frame.close()
@@ -259,7 +264,10 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
             "bottomLines" to emptyList<Map<String, Any>>(),
             "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
           )
-          if (gate.sceneChanged) photo["sceneChanged"] = true
+          if (pendingSceneChanged) {
+            photo["sceneChanged"] = true
+            pendingSceneChanged = false
+          }
           onText(photo)
         }
         .addOnCompleteListener { frame.close() }
@@ -306,6 +314,7 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     released = true
     active = false
     torchEnabled = false
+    pendingSceneChanged = false
     motionGate.reset()
     camera?.cameraControl?.enableTorch(false)
     camera = null

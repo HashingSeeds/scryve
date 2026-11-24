@@ -370,19 +370,20 @@ export function useCatalogSync(game: string, enabled = true) {
   )
 
   useEffect(() => {
-    if (!enabled || !supported) return
+    if (!enabled || !supported) {
+      setSyncing(false)
+      return
+    }
     let active = true
     setSyncing(true)
     ensureCatalogSynced(game)
-      .then(() => {
+      .catch(() => {})
+      .finally(() => {
         if (!active) return
         setPrintingCount(catalogDb.countPrintings(game))
         setPriceCount(catalogDb.countPrices(game))
         setUpdatedAt(catalogDb.getMeta(metaKey(game, META_PRICES_UPDATED_AT)))
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setSyncing(false)
+        setSyncing(false)
       })
     return () => {
       active = false

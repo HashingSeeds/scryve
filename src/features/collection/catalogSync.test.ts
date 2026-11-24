@@ -158,4 +158,39 @@ describe("catalogSync", () => {
     expect(requestedUrls.some((url) => url.includes("multigame-preview"))).toBe(true)
     expect(catalogDb.getPrinting("mtg", "scry-fdn")?.setCode).toBe("fdn")
   })
+
+  it("matches zero-padded stored collector numbers when queried without leading zeroes", () => {
+    catalogDb.replacePrintings(
+      "mtg",
+      [
+        {
+          game: "mtg",
+          printingId: "fdn-0001",
+          cardId: "ora-plains",
+          name: "Plains",
+          nameNormalized: "plains",
+          setCode: "fdn",
+          collectorNumber: "0001",
+          finishes: ["nonfoil"],
+        },
+        {
+          game: "mtg",
+          printingId: "fdn-0002",
+          cardId: "ora-plains",
+          name: "Plains",
+          nameNormalized: "plains",
+          setCode: "fdn",
+          collectorNumber: "0002",
+          finishes: ["nonfoil"],
+        },
+      ],
+      "v1",
+    )
+
+    const resolved = resolveScannedPrinting("mtg", "Plains", {
+      setCode: "fdn",
+      collectorNumber: "2",
+    })
+    expect(resolved.printing?.printingId).toBe("fdn-0002")
+  })
 })

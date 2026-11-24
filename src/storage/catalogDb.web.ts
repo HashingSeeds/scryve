@@ -4,9 +4,14 @@ import type { CatalogDb, CatalogPrice, CatalogPrinting } from "./catalogDbTypes"
 const metaMap = new Map<string, string>()
 const printingsByKey = new Map<string, CatalogPrinting>()
 const printingsBySetNum = new Map<string, CatalogPrinting>()
+const printingsBySetNormNum = new Map<string, CatalogPrinting>()
 const printingsByName = new Map<string, CatalogPrinting[]>()
 const printingsByCardId = new Map<string, CatalogPrinting[]>()
 const pricesByPrinting = new Map<string, CatalogPrice[]>()
+
+function normalizeCollectorNumber(value: string) {
+  return value.trim().toLowerCase().replace(/^0+/, "") || "0"
+}
 
 function printingKey(game: string, printingId: string) {
   return `${game}\u0000${printingId}`
@@ -36,6 +41,9 @@ export const catalogDb: CatalogDb = {
     for (const [key, entry] of printingsBySetNum) {
       if (entry.game === game) printingsBySetNum.delete(key)
     }
+    for (const [key, entry] of printingsBySetNormNum) {
+      if (entry.game === game) printingsBySetNormNum.delete(key)
+    }
     for (const key of printingsByName.keys()) {
       if (key.startsWith(`${game}\u0000`)) printingsByName.delete(key)
     }
@@ -53,6 +61,14 @@ export const catalogDb: CatalogDb = {
         setNumKey(game, normalized.setCode, normalized.collectorNumber),
         normalized,
       )
+      const normKey = setNumKey(
+        game,
+        normalized.setCode,
+        normalizeCollectorNumber(normalized.collectorNumber),
+      )
+      if (!printingsBySetNormNum.has(normKey)) {
+        printingsBySetNormNum.set(normKey, normalized)
+      }
       const byName = printingsByName.get(groupKey(game, normalized.nameNormalized)) ?? []
       byName.push(normalized)
       printingsByName.set(groupKey(game, normalized.nameNormalized), byName)
@@ -91,8 +107,9 @@ export const catalogDb: CatalogDb = {
   findPrintingBySetNumber(game, setCode, collectorNumber) {
     const direct = printingsBySetNum.get(setNumKey(game, setCode.trim(), collectorNumber.trim()))
     if (direct) return direct
-    const trimmed = collectorNumber.trim().replace(/^0+/, "")
-    return printingsBySetNum.get(setNumKey(game, setCode.trim(), trimmed))
+    return printingsBySetNormNum.get(
+      setNumKey(game, setCode.trim(), normalizeCollectorNumber(collectorNumber)),
+    )
   },
 
   findPrintingsByName(game, nameNormalized) {
@@ -136,6 +153,7 @@ export const catalogDb: CatalogDb = {
     metaMap.clear()
     printingsByKey.clear()
     printingsBySetNum.clear()
+    printingsBySetNormNum.clear()
     printingsByName.clear()
     printingsByCardId.clear()
     pricesByPrinting.clear()

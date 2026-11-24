@@ -53,6 +53,23 @@ describe("collectorHintFromCardBottom", () => {
     })
   })
 
+  it("ignores same-line copyright years and preserves alphabetic collector suffixes", () => {
+    expect(collectorHintFromCardBottom(["BLB EN 0014 © 2024"])).toEqual({
+      setCode: "blb",
+      collectorNumber: "14",
+      language: "en",
+    })
+    expect(collectorHintFromCardBottom(["BLB EN © 2024"])).toEqual({
+      setCode: "blb",
+      language: "en",
+    })
+    expect(collectorHintFromCardBottom(["BLB EN 14a"])).toEqual({
+      setCode: "blb",
+      collectorNumber: "14a",
+      language: "en",
+    })
+  })
+
   it("returns empty object for empty or unreadable lines", () => {
     expect(collectorHintFromCardBottom(["", "Artist Name"])).toEqual({})
   })

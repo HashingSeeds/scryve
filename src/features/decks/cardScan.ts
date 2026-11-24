@@ -3,7 +3,9 @@ const MANA_COSTS_AND_NUMBERS = /\{[^}]*\}|(?<![\p{L}\p{N}])\p{N}+(?![\p{L}\p{N}]
 const SET_CODE_LINE = /^(?:\p{Lu}{1,3}\s*)+$/u
 const COLLECTOR_RATIO = /\b0*([1-9]\d{0,3}[a-z]?)\s*\/\s*0*\d{1,4}\b/i
 const SET_AND_LANG = /\b([A-Z0-9]{3,5})\s*[•·★*.-]?\s*(EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT)\b/
-const SET_AND_NUMBER = /\b([A-Z][A-Z0-9]{2,4})\b[^\n]{0,12}\b0*([1-9]\d{0,3}[a-z]?)\b/
+const SET_AND_NUMBER =
+  /\b([A-Z][A-Z0-9]{2,4})\b(?:\s*[•·★*.-]?\s*(?:EN|JA|JP|FR|DE|IT|ES|PT|KO|RU|ZHS|ZHT|[CURMSLTBP]))?\s*[•·★*.#/-]?\s*0*([1-9]\d{0,3}[A-Z]?)\b/
+const COPYRIGHT_TAIL = /[©®].*$/
 const STANDALONE_COLLECTOR = /\b(0\d{2,3}[a-z]?)\b/i
 const FOIL_STAR = /[★☆]/
 const IGNORED_SET_TOKENS = new Set([
@@ -58,14 +60,16 @@ export function collectorHintFromCardBottom(blocks: readonly string[]): Collecto
 
   if (!setCode || !collectorNumber) {
     for (const line of raw) {
-      const upper = line.toUpperCase()
+      const cleaned = line.replace(COPYRIGHT_TAIL, "").trim()
+      if (!cleaned) continue
+      const upper = cleaned.toUpperCase()
       const pair = SET_AND_NUMBER.exec(upper)
       if (pair && !IGNORED_SET_TOKENS.has(pair[1])) {
         setCode ??= pair[1].toLowerCase()
         collectorNumber ??= pair[2].toLowerCase()
       }
       if (!collectorNumber) {
-        const padded = STANDALONE_COLLECTOR.exec(line)
+        const padded = STANDALONE_COLLECTOR.exec(cleaned)
         if (padded) collectorNumber = padded[1].replace(/^0+/, "").toLowerCase()
       }
     }
