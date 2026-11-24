@@ -764,6 +764,12 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
     editor.edit({ type: "remove", card }, draft)
   }
 
+  function replaceImportCard(previous: ImportedDeckCard, next: ImportedDeckCard) {
+    const draft = editor.latest.current
+    if (!draft) return undefined
+    return editor.edit({ type: "replace", previous, next }, draft)
+  }
+
   function withoutProblem(draft: ImportDraft, problem: ImportProblem): ImportDraft {
     return {
       ...draft,
@@ -1084,6 +1090,7 @@ function useAddDeck({ onBack, onCreated, onPreview, onClosePreview, access }: Ad
           onFocus={focusImportCard}
           onAdd={addImportCard}
           onRemove={removeImportCard}
+          onReplace={replaceImportCard}
           imageFor={(card) => {
             const details = previewDetailsByKey[cardDetailsKey(card, draftGame)]
             return (
