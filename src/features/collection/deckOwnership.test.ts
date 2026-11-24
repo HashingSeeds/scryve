@@ -102,5 +102,16 @@ describe("deckOwnership", () => {
     expect(summary.ownedCards).toBe(3)
     expect(summary.missingCards).toBe(2)
     expect(summary.estimatedMissingCents).toBe(400)
+
+    const fallbackPrinting = computeDeckOwnership("mtg", [
+      {
+        name: "Lightning Bolt",
+        quantity: 3,
+        oracleId: "ora-bolt",
+        scryfallId: "unknown-printing-id",
+      },
+    ])
+    expect(fallbackPrinting.missingCards).toBe(1)
+    expect(fallbackPrinting.estimatedMissingCents).toBe(200)
   })
 })

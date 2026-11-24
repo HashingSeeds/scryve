@@ -69,7 +69,7 @@ export function computeDeckOwnership(
         catalogDb.findPrintingsByCardId(game, cardId)[0] ??
         catalogDb.findPrintingsByName(game, normalizePrintingName(info.name))[0]
       setCode = printing?.setCode
-      const lookupId = info.printingId ?? printing?.printingId
+      const lookupId = printing?.printingId ?? info.printingId
       if (lookupId) {
         unitPriceCents = lookupPrintingPrice(game, lookupId, "nonfoil", "NM").retailCents
       }

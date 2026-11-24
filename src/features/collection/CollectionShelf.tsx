@@ -12,8 +12,8 @@ import { TextField } from "@/components/TextField"
 import { CardScanner, type ScannedPrintingPayload } from "@/features/decks/CardScanner"
 import { useCardNameIndex } from "@/features/decks/useCardNameIndex"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import { formatCurrency, formatDate, joinParts } from "@/i18n/format"
-import { translate } from "@/i18n/translate"
+import { formatCurrency, joinParts } from "@/i18n/format"
+import { translate, translateForStorage } from "@/i18n/translate"
 import { catalogDb } from "@/storage/catalogDb"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
@@ -160,21 +160,17 @@ export function CollectionShelf({
   }, [mode, revision, sync.priceCount, sync.updatedAt, scanSessions, game])
 
   const quickAddMatches = useMemo(() => {
+    void sync.printingCount
     const norm = normalizePrintingName(addCardQuery)
     if (norm.length < 2) return []
     return catalogDb.findPrintingsByName(game, norm).slice(0, 8)
-  }, [addCardQuery, game])
+  }, [addCardQuery, game, sync.printingCount])
 
   function startNewScanSession() {
     const session = createBinder({
       kind: "scan_session",
-      name: translate("decks:collection.scanSessionName", {
-        date: formatDate(new Date(), {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        }),
+      name: translateForStorage("decks:collection.scanSessionName", {
+        date: new Date(),
       }),
       game,
     })
