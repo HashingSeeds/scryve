@@ -265,6 +265,7 @@ export function CardSearch({
   )
   const [scanning, setScanning] = useState(false)
   const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
+  const scannedEntriesById = useRef(new Map<number, GuestDeckPayload["cards"][number]>())
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
@@ -768,7 +769,11 @@ export function CardSearch({
         resolved[index] = { error, retryable: offline }
         return
       }
-      scannedEntries.current.set(name, searchEntry(chosen))
+      const entry = searchEntry(chosen)
+      scannedEntries.current.set(name, entry)
+      if (overrides?.[index]?.scanId !== undefined) {
+        scannedEntriesById.current.set(overrides[index]!.scanId!, entry)
+      }
       if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: chosen.name, local: true })}`)
       resolved[index] = { imageUrl: chosen.smallImageUrl ?? chosen.imageUrl }
     })
@@ -800,7 +805,11 @@ export function CardSearch({
           resolved[slot] = { error, retryable: offline }
           return
         }
-        scannedEntries.current.set(name, searchEntry(chosen))
+        const entry = searchEntry(chosen)
+        scannedEntries.current.set(name, entry)
+        if (overrides?.[slot]?.scanId !== undefined) {
+          scannedEntriesById.current.set(overrides[slot]!.scanId!, entry)
+        }
         if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: chosen.name })}`)
         resolved[slot] = { imageUrl: chosen.smallImageUrl ?? chosen.imageUrl }
       })
@@ -816,25 +825,32 @@ export function CardSearch({
   }
 
   function updateScannedPrinting(
-    _id: number,
+    id: number,
     update: {
       name: string
       printingId: string
       imageUrl?: string
       smallImageUrl?: string
     },
-  ) {
-    const previous = scannedEntries.current.get(update.name)
-    if (!previous || !onAdd) return
-    onRemove?.(previous)
+  ): boolean {
+    const previous = scannedEntriesById.current.get(id) ?? scannedEntries.current.get(update.name)
+    if (!previous || !onAdd) return false
     const updated: GuestDeckPayload["cards"][number] = {
       ...previous,
       scryfallId: update.printingId,
       imageUrl: update.imageUrl ?? previous.imageUrl,
       smallImageUrl: update.smallImageUrl ?? update.imageUrl ?? previous.smallImageUrl,
     }
+    onRemove?.(previous)
     const error = onAdd(updated)
-    if (!error) scannedEntries.current.set(update.name, updated)
+    if (error) {
+      // why: if the deck rejects the replacement (e.g. offline uncached printing), restore the original copy.
+      onAdd(previous)
+      return false
+    }
+    scannedEntries.current.set(update.name, updated)
+    scannedEntriesById.current.set(id, updated)
+    return true
   }
 
   function removeScannedCard(name: string) {
