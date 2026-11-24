@@ -150,7 +150,7 @@ describe("CollectionShelf", () => {
 
     addCollectionCard({
       game: "mtg",
-      cardId: "ora-sol",
+      cardId: "name:sol ring",
       printingId: "cmm-410",
       name: "Sol Ring",
       setCode: "cmm",

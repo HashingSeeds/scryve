@@ -1,7 +1,7 @@
 import { catalogDb } from "@/storage/catalogDb"
 import { localCardDb } from "@/storage/localDb"
 
-import { addCollectionCard } from "./collectionStore"
+import { addCollectionCard, createBinder } from "./collectionStore"
 import { computeDeckOwnership } from "./deckOwnership"
 
 describe("deckOwnership", () => {
@@ -79,6 +79,18 @@ describe("deckOwnership", () => {
       setCode: "cmm",
       collectorNumber: "410",
       quantity: 3,
+    })
+
+    const scanSession = createBinder({ kind: "scan_session", name: "Inbox Scan", game: "mtg" })
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-bolt",
+      printingId: "scry-bolt",
+      name: "Lightning Bolt",
+      setCode: "fdn",
+      collectorNumber: "100",
+      quantity: 4,
+      binderId: scanSession.id,
     })
 
     const summary = computeDeckOwnership("mtg", [

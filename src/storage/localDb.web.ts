@@ -224,9 +224,11 @@ export const localCardDb: LocalCardDb = {
 
   ownedQuantitiesByCardId(game, cardIds) {
     const wanted = new Set(cardIds)
+    const scanSessionIds = new Set(this.listBinders("scan_session").map((binder) => binder.id))
     const counts = new Map<string, number>()
     for (const entry of this.listCollectionEntries({ game })) {
       if (!wanted.has(entry.cardId)) continue
+      if (entry.binderId && scanSessionIds.has(entry.binderId)) continue
       counts.set(entry.cardId, (counts.get(entry.cardId) ?? 0) + entry.quantity)
     }
     return counts

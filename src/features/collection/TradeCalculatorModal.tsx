@@ -143,11 +143,12 @@ export function TradeCalculatorModal({
 
   function commitTrade() {
     const scanSessionIds = new Set(listBinders("scan_session").map((session) => session.id))
+    const gameEntries = listCollectionEntries({ game })
     const remainingByEntryId = new Map<string, number>()
 
     for (const item of giveItems) {
       let needed = item.quantity
-      const matches = listCollectionEntries({ game, cardId: item.cardId }).filter(
+      const matches = gameEntries.filter(
         (entry) =>
           entry.printingId === item.printingId &&
           entry.finish === item.finish &&
