@@ -69,6 +69,21 @@ export function deleteBinder(id: string): void {
   notify()
 }
 
+export function deleteBinderKeepingCards(id: string, now = Date.now()): void {
+  localCardDb.transaction(() => {
+    const entries = localCardDb.listCollectionEntries({ binderId: id })
+    for (const entry of entries) {
+      localCardDb.upsertCollectionEntry({
+        ...entry,
+        binderId: undefined,
+        updatedAt: now,
+      })
+    }
+    localCardDb.deleteBinder(id)
+  })
+  notify()
+}
+
 export interface AddCollectionCardInput {
   game: string
   cardId: string
@@ -107,7 +122,9 @@ export function addCollectionCard(input: AddCollectionCardInput): StoredCollecti
         entry.finish === finish &&
         entry.condition === condition &&
         entry.language === language &&
-        (entry.edition ?? "") === (input.edition ?? ""),
+        (entry.edition ?? "") === (input.edition ?? "") &&
+        (entry.acquiredCents ?? null) === (input.acquiredCents ?? null) &&
+        (entry.notes ?? "") === (input.notes ?? ""),
     )
 
   const entry: StoredCollectionEntry = existing

@@ -51,15 +51,17 @@ function parseCents(raw: string | undefined): number | undefined {
   return Number.isFinite(value) && value >= 0 ? Math.round(value * 100) : undefined
 }
 
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = []
+function parseCsvRecords(text: string): string[][] {
+  const records: string[][] = []
+  let fields: string[] = []
   let current = ""
   let inQuotes = false
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i]
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
     if (inQuotes) {
       if (ch === '"') {
-        if (line[i + 1] === '"') {
+        if (text[i + 1] === '"') {
           current += '"'
           i += 1
         } else {
@@ -73,12 +75,19 @@ function parseCsvLine(line: string): string[] {
     } else if (ch === ",") {
       fields.push(current.trim())
       current = ""
+    } else if (ch === "\r" || ch === "\n") {
+      if (ch === "\r" && text[i + 1] === "\n") i += 1
+      fields.push(current.trim())
+      if (fields.some((cell) => cell.length > 0)) records.push(fields)
+      fields = []
+      current = ""
     } else {
       current += ch
     }
   }
   fields.push(current.trim())
-  return fields
+  if (fields.some((cell) => cell.length > 0)) records.push(fields)
+  return records
 }
 
 function parsePlainLine(line: string): ParsedCollectionRow | undefined {
@@ -112,13 +121,11 @@ export function parseCollectionImport(text: string): {
   rows: ParsedCollectionRow[]
   skipped: number
 } {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-  if (lines.length === 0) return { rows: [], skipped: 0 }
+  if (!text.trim()) return { rows: [], skipped: 0 }
 
-  const firstColumns = parseCsvLine(lines[0]).map((col) => col.toLowerCase())
+  const csvRecords = parseCsvRecords(text)
+  if (csvRecords.length === 0) return { rows: [], skipped: 0 }
+  const firstColumns = csvRecords[0].map((col) => col.toLowerCase())
   const nameCol = firstColumns.findIndex((col) => col === "name" || col === "card name")
   const isCsvHeader = nameCol >= 0 && firstColumns.length >= 2
 
@@ -143,8 +150,8 @@ export function parseCollectionImport(text: string): {
     )
     const notesCol = firstColumns.findIndex((col) => col === "notes" || col === "tags")
 
-    for (let i = 1; i < lines.length; i += 1) {
-      const cols = parseCsvLine(lines[i])
+    for (let i = 1; i < csvRecords.length; i += 1) {
+      const cols = csvRecords[i]
       const name = cols[nameCol]?.trim()
       if (!name) {
         skipped += 1
@@ -167,6 +174,10 @@ export function parseCollectionImport(text: string): {
     return { rows, skipped }
   }
 
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
   for (const line of lines) {
     const parsed = parsePlainLine(line)
     if (parsed) rows.push(parsed)
@@ -212,17 +223,23 @@ export function importCollectionText(
   localCardDb.transaction(() => {
     for (const row of rows) {
       const normalized = normalizePrintingName(row.name)
-      const exact =
+      const byName = catalogDb.findPrintingsByName(game, normalized)
+      const exactCandidate =
         row.setCode && row.collectorNumber
           ? catalogDb.findPrintingBySetNumber(game, row.setCode, row.collectorNumber)
           : undefined
-      const byName = exact ? [exact] : catalogDb.findPrintingsByName(game, normalized)
-      const matched =
-        exact ??
-        (row.setCode ? byName.find((item) => item.setCode === row.setCode) : undefined) ??
-        byName[0]
+      const exact =
+        exactCandidate && exactCandidate.nameNormalized === normalized ? exactCandidate : undefined
 
-      const cardId = matched?.cardId ?? `name:${normalized}`
+      let matched = exact
+      if (!matched && row.setCode && !row.collectorNumber) {
+        matched = byName.find((item) => item.setCode === row.setCode)
+      }
+      if (!matched && !row.setCode && !row.collectorNumber) {
+        matched = byName[0]
+      }
+
+      const cardId = matched?.cardId ?? byName[0]?.cardId ?? `name:${normalized}`
       const printingId =
         matched?.printingId ??
         (row.setCode || row.collectorNumber

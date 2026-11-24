@@ -5,7 +5,13 @@ import { localCardDb } from "@/storage/localDb"
 import { ThemeProvider } from "@/theme/context"
 
 import { CollectionShelf } from "./CollectionShelf"
-import { listBinders, listCollectionEntries } from "./collectionStore"
+import {
+  addCollectionCard,
+  createBinder,
+  listBinders,
+  listCollectionEntries,
+} from "./collectionStore"
+import { TradeCalculatorModal } from "./TradeCalculatorModal"
 
 jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn(async () => true),
@@ -82,5 +88,82 @@ describe("CollectionShelf", () => {
     expect(stored[0].quantity).toBe(2)
     expect(view.getByText("Sol Ring")).toBeTruthy()
     expect(view.getByText("$5.00")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("delete-binder-button"))
+    expect(listBinders("binder")).toHaveLength(0)
+    const remaining = listCollectionEntries({ game: "mtg" })
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].binderId).toBeUndefined()
+    expect(remaining[0].quantity).toBe(2)
+  })
+
+  it("scopes scan sessions to the active game", () => {
+    createBinder({ kind: "scan_session", name: "MTG Box", game: "mtg" })
+    createBinder({ kind: "scan_session", name: "Pokemon Box", game: "pokemon" })
+
+    const mtgView = render(
+      <ThemeProvider initialContext="dark">
+        <CollectionShelf mode="scans" game="mtg" />
+      </ThemeProvider>,
+    )
+    expect(mtgView.getByText("MTG Box")).toBeTruthy()
+    expect(mtgView.queryByText("Pokemon Box")).toBeNull()
+  })
+
+  it("validates condition and excludes scan sessions before committing a trade, and merges colliding edits", () => {
+    const scanSession = createBinder({ kind: "scan_session", name: "Temp Scan", game: "mtg" })
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+      finish: "nonfoil",
+      condition: "LP",
+      quantity: 1,
+    })
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+      finish: "nonfoil",
+      condition: "NM",
+      quantity: 2,
+      binderId: scanSession.id,
+    })
+
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <TradeCalculatorModal visible game="mtg" onClose={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    fireEvent.changeText(view.getByTestId("trade-search-input"), "Sol Ring")
+    fireEvent.press(view.getByText("Sol Ring · CMM · #410"))
+    fireEvent.press(view.getByTestId("trade-commit-button"))
+    expect(view.getByTestId("trade-error-message")).toBeTruthy()
+    expect(listCollectionEntries({ game: "mtg" })).toHaveLength(2)
+
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+      finish: "nonfoil",
+      condition: "NM",
+      quantity: 1,
+    })
+    fireEvent.press(view.getByTestId("trade-commit-button"))
+    expect(view.queryByTestId("trade-error-message")).toBeNull()
+    const after = listCollectionEntries({ game: "mtg" })
+    expect(after.find((entry) => entry.condition === "LP")?.quantity).toBe(1)
+    expect(after.find((entry) => entry.binderId === scanSession.id)?.quantity).toBe(2)
+    expect(after.find((entry) => !entry.binderId && entry.condition === "NM")).toBeUndefined()
   })
 })

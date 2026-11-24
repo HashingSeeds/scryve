@@ -19,12 +19,12 @@ import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
-import { lookupPrintingPrice, normalizePrintingName, useCatalogSync } from "./catalogSync"
+import { normalizePrintingName, useCatalogSync, valueCollectionEntries } from "./catalogSync"
 import { exportCollectionCsv, importCollectionText } from "./collectionImportExport"
 import {
   addCollectionCard,
   createBinder,
-  deleteBinder,
+  deleteBinderKeepingCards,
   listBinders,
   listCollectionEntries,
   updateCollectionEntry,
@@ -68,59 +68,57 @@ export function CollectionShelf({
   const [addCardOpen, setAddCardOpen] = useState(false)
   const [addCardQuery, setAddCardQuery] = useState("")
 
-  const nameIndex = useCardNameIndex(game, deviceId, Boolean(scanningSession))
+  const activeScanGame = scanningSession?.game ?? game
+  const nameIndex = useCardNameIndex(activeScanGame, deviceId, Boolean(scanningSession))
 
   const binders = useMemo(() => {
     void revision
-    return listBinders("binder")
-  }, [revision])
+    return listBinders("binder").filter((binder) => !binder.game || binder.game === game)
+  }, [revision, game])
 
   const scanSessions = useMemo(() => {
     void revision
-    return listBinders("scan_session")
-  }, [revision])
+    return listBinders("scan_session").filter((session) => !session.game || session.game === game)
+  }, [revision, game])
+
+  const activeBinderId =
+    selectedBinderId === "all" || binders.some((binder) => binder.id === selectedBinderId)
+      ? selectedBinderId
+      : "all"
 
   const allEntries = useMemo(() => {
+    if (mode === "scans") return []
     void revision
     return listCollectionEntries({ game })
-  }, [revision, game])
+  }, [mode, revision, game])
 
   const scanSessionIds = useMemo(
     () => new Set(scanSessions.map((session) => session.id)),
     [scanSessions],
   )
 
-  const collectionEntries = useMemo(
-    () =>
-      allEntries.filter((entry) => {
-        if (selectedBinderId === "all")
-          return !entry.binderId || !scanSessionIds.has(entry.binderId)
-        return entry.binderId === selectedBinderId
-      }),
-    [allEntries, selectedBinderId, scanSessionIds],
-  )
+  const collectionEntries = useMemo(() => {
+    if (mode === "scans") return []
+    return allEntries.filter((entry) => {
+      if (activeBinderId === "all") return !entry.binderId || !scanSessionIds.has(entry.binderId)
+      return entry.binderId === activeBinderId
+    })
+  }, [mode, allEntries, activeBinderId, scanSessionIds])
+
+  const valuedCollection = useMemo(() => {
+    if (mode === "scans") return []
+    void sync.priceCount
+    return valueCollectionEntries(game, collectionEntries).items
+  }, [mode, game, collectionEntries, sync.priceCount])
 
   const pricedEntries = useMemo(() => {
+    if (mode === "scans") return []
     const term = search.trim().toLowerCase()
-    const items = collectionEntries
-      .filter(
-        (entry) => !term || entry.name.toLowerCase().includes(term) || entry.setCode.includes(term),
-      )
-      .map((entry) => {
-        const price = lookupPrintingPrice(
-          entry.game,
-          entry.printingId,
-          entry.finish,
-          entry.condition,
+    const items = term
+      ? valuedCollection.filter(
+          ({ entry }) => entry.name.toLowerCase().includes(term) || entry.setCode.includes(term),
         )
-        const printing = catalogDb.getPrinting(entry.game, entry.printingId)
-        return {
-          entry,
-          printing,
-          retailCents: price.retailCents ?? 0,
-          buylistCents: price.buylistCents ?? 0,
-        }
-      })
+      : [...valuedCollection]
     if (sort === "name") return items.sort((a, b) => a.entry.name.localeCompare(b.entry.name))
     if (sort === "recent") return items.sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
     return items.sort(
@@ -128,7 +126,7 @@ export function CollectionShelf({
         b.retailCents * b.entry.quantity - a.retailCents * a.entry.quantity ||
         a.entry.name.localeCompare(b.entry.name),
     )
-  }, [collectionEntries, search, sort])
+  }, [mode, valuedCollection, search, sort])
 
   const totals = useMemo(() => {
     let cards = 0
@@ -141,6 +139,23 @@ export function CollectionShelf({
     }
     return { cards, retailCents, buylistCents }
   }, [pricedEntries])
+
+  const scanSessionSummaries = useMemo(() => {
+    if (mode !== "scans") return new Map<string, { count: number; retailCents: number }>()
+    void revision
+    void sync.priceCount
+    const summaryById = new Map<string, { count: number; retailCents: number }>()
+    for (const session of scanSessions) {
+      const entries = listCollectionEntries({ binderId: session.id })
+      const sessionGame = session.game ?? game
+      const { totals: sessionTotals } = valueCollectionEntries(sessionGame, entries)
+      summaryById.set(session.id, {
+        count: sessionTotals.cards,
+        retailCents: sessionTotals.retailCents,
+      })
+    }
+    return summaryById
+  }, [mode, revision, sync.priceCount, scanSessions, game])
 
   const quickAddMatches = useMemo(() => {
     const norm = normalizePrintingName(addCardQuery)
@@ -165,11 +180,12 @@ export function CollectionShelf({
   }
 
   function handleScanIntoSession(session: StoredBinder, scan: ScannedPrintingPayload) {
+    const sessionGame = session.game ?? game
     const printing = scan.printingId
-      ? catalogDb.getPrinting(game, scan.printingId)
-      : catalogDb.findPrintingsByName(game, normalizePrintingName(scan.name))[0]
+      ? catalogDb.getPrinting(sessionGame, scan.printingId)
+      : catalogDb.findPrintingsByName(sessionGame, normalizePrintingName(scan.name))[0]
     addCollectionCard({
-      game,
+      game: sessionGame,
       cardId: printing?.cardId ?? scan.cardId ?? `name:${normalizePrintingName(scan.name)}`,
       printingId:
         printing?.printingId ?? scan.printingId ?? `scan:${normalizePrintingName(scan.name)}`,
@@ -188,11 +204,11 @@ export function CollectionShelf({
   const scanningTotalCents = useMemo(() => {
     if (!scanningSession) return undefined
     void revision
-    return listCollectionEntries({ binderId: scanningSession.id }).reduce((sum, entry) => {
-      const price = lookupPrintingPrice(entry.game, entry.printingId, entry.finish, entry.condition)
-      return sum + (price.retailCents ?? 0) * entry.quantity
-    }, 0)
-  }, [scanningSession, revision])
+    void sync.priceCount
+    const sessionGame = scanningSession.game ?? game
+    const entries = listCollectionEntries({ binderId: scanningSession.id })
+    return valueCollectionEntries(sessionGame, entries).totals.retailCents
+  }, [scanningSession, revision, sync.priceCount, game])
 
   if (mode === "scans") {
     return (
@@ -225,16 +241,7 @@ export function CollectionShelf({
             </View>
           }
           renderItem={({ item }) => {
-            const entries = listCollectionEntries({ binderId: item.id })
-            const count = entries.reduce((sum, entry) => sum + entry.quantity, 0)
-            const retail = entries.reduce(
-              (sum, entry) =>
-                sum +
-                (lookupPrintingPrice(entry.game, entry.printingId, entry.finish, entry.condition)
-                  .retailCents ?? 0) *
-                  entry.quantity,
-              0,
-            )
+            const summary = scanSessionSummaries.get(item.id) ?? { count: 0, retailCents: 0 }
             return (
               <TouchableOpacity
                 testID={`scan-session-row-${item.id}`}
@@ -248,8 +255,8 @@ export function CollectionShelf({
                     size="xs"
                     style={{ color: theme.colors.textDim }}
                     text={joinParts([
-                      translate("decks:cardCount", { count }),
-                      formatCurrency(retail, "USD"),
+                      translate("decks:cardCount", { count: summary.count }),
+                      formatCurrency(summary.retailCents, "USD"),
                     ])}
                   />
                 </View>
@@ -272,7 +279,7 @@ export function CollectionShelf({
         ) : null}
         {scanningSession ? (
           <CardScanner
-            game={game}
+            game={activeScanGame}
             nameIndex={nameIndex}
             singleton={false}
             copiesInDeck={() => 0}
@@ -360,7 +367,7 @@ export function CollectionShelf({
           <TouchableOpacity
             testID="binder-filter-all"
             accessibilityRole="button"
-            style={[themed($binderChip), selectedBinderId === "all" && themed($binderChipSelected)]}
+            style={[themed($binderChip), activeBinderId === "all" && themed($binderChipSelected)]}
             onPress={() => setSelectedBinderId("all")}
           >
             <Text size="xs" weight="medium" tx="decks:collection.allCards" />
@@ -372,7 +379,7 @@ export function CollectionShelf({
               accessibilityRole="button"
               style={[
                 themed($binderChip),
-                selectedBinderId === binder.id && themed($binderChipSelected),
+                activeBinderId === binder.id && themed($binderChipSelected),
               ]}
               onPress={() => setSelectedBinderId(binder.id)}
             >
@@ -414,7 +421,7 @@ export function CollectionShelf({
             />
           </View>
         }
-        renderItem={({ item: { entry, printing, retailCents, buylistCents } }) => (
+        renderItem={({ item: { entry, retailCents, buylistCents } }) => (
           <View style={themed($rowCard)}>
             <TouchableOpacity
               accessibilityRole="button"
@@ -469,7 +476,8 @@ export function CollectionShelf({
               <View style={$linkRow}>
                 <TouchableOpacity
                   accessibilityRole="link"
-                  onPress={() =>
+                  onPress={() => {
+                    const printing = catalogDb.getPrinting(entry.game, entry.printingId)
                     void Linking.openURL(
                       tcgplayerCardUrl({
                         name: entry.name,
@@ -477,7 +485,7 @@ export function CollectionShelf({
                         tcgplayerId: printing?.tcgplayerId,
                       }),
                     )
-                  }
+                  }}
                 >
                   <Text
                     size="xs"
@@ -504,11 +512,12 @@ export function CollectionShelf({
           </View>
         )}
         ListFooterComponent={
-          selectedBinderId !== "all" ? (
+          activeBinderId !== "all" ? (
             <Button
+              testID="delete-binder-button"
               tx="decks:collection.deleteBinder"
               onPress={() => {
-                deleteBinder(selectedBinderId)
+                deleteBinderKeepingCards(activeBinderId)
                 setSelectedBinderId("all")
               }}
             />
@@ -572,7 +581,7 @@ export function CollectionShelf({
                 const { imported, skipped } = importCollectionText(
                   importText,
                   game,
-                  selectedBinderId === "all" ? undefined : selectedBinderId,
+                  activeBinderId === "all" ? undefined : activeBinderId,
                 )
                 setImportText("")
                 setImportMessage(
@@ -624,7 +633,7 @@ export function CollectionShelf({
                     name: printing.name,
                     setCode: printing.setCode,
                     collectorNumber: printing.collectorNumber,
-                    binderId: selectedBinderId === "all" ? undefined : selectedBinderId,
+                    binderId: activeBinderId === "all" ? undefined : activeBinderId,
                     imageUrl: printing.imageUrl,
                     smallImageUrl: printing.smallImageUrl,
                   })
@@ -668,7 +677,7 @@ export function CollectionShelf({
 
       {scanningSession ? (
         <CardScanner
-          game={game}
+          game={activeScanGame}
           nameIndex={nameIndex}
           singleton={false}
           copiesInDeck={() => 0}

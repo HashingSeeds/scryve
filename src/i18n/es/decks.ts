@@ -534,6 +534,7 @@ export default {
     tradeBehind: "Das de más: {{delta}}",
     tradeCommit: "Confirmar intercambio",
     tradeCommitted: "Intercambio guardado en tu colección.",
+    tradeInsufficientStock: "No hay suficientes copias de {{card}} en ese estado.",
     tradeClear: "Borrar",
     tradeScanGive: "Escanear lo que das",
     tradeScanReceive: "Escanear lo que recibes",

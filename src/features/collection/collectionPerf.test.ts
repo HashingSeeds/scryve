@@ -3,6 +3,7 @@ import type { CatalogPrice, CatalogPrinting } from "@/storage/catalogDbTypes"
 import { localCardDb } from "@/storage/localDb"
 import type { StoredCollectionEntry } from "@/storage/localDbTypes"
 
+import { valueCollectionEntries } from "./catalogSync"
 import { computeDeckOwnership } from "./deckOwnership"
 
 describe("collection SQLite scale benchmark (30,000 cards)", () => {
@@ -68,6 +69,15 @@ describe("collection SQLite scale benchmark (30,000 cards)", () => {
     const tBinderMs = performance.now() - tBinderStart
     expect(binderRows).toHaveLength(5_000)
     expect(tBinderMs).toBeLessThan(250)
+
+    const allRows = localCardDb.listCollectionEntries({ game: "mtg" })
+    const tValueStart = performance.now()
+    const valued = valueCollectionEntries("mtg", allRows)
+    const tValueMs = performance.now() - tValueStart
+    expect(valued.items).toHaveLength(totalEntries)
+    expect(valued.totals.cards).toBe(totalEntries)
+    expect(valued.totals.retailCents).toBeGreaterThan(0)
+    expect(tValueMs).toBeLessThan(250)
 
     const deckCards = Array.from({ length: 100 }, (_, i) => ({
       name: `Card ${i}`,

@@ -606,6 +606,7 @@ const decks = {
     tradeBehind: "You give {{delta}} more",
     tradeCommit: "Commit trade",
     tradeCommitted: "Trade saved to your collection.",
+    tradeInsufficientStock: "Not enough copies of {{card}} in that condition.",
     tradeClear: "Clear",
     tradeScanGive: "Scan give",
     tradeScanReceive: "Scan receive",

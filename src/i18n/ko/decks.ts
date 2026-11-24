@@ -501,6 +501,7 @@ export default {
     tradeBehind: "{{delta}} 더 줌",
     tradeCommit: "트레이드 확정",
     tradeCommitted: "트레이드가 컬렉션에 저장되었습니다.",
+    tradeInsufficientStock: "해당 상태의 {{card}} 보유 수량이 부족합니다.",
     tradeClear: "비우기",
     tradeScanGive: "주는 카드 스캔",
     tradeScanReceive: "받는 카드 스캔",

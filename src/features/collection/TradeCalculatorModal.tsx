@@ -20,7 +20,12 @@ import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
 import { lookupPrintingPrice, normalizePrintingName } from "./catalogSync"
-import { addCollectionCard, listCollectionEntries, updateCollectionEntry } from "./collectionStore"
+import {
+  addCollectionCard,
+  listBinders,
+  listCollectionEntries,
+  updateCollectionEntry,
+} from "./collectionStore"
 import { PrintingPickerSheet } from "./PrintingPickerSheet"
 import type { CardCondition, CardFinish } from "../../../convex/lib/cardPricing"
 import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
@@ -62,6 +67,7 @@ export function TradeCalculatorModal({
   const [scanningSide, setScanningSide] = useState<TradeSide>()
   const [editingItem, setEditingItem] = useState<{ side: TradeSide; item: TradeItem }>()
   const [committedMessage, setCommittedMessage] = useState<string>()
+  const [tradeError, setTradeError] = useState<string>()
   const nameIndex = useCardNameIndex(game, deviceId, Boolean(scanningSide))
 
   const quickResults = useMemo(() => {
@@ -87,6 +93,7 @@ export function TradeCalculatorModal({
 
   function addItem(targetSide: TradeSide, item: Omit<TradeItem, "key" | "quantity">) {
     setCommittedMessage(undefined)
+    setTradeError(undefined)
     const key = `${item.printingId}:${item.finish}:${item.condition}`
     setSideItems(targetSide, (prev) => {
       const existing = prev.find((entry) => entry.key === key)
@@ -100,6 +107,7 @@ export function TradeCalculatorModal({
   }
 
   function adjustQty(targetSide: TradeSide, key: string, change: number) {
+    setTradeError(undefined)
     setSideItems(targetSide, (prev) =>
       prev
         .map((entry) =>
@@ -134,18 +142,36 @@ export function TradeCalculatorModal({
   }
 
   function commitTrade() {
+    const scanSessionIds = new Set(listBinders("scan_session").map((session) => session.id))
+    const remainingByEntryId = new Map<string, number>()
+
+    for (const item of giveItems) {
+      let needed = item.quantity
+      const matches = listCollectionEntries({ game, cardId: item.cardId }).filter(
+        (entry) =>
+          entry.printingId === item.printingId &&
+          entry.finish === item.finish &&
+          entry.condition === item.condition &&
+          (!entry.binderId || !scanSessionIds.has(entry.binderId)),
+      )
+      for (const entry of matches) {
+        if (needed <= 0) break
+        const available = remainingByEntryId.get(entry.id) ?? entry.quantity
+        if (available <= 0) continue
+        const take = Math.min(needed, available)
+        remainingByEntryId.set(entry.id, available - take)
+        needed -= take
+      }
+      if (needed > 0) {
+        setCommittedMessage(undefined)
+        setTradeError(translate("decks:collection.tradeInsufficientStock", { card: item.name }))
+        return
+      }
+    }
+
     localCardDb.transaction(() => {
-      for (const item of giveItems) {
-        let remaining = item.quantity
-        const matches = listCollectionEntries({ game, cardId: item.cardId }).filter(
-          (entry) => entry.printingId === item.printingId && entry.finish === item.finish,
-        )
-        for (const entry of matches) {
-          if (remaining <= 0) break
-          const take = Math.min(remaining, entry.quantity)
-          updateCollectionEntry(entry.id, { quantity: entry.quantity - take })
-          remaining -= take
-        }
+      for (const [entryId, nextQuantity] of remainingByEntryId) {
+        updateCollectionEntry(entryId, { quantity: nextQuantity })
       }
       for (const item of receiveItems) {
         addCollectionCard({
@@ -163,6 +189,7 @@ export function TradeCalculatorModal({
         })
       }
     })
+    setTradeError(undefined)
     setGiveItems([])
     setReceiveItems([])
     setCommittedMessage(translate("decks:collection.tradeCommitted"))
@@ -187,6 +214,7 @@ export function TradeCalculatorModal({
             setGiveItems([])
             setReceiveItems([])
             setCommittedMessage(undefined)
+            setTradeError(undefined)
           }}
           backgroundColor={theme.colors.background}
         />
@@ -227,6 +255,14 @@ export function TradeCalculatorModal({
           />
           {committedMessage ? (
             <Text size="xs" style={{ color: theme.colors.tint }} text={committedMessage} />
+          ) : null}
+          {tradeError ? (
+            <Text
+              testID="trade-error-message"
+              size="xs"
+              style={{ color: theme.colors.error }}
+              text={tradeError}
+            />
           ) : null}
           <SegmentedControl
             testID="trade-side-segment"
@@ -374,25 +410,38 @@ export function TradeCalculatorModal({
           initialFinish={editingItem.item.finish}
           initialCondition={editingItem.item.condition}
           onPick={({ printing, finish, condition, retailCents }) => {
+            setTradeError(undefined)
             const nextKey = `${printing.printingId}:${finish}:${condition}`
-            setSideItems(editingItem.side, (prev) =>
-              prev.map((entry) =>
-                entry.key === editingItem.item.key
-                  ? {
-                      ...entry,
-                      key: nextKey,
-                      printingId: printing.printingId,
-                      setCode: printing.setCode,
-                      collectorNumber: printing.collectorNumber,
-                      finish,
-                      condition,
-                      unitPriceCents: retailCents ?? 0,
-                      imageUrl: printing.imageUrl,
-                      smallImageUrl: printing.smallImageUrl,
-                    }
-                  : entry,
-              ),
-            )
+            setSideItems(editingItem.side, (prev) => {
+              const source = prev.find((entry) => entry.key === editingItem.item.key)
+              if (!source) return prev
+              const updated: TradeItem = {
+                ...source,
+                key: nextKey,
+                printingId: printing.printingId,
+                setCode: printing.setCode,
+                collectorNumber: printing.collectorNumber,
+                finish,
+                condition,
+                unitPriceCents: retailCents ?? 0,
+                imageUrl: printing.imageUrl,
+                smallImageUrl: printing.smallImageUrl,
+              }
+              if (nextKey === editingItem.item.key) {
+                return prev.map((entry) => (entry.key === editingItem.item.key ? updated : entry))
+              }
+              const existingTarget = prev.find((entry) => entry.key === nextKey)
+              if (existingTarget) {
+                return prev
+                  .filter((entry) => entry.key !== editingItem.item.key)
+                  .map((entry) =>
+                    entry.key === nextKey
+                      ? { ...updated, quantity: existingTarget.quantity + source.quantity }
+                      : entry,
+                  )
+              }
+              return prev.map((entry) => (entry.key === editingItem.item.key ? updated : entry))
+            })
             setEditingItem(undefined)
           }}
           onClose={() => setEditingItem(undefined)}
