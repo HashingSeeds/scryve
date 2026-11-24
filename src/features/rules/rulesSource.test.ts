@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react-native"
 
 import { storage } from "@/utils/storage"
 
+import * as comprehensiveRules from "./comprehensiveRules"
 import { GAME_RULES } from "./gameRules"
 import { downloadRules, loadStoredRules, prefetchRules, useComprehensiveRules } from "./rulesSource"
 
@@ -72,26 +73,62 @@ describe("downloadRules", () => {
   })
 })
 
-it("prefetchRules downloads once, shares the download with Rules, and skips a current copy", async () => {
-  const store = memoryStore()
-  const fetcher = jest.fn(async () => ({ ok: true, status: 200, text: async () => SOURCE }))
-  prefetchRules(MAGIC, store, fetcher)
-  prefetchRules(MAGIC, store, fetcher)
-  const rules = await downloadRules(MAGIC, store, fetcher)
-  prefetchRules(MAGIC, store, fetcher)
-  expect(fetcher).toHaveBeenCalledTimes(1)
-  expect(loadStoredRules(MAGIC, store)?.rules).toBe(rules)
-})
+describe("prefetchRules", () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
 
-it("prefetchRules trusts a stored copy's URL without parsing its text", () => {
-  const store = memoryStore()
-  store.set("scryve.rules.url.v1", MAGIC.url)
-  store.set("scryve.rules.text.v1", SOURCE)
-  const source = { ...MAGIC, parse: jest.fn(MAGIC.parse) }
-  const fetcher = jest.fn(async () => ({ ok: true, status: 200, text: async () => SOURCE }))
-  prefetchRules(source, store, fetcher)
-  expect(source.parse).not.toHaveBeenCalled()
-  expect(fetcher).not.toHaveBeenCalled()
+  it("waits for the board to settle, then downloads once and shares it with Rules", async () => {
+    const store = memoryStore()
+    const fetcher = jest.fn(async () => ({ ok: true, status: 200, text: async () => SOURCE }))
+    prefetchRules(MAGIC, store, fetcher)
+    prefetchRules(MAGIC, store, fetcher)
+    expect(fetcher).not.toHaveBeenCalled()
+    await jest.advanceTimersByTimeAsync(1000)
+    const download = downloadRules(MAGIC, store, fetcher)
+    await jest.runAllTimersAsync()
+    const rules = await download
+    prefetchRules(MAGIC, store, fetcher)
+    await jest.runAllTimersAsync()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(loadStoredRules(MAGIC, store)?.rules).toBe(rules)
+  })
+
+  it("parses a stored copy after the board settles, so Rules reads it without parsing", async () => {
+    const store = memoryStore()
+    store.set("scryve.rules.url.v1", MAGIC.url)
+    store.set("scryve.rules.text.v1", SOURCE)
+    const source = { ...MAGIC, parse: jest.fn(MAGIC.parse) }
+    const fetcher = jest.fn(async () => ({ ok: true, status: 200, text: async () => SOURCE }))
+    prefetchRules(source, store, fetcher)
+    expect(source.parse).not.toHaveBeenCalled()
+    await jest.runAllTimersAsync()
+    expect(loadStoredRules(source, store)?.rules.effectiveDate).toBe("September 25, 2026")
+    expect(source.parse).toHaveBeenCalledTimes(1)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it("indexes a stored Flesh and Blood copy when the recheck fails offline", async () => {
+    const store = memoryStore()
+    store.set("scryve.rules.fab.url.v1", GAME_RULES.fab.url)
+    store.set(
+      "scryve.rules.fab.text.v1",
+      [
+        "1 Game Concepts",
+        "1.0 General",
+        "1.0.1 First.",
+        "1 Glossary",
+        "1.-1.3 Ability",
+        "Text.",
+      ].join("\n"),
+    )
+    const prepare = jest.spyOn(comprehensiveRules, "prepareSearchIndex")
+    prefetchRules(GAME_RULES.fab, store, async () => {
+      throw new Error("offline")
+    })
+    await jest.runAllTimersAsync()
+    expect(prepare).toHaveBeenCalledWith(loadStoredRules(GAME_RULES.fab, store)?.rules)
+    prepare.mockRestore()
+  })
 })
 
 it("shows rules a prefetch stored after the screen first read the cache", () => {
@@ -155,9 +192,14 @@ it("rechecks Flesh and Blood rules once per launch, keeping the stored copy on 3
     if (value) relaunch.set(`scryve.rules.fab.${key}.v1`, value)
   }
   const notModified = jest.fn(async () => ({ ok: false, status: 304, text: async () => "" }))
+  jest.useFakeTimers()
   prefetchRules(FAB, relaunch, notModified)
-  const rules = await downloadRules(FAB, relaunch, notModified)
+  await jest.advanceTimersByTimeAsync(1000)
+  const download = downloadRules(FAB, relaunch, notModified)
   prefetchRules(FAB, relaunch, notModified)
+  await jest.runAllTimersAsync()
+  const rules = await download
+  jest.useRealTimers()
   expect(notModified).toHaveBeenCalledTimes(1)
   expect(notModified).toHaveBeenCalledWith(FAB.url, {
     headers: { "If-None-Match": '"v1"', "If-Modified-Since": "Tue, 29 Sep 2026 08:42:59 GMT" },
