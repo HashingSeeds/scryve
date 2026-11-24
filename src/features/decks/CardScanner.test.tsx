@@ -997,7 +997,7 @@ function renderPrintingScanner(initialSetLock?: string) {
   const layout = { x: 0, y: 0, width: 400, height: 700 }
   for (const laidOut of view.UNSAFE_getAllByType(View).filter((node) => node.props.onLayout))
     fireEvent(laidOut, "layout", { nativeEvent: { layout }, persist: () => undefined })
-  return { onScanPrinting, onUpdatePrinting }
+  return { view, onScanPrinting, onUpdatePrinting }
 }
 
 test("a set-only read keeps refining until a collector number pins the printing", async () => {
@@ -1282,5 +1282,32 @@ test("a foil star seen just before the name is read makes the add foil", () => {
   expect(onScanPrinting).toHaveBeenLastCalledWith(
     expect.objectContaining({ printingId: "tmc-sol", finish: "foil" }),
   )
+  catalogDb.clearAll()
+})
+
+test("in bulk mode a new card on the stand does not inherit the last card's foil star", () => {
+  solRingPrintings({ id: "tmc-sol", set: "tmc", number: "100" })
+  const { view, onScanPrinting } = renderPrintingScanner()
+  fireEvent.press(view.getByTestId("card-scan-mode"))
+  collectorFrame("", {
+    bottomLines: [
+      { text: "100/350 U", x: 0, y: 1080, width: 100, height: 20, angle: 0, confidence: 1 },
+      {
+        text: "TMC * EN",
+        x: 0,
+        y: 1100,
+        width: 100,
+        height: 20,
+        angle: 0,
+        confidence: 1,
+        foilStar: true,
+      },
+    ],
+  })
+  expect(onScanPrinting).toHaveBeenLastCalledWith(expect.objectContaining({ finish: "foil" }))
+
+  collectorFrame("100/350 U TMC • EN", { sceneChanged: true })
+  expect(onScanPrinting).toHaveBeenCalledTimes(2)
+  expect(onScanPrinting).toHaveBeenLastCalledWith(expect.objectContaining({ finish: "nonfoil" }))
   catalogDb.clearAll()
 })

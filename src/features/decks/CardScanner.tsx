@@ -590,13 +590,8 @@ export function CardScanner({
       at: Date.now(),
     }
     const last = lastAcceptedCard.current
-    if (last && starMatches(last))
-      maybeUpgradeLastAccepted(
-        last.name,
-        { setCode: last.setCode, collectorNumber: last.collectorNumber },
-        true,
-        lockedSet,
-      )
+    if (last?.finish === "nonfoil" && !finishLocked && starMatches(last))
+      maybeUpgradeLastAccepted(last.name, {}, true, "")
   }
 
   function readText(photo: CardPhotoText) {
@@ -607,7 +602,10 @@ export function CardScanner({
       candidateFoilStar.current = false
       nameInFrame.current = undefined
       printingInFrame.current = undefined
-      if (scanMode === "bulk") recentSeenAtByName.current.clear()
+      if (scanMode === "bulk") {
+        recentSeenAtByName.current.clear()
+        starSeen.current = undefined
+      }
       recentVotes.current = []
       emptyFrames.current = 0
       blankFrames.current = 0
