@@ -803,7 +803,6 @@ export function CardScanner({
       ).length
       const inDeck = copiesInDeck(card.name) + stillAdding
       landCountOpen.current = true
-      // why: a correction from the review list can land here, and the count prompt sits under the frame.
       setReviewing(false)
       setLandCount({ card, inDeck, count: Math.max(inDeck, 1) })
       return
@@ -1461,7 +1460,6 @@ const $hudRow: ViewStyle = {
   paddingHorizontal: 12,
   paddingVertical: 6,
 }
-// why: a dark translucent backing keeps white text readable over any live camera feed.
 const CAMERA_BACKING = "rgba(0,0,0,0.62)"
 const $hudPill: ViewStyle = {
   backgroundColor: CAMERA_BACKING,
@@ -1472,7 +1470,6 @@ const $hudPill: ViewStyle = {
 const $onCamera: TextStyle = { color: "#FFFFFF" }
 const $onCameraDim: TextStyle = { color: "rgba(255,255,255,0.72)" }
 const $overlay: ViewStyle = { ...StyleSheet.absoluteFill, gap: 8 }
-// why: spare height on tall screens goes above and below the group, so readout and actions stay against the frame.
 const $spacer: ViewStyle = { flex: 1 }
 const $readout: ViewStyle = {
   flexDirection: "row",
