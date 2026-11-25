@@ -62,12 +62,32 @@ function writeVersion(version) {
   fs.writeFileSync(packageJsonPath, next)
 }
 
-// why: main only takes pull requests, so the bump lands as a self-merged PR before the tag.
+// why: `checks` reports a few seconds after the PR opens, and gh errors until it does.
+function waitForChecks(branch) {
+  for (;;) {
+    let buckets = []
+    try {
+      const out = execFileSync("gh", ["pr", "checks", branch, "--required", "--json", "bucket"], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      buckets = JSON.parse(out).map((check) => check.bucket)
+    } catch {}
+    if (buckets.length && !buckets.includes("pending")) {
+      if (buckets.every((bucket) => bucket === "pass" || bucket === "skipping")) return
+      throw new Error(`Required checks failed on ${branch}.`)
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15_000)
+  }
+}
+
+// why: main only takes pull requests that pass `checks`, so the bump lands as a self-merged PR before the tag. Only the squash commit skips CI; a skipped PR commit never reports `checks`.
 function mergeBump(tag, base) {
   const branch = `release/${tag}`
   const title = `chore(release): ${tag} [skip ci]`
   writeVersion(tag.slice(1))
-  git("commit", "--quiet", "-m", title, "--", "package.json")
+  git("commit", "--quiet", "-m", `chore(release): ${tag}`, "--", "package.json")
   const bump = git("rev-parse", "HEAD")
   try {
     git("push", "--quiet", "--force", "origin", `HEAD:refs/heads/${branch}`)
@@ -83,6 +103,7 @@ function mergeBump(tag, base) {
       "--body",
       `Bumps the app version to ${tag} for a native build.`,
     )
+    waitForChecks(branch)
     gh(
       "pr",
       "merge",
