@@ -519,6 +519,7 @@ export default {
     searchCards: "Buscar cartas",
     searchCatalogPlaceholder: "Nombre de la carta a añadir…",
     emptyCollection: "Aún no hay cartas aquí. Escanea, importa un CSV o busca para añadir una.",
+    emptySession: "Aún no se ha escaneado ninguna carta en esta sesión.",
     tradeTitle: "Calculadora de intercambio",
     tradeGive: "Das",
     tradeReceive: "Recibes",

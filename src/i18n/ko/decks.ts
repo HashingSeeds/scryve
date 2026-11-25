@@ -486,6 +486,7 @@ export default {
     searchCards: "카드 검색",
     searchCatalogPlaceholder: "추가할 카드 이름…",
     emptyCollection: "아직 카드가 없습니다. 스캔하거나 CSV를 가져오거나 검색해서 추가하세요.",
+    emptySession: "이번 세션에서 스캔한 카드가 아직 없습니다.",
     tradeTitle: "트레이드 계산기",
     tradeGive: "내가 주는 카드",
     tradeReceive: "내가 받는 카드",

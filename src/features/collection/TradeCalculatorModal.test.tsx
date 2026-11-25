@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { cardNameIndex, type CardNameIndex } from "@/features/decks/cardNameMatch"
 import type { CardScanner } from "@/features/decks/CardScanner"
 import { catalogDb } from "@/storage/catalogDb"
 import { ThemeProvider } from "@/theme/context"
@@ -14,9 +15,49 @@ jest.mock("@/features/decks/CardScanner", () => ({
     return null
   },
 }))
+let mockNameIndex: CardNameIndex | undefined
 jest.mock("@/features/decks/useCardNameIndex", () => ({
-  useCardNameIndex: () => undefined,
+  useCardNameIndex: () => mockNameIndex,
 }))
+
+test("a partial name suggests card names, and picking one lists its printings", () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "cmm-410",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "cmm",
+        setName: "cmm",
+        collectorNumber: "410",
+        finishes: ["nonfoil"],
+      },
+    ],
+    "v1",
+  )
+  mockNameIndex = cardNameIndex(["Sol Ring", "Sol Talisman", "Lightning Bolt"])
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <TradeCalculatorModal visible game="mtg" onClose={jest.fn()} />
+    </ThemeProvider>,
+  )
+  const input = view.getByTestId("trade-search-input")
+
+  fireEvent.changeText(input, "zzqx")
+  expect(view.getByText("No cards found.")).toBeTruthy()
+
+  fireEvent.changeText(input, "Sol Ri")
+  fireEvent.press(view.getByText("Sol Ring"))
+  fireEvent.press(view.getByText("Sol Ring · CMM · #410"))
+
+  expect(view.getByText("CMM · #410 · $0.00")).toBeTruthy()
+  mockNameIndex = undefined
+  catalogDb.clearAll()
+})
 
 test("a printing refined after a trade scan moves that copy and its price to the new printing", () => {
   catalogDb.clearAll()
@@ -78,8 +119,8 @@ test("a printing refined after a trade scan moves that copy and its price to the
   })
 
   expect(accepted).toBe(true)
-  expect(view.getByText("CMM · #410 · nonfoil · NM · $1.00")).toBeTruthy()
-  expect(view.getByText("40K · #240 · foil · NM · $18.00")).toBeTruthy()
+  expect(view.getByText("CMM · #410 · $1.00")).toBeTruthy()
+  expect(view.getByText("40K · #240 · Foil · $18.00")).toBeTruthy()
   expect(view.getByText("$19.00")).toBeTruthy()
 
   act(() => {
@@ -93,7 +134,7 @@ test("a printing refined after a trade scan moves that copy and its price to the
       retailCents: 300,
     })
   })
-  expect(view.getByText("CMM · #410 · nonfoil · NM · $3.00")).toBeTruthy()
+  expect(view.getByText("CMM · #410 · $3.00")).toBeTruthy()
 
   act(() => {
     mockScanner?.onUpdatePrinting?.(0, {
@@ -105,6 +146,6 @@ test("a printing refined after a trade scan moves that copy and its price to the
       condition: "NM",
     })
   })
-  expect(view.getByText("CMM · #410 · nonfoil · NM · $3.00")).toBeTruthy()
+  expect(view.getByText("CMM · #410 · $3.00")).toBeTruthy()
   catalogDb.clearAll()
 })

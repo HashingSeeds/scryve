@@ -525,6 +525,7 @@ export default {
     searchCatalogPlaceholder: "Nom de la carte à ajouter…",
     emptyCollection:
       "Aucune carte ici pour l’instant. Scannez, importez un CSV ou lancez une recherche pour en ajouter.",
+    emptySession: "Aucune carte scannée dans cette session.",
     tradeTitle: "Calculateur d’échange",
     tradeGive: "Vous donnez",
     tradeReceive: "Vous recevez",

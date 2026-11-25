@@ -974,6 +974,7 @@ export function CardScanner({
               >
                 <TouchableOpacity
                   testID="card-scan-torch"
+                  hitSlop={HUD_HIT_SLOP}
                   accessibilityRole="button"
                   style={[$hudPill, torch && { backgroundColor: theme.colors.tint }]}
                   onPress={() => setTorch((on) => !on)}
@@ -982,6 +983,7 @@ export function CardScanner({
                 </TouchableOpacity>
                 <TouchableOpacity
                   testID="card-scan-mode"
+                  hitSlop={HUD_HIT_SLOP}
                   accessibilityRole="button"
                   style={[$hudPill, scanMode === "bulk" && { backgroundColor: theme.colors.tint }]}
                   onPress={() => setScanMode((mode) => (mode === "handheld" ? "bulk" : "handheld"))}
@@ -996,6 +998,7 @@ export function CardScanner({
                 {scanMode === "bulk" ? (
                   <TouchableOpacity
                     testID="card-scan-next-copy"
+                    hitSlop={HUD_HIT_SLOP}
                     accessibilityRole="button"
                     style={$hudPill}
                     onPress={() => {
@@ -1011,6 +1014,7 @@ export function CardScanner({
                 ) : null}
                 <TouchableOpacity
                   testID="card-scan-finish"
+                  hitSlop={HUD_HIT_SLOP}
                   accessibilityRole="button"
                   style={[$hudPill, finish !== "nonfoil" && { backgroundColor: theme.colors.tint }]}
                   onPress={() => {
@@ -1029,6 +1033,7 @@ export function CardScanner({
                 </TouchableOpacity>
                 <TouchableOpacity
                   testID="card-scan-condition"
+                  hitSlop={HUD_HIT_SLOP}
                   accessibilityRole="button"
                   style={[$hudPill, condition !== "NM" && { backgroundColor: theme.colors.tint }]}
                   onPress={() =>
@@ -1048,6 +1053,7 @@ export function CardScanner({
                 </TouchableOpacity>
                 <TouchableOpacity
                   testID="card-scan-set-lock"
+                  hitSlop={HUD_HIT_SLOP}
                   accessibilityRole="button"
                   style={[$hudPill, Boolean(setLock) && { backgroundColor: theme.colors.tint }]}
                   onPress={() => {
@@ -1201,7 +1207,11 @@ export function CardScanner({
                 ) : null}
               </>
             ) : (
-              <Text size="sm" style={{ color: theme.colors.textDim }} tx="decks:cardScan.empty" />
+              <Text
+                size="sm"
+                style={{ color: theme.colors.textDim }}
+                tx={onScanPrinting ? "decks:collection.emptySession" : "decks:cardScan.empty"}
+              />
             )}
           </View>
         ) : permission ? (
@@ -1368,9 +1378,11 @@ export function CardScanner({
 }
 
 const $screen: ViewStyle = { flex: 1 }
+// why: the pills draw 33 pt tall, so the slop and the row's matching padding make each target 45 pt.
+const HUD_HIT_SLOP = { top: 6, bottom: 6, left: 4, right: 4 }
 const $hudScroll: ViewStyle = {
   position: "absolute",
-  top: 10,
+  top: 4,
   start: 0,
   end: 0,
   zIndex: 5,
@@ -1379,6 +1391,7 @@ const $hudRow: ViewStyle = {
   flexDirection: "row",
   gap: 8,
   paddingHorizontal: 12,
+  paddingVertical: 6,
 }
 const $hudPill: ViewStyle = {
   backgroundColor: "rgba(0,0,0,0.62)",

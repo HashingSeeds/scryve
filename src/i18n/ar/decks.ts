@@ -533,6 +533,7 @@ export default {
     searchCatalogPlaceholder: "اسم البطاقة المراد إضافتها…",
     emptyCollection:
       "لا توجد بطاقات هنا بعد. امسح بطاقة ضوئيًا أو استورد ملف CSV أو ابحث لإضافة بطاقة.",
+    emptySession: "لم تُمسح بطاقات في هذه الجلسة بعد.",
     tradeTitle: "حاسبة المبادلة",
     tradeGive: "ما تعطيه",
     tradeReceive: "ما تستلمه",
