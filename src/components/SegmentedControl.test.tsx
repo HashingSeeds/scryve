@@ -73,6 +73,30 @@ describe("SegmentedControl", () => {
     expect(width()).toBe(300)
   })
 
+  it("moves the thumb on tap before the new selection renders", () => {
+    const { view, onSelect } = renderControl("none")
+    layoutOf(view)("system", 308)
+    const thumbX = () =>
+      StyleSheet.flatten(
+        view.getByTestId("system-thumb", { includeHiddenElements: true }).props.style,
+      ).transform?.[0]
+    expect(thumbX()).toEqual({ translateX: 0 })
+
+    fireEvent.press(view.getByTestId("system-ygo"))
+    expect(onSelect).toHaveBeenCalledWith("ygo")
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <SegmentedControl
+          testID="system"
+          segments={SEGMENTS}
+          selectedId="none"
+          onSelect={onSelect}
+        />
+      </ThemeProvider>,
+    )
+    expect(thumbX()).toEqual({ translateX: 200 })
+  })
+
   it("selects the segment a drag is released over", () => {
     const { view, onSelect } = renderControl("none")
     layoutOf(view)("system", 308)

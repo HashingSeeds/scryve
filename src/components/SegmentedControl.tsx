@@ -105,6 +105,11 @@ export function SegmentedControl({
 
   function tap(id: string) {
     if (disabled || id === selectedId) return
+    // why: the spring starts on the UI thread before onSelect, so the thumb moves while JS renders the new tab; the effect alone waited for that commit.
+    if (segmentWidth > 0) {
+      const target = segmentWidth * segments.findIndex((segment) => segment.id === id)
+      offset.set(reducedMotion === false ? withSpring(target, SETTLE_SPRING) : target)
+    }
     tick()
     onSelect(id)
   }
@@ -184,6 +189,7 @@ export function SegmentedControl({
         {segmentWidth > 0 ? (
           <Animated.View
             pointerEvents="none"
+            testID={testID ? `${testID}-thumb` : undefined}
             style={[themed($thumbShape), { width: segmentWidth, backgroundColor: accent }, $thumb]}
           />
         ) : null}
