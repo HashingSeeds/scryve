@@ -26,6 +26,7 @@ const mockGamesQuery = jest.fn((..._args: unknown[]) => ({ page: [] as unknown[]
 const mockSearchCards = jest.fn()
 const mockConvex = { action: mockSearchCards }
 const mockConnectionState = { isWebSocketConnected: true }
+jest.mock("@/features/library/LibraryTabs", () => ({ LibraryTabs: () => null }))
 jest.mock("@legendapp/list/react-native", () => require("../../test/support/legendListAsFlatList"))
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvex,

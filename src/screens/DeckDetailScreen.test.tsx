@@ -15,6 +15,7 @@ import { clear as clearStorage } from "@/utils/storage"
 import { DeckDetailScreen } from "./DeckDetailScreen"
 
 let mockFocused = true
+jest.mock("@/features/library/LibraryTabs", () => ({ LibraryTabs: () => null }))
 jest.mock("@/features/decks/useSeatDeckCards", () => ({
   useSeatDeckCards: (deck: unknown) =>
     deck
