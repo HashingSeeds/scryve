@@ -200,7 +200,7 @@ async function isCurrentUser(Purchases: Purchases, appUserID: string | null) {
     : (await Purchases.getAppUserID()) === appUserID
 }
 
-/** why: logging in from the anonymous player moves its purchases onto the account. */
+/** why: logging in from the anonymous player moves its purchases onto the account, but RevenueCat merges only an account's first anonymous player, so a later anonymous buyer's store purchase is synced over instead. */
 async function configureForUser(apiKey: string, appUserID: string | null) {
   const Purchases = await loadPurchases()
   const configured = await Purchases.isConfigured()
@@ -215,8 +215,14 @@ async function configureForUser(apiKey: string, appUserID: string | null) {
   }
 
   if (await isCurrentUser(Purchases, appUserID)) return Purchases
-  if (appUserID === null) await Purchases.logOut()
-  else await Purchases.logIn(appUserID)
+  if (appUserID === null) {
+    await Purchases.logOut()
+    return Purchases
+  }
+  const anonymousPro =
+    (await Purchases.isAnonymous()) && hasCountPro(await Purchases.getCustomerInfo())
+  const { customerInfo } = await Purchases.logIn(appUserID)
+  if (anonymousPro && !hasCountPro(customerInfo)) await Purchases.syncPurchases()
   return Purchases
 }
 
@@ -391,7 +397,7 @@ export function RevenueCatProvider({
           const next = await refreshCustomerInfo()
           // why: renewal reminders arrive through the account, so an anonymous buyer is asked to sign in instead.
           if (appUserID === null) {
-            if (signIn) offerAccountForPro(signIn)
+            if (signIn && hasCountPro(next)) offerAccountForPro(signIn)
           } else if (result === "purchased" && renewsYearly(next)) offerRenewalReminder()
         }
         return result

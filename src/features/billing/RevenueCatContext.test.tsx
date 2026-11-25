@@ -75,6 +75,7 @@ jest.mock("react-native-purchases", () => {
       isAnonymous: jest.fn(),
       logIn: jest.fn(),
       logOut: jest.fn(),
+      syncPurchases: jest.fn(),
     },
   }
 })
@@ -201,6 +202,35 @@ describe("RevenueCatProvider", () => {
     expect(title).toBe("Keep Pro on all your devices?")
     buttons?.find((button) => button.text === "Sign in")?.onPress?.()
     expect(signIn).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not offer sign in when a restore finds no Pro", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    jest.mocked(presentCountProPaywall).mockResolvedValueOnce("restored")
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null} signIn={jest.fn()}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("restored")
+    })
+    expect(alert).not.toHaveBeenCalled()
+  })
+
+  it("syncs an anonymous buyer's purchase to an account RevenueCat will not merge", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("$RCAnonymousID:abc")
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    purchasesMock.logIn.mockResolvedValue({ customerInfo: expiredCustomerInfo, created: false })
+    renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(Purchases.syncPurchases).toHaveBeenCalledTimes(1))
+    expect(Purchases.logIn).toHaveBeenCalledWith("user_123")
   })
 
   it("logs RevenueCat out of the previous account when the player signs out", async () => {
