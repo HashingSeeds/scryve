@@ -118,7 +118,7 @@ describe("local catalog SQLite database", () => {
     expect(batch.get("missing")).toBeUndefined()
   })
 
-  it("finds offline cards by exact name, then name prefix, then word start, more played first", async () => {
+  it("finds offline cards by exact name, then whole word, then name prefix, then word start, more played first", async () => {
     const row = (cardId: string, nameKey: string, rank?: number) => ({
       cardId,
       nameKey,
@@ -133,6 +133,7 @@ describe("local catalog SQLite database", () => {
         row("lightning", "lightning"),
         row("ball", "ball lightning", 0),
         row("glint", "glint hawk"),
+        row("wave", "boltwave", 3),
       ],
       "v1",
     )
@@ -150,6 +151,9 @@ describe("local catalog SQLite database", () => {
       "lightning bolt",
       "lightning",
       "ball lightning",
+    ])
+    expect(catalogDb.searchLocalCards("mtg", "bolt", 1).map((card) => card.name)).toEqual([
+      "lightning bolt",
     ])
     expect(names("ight")).toEqual([])
     expect(catalogDb.searchLocalCards("pokemon", "light", 5)).toEqual([])

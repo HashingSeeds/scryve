@@ -132,12 +132,10 @@ function homeRows(
         ? { kind: "term", key: `term-${result.entry.term}`, entry: result.entry }
         : { ...result, kind: "result", key: result.rule.id },
     )
-    const first = found[0]
-    // why: "mill" means the keyword action, not Millstone, so an exact glossary term stays above the cards.
-    const after =
-      first?.kind === "term" && first.entry.term.toLowerCase() === query.trim().toLowerCase()
-        ? 1
-        : 0
+    const exact = found.find(
+      (row) => row.kind === "term" && row.entry.term.toLowerCase() === query.trim().toLowerCase(),
+    )
+    const rest = found.filter((row) => row !== exact)
     const asked = textSearchKey(query).split(" ")
     const isNamed = (card: LocalCard) => {
       const words = new Set(textSearchKey(card.name).split(" "))
@@ -147,7 +145,7 @@ function homeRows(
       cards
         .filter((card) => named === isNamed(card))
         .map((card): Row => ({ kind: "card", key: `card-${card.cardId}`, card }))
-    return [...found.slice(0, after), ...cardRows(true), ...found.slice(after), ...cardRows(false)]
+    return [...(exact ? [exact] : []), ...cardRows(true), ...rest, ...cardRows(false)]
   }
   if (tab === "glossary")
     return rules.glossary.map((entry) => ({ kind: "term", key: entry.term, entry }))

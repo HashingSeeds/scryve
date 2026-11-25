@@ -51,6 +51,8 @@ const mockRules: ComprehensiveRules = {
               text: "Multiple instances of trample on the same creature are redundant. Multiple instances of trample over planeswalkers are redundant.",
               examples: [],
             },
+            { id: "702.26", text: "Phasing", examples: [] },
+            { id: "702.26a", text: "Phasing is a static ability.", examples: [] },
           ],
         },
         {
@@ -67,6 +69,11 @@ const mockRules: ComprehensiveRules = {
   glossary: [
     { term: "Illegal Action", text: "An action that breaks the rules. See rule 733.2." },
     { term: "Illegal Target", text: "A target that can't be chosen." },
+    { term: "Phase", text: "A part of a turn." },
+    {
+      term: "Phasing",
+      text: "A permanent that phases out is treated as though it doesn't exist. See rule 702.26.",
+    },
   ],
   notice: [],
 }
@@ -85,9 +92,14 @@ const mockCard = {
   typeLine: "Instant",
   oracleText: "Counter target spell.",
 }
+const mockPhasingCard = { cardId: "card-2", name: "The Phasing of Zhalfir" }
 jest.mock("@/features/rules/localCards", () => ({
   useLocalCardSearch: (_game: string, query: string) =>
-    query.toLowerCase().startsWith("ille") ? [mockCard] : [],
+    query.toLowerCase().startsWith("ille")
+      ? [mockCard]
+      : query.toLowerCase() === "phasing"
+        ? [mockPhasingCard]
+        : [],
 }))
 jest.mock("expo-router", () => ({
   useFocusEffect: (effect: () => void) =>
@@ -218,7 +230,7 @@ it("reports a search after typing settles, and drops one cleared before then", (
   jest.useRealTimers()
 })
 
-it("lists a card by name above rules, a half-typed one below them, and opens it", () => {
+it("lists a card by name above rules but below an exact term, a half-typed one below rules, and opens it", () => {
   const view = renderRules()
   const order = () =>
     view.getAllByTestId(/^(rules-card|rules-term|rule)-/).map((row) => row.props.testID)
@@ -229,6 +241,9 @@ it("lists a card by name above rules, a half-typed one below them, and opens it"
   fireEvent.changeText(view.getByTestId("rules-search"), "illegal action")
   expect(order().slice(0, 2)).toEqual(["rules-term-Illegal Action", "rule-733.1"])
   expect(order().at(-1)).toBe("rules-card-card-1")
+
+  fireEvent.changeText(view.getByTestId("rules-search"), "phasing")
+  expect(order().slice(0, 2)).toEqual(["rules-term-Phasing", "rules-card-card-2"])
 
   fireEvent.changeText(view.getByTestId("rules-search"), "illeg")
   expect(order().at(-1)).toBe("rules-card-card-1")
