@@ -192,7 +192,7 @@ export function TradeCalculatorModal({
     }
     setSideItems(targetSide, (prev) =>
       prev.some((entry) => entry.key === fromKey)
-        ? withCopy(changeQuantity(prev, fromKey, -1), next)
+        ? changeQuantity(withCopy(prev, next), fromKey, -1)
         : prev,
     )
     scanItemKeys.current.set(scanId, itemKey(next))

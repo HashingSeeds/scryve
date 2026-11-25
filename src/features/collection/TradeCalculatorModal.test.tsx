@@ -94,5 +94,17 @@ test("a printing refined after a trade scan moves that copy and its price to the
     })
   })
   expect(view.getByText("CMM · #410 · nonfoil · NM · $3.00")).toBeTruthy()
+
+  act(() => {
+    mockScanner?.onUpdatePrinting?.(0, {
+      name: "Sol Ring",
+      printingId: "cmm-410",
+      setCode: "cmm",
+      collectorNumber: "410",
+      finish: "nonfoil",
+      condition: "NM",
+    })
+  })
+  expect(view.getByText("CMM · #410 · nonfoil · NM · $3.00")).toBeTruthy()
   catalogDb.clearAll()
 })
