@@ -29,26 +29,34 @@ export function computeDeckOwnership(
 ): DeckOwnershipSummary {
   const byCardId = new Map<
     string,
-    { name: string; needed: number; printingId?: string; setCode?: string }
+    { name: string; nameKey: string; needed: number; printingId?: string; setCode?: string }
   >()
 
   for (const card of cards) {
     if (card.quantity <= 0) continue
-    const cardId = card.oracleId ?? card.cardId ?? `name:${normalizePrintingName(card.name)}`
+    const printingId = card.scryfallId ?? card.printingId
+    const normalized = normalizePrintingName(card.name)
+    const nameKey = `name:${normalized}`
+    // why: collection entries take the catalog's card ID, falling back to the name key, so a deck card without one resolves the same way.
+    const cardId =
+      card.oracleId ??
+      card.cardId ??
+      (printingId ? catalogDb.getPrinting(game, printingId)?.cardId : undefined) ??
+      catalogDb.findPrintingsByName(game, normalized)[0]?.cardId ??
+      nameKey
     const existing = byCardId.get(cardId)
     if (existing) {
       existing.needed += card.quantity
     } else {
-      byCardId.set(cardId, {
-        name: card.name,
-        needed: card.quantity,
-        printingId: card.scryfallId ?? card.printingId,
-      })
+      byCardId.set(cardId, { name: card.name, nameKey, needed: card.quantity, printingId })
     }
   }
 
-  const cardIds = [...byCardId.keys()]
-  const ownedMap = ownedQuantitiesByCardId(game, cardIds)
+  // why: a copy scanned before the catalog knew the card is stored under its name key; a group keyed by that name already counts it.
+  const ownedMap = ownedQuantitiesByCardId(game, [
+    ...byCardId.keys(),
+    ...[...byCardId.values()].map((info) => info.nameKey),
+  ])
 
   let totalCards = 0
   let ownedCards = 0
@@ -57,7 +65,9 @@ export function computeDeckOwnership(
   const items: DeckOwnershipItem[] = []
 
   for (const [cardId, info] of byCardId) {
-    const owned = ownedMap.get(cardId) ?? 0
+    const owned =
+      (ownedMap.get(cardId) ?? 0) +
+      (byCardId.has(info.nameKey) ? 0 : (ownedMap.get(info.nameKey) ?? 0))
     const covered = Math.min(info.needed, owned)
     const missing = Math.max(0, info.needed - owned)
     let unitPriceCents: number | undefined

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import type { ComponentProps } from "react"
 import { FlatList, Modal, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
 
@@ -49,6 +50,34 @@ interface TradeItem {
   smallImageUrl?: string
 }
 
+type TradeItemDraft = Omit<TradeItem, "key" | "quantity">
+type PrintingUpdate = Parameters<
+  NonNullable<ComponentProps<typeof CardScanner>["onUpdatePrinting"]>
+>[1]
+
+const itemKey = (item: TradeItemDraft) => `${item.printingId}:${item.finish}:${item.condition}`
+
+function withCopy(items: TradeItem[], item: TradeItemDraft): TradeItem[] {
+  const key = itemKey(item)
+  if (!items.some((entry) => entry.key === key)) return [{ ...item, key, quantity: 1 }, ...items]
+  // why: a row added before prices loaded shows $0, so a copy that arrives with a price reprices the row.
+  return items.map((entry) =>
+    entry.key === key
+      ? {
+          ...entry,
+          quantity: entry.quantity + 1,
+          unitPriceCents: item.unitPriceCents || entry.unitPriceCents,
+        }
+      : entry,
+  )
+}
+
+function changeQuantity(items: TradeItem[], key: string, change: number): TradeItem[] {
+  return items
+    .map((entry) => (entry.key === key ? { ...entry, quantity: entry.quantity + change } : entry))
+    .filter((entry) => entry.quantity > 0)
+}
+
 export function TradeCalculatorModal({
   visible,
   game = DEFAULT_DECK_GAME,
@@ -69,6 +98,8 @@ export function TradeCalculatorModal({
   const [committedMessage, setCommittedMessage] = useState<string>()
   const [tradeError, setTradeError] = useState<string>()
   const nameIndex = useCardNameIndex(game, deviceId, Boolean(scanningSide))
+  // why: the scanner refines a card by its scan ID after adding it, so remember which row each scan landed in.
+  const scanItemKeys = useRef(new Map<number, string>())
 
   useEffect(() => {
     setGiveItems([])
@@ -78,6 +109,7 @@ export function TradeCalculatorModal({
     setEditingItem(undefined)
     setCommittedMessage(undefined)
     setTradeError(undefined)
+    scanItemKeys.current.clear()
   }, [game])
 
   const quickResults = useMemo(() => {
@@ -101,30 +133,16 @@ export function TradeCalculatorModal({
     else setReceiveItems(updater)
   }
 
-  function addItem(targetSide: TradeSide, item: Omit<TradeItem, "key" | "quantity">) {
+  function addItem(targetSide: TradeSide, item: TradeItemDraft) {
     setCommittedMessage(undefined)
     setTradeError(undefined)
-    const key = `${item.printingId}:${item.finish}:${item.condition}`
-    setSideItems(targetSide, (prev) => {
-      const existing = prev.find((entry) => entry.key === key)
-      if (existing) {
-        return prev.map((entry) =>
-          entry.key === key ? { ...entry, quantity: entry.quantity + 1 } : entry,
-        )
-      }
-      return [{ ...item, key, quantity: 1 }, ...prev]
-    })
+    setSideItems(targetSide, (prev) => withCopy(prev, item))
+    return itemKey(item)
   }
 
   function adjustQty(targetSide: TradeSide, key: string, change: number) {
     setTradeError(undefined)
-    setSideItems(targetSide, (prev) =>
-      prev
-        .map((entry) =>
-          entry.key === key ? { ...entry, quantity: entry.quantity + change } : entry,
-        )
-        .filter((entry) => entry.quantity > 0),
-    )
+    setSideItems(targetSide, (prev) => changeQuantity(prev, key, change))
   }
 
   function handleScan(targetSide: TradeSide, scan: ScannedPrintingPayload) {
@@ -137,7 +155,7 @@ export function TradeCalculatorModal({
       scan.retailCents ??
       lookupPrintingPrice(game, printingId, scan.finish, scan.condition).retailCents ??
       0
-    addItem(targetSide, {
+    const key = addItem(targetSide, {
       cardId: printing?.cardId ?? scan.cardId ?? `name:${normalizePrintingName(scan.name)}`,
       printingId,
       name: printing?.name ?? scan.name,
@@ -149,6 +167,36 @@ export function TradeCalculatorModal({
       imageUrl: printing?.imageUrl ?? scan.imageUrl,
       smallImageUrl: printing?.smallImageUrl ?? scan.imageUrl,
     })
+    scanItemKeys.current.set(scan.id, key)
+  }
+
+  // why: a refinement corrects one scanned copy, so it moves that copy and leaves the rest of its row alone.
+  function handleScanUpdate(targetSide: TradeSide, scanId: number, update: PrintingUpdate) {
+    const fromKey = scanItemKeys.current.get(scanId)
+    if (!fromKey) return false
+    const printing = catalogDb.getPrinting(game, update.printingId)
+    const next: TradeItemDraft = {
+      cardId: printing?.cardId ?? `name:${normalizePrintingName(update.name)}`,
+      printingId: update.printingId,
+      name: printing?.name ?? update.name,
+      setCode: update.setCode,
+      collectorNumber: update.collectorNumber,
+      finish: update.finish,
+      condition: update.condition,
+      unitPriceCents:
+        update.retailCents ??
+        lookupPrintingPrice(game, update.printingId, update.finish, update.condition).retailCents ??
+        0,
+      imageUrl: update.imageUrl ?? printing?.imageUrl,
+      smallImageUrl: update.smallImageUrl ?? printing?.smallImageUrl ?? update.imageUrl,
+    }
+    setSideItems(targetSide, (prev) =>
+      prev.some((entry) => entry.key === fromKey)
+        ? changeQuantity(withCopy(prev, next), fromKey, -1)
+        : prev,
+    )
+    scanItemKeys.current.set(scanId, itemKey(next))
+    return true
   }
 
   function commitTrade() {
@@ -412,8 +460,12 @@ export function TradeCalculatorModal({
           copiesInDeck={() => 0}
           addCards={async (names) => names.map(() => ({}))}
           onScanPrinting={(scan) => handleScan(scanningSide, scan)}
+          onUpdatePrinting={(scanId, update) => handleScanUpdate(scanningSide, scanId, update)}
           sessionTotalCents={scanningSide === "give" ? giveTotal : receiveTotal}
-          onClose={() => setScanningSide(undefined)}
+          onClose={() => {
+            scanItemKeys.current.clear()
+            setScanningSide(undefined)
+          }}
         />
       ) : null}
 

@@ -114,4 +114,46 @@ describe("deckOwnership", () => {
     expect(fallbackPrinting.missingCards).toBe(1)
     expect(fallbackPrinting.estimatedMissingCents).toBe(200)
   })
+
+  it("counts owned copies of a deck card that has only a name", () => {
+    addCollectionCard({
+      game: "mtg",
+      cardId: "name:sol ring",
+      printingId: "scan:sol ring",
+      name: "Sol Ring",
+      setCode: "",
+      collectorNumber: "",
+      quantity: 1,
+    })
+    catalogDb.replacePrintings(
+      "mtg",
+      [
+        {
+          game: "mtg",
+          printingId: "scry-sol",
+          cardId: "ora-sol",
+          name: "Sol Ring",
+          nameNormalized: "sol ring",
+          setCode: "cmm",
+          collectorNumber: "410",
+          finishes: ["nonfoil"],
+        },
+      ],
+      "v1",
+    )
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "scry-sol",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+      quantity: 2,
+    })
+
+    const summary = computeDeckOwnership("mtg", [{ name: "Sol Ring", quantity: 4 }])
+
+    expect(summary.ownedCards).toBe(3)
+    expect(summary.missingCards).toBe(1)
+  })
 })

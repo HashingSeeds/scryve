@@ -673,9 +673,18 @@ export function CardScanner({
           condition,
         })
       : firstResolved
+    const last = lastAcceptedCard.current
+    // why: a card accepted before its printing was pinned is still being refined, so a pinned read of another printing corrects it rather than counting a new copy.
+    const stillRefining = Boolean(
+      last &&
+      last.name === match.name &&
+      last.evidence !== "setAndNumber" &&
+      Date.now() - last.acceptedAt <= IN_FRAME_UPGRADE_WINDOW_MS,
+    )
     // why: handheld OCR occasionally drops a leading digit on extended-art printings (#169 -> #69), so reprint auto-swap stays bulk-only.
     const reprintSwapped = Boolean(
       scanMode === "bulk" &&
+      !stillRefining &&
       bottomHint.setCode &&
       bottomHint.collectorNumber &&
       resolved.printing?.printingId &&
