@@ -376,7 +376,7 @@ export function RulesScreen({
               cardId={item.card.cardId}
               source={item.card.smallImageUrl ?? item.card.imageUrl}
               compact
-              style={$thumbnail}
+              style={themed($thumbnail)}
               accessibilityLabel={item.card.name}
             />
             <View style={$flex}>
@@ -828,7 +828,6 @@ const $gutter: TextStyle = { width: 60, paddingTop: 2, fontVariant: ["tabular-nu
 const $caretOpen = { transform: [{ rotate: "90deg" }] }
 const $active: TextStyle = { textDecorationLine: "underline" }
 const $pressed: ViewStyle = { opacity: 0.7 }
-const $thumbnail: ImageStyle = { width: 32, aspectRatio: 488 / 680 }
 const $tabsClip: ViewStyle = { overflow: "hidden" }
 const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
@@ -865,6 +864,11 @@ const $recentRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.xs,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
+})
+const $thumbnail: ThemedStyle<ImageStyle> = ({ colors }) => ({
+  width: 32,
+  aspectRatio: 488 / 680,
+  backgroundColor: colors.separator,
 })
 const $cardRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
