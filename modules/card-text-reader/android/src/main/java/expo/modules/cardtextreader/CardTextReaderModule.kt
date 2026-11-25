@@ -15,9 +15,11 @@ class CardTextReaderModule : Module() {
       }
 
       Prop("guide") { view: CardTextCameraView, guide: Map<String, Double>? ->
-        view.guide = guide?.mapValues { it.value.toFloat() }?.let {
-          Box(it.getValue("x"), it.getValue("y"), it.getValue("width"), it.getValue("height"))
-        }
+        view.setGuideBox(
+          guide?.mapValues { it.value.toFloat() }?.let {
+            Box(it.getValue("x"), it.getValue("y"), it.getValue("width"), it.getValue("height"))
+          },
+        )
       }
 
       Prop("torch") { view: CardTextCameraView, torch: Boolean? ->

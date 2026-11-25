@@ -333,10 +333,12 @@ export const localCardDb: LocalCardDb = {
 
   deleteBinder(id) {
     const db = openNativeDb()
-    db.withTransactionSync(() => {
+    const run = () => {
       db.runSync("DELETE FROM collection_entries WHERE binder_id = ?", [id])
       db.runSync("DELETE FROM binders WHERE id = ?", [id])
-    })
+    }
+    if (db.isInTransactionSync()) run()
+    else db.withTransactionSync(run)
   },
 
   listCollectionEntries(filter = {}) {
@@ -427,7 +429,10 @@ export const localCardDb: LocalCardDb = {
       const rows = db.getAllSync<{ card_id: string; total: number }>(
         `SELECT card_id, SUM(quantity) AS total
          FROM collection_entries
-         WHERE game = ? AND deleted_at IS NULL AND card_id IN (${placeholders})
+         WHERE game = ?
+           AND deleted_at IS NULL
+           AND card_id IN (${placeholders})
+           AND (binder_id IS NULL OR binder_id NOT IN (SELECT id FROM binders WHERE kind = 'scan_session'))
          GROUP BY card_id`,
         [game, ...slice],
       )

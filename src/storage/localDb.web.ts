@@ -18,6 +18,24 @@ const COLLECTION_PREFIX = "scryve.cardDb.collection.v1."
 const DETAILS_MAP_KEY = "scryve.cardDb.cardDetails.v1"
 
 let detailsRevision = 0
+let txDepth = 0
+let txUndo: Map<string, string | undefined> | undefined
+
+function recordUndo(key: string) {
+  if (txUndo && !txUndo.has(key)) {
+    txUndo.set(key, storage.getString(key))
+  }
+}
+
+function writeKey(key: string, value: string) {
+  recordUndo(key)
+  storage.set(key, value)
+}
+
+function deleteKey(key: string) {
+  recordUndo(key)
+  storage.remove(key)
+}
 
 function createdAtOf(payload: string): number {
   try {
@@ -64,11 +82,11 @@ export const localCardDb: LocalCardDb = {
   },
 
   setKv(key, value) {
-    storage.set(key, value)
+    writeKey(key, value)
   },
 
   deleteKv(key) {
-    storage.remove(key)
+    deleteKey(key)
   },
 
   getAllKvKeys() {
@@ -91,17 +109,17 @@ export const localCardDb: LocalCardDb = {
   },
 
   upsertGuestDeck(localId, _deckKey, _updatedAt, payload) {
-    storage.set(`${GUEST_DECK_PREFIX}${localId}`, payload)
+    writeKey(`${GUEST_DECK_PREFIX}${localId}`, payload)
   },
 
   deleteGuestDeck(localId) {
-    storage.remove(`${GUEST_DECK_PREFIX}${localId}`)
+    deleteKey(`${GUEST_DECK_PREFIX}${localId}`)
   },
 
   clearGuestDecks() {
     for (const key of storage.getAllKeys()) {
       if (key.startsWith(GUEST_DECK_PREFIX) || key.startsWith(GUEST_META_PREFIX)) {
-        storage.remove(key)
+        deleteKey(key)
       }
     }
   },
@@ -111,11 +129,11 @@ export const localCardDb: LocalCardDb = {
   },
 
   setGuestMeta(key, value) {
-    storage.set(`${GUEST_META_PREFIX}${key}`, value)
+    writeKey(`${GUEST_META_PREFIX}${key}`, value)
   },
 
   deleteGuestMeta(key) {
-    storage.remove(`${GUEST_META_PREFIX}${key}`)
+    deleteKey(`${GUEST_META_PREFIX}${key}`)
   },
 
   listCardDetails(): StoredCardDetailRow[] {
@@ -138,12 +156,12 @@ export const localCardDb: LocalCardDb = {
       ([, left], [, right]) => right.accessedAt - left.accessedAt,
     )
     const trimmed = Object.fromEntries(sorted.slice(0, maxEntries))
-    storage.set(DETAILS_MAP_KEY, JSON.stringify(trimmed))
+    writeKey(DETAILS_MAP_KEY, JSON.stringify(trimmed))
     detailsRevision += 1
   },
 
   clearCardDetails() {
-    storage.remove(DETAILS_MAP_KEY)
+    deleteKey(DETAILS_MAP_KEY)
     detailsRevision += 1
   },
 
@@ -168,13 +186,13 @@ export const localCardDb: LocalCardDb = {
   },
 
   upsertBinder(binder) {
-    storage.set(`${BINDER_PREFIX}${binder.id}`, JSON.stringify(binder))
+    writeKey(`${BINDER_PREFIX}${binder.id}`, JSON.stringify(binder))
   },
 
   deleteBinder(id) {
-    storage.remove(`${BINDER_PREFIX}${id}`)
+    deleteKey(`${BINDER_PREFIX}${id}`)
     for (const entry of this.listCollectionEntries({ binderId: id, includeDeleted: true })) {
-      storage.remove(`${COLLECTION_PREFIX}${entry.id}`)
+      deleteKey(`${COLLECTION_PREFIX}${entry.id}`)
     }
   },
 
@@ -203,7 +221,7 @@ export const localCardDb: LocalCardDb = {
   },
 
   upsertCollectionEntry(entry) {
-    storage.set(`${COLLECTION_PREFIX}${entry.id}`, JSON.stringify(entry))
+    writeKey(`${COLLECTION_PREFIX}${entry.id}`, JSON.stringify(entry))
   },
 
   upsertCollectionEntries(entries) {
@@ -215,7 +233,7 @@ export const localCardDb: LocalCardDb = {
     if (!raw) return
     try {
       const entry = JSON.parse(raw) as StoredCollectionEntry
-      storage.set(
+      writeKey(
         `${COLLECTION_PREFIX}${id}`,
         JSON.stringify({ ...entry, deletedAt, updatedAt: deletedAt }),
       )
@@ -224,16 +242,39 @@ export const localCardDb: LocalCardDb = {
 
   ownedQuantitiesByCardId(game, cardIds) {
     const wanted = new Set(cardIds)
+    const scanSessionIds = new Set(this.listBinders("scan_session").map((binder) => binder.id))
     const counts = new Map<string, number>()
     for (const entry of this.listCollectionEntries({ game })) {
       if (!wanted.has(entry.cardId)) continue
+      if (entry.binderId && scanSessionIds.has(entry.binderId)) continue
       counts.set(entry.cardId, (counts.get(entry.cardId) ?? 0) + entry.quantity)
     }
     return counts
   },
 
   transaction(run) {
-    run()
+    const isOuter = txDepth === 0
+    if (isOuter) {
+      txUndo = new Map()
+    }
+    txDepth += 1
+    try {
+      run()
+    } catch (error) {
+      if (isOuter && txUndo) {
+        for (const [key, previous] of txUndo) {
+          if (previous === undefined) storage.remove(key)
+          else storage.set(key, previous)
+        }
+        if (txUndo.has(DETAILS_MAP_KEY)) detailsRevision += 1
+      }
+      throw error
+    } finally {
+      txDepth -= 1
+      if (isOuter) {
+        txUndo = undefined
+      }
+    }
   },
 
   clearAll() {
@@ -241,7 +282,7 @@ export const localCardDb: LocalCardDb = {
     this.clearCardDetails()
     for (const key of storage.getAllKeys()) {
       if (key.startsWith(BINDER_PREFIX) || key.startsWith(COLLECTION_PREFIX)) {
-        storage.remove(key)
+        deleteKey(key)
       }
     }
   },

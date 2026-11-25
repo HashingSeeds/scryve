@@ -198,9 +198,27 @@ function formatPlain(value: number, format?: string) {
   return String(value)
 }
 
+function toAsciiDigits(text: string) {
+  return text
+    .replace(/[\u0660-\u0669]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/[\u0966-\u096f]/g, (digit) => String(digit.charCodeAt(0) - 0x0966))
+}
+
+function formatPlainDate(value: Date) {
+  return toAsciiDigits(dateFormat(DATE_AND_TIME).format(value)).replace(
+    /[\u200e\u200f\u2066-\u2069]/g,
+    "",
+  )
+}
+
 export const formatInterpolation: FormatFunction = (value, format, _language, options) => {
   // why: saved text outlives the reader's language, so translateForStorage gets plain ASCII and no isolates.
-  if (options?.forStorage) return typeof value === "number" ? formatPlain(value, format) : value
+  if (options?.forStorage) {
+    if (typeof value === "number") return formatPlain(value, format)
+    if (value instanceof Date) return formatPlainDate(value)
+    return value
+  }
   if (typeof value === "number") {
     if (format === "signed") return isolate(formatSigned(value))
     if (format === "percent") return isolate(formatPercent(value))

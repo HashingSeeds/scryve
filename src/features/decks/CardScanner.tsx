@@ -39,10 +39,10 @@ import {
   type CardNameIndex,
   type CardNameMatch,
 } from "./cardNameMatch"
-import { collectorHintFromCardBottom } from "./cardScan"
+import { collectorHintFromCardBottom, type CollectorHint } from "./cardScan"
 import { CardScanStats } from "./CardScanStats"
 import {
-  framedLinesFromCardBottom,
+  framedLineObjectsFromCardBottom,
   framedLinesFromCardTop,
   type ScanFraming,
 } from "./cardTextLayout"
@@ -53,6 +53,7 @@ import {
   scanHaptic,
   type CardPhotoText,
   type CardScanMode,
+  type CardTextLine,
 } from "../../../modules/card-text-reader"
 
 export type CardScan = { linesFromCardTop: string[]; photo: CardPhotoText; framing: ScanFraming }
@@ -107,6 +108,33 @@ const ADD_BATCH_SIZE = 10
 const ADD_BATCH_WAIT_MS = 1500
 const HIT_THRESHOLD_CENTS = 500
 const BIG_HIT_THRESHOLD_CENTS = 2000
+const HANDHELD_REACCEPT_COOLDOWN_MS = 4_500
+const IN_FRAME_UPGRADE_WINDOW_MS = 2_500
+
+const PRINTING_EVIDENCE_RANK = { none: 0, setOrNumber: 1, setAndNumber: 2 } as const
+type PrintingEvidence = keyof typeof PRINTING_EVIDENCE_RANK
+
+const collectorKey = (collectorNumber: string) =>
+  collectorNumber.toLowerCase().replace(/^0+/, "") || "0"
+
+// why: a misread number can fall back to another printing in the set, so set plus number only counts once the resolved printing carries both; until then later frames can still refine.
+function printingEvidence(
+  hint: CollectorHint,
+  lockedSet: string,
+  printing?: { setCode: string; collectorNumber: string },
+): PrintingEvidence {
+  const setCode = (hint.setCode || lockedSet).toLowerCase()
+  const number = hint.collectorNumber
+  const pinned = printing
+    ? Boolean(
+        number &&
+        printing.setCode === setCode &&
+        collectorKey(printing.collectorNumber) === collectorKey(number),
+      )
+    : Boolean(setCode && number)
+  if (pinned) return "setAndNumber"
+  return setCode || number ? "setOrNumber" : "none"
+}
 const FINISH_CYCLE: readonly CardFinish[] = ["nonfoil", "foil", "etched"]
 const CONDITION_CYCLE: readonly CardCondition[] = ["NM", "LP", "MP", "HP", "DMG"]
 // why: Scryfall pauses lookups for 30 seconds after a 429, so the last waits outlast a pause.
@@ -214,10 +242,25 @@ export function CardScanner({
   const countedLands = useRef(new Set<string>())
   const candidateName = useRef<string>(undefined)
   const candidateBottomLines = useRef<string[]>([])
+  const candidateFoilStar = useRef(false)
   const recentVotes = useRef<(string | undefined)[]>([])
   const emptyFrames = useRef(0)
+  const blankFrames = useRef(0)
+  const starSeen = useRef<{ setCode: string; collectorNumber: string; at: number }>(undefined)
   const nameInFrame = useRef<string>(undefined)
   const printingInFrame = useRef<string>(undefined)
+  const recentSeenAtByName = useRef(new Map<string, number>())
+  const lastAcceptedCard = useRef<{
+    id: number
+    name: string
+    printingId?: string
+    setCode?: string
+    collectorNumber?: string
+    finish: CardFinish
+    condition: CardCondition
+    evidence: PrintingEvidence
+    acceptedAt: number
+  }>(undefined)
   const rejectedBySetLock = useRef(false)
   const waiting = useRef<ScannedCard[]>([])
   const batchTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -229,6 +272,8 @@ export function CardScanner({
   const corrections = useRef(new Set<Promise<void>>())
   const [closing, setClosing] = useState(false)
   const closingRef = useRef(false)
+  // why: native emits frames on its own clock; when JS falls behind, only the newest frame is worth reading.
+  const pendingPhoto = useRef<CardPhotoText>(undefined)
   const nextId = useRef(0)
   const lastAcceptedAt = useRef(Date.now())
   // why: retry timers outlive renders, so a retry after reconnecting must use the latest addCards.
@@ -276,6 +321,7 @@ export function CardScanner({
     settleLookup.current.delete(card.id)
     if (!("error" in result)) return updateCard(card.id, { ...result, state: "added" })
     countedLands.current.delete(card.name)
+    recentSeenAtByName.current.delete(card.name)
     updateCard(card.id, { state: "failed" })
   }
 
@@ -320,7 +366,10 @@ export function CardScanner({
     })
   }
 
-  function add(card: Omit<ScannedCard, "id" | "state">) {
+  function add(
+    card: Omit<ScannedCard, "id" | "state">,
+    evidence: PrintingEvidence = "setAndNumber",
+  ) {
     const id = nextId.current++
     const scanned: ScannedCard = {
       ...card,
@@ -337,9 +386,30 @@ export function CardScanner({
     )
     if (__DEV__) {
       const ms = Date.now() - lastAcceptedAt.current
-      console.log(`SCANACCEPT ${JSON.stringify({ name: card.name, ms })}`)
+      console.log(
+        `SCANACCEPT ${JSON.stringify({
+          name: card.name,
+          ms,
+          set: card.setCode,
+          num: card.collectorNumber,
+          finish: card.finish,
+          retailCents: card.retailCents,
+        })}`,
+      )
     }
-    lastAcceptedAt.current = Date.now()
+    const acceptedAt = Date.now()
+    lastAcceptedAt.current = acceptedAt
+    lastAcceptedCard.current = {
+      id,
+      name: card.name,
+      printingId: card.printingId,
+      setCode: card.setCode,
+      collectorNumber: card.collectorNumber,
+      finish: card.finish,
+      condition: card.condition,
+      evidence,
+      acceptedAt,
+    }
     setAdded((current) => [scanned, ...current])
     if (onScanPrinting) {
       onScanPrinting({
@@ -375,60 +445,237 @@ export function CardScanner({
       scan.peakHeat = heat
   }
 
+  function primaryFoilStar(lines: readonly CardTextLine[]): boolean {
+    const collectorLines = lines.filter((line) => {
+      const parsed = collectorHintFromCardBottom([line.text])
+      return Boolean(parsed.setCode || parsed.language || parsed.isFoilStar || line.foilStar)
+    })
+    if (collectorLines.length === 0) return false
+    // why: pick the lowest line in the frame so a foil card peeking above cannot override this card's collector strip; the parsed set hint can come from that card, so it must not steer the pick.
+    let primary = collectorLines[0]
+    for (let i = 1; i < collectorLines.length; i += 1) {
+      if (collectorLines[i].y > primary.y) primary = collectorLines[i]
+    }
+    return Boolean(primary.foilStar || collectorHintFromCardBottom([primary.text]).isFoilStar)
+  }
+
+  function maybeUpgradeLastAccepted(
+    matchName: string,
+    bottomHint: CollectorHint,
+    frameHasFoilStar: boolean,
+    lockedSet: string,
+  ) {
+    const last = lastAcceptedCard.current
+    if (!last || last.name !== matchName) return
+    if (Date.now() - last.acceptedAt > IN_FRAME_UPGRADE_WINDOW_MS) return
+    const wantsFoilUpgrade = last.finish === "nonfoil" && !finishLocked && frameHasFoilStar
+    const evidence = printingEvidence(bottomHint, lockedSet)
+    const wantsPrintingRefine =
+      PRINTING_EVIDENCE_RANK[evidence] > PRINTING_EVIDENCE_RANK[last.evidence]
+    if (!wantsFoilUpgrade && !wantsPrintingRefine) return
+    const targetFinish: CardFinish = wantsFoilUpgrade ? "foil" : last.finish
+    // why: a foil star alone says nothing about the printing, so keep the accepted one and only reprice it.
+    const hint = wantsPrintingRefine
+      ? bottomHint
+      : { setCode: last.setCode, collectorNumber: last.collectorNumber }
+    const refined = resolveScannedPrinting(game, matchName, hint, {
+      setLock: lockedSet || undefined,
+      finish: targetFinish,
+      condition: last.condition,
+    })
+    const nextFinish = refined.finish
+    const finishChanged = nextFinish !== last.finish
+    const nextPrinting = refined.printing
+    const printingChanged = Boolean(
+      wantsPrintingRefine &&
+      nextPrinting?.printingId &&
+      nextPrinting.printingId !== last.printingId,
+    )
+    const nextEvidence =
+      wantsPrintingRefine && nextPrinting
+        ? printingEvidence(bottomHint, lockedSet, nextPrinting)
+        : last.evidence
+    if (!finishChanged && !printingChanged) {
+      lastAcceptedCard.current = { ...last, evidence: nextEvidence }
+      return
+    }
+    lastAcceptedCard.current = {
+      ...last,
+      finish: nextFinish,
+      printingId: nextPrinting?.printingId ?? last.printingId,
+      setCode: nextPrinting?.setCode ?? last.setCode,
+      collectorNumber: nextPrinting?.collectorNumber ?? last.collectorNumber,
+      evidence: nextEvidence,
+    }
+    if (printingChanged && nextPrinting?.printingId) {
+      printingInFrame.current = nextPrinting.printingId
+    }
+    const scannerUpdate = {
+      finish: nextFinish,
+      ...(nextPrinting
+        ? {
+            cardId: nextPrinting.cardId,
+            printingId: nextPrinting.printingId,
+            setCode: nextPrinting.setCode,
+            collectorNumber: nextPrinting.collectorNumber,
+            imageUrl: nextPrinting.smallImageUrl ?? nextPrinting.imageUrl,
+          }
+        : {}),
+      retailCents: refined.price.retailCents,
+      buylistCents: refined.price.buylistCents,
+    }
+    const revision = (printingEditRevision.current.get(last.id) ?? 0) + 1
+    printingEditRevision.current.set(last.id, revision)
+    const queued = waiting.current.find((item) => item.id === last.id)
+    if (queued) {
+      Object.assign(queued, scannerUpdate)
+      updateCard(last.id, scannerUpdate)
+      return
+    }
+    if (!onUpdatePrinting || !nextPrinting) return
+    // why: an add already sent to the deck has no scan ID there until it settles, so wait for it like a manual correction does.
+    const apply = async () => {
+      await lookups.current.get(last.id)
+      if (printingEditRevision.current.get(last.id) !== revision) return
+      const accepted = onUpdatePrinting(last.id, {
+        name: matchName,
+        printingId: nextPrinting.printingId,
+        setCode: nextPrinting.setCode,
+        collectorNumber: nextPrinting.collectorNumber,
+        finish: nextFinish,
+        condition: last.condition,
+        imageUrl: nextPrinting.imageUrl,
+        smallImageUrl: nextPrinting.smallImageUrl,
+        retailCents: refined.price.retailCents,
+        buylistCents: refined.price.buylistCents,
+      })
+      if (accepted !== false) return updateCard(last.id, scannerUpdate)
+      if (lastAcceptedCard.current?.id !== last.id) return
+      // why: the row only changes once the deck accepts, so it holds what the deck has; reset evidence so a later frame can retry.
+      const shown = addedRef.current.find((card) => card.id === last.id)
+      lastAcceptedCard.current = {
+        ...last,
+        printingId: shown?.printingId,
+        setCode: shown?.setCode,
+        collectorNumber: shown?.collectorNumber,
+        finish: shown?.finish ?? last.finish,
+        evidence: "none",
+      }
+      printingInFrame.current = shown?.printingId
+    }
+    const task = apply().finally(() => corrections.current.delete(task))
+    corrections.current.add(task)
+  }
+
+  function starMatches(printing?: { setCode?: string; collectorNumber?: string }) {
+    const star = starSeen.current
+    return Boolean(
+      star &&
+      printing?.setCode &&
+      printing.collectorNumber &&
+      Date.now() - star.at <= IN_FRAME_UPGRADE_WINDOW_MS &&
+      printing.setCode.toLowerCase() === star.setCode &&
+      collectorKey(printing.collectorNumber) === star.collectorNumber,
+    )
+  }
+
+  // why: the star often shows only when the card tilts and its name leaves the frame, so the set and collector number on the starred strip identify the card instead.
+  function noteFoilStar(lines: readonly CardTextLine[], lockedSet: string) {
+    const hint = collectorHintFromCardBottom(lines.map((line) => line.text))
+    const setCode = (hint.setCode || lockedSet).toLowerCase()
+    if (!setCode || !hint.collectorNumber) return
+    starSeen.current = {
+      setCode,
+      collectorNumber: collectorKey(hint.collectorNumber),
+      at: Date.now(),
+    }
+    const last = lastAcceptedCard.current
+    if (last?.finish === "nonfoil" && !finishLocked && starMatches(last))
+      maybeUpgradeLastAccepted(last.name, {}, true, "")
+  }
+
   function readText(photo: CardPhotoText) {
     if (closingRef.current || !view.current || !frame) return
     if (photo.sceneChanged) {
       candidateName.current = undefined
       candidateBottomLines.current = []
+      candidateFoilStar.current = false
       nameInFrame.current = undefined
       printingInFrame.current = undefined
+      if (scanMode === "bulk") {
+        recentSeenAtByName.current.clear()
+        starSeen.current = undefined
+      }
       recentVotes.current = []
       emptyFrames.current = 0
+      blankFrames.current = 0
     }
     const framing = { view: view.current, frame }
     const linesFromCardTop = framedLinesFromCardTop(photo, framing)
     const match = nameIndex ? nameFromCardTop(nameIndex, linesFromCardTop) : undefined
+    const frameBottomLineObjects =
+      photo.bottomLines && photo.bottomLines.length > 0
+        ? photo.bottomLines
+        : framedLineObjectsFromCardBottom(photo, framing)
+    const frameHasFoilStar = primaryFoilStar(frameBottomLineObjects)
+    const lockedSet = setLock.trim().toUpperCase()
+    if (frameHasFoilStar) noteFoilStar(frameBottomLineObjects, lockedSet)
     if (linesFromCardTop.length) onRead?.({ linesFromCardTop, photo, framing }, match?.name)
     if (!linesFromCardTop.length) {
       emptyFrames.current += 1
-      if (emptyFrames.current >= 2) {
+      const fullyEmpty = photo.lines.length === 0 && (photo.bottomLines?.length ?? 0) === 0
+      // why: glare can blank the text while the card is still in view, so only frames with no text and no outlined card unlock immediate repeat scans.
+      blankFrames.current = fullyEmpty && !photo.cardCorners ? blankFrames.current + 1 : 0
+      if (blankFrames.current >= 2) {
+        if (nameInFrame.current) recentSeenAtByName.current.delete(nameInFrame.current)
         candidateName.current = undefined
         candidateBottomLines.current = []
+        candidateFoilStar.current = false
         nameInFrame.current = undefined
         printingInFrame.current = undefined
+        recentVotes.current = []
+      } else if (emptyFrames.current >= 3) {
+        candidateName.current = undefined
+        candidateBottomLines.current = []
+        candidateFoilStar.current = false
         recentVotes.current = []
       }
       setStatus("looking")
       return
     }
     emptyFrames.current = 0
+    blankFrames.current = 0
     if (!nameIndex || !match) {
       recentVotes.current = [...recentVotes.current.slice(-2), undefined]
       setStatus(nameIndex ? "unsure" : "loading")
       return
     }
-    const frameBottomLines =
-      photo.bottomLines && photo.bottomLines.length > 0
-        ? photo.bottomLines.map((line) => line.text)
-        : framedLinesFromCardBottom(photo, framing)
+    const frameBottomLines = frameBottomLineObjects.map((line) => line.text)
     const combinedBottomLines =
       candidateName.current === match.name
         ? [...candidateBottomLines.current, ...frameBottomLines]
         : frameBottomLines
     const bottomHint = collectorHintFromCardBottom(combinedBottomLines)
-    const effectiveFinish: CardFinish = finishLocked
-      ? finish
-      : bottomHint.isFoilStar
-        ? "foil"
-        : finish
-    const lockedSet = setLock.trim().toUpperCase()
-    const resolved = resolveScannedPrinting(game, match.name, bottomHint, {
+    const detectedFoilStar =
+      frameHasFoilStar || (candidateName.current === match.name && candidateFoilStar.current)
+    const effectiveFinish: CardFinish = finishLocked ? finish : detectedFoilStar ? "foil" : finish
+    const firstResolved = resolveScannedPrinting(game, match.name, bottomHint, {
       setLock: lockedSet || undefined,
       finish: effectiveFinish,
       condition,
     })
-    // why: only treat a same-name frame as a swapped reprint when OCR resolved to a distinct known printingId; raw OCR jitter would otherwise double-scan the card in place.
+    const starredJustBefore =
+      !finishLocked && effectiveFinish !== "foil" && starMatches(firstResolved.printing)
+    const resolved = starredJustBefore
+      ? resolveScannedPrinting(game, match.name, bottomHint, {
+          setLock: lockedSet || undefined,
+          finish: "foil",
+          condition,
+        })
+      : firstResolved
+    // why: handheld OCR occasionally drops a leading digit on extended-art printings (#169 -> #69), so reprint auto-swap stays bulk-only.
     const reprintSwapped = Boolean(
+      scanMode === "bulk" &&
       bottomHint.setCode &&
       bottomHint.collectorNumber &&
       resolved.printing?.printingId &&
@@ -436,10 +683,27 @@ export function CardScanner({
       resolved.printing.printingId !== printingInFrame.current,
     )
     if (match.name === nameInFrame.current && !reprintSwapped) {
+      // why: the cooldown counts from the last sighting, so a card that stays peeking behind the next one never re-adds.
+      if (scanMode === "handheld") recentSeenAtByName.current.set(match.name, Date.now())
+      maybeUpgradeLastAccepted(match.name, bottomHint, frameHasFoilStar, lockedSet)
       candidateName.current = undefined
       candidateBottomLines.current = []
+      candidateFoilStar.current = false
       recentVotes.current = []
       return
+    }
+    if (scanMode === "handheld") {
+      const lastSeenAt = recentSeenAtByName.current.get(match.name)
+      if (lastSeenAt !== undefined && Date.now() - lastSeenAt < HANDHELD_REACCEPT_COOLDOWN_MS) {
+        recentSeenAtByName.current.set(match.name, Date.now())
+        nameInFrame.current = match.name
+        maybeUpgradeLastAccepted(match.name, bottomHint, frameHasFoilStar, lockedSet)
+        candidateName.current = undefined
+        candidateBottomLines.current = []
+        candidateFoilStar.current = false
+        recentVotes.current = []
+        return
+      }
     }
     const fastExact = match.similarity === 1 && (scanMode === "bulk" || Boolean(photo.cardCorners))
     if (!fastExact) {
@@ -448,6 +712,7 @@ export function CardScanner({
       if (votes < 2) {
         candidateName.current = match.name
         candidateBottomLines.current = combinedBottomLines.slice(-12)
+        candidateFoilStar.current = detectedFoilStar
         prepareScanHaptics()
         setStatus("steady")
         return
@@ -455,9 +720,11 @@ export function CardScanner({
     }
     candidateName.current = undefined
     candidateBottomLines.current = []
+    candidateFoilStar.current = false
     recentVotes.current = []
     nameInFrame.current = match.name
     printingInFrame.current = resolved.printing?.printingId
+    recentSeenAtByName.current.set(match.name, Date.now())
     setAcceptedToken((token) => token + 1)
     setStatus("looking")
     const alternates = closestNamesFromCardTop(nameIndex, linesFromCardTop, ALTERNATE_COUNT + 1)
@@ -473,20 +740,23 @@ export function CardScanner({
       return
     }
     rejectedBySetLock.current = false
-    accept({
-      ...match,
-      alternates,
-      cardId: resolved.printing?.cardId,
-      printingId: resolved.printing?.printingId,
-      setCode: resolved.printing?.setCode ?? bottomHint.setCode,
-      collectorNumber: resolved.printing?.collectorNumber ?? bottomHint.collectorNumber,
-      finish: resolved.finish,
-      condition,
-      language: bottomHint.language ?? "en",
-      imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
-      retailCents: resolved.price.retailCents,
-      buylistCents: resolved.price.buylistCents,
-    })
+    accept(
+      {
+        ...match,
+        alternates,
+        cardId: resolved.printing?.cardId,
+        printingId: resolved.printing?.printingId,
+        setCode: resolved.printing?.setCode ?? bottomHint.setCode,
+        collectorNumber: resolved.printing?.collectorNumber ?? bottomHint.collectorNumber,
+        finish: resolved.finish,
+        condition,
+        language: bottomHint.language ?? "en",
+        imageUrl: resolved.printing?.smallImageUrl ?? resolved.printing?.imageUrl,
+        retailCents: resolved.price.retailCents,
+        buylistCents: resolved.price.buylistCents,
+      },
+      printingEvidence(bottomHint, lockedSet, resolved.printing),
+    )
   }
 
   function skip(name: string) {
@@ -495,7 +765,10 @@ export function CardScanner({
     setStatus({ alreadyInDeck: name })
   }
 
-  function accept(card: Omit<ScannedCard, "id" | "state">) {
+  function accept(
+    card: Omit<ScannedCard, "id" | "state">,
+    evidence: PrintingEvidence = "setAndNumber",
+  ) {
     if (BASIC_LANDS.has(card.name)) {
       if (countedLands.current.has(card.name)) return skip(card.name)
       const stillAdding = addedRef.current.filter(
@@ -516,7 +789,7 @@ export function CardScanner({
         ))
     )
       return skip(card.name)
-    add(card)
+    add(card, evidence)
   }
 
   function addLands({ card, inDeck, count }: LandCount) {
@@ -666,9 +939,21 @@ export function CardScanner({
               scanMode={scanMode}
               acceptedToken={acceptedToken}
               onText={(event) => {
-                count(event.nativeEvent)
-                readText(event.nativeEvent)
-                if (showStats) setLastPhoto(event.nativeEvent)
+                const photo = event.nativeEvent
+                count(photo)
+                const queued = pendingPhoto.current
+                pendingPhoto.current = queued?.sceneChanged
+                  ? { ...photo, sceneChanged: true }
+                  : photo
+                if (queued) return
+                // why: the timer runs after frames already queued behind this one, so a slow read skips stale frames instead of replaying them.
+                setTimeout(() => {
+                  const next = pendingPhoto.current
+                  pendingPhoto.current = undefined
+                  if (!next) return
+                  readText(next)
+                  if (showStats) setLastPhoto(next)
+                }, 0)
               }}
             />
             {showPrereleaseHud && !reviewing ? (
@@ -954,6 +1239,9 @@ export function CardScanner({
           }) => {
             const target = pickingPrinting
             setPickingPrinting(undefined)
+            if (lastAcceptedCard.current?.id === target.id) {
+              lastAcceptedCard.current = undefined
+            }
             const revision = (printingEditRevision.current.get(target.id) ?? 0) + 1
             printingEditRevision.current.set(target.id, revision)
             const queued = waiting.current.find((item) => item.id === target.id)
@@ -1035,6 +1323,7 @@ export function CardScanner({
               onPress={() => {
                 setSetLock(setLockDraft.trim().toUpperCase())
                 if (rejectedBySetLock.current) {
+                  if (nameInFrame.current) recentSeenAtByName.current.delete(nameInFrame.current)
                   nameInFrame.current = undefined
                   printingInFrame.current = undefined
                   candidateName.current = undefined
@@ -1051,6 +1340,7 @@ export function CardScanner({
                   setSetLock("")
                   setSetLockDraft("")
                   if (rejectedBySetLock.current) {
+                    if (nameInFrame.current) recentSeenAtByName.current.delete(nameInFrame.current)
                     nameInFrame.current = undefined
                     printingInFrame.current = undefined
                     candidateName.current = undefined

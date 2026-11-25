@@ -316,6 +316,104 @@ function resolvePrintingFinish(
   return first === "foil" || first === "etched" ? first : "nonfoil"
 }
 
+export interface ValuedCollectionEntry<
+  T extends { printingId: string; finish: string; condition: string; quantity: number },
+> {
+  entry: T
+  retailCents: number
+  buylistCents: number
+}
+
+export function valueCollectionEntries<
+  T extends { printingId: string; finish: string; condition: string; quantity: number },
+>(
+  game: string,
+  entries: readonly T[],
+): {
+  items: ValuedCollectionEntry<T>[]
+  totals: { cards: number; retailCents: number; buylistCents: number }
+} {
+  if (entries.length === 0) {
+    return { items: [], totals: { cards: 0, retailCents: 0, buylistCents: 0 } }
+  }
+  const pricesByPrinting = catalogDb.getPricesBatch(
+    game,
+    entries.map((entry) => entry.printingId),
+  )
+  const summaryCache = new Map<string, PrintingPriceSummary>()
+  const items: ValuedCollectionEntry<T>[] = new Array(entries.length)
+  let cards = 0
+  let retailCents = 0
+  let buylistCents = 0
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i]
+    const cacheKey = `${entry.printingId}\u0000${entry.finish}\u0000${entry.condition}`
+    let summary = summaryCache.get(cacheKey)
+    if (!summary) {
+      const rows = pricesByPrinting.get(entry.printingId)
+      summary = rows ? summarizePrintingPrices(rows, entry.finish, entry.condition) : {}
+      summaryCache.set(cacheKey, summary)
+    }
+    const unitRetail = summary.retailCents ?? 0
+    const unitBuylist = summary.buylistCents ?? 0
+    items[i] = { entry, retailCents: unitRetail, buylistCents: unitBuylist }
+    cards += entry.quantity
+    retailCents += unitRetail * entry.quantity
+    buylistCents += unitBuylist * entry.quantity
+  }
+  return { items, totals: { cards, retailCents, buylistCents } }
+}
+
+function isSingleEditAway(a: string, b: string): boolean {
+  if (a === b) return false
+  const lenDiff = Math.abs(a.length - b.length)
+  if (lenDiff > 1) return false
+  if (a.length === b.length) {
+    let diffs = 0
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) {
+        diffs += 1
+        if (diffs > 1) return false
+      }
+    }
+    return diffs === 1
+  }
+  const shorter = a.length < b.length ? a : b
+  const longer = a.length < b.length ? b : a
+  let i = 0
+  let j = 0
+  let skipped = false
+  while (i < shorter.length && j < longer.length) {
+    if (shorter[i] === longer[j]) {
+      i += 1
+      j += 1
+    } else if (skipped) {
+      return false
+    } else {
+      skipped = true
+      j += 1
+    }
+  }
+  return true
+}
+
+function uniqueFuzzySetMatch(
+  code: string | undefined,
+  candidates: readonly CatalogPrinting[],
+): string | undefined {
+  if (!code || code.length < 3) return undefined
+  const lower = code.toLowerCase()
+  const uniqueSets = new Set(candidates.map((candidate) => candidate.setCode))
+  if (uniqueSets.has(lower)) return lower
+  let matched: string | undefined
+  for (const setCode of uniqueSets) {
+    if (setCode.length < 3 || !isSingleEditAway(lower, setCode)) continue
+    if (matched) return undefined
+    matched = setCode
+  }
+  return matched
+}
+
 export function resolveScannedPrinting(
   game: string,
   name: string,
@@ -335,8 +433,12 @@ export function resolveScannedPrinting(
           candidates.some((candidate) => candidate.setCode === code.toLowerCase()),
         )
       : undefined
+  const rawSet = lockedSet ?? hint.setCode?.toLowerCase() ?? matchedCandidateSet?.toLowerCase()
   const preferredSet =
-    lockedSet ?? hint.setCode?.toLowerCase() ?? matchedCandidateSet?.toLowerCase()
+    lockedSet ??
+    (rawSet && candidates.some((candidate) => candidate.setCode === rawSet)
+      ? rawSet
+      : uniqueFuzzySetMatch(rawSet, candidates))
   const collector = hint.collectorNumber?.toLowerCase()
 
   const pickFrom = (pool: readonly CatalogPrinting[]) => {

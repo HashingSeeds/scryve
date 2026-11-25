@@ -49,4 +49,70 @@ describe("web local card database", () => {
     spy.mockRestore()
     expect(localCardDb.listGuestDecks()).toEqual([])
   })
+
+  it("rolls back all writes when a transaction throws partway through", () => {
+    localCardDb.upsertCollectionEntry({
+      id: "e1",
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+      finish: "nonfoil",
+      condition: "NM",
+      language: "en",
+      quantity: 2,
+      createdAt: 100,
+      updatedAt: 100,
+    })
+
+    const originalSet = storage.set.bind(storage)
+    let writes = 0
+    const spy = jest.spyOn(storage, "set").mockImplementation((key, value) => {
+      writes += 1
+      if (writes === 2) throw new Error("quota exceeded")
+      originalSet(key, value)
+    })
+
+    expect(() =>
+      localCardDb.transaction(() => {
+        localCardDb.upsertCollectionEntry({
+          id: "e1",
+          game: "mtg",
+          cardId: "ora-sol",
+          printingId: "cmm-410",
+          name: "Sol Ring",
+          setCode: "cmm",
+          collectorNumber: "410",
+          finish: "nonfoil",
+          condition: "NM",
+          language: "en",
+          quantity: 1,
+          createdAt: 100,
+          updatedAt: 200,
+        })
+        localCardDb.upsertCollectionEntry({
+          id: "e2",
+          game: "mtg",
+          cardId: "ora-rhystic",
+          printingId: "wot-25",
+          name: "Rhystic Study",
+          setCode: "wot",
+          collectorNumber: "25",
+          finish: "nonfoil",
+          condition: "NM",
+          language: "en",
+          quantity: 1,
+          createdAt: 200,
+          updatedAt: 200,
+        })
+      }),
+    ).toThrow("quota exceeded")
+
+    spy.mockRestore()
+    const entries = localCardDb.listCollectionEntries({ game: "mtg" })
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({ id: "e1", quantity: 2, updatedAt: 100 })
+  })
 })

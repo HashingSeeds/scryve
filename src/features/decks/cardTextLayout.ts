@@ -1,4 +1,4 @@
-import type { CardPhotoText } from "../../../modules/card-text-reader"
+import type { CardPhotoText, CardTextLine } from "../../../modules/card-text-reader"
 
 type Size = { width: number; height: number }
 type Point = { x: number; y: number }
@@ -92,11 +92,18 @@ export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFramin
  * why: when card-corner detection falls back to full-frame OCR, `photo.bottomLines` is empty even
  * though the collector strip was already recognized near the bottom of the guide frame.
  */
-export function framedLinesFromCardBottom(photo: CardPhotoText, framing: ScanFraming): string[] {
+export function framedLineObjectsFromCardBottom(
+  photo: CardPhotoText,
+  framing: ScanFraming,
+): CardTextLine[] {
   const { framed, half, downTheCard } = framedPieces(photo, framing)
   if (framed.length === 0) return []
   const cutoff = half.y * 0.3
   const lower = framed.filter((piece) => downTheCard(piece) >= cutoff)
   const chosen = lower.length > 0 ? lower : framed.slice(-4)
-  return chosen.sort((a, b) => downTheCard(a) - downTheCard(b)).map(({ line }) => line.text)
+  return chosen.sort((a, b) => downTheCard(a) - downTheCard(b)).map(({ line }) => line)
+}
+
+export function framedLinesFromCardBottom(photo: CardPhotoText, framing: ScanFraming): string[] {
+  return framedLineObjectsFromCardBottom(photo, framing).map((line) => line.text)
 }
