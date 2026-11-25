@@ -18,7 +18,7 @@ jest.mock("@/features/decks/useCardNameIndex", () => ({
   useCardNameIndex: () => undefined,
 }))
 
-test("a printing refined after a trade scan moves that copy to the new printing", () => {
+test("a printing refined after a trade scan moves that copy and its price to the new printing", () => {
   catalogDb.clearAll()
   catalogDb.replacePrintings(
     "mtg",
@@ -55,6 +55,13 @@ test("a printing refined after a trade scan moves that copy to the new printing"
   act(() => {
     mockScanner?.onScanPrinting?.({ ...scan, id: 0 })
     mockScanner?.onScanPrinting?.({ ...scan, id: 1 })
+    mockScanner?.onScanPrinting?.({
+      ...scan,
+      id: 2,
+      printingId: "40k-240",
+      finish: "foil",
+      retailCents: undefined,
+    })
   })
 
   let accepted: boolean | void = false
@@ -72,7 +79,7 @@ test("a printing refined after a trade scan moves that copy to the new printing"
 
   expect(accepted).toBe(true)
   expect(view.getByText("CMM · #410 · nonfoil · NM · $1.00")).toBeTruthy()
-  expect(view.getByText("40K · #240 · foil · NM · $9.00")).toBeTruthy()
-  expect(view.getByText("$10.00")).toBeTruthy()
+  expect(view.getByText("40K · #240 · foil · NM · $18.00")).toBeTruthy()
+  expect(view.getByText("$19.00")).toBeTruthy()
   catalogDb.clearAll()
 })

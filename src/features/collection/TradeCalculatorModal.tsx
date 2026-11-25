@@ -60,8 +60,15 @@ const itemKey = (item: TradeItemDraft) => `${item.printingId}:${item.finish}:${i
 function withCopy(items: TradeItem[], item: TradeItemDraft): TradeItem[] {
   const key = itemKey(item)
   if (!items.some((entry) => entry.key === key)) return [{ ...item, key, quantity: 1 }, ...items]
+  // why: a row added before prices loaded shows $0, so a copy that arrives with a price reprices the row.
   return items.map((entry) =>
-    entry.key === key ? { ...entry, quantity: entry.quantity + 1 } : entry,
+    entry.key === key
+      ? {
+          ...entry,
+          quantity: entry.quantity + 1,
+          unitPriceCents: item.unitPriceCents || entry.unitPriceCents,
+        }
+      : entry,
   )
 }
 
