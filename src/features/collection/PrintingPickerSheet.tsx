@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { FlatList, TouchableOpacity, View } from "react-native"
-import type { ImageStyle, ViewStyle } from "react-native"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 
 import { CardImage } from "@/components/CardImage"
 import { ChoiceButton } from "@/components/ChoiceButton"
@@ -156,7 +156,11 @@ export function PrintingPickerSheet({
                     />
                   </View>
                   {price.retailCents !== undefined ? (
-                    <Text weight="medium" text={formatCurrency(price.retailCents, "USD")} />
+                    <Text
+                      weight="medium"
+                      style={$price}
+                      text={formatCurrency(price.retailCents, "USD")}
+                    />
                   ) : null}
                 </TouchableOpacity>
               )
@@ -189,4 +193,6 @@ const $selectedRow: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $disabledRow: ViewStyle = { opacity: 0.45 }
 const $thumb: ImageStyle = { width: 38, height: 53 }
-const $meta: ViewStyle = { flex: 1 }
+// why: `flex: 1` alone sized this column to its text, pushing large prices past the row edge.
+const $meta: ViewStyle = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }
+const $price: TextStyle = { flexShrink: 0 }
