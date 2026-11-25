@@ -566,7 +566,7 @@ const decks = {
     retailTotal: "Retail {{total}}",
     buylistTotal: "Buylist {{total}}",
     sortRecent: "Recent",
-    sortValue: "Highest value",
+    sortValue: "Value",
     sortName: "Name",
     emptySession: "No cards scanned in this session yet.",
     movedToBinder_one: "Moved {{count}} entry.",

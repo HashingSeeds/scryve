@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
@@ -19,6 +20,7 @@ export function Tabs<Id extends string>({
   disabled,
   accessibilityLabel,
   testID,
+  trailing,
 }: {
   tabs: readonly Tab<Id>[]
   selectedId: Id
@@ -26,6 +28,7 @@ export function Tabs<Id extends string>({
   disabled?: boolean
   accessibilityLabel?: string
   testID?: string
+  trailing?: ReactNode
 }) {
   const { themed } = useAppTheme()
   return (
@@ -59,6 +62,7 @@ export function Tabs<Id extends string>({
           </TouchableOpacity>
         )
       })}
+      {trailing ? <View style={$trailing}>{trailing}</View> : null}
     </View>
   )
 }
@@ -79,4 +83,5 @@ const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderBottomColor: "transparent",
 })
 const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.tint })
+const $trailing: ViewStyle = { marginStart: "auto", justifyContent: "center" }
 const $count: TextStyle = { fontVariant: ["tabular-nums"] }

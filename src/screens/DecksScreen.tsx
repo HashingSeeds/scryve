@@ -11,7 +11,10 @@ import { colorLabel, identityLabel } from "@/components/CardFocusDialog"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
-import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
+import {
+  $floatingNavigationClearance,
+  FloatingAppNavigation,
+} from "@/components/FloatingAppNavigation"
 import { Header, HeaderBack, HeaderIcon } from "@/components/Header"
 import { NUMBER_LANE_WIDTH, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
@@ -344,7 +347,7 @@ function LocalDeckList({
       testID="local-decks-list"
       data={rows}
       keyExtractor={(row) => String(row._id)}
-      contentContainerStyle={themed($listContent)}
+      contentContainerStyle={themed([$listContent, $floatingNavigationClearance])}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -486,7 +489,7 @@ function DeckShelf({
       data={rows}
       extraData={failedDeckIds}
       keyExtractor={(row) => String(row.deck._id)}
-      contentContainerStyle={themed($listContent)}
+      contentContainerStyle={themed([$listContent, $floatingNavigationClearance])}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -698,16 +701,18 @@ export function DecksScreen({
       />
       <View style={themed($content)}>
         {showCollectionArea ? (
-          <SegmentedControl
-            testID="decks-area-segment"
-            segments={[
-              { id: "decks", label: translate("decks:collection.tabDecks") },
-              { id: "collection", label: translate("decks:collection.tabCollection") },
-              { id: "scans", label: translate("decks:collection.tabScans") },
-            ]}
-            selectedId={area}
-            onSelect={(next) => setArea(next as "decks" | "collection" | "scans")}
-          />
+          <View style={themed($areaControl)}>
+            <SegmentedControl
+              testID="decks-area-segment"
+              segments={[
+                { id: "decks", label: translate("decks:collection.tabDecks") },
+                { id: "collection", label: translate("decks:collection.tabCollection") },
+                { id: "scans", label: translate("decks:collection.tabScans") },
+              ]}
+              selectedId={area}
+              onSelect={(next) => setArea(next as "decks" | "collection" | "scans")}
+            />
+          </View>
         ) : null}
         {showCollectionArea && area !== "decks" ? (
           <CollectionShelf mode={area} game={system === ALL_SYSTEMS ? DEFAULT_DECK_GAME : system} />
@@ -948,16 +953,14 @@ const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
-  paddingVertical: spacing.xs,
+  paddingBottom: spacing.xs,
 })
+const $areaControl: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.sm })
 const $flex1: ViewStyle = { flex: 1 }
 const $filtersDialog: ViewStyle = { height: 560 }
 const $filtersScroll: ViewStyle = { flexGrow: 1, flexBasis: 0 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
-const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  paddingTop: spacing.xs,
-  paddingBottom: spacing.xxxl + spacing.lg,
-})
+const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingTop: spacing.xs })
 const $row: ThemedStyle<ViewStyle> = ({ colors }) => ({
   minHeight: 72,
   flexDirection: "row",

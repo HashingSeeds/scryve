@@ -12,6 +12,10 @@ import { Text } from "./Text"
 
 export type AppDestination = "decks" | "cards"
 
+export const $floatingNavigationClearance: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingBottom: spacing.xxxl + spacing.lg,
+})
+
 export function FloatingAppNavigation({
   destination,
   onDecks,

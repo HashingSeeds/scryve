@@ -502,7 +502,7 @@ export default {
     retailTotal: "سعر التجزئة: {{total}}",
     buylistTotal: "قائمة الشراء: {{total}}",
     sortRecent: "الأحدث",
-    sortValue: "الأعلى قيمة",
+    sortValue: "القيمة",
     sortName: "الاسم",
     emptySession: "لم تُمسح بطاقات في هذه الجلسة بعد.",
     movedToBinder_zero: "تم نقل {{count}} إدخال.",

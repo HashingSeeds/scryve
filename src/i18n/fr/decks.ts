@@ -497,7 +497,7 @@ export default {
     retailTotal: "Vente : {{total}}",
     buylistTotal: "Rachat : {{total}}",
     sortRecent: "Récentes",
-    sortValue: "Valeur décroissante",
+    sortValue: "Valeur",
     sortName: "Nom",
     emptySession: "Aucune carte scannée dans cette session.",
     movedToBinder_one: "{{count}} entrée déplacée.",

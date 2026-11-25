@@ -5,6 +5,7 @@ import type { ImageStyle, ViewStyle } from "react-native"
 import { CardImage } from "@/components/CardImage"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { Sheet } from "@/components/Sheet"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { formatCurrency, joinParts } from "@/i18n/format"
 import { catalogDb } from "@/storage/catalogDb"
@@ -101,7 +102,8 @@ export function PrintingPickerSheet({
           <FlatList
             data={printings}
             keyExtractor={(item) => item.printingId}
-            style={$list}
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed($sheetScrollContent)}
             renderItem={({ item }) => {
               const supported = item.finishes.length === 0 || item.finishes.includes(finish)
               const price = supported
@@ -166,17 +168,12 @@ export function PrintingPickerSheet({
   )
 }
 
-const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  padding: spacing.md,
-  gap: spacing.sm,
-  maxHeight: 540,
-})
+const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flexShrink: 1, gap: spacing.sm })
 const $pillRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
   gap: spacing.xs,
 })
-const $list: ViewStyle = { maxHeight: 340 }
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

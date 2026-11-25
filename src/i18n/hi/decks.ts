@@ -467,7 +467,7 @@ export default {
     retailTotal: "रिटेल {{total}}",
     buylistTotal: "बायलिस्ट {{total}}",
     sortRecent: "सबसे नया",
-    sortValue: "सबसे ज़्यादा कीमत",
+    sortValue: "वैल्यू",
     sortName: "नाम",
     emptySession: "इस सेशन में अभी तक कोई कार्ड स्कैन नहीं हुआ।",
     movedToBinder_one: "{{count}} एंट्री बाइंडर में डाली गई।",

@@ -461,7 +461,7 @@ export default {
     retailTotal: "소매가 {{total}}",
     buylistTotal: "매입가 {{total}}",
     sortRecent: "최근",
-    sortValue: "높은 가치순",
+    sortValue: "가치",
     sortName: "이름",
     emptySession: "이번 세션에서 스캔한 카드가 아직 없습니다.",
     movedToBinder_other: "항목 {{count}}개를 이동했습니다.",

@@ -1,14 +1,18 @@
 import { useMemo, useRef, useState } from "react"
-import { FlatList, Linking, ScrollView, TouchableOpacity, View } from "react-native"
-import type { ImageStyle, ViewStyle } from "react-native"
+import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
+import type { ViewStyle } from "react-native"
 import * as Clipboard from "expo-clipboard"
 
 import { Button } from "@/components/Button"
-import { CardImage } from "@/components/CardImage"
 import { DialogCard } from "@/components/DialogCard"
+import { $floatingNavigationClearance } from "@/components/FloatingAppNavigation"
 import { SegmentedControl } from "@/components/SegmentedControl"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
+import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
+import { searchCardNames } from "@/features/decks/cardNameMatch"
 import { CardScanner, type ScannedPrintingPayload } from "@/features/decks/CardScanner"
 import { useCardNameIndex } from "@/features/decks/useCardNameIndex"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -17,10 +21,10 @@ import { translate, translateForStorage } from "@/i18n/translate"
 import { catalogDb } from "@/storage/catalogDb"
 import { localCardDb } from "@/storage/localDb"
 import { useAppTheme } from "@/theme/context"
-import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
 import { normalizePrintingName, useCatalogSync, valueCollectionEntries } from "./catalogSync"
+import { CollectionEntryRow } from "./CollectionEntryRow"
 import { exportCollectionCsv, importCollectionText } from "./collectionImportExport"
 import {
   addCollectionCard,
@@ -37,7 +41,6 @@ import {
 } from "./collectionStore"
 import { PrintingPickerSheet } from "./PrintingPickerSheet"
 import { ScanSessionView } from "./ScanSessionView"
-import { cardKingdomCardUrl, tcgplayerCardUrl } from "./storeLinks"
 import { TradeCalculatorModal } from "./TradeCalculatorModal"
 import type { CardCondition, CardFinish } from "../../../convex/lib/cardPricing"
 import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
@@ -71,6 +74,7 @@ export function CollectionShelf({
   const [editingEntry, setEditingEntry] = useState<StoredCollectionEntry>()
   const [addCardOpen, setAddCardOpen] = useState(false)
   const [addCardQuery, setAddCardQuery] = useState("")
+  const [addCardName, setAddCardName] = useState<string>()
 
   // why: the shelf stays mounted under the scanner and session view; following each scan's revision re-listed and re-valued the whole collection behind them.
   const scanOpen = Boolean(scanningSession || activeScanSession)
@@ -79,7 +83,11 @@ export function CollectionShelf({
   const revision = scanOpen ? shelfRevision : liveRevision
 
   const activeScanGame = scanningSession?.game ?? game
-  const nameIndex = useCardNameIndex(activeScanGame, deviceId, Boolean(scanningSession))
+  const nameIndex = useCardNameIndex(
+    activeScanGame,
+    deviceId,
+    Boolean(scanningSession) || addCardOpen,
+  )
 
   const binders = useMemo(() => {
     void revision
@@ -158,12 +166,36 @@ export function CollectionShelf({
     return summaryById
   }, [mode, allValued, scanSessionIds])
 
-  const quickAddMatches = useMemo(() => {
+  const addCardNames = useMemo(
+    () =>
+      nameIndex && addCardQuery.trim().length >= 2
+        ? searchCardNames(nameIndex, addCardQuery, ADD_CARD_LIMIT)
+        : [],
+    [nameIndex, addCardQuery],
+  )
+
+  const addCardPrintings = useMemo(() => {
     void sync.version
-    const norm = normalizePrintingName(addCardQuery)
-    if (norm.length < 2) return []
-    return catalogDb.findPrintingsByName(game, norm).slice(0, 8)
-  }, [addCardQuery, game, sync.version])
+    return addCardName
+      ? catalogDb.findPrintingsByName(game, normalizePrintingName(addCardName))
+      : []
+  }, [addCardName, game, sync.version])
+
+  function closeAddCard() {
+    setAddCardOpen(false)
+    setAddCardQuery("")
+    setAddCardName(undefined)
+  }
+
+  function finishScanning(session: StoredBinder) {
+    scanEntryIdByScanId.current.clear()
+    setScanningSession(undefined)
+    if (listCollectionEntries({ binderId: session.id }).length === 0) {
+      deleteBinderKeepingCards(session.id)
+    } else {
+      setActiveScanSession(session)
+    }
+  }
 
   function startNewScanSession() {
     const session = createBinder({
@@ -270,55 +302,59 @@ export function CollectionShelf({
   if (mode === "scans") {
     return (
       <View style={$flex1}>
-        <View style={themed($headerActions)}>
-          <Button
-            testID="new-scan-session-button"
-            preset="primary"
-            tx="decks:collection.newScanSession"
-            onPress={startNewScanSession}
-          />
-          <Button
-            testID="scans-trade-button"
-            tx="decks:collection.trade"
-            onPress={() => setTradeOpen(true)}
-          />
-        </View>
         <FlatList
           testID="scan-sessions-list"
           data={scanSessions}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={themed($listContent)}
+          contentContainerStyle={themed($floatingNavigationClearance)}
+          ListHeaderComponent={
+            <View style={themed([$header, $actions])}>
+              <Button
+                testID="new-scan-session-button"
+                preset="primary"
+                tx="decks:collection.newScanSession"
+                style={$compactButton}
+                onPress={startNewScanSession}
+              />
+              <Button
+                testID="scans-trade-button"
+                tx="decks:collection.trade"
+                style={$compactButton}
+                onPress={() => setTradeOpen(true)}
+              />
+            </View>
+          }
           ListEmptyComponent={
             <View style={themed($empty)}>
-              <Text
-                size="sm"
-                style={{ color: theme.colors.textDim }}
-                tx="decks:collection.emptyScans"
-              />
+              <Text size="sm" tone="dim" tx="decks:collection.emptyScans" />
             </View>
           }
           renderItem={({ item }) => {
             const summary = scanSessionSummaries.get(item.id) ?? { count: 0, retailCents: 0 }
             return (
-              <TouchableOpacity
-                testID={`scan-session-row-${item.id}`}
-                accessibilityRole="button"
-                style={themed($rowCard)}
-                onPress={() => setActiveScanSession(item)}
-              >
-                <View style={$flex1}>
-                  <Text weight="medium" text={item.name} />
+              <View style={themed($row)}>
+                <TouchableOpacity
+                  testID={`scan-session-row-${item.id}`}
+                  accessibilityRole="button"
+                  style={themed($rowLead)}
+                  onPress={() => setActiveScanSession(item)}
+                >
+                  <Text size="sm" weight="medium" numberOfLines={1} text={item.name} />
                   <Text
-                    size="xs"
-                    style={{ color: theme.colors.textDim }}
+                    size="meta"
+                    tone="dim"
+                    numberOfLines={1}
                     text={joinParts([
                       translate("decks:cardCount", { count: summary.count }),
                       formatCurrency(summary.retailCents, "USD"),
                     ])}
                   />
-                </View>
-                <Button tx="decks:collection.scanMore" onPress={() => setScanningSession(item)} />
-              </TouchableOpacity>
+                </TouchableOpacity>
+                <TextAction
+                  tx="decks:collection.scanMore"
+                  onPress={() => setScanningSession(item)}
+                />
+              </View>
             )
           }}
         />
@@ -347,12 +383,7 @@ export function CollectionShelf({
             }
             sessionTotalCents={scanningTotalCents}
             initialSetLock={scanningSession.defaultSetCode}
-            onClose={() => {
-              scanEntryIdByScanId.current.clear()
-              const finished = scanningSession
-              setScanningSession(undefined)
-              setActiveScanSession(finished)
-            }}
+            onClose={() => finishScanning(scanningSession)}
           />
         ) : null}
         <TradeCalculatorModal visible={tradeOpen} game={game} onClose={() => setTradeOpen(false)} />
@@ -362,223 +393,120 @@ export function CollectionShelf({
 
   return (
     <View style={$flex1}>
-      <View style={themed($summaryBox)}>
-        <View style={$summaryHeader}>
-          <View style={$flex1}>
-            <Text weight="bold" text={translate("decks:cardCount", { count: totals.cards })} />
-            <Text
-              size="xs"
-              style={{ color: theme.colors.textDim }}
-              text={joinParts([
-                translate("decks:collection.retailTotal", {
-                  total: formatCurrency(totals.retailCents, "USD"),
-                }),
-                totals.buylistCents > 0
-                  ? translate("decks:collection.buylistTotal", {
-                      total: formatCurrency(totals.buylistCents, "USD"),
-                    })
-                  : "",
-                sync.syncing ? translate("decks:collection.syncingPrices") : "",
-              ])}
-            />
-          </View>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={$chipRow}
-        >
-          <Button
-            testID="collection-scan-button"
-            preset="primary"
-            tx="decks:collection.newScanSession"
-            onPress={startNewScanSession}
-          />
-          <Button
-            testID="collection-add-card-button"
-            tx="decks:collection.addCard"
-            onPress={() => setAddCardOpen(true)}
-          />
-          <Button
-            testID="collection-trade-button"
-            tx="decks:collection.trade"
-            onPress={() => setTradeOpen(true)}
-          />
-          <Button
-            testID="collection-import-button"
-            tx="decks:collection.importExport"
-            onPress={() => {
-              setImportMessage(undefined)
-              setImportOpen(true)
-            }}
-          />
-          <Button
-            testID="collection-new-binder-button"
-            tx="decks:collection.newBinder"
-            onPress={() => setNewBinderOpen(true)}
-          />
-        </ScrollView>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={$chipRow}
-        >
-          <TouchableOpacity
-            testID="binder-filter-all"
-            accessibilityRole="button"
-            style={[themed($binderChip), activeBinderId === "all" && themed($binderChipSelected)]}
-            onPress={() => setSelectedBinderId("all")}
-          >
-            <Text size="xs" weight="medium" tx="decks:collection.allCards" />
-          </TouchableOpacity>
-          {binders.map((binder) => (
-            <TouchableOpacity
-              key={binder.id}
-              testID={`binder-filter-${binder.id}`}
-              accessibilityRole="button"
-              style={[
-                themed($binderChip),
-                activeBinderId === binder.id && themed($binderChipSelected),
-              ]}
-              onPress={() => setSelectedBinderId(binder.id)}
-            >
-              <Text size="xs" weight="medium" text={binder.name} />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <TextField
-          testID="collection-search-input"
-          value={search}
-          onChangeText={setSearch}
-          placeholderTx="decks:collection.searchCards"
-          autoCorrect={false}
-          clearable
-        />
-        <SegmentedControl
-          segments={[
-            { id: "value", label: translate("decks:collection.sortValue") },
-            { id: "name", label: translate("decks:collection.sortName") },
-            { id: "recent", label: translate("decks:collection.sortRecent") },
-          ]}
-          selectedId={sort}
-          onSelect={(id) => setSort(id as SortMode)}
-        />
-      </View>
-
       <FlatList
         testID="collection-entries-list"
         data={pricedEntries}
         // why: the default 21-screen window rendered every row of a 1,000-card collection within seconds of opening, and opening the scanner re-rendered them all.
         windowSize={5}
         keyExtractor={(item) => item.entry.id}
-        contentContainerStyle={themed($listContent)}
-        ListEmptyComponent={
-          <View style={themed($empty)}>
-            <Text
-              size="sm"
-              style={{ color: theme.colors.textDim }}
-              tx="decks:collection.emptyCollection"
+        contentContainerStyle={themed($floatingNavigationClearance)}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ListHeaderComponent={
+          <View style={themed($header)}>
+            <View>
+              <Text weight="bold" text={translate("decks:cardCount", { count: totals.cards })} />
+              <Text
+                size="meta"
+                tone="dim"
+                text={joinParts([
+                  translate("decks:collection.retailTotal", {
+                    total: formatCurrency(totals.retailCents, "USD"),
+                  }),
+                  totals.buylistCents > 0
+                    ? translate("decks:collection.buylistTotal", {
+                        total: formatCurrency(totals.buylistCents, "USD"),
+                      })
+                    : "",
+                  sync.syncing ? translate("decks:collection.syncingPrices") : "",
+                ])}
+              />
+            </View>
+            <View style={themed($actions)}>
+              <Button
+                testID="collection-scan-button"
+                preset="primary"
+                tx="decks:collection.newScanSession"
+                style={$compactButton}
+                onPress={startNewScanSession}
+              />
+              <Button
+                testID="collection-add-card-button"
+                tx="decks:collection.addCard"
+                style={$compactButton}
+                onPress={() => setAddCardOpen(true)}
+              />
+              <Button
+                testID="collection-trade-button"
+                tx="decks:collection.trade"
+                style={$compactButton}
+                onPress={() => setTradeOpen(true)}
+              />
+              <Button
+                testID="collection-import-button"
+                tx="decks:collection.importExport"
+                style={$compactButton}
+                onPress={() => {
+                  setImportMessage(undefined)
+                  setImportOpen(true)
+                }}
+              />
+            </View>
+            <Tabs
+              testID="binder-filter"
+              accessibilityLabel={translate("decks:collection.binders")}
+              tabs={[
+                { id: "all", label: translate("decks:collection.allCards") },
+                ...binders.map((binder) => ({ id: binder.id, label: binder.name })),
+              ]}
+              selectedId={activeBinderId}
+              onSelect={setSelectedBinderId}
+              trailing={
+                <TextAction
+                  testID="collection-new-binder-button"
+                  tx="decks:collection.newBinder"
+                  onPress={() => setNewBinderOpen(true)}
+                />
+              }
+            />
+            <TextField
+              testID="collection-search-input"
+              value={search}
+              onChangeText={setSearch}
+              placeholderTx="decks:collection.searchCards"
+              autoCorrect={false}
+              clearable
+            />
+            <SegmentedControl
+              segments={[
+                { id: "value", label: translate("decks:collection.sortValue") },
+                { id: "name", label: translate("decks:collection.sortName") },
+                { id: "recent", label: translate("decks:collection.sortRecent") },
+              ]}
+              selectedId={sort}
+              onSelect={(id) => setSort(id as SortMode)}
             />
           </View>
         }
-        renderItem={({ item: { entry, retailCents, buylistCents } }) => (
-          <View style={themed($rowCard)}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={$cardLead}
-              onPress={() => setEditingEntry(entry)}
-            >
-              <CardImage
-                game={entry.game}
-                source={entry.smallImageUrl ?? entry.imageUrl}
-                compact
-                style={$thumb}
-                accessibilityLabel={entry.name}
-              />
-              <View style={$flex1}>
-                <Text weight="medium" numberOfLines={1} text={entry.name} />
-                <Text
-                  size="xs"
-                  style={{ color: theme.colors.textDim }}
-                  text={joinParts([
-                    entry.setCode.toUpperCase(),
-                    entry.collectorNumber ? `#${entry.collectorNumber}` : "",
-                    entry.finish,
-                    entry.condition,
-                  ])}
-                />
-                <Text
-                  size="xs"
-                  style={{ color: theme.colors.textDim }}
-                  text={joinParts([
-                    retailCents > 0 ? formatCurrency(retailCents * entry.quantity, "USD") : "",
-                    buylistCents > 0
-                      ? translate("decks:cardScan.buylistShort", {
-                          value: formatCurrency(buylistCents * entry.quantity, "USD"),
-                        })
-                      : "",
-                  ])}
-                />
-              </View>
-            </TouchableOpacity>
-            <View style={$rowActions}>
-              <View style={$qtyRow}>
-                <Button
-                  text="−"
-                  onPress={() => updateCollectionEntry(entry.id, { quantity: entry.quantity - 1 })}
-                />
-                <Text weight="medium" text={entry.quantity} />
-                <Button
-                  text="+"
-                  onPress={() => updateCollectionEntry(entry.id, { quantity: entry.quantity + 1 })}
-                />
-              </View>
-              <View style={$linkRow}>
-                <TouchableOpacity
-                  accessibilityRole="link"
-                  onPress={() => {
-                    const printing = catalogDb.getPrinting(entry.game, entry.printingId)
-                    void Linking.openURL(
-                      tcgplayerCardUrl({
-                        name: entry.name,
-                        setCode: entry.setCode,
-                        tcgplayerId: printing?.tcgplayerId,
-                      }),
-                    )
-                  }}
-                >
-                  <Text
-                    size="xs"
-                    style={{ color: theme.colors.tint }}
-                    tx="decks:collection.tcgplayer"
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  accessibilityRole="link"
-                  onPress={() =>
-                    void Linking.openURL(
-                      cardKingdomCardUrl({ name: entry.name }, { buylist: true }),
-                    )
-                  }
-                >
-                  <Text
-                    size="xs"
-                    style={{ color: theme.colors.tint }}
-                    tx="decks:collection.cardKingdomBuylist"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
+        ListEmptyComponent={
+          <View style={themed($empty)}>
+            <Text size="sm" tone="dim" tx="decks:collection.emptyCollection" />
           </View>
+        }
+        renderItem={({ item: { entry, retailCents, buylistCents } }) => (
+          <CollectionEntryRow
+            entry={entry}
+            retailCents={retailCents * entry.quantity}
+            buylistCents={buylistCents * entry.quantity}
+            onEdit={() => setEditingEntry(entry)}
+          />
         )}
         ListFooterComponent={
           activeBinderId !== "all" ? (
             <Button
               testID="delete-binder-button"
               tx="decks:collection.deleteBinder"
+              style={themed($deleteBinder)}
               onPress={() => {
                 deleteBinderKeepingCards(activeBinderId)
                 setSelectedBinderId("all")
@@ -670,44 +598,77 @@ export function CollectionShelf({
       {addCardOpen ? (
         <DialogCard
           visible
-          onClose={() => setAddCardOpen(false)}
+          onClose={closeAddCard}
           backdropAccessibilityLabel={translate("common:close")}
         >
           <Text preset="subheading" tx="decks:collection.addCard" />
           <TextField
             testID="collection-add-card-input"
             value={addCardQuery}
-            onChangeText={setAddCardQuery}
+            onChangeText={(query) => {
+              setAddCardQuery(query)
+              setAddCardName(undefined)
+            }}
             placeholderTx="decks:collection.searchCatalogPlaceholder"
             autoCorrect={false}
           />
-          <View style={$dialogButtons}>
-            {quickAddMatches.map((printing) => (
-              <Button
-                key={printing.printingId}
-                text={joinParts([
-                  printing.name,
-                  printing.setCode.toUpperCase(),
-                  `#${printing.collectorNumber}`,
-                ])}
-                onPress={() => {
-                  addCollectionCard({
-                    game,
-                    cardId: printing.cardId,
-                    printingId: printing.printingId,
-                    name: printing.name,
-                    setCode: printing.setCode,
-                    collectorNumber: printing.collectorNumber,
-                    binderId: activeBinderId === "all" ? undefined : activeBinderId,
-                    imageUrl: printing.imageUrl,
-                    smallImageUrl: printing.smallImageUrl,
-                  })
-                  setAddCardQuery("")
-                  setAddCardOpen(false)
-                }}
-              />
-            ))}
-          </View>
+          {addCardName ? <Text size="sm" weight="medium" text={addCardName} /> : null}
+          <ScrollView
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed($sheetScrollContent)}
+            keyboardShouldPersistTaps="handled"
+          >
+            {addCardName ? (
+              addCardPrintings.length ? (
+                addCardPrintings.map((printing) => (
+                  <TouchableOpacity
+                    key={printing.printingId}
+                    accessibilityRole="button"
+                    style={themed($pickRow)}
+                    onPress={() => {
+                      addCollectionCard({
+                        game,
+                        cardId: printing.cardId,
+                        printingId: printing.printingId,
+                        name: printing.name,
+                        setCode: printing.setCode,
+                        collectorNumber: printing.collectorNumber,
+                        binderId: activeBinderId === "all" ? undefined : activeBinderId,
+                        imageUrl: printing.imageUrl,
+                        smallImageUrl: printing.smallImageUrl,
+                      })
+                      closeAddCard()
+                    }}
+                  >
+                    <Text
+                      size="sm"
+                      numberOfLines={1}
+                      text={joinParts([
+                        printing.setCode.toUpperCase(),
+                        `#${printing.collectorNumber}`,
+                        printing.setName ?? "",
+                      ])}
+                    />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text size="sm" tone="dim" tx="decks:collection.noPrintings" />
+              )
+            ) : addCardNames.length ? (
+              addCardNames.map((name) => (
+                <TouchableOpacity
+                  key={name}
+                  accessibilityRole="button"
+                  style={themed($pickRow)}
+                  onPress={() => setAddCardName(name)}
+                >
+                  <Text size="sm" weight="medium" numberOfLines={1} text={name} />
+                </TouchableOpacity>
+              ))
+            ) : nameIndex && addCardQuery.trim().length >= 2 ? (
+              <Text size="sm" tone="dim" tx="decks:cardSearch.noResults" />
+            ) : null}
+          </ScrollView>
         </DialogCard>
       ) : null}
 
@@ -753,12 +714,7 @@ export function CollectionShelf({
             handleUpdateScannedPrinting(scanningSession, scanId, update)
           }
           sessionTotalCents={scanningTotalCents}
-          onClose={() => {
-            scanEntryIdByScanId.current.clear()
-            const finished = scanningSession
-            setScanningSession(undefined)
-            setActiveScanSession(finished)
-          }}
+          onClose={() => finishScanning(scanningSession)}
         />
       ) : null}
 
@@ -780,49 +736,44 @@ export function CollectionShelf({
   )
 }
 
+const ADD_CARD_LIMIT = 8
+
 const $flex1: ViewStyle = { flex: 1 }
-const $summaryBox: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xs,
-  paddingBottom: spacing.sm,
+const $header: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.sm,
+  paddingBottom: spacing.xs,
 })
-const $summaryHeader: ViewStyle = { flexDirection: "row", alignItems: "center" }
-const $headerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
+  flexWrap: "wrap",
   gap: spacing.xs,
-  paddingBottom: spacing.sm,
 })
-const $chipRow: ViewStyle = { flexDirection: "row", gap: 8 }
-const $binderChip: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  paddingHorizontal: spacing.sm,
-  paddingVertical: spacing.xs,
-  borderRadius: radius.full,
-  backgroundColor: colors.background,
-  borderWidth: 1,
-  borderColor: colors.separator,
-})
-const $binderChipSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderColor: colors.tint,
-})
-const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xs,
-  paddingBottom: spacing.lg,
-})
+const $compactButton: ViewStyle = { minHeight: 44 }
 const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xl,
   alignItems: "center",
 })
-const $rowCard: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $row: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  minHeight: 66,
   flexDirection: "row",
   alignItems: "center",
-  gap: spacing.sm,
-  padding: spacing.sm,
-  borderRadius: radius.md,
-  backgroundColor: colors.background,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
 })
-const $cardLead: ViewStyle = { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }
-const $thumb: ImageStyle = { width: 40, height: 56 }
-const $rowActions: ViewStyle = { alignItems: "flex-end", gap: 6 }
-const $qtyRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 6 }
-const $linkRow: ViewStyle = { flexDirection: "row", gap: 10 }
+const $rowLead: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  gap: spacing.xxxs,
+  paddingVertical: spacing.sm,
+})
+const $deleteBinder: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  marginTop: spacing.md,
+})
+const $pickRow: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  minHeight: 44,
+  justifyContent: "center",
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
 const $multiline: ViewStyle = { minHeight: 100 }
 const $dialogButtons: ViewStyle = { gap: 8 }
