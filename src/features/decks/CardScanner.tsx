@@ -164,6 +164,18 @@ function statusText(status: ScanStatus) {
   return translate(`decks:cardScan.${status}`)
 }
 
+// why: the slot is a direct child of the full-size overlay, so the frame's rect is already in camera-view coordinates.
+function frameIn(slot: LayoutRectangle): LayoutRectangle {
+  const width = Math.min(slot.width * 0.72, (slot.height * 63) / 88)
+  const height = (width * 88) / 63
+  return {
+    x: slot.x + (slot.width - width) / 2,
+    y: slot.y + (slot.height - height) / 2,
+    width,
+    height,
+  }
+}
+
 function cardLabel(card: CardNameMatch) {
   return card.printedName ? `${card.printedName} (${card.name})` : card.name
 }
@@ -965,130 +977,257 @@ export function CardScanner({
                 }, 0)
               }}
             />
-            {showPrereleaseHud && !reviewing ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={$hudScroll}
-                contentContainerStyle={$hudRow}
-              >
+            <View style={$overlay} pointerEvents="box-none">
+              {landCount ? (
+                <View style={$readout}>
+                  <View style={$readoutText}>
+                    <Text
+                      weight="medium"
+                      numberOfLines={1}
+                      style={$onCamera}
+                      text={cardLabel(landCount.card)}
+                    />
+                    <Text size="xs" style={$onCameraDim} tx="decks:cardScan.howMany" />
+                  </View>
+                </View>
+              ) : last ? (
                 <TouchableOpacity
-                  testID="card-scan-torch"
-                  hitSlop={HUD_HIT_SLOP}
+                  testID="card-scan-review"
                   accessibilityRole="button"
-                  style={[$hudPill, torch && { backgroundColor: theme.colors.tint }]}
-                  onPress={() => setTorch((on) => !on)}
+                  accessibilityLabel={translate("decks:cardScan.review")}
+                  style={$readout}
+                  onPress={() => setReviewing(true)}
                 >
-                  <Text size="xs" weight="medium" style={$hudText} tx="decks:cardScan.torch" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID="card-scan-mode"
-                  hitSlop={HUD_HIT_SLOP}
-                  accessibilityRole="button"
-                  style={[$hudPill, scanMode === "bulk" && { backgroundColor: theme.colors.tint }]}
-                  onPress={() => setScanMode((mode) => (mode === "handheld" ? "bulk" : "handheld"))}
-                >
-                  <Text
-                    size="xs"
-                    weight="medium"
-                    style={$hudText}
-                    tx={scanMode === "bulk" ? "decks:cardScan.bulk" : "decks:cardScan.handheld"}
+                  <CardImage
+                    game={game}
+                    source={last.imageUrl}
+                    compact
+                    style={$readoutImage}
+                    accessibilityLabel={last.name}
                   />
+                  <View style={$readoutText}>
+                    <Text
+                      weight="medium"
+                      numberOfLines={1}
+                      style={$onCamera}
+                      text={cardLabel(last)}
+                    />
+                    {lastDetails ? (
+                      <Text size="xs" style={{ color: theme.colors.tint }} text={lastDetails} />
+                    ) : null}
+                    <Text size="xs" style={$onCameraDim} text={addedSummary} />
+                  </View>
                 </TouchableOpacity>
-                {scanMode === "bulk" ? (
+              ) : (
+                <View style={$readout}>
+                  <Text
+                    size="sm"
+                    style={[$onCameraDim, $readoutText]}
+                    tx={onScanPrinting ? "decks:collection.emptySession" : "decks:cardScan.empty"}
+                  />
+                </View>
+              )}
+              <Text size="sm" numberOfLines={2} style={$hint} text={statusText(status)} />
+              <View
+                testID="card-scan-frame-slot"
+                style={$frameSlot}
+                pointerEvents="none"
+                onLayout={(event) => setFrame(frameIn(event.nativeEvent.layout))}
+              >
+                {frame ? (
+                  <View style={[$frame, { width: frame.width, height: frame.height }]} />
+                ) : null}
+              </View>
+              <View style={$actions}>
+                {landCount ? (
+                  <>
+                    <Button
+                      text="−"
+                      accessibilityLabel={translate("decks:cardRow.decrease", {
+                        card: landCount.card.name,
+                      })}
+                      disabled={landCount.count <= landCount.inDeck}
+                      onPress={() => setLandCount({ ...landCount, count: landCount.count - 1 })}
+                    />
+                    <Text
+                      weight="medium"
+                      testID="card-scan-land-count"
+                      style={$landCount}
+                      text={landCount.count}
+                    />
+                    <Button
+                      text="+"
+                      accessibilityLabel={translate("decks:cardRow.increase", {
+                        card: landCount.card.name,
+                      })}
+                      onPress={() => setLandCount({ ...landCount, count: landCount.count + 1 })}
+                    />
+                    <Button
+                      testID="card-scan-add-lands"
+                      style={$action}
+                      tx={
+                        landCount.count > landCount.inDeck
+                          ? "decks:cardScan.addLands"
+                          : "common:close"
+                      }
+                      onPress={() => addLands(landCount)}
+                    />
+                  </>
+                ) : last ? (
+                  <>
+                    {showPrereleaseHud && (onUpdatePrinting || last.state !== "added") ? (
+                      <Button
+                        testID="card-scan-printing"
+                        style={$action}
+                        tx="decks:cardScan.changePrinting"
+                        onPress={() => setPickingPrinting(last)}
+                      />
+                    ) : null}
+                    {removeCard ? (
+                      <Button
+                        testID="card-scan-wrong"
+                        style={$action}
+                        tx="decks:cardScan.wrongCard"
+                        onPress={() => setFixing(last)}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+              </View>
+              {showPrereleaseHud ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={$hudScroll}
+                  contentContainerStyle={$hudRow}
+                >
                   <TouchableOpacity
-                    testID="card-scan-next-copy"
+                    testID="card-scan-torch"
                     hitSlop={HUD_HIT_SLOP}
                     accessibilityRole="button"
-                    style={$hudPill}
-                    onPress={() => {
-                      candidateName.current = undefined
-                      nameInFrame.current = undefined
-                      printingInFrame.current = undefined
-                      recentVotes.current = []
-                      setStatus("looking")
-                    }}
+                    style={[$hudPill, torch && { backgroundColor: theme.colors.tint }]}
+                    onPress={() => setTorch((on) => !on)}
                   >
-                    <Text size="xs" weight="medium" style={$hudText} tx="decks:cardScan.nextCopy" />
+                    <Text size="xs" weight="medium" style={$onCamera} tx="decks:cardScan.torch" />
                   </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity
-                  testID="card-scan-finish"
-                  hitSlop={HUD_HIT_SLOP}
-                  accessibilityRole="button"
-                  style={[$hudPill, finish !== "nonfoil" && { backgroundColor: theme.colors.tint }]}
-                  onPress={() => {
-                    const next =
-                      FINISH_CYCLE[(FINISH_CYCLE.indexOf(finish) + 1) % FINISH_CYCLE.length]
-                    setFinish(next)
-                    setFinishLocked(next !== "nonfoil")
-                  }}
-                >
-                  <Text
-                    size="xs"
-                    weight="medium"
-                    style={$hudText}
-                    tx={`decks:cardScan.finish.${finish}`}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID="card-scan-condition"
-                  hitSlop={HUD_HIT_SLOP}
-                  accessibilityRole="button"
-                  style={[$hudPill, condition !== "NM" && { backgroundColor: theme.colors.tint }]}
-                  onPress={() =>
-                    setCondition(
-                      CONDITION_CYCLE[
-                        (CONDITION_CYCLE.indexOf(condition) + 1) % CONDITION_CYCLE.length
-                      ],
-                    )
-                  }
-                >
-                  <Text
-                    size="xs"
-                    weight="medium"
-                    style={$hudText}
-                    tx={`decks:cardScan.condition.${condition}`}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID="card-scan-set-lock"
-                  hitSlop={HUD_HIT_SLOP}
-                  accessibilityRole="button"
-                  style={[$hudPill, Boolean(setLock) && { backgroundColor: theme.colors.tint }]}
-                  onPress={() => {
-                    setSetLockDraft(setLock)
-                    setSetLockOpen(true)
-                  }}
-                >
-                  <Text
-                    size="xs"
-                    weight="medium"
-                    style={$hudText}
-                    text={
-                      setLock
-                        ? `${translate("decks:cardScan.setLock")}: ${setLock}`
-                        : translate("decks:cardScan.setLockAny")
+                  <TouchableOpacity
+                    testID="card-scan-mode"
+                    hitSlop={HUD_HIT_SLOP}
+                    accessibilityRole="button"
+                    style={[
+                      $hudPill,
+                      scanMode === "bulk" && { backgroundColor: theme.colors.tint },
+                    ]}
+                    onPress={() =>
+                      setScanMode((mode) => (mode === "handheld" ? "bulk" : "handheld"))
                     }
-                  />
-                </TouchableOpacity>
-                {sessionTotalCents !== undefined ? (
-                  <View style={$hudPill}>
+                  >
                     <Text
                       size="xs"
                       weight="medium"
-                      style={$hudText}
-                      text={translate("decks:cardScan.sessionTotal", {
-                        total: formatCurrency(sessionTotalCents, "USD"),
-                      })}
+                      style={$onCamera}
+                      tx={scanMode === "bulk" ? "decks:cardScan.bulk" : "decks:cardScan.handheld"}
                     />
-                  </View>
-                ) : null}
-              </ScrollView>
-            ) : null}
-            <View style={$overlay} pointerEvents="none">
-              <View style={$frame} onLayout={(event) => setFrame(event.nativeEvent.layout)} />
-              <Text size="sm" style={$hint} text={statusText(status)} />
+                  </TouchableOpacity>
+                  {scanMode === "bulk" ? (
+                    <TouchableOpacity
+                      testID="card-scan-next-copy"
+                      hitSlop={HUD_HIT_SLOP}
+                      accessibilityRole="button"
+                      style={$hudPill}
+                      onPress={() => {
+                        candidateName.current = undefined
+                        nameInFrame.current = undefined
+                        printingInFrame.current = undefined
+                        recentVotes.current = []
+                        setStatus("looking")
+                      }}
+                    >
+                      <Text
+                        size="xs"
+                        weight="medium"
+                        style={$onCamera}
+                        tx="decks:cardScan.nextCopy"
+                      />
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity
+                    testID="card-scan-finish"
+                    hitSlop={HUD_HIT_SLOP}
+                    accessibilityRole="button"
+                    style={[
+                      $hudPill,
+                      finish !== "nonfoil" && { backgroundColor: theme.colors.tint },
+                    ]}
+                    onPress={() => {
+                      const next =
+                        FINISH_CYCLE[(FINISH_CYCLE.indexOf(finish) + 1) % FINISH_CYCLE.length]
+                      setFinish(next)
+                      setFinishLocked(next !== "nonfoil")
+                    }}
+                  >
+                    <Text
+                      size="xs"
+                      weight="medium"
+                      style={$onCamera}
+                      tx={`decks:cardScan.finish.${finish}`}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="card-scan-condition"
+                    hitSlop={HUD_HIT_SLOP}
+                    accessibilityRole="button"
+                    style={[$hudPill, condition !== "NM" && { backgroundColor: theme.colors.tint }]}
+                    onPress={() =>
+                      setCondition(
+                        CONDITION_CYCLE[
+                          (CONDITION_CYCLE.indexOf(condition) + 1) % CONDITION_CYCLE.length
+                        ],
+                      )
+                    }
+                  >
+                    <Text
+                      size="xs"
+                      weight="medium"
+                      style={$onCamera}
+                      tx={`decks:cardScan.condition.${condition}`}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="card-scan-set-lock"
+                    hitSlop={HUD_HIT_SLOP}
+                    accessibilityRole="button"
+                    style={[$hudPill, Boolean(setLock) && { backgroundColor: theme.colors.tint }]}
+                    onPress={() => {
+                      setSetLockDraft(setLock)
+                      setSetLockOpen(true)
+                    }}
+                  >
+                    <Text
+                      size="xs"
+                      weight="medium"
+                      style={$onCamera}
+                      text={
+                        setLock
+                          ? `${translate("decks:cardScan.setLock")}: ${setLock}`
+                          : translate("decks:cardScan.setLockAny")
+                      }
+                    />
+                  </TouchableOpacity>
+                  {sessionTotalCents !== undefined ? (
+                    <View style={$hudPill}>
+                      <Text
+                        size="xs"
+                        weight="medium"
+                        style={$onCamera}
+                        text={translate("decks:cardScan.sessionTotal", {
+                          total: formatCurrency(sessionTotalCents, "USD"),
+                        })}
+                      />
+                    </View>
+                  ) : null}
+                </ScrollView>
+              ) : null}
             </View>
             {showStats && lastPhoto ? <CardScanStats photo={lastPhoto} /> : null}
             {reviewing ? (
@@ -1131,90 +1270,7 @@ export function CardScanner({
             ) : null}
           </View>
         )}
-        {permission?.granted ? (
-          <View style={themed($added)}>
-            {landCount ? (
-              <>
-                <View style={$addedName}>
-                  <Text weight="medium" numberOfLines={1} text={cardLabel(landCount.card)} />
-                  <Text
-                    size="xs"
-                    style={{ color: theme.colors.textDim }}
-                    tx="decks:cardScan.howMany"
-                  />
-                </View>
-                <Button
-                  text="−"
-                  accessibilityLabel={translate("decks:cardRow.decrease", {
-                    card: landCount.card.name,
-                  })}
-                  disabled={landCount.count <= landCount.inDeck}
-                  onPress={() => setLandCount({ ...landCount, count: landCount.count - 1 })}
-                />
-                <Text weight="medium" testID="card-scan-land-count" text={landCount.count} />
-                <Button
-                  text="+"
-                  accessibilityLabel={translate("decks:cardRow.increase", {
-                    card: landCount.card.name,
-                  })}
-                  onPress={() => setLandCount({ ...landCount, count: landCount.count + 1 })}
-                />
-                <Button
-                  testID="card-scan-add-lands"
-                  tx={
-                    landCount.count > landCount.inDeck ? "decks:cardScan.addLands" : "common:close"
-                  }
-                  onPress={() => addLands(landCount)}
-                />
-              </>
-            ) : last ? (
-              <>
-                <TouchableOpacity
-                  testID="card-scan-review"
-                  accessibilityRole="button"
-                  accessibilityLabel={translate("decks:cardScan.review")}
-                  style={$addedCard}
-                  onPress={() => setReviewing(true)}
-                >
-                  <CardImage
-                    game={game}
-                    source={last.imageUrl}
-                    compact
-                    style={$addedImage}
-                    accessibilityLabel={last.name}
-                  />
-                  <View style={$addedName}>
-                    <Text weight="medium" numberOfLines={2} text={cardLabel(last)} />
-                    {lastDetails ? (
-                      <Text size="xs" style={{ color: theme.colors.tint }} text={lastDetails} />
-                    ) : null}
-                    <Text size="xs" style={{ color: theme.colors.textDim }} text={addedSummary} />
-                  </View>
-                </TouchableOpacity>
-                {showPrereleaseHud && (onUpdatePrinting || last.state !== "added") ? (
-                  <Button
-                    testID="card-scan-printing"
-                    tx="decks:cardScan.changePrinting"
-                    onPress={() => setPickingPrinting(last)}
-                  />
-                ) : null}
-                {removeCard ? (
-                  <Button
-                    testID="card-scan-wrong"
-                    tx="decks:cardScan.wrongCard"
-                    onPress={() => setFixing(last)}
-                  />
-                ) : null}
-              </>
-            ) : (
-              <Text
-                size="sm"
-                style={{ color: theme.colors.textDim }}
-                tx={onScanPrinting ? "decks:collection.emptySession" : "decks:cardScan.empty"}
-              />
-            )}
-          </View>
-        ) : permission ? (
+        {permission && !permission.granted ? (
           <BottomActionBar>
             <Button
               preset="primary"
@@ -1380,55 +1436,61 @@ export function CardScanner({
 const $screen: ViewStyle = { flex: 1 }
 // why: the pills draw 33 pt tall, so the slop and the row's matching padding make each target 45 pt.
 const HUD_HIT_SLOP = { top: 6, bottom: 6, left: 4, right: 4 }
-const $hudScroll: ViewStyle = {
-  position: "absolute",
-  top: 4,
-  start: 0,
-  end: 0,
-  zIndex: 5,
-}
+const $hudScroll: ViewStyle = { flexGrow: 0 }
 const $hudRow: ViewStyle = {
   flexDirection: "row",
   gap: 8,
   paddingHorizontal: 12,
   paddingVertical: 6,
 }
+// why: a dark translucent backing keeps white text readable over any live camera feed.
+const CAMERA_BACKING = "rgba(0,0,0,0.62)"
 const $hudPill: ViewStyle = {
-  backgroundColor: "rgba(0,0,0,0.62)",
+  backgroundColor: CAMERA_BACKING,
   paddingHorizontal: 10,
   paddingVertical: 6,
   borderRadius: radius.full,
 }
-const $hudText: TextStyle = { color: "#FFFFFF" }
-const $overlay: ViewStyle = {
-  ...StyleSheet.absoluteFill,
+const $onCamera: TextStyle = { color: "#FFFFFF" }
+const $onCameraDim: TextStyle = { color: "rgba(255,255,255,0.72)" }
+const $overlay: ViewStyle = { ...StyleSheet.absoluteFill, paddingTop: 8, gap: 8 }
+const $readout: ViewStyle = {
+  flexDirection: "row",
   alignItems: "center",
-  justifyContent: "center",
-  gap: 16,
+  gap: 8,
+  minHeight: 80,
+  marginHorizontal: 12,
+  padding: 8,
+  borderRadius: radius.lg,
+  backgroundColor: CAMERA_BACKING,
 }
-const $frame: ViewStyle = {
-  width: "72%",
-  aspectRatio: 63 / 88,
-  borderWidth: 2,
-  borderColor: "#FFFFFF",
-  borderRadius: radius.xl,
-}
+const $readoutImage: ImageStyle = { width: 46, height: 64 }
+const $readoutText: ViewStyle = { flex: 1 }
 const $hint: TextStyle = { color: "#FFFFFF", textAlign: "center", paddingHorizontal: 24 }
+const $frameSlot: ViewStyle = { flex: 1, alignItems: "center", justifyContent: "center" }
+const $frame: ViewStyle = { borderWidth: 2, borderColor: "#FFFFFF", borderRadius: radius.xl }
+const $actions: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+  minHeight: 56,
+  paddingHorizontal: 12,
+}
+const $action: ViewStyle = { flex: 1 }
+const $landCount: TextStyle = {
+  ...$onCamera,
+  minWidth: 40,
+  paddingVertical: 8,
+  borderRadius: radius.lg,
+  overflow: "hidden",
+  textAlign: "center",
+  backgroundColor: CAMERA_BACKING,
+}
 const $permission: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   paddingVertical: spacing.lg,
   paddingHorizontal: spacing.md,
 })
-const $added: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  minHeight: 88,
-  paddingHorizontal: spacing.md,
-  paddingVertical: spacing.sm,
-})
-const $addedImage: ImageStyle = { width: 46, height: 64 }
-const $addedCard: ViewStyle = { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }
 const $review: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   backgroundColor: colors.background,
   padding: spacing.md,

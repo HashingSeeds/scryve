@@ -12,8 +12,10 @@ import { scanHaptic, type CardPhotoText } from "../../../modules/card-text-reade
 
 let mockOnText: ((event: { nativeEvent: CardPhotoText }) => void) | undefined
 let mockQueueText: typeof mockOnText
+let mockGuide: unknown
 jest.mock("../../../modules/card-text-reader", () => ({
-  CardTextCamera: (props: { onText: NonNullable<typeof mockOnText> }) => {
+  CardTextCamera: (props: { onText: NonNullable<typeof mockOnText>; guide?: unknown }) => {
+    mockGuide = props.guide
     mockQueueText = props.onText
     mockOnText = (event) => {
       const faked = "clock" in setTimeout
@@ -108,6 +110,17 @@ function slowAdds() {
 async function finish(view: ReturnType<typeof render>) {
   await act(async () => fireEvent.press(view.getByText("Done")))
 }
+
+test("a short slot shrinks the frame to a full card and guides the camera in view coordinates", () => {
+  const { view } = renderScanner({ singleton: false })
+  const layout = { x: 0, y: 100, width: 320, height: 280 }
+  fireEvent(view.getByTestId("card-scan-frame-slot"), "layout", {
+    nativeEvent: { layout },
+    persist: () => undefined,
+  })
+  const width = (280 * 63) / 88
+  expect(mockGuide).toEqual({ x: (320 - width) / 2, y: 100, width, height: 280 })
+})
 
 test("skips a card the Commander deck already holds and says so", async () => {
   const { view, addCards } = renderScanner({ singleton: true, inDeck: { "Sol Ring": 1 } })
