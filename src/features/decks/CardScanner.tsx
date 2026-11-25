@@ -1454,7 +1454,7 @@ export function CardScanner({
 const $screen: ViewStyle = { flex: 1 }
 // why: the pills draw 33 pt tall, so the slop and the row's matching padding make each target 45 pt.
 const HUD_HIT_SLOP = { top: 6, bottom: 6, left: 4, right: 4 }
-const $hudScroll: ViewStyle = { flexGrow: 0 }
+const $hudScroll: ViewStyle = { flexGrow: 0, flexShrink: 0 }
 const $hudRow: ViewStyle = {
   flexDirection: "row",
   gap: 8,
