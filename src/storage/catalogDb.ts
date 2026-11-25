@@ -196,7 +196,7 @@ export function resetCatalogDbConnection() {
   }
 }
 
-export const catalogDb: CatalogDb = {
+const nativeCatalogDb: CatalogDb = {
   getMeta(key) {
     const row = openCatalogNativeDb().getFirstSync<{ value: string }>(
       "SELECT value FROM catalog_meta WHERE key = ?",
@@ -513,4 +513,21 @@ export const catalogDb: CatalogDb = {
       db.runSync("DELETE FROM local_cards")
     })
   },
+}
+
+let importQueue: Promise<unknown> = Promise.resolve()
+
+/** why: expo-sqlite answers a failed BEGIN with ROLLBACK, so imports overlapping on this one connection would undo each other's open transaction. */
+function queued<T>(run: () => Promise<T>): Promise<T> {
+  const next = importQueue.then(run, run)
+  importQueue = next.catch(() => {})
+  return next
+}
+
+export const catalogDb: CatalogDb = {
+  ...nativeCatalogDb,
+  replacePrintingsAsync: (...args) => queued(() => nativeCatalogDb.replacePrintingsAsync(...args)),
+  replacePricesAsync: (...args) => queued(() => nativeCatalogDb.replacePricesAsync(...args)),
+  replaceLocalCardsAsync: (...args) =>
+    queued(() => nativeCatalogDb.replaceLocalCardsAsync(...args)),
 }

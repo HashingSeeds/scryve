@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { catalogDb } from "@/storage/catalogDb"
 import type { LocalCardRow } from "@/storage/catalogDbTypes"
 
+import { normalizeRuleNumber } from "./comprehensiveRules"
 import { RULES_TEXT_IN_APP } from "./gameRules"
 import {
   decodeLocalCard,
@@ -103,9 +104,8 @@ export function useLocalCardSearch(game: string, query: string): LocalCard[] {
   }, [game])
   return useMemo(() => {
     const key = textSearchKey(query)
-    if (!RULES_TEXT_IN_APP || !isLocalCardGame(game) || key.length < 2 || /^\d/.test(key)) {
-      return []
-    }
+    const ruleNumber = normalizeRuleNumber(query.trim().toLowerCase())
+    if (!RULES_TEXT_IN_APP || !isLocalCardGame(game) || key.length < 2 || ruleNumber) return []
     return catalogDb.searchLocalCards(game, key, SEARCH_LIMIT)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- why: a finished refresh has new rows to read for the same query.
   }, [game, query, refreshed])
