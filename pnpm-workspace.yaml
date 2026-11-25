@@ -27,6 +27,7 @@ patchedDependencies:
   # screen icon of every install on the default icon. The patch keeps 8.0.0's launcher layout, reads the
   # current icon from component state, and switches it once the app is in the background, since
   # disabling the component the app launched from closes it.
+  # Drop it once pchalupa/expo-alternate-app-icons#278 ships an update path for 8.0.0 installs (#1121).
   expo-alternate-app-icons@11.0.0: patches/expo-alternate-app-icons@11.0.0.patch
   # react-native-mmkv 4.3.2's Jest mock clears its map before walking the keys it cleared, so
   # clearAll() never notifies value listeners under Jest. Native MMKV does.
