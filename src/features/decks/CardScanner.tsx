@@ -1493,7 +1493,7 @@ const $actions: ViewStyle = {
   gap: 8,
   minHeight: 56,
 }
-const $action: ViewStyle = { paddingHorizontal: 24 }
+const $action: ViewStyle = { flexShrink: 1, paddingHorizontal: 24 }
 const $landCount: TextStyle = {
   ...$onCamera,
   minWidth: 40,
