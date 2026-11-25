@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react"
-import { FlatList, Pressable, View } from "react-native"
+import { FlatList, Keyboard, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
+import type { ImageStyle } from "expo-image"
 import { useFocusEffect } from "expo-router"
 import { GestureDetector } from "react-native-gesture-handler"
 import { useKeyboardState } from "react-native-keyboard-controller"
@@ -13,6 +14,8 @@ import Animated, {
 } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { CardImage } from "@/components/CardImage"
 import { Header, HeaderBack } from "@/components/Header"
 import { Icon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
@@ -20,6 +23,7 @@ import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import type { BackAction } from "@/features/game/useBackToBoard"
 import {
   adjacentSections,
@@ -36,6 +40,7 @@ import {
   type RuleSection,
 } from "@/features/rules/comprehensiveRules"
 import { RULES_TEXT_IN_APP, type TextRules } from "@/features/rules/gameRules"
+import { useLocalCardSearch } from "@/features/rules/localCards"
 import { recentRules, rememberRule } from "@/features/rules/recentRules"
 import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { useRulesSearchAnalytics } from "@/features/rules/useRulesSearchAnalytics"
@@ -46,6 +51,8 @@ import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { openUrl } from "@/utils/openUrl"
 import { useReducedMotion } from "@/utils/useReducedMotion"
+
+import type { LocalCard } from "../../convex/lib/localCards"
 
 const TABS_COLLAPSE_MS = 180
 const TABS_FALLBACK_HEIGHT = 44
@@ -60,6 +67,7 @@ type Row =
   | { kind: "section"; key: string; section: RuleSection }
   | { kind: "recent"; key: string; id: string; title: string }
   | { kind: "term"; key: string; entry: GlossaryEntry }
+  | { kind: "card"; key: string; card: LocalCard }
   | { kind: "result"; key: string; rule: Rule; matched?: ReadonlySet<string>; partial?: string }
   | { kind: "rule"; key: string; rule: Rule; target: boolean }
   | { kind: "all"; key: string; section: RuleSection }
@@ -106,14 +114,30 @@ function homeRows(
     query,
     open,
     recent,
-  }: { tab: Tab; query: string; open: ReadonlySet<string>; recent: string[] },
+    cards,
+  }: {
+    tab: Tab
+    query: string
+    open: ReadonlySet<string>
+    recent: string[]
+    cards: readonly LocalCard[]
+  },
 ): Row[] {
-  if (query.trim())
-    return searchRules(rules, query).map((result): Row =>
+  if (query.trim()) {
+    const found = searchRules(rules, query).map((result): Row =>
       result.kind === "term"
         ? { kind: "term", key: `term-${result.entry.term}`, entry: result.entry }
         : { ...result, kind: "result", key: result.rule.id },
     )
+    const first = found[0]
+    // why: "mill" means the keyword action, not Millstone, so an exact glossary term stays above the cards.
+    const after =
+      first?.kind === "term" && first.entry.term.toLowerCase() === query.trim().toLowerCase()
+        ? 1
+        : 0
+    const cardRows = cards.map((card): Row => ({ kind: "card", key: `card-${card.cardId}`, card }))
+    return [...found.slice(0, after), ...cardRows, ...found.slice(after)]
+  }
   if (tab === "glossary")
     return rules.glossary.map((entry) => ({ kind: "term", key: entry.term, entry }))
   if (tab === "recent")
@@ -161,6 +185,11 @@ export function RulesScreen({
   )
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
   const [peek, setPeek] = useState<Peek>()
+  const [card, setCard] = useState<LocalCard>()
+  const cardSheet = useSheetPresence(card)
+  const shownCard = cardSheet.shown
+  const pendingRule = useRef<string | undefined>(undefined)
+  const cards = useLocalCardSearch(system, ruleId ? "" : query)
   useFocusEffect(useCallback(() => setRecent(recentRules(source.cacheKey)), [source.cacheKey]))
   const rows = useMemo(
     () =>
@@ -168,8 +197,8 @@ export function RulesScreen({
         ? []
         : ruleId
           ? readerRows(rules, ruleId)
-          : homeRows(rules, { tab, query, open, recent }),
-    [rules, ruleId, tab, query, open, recent],
+          : homeRows(rules, { tab, query, open, recent, cards }),
+    [rules, ruleId, tab, query, open, recent, cards],
   )
   const targetIndex = rows.findIndex((row) => row.kind === "rule" && row.target)
   const list = useRef<FlatList<Row>>(null)
@@ -202,7 +231,13 @@ export function RulesScreen({
   const home = !ruleId
   const searching = home && Boolean(query.trim())
   const searchResults = rows.flatMap((row) =>
-    row.kind === "result" ? [row.rule.id] : row.kind === "term" ? ["glossary"] : [],
+    row.kind === "result"
+      ? [row.rule.id]
+      : row.kind === "term"
+        ? ["glossary"]
+        : row.kind === "card"
+          ? ["card"]
+          : [],
   )
   const searchOpened = useRulesSearchAnalytics(
     system,
@@ -313,6 +348,34 @@ export function RulesScreen({
           <View style={themed($entry)}>{body}</View>
         )
       }
+      case "card":
+        return (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              searchOpened(index + 1, "card")
+              Keyboard.dismiss()
+              setCard(item.card)
+            }}
+            style={({ pressed }) => [themed($cardRow), pressed && $pressed]}
+            testID={`rules-card-${item.card.cardId}`}
+          >
+            <CardImage
+              game={system}
+              cardId={item.card.cardId}
+              source={item.card.smallImageUrl ?? item.card.imageUrl}
+              compact
+              style={$thumbnail}
+              accessibilityLabel={item.card.name}
+            />
+            <View style={$flex}>
+              <Text size="sm" weight="medium" numberOfLines={1} text={item.card.name} />
+              {item.card.typeLine ? (
+                <Text size="xs" tone="dim" numberOfLines={1} text={item.card.typeLine} />
+              ) : null}
+            </View>
+          </Pressable>
+        )
       case "result": {
         // why: a search lists up to 50 results, so each excerpt is built only when its row renders.
         const context = rules && ruleContext(rules, item.rule.id)
@@ -569,6 +632,34 @@ export function RulesScreen({
     />
   ) : null
 
+  const cardDialog = shownCard ? (
+    <CardFocusDialog
+      card={{
+        game: system,
+        cardId: shownCard.cardId,
+        name: shownCard.name,
+        imageUrl: shownCard.imageUrl,
+        smallImageUrl: shownCard.smallImageUrl,
+        quantity: 0,
+        boardLabel: "",
+      }}
+      details={shownCard}
+      showQuantity={false}
+      visible={cardSheet.visible}
+      onClose={() => setCard(undefined)}
+      onDismissed={() => {
+        cardSheet.onDismissed()
+        const rule = pendingRule.current
+        pendingRule.current = undefined
+        if (rule) onOpenRule(rule)
+      }}
+      onOpenRule={(id) => {
+        pendingRule.current = id
+        setCard(undefined)
+      }}
+    />
+  ) : null
+
   if (sheet) {
     return (
       <View style={$flex}>
@@ -578,6 +669,7 @@ export function RulesScreen({
             {listNode}
           </>
         )}
+        {cardDialog}
       </View>
     )
   }
@@ -604,6 +696,7 @@ export function RulesScreen({
           {listNode}
         </>
       )}
+      {cardDialog}
     </Screen>
   )
 }
@@ -724,6 +817,7 @@ const $gutter: TextStyle = { width: 60, paddingTop: 2, fontVariant: ["tabular-nu
 const $caretOpen = { transform: [{ rotate: "90deg" }] }
 const $active: TextStyle = { textDecorationLine: "underline" }
 const $pressed: ViewStyle = { opacity: 0.7 }
+const $thumbnail: ImageStyle = { width: 32, aspectRatio: 488 / 680 }
 const $tabsClip: ViewStyle = { overflow: "hidden" }
 const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
@@ -760,6 +854,12 @@ const $recentRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.xs,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
+})
+const $cardRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  paddingVertical: spacing.xs,
 })
 const $entry: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,

@@ -1,3 +1,4 @@
+import type { LocalCard } from "./localCards"
 import { type CardReference, normalizeScryfallCard, objectRecord } from "./scryfall"
 import { LEGALITY_FORMATS } from "./systems"
 
@@ -126,14 +127,39 @@ function faceDetailsWithoutOracleText(faceDetails: string): string {
   )
 }
 
-export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
+function deckCard(value: unknown) {
   const raw = objectRecord(value)
   if (!raw) return null
   if (typeof raw.layout === "string" && NON_DECK_LAYOUTS.has(raw.layout)) return null
   if (raw.set_type === "memorabilia" || outsidePaperDecks(raw)) return null
-
   const card = normalizeScryfallCard(raw)
-  if (!card) return null
+  return card && { raw, card }
+}
+
+/** why: the rules sheet shows a card's full text offline, which the deck search file leaves out to stay small. */
+export function magicLocalCard(value: unknown): LocalCard | null {
+  const found = deckCard(value)
+  if (!found) return null
+  const { raw, card } = found
+  return {
+    cardId: card.scryfallId,
+    name: card.name,
+    ...(typeof raw.edhrec_rank === "number" ? { rank: raw.edhrec_rank } : {}),
+    imageUrl: card.imageUrl,
+    smallImageUrl: card.smallImageUrl,
+    manaCost: card.manaCost,
+    typeLine: card.typeLine,
+    oracleText: card.oracleText,
+    faceDetails: card.faceDetails,
+    keywords: card.keywords,
+    colorIdentity: card.colorIdentity,
+  }
+}
+
+export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
+  const found = deckCard(value)
+  if (!found) return null
+  const { raw, card } = found
   const {
     oracleText,
     commanderRulesUpdatedAt: _commanderRulesUpdatedAt,

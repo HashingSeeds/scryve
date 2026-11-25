@@ -117,4 +117,42 @@ describe("local catalog SQLite database", () => {
     expect(batch.get("sol-cmm-412")).toHaveLength(2)
     expect(batch.get("missing")).toBeUndefined()
   })
+
+  it("finds offline cards by exact name, then name prefix, then word start, more played first", async () => {
+    const row = (cardId: string, nameKey: string, rank?: number) => ({
+      cardId,
+      nameKey,
+      rank,
+      json: JSON.stringify({ cardId, name: nameKey }),
+    })
+    await catalogDb.replaceLocalCardsAsync(
+      "mtg",
+      [
+        row("bolt-bend", "lightning bolt", 2),
+        row("helix", "lightning helix", 1),
+        row("lightning", "lightning"),
+        row("ball", "ball lightning", 0),
+        row("glint", "glint hawk"),
+      ],
+      "v1",
+    )
+
+    const names = (key: string) =>
+      catalogDb.searchLocalCards("mtg", key, 5).map((card) => card.name)
+    expect(names("lightning")).toEqual([
+      "lightning",
+      "lightning helix",
+      "lightning bolt",
+      "ball lightning",
+    ])
+    expect(names("light")).toEqual([
+      "lightning helix",
+      "lightning bolt",
+      "lightning",
+      "ball lightning",
+    ])
+    expect(names("ight")).toEqual([])
+    expect(catalogDb.searchLocalCards("pokemon", "light", 5)).toEqual([])
+    expect(catalogDb.getMeta("localCards:mtg:version")).toBe("v1")
+  })
 })

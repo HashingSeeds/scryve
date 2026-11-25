@@ -1,3 +1,5 @@
+import type { LocalCard } from "../../convex/lib/localCards"
+
 export interface CatalogPrinting {
   game: string
   printingId: string
@@ -25,6 +27,14 @@ export interface CatalogPrice {
   updatedAt: string
 }
 
+/** why: the card stays the file's own JSON line, so a weekly import never re-encodes 30k cards. */
+export interface LocalCardRow {
+  cardId: string
+  nameKey: string
+  rank?: number
+  json: string
+}
+
 export interface CatalogDb {
   getMeta(key: string): string | undefined
   setMeta(key: string, value: string): void
@@ -48,5 +58,11 @@ export interface CatalogDb {
   getPricesBatch(game: string, printingIds: readonly string[]): Map<string, CatalogPrice[]>
   hasPrintings(game: string): boolean
   hasPrices(game: string): boolean
+  replaceLocalCardsAsync(
+    game: string,
+    rows: readonly LocalCardRow[],
+    version: string,
+  ): Promise<void>
+  searchLocalCards(game: string, nameKey: string, limit: number): LocalCard[]
   clearAll(): void
 }

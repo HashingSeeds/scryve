@@ -146,6 +146,10 @@ export const catalogDb: CatalogDb = {
     return false
   },
 
+  // why: web never shows the rules sheet (RULES_TEXT_IN_APP), so it keeps no offline cards.
+  async replaceLocalCardsAsync() {},
+  searchLocalCards: () => [],
+
   clearAll() {
     metaMap.clear()
     printingsByKey.clear()

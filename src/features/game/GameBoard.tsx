@@ -18,6 +18,7 @@ import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { gameRules, openRules } from "@/features/rules/gameRules"
+import { prefetchLocalCards } from "@/features/rules/localCards"
 import { prefetchRules } from "@/features/rules/rulesSource"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -109,6 +110,9 @@ export function useBoardChrome({
   useEffect(() => {
     if (rules?.kind === "text") prefetchRules(rules)
   }, [rules])
+  useEffect(() => {
+    if (system) prefetchLocalCards(system)
+  }, [system])
   const hasRules = Boolean(rules && (rules.kind === "link" || onRules))
   const playerCount = teams?.length ?? players.length
   const canPickLayout = getPlayerGridLayoutOptions(playerCount).length > 1 || Boolean(layout.seats)

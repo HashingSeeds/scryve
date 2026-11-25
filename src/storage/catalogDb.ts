@@ -2,12 +2,14 @@ import { Paths } from "expo-file-system"
 import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite"
 
 import type { CatalogDb, CatalogPrice, CatalogPrinting } from "./catalogDbTypes"
+import type { LocalCard } from "../../convex/lib/localCards"
 
 const CATALOG_DB_NAME = "scryve-catalog.db"
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 const ASYNC_IMPORT_BATCH_SIZE = 2000
 const PRINTING_MULTI_INSERT_ROWS = 70
 const PRICE_MULTI_INSERT_ROWS = 110
+const LOCAL_CARD_MULTI_INSERT_ROWS = 200
 
 let cachedDb: SQLiteDatabase | undefined
 
@@ -70,8 +72,25 @@ function openCatalogNativeDb(): SQLiteDatabase {
           PRIMARY KEY (game, printing_id, finish, source)
         );
         DROP INDEX IF EXISTS idx_prices_printing;
+        CREATE TABLE IF NOT EXISTS local_cards (
+          game TEXT NOT NULL,
+          card_id TEXT NOT NULL,
+          name_key TEXT NOT NULL,
+          rank INTEGER,
+          json TEXT NOT NULL,
+          PRIMARY KEY (game, card_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_local_cards_name ON local_cards (game, name_key);
         DROP TABLE IF EXISTS printings_staging;
         DROP TABLE IF EXISTS prices_staging;
+        DROP TABLE IF EXISTS local_cards_staging;
+        CREATE TABLE local_cards_staging (
+          game TEXT NOT NULL,
+          card_id TEXT NOT NULL,
+          name_key TEXT NOT NULL,
+          rank INTEGER,
+          json TEXT NOT NULL
+        );
         CREATE TABLE printings_staging (
           game TEXT NOT NULL,
           printing_id TEXT NOT NULL,
@@ -436,12 +455,62 @@ export const catalogDb: CatalogDb = {
     )
   },
 
+  async replaceLocalCardsAsync(game, rows, version) {
+    const db = openCatalogNativeDb()
+    await db.runAsync("DELETE FROM local_cards_staging WHERE game = ?", [game])
+    for (let offset = 0; offset < rows.length; offset += ASYNC_IMPORT_BATCH_SIZE) {
+      const chunk = rows.slice(offset, offset + ASYNC_IMPORT_BATCH_SIZE)
+      await db.withTransactionAsync(async () => {
+        for (let i = 0; i < chunk.length; i += LOCAL_CARD_MULTI_INSERT_ROWS) {
+          const slice = chunk.slice(i, i + LOCAL_CARD_MULTI_INSERT_ROWS)
+          await db.runAsync(
+            `INSERT INTO local_cards_staging (game, card_id, name_key, rank, json) VALUES ${slice
+              .map(() => "(?,?,?,?,?)")
+              .join(",")}`,
+            slice.flatMap((row) => [game, row.cardId, row.nameKey, row.rank ?? null, row.json]),
+          )
+        }
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    db.withTransactionSync(() => {
+      db.runSync("DELETE FROM local_cards WHERE game = ?", [game])
+      db.runSync(
+        "INSERT OR REPLACE INTO local_cards SELECT * FROM local_cards_staging WHERE game = ?",
+        [game],
+      )
+      db.runSync("DELETE FROM local_cards_staging WHERE game = ?", [game])
+      db.runSync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
+        `localCards:${game}:version`,
+        version,
+      ])
+    })
+    try {
+      db.execSync("PRAGMA wal_checkpoint(TRUNCATE);")
+    } catch {}
+  },
+
+  searchLocalCards(game, nameKey, limit) {
+    // why: name keys are ASCII, so U+FFFF sorts after every name that starts with the key.
+    const end = `${nameKey}\uffff`
+    return openCatalogNativeDb()
+      .getAllSync<{ json: string }>(
+        `SELECT json FROM local_cards
+          WHERE game = ? AND ((name_key >= ? AND name_key < ?) OR instr(' ' || name_key, ?) > 0)
+          ORDER BY name_key = ? DESC, (name_key >= ? AND name_key < ?) DESC, rank IS NULL, rank, name_key
+          LIMIT ?`,
+        [game, nameKey, end, ` ${nameKey}`, nameKey, nameKey, end, limit],
+      )
+      .map((row): LocalCard => JSON.parse(row.json))
+  },
+
   clearAll() {
     const db = openCatalogNativeDb()
     db.withTransactionSync(() => {
       db.runSync("DELETE FROM catalog_meta")
       db.runSync("DELETE FROM printings")
       db.runSync("DELETE FROM prices")
+      db.runSync("DELETE FROM local_cards")
     })
   },
 }
