@@ -34,7 +34,6 @@ export function LibraryTabs({
   decksSystem?: string
   cardsGame?: string
 }) {
-  // why: the bar swaps tabs in place instead of pushing routes, so back still leaves for the board and each tab keeps its search and scroll.
   const [tab, setTab] = useState(initial)
   const [opened, setOpened] = useState<ReadonlySet<AppTab>>(() => new Set([initial]))
   const account = useAccountEntry()
@@ -72,7 +71,6 @@ export function LibraryTabs({
       <AppTabBar
         tab={tab}
         onSelect={(next) => {
-          // why: the shelf's game filter picked the game for Cards when Cards was its own screen, so the first visit still follows it.
           if (next === "cards" && !opened.has("cards") && isPlaySystemId(shelfSystem.current))
             setCardsSystem(shelfSystem.current)
           setOpened((current) => (current.has(next) ? current : new Set([...current, next])))

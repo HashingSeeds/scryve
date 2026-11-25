@@ -965,19 +965,38 @@ export function CardSearch({
     () => new Set(collectionEntries?.map(({ entry }) => entry.name)),
     [collectionEntries],
   )
-  const ownedMatches = useMemo(
-    () =>
-      needle
-        ? collectionEntries?.filter(({ entry }) => entry.name.toLocaleLowerCase().includes(needle))
-        : collectionEntries,
-    [collectionEntries, needle],
-  )
+  const filtersOwned = pickedFilters > 0 || colorFilters.length > 0
+  const ownedItems = useMemo(() => {
+    const matches =
+      needle || filtersOwned
+        ? collectionEntries?.filter(({ entry }) => {
+            if (!entry.name.toLocaleLowerCase().includes(needle)) return false
+            if (!filtersOwned) return true
+            const known = magicCards?.byName.get(entry.name)
+            return (
+              known !== undefined &&
+              matchesCardFilters(SCRYFALL_SOURCE, known, cardFilters, picked) &&
+              matchesColors(known.colorIdentity, colorFilters, colorMatch)
+            )
+          })
+        : collectionEntries
+    return matches?.map((owned) => ({ kind: "owned" as const, owned }))
+  }, [
+    collectionEntries,
+    needle,
+    filtersOwned,
+    magicCards,
+    cardFilters,
+    picked,
+    colorFilters,
+    colorMatch,
+  ])
   const shownCards = collection
     ? catalogResults?.filter((card) => !ownedNames.has(card.name))
     : catalogResults
   const listData: readonly ResultItem[] = collection
     ? [
-        ...(ownedMatches ?? []).map((owned) => ({ kind: "owned" as const, owned })),
+        ...(ownedItems ?? []),
         ...(shownCards?.length ? [{ kind: "catalog" as const }, ...shownCards] : []),
       ]
     : (shownCards ?? NO_RESULTS)
@@ -1436,7 +1455,7 @@ export function CardSearch({
           }}
           ListFooterComponent={
             <ResultSlot edge="below">
-              {!busy && catalogResults?.length === 0 ? (
+              {!busy && catalogResults?.length === 0 && !ownedItems?.length ? (
                 <>
                   <Text tx="decks:cardSearch.noResults" />
                   {onOpenRules && text.length >= 2 ? (

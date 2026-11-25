@@ -1,5 +1,6 @@
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { parseMagicCards, type MagicCards } from "@/features/decks/localMagicSearch"
 import { catalogDb } from "@/storage/catalogDb"
 import { localCardDb } from "@/storage/localDb"
 import { ThemeProvider } from "@/theme/context"
@@ -16,9 +17,10 @@ import {
 import { TradeCalculatorModal } from "./TradeCalculatorModal"
 
 const mockAction = jest.fn()
+const mockConvex = { action: mockAction, query: jest.fn().mockResolvedValue([]) }
 jest.mock("convex/react", () => ({
-  useConvex: () => ({ action: mockAction, query: jest.fn().mockResolvedValue([]) }),
-  useAction: () => jest.fn(),
+  useConvex: () => mockConvex,
+  useAction: () => mockAction,
   useConvexConnectionState: () => ({ isWebSocketConnected: true }),
 }))
 jest.mock("@legendapp/list/react-native", () =>
@@ -28,6 +30,8 @@ jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn(async () => true),
 }))
 jest.mock("@/features/decks/useCardNameIndex", () => ({ useCardNameIndex: () => undefined }))
+let mockMagicCards: MagicCards | undefined
+jest.mock("@/features/decks/useMagicCards", () => ({ useMagicCards: () => mockMagicCards }))
 jest.mock("@/features/decks/CardScanner", () => {
   const { Pressable } = jest.requireActual("react-native")
   return {
@@ -65,6 +69,7 @@ function choose(view: ReturnType<typeof renderCards>, action: string) {
 }
 
 beforeEach(() => {
+  mockMagicCards = undefined
   clear()
   mockAction.mockReset()
   catalogDb.clearAll()
@@ -151,6 +156,55 @@ it("lists owned matches first and adds a catalog card to the open binder", async
   } finally {
     jest.useRealTimers()
   }
+})
+
+it("counts an owned match as a result when the catalog has none", async () => {
+  addCollectionCard({ ...solRing, cardId: "name:sol ring", printingId: "scan:sol ring" })
+  mockAction.mockResolvedValue([])
+  jest.useFakeTimers()
+  try {
+    const view = renderCards()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "sol")
+    await act(async () => jest.advanceTimersByTime(400))
+
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+    expect(view.queryByText("No cards found.")).toBeNull()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+it("narrows owned cards to the picked filters", async () => {
+  mockMagicCards = parseMagicCards(
+    JSON.stringify({
+      version: "1",
+      cards: [
+        { name: "Lightning Bolt", scryfallId: "bolt", colorIdentity: "R", typeLine: "Instant" },
+        { name: "Sol Ring", scryfallId: "sol", colorIdentity: "", typeLine: "Artifact" },
+      ],
+    }),
+  )
+  addCollectionCard(solRing)
+  addCollectionCard({
+    ...solRing,
+    cardId: "ora-bolt",
+    printingId: "lea-161",
+    name: "Lightning Bolt",
+    setCode: "lea",
+    collectorNumber: "161",
+  })
+  mockAction.mockResolvedValue([])
+  const view = renderCards()
+  expect(view.getByText("Sol Ring")).toBeTruthy()
+
+  choose(view, "filters")
+  await act(async () => {})
+  fireEvent.press(view.getByTestId("card-color-R"))
+  fireEvent.press(view.getByText("Done"))
+  await act(async () => {})
+
+  expect(view.getByText("Lightning Bolt")).toBeTruthy()
+  expect(view.queryByText("Sol Ring")).toBeNull()
 })
 
 it("drops a scan session closed with no cards and opens one that kept cards", () => {

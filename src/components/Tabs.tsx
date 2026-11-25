@@ -31,7 +31,6 @@ export function Tabs<Id extends string>({
   accessibilityLabel?: string
   testID?: string
   trailing?: ReactNode
-  // why: a list of tabs that grows with the player's data, such as binders, would wrap into rows that push the content off screen.
   scrolls?: boolean
 }) {
   const { themed } = useAppTheme()
@@ -76,6 +75,7 @@ export function Tabs<Id extends string>({
       {...scrollProps}
       horizontal
       showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={$scrollContent}
     >
       {bar}

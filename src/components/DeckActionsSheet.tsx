@@ -50,17 +50,18 @@ export function DeckActionsSheet({
               style={themed($row)}
               onPress={onPress}
             >
-              <View style={$labelRow}>
+              <View style={themed($labelRow)}>
                 <Text
                   weight="medium"
                   tone={blocked ? "dim" : undefined}
-                  style={
+                  style={[
+                    $label,
                     destructive && !blocked
                       ? themed($destructive)
                       : selected
                         ? { color: theme.colors.tint }
-                        : undefined
-                  }
+                        : undefined,
+                  ]}
                   text={label}
                 />
                 {selected ? <Icon icon="check" size={18} color={theme.colors.tint} /> : null}
@@ -80,9 +81,11 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
   paddingVertical: spacing.sm,
 })
-const $labelRow: ViewStyle = {
+const $labelRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
-}
+  gap: spacing.sm,
+})
+const $label: TextStyle = { flexShrink: 1 }
 const $destructive: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })

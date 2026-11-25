@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import type { ViewStyle } from "react-native"
-import { Pressable, StyleSheet, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { useKeyboardState } from "react-native-keyboard-controller"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -13,6 +13,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { AppUtilityItems, type AppUtilityActions } from "./AppUtilityMenu"
 import { Icon, type IconTypes } from "./Icon"
 import { Sheet } from "./Sheet"
+import { $sheetScroll, $sheetScrollContent } from "./sheetStyles"
 import { Text } from "./Text"
 
 export type AppTab = "decks" | "cards"
@@ -83,13 +84,18 @@ export function AppTabBar({
           action?.()
         }}
       >
-        <AppUtilityItems
-          {...utility}
-          choose={(action) => {
-            pending.current = action
-            setMoreOpen(false)
-          }}
-        />
+        <ScrollView
+          style={themed($sheetScroll)}
+          contentContainerStyle={themed($sheetScrollContent)}
+        >
+          <AppUtilityItems
+            {...utility}
+            choose={(action) => {
+              pending.current = action
+              setMoreOpen(false)
+            }}
+          />
+        </ScrollView>
       </Sheet>
     </>
   )
