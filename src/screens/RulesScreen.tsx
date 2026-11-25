@@ -386,7 +386,7 @@ export function RulesScreen({
               cardId={item.card.cardId}
               source={item.card.smallImageUrl ?? item.card.imageUrl}
               compact
-              style={[themed($thumbnail), { height: resultText }]}
+              style={[themed($thumbnail), { height: resultText - 2 * theme.spacing.xs }]}
               accessibilityLabel={item.card.name}
             />
             <View style={$flex}>
