@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { ComponentProps } from "react"
 import { FlatList, Modal, TouchableOpacity, View } from "react-native"
-import type { ViewStyle } from "react-native"
+import type { ListRenderItem, ViewStyle } from "react-native"
 
 import { Button } from "@/components/Button"
-import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { searchCardNames } from "@/features/decks/cardNameMatch"
 import { CardScanner, type ScannedPrintingPayload } from "@/features/decks/CardScanner"
 import { useCardNameIndex } from "@/features/decks/useCardNameIndex"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -51,6 +51,8 @@ interface TradeItem {
 }
 
 type TradeItemDraft = Omit<TradeItem, "key" | "quantity">
+type CatalogPrinting = ReturnType<typeof catalogDb.findPrintingsByName>[number]
+const NAME_SUGGESTIONS = 8
 type PrintingUpdate = Parameters<
   NonNullable<ComponentProps<typeof CardScanner>["onUpdatePrinting"]>
 >[1]
@@ -97,7 +99,7 @@ export function TradeCalculatorModal({
   const [editingItem, setEditingItem] = useState<{ side: TradeSide; item: TradeItem }>()
   const [committedMessage, setCommittedMessage] = useState<string>()
   const [tradeError, setTradeError] = useState<string>()
-  const nameIndex = useCardNameIndex(game, deviceId, Boolean(scanningSide))
+  const nameIndex = useCardNameIndex(game, deviceId, visible)
   // why: the scanner refines a card by its scan ID after adding it, so remember which row each scan landed in.
   const scanItemKeys = useRef(new Map<number, string>())
 
@@ -112,11 +114,15 @@ export function TradeCalculatorModal({
     scanItemKeys.current.clear()
   }, [game])
 
-  const quickResults = useMemo(() => {
-    const trimmed = normalizePrintingName(search)
-    if (trimmed.length < 2) return []
-    return catalogDb.findPrintingsByName(game, trimmed).slice(0, 6)
-  }, [game, search])
+  // why: an exact name lists its printings; anything else suggests names, and tapping one fills it in.
+  const searchResults = useMemo(() => {
+    const key = normalizePrintingName(search)
+    if (key.length < 2) return undefined
+    const printings = catalogDb.findPrintingsByName(game, key)
+    if (printings.length) return { printings, names: [] }
+    const names = nameIndex ? searchCardNames(nameIndex, search, NAME_SUGGESTIONS) : []
+    return { printings, names }
+  }, [game, nameIndex, search])
 
   const giveTotal = useMemo(
     () => giveItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0),
@@ -256,6 +262,60 @@ export function TradeCalculatorModal({
 
   const activeItems = side === "give" ? giveItems : receiveItems
 
+  const renderPrinting: ListRenderItem<CatalogPrinting> = ({ item: printing }) => {
+    const rowFinish: CardFinish =
+      printing.finishes.length === 0 || printing.finishes.includes(DEFAULT_FINISH)
+        ? DEFAULT_FINISH
+        : printing.finishes[0] === "foil" || printing.finishes[0] === "etched"
+          ? printing.finishes[0]
+          : DEFAULT_FINISH
+    const price = lookupPrintingPrice(game, printing.printingId, rowFinish, DEFAULT_CONDITION)
+    return (
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={themed($quickRow)}
+        onPress={() => {
+          addItem(side, {
+            cardId: printing.cardId,
+            printingId: printing.printingId,
+            name: printing.name,
+            setCode: printing.setCode,
+            collectorNumber: printing.collectorNumber,
+            finish: rowFinish,
+            condition: DEFAULT_CONDITION,
+            unitPriceCents: price.retailCents ?? 0,
+            imageUrl: printing.imageUrl,
+            smallImageUrl: printing.smallImageUrl,
+          })
+          setSearch("")
+        }}
+      >
+        <Text
+          style={$flex1}
+          numberOfLines={1}
+          text={joinParts([
+            printing.name,
+            printing.setCode.toUpperCase(),
+            `#${printing.collectorNumber}`,
+          ])}
+        />
+        {price.retailCents !== undefined ? (
+          <Text size="xs" text={formatCurrency(price.retailCents, "USD")} />
+        ) : null}
+      </TouchableOpacity>
+    )
+  }
+
+  const renderName: ListRenderItem<string> = ({ item: name }) => (
+    <TouchableOpacity
+      accessibilityRole="button"
+      style={themed($quickRow)}
+      onPress={() => setSearch(name)}
+    >
+      <Text style={$flex1} numberOfLines={1} text={name} />
+    </TouchableOpacity>
+  )
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <Screen
@@ -263,20 +323,20 @@ export function TradeCalculatorModal({
         safeAreaEdges={["bottom"]}
         backgroundColor={theme.colors.background}
         contentContainerStyle={$screen}
-      >
-        <Header
-          titleTx="decks:collection.tradeTitle"
-          leftTx="common:back"
-          onLeftPress={onClose}
-          rightTx="decks:collection.tradeClear"
-          onRightPress={() => {
+        header={{
+          titleTx: "decks:collection.tradeTitle",
+          leftTx: "common:back",
+          onLeftPress: onClose,
+          rightTx: "decks:collection.tradeClear",
+          onRightPress: () => {
             setGiveItems([])
             setReceiveItems([])
             setCommittedMessage(undefined)
             setTradeError(undefined)
-          }}
-          backgroundColor={theme.colors.background}
-        />
+          },
+          backgroundColor: theme.colors.background,
+        }}
+      >
         <View style={themed($summary)}>
           <View style={$summaryCols}>
             <View style={$summaryCol}>
@@ -351,96 +411,73 @@ export function TradeCalculatorModal({
               onPress={() => setScanningSide(side)}
             />
           </View>
-          {quickResults.length > 0 ? (
-            <View style={themed($quickList)}>
-              {quickResults.map((printing) => {
-                const rowFinish: CardFinish =
-                  printing.finishes.length === 0 || printing.finishes.includes(DEFAULT_FINISH)
-                    ? DEFAULT_FINISH
-                    : printing.finishes[0] === "foil" || printing.finishes[0] === "etched"
-                      ? printing.finishes[0]
-                      : DEFAULT_FINISH
-                const price = lookupPrintingPrice(
-                  game,
-                  printing.printingId,
-                  rowFinish,
-                  DEFAULT_CONDITION,
-                )
-                return (
-                  <TouchableOpacity
-                    key={printing.printingId}
-                    accessibilityRole="button"
-                    style={themed($quickRow)}
-                    onPress={() => {
-                      addItem(side, {
-                        cardId: printing.cardId,
-                        printingId: printing.printingId,
-                        name: printing.name,
-                        setCode: printing.setCode,
-                        collectorNumber: printing.collectorNumber,
-                        finish: rowFinish,
-                        condition: DEFAULT_CONDITION,
-                        unitPriceCents: price.retailCents ?? 0,
-                        imageUrl: printing.imageUrl,
-                        smallImageUrl: printing.smallImageUrl,
-                      })
-                      setSearch("")
-                    }}
-                  >
-                    <Text
-                      style={$flex1}
-                      numberOfLines={1}
-                      text={joinParts([
-                        printing.name,
-                        printing.setCode.toUpperCase(),
-                        `#${printing.collectorNumber}`,
-                      ])}
-                    />
-                    {price.retailCents !== undefined ? (
-                      <Text size="xs" text={formatCurrency(price.retailCents, "USD")} />
-                    ) : null}
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
-          ) : null}
         </View>
 
-        <FlatList
-          testID="trade-items-list"
-          data={activeItems}
-          keyExtractor={(item) => item.key}
-          contentContainerStyle={themed($listContent)}
-          renderItem={({ item }) => (
-            <View style={themed($itemRow)}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                style={$flex1}
-                onPress={() => setEditingItem({ side, item })}
-              >
-                <Text weight="medium" numberOfLines={1} text={item.name} />
-                <Text
-                  size="xs"
-                  style={{ color: theme.colors.textDim }}
-                  text={joinParts([
-                    item.setCode.toUpperCase(),
-                    item.collectorNumber ? `#${item.collectorNumber}` : "",
-                    item.finish,
-                    item.condition,
-                    formatCurrency(item.unitPriceCents * item.quantity, "USD"),
-                  ])}
-                />
-              </TouchableOpacity>
-              <View style={$qtyRow}>
-                <Button text="−" onPress={() => adjustQty(side, item.key, -1)} />
-                <Text weight="medium" text={item.quantity} />
-                <Button text="+" onPress={() => adjustQty(side, item.key, 1)} />
+        {searchResults?.printings.length ? (
+          <FlatList
+            testID="trade-search-results"
+            style={$results}
+            data={searchResults.printings}
+            keyExtractor={(printing) => printing.printingId}
+            renderItem={renderPrinting}
+            contentContainerStyle={themed($listContent)}
+            keyboardShouldPersistTaps="handled"
+          />
+        ) : searchResults?.names.length ? (
+          <FlatList
+            testID="trade-search-results"
+            style={$results}
+            data={searchResults.names}
+            keyExtractor={(name) => name}
+            renderItem={renderName}
+            contentContainerStyle={themed($listContent)}
+            keyboardShouldPersistTaps="handled"
+          />
+        ) : searchResults ? (
+          <View style={[$results, themed($listContent)]}>
+            <Text style={{ color: theme.colors.textDim }} tx="decks:cardSearch.noResults" />
+          </View>
+        ) : (
+          <FlatList
+            testID="trade-items-list"
+            style={$results}
+            data={activeItems}
+            keyExtractor={(item) => item.key}
+            contentContainerStyle={themed($listContent)}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <View style={themed($itemRow)}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={$flex1}
+                  onPress={() => setEditingItem({ side, item })}
+                >
+                  <Text weight="medium" numberOfLines={1} text={item.name} />
+                  <Text
+                    size="xs"
+                    style={{ color: theme.colors.textDim }}
+                    text={joinParts([
+                      item.setCode.toUpperCase(),
+                      item.collectorNumber ? `#${item.collectorNumber}` : "",
+                      item.finish !== DEFAULT_FINISH &&
+                        translate(`decks:cardScan.finish.${item.finish}`),
+                      item.condition !== DEFAULT_CONDITION &&
+                        translate(`decks:cardScan.condition.${item.condition}`),
+                      formatCurrency(item.unitPriceCents * item.quantity, "USD"),
+                    ])}
+                  />
+                </TouchableOpacity>
+                <View style={$qtyRow}>
+                  <Button text="−" onPress={() => adjustQty(side, item.key, -1)} />
+                  <Text weight="medium" text={item.quantity} />
+                  <Button text="+" onPress={() => adjustQty(side, item.key, 1)} />
+                </View>
               </View>
-            </View>
-          )}
-        />
+            )}
+          />
+        )}
 
-        {giveItems.length > 0 || receiveItems.length > 0 ? (
+        {!searchResults && (giveItems.length > 0 || receiveItems.length > 0) ? (
           <View style={themed($footer)}>
             <Button
               testID="trade-commit-button"
@@ -521,7 +558,8 @@ export function TradeCalculatorModal({
   )
 }
 
-const $screen: ViewStyle = { flex: 1 }
+// why: the fixed preset bottom-aligns content, so a column taller than the space above the keyboard would slide up under the header.
+const $screen: ViewStyle = { flex: 1, justifyContent: "flex-start" }
 const $flex1: ViewStyle = { flex: 1 }
 const $summary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.md,
@@ -530,12 +568,8 @@ const $summary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $summaryCols: ViewStyle = { flexDirection: "row", justifyContent: "space-between" }
 const $summaryCol: ViewStyle = { gap: 2 }
 const $inputRow: ViewStyle = { flexDirection: "row", gap: 8, alignItems: "center" }
-const $quickList: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  borderRadius: radius.md,
-  backgroundColor: colors.surface,
-  padding: spacing.xs,
-  gap: spacing.xs,
-})
+// why: the keyboard shrinks the screen, so the results give up height instead of pushing the header off screen.
+const $results: ViewStyle = { flex: 1, minHeight: 0 }
 const $quickRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
