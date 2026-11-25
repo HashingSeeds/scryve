@@ -1311,3 +1311,28 @@ test("in bulk mode a new card on the stand does not inherit the last card's foil
   expect(onScanPrinting).toHaveBeenLastCalledWith(expect.objectContaining({ finish: "nonfoil" }))
   catalogDb.clearAll()
 })
+
+test("in bulk mode a collector number read after a title-only match refines that card instead of adding another", async () => {
+  solRingPrintings(
+    { id: "10e-sol", set: "10e", number: "335" },
+    { id: "40k-sol", set: "40k", number: "240" },
+  )
+  const { view, onScanPrinting, onUpdatePrinting } = renderPrintingScanner()
+  fireEvent.press(view.getByTestId("card-scan-mode"))
+  show("Sol Ring")
+  expect(onScanPrinting).toHaveBeenLastCalledWith(
+    expect.objectContaining({ printingId: "10e-sol" }),
+  )
+
+  collectorFrame("240/250 U 40K • EN")
+  await act(async () => {})
+  expect(onScanPrinting).toHaveBeenCalledTimes(1)
+  expect(onUpdatePrinting).toHaveBeenLastCalledWith(
+    expect.any(Number),
+    expect.objectContaining({ printingId: "40k-sol" }),
+  )
+
+  collectorFrame("335/383 U 10E • EN")
+  expect(onScanPrinting).toHaveBeenCalledTimes(2)
+  catalogDb.clearAll()
+})
