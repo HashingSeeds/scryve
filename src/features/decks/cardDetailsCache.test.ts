@@ -1,4 +1,5 @@
-import { storage } from "@/utils/storage"
+import { localCardDb } from "@/storage/localDb"
+import { clear, storage } from "@/utils/storage"
 
 import {
   completeCardDetails,
@@ -33,7 +34,11 @@ const DETAILS_KEY = "scryve.cards.details.v1"
 const solRing = { oracleText: "{T}: Add {C}{C}.", typeLine: "Artifact" }
 
 describe("card details cache", () => {
-  beforeEach(() => mockPrefetch.mockClear())
+  beforeEach(() => {
+    mockPrefetch.mockClear()
+    storage.clearAll()
+    localCardDb.clearAll()
+  })
 
   it("round-trips warmed details and ignores corrupt payloads", () => {
     const store = memoryStore()
@@ -59,10 +64,115 @@ describe("card details cache", () => {
     expect(loadCardDetails(memoryStore(values))).toEqual(loadCardDetails(store))
   })
 
-  it("reparses after MMKV is wiped outside the cache", () => {
-    saveCardDetails({ ring: solRing })
-    storage.clearAll()
+  it("migrates legacy MMKV card details into SQLite and reflects external database clears", () => {
+    storage.set(DETAILS_KEY, JSON.stringify({ ring: solRing }))
+    expect(readCardDetail("ring")).toEqual(solRing)
+    expect(storage.getString(DETAILS_KEY)).toBeUndefined()
+    const listSpy = jest.spyOn(localCardDb, "listCardDetails")
+    expect(loadCardDetails()).toEqual({ ring: solRing })
+    expect(loadCardDetails()).toEqual({ ring: solRing })
+    expect(listSpy).toHaveBeenCalledTimes(1)
+    listSpy.mockRestore()
+    localCardDb.clearCardDetails()
     expect(loadCardDetails()).toEqual({})
+  })
+
+  it("keeps legacy and newly saved details readable in memory when SQLite writes fail and flushes them on recovery", () => {
+    storage.set(DETAILS_KEY, JSON.stringify({ ring: solRing }))
+    const upsert = jest.spyOn(localCardDb, "upsertCardDetails").mockImplementation(() => {
+      throw new Error("disk full")
+    })
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => {})
+    expect(readCardDetail("ring")).toEqual(solRing)
+    saveCardDetails({ bolt: { typeLine: "Instant" } })
+    expect(readCardDetail("bolt")).toEqual({ typeLine: "Instant" })
+    expect(loadCardDetails()).toEqual({ ring: solRing, bolt: { typeLine: "Instant" } })
+    upsert.mockRestore()
+
+    saveCardDetails({ island: { typeLine: "Land" } })
+    expect(loadCardDetails()).toEqual({
+      ring: solRing,
+      bolt: { typeLine: "Instant" },
+      island: { typeLine: "Land" },
+    })
+    expect(localCardDb.getCardDetail("bolt")).toBe('{"typeLine":"Instant"}')
+    expect(localCardDb.getCardDetail("island")).toBe('{"typeLine":"Land"}')
+    errorLog.mockRestore()
+  })
+
+  it("sanitizes non-string fields on save so SearchCard payloads round-trip cleanly", () => {
+    saveCardDetails({
+      ring: {
+        ...solRing,
+        manaValue: 1,
+        legalFormats: ["commander"],
+      } as unknown as typeof solRing,
+    })
+    expect(readCardDetail("ring")).toEqual(solRing)
+    expect(loadCardDetails()).toEqual({ ring: solRing })
+  })
+
+  it("keeps newer SQLite card details when a legacy migration retries", () => {
+    storage.set(DETAILS_KEY, JSON.stringify({ ring: solRing, bolt: { typeLine: "Old" } }))
+    const upsert = jest.spyOn(localCardDb, "upsertCardDetails").mockImplementationOnce(() => {
+      throw new Error("disk full")
+    })
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => {})
+    expect(readCardDetail("ring")).toEqual(solRing)
+    upsert.mockRestore()
+
+    const updatedRing = { oracleText: "Updated text", typeLine: "Artifact" }
+    saveCardDetails({ ring: updatedRing })
+
+    expect(loadCardDetails()).toEqual({
+      ring: updatedRing,
+      bolt: { typeLine: "Old" },
+    })
+    expect(storage.getString(DETAILS_KEY)).toBeUndefined()
+    expect(readCardDetail("ring")).toEqual(updatedRing)
+    errorLog.mockRestore()
+  })
+
+  it("retries SQLite reads after a transient listCardDetails failure without an intervening write", () => {
+    saveCardDetails({ ring: solRing })
+    const list = jest.spyOn(localCardDb, "listCardDetails").mockImplementationOnce(() => {
+      throw new Error("busy")
+    })
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => {})
+    expect(loadCardDetails()).toEqual({})
+    list.mockRestore()
+
+    expect(loadCardDetails()).toEqual({ ring: solRing })
+    expect(readCardDetail("ring")).toEqual(solRing)
+    errorLog.mockRestore()
+  })
+
+  it("replaces an unreadable SQLite row with valid legacy details during migration", () => {
+    localCardDb.upsertCardDetails([{ key: "ring", payload: "not-json{", accessedAt: 1 }], 1500)
+    storage.set(DETAILS_KEY, JSON.stringify({ ring: solRing }))
+
+    expect(readCardDetail("ring")).toEqual(solRing)
+    expect(storage.getString(DETAILS_KEY)).toBeUndefined()
+    expect(loadCardDetails()).toEqual({ ring: solRing })
+    expect(localCardDb.getCardDetail("ring")).toBe(JSON.stringify(solRing))
+  })
+
+  it("clears pending and cached card details when storage.clear runs", () => {
+    const upsert = jest.spyOn(localCardDb, "upsertCardDetails").mockImplementation(() => {
+      throw new Error("disk full")
+    })
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => {})
+    saveCardDetails({ bolt: { typeLine: "Instant" } })
+    expect(readCardDetail("bolt")).toEqual({ typeLine: "Instant" })
+    upsert.mockRestore()
+
+    clear()
+
+    expect(readCardDetail("bolt")).toBeUndefined()
+    expect(loadCardDetails()).toEqual({})
+    saveCardDetails({ island: { typeLine: "Land" } })
+    expect(loadCardDetails()).toEqual({ island: { typeLine: "Land" } })
+    errorLog.mockRestore()
   })
 
   it("evicts the least recently saved details past 1,500 entries", () => {
