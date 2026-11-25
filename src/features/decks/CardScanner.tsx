@@ -1054,7 +1054,7 @@ export function CardScanner({
                   <View style={[$frame, { width: frame.width, height: frame.height }]} />
                 ) : null}
               </View>
-              <View style={[$actions, frame && { width: frame.width }]}>
+              <View style={[$actions, frame && { maxWidth: frame.width }]}>
                 {landCount ? (
                   <>
                     <Button
@@ -1493,7 +1493,7 @@ const $actions: ViewStyle = {
   gap: 8,
   minHeight: 56,
 }
-const $action: ViewStyle = { flex: 1 }
+const $action: ViewStyle = { paddingHorizontal: 24 }
 const $landCount: TextStyle = {
   ...$onCamera,
   minWidth: 40,
