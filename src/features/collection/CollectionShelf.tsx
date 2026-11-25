@@ -26,6 +26,7 @@ import {
   addCollectionCard,
   createBinder,
   deleteBinderKeepingCards,
+  getCollectionEntry,
   listBinders,
   listCollectionEntries,
   updateCollectionEntry,
@@ -214,10 +215,8 @@ export function CollectionShelf({
     const entryId = scanEntryIdByScanId.current.get(scanId)
     if (!entryId) return false
     const sessionGame = session.game ?? game
-    const current = listCollectionEntries({ binderId: session.id }).find(
-      (entry) => entry.id === entryId,
-    )
-    if (!current) return false
+    const current = getCollectionEntry(entryId)
+    if (!current || current.binderId !== session.id) return false
     const printing = catalogDb.getPrinting(sessionGame, update.printingId)
     const nextCardId = printing?.cardId ?? current.cardId
     let nextId: string | undefined

@@ -198,7 +198,7 @@ export function updateCollectionEntry(
   >,
   now = Date.now(),
 ): StoredCollectionEntry | undefined {
-  const current = localCardDb.listCollectionEntries().find((entry) => entry.id === id)
+  const current = localCardDb.getCollectionEntry(id)
   if (!current) return undefined
   if (patch.quantity !== undefined && patch.quantity <= 0) {
     localCardDb.deleteCollectionEntry(id, now)
@@ -247,6 +247,10 @@ export function moveBinderEntries(
   })
   notify()
   return entries.length
+}
+
+export function getCollectionEntry(id: string): StoredCollectionEntry | undefined {
+  return localCardDb.getCollectionEntry(id)
 }
 
 export function listCollectionEntries(filter?: {

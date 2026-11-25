@@ -220,6 +220,17 @@ export const localCardDb: LocalCardDb = {
     return entries.sort((left, right) => right.updatedAt - left.updatedAt)
   },
 
+  getCollectionEntry(id) {
+    const raw = storage.getString(`${COLLECTION_PREFIX}${id}`)
+    if (!raw) return undefined
+    try {
+      const entry = JSON.parse(raw) as StoredCollectionEntry
+      return entry.deletedAt === undefined ? entry : undefined
+    } catch {
+      return undefined
+    }
+  },
+
   upsertCollectionEntry(entry) {
     writeKey(`${COLLECTION_PREFIX}${entry.id}`, JSON.stringify(entry))
   },

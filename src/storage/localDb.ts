@@ -368,6 +368,14 @@ export const localCardDb: LocalCardDb = {
       .map(hydrateCollectionEntry)
   },
 
+  getCollectionEntry(id) {
+    const row = openNativeDb().getFirstSync<RawCollectionEntryRow>(
+      "SELECT * FROM collection_entries WHERE id = ? AND deleted_at IS NULL",
+      [id],
+    )
+    return row ? hydrateCollectionEntry(row) : undefined
+  },
+
   upsertCollectionEntry(entry) {
     openNativeDb().runSync(
       `INSERT OR REPLACE INTO collection_entries (
