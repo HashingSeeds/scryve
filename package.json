@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node scripts/dev.cjs",
     "start:expo": "APP_VARIANT=development npx expo start --dev-client --scheme scryve-dev",
+    "revyl:dev": "scripts/revyl-dev.sh",
     "android": "env APP_VARIANT=development npx expo run:android",
     "ios": "env APP_VARIANT=development npx expo run:ios",
     "web": "env APP_VARIANT=development npx expo start --web",

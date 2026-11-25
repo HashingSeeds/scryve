@@ -25,3 +25,13 @@ build:
                 build_commands:
                     - cd android && ./gradlew assembleDebug -PreactNativeArchitectures=x86_64
                 output_path: android/app/build/outputs/apk/debug/app-debug.apk
+        # why: dev-client.yml already built this dev client. A recipe only unpacks it, since Revyl
+        # tags a build as an Expo dev client only when a recipe produced it, not on `build upload`.
+        ci:
+            ios:
+                app_id: ffe02298-5176-46ee-a0fc-8d4b815f1cd1
+                env:
+                    APP_VARIANT: development
+                build_commands:
+                    - rm -rf build/revyl && mkdir -p build/revyl && tar -xzf build/ios-sim.tar.gz -C build/revyl
+                output_path: build/revyl/*.app

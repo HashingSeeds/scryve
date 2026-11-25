@@ -236,3 +236,18 @@ jobs:
           aws s3 cp "$ARTIFACT" "s3://$BUCKET/$prefix/$name" --no-progress
           aws s3 cp build/build.json "s3://$BUCKET/$prefix/build.json" \
             --content-type application/json --no-progress
+
+      # why: agents' Revyl simulators load this build through scripts/revyl-dev.sh instead of
+      # building in their worktree. The version starts with the fingerprint that script matches.
+      - name: Upload to Revyl
+        if: matrix.platform == 'ios'
+        env:
+          REVYL_API_KEY: ${{ secrets.REVYL_API_KEY }}
+          REVYL_VERSION: v0.2.71
+        run: |
+          set -euo pipefail
+          : "${REVYL_API_KEY:?set REVYL_API_KEY in the dev-builds environment}"
+          curl -fsSL -o "$RUNNER_TEMP/revyl" "https://github.com/RevylAI/revyl-cli/releases/download/$REVYL_VERSION/revyl-darwin-arm64"
+          chmod +x "$RUNNER_TEMP/revyl"
+          "$RUNNER_TEMP/revyl" build --local --profile ci --platform ios --branch main \
+            --version "$FINGERPRINT-$GITHUB_RUN_ID"
