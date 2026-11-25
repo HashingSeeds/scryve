@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native"
 import type { ImageStyle, LayoutRectangle, TextStyle, ViewStyle } from "react-native"
@@ -19,7 +20,7 @@ import { CardImage } from "@/components/CardImage"
 import { DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
-import { Text } from "@/components/Text"
+import { $sizeStyles, Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { resolveScannedPrinting, useCatalogSync } from "@/features/collection/catalogSync"
 import { PrintingPickerSheet } from "@/features/collection/PrintingPickerSheet"
@@ -164,9 +165,11 @@ function statusText(status: ScanStatus) {
   return translate(`decks:cardScan.${status}`)
 }
 
+const FRAME_WIDTH = 0.72
+
 // why: the slot is a direct child of the full-size overlay, so the frame's rect is already in camera-view coordinates.
 function frameIn(slot: LayoutRectangle): LayoutRectangle {
-  const width = Math.min(slot.width * 0.72, (slot.height * 63) / 88)
+  const width = Math.min(slot.width * FRAME_WIDTH, (slot.height * 63) / 88)
   const height = (width * 88) / 63
   return {
     x: slot.x + (slot.width - width) / 2,
@@ -300,6 +303,7 @@ export function CardScanner({
     peakHeat?: NonNullable<NonNullable<CardPhotoText["detection"]>["thermal"]>
   }>({ startedAt: Date.now(), reads: 0, outlinedReads: 0, skipped: 0, fixed: 0 })
   const { themed, theme } = useAppTheme()
+  const { width: screenWidth, fontScale } = useWindowDimensions()
 
   useEffect(() => {
     addedRef.current = added
@@ -799,6 +803,8 @@ export function CardScanner({
       ).length
       const inDeck = copiesInDeck(card.name) + stillAdding
       landCountOpen.current = true
+      // why: a correction from the review list can land here, and the count prompt sits under the frame.
+      setReviewing(false)
       setLandCount({ card, inDeck, count: Math.max(inDeck, 1) })
       return
     }
@@ -977,7 +983,13 @@ export function CardScanner({
                 }, 0)
               }}
             />
-            <View style={$overlay} pointerEvents="box-none">
+            <View
+              style={$overlay}
+              pointerEvents="box-none"
+              accessibilityElementsHidden={reviewing}
+              importantForAccessibility={reviewing ? "no-hide-descendants" : "auto"}
+            >
+              <View style={$spacer} />
               {landCount ? (
                 <View style={$readout}>
                   <View style={$readoutText}>
@@ -1027,10 +1039,15 @@ export function CardScanner({
                   />
                 </View>
               )}
-              <Text size="sm" numberOfLines={2} style={$hint} text={statusText(status)} />
+              <Text
+                size="sm"
+                numberOfLines={2}
+                style={[$hint, { minHeight: 2 * $sizeStyles.sm.lineHeight * fontScale }]}
+                text={statusText(status)}
+              />
               <View
                 testID="card-scan-frame-slot"
-                style={$frameSlot}
+                style={[$frameSlot, { height: (screenWidth * FRAME_WIDTH * 88) / 63 }]}
                 pointerEvents="none"
                 onLayout={(event) => setFrame(frameIn(event.nativeEvent.layout))}
               >
@@ -1094,6 +1111,7 @@ export function CardScanner({
                   </>
                 ) : null}
               </View>
+              <View style={$spacer} />
               {showPrereleaseHud ? (
                 <ScrollView
                   horizontal
@@ -1453,7 +1471,9 @@ const $hudPill: ViewStyle = {
 }
 const $onCamera: TextStyle = { color: "#FFFFFF" }
 const $onCameraDim: TextStyle = { color: "rgba(255,255,255,0.72)" }
-const $overlay: ViewStyle = { ...StyleSheet.absoluteFill, paddingTop: 8, gap: 8 }
+const $overlay: ViewStyle = { ...StyleSheet.absoluteFill, gap: 8 }
+// why: spare height on tall screens goes above and below the group, so readout and actions stay against the frame.
+const $spacer: ViewStyle = { flex: 1 }
 const $readout: ViewStyle = {
   flexDirection: "row",
   alignItems: "center",
@@ -1467,7 +1487,7 @@ const $readout: ViewStyle = {
 const $readoutImage: ImageStyle = { width: 46, height: 64 }
 const $readoutText: ViewStyle = { flex: 1 }
 const $hint: TextStyle = { color: "#FFFFFF", textAlign: "center", paddingHorizontal: 24 }
-const $frameSlot: ViewStyle = { flex: 1, alignItems: "center", justifyContent: "center" }
+const $frameSlot: ViewStyle = { flexShrink: 1, alignItems: "center", justifyContent: "center" }
 const $frame: ViewStyle = { borderWidth: 2, borderColor: "#FFFFFF", borderRadius: radius.xl }
 const $actions: ViewStyle = {
   flexDirection: "row",

@@ -223,6 +223,16 @@ test("an alternate picked after a misread follows the basic land count prompt", 
   expect(addCards.mock.calls.flat(2)).toEqual(["Forest"])
 })
 
+test("a land picked from the review list closes the list so its count prompt shows at the frame", async () => {
+  const { view } = renderScanner({ singleton: true })
+  scan("Sol Ring", "Forest")
+  fireEvent.press(view.getByTestId("card-scan-review"))
+  fireEvent.press(within(view.getByTestId("card-scan-review-list")).getByText("Wrong card"))
+  await act(async () => fireEvent.press(view.getByText("Forest")))
+  expect(view.queryByTestId("card-scan-review-list")).toBeNull()
+  expect(view.getByTestId("card-scan-add-lands")).toBeTruthy()
+})
+
 test("Done keeps an alternate chosen while the wrong card was still being added", async () => {
   jest.useFakeTimers()
   try {
