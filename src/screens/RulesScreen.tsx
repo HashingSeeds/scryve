@@ -386,7 +386,7 @@ export function RulesScreen({
               cardId={item.card.cardId}
               source={item.card.smallImageUrl ?? item.card.imageUrl}
               compact
-              style={themed($thumbnail)}
+              style={[themed($thumbnail), { height: resultText }]}
               accessibilityLabel={item.card.name}
             />
             <View style={$flex}>
@@ -889,13 +889,12 @@ const $recentRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $thumbnail: ThemedStyle<ImageStyle> = ({ colors }) => ({
-  width: 32,
   aspectRatio: 488 / 680,
   backgroundColor: colors.separator,
 })
 const $cardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
-  alignItems: "flex-start",
+  alignItems: "center",
   gap: spacing.sm,
   paddingVertical: spacing.sm,
   borderBottomWidth: 1,
