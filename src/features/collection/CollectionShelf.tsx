@@ -470,6 +470,8 @@ export function CollectionShelf({
       <FlatList
         testID="collection-entries-list"
         data={pricedEntries}
+        // why: the default 21-screen window rendered every row of a 1,000-card collection within seconds of opening, and opening the scanner re-rendered them all.
+        windowSize={5}
         keyExtractor={(item) => item.entry.id}
         contentContainerStyle={themed($listContent)}
         ListEmptyComponent={
