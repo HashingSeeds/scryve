@@ -201,7 +201,10 @@ async function isCurrentUser(Purchases: Purchases, appUserID: string | null) {
 }
 
 /** why: logging in from the anonymous player moves its purchases onto the account, but RevenueCat merges only an account's first anonymous player, so a later anonymous buyer's store purchase is synced over instead. */
-async function configureForUser(apiKey: string, appUserID: string | null) {
+async function configureForUser(
+  apiKey: string,
+  appUserID: string | null,
+): Promise<{ Purchases: Purchases; linkError?: string }> {
   const Purchases = await loadPurchases()
   const configured = await Purchases.isConfigured()
   if (!configured) {
@@ -211,19 +214,25 @@ async function configureForUser(apiKey: string, appUserID: string | null) {
       appUserID,
       entitlementVerificationMode: Purchases.ENTITLEMENT_VERIFICATION_MODE.INFORMATIONAL,
     })
-    return Purchases
+    return { Purchases }
   }
 
-  if (await isCurrentUser(Purchases, appUserID)) return Purchases
+  if (await isCurrentUser(Purchases, appUserID)) return { Purchases }
   if (appUserID === null) {
     await Purchases.logOut()
-    return Purchases
+    return { Purchases }
   }
   const anonymousPro =
     (await Purchases.isAnonymous()) && hasCountPro(await Purchases.getCustomerInfo())
   const { customerInfo } = await Purchases.logIn(appUserID)
-  if (anonymousPro && !hasCountPro(customerInfo)) await Purchases.syncPurchasesForResult()
-  return Purchases
+  if (!anonymousPro || hasCountPro(customerInfo)) return { Purchases }
+  // why: a failed sync still lets billing load, so the player can reach Restore Purchases.
+  try {
+    await Purchases.syncPurchasesForResult()
+    return { Purchases }
+  } catch (cause) {
+    return { Purchases, linkError: revenueCatErrorMessage(cause) }
+  }
 }
 
 function offerAccountForPro(signIn: () => void) {
@@ -303,9 +312,10 @@ export function RevenueCatProvider({
     setError(undefined)
 
     void configureForUser(apiKey, appUserID)
-      .then(async (Purchases) => {
+      .then(async ({ Purchases, linkError }) => {
         if (cancelled) return
         setConfiguredUserId(appUserID)
+        if (linkError) setError(linkError)
         Purchases.addCustomerInfoUpdateListener(listener)
         subscribedSdk = Purchases
         const [, offerings] = await Promise.all([

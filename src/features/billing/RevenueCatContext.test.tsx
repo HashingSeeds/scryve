@@ -233,6 +233,20 @@ describe("RevenueCatProvider", () => {
     expect(Purchases.logIn).toHaveBeenCalledWith("user_123")
   })
 
+  it("still loads billing when that sync fails, so Restore Purchases stays reachable", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("$RCAnonymousID:abc")
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    purchasesMock.logIn.mockResolvedValue({ customerInfo: expiredCustomerInfo, created: false })
+    purchasesMock.syncPurchasesForResult.mockRejectedValueOnce(
+      Object.assign(new Error("offline"), { code: "10" }),
+    )
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isReady).toBe(true)
+    expect(result.current.error).toBeTruthy()
+  })
+
   it("logs RevenueCat out of the previous account when the player signs out", async () => {
     purchasesMock.isConfigured.mockResolvedValue(true)
     purchasesMock.isAnonymous.mockResolvedValue(false)
