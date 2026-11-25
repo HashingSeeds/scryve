@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
+import { CardSymbolText } from "@/components/CardSymbolText"
 import { Header, HeaderBack } from "@/components/Header"
 import { Icon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
@@ -385,7 +386,7 @@ export function RulesScreen({
               cardId={item.card.cardId}
               source={item.card.smallImageUrl ?? item.card.imageUrl}
               compact
-              style={[themed($thumbnail), { width: (resultText * 488) / 680 }]}
+              style={themed($thumbnail)}
               accessibilityLabel={item.card.name}
             />
             <View style={$flex}>
@@ -394,7 +395,13 @@ export function RulesScreen({
                 <Text size="xs" tone="dim" numberOfLines={1} text={item.card.typeLine} />
               ) : null}
               {item.card.oracleText ? (
-                <Text size="xs" tone="dim" numberOfLines={1} text={item.card.oracleText} />
+                <CardSymbolText
+                  game={system}
+                  size="xs"
+                  tone="dim"
+                  numberOfLines={1}
+                  text={item.card.oracleText}
+                />
               ) : null}
             </View>
           </Pressable>
@@ -888,7 +895,7 @@ const $thumbnail: ThemedStyle<ImageStyle> = ({ colors }) => ({
 })
 const $cardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: spacing.sm,
   paddingVertical: spacing.sm,
   borderBottomWidth: 1,
