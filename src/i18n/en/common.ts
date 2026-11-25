@@ -39,7 +39,7 @@ const common = {
   },
   appNavigation: {
     decks: "Decks",
-    // Floating button on the deck shelf that opens card lookup.
+    // Bottom bar tab that opens card lookup and the collection.
     cards: "Cards",
     // The Play tab.
     play: "Play",

@@ -26,7 +26,6 @@ it.each([
     const view = render(
       <ThemeProvider initialContext="dark">
         <FloatingAppNavigation
-          destination={{ kind: "decks", onPress: jest.fn() }}
           onHistory={jest.fn()}
           onSettings={jest.fn()}
           onSupport={jest.fn()}
@@ -45,31 +44,27 @@ describe("FloatingAppNavigation", () => {
   it.each([
     [false, 218],
     [true, 272],
-  ])(
-    "with nearby play %s, expands its hit area to the open menu without moving the destination button",
-    (nearbyPlay, height) => {
-      mockNearbyPlay = nearbyPlay
-      const view = render(
-        <ThemeProvider initialContext="dark">
-          <FloatingAppNavigation
-            destination={{ kind: "cards", onPress: jest.fn() }}
-            onHistory={jest.fn()}
-            onSettings={jest.fn()}
-            onSupport={jest.fn()}
-            onAccount={jest.fn()}
-          />
-        </ThemeProvider>,
-      )
+  ])("with nearby play %s, expands its hit area to the open menu", (nearbyPlay, height) => {
+    mockNearbyPlay = nearbyPlay
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <FloatingAppNavigation
+          onHistory={jest.fn()}
+          onSettings={jest.fn()}
+          onSupport={jest.fn()}
+          onAccount={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
 
-      const navigation = view.getByTestId("floating-app-navigation")
-      expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({
-        height: 48,
-        justifyContent: "flex-end",
-      })
+    const navigation = view.getByTestId("floating-app-navigation")
+    expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({
+      height: 48,
+      justifyContent: "flex-end",
+    })
 
-      fireEvent.press(view.getByTestId("utility-menu-button"))
+    fireEvent.press(view.getByTestId("utility-menu-button"))
 
-      expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({ height })
-    },
-  )
+    expect(StyleSheet.flatten(navigation.props.style)).toMatchObject({ height })
+  })
 })

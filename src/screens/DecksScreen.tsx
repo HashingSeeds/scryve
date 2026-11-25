@@ -5,16 +5,11 @@ import { useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import Svg, { Path } from "react-native-svg"
 
-import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { colorLabel, identityLabel } from "@/components/CardFocusDialog"
 import { CardSymbolText } from "@/components/CardSymbolText"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
-import {
-  $floatingNavigationClearance,
-  FloatingAppNavigation,
-} from "@/components/FloatingAppNavigation"
 import { Header, HeaderBack, HeaderIcon } from "@/components/Header"
 import { NUMBER_LANE_WIDTH, TrailingNumber } from "@/components/NumberLane"
 import { Screen } from "@/components/Screen"
@@ -26,7 +21,6 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import { CollectionShelf } from "@/features/collection/CollectionShelf"
 import {
   COLOR_MATCHES,
   matchesColors,
@@ -48,7 +42,6 @@ import { useRecentDecks } from "@/features/decks/recentDecks"
 import { formatName, gameName } from "@/features/game/playSystems"
 import { isSystemVisible } from "@/features/game/systemVisibility"
 import type { BackAction } from "@/features/game/useBackToBoard"
-import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -347,7 +340,7 @@ function LocalDeckList({
       testID="local-decks-list"
       data={rows}
       keyExtractor={(row) => String(row._id)}
-      contentContainerStyle={themed([$listContent, $floatingNavigationClearance])}
+      contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -489,7 +482,7 @@ function DeckShelf({
       data={rows}
       extraData={failedDeckIds}
       keyExtractor={(row) => String(row.deck._id)}
-      contentContainerStyle={themed([$listContent, $floatingNavigationClearance])}
+      contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -562,12 +555,7 @@ export function DecksScreen({
   initialSystem,
   onSelect,
   onAddDeck,
-  onCards,
-  onHistory,
-  onSettings,
-  onSupport,
-  onAccount,
-  accountEntry = "account",
+  onSystemChange,
   unavailableMessage,
   access,
 }: {
@@ -575,12 +563,7 @@ export function DecksScreen({
   initialSystem?: string
   onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
-  onCards?: (game?: string) => void
-  onHistory: () => void
-  onSettings: () => void
-  onSupport: () => void
-  onAccount: () => void
-  accountEntry?: AccountEntry
+  onSystemChange?: (system: string) => void
   unavailableMessage?: string
   access?: CloudAccess
 }) {
@@ -597,8 +580,6 @@ export function DecksScreen({
     [ownRows],
   )
   const [collection, setCollection] = useState<DeckCollection>("all")
-  const [area, setArea] = useState<"decks" | "collection" | "scans">("decks")
-  const showCollectionArea = prereleaseBuild()
   const [system, setSystem] = useState(
     DECK_GAME_LIST.find((game) => game.id === initialSystem)?.id ?? ALL_SYSTEMS,
   )
@@ -608,6 +589,7 @@ export function DecksScreen({
       setGame(initialSystem, ALL_FORMATS)
     }
   }, [initialSystem, setGame])
+  useEffect(() => onSystemChange?.(system), [onSystemChange, system])
   const [search, setSearch] = useState("")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
@@ -700,140 +682,120 @@ export function DecksScreen({
         }
       />
       <View style={themed($content)}>
-        {showCollectionArea ? (
-          <View style={themed($areaControl)}>
-            <SegmentedControl
-              testID="decks-area-segment"
-              segments={[
-                { id: "decks", label: translate("decks:collection.tabDecks") },
-                { id: "collection", label: translate("decks:collection.tabCollection") },
-                { id: "scans", label: translate("decks:collection.tabScans") },
-              ]}
-              selectedId={area}
-              onSelect={(next) => setArea(next as "decks" | "collection" | "scans")}
-            />
-          </View>
-        ) : null}
-        {showCollectionArea && area !== "decks" ? (
-          <CollectionShelf mode={area} game={system === ALL_SYSTEMS ? DEFAULT_DECK_GAME : system} />
-        ) : (
-          <>
-            <View style={themed($searchRow)}>
-              <TextField
-                testID="deck-search-input"
-                placeholderTx="decks:shelf.search"
-                value={search}
-                maxLength={80}
-                autoCorrect={false}
-                clearable
-                containerStyle={$flex1}
-                onChangeText={setSearch}
-              />
-              <FilterButton
-                testID="deck-filters-button"
-                count={filterCount}
-                onPress={() => setFiltersOpen(true)}
-              />
-            </View>
-            <Tabs
-              testID="collection-filter"
-              tabs={COLLECTIONS.map(({ id, labelTx }) => ({ id, label: translate(labelTx) }))}
-              selectedId={collection}
-              onSelect={setCollection}
-            />
-            {guestOnly ? (
-              <LocalDeckList
-                rows={visibleGuestRows}
-                showGame={system === ALL_SYSTEMS}
-                onSelect={onSelect}
-                footer={
-                  visibleGuestRows.length ? null : (
-                    <View style={themed($empty)}>
-                      <Text
-                        preset="subheading"
-                        tx={
-                          collectionGuestRows.length
-                            ? "decks:shelf.nothingMatches"
-                            : EMPTY_COLLECTION[collection].titleTx
-                        }
-                      />
-                      <Text
-                        size="sm"
-                        tx={
-                          collectionGuestRows.length
-                            ? "decks:shelf.tryAnotherSearch"
-                            : collection === "all"
-                              ? "decks:shelf.guestEmpty"
-                              : EMPTY_COLLECTION[collection].detailTx
-                        }
-                      />
-                      {collectionGuestRows.length ? (
-                        <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} />
-                      ) : null}
-                    </View>
-                  )
-                }
-              />
-            ) : access && !access.ready && !(isDeckSyncEnabled() && access.ownerId) ? (
-              <LocalDeckList
-                rows={visibleGuestRows}
-                showGame={system === ALL_SYSTEMS}
-                onSelect={onSelect}
-                footer={
-                  access.loading ? (
-                    <DeckShelfSkeleton />
-                  ) : (
-                    <View style={themed($empty)}>
-                      <Text text={access.message ?? translate("decks:shelf.unavailable")} />
-                      <Button
-                        text={access.actionLabel ?? translate("common:tryAgain")}
-                        onPress={access.request}
-                      />
-                    </View>
-                  )
-                }
-              />
-            ) : unavailableMessage ? (
-              <LocalDeckList
-                rows={visibleGuestRows}
-                showGame={system === ALL_SYSTEMS}
-                onSelect={onSelect}
-                footer={
-                  <View testID="decks-offline-state" style={themed($empty)}>
-                    <Text preset="subheading" tx="decks:shelf.unavailable" />
-                    <Text size="sm" tone="dim" text={unavailableMessage} />
-                  </View>
-                }
-              />
-            ) : (
-              <ConvexQueryBoundary
-                resetKey={`${collection}:${system}:${activeFormat}`}
-                fallback={({ retry }) => (
-                  <LocalDeckList
-                    rows={visibleGuestRows}
-                    showGame={system === ALL_SYSTEMS}
-                    onSelect={onSelect}
-                    footer={<DeckShelfUnavailable retry={retry} />}
+        <View style={themed($searchRow)}>
+          <TextField
+            testID="deck-search-input"
+            placeholderTx="decks:shelf.search"
+            value={search}
+            maxLength={80}
+            autoCorrect={false}
+            clearable
+            containerStyle={$flex1}
+            onChangeText={setSearch}
+          />
+          <FilterButton
+            testID="deck-filters-button"
+            count={filterCount}
+            onPress={() => setFiltersOpen(true)}
+          />
+        </View>
+        <Tabs
+          testID="collection-filter"
+          tabs={COLLECTIONS.map(({ id, labelTx }) => ({ id, label: translate(labelTx) }))}
+          selectedId={collection}
+          onSelect={setCollection}
+        />
+        {guestOnly ? (
+          <LocalDeckList
+            rows={visibleGuestRows}
+            showGame={system === ALL_SYSTEMS}
+            onSelect={onSelect}
+            footer={
+              visibleGuestRows.length ? null : (
+                <View style={themed($empty)}>
+                  <Text
+                    preset="subheading"
+                    tx={
+                      collectionGuestRows.length
+                        ? "decks:shelf.nothingMatches"
+                        : EMPTY_COLLECTION[collection].titleTx
+                    }
                   />
-                )}
-              >
-                <DeckShelf
-                  system={system}
-                  format={activeFormat}
-                  colors={activeColors}
-                  colorMatch={colorMatch}
-                  search={search}
-                  collection={collection}
-                  recentDeckIds={recentDeckIds}
-                  clearVisibleFilters={clearVisibleFilters}
-                  onSelect={onSelect}
-                  access={access}
-                  localRows={visibleGuestRows}
-                  hasLocalDecks={collectionGuestRows.length > 0}
-                />
-              </ConvexQueryBoundary>
+                  <Text
+                    size="sm"
+                    tx={
+                      collectionGuestRows.length
+                        ? "decks:shelf.tryAnotherSearch"
+                        : collection === "all"
+                          ? "decks:shelf.guestEmpty"
+                          : EMPTY_COLLECTION[collection].detailTx
+                    }
+                  />
+                  {collectionGuestRows.length ? (
+                    <Button tx="decks:shelf.clearSearch" onPress={clearVisibleFilters} />
+                  ) : null}
+                </View>
+              )
+            }
+          />
+        ) : access && !access.ready && !(isDeckSyncEnabled() && access.ownerId) ? (
+          <LocalDeckList
+            rows={visibleGuestRows}
+            showGame={system === ALL_SYSTEMS}
+            onSelect={onSelect}
+            footer={
+              access.loading ? (
+                <DeckShelfSkeleton />
+              ) : (
+                <View style={themed($empty)}>
+                  <Text text={access.message ?? translate("decks:shelf.unavailable")} />
+                  <Button
+                    text={access.actionLabel ?? translate("common:tryAgain")}
+                    onPress={access.request}
+                  />
+                </View>
+              )
+            }
+          />
+        ) : unavailableMessage ? (
+          <LocalDeckList
+            rows={visibleGuestRows}
+            showGame={system === ALL_SYSTEMS}
+            onSelect={onSelect}
+            footer={
+              <View testID="decks-offline-state" style={themed($empty)}>
+                <Text preset="subheading" tx="decks:shelf.unavailable" />
+                <Text size="sm" tone="dim" text={unavailableMessage} />
+              </View>
+            }
+          />
+        ) : (
+          <ConvexQueryBoundary
+            resetKey={`${collection}:${system}:${activeFormat}`}
+            fallback={({ retry }) => (
+              <LocalDeckList
+                rows={visibleGuestRows}
+                showGame={system === ALL_SYSTEMS}
+                onSelect={onSelect}
+                footer={<DeckShelfUnavailable retry={retry} />}
+              />
             )}
-          </>
+          >
+            <DeckShelf
+              system={system}
+              format={activeFormat}
+              colors={activeColors}
+              colorMatch={colorMatch}
+              search={search}
+              collection={collection}
+              recentDeckIds={recentDeckIds}
+              clearVisibleFilters={clearVisibleFilters}
+              onSelect={onSelect}
+              access={access}
+              localRows={visibleGuestRows}
+              hasLocalDecks={collectionGuestRows.length > 0}
+            />
+          </ConvexQueryBoundary>
         )}
       </View>
       {access?.ready && access.ownerId && guestDecks.length > 0 ? (
@@ -841,19 +803,6 @@ export function DecksScreen({
           <KeyTotalsQuery ownerId={access.ownerId} onTotals={setTotals} />
         </ConvexQueryBoundary>
       ) : null}
-      <FloatingAppNavigation
-        destination={
-          onCards && {
-            kind: "cards",
-            onPress: () => onCards(system === ALL_SYSTEMS ? undefined : system),
-          }
-        }
-        accountEntry={accountEntry}
-        onHistory={onHistory}
-        onSettings={onSettings}
-        onSupport={onSupport}
-        onAccount={onAccount}
-      />
       <DialogCard
         visible={filtersOpen}
         onClose={() => setFiltersOpen(false)}
@@ -955,12 +904,14 @@ const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingBottom: spacing.xs,
 })
-const $areaControl: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.sm })
 const $flex1: ViewStyle = { flex: 1 }
 const $filtersDialog: ViewStyle = { height: 560 }
 const $filtersScroll: ViewStyle = { flexGrow: 1, flexBasis: 0 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
-const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingTop: spacing.xs })
+const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingTop: spacing.xs,
+  paddingBottom: spacing.md,
+})
 const $row: ThemedStyle<ViewStyle> = ({ colors }) => ({
   minHeight: 72,
   flexDirection: "row",

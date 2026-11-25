@@ -27,6 +27,14 @@ import { Text, type TextProps } from "./Text"
 
 export type AccountEntry = "account" | "signIn"
 
+export type AppUtilityActions = {
+  onHistory: () => void
+  onSettings: () => void
+  onSupport: () => void
+  onAccount: () => void
+  accountEntry?: AccountEntry
+}
+
 export function AppUtilityMenu({
   visible = true,
   compact = false,
@@ -37,7 +45,6 @@ export function AppUtilityMenu({
   onSupport,
   onAccount,
   onOpenHeightChange,
-  onChoose,
   accountEntry = "account",
 }: {
   visible?: boolean
@@ -49,8 +56,6 @@ export function AppUtilityMenu({
   onSupport: () => void
   onAccount: () => void
   onOpenHeightChange?: (height: number) => void
-  // why: runs before any item, so a screen can settle its own state before the app moves on.
-  onChoose?: () => void
   accountEntry?: AccountEntry
 }) {
   const { themed } = useAppTheme()
@@ -105,7 +110,6 @@ export function AppUtilityMenu({
   if (!visible) return null
   const choose = (action: () => void) => {
     close()
-    onChoose?.()
     action()
   }
   const slotStyle = open ? { width: openWidth, height: openHeight } : undefined
@@ -184,75 +188,108 @@ export function AppUtilityMenu({
           ]}
           onLayout={(event) => setMeasuredHeight(event.nativeEvent.layout.height)}
         >
-          {storeUpdate ? (
-            <MenuItem
-              testID="utility-store-update-button"
-              icon="update"
-              tx="common:appMenu.updateApp"
-              accessibilityRole="link"
-              accessibilityLabel={translate(storeUpdate.labelTx)}
-              tone="tint"
-              onPress={() => choose(updateFromStore)}
-            />
-          ) : null}
-          {onDecks ? (
-            <MenuItem
-              testID="utility-decks-button"
-              icon="decks"
-              tx="common:appNavigation.decks"
-              onPress={() => choose(onDecks)}
-            />
-          ) : null}
-          <MenuItem
-            testID="utility-history-button"
-            icon="history"
-            tx="common:appMenu.history"
-            onPress={() => choose(onHistory)}
+          <AppUtilityItems
+            accountEntry={accountEntry}
+            onDecks={onDecks}
+            onHistory={onHistory}
+            onSettings={onSettings}
+            onSupport={onSupport}
+            onAccount={onAccount}
+            choose={choose}
           />
-          {showsEvents ? (
-            <MenuItem
-              testID="utility-events-button"
-              icon="events"
-              tx="events:title"
-              onPress={() => choose(() => openEvents(nearbyOnly))}
-            />
-          ) : null}
-          {testsNearby ? (
-            <MenuItem
-              testID="utility-nearby-only-button"
-              icon="nearby"
-              tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: nearbyOnly }}
-              onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
-            />
-          ) : null}
-          <MenuItem
-            testID="utility-account-button"
-            icon="account"
-            tx={`common:appMenu.${accountEntry}`}
-            onPress={() => choose(onAccount)}
-          />
-          <MenuItem
-            testID="utility-support-button"
-            icon="support"
-            tx="common:appMenu.support"
-            onPress={() => choose(onSupport)}
-          />
-          <MenuItem
-            testID="utility-settings-button"
-            icon="settings"
-            tx="common:appMenu.settings"
-            accessibilityLabel={translate(
-              updateReady ? "common:appMenu.settingsUpdateReady" : "common:appMenu.settings",
-            )}
-            onPress={() => choose(onSettings)}
-          >
-            {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
-          </MenuItem>
         </Animated.View>
       </Animated.View>
     </Animated.View>
+  )
+}
+
+export function AppUtilityItems({
+  onDecks,
+  onHistory,
+  onSettings,
+  onSupport,
+  onAccount,
+  accountEntry = "account",
+  choose,
+}: AppUtilityActions & {
+  onDecks?: () => void
+  choose: (action: () => void) => void
+}) {
+  const { themed } = useAppTheme()
+  const updateReady = useAppUpdate().status === "ready"
+  const storeUpdate = useStoreUpdate()
+  const nearbyOnly = useNearbyOnly()
+  const testsNearby = nearbyBetaAvailable()
+  const showsEvents = nearbyOnly || readPublicCloudConfig().configured
+  return (
+    <>
+      {storeUpdate ? (
+        <MenuItem
+          testID="utility-store-update-button"
+          icon="update"
+          tx="common:appMenu.updateApp"
+          accessibilityRole="link"
+          accessibilityLabel={translate(storeUpdate.labelTx)}
+          tone="tint"
+          onPress={() => choose(updateFromStore)}
+        />
+      ) : null}
+      {onDecks ? (
+        <MenuItem
+          testID="utility-decks-button"
+          icon="decks"
+          tx="common:appNavigation.decks"
+          onPress={() => choose(onDecks)}
+        />
+      ) : null}
+      <MenuItem
+        testID="utility-history-button"
+        icon="history"
+        tx="common:appMenu.history"
+        onPress={() => choose(onHistory)}
+      />
+      {showsEvents ? (
+        <MenuItem
+          testID="utility-events-button"
+          icon="events"
+          tx="events:title"
+          onPress={() => choose(() => openEvents(nearbyOnly))}
+        />
+      ) : null}
+      {testsNearby ? (
+        <MenuItem
+          testID="utility-nearby-only-button"
+          icon="nearby"
+          tx={nearbyOnly ? "common:appMenu.nearbyOnlyOn" : "common:appMenu.nearbyOnlyOff"}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: nearbyOnly }}
+          onPress={() => choose(() => setNearbyOnly(!nearbyOnly))}
+        />
+      ) : null}
+      <MenuItem
+        testID="utility-account-button"
+        icon="account"
+        tx={`common:appMenu.${accountEntry}`}
+        onPress={() => choose(onAccount)}
+      />
+      <MenuItem
+        testID="utility-support-button"
+        icon="support"
+        tx="common:appMenu.support"
+        onPress={() => choose(onSupport)}
+      />
+      <MenuItem
+        testID="utility-settings-button"
+        icon="settings"
+        tx="common:appMenu.settings"
+        accessibilityLabel={translate(
+          updateReady ? "common:appMenu.settingsUpdateReady" : "common:appMenu.settings",
+        )}
+        onPress={() => choose(onSettings)}
+      >
+        {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
+      </MenuItem>
+    </>
   )
 }
 

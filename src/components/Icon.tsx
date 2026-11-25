@@ -145,6 +145,7 @@ const GLYPH_SIZE = 24
 const glyphRegistry = {
   back: () => <Path d="m15 18-6-6 6-6" />,
   arrowBack: () => <Path d="M19 12H5m7 7-7-7 7-7" />,
+  chevronDown: () => <Path d="m6 9 6 6 6-6" />,
   more: () => (
     <>
       <Circle cx={5} cy={12} r={1} />
@@ -170,6 +171,13 @@ const glyphRegistry = {
     <>
       <Rect x={7} y={3.5} width={12} height={15.5} rx={2} />
       <Path d="M5 6.5v12a2 2 0 0 0 2 2h9" />
+    </>
+  ),
+  cards: () => (
+    <>
+      <Rect x={3.5} y={4.5} width={11} height={15} rx={2} />
+      <Circle cx={16} cy={12} r={3.5} />
+      <Path d="m18.5 14.5 2.5 2.5" />
     </>
   ),
   history: () => <Path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4M12 7.5V12l3 2" />,

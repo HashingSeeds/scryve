@@ -34,6 +34,8 @@ export function Sheet({
   const { top, bottom } = useSafeAreaInsets()
   const sheet = useRef<ModalBottomSheetRef>(null)
   const [mounted, setMounted] = useState(visible)
+  // why: a sheet reopened from onDismissed sets visible in the same batch as the unmount, so a fresh key gives it a new native sheet.
+  const [presentation, setPresentation] = useState(0)
   const latestOnDismissed = useRef(onDismissed)
   latestOnDismissed.current = onDismissed
   if (visible && !mounted) setMounted(true)
@@ -53,6 +55,7 @@ export function Sheet({
       if (cancelled) return
       onScreen.current = false
       setMounted(false)
+      setPresentation((count) => count + 1)
       latestOnDismissed.current?.()
     })
     return () => {
@@ -63,7 +66,7 @@ export function Sheet({
   if (!mounted) return null
   const fit = size === "fit"
   return (
-    <Host style={StyleSheet.absoluteFill} pointerEvents="none">
+    <Host key={presentation} style={StyleSheet.absoluteFill} pointerEvents="none">
       <ModalBottomSheet
         ref={sheet}
         onDismissRequest={onClose}

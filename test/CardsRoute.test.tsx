@@ -10,7 +10,8 @@ import CardsRoute from "../src/app/cards"
 
 let mockParams: { deckId?: string; game?: string } = {}
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), canGoBack: () => true, replace: jest.fn() },
+  router: { back: jest.fn(), canGoBack: () => true, replace: jest.fn(), push: jest.fn() },
+  useFocusEffect: jest.fn(),
   useLocalSearchParams: () => mockParams,
 }))
 jest.mock("convex/react", () => ({
@@ -19,6 +20,10 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => ({ isWebSocketConnected: true }),
 }))
 jest.mock("@/features/decks/useCardNameIndex", () => ({ useCardNameIndex: () => undefined }))
+jest.mock("@/features/auth/AuthContext", () => ({
+  useAuthAccess: () => ({ configured: false, isSignedIn: false, openAuth: jest.fn() }),
+}))
+jest.mock("@/features/auth/CloudScreen", () => ({ CloudScreen: () => null }))
 
 const island = { name: "Island", quantity: 1, scryfallId: "island", section: "main" }
 
@@ -68,7 +73,7 @@ it("opens cold as a lookup and leaves the deck's saved draft alone", () => {
   mockParams = { deckId: "deck-1", game: "mtg" }
   const view = renderRoute()
 
-  expect(view.getByText("Cards")).toBeTruthy()
+  expect(view.getByTestId("app-tab-cards").props.accessibilityState).toEqual({ selected: true })
   expect(view.queryByText("Done")).toBeNull()
   fireEvent.changeText(view.getByTestId("card-search-input"), "Island")
   expect(view.queryByText("In this deck")).toBeNull()
