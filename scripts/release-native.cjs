@@ -64,6 +64,7 @@ function writeVersion(version) {
 
 // why: `checks` reports a few seconds after the PR opens, and gh errors until it does.
 function waitForChecks(branch) {
+  const deadline = Date.now() + 30 * 60_000
   for (;;) {
     let buckets = []
     try {
@@ -71,6 +72,7 @@ function waitForChecks(branch) {
         cwd: root,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
+        timeout: 60_000,
       })
       buckets = JSON.parse(out).map((check) => check.bucket)
     } catch {}
@@ -78,6 +80,8 @@ function waitForChecks(branch) {
       if (buckets.every((bucket) => bucket === "pass" || bucket === "skipping")) return
       throw new Error(`Required checks failed on ${branch}.`)
     }
+    if (Date.now() > deadline)
+      throw new Error(`Required checks on ${branch} did not finish within 30 minutes.`)
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15_000)
   }
 }
