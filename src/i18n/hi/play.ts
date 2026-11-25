@@ -416,7 +416,6 @@ export default {
   rules: {
     title: "नियम",
     cards: "कार्ड",
-    card: "कार्ड",
     search: "नियम खोजें",
     recent: "हाल के",
     contents: "विषय-सूची",

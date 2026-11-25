@@ -430,7 +430,6 @@ export default {
   rules: {
     title: "Reglas",
     cards: "Cartas",
-    card: "Carta",
     search: "Buscar reglas",
     recent: "Recientes",
     contents: "Contenido",

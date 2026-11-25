@@ -234,5 +234,5 @@ it("lists a card by name above rules, a half-typed one below them, and opens it"
   expect(order().at(-1)).toBe("rules-card-card-1")
 
   fireEvent.press(view.getByTestId("rules-card-card-1"))
-  expect(view.getAllByText("Counter target spell.")).toHaveLength(2)
+  expect(view.getByText("Counter target spell.")).toBeTruthy()
 })

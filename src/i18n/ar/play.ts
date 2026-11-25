@@ -457,7 +457,6 @@ export default {
   rules: {
     title: "القواعد",
     cards: "البطاقات",
-    card: "بطاقة",
     search: "بحث في القواعد",
     recent: "الأخيرة",
     contents: "المحتويات",

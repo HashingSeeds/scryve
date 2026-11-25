@@ -486,8 +486,6 @@ const play = {
     title: "Rules",
     // Header button that opens card lookup.
     cards: "Cards",
-    // Label on a card in rules search results, where a rule shows its number.
-    card: "Card",
     search: "Search rules",
     // Tab listing rules the player opened recently.
     // ar: Tab of rules you opened recently: "الأخيرة". الأحدث means newest rule changes.
