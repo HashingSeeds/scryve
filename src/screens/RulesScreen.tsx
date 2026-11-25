@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react"
-import { FlatList, Keyboard, Pressable, View } from "react-native"
+import { FlatList, Keyboard, Pressable, useWindowDimensions, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import type { ImageStyle } from "expo-image"
 import { useFocusEffect } from "expo-router"
@@ -21,7 +21,7 @@ import { Icon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
-import { Text } from "@/components/Text"
+import { $sizeStyles, Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { useSheetPresence } from "@/components/useSheetPresence"
 import type { BackAction } from "@/features/game/useBackToBoard"
@@ -240,6 +240,13 @@ export function RulesScreen({
   const title = section ? `${section.id}. ${section.title}` : translate("play:rules.title")
   const home = !ruleId
   const searching = home && Boolean(query.trim())
+  const { fontScale } = useWindowDimensions()
+  const resultText = Math.ceil(
+    ($sizeStyles.sm.lineHeight + theme.spacing.xxxs + 2 * $sizeStyles.xs.lineHeight) * fontScale,
+  )
+  const resultRow: ViewStyle | undefined = searching
+    ? { height: resultText + 2 * theme.spacing.sm + 1, overflow: "hidden" }
+    : undefined
   const searchResults = rows.flatMap((row) =>
     row.kind === "result"
       ? [row.rule.id]
@@ -336,12 +343,13 @@ export function RulesScreen({
         )
         const body = (
           <>
-            <Text size="sm" weight="medium" text={item.entry.term} />
+            <Text size="sm" weight="medium" numberOfLines={1} text={item.entry.term} />
             <RuleText
               reference={source.references}
               text={item.entry.text}
               onPressReference={(id) => openResult(id, index)}
-              lines={searching ? 3 : undefined}
+              lines={searching ? 2 : undefined}
+              size={searching ? "xs" : "sm"}
               dim
             />
           </>
@@ -350,13 +358,13 @@ export function RulesScreen({
           <Pressable
             accessibilityRole="link"
             onPress={() => openResult(firstCitedRule.id, index)}
-            style={({ pressed }) => [themed($entry), pressed && $pressed]}
+            style={({ pressed }) => [themed($entry), resultRow, pressed && $pressed]}
             testID={`rules-term-${item.entry.term}`}
           >
             {body}
           </Pressable>
         ) : (
-          <View style={themed($entry)}>{body}</View>
+          <View style={[themed($entry), resultRow]}>{body}</View>
         )
       }
       case "card":
@@ -369,7 +377,7 @@ export function RulesScreen({
               Keyboard.dismiss()
               setCard(item.card)
             }}
-            style={({ pressed }) => [themed($cardRow), pressed && $pressed]}
+            style={({ pressed }) => [themed($cardRow), resultRow, pressed && $pressed]}
             testID={`rules-card-${item.card.cardId}`}
           >
             <CardImage
@@ -377,13 +385,16 @@ export function RulesScreen({
               cardId={item.card.cardId}
               source={item.card.smallImageUrl ?? item.card.imageUrl}
               compact
-              style={themed($thumbnail)}
+              style={[themed($thumbnail), { width: (resultText * 488) / 680 }]}
               accessibilityLabel={item.card.name}
             />
             <View style={$flex}>
               <Text size="sm" weight="medium" numberOfLines={1} text={item.card.name} />
               {item.card.typeLine ? (
                 <Text size="xs" tone="dim" numberOfLines={1} text={item.card.typeLine} />
+              ) : null}
+              {item.card.oracleText ? (
+                <Text size="xs" tone="dim" numberOfLines={1} text={item.card.oracleText} />
               ) : null}
             </View>
           </Pressable>
@@ -403,7 +414,7 @@ export function RulesScreen({
           <Pressable
             accessibilityRole="link"
             onPress={() => openResult(item.rule.id, index)}
-            style={({ pressed }) => [themed($entry), pressed && $pressed]}
+            style={({ pressed }) => [themed($entry), resultRow, pressed && $pressed]}
             testID={`rule-${item.rule.id}`}
           >
             <View style={themed($resultHeader)}>
@@ -413,7 +424,7 @@ export function RulesScreen({
                 <Text size="xs" tone="dim" numberOfLines={1} style={$flex} text={title} />
               ) : null}
             </View>
-            <Text size="xs" tone="dim" numberOfLines={3}>
+            <Text size="xs" tone="dim" numberOfLines={2}>
               {segments.map((segment, segmentIndex) =>
                 segment.matched ? (
                   <Text key={segmentIndex} size="xs" weight="medium" text={segment.text} />
@@ -793,6 +804,7 @@ function RuleText({
   active,
   dim,
   lines,
+  size = "sm",
 }: {
   text: string
   reference: RegExp
@@ -800,17 +812,18 @@ function RuleText({
   active?: string
   dim?: boolean
   lines?: number
+  size?: "sm" | "xs"
 }) {
   const { themed } = useAppTheme()
   return (
-    <Text size="sm" tone={dim ? "dim" : undefined} numberOfLines={lines}>
+    <Text size={size} tone={dim ? "dim" : undefined} numberOfLines={lines}>
       {ruleReferences(text, reference).map((part, index) =>
         typeof part === "string" ? (
           part
         ) : (
           <Text
             key={index}
-            size="sm"
+            size={size}
             accessibilityRole="link"
             style={[themed($link), part.id === active && $active]}
             onPress={() => onPressReference(part.id)}
