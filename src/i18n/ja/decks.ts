@@ -465,7 +465,7 @@ export default {
     retailTotal: "販売価格 {{total}}",
     buylistTotal: "買取 {{total}}",
     sortRecent: "新しい順",
-    sortValue: "価値の高い順",
+    sortValue: "価値",
     sortName: "名前順",
     emptySession: "このセッションでスキャンしたカードはまだありません。",
     movedToBinder_other: "{{count}}種類を移動しました。",

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react"
 import { FlatList, TouchableOpacity, View } from "react-native"
-import type { ImageStyle, ViewStyle } from "react-native"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 
 import { CardImage } from "@/components/CardImage"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { Sheet } from "@/components/Sheet"
+import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import { formatCurrency, joinParts } from "@/i18n/format"
 import { catalogDb } from "@/storage/catalogDb"
@@ -101,7 +102,8 @@ export function PrintingPickerSheet({
           <FlatList
             data={printings}
             keyExtractor={(item) => item.printingId}
-            style={$list}
+            style={themed($sheetScroll)}
+            contentContainerStyle={themed($sheetScrollContent)}
             renderItem={({ item }) => {
               const supported = item.finishes.length === 0 || item.finishes.includes(finish)
               const price = supported
@@ -154,7 +156,11 @@ export function PrintingPickerSheet({
                     />
                   </View>
                   {price.retailCents !== undefined ? (
-                    <Text weight="medium" text={formatCurrency(price.retailCents, "USD")} />
+                    <Text
+                      weight="medium"
+                      style={$price}
+                      text={formatCurrency(price.retailCents, "USD")}
+                    />
                   ) : null}
                 </TouchableOpacity>
               )
@@ -166,17 +172,12 @@ export function PrintingPickerSheet({
   )
 }
 
-const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  padding: spacing.md,
-  gap: spacing.sm,
-  maxHeight: 540,
-})
+const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flexShrink: 1, gap: spacing.sm })
 const $pillRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
   gap: spacing.xs,
 })
-const $list: ViewStyle = { maxHeight: 340 }
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
@@ -192,4 +193,6 @@ const $selectedRow: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $disabledRow: ViewStyle = { opacity: 0.45 }
 const $thumb: ImageStyle = { width: 38, height: 53 }
-const $meta: ViewStyle = { flex: 1 }
+// why: `flex: 1` alone sized this column to its text, pushing large prices past the row edge.
+const $meta: ViewStyle = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }
+const $price: TextStyle = { flexShrink: 0 }

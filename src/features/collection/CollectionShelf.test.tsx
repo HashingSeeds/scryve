@@ -19,9 +19,19 @@ import { encodeFinishes, encodeRarity } from "../../../convex/lib/cardPricing"
 jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn(async () => true),
 }))
-jest.mock("@/features/decks/useCardNameIndex", () => ({
-  useCardNameIndex: () => undefined,
-}))
+const mockNames = { list: ["Sol Ring"] }
+jest.mock("@/features/decks/useCardNameIndex", () => {
+  const { cardNameIndex } = jest.requireActual("@/features/decks/cardNameMatch")
+  return { useCardNameIndex: () => cardNameIndex(mockNames.list) }
+})
+jest.mock("@/features/decks/CardScanner", () => {
+  const { Pressable } = jest.requireActual("react-native")
+  return {
+    CardScanner: ({ onClose }: { onClose: () => void }) => (
+      <Pressable testID="card-scanner-close" onPress={onClose} />
+    ),
+  }
+})
 jest.mock("../../../modules/card-text-reader", () => ({
   CardTextCamera: () => null,
   canReadCardText: false,
@@ -87,6 +97,7 @@ describe("CollectionShelf", () => {
     expect(stored[0].quantity).toBe(2)
     expect(view.getByText("Sol Ring")).toBeTruthy()
     expect(view.getByText("$5.00")).toBeTruthy()
+    expect(view.getByText("CMM · #410")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("delete-binder-button"))
     expect(listBinders("binder")).toHaveLength(0)
@@ -94,6 +105,56 @@ describe("CollectionShelf", () => {
     expect(remaining).toHaveLength(1)
     expect(remaining[0].binderId).toBeUndefined()
     expect(remaining[0].quantity).toBe(2)
+  })
+
+  it("adds a card from a partial name and says when nothing matches", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CollectionShelf mode="collection" />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("collection-add-card-button"))
+    fireEvent.changeText(view.getByTestId("collection-add-card-input"), "Zzyzx")
+    expect(view.getByText("No cards found.")).toBeTruthy()
+
+    fireEvent.changeText(view.getByTestId("collection-add-card-input"), "Sol Ri")
+    fireEvent.press(view.getByText("Sol Ring"))
+    fireEvent.press(view.getByText("CMM · #410 · Commander Masters"))
+    expect(listCollectionEntries({ game: "mtg" }).map((entry) => entry.printingId)).toEqual([
+      "cmm-410",
+    ])
+  })
+
+  it("finds an exact cached name when the name index is empty", () => {
+    mockNames.list = []
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <CollectionShelf mode="collection" />
+        </ThemeProvider>,
+      )
+      fireEvent.press(view.getByTestId("collection-add-card-button"))
+      fireEvent.changeText(view.getByTestId("collection-add-card-input"), "sol ring")
+      fireEvent.press(view.getByText("Sol Ring"))
+      expect(view.getByText("CMM · #410 · Commander Masters")).toBeTruthy()
+    } finally {
+      mockNames.list = ["Sol Ring"]
+    }
+  })
+
+  it("deletes a scan session the scanner closes with no cards", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CollectionShelf mode="scans" game="mtg" />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("new-scan-session-button"))
+    expect(listBinders("scan_session")).toHaveLength(1)
+    fireEvent.press(view.getByTestId("card-scanner-close"))
+    expect(listBinders("scan_session")).toHaveLength(0)
+    expect(view.queryByTestId("scan-session-list")).toBeNull()
   })
 
   it("scopes scan sessions to the active game", () => {
@@ -235,7 +296,7 @@ describe("CollectionShelf", () => {
           binderId: session.id,
         })
       })
-      await act(async () => fireEvent.press(view.getByText("Done")))
+      fireEvent.press(view.getByTestId("card-scanner-close"))
       expect(shelfLists()).toBe(1)
 
       fireEvent.press(view.getByText("Back"))
@@ -320,10 +381,11 @@ describe("CollectionShelf", () => {
 
       fireEvent.press(view.getByTestId("collection-add-card-button"))
       fireEvent.changeText(view.getByTestId("collection-add-card-input"), "Sol Ring")
-      expect(view.queryByText("Sol Ring · CMM · #410")).toBeNull()
+      fireEvent.press(view.getByText("Sol Ring"))
+      expect(view.queryByText("CMM · #410 · Commander Masters")).toBeNull()
 
       releasePrintings()
-      expect(await view.findByText("Sol Ring · CMM · #410")).toBeTruthy()
+      expect(await view.findByText("CMM · #410 · Commander Masters")).toBeTruthy()
     } finally {
       global.fetch = originalFetch
     }
