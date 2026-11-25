@@ -96,6 +96,9 @@ export default {
       saveFailed: "Impossible d’enregistrer votre choix. Réessayez.",
       unavailable:
         "Le partage de l’usage n’est pas disponible dans cette version. Aucun événement PostHog ne sera envoyé.",
+      storeLinks: "Soutenir Scryve avec les liens vers les boutiques",
+      storeLinksHelper:
+        "Les liens sortants vers TCGplayer et Card Kingdom peuvent inclure un code de parrainage, sans frais supplémentaires.",
     },
     appInfo: {
       heading: "Informations sur l’app",

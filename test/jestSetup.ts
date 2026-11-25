@@ -230,3 +230,6 @@ jest.mock("expo-screen-orientation", () => ({
   getOrientationAsync: jest.fn(async () => 0),
   addOrientationChangeListener: jest.fn(() => ({ remove: jest.fn() })),
 }))
+
+// why: Jest runs on Node 24, so backing expo-sqlite with built-in node:sqlite tests real SQL, indexes, and transactions.
+jest.mock("expo-sqlite", () => require("./support/mockExpoSqlite"))

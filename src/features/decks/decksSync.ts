@@ -4,6 +4,7 @@ import { useConvex, type ConvexReactClient } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { createSnapshotStore, type SnapshotStore } from "@/features/sync/snapshotStore"
+import { cardKvStorage } from "@/storage/cardStorage"
 import { storage } from "@/utils/storage"
 
 import { api } from "../../../convex/_generated/api"
@@ -104,7 +105,7 @@ export function setDeckSyncEnabled(enabled: boolean) {
 export class DeckSyncRepository {
   constructor(
     readonly ownerId: string,
-    private readonly local: DeckSyncStorage = storage,
+    private readonly local: DeckSyncStorage = cardKvStorage,
     private readonly deploymentUrl?: string,
   ) {}
 
@@ -295,7 +296,7 @@ const controllers = new WeakMap<object, Map<string, DeckSyncController>>()
 export function getDeckSyncController(
   client: Pick<ConvexReactClient, "query" | "watchQuery" | "url">,
   ownerId: string,
-  repository = new DeckSyncRepository(ownerId, storage, client.url),
+  repository = new DeckSyncRepository(ownerId, cardKvStorage, client.url),
 ) {
   let byOwner = controllers.get(client)
   if (!byOwner) {

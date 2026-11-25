@@ -795,7 +795,8 @@ describe("DecksScreen", () => {
     mockListMine.error = new Error("Network unavailable")
     const view = renderShelf()
 
-    expect(view.getByText("Decks")).toBeTruthy()
+    expect(view.getAllByText("Decks").length).toBeGreaterThan(0)
+    expect(view.getByTestId("decks-area-segment")).toBeTruthy()
     expect(view.getByTestId("collection-filter")).toBeTruthy()
     expect(view.getByTestId("deck-filters-button")).toBeTruthy()
     expect(view.getByTestId("deck-search-input")).toBeTruthy()

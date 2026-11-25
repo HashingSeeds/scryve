@@ -105,6 +105,9 @@ const account = {
         "Off by default. Shares usage with a random ID that isn't linked to your account. Details in Privacy Policy.",
       saveFailed: "Could not save your choice. Please try again.",
       unavailable: "Usage sharing is unavailable in this build. No PostHog events will be sent.",
+      storeLinks: "Support Scryve with store links",
+      storeLinksHelper:
+        "Outbound TCGplayer and Card Kingdom links may include a referral tag at no extra cost.",
     },
     appInfo: {
       heading: "App information",

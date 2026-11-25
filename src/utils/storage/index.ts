@@ -43,8 +43,20 @@ export function remove(key: string): void {
   } catch {}
 }
 
+const clearListeners = new Set<() => void>()
+
+export function onStorageClear(listener: () => void): () => void {
+  clearListeners.add(listener)
+  return () => clearListeners.delete(listener)
+}
+
 export function clear(): void {
   try {
     storage.clearAll()
   } catch {}
+  for (const listener of clearListeners) {
+    try {
+      listener()
+    } catch {}
+  }
 }

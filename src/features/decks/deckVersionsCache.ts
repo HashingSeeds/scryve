@@ -12,7 +12,7 @@ import { useConvex, useConvexConnectionState, type ConvexReactClient } from "con
 import type { FunctionReturnType } from "convex/server"
 
 import type { DeckCard } from "@/features/decks/deckCards"
-import { storage } from "@/utils/storage"
+import { cardKvStorage } from "@/storage/cardStorage"
 
 import { scopedOwnerId } from "./decksSync"
 import { api } from "../../../convex/_generated/api"
@@ -389,7 +389,7 @@ export const cachedCardIdentity = cardIdentity
 export class DeckVersionCacheRepository {
   constructor(
     readonly ownerId: string,
-    private readonly local: DeckVersionCacheStorage = storage,
+    private readonly local: DeckVersionCacheStorage = cardKvStorage,
     private readonly deploymentUrl?: string,
   ) {}
 
@@ -792,7 +792,7 @@ const controllers = new WeakMap<object, Map<string, DeckVersionCacheController>>
 export function getDeckVersionCacheController(
   client: Pick<ConvexReactClient, "query" | "url">,
   ownerId: string,
-  repository = new DeckVersionCacheRepository(ownerId, storage, client.url),
+  repository = new DeckVersionCacheRepository(ownerId, cardKvStorage, client.url),
 ) {
   let byOwner = controllers.get(client)
   if (!byOwner) {

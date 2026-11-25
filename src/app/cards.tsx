@@ -46,6 +46,7 @@ function DeckCardsRoute({ host }: { host: DeckSearchHost }) {
       deckCards={cards}
       onAdd={host.onAdd}
       onRemove={host.onRemove}
+      onReplace={host.onReplace}
       onClose={leave}
     />
   )

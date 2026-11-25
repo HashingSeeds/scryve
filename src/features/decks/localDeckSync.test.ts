@@ -145,8 +145,10 @@ test("saves server content and its key before moving the exact revision", async 
 })
 
 test("does not move server content if saving the local copy fails", async () => {
-  const { storage } = jest.requireActual("@/utils/storage") as typeof import("@/utils/storage")
-  const write = jest.spyOn(storage, "set").mockImplementation(() => {
+  const { localCardDb } = jest.requireActual(
+    "@/storage/localDb",
+  ) as typeof import("@/storage/localDb")
+  const write = jest.spyOn(localCardDb, "upsertGuestDeck").mockImplementation(() => {
     throw new Error("disk full")
   })
   await expect(renderSync().keepOnDevice(deckId)).rejects.toThrow("Unable to save")

@@ -185,6 +185,7 @@ export type DeckEdits<Card extends DeckCard = DeckCard> = {
 export type DeckEdit<Card extends DeckCard = DeckCard> =
   | { type: "add"; card: Card }
   | { type: "remove"; card: Card }
+  | { type: "replace"; previous: Card; next: Card }
   | {
       type: "chooseCommander"
       card: Card
@@ -221,6 +222,18 @@ export function editDeck<Draft extends DeckEdits>(
         ...draft,
         cards: adjustCardQuantity(draft.cards, entry, -1),
         undo: entry.quantity === 1 ? { name: entry.name, cards: draft.cards } : undefined,
+      }
+    }
+    case "replace": {
+      const entry = draft.cards.find((card) => printingKey(card) === printingKey(edit.previous))
+      if (!entry) return draft
+      const withoutPrevious = adjustCardQuantity(draft.cards, entry, -1)
+      const result = addCopy(withoutPrevious, edit.next)
+      if ("error" in result && result.error !== undefined) return { error: result.error }
+      return {
+        ...draft,
+        cards: result.cards,
+        undo: { name: entry.name, cards: draft.cards },
       }
     }
     case "move": {

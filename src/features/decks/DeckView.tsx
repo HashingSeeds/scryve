@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react"
-import { View } from "react-native"
+import { useMemo, useState, type ReactNode } from "react"
+import { Linking, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { router } from "expo-router"
 import { SectionList } from "@legendapp/list/section-list"
@@ -12,10 +12,16 @@ import { Tabs } from "@/components/Tabs"
 import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
+import { useCatalogSync } from "@/features/collection/catalogSync"
+import { useCollectionRevision } from "@/features/collection/collectionStore"
+import { computeDeckOwnership } from "@/features/collection/deckOwnership"
+import { tcgplayerMassEntryUrl } from "@/features/collection/storeLinks"
 import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
-import { joinParts } from "@/i18n/format"
+import { prereleaseBuild } from "@/features/updates/appUpdate"
+import { formatCurrency, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
+import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
 
 import { CardSearchScreen } from "./CardSearchScreen"
@@ -166,6 +172,25 @@ export function DeckView({
     })
   }
   const shownCards = building ? cards : savedCards
+  const collectionRevision = useCollectionRevision()
+  const showOwnership = prereleaseBuild() && building && !cardsUnavailable && shownCards.length > 0
+  const catalogSync = useCatalogSync(game, showOwnership)
+  const ownership = useMemo(() => {
+    void collectionRevision
+    void catalogSync.printingCount
+    void catalogSync.priceCount
+    void catalogSync.updatedAt
+    if (!showOwnership) return undefined
+    return computeDeckOwnership(game, shownCards)
+  }, [
+    catalogSync.priceCount,
+    catalogSync.printingCount,
+    catalogSync.updatedAt,
+    collectionRevision,
+    game,
+    showOwnership,
+    shownCards,
+  ])
   const issues = useDeckIssues(game, format, shownCards)
   const side = sideboardSection({ game, format })
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
@@ -260,6 +285,51 @@ export function DeckView({
               play
             )}
             {cardsMessage}
+            {ownership ? (
+              <View testID="deck-ownership-bar" style={themed($ownershipCard)}>
+                <View style={$flex}>
+                  <Text
+                    size="xs"
+                    weight="medium"
+                    text={translate("decks:collection.ownershipSummary", {
+                      owned: ownership.ownedCards,
+                      total: ownership.totalCards,
+                    })}
+                  />
+                  <Text
+                    size="xs"
+                    tone="dim"
+                    text={
+                      ownership.missingCards === 0
+                        ? translate("decks:collection.ownershipComplete")
+                        : translate("decks:collection.ownershipMissing", {
+                            missing: ownership.missingCards,
+                            cost: formatCurrency(ownership.estimatedMissingCents, "USD"),
+                          })
+                    }
+                  />
+                </View>
+                {ownership.missingCards > 0 && catalogSync.supported ? (
+                  <Button
+                    testID="deck-buy-missing"
+                    tx="decks:collection.buyMissing"
+                    onPress={() =>
+                      void Linking.openURL(
+                        tcgplayerMassEntryUrl(
+                          ownership.items
+                            .filter((item) => item.missing > 0)
+                            .map((item) => ({
+                              name: item.name,
+                              setCode: item.setCode,
+                              quantity: item.missing,
+                            })),
+                        ),
+                      )
+                    }
+                  />
+                ) : null}
+              </View>
+            ) : null}
             {building && !cardsUnavailable && shownCards.length > 0 ? (
               <DeckIssues
                 game={game}
@@ -411,6 +481,7 @@ export function DeckView({
           commanderCards={cards}
           onClose={() => setChoosingCommander(false)}
           onRemove={search.onRemove}
+          onReplace={search.onReplace}
           onAdd={(card) => {
             const addError = search.onAdd(card)
             if (!addError && isCommanderPick({ game, format }, card)) setChoosingCommander(false)
@@ -477,6 +548,15 @@ const $notes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
 })
 const $bar: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
+const $ownershipCard: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  padding: spacing.sm,
+  marginTop: spacing.xs,
+  borderRadius: radius.md,
+  backgroundColor: colors.background,
+})
 const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.sm,

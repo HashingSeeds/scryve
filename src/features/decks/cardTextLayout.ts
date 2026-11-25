@@ -1,11 +1,11 @@
-import type { CardPhotoText } from "../../../modules/card-text-reader"
+import type { CardPhotoText, CardTextLine } from "../../../modules/card-text-reader"
 
 type Size = { width: number; height: number }
 type Point = { x: number; y: number }
 
 export type ScanFraming = { view: Size; frame: Size & { x: number; y: number } }
 
-const FRAME_MARGIN = 1.1
+const FRAME_MARGIN = 1.0
 
 function circularMeanRadians(lines: CardPhotoText["lines"]) {
   let sin = 0
@@ -26,11 +26,7 @@ function insideCard(cardCorners: Point[], point: Point) {
   return sides.every((side) => side >= 0) || sides.every((side) => side <= 0)
 }
 
-/**
- * why: a phone lying flat can save the photo turned 90° or 180° from the locked portrait
- * preview, so the frame is matched symmetrically around the photo's center.
- */
-export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFraming): string[] {
+function framedPieces(photo: CardPhotoText, framing: ScanFraming) {
   const sideways = photo.width > photo.height !== framing.view.width > framing.view.height
   const view = sideways ? { width: framing.view.height, height: framing.view.width } : framing.view
   const scale = Math.max(view.width / photo.width, view.height / photo.height)
@@ -61,6 +57,15 @@ export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFramin
     -x * Math.sin(cardRotation) + y * Math.cos(cardRotation)
   const acrossTheCard = ({ x, y }: { x: number; y: number }) =>
     x * Math.cos(cardRotation) + y * Math.sin(cardRotation)
+  return { framed, half, downTheCard, acrossTheCard }
+}
+
+/**
+ * why: a phone lying flat can save the photo turned 90° or 180° from the locked portrait
+ * preview, so the frame is matched symmetrically around the photo's center.
+ */
+export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFraming): string[] {
+  const { framed, downTheCard, acrossTheCard } = framedPieces(photo, framing)
   // why: a split name's last piece can be another card's name ("Leonardo, the" + "Balance").
   const rows: (typeof framed)[] = []
   for (const piece of framed.sort((a, b) => downTheCard(a) - downTheCard(b))) {
@@ -81,4 +86,24 @@ export function framedLinesFromCardTop(photo: CardPhotoText, framing: ScanFramin
       .map(({ line }) => line.text)
     return texts.length > 1 ? [texts.join(" "), texts[0]] : texts
   })
+}
+
+/**
+ * why: when card-corner detection falls back to full-frame OCR, `photo.bottomLines` is empty even
+ * though the collector strip was already recognized near the bottom of the guide frame.
+ */
+export function framedLineObjectsFromCardBottom(
+  photo: CardPhotoText,
+  framing: ScanFraming,
+): CardTextLine[] {
+  const { framed, half, downTheCard } = framedPieces(photo, framing)
+  if (framed.length === 0) return []
+  const cutoff = half.y * 0.3
+  const lower = framed.filter((piece) => downTheCard(piece) >= cutoff)
+  const chosen = lower.length > 0 ? lower : framed.slice(-4)
+  return chosen.sort((a, b) => downTheCard(a) - downTheCard(b)).map(({ line }) => line)
+}
+
+export function framedLinesFromCardBottom(photo: CardPhotoText, framing: ScanFraming): string[] {
+  return framedLineObjectsFromCardBottom(photo, framing).map((line) => line.text)
 }
