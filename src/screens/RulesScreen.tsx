@@ -44,6 +44,7 @@ import { useLocalCardSearch } from "@/features/rules/localCards"
 import { recentRules, rememberRule } from "@/features/rules/recentRules"
 import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { useRulesSearchAnalytics } from "@/features/rules/useRulesSearchAnalytics"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import type { SheetDragGesture } from "@/screens/RulesSheet"
 import { useAppTheme } from "@/theme/context"
@@ -352,6 +353,7 @@ export function RulesScreen({
         return (
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={joinParts([item.card.name, item.card.typeLine])}
             onPress={() => {
               searchOpened(index + 1, "card")
               Keyboard.dismiss()
