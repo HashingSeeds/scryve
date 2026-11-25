@@ -490,6 +490,7 @@ export default {
     searchCards: "カードを検索",
     searchCatalogPlaceholder: "追加するカード名…",
     emptyCollection: "まだカードがありません。スキャン、CSVのインポート、検索で追加できます。",
+    emptySession: "このセッションでスキャンしたカードはまだありません。",
     tradeTitle: "トレード計算機",
     tradeGive: "渡すカード",
     tradeReceive: "受け取るカード",

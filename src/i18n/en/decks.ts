@@ -597,6 +597,7 @@ const decks = {
     searchCards: "Search cards",
     searchCatalogPlaceholder: "Card name to add…",
     emptyCollection: "No cards here yet. Scan, import a CSV, or search to add one.",
+    emptySession: "No cards scanned in this session yet.",
     tradeTitle: "Trade calculator",
     tradeGive: "You give",
     tradeReceive: "You receive",

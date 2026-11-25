@@ -493,6 +493,7 @@ export default {
     searchCards: "कार्ड खोजें",
     searchCatalogPlaceholder: "जोड़ने के लिए कार्ड का नाम…",
     emptyCollection: "यहाँ अभी कोई कार्ड नहीं है। स्कैन करें, CSV इंपोर्ट करें या खोजकर जोड़ें।",
+    emptySession: "इस सेशन में अभी तक कोई कार्ड स्कैन नहीं हुआ।",
     tradeTitle: "ट्रेड कैलकुलेटर",
     tradeGive: "आप देते हैं",
     tradeReceive: "आप लेते हैं",
