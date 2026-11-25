@@ -172,9 +172,9 @@ export const localCardDb: LocalCardDb = {
   },
 
   deleteBinder(id) {
-    storage.delete(`${BINDER_PREFIX}${id}`)
+    storage.remove(`${BINDER_PREFIX}${id}`)
     for (const entry of this.listCollectionEntries({ binderId: id, includeDeleted: true })) {
-      storage.delete(`${COLLECTION_PREFIX}${entry.id}`)
+      storage.remove(`${COLLECTION_PREFIX}${entry.id}`)
     }
   },
 
@@ -241,7 +241,7 @@ export const localCardDb: LocalCardDb = {
     this.clearCardDetails()
     for (const key of storage.getAllKeys()) {
       if (key.startsWith(BINDER_PREFIX) || key.startsWith(COLLECTION_PREFIX)) {
-        storage.delete(key)
+        storage.remove(key)
       }
     }
   },
