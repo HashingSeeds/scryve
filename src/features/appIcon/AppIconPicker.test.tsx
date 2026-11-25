@@ -115,5 +115,7 @@ describe("AppIconPicker", () => {
     view.unmount()
     const failed = renderFor({ isSignedIn: true, isCountPro: false, isFoil: false, failed: true })
     expect(failed.getByText("Couldn't check Scryve Pro, so Pro icons are locked.")).toBeTruthy()
+    fireEvent.press(failed.getByTestId("app-icon-midnight"))
+    expect(mockPresentPaywall).toHaveBeenCalledTimes(1)
   })
 })

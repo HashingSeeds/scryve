@@ -104,7 +104,6 @@ export function AppIconPicker() {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
   const planFailed = !billing.isLoading && billing.customerInfo === null && Boolean(billing.error)
-  const planUnknown = billing.isLoading || planFailed
   const [current, setCurrent] = useState(() => (supportsAlternateIcons ? getAppIconName() : null))
   const [error, setError] = useState("")
   const pro = useProSignIn(() => void billing.presentPaywall())
@@ -154,7 +153,7 @@ export function AppIconPicker() {
     lapsed,
   }: (typeof options)[number]) => {
     const selected = name === current
-    const disabled = lapsed || (locked && planUnknown)
+    const disabled = lapsed || (locked && billing.isLoading)
     return (
       <TouchableOpacity
         key={id}

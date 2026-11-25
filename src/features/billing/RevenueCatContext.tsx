@@ -193,7 +193,6 @@ function mostRecentlyFetchedCustomerInfo(current: CustomerInfo | null, next: Cus
 
 type Purchases = Awaited<ReturnType<typeof loadPurchases>>
 
-/** why: a null appUserID is the anonymous player RevenueCat makes for a signed-out phone. */
 async function isCurrentUser(Purchases: Purchases, appUserID: string | null) {
   return appUserID === null
     ? await Purchases.isAnonymous()
@@ -201,7 +200,7 @@ async function isCurrentUser(Purchases: Purchases, appUserID: string | null) {
 }
 
 /** why: logging in from the anonymous player moves its purchases onto the account, but RevenueCat merges only an account's first anonymous player, so a later anonymous buyer's store purchase is synced over instead. */
-async function configureForUser(
+async function switchUser(
   apiKey: string,
   appUserID: string | null,
 ): Promise<{ Purchases: Purchases; linkError?: string }> {
@@ -214,6 +213,8 @@ async function configureForUser(
       appUserID,
       entitlementVerificationMode: Purchases.ENTITLEMENT_VERIFICATION_MODE.INFORMATIONAL,
     })
+    // why: configuring without an ID reuses the SDK's saved one, which earlier builds left on the account after sign out.
+    if (appUserID === null && !(await Purchases.isAnonymous())) await Purchases.logOut()
     return { Purchases }
   }
 
@@ -226,13 +227,21 @@ async function configureForUser(
     (await Purchases.isAnonymous()) && hasCountPro(await Purchases.getCustomerInfo())
   const { customerInfo } = await Purchases.logIn(appUserID)
   if (!anonymousPro || hasCountPro(customerInfo)) return { Purchases }
-  // why: a failed sync still lets billing load, so the player can reach Restore Purchases.
   try {
     await Purchases.syncPurchasesForResult()
     return { Purchases }
   } catch (cause) {
     return { Purchases, linkError: revenueCatErrorMessage(cause) }
   }
+}
+
+let identityChange: Promise<unknown> = Promise.resolve()
+
+/** why: a sign out while a logIn is still pending would otherwise see the SDK as anonymous, skip logOut, and leave it on the account once logIn lands. */
+function configureForUser(apiKey: string, appUserID: string | null) {
+  const run = identityChange.then(() => switchUser(apiKey, appUserID))
+  identityChange = run.catch(() => undefined)
+  return run
 }
 
 function offerAccountForPro(signIn: () => void) {
@@ -405,7 +414,6 @@ export function RevenueCatProvider({
         if (result === "error") return fail(translate("account:billing.errors.paywallFailed"))
         if (result === "purchased" || result === "restored") {
           const next = await refreshCustomerInfo()
-          // why: renewal reminders arrive through the account, so an anonymous buyer is asked to sign in instead.
           if (appUserID === null) {
             if (signIn && hasCountPro(next)) offerAccountForPro(signIn)
           } else if (result === "purchased" && renewsYearly(next)) offerRenewalReminder()

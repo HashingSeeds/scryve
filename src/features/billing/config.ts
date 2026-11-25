@@ -12,7 +12,7 @@ export const COUNT_PRODUCT_IDS = {
   monthly: "monthly",
 } as const
 
-/** why: a store purchase can be restored from the player's Apple or Google account, so a signed-out phone buys Pro anonymously and signing in carries it over. A web purchase has nothing to restore from, so web buys on an account. */
+/** why: an anonymous web purchase has no store receipt to restore, so clearing site data would lose it. */
 export const SIGNED_OUT_PURCHASES = Platform.OS !== "web"
 
 export type CountProductId = (typeof COUNT_PRODUCT_IDS)[keyof typeof COUNT_PRODUCT_IDS]

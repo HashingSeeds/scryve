@@ -247,6 +247,46 @@ describe("RevenueCatProvider", () => {
     expect(result.current.error).toBeTruthy()
   })
 
+  it("logs out the account an earlier build left saved when a signed-out phone configures", async () => {
+    purchasesMock.isAnonymous.mockResolvedValue(false)
+    renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(Purchases.logOut).toHaveBeenCalledTimes(1))
+  })
+
+  it("still logs out when the player signs out while signing in is pending", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("$RCAnonymousID:abc")
+    let loggedIn = false
+    purchasesMock.isAnonymous.mockImplementation(async () => !loggedIn)
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    let finishLogin!: () => void
+    purchasesMock.logIn.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishLogin = () => {
+          loggedIn = true
+          resolve({ customerInfo: expiredCustomerInfo, created: false })
+        }
+      }),
+    )
+    const billingFor = (appUserID: string | null) => (
+      <RevenueCatProvider apiKey="test_public" appUserID={appUserID}>
+        {null}
+      </RevenueCatProvider>
+    )
+    const { rerender } = render(billingFor("user_123"))
+    await waitFor(() => expect(Purchases.logIn).toHaveBeenCalledWith("user_123"))
+    rerender(billingFor(null))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+    await act(async () => finishLogin())
+    await waitFor(() => expect(Purchases.logOut).toHaveBeenCalledTimes(1))
+  })
+
   it("logs RevenueCat out of the previous account when the player signs out", async () => {
     purchasesMock.isConfigured.mockResolvedValue(true)
     purchasesMock.isAnonymous.mockResolvedValue(false)
