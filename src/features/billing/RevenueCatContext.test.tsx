@@ -72,7 +72,9 @@ jest.mock("react-native-purchases", () => {
       purchasePackage: jest.fn(),
       restorePurchases: jest.fn(),
       getAppUserID: jest.fn(),
+      isAnonymous: jest.fn(),
       logIn: jest.fn(),
+      logOut: jest.fn(),
     },
   }
 })
@@ -176,6 +178,44 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "failed" })
     })
     expect(Purchases.purchasePackage).not.toHaveBeenCalled()
+  })
+
+  it("lets a signed-out player buy anonymously, then offers sign in", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    const signIn = jest.fn()
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null} signIn={signIn}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    expect(Purchases.configure).toHaveBeenCalledWith(expect.objectContaining({ appUserID: null }))
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("purchased")
+    })
+    expect(alert).toHaveBeenCalledTimes(1)
+    const [title, , buttons] = alert.mock.calls[0]
+    expect(title).toBe("Keep Pro on all your devices?")
+    buttons?.find((button) => button.text === "Sign in")?.onPress?.()
+    expect(signIn).toHaveBeenCalledTimes(1)
+  })
+
+  it("logs RevenueCat out of the previous account when the player signs out", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.isAnonymous.mockResolvedValue(false)
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(Purchases.logOut).toHaveBeenCalledTimes(1))
+    expect(Purchases.logIn).not.toHaveBeenCalled()
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
   })
 
   it("tells the player when the paywall itself errors, and stays quiet when they close it", async () => {

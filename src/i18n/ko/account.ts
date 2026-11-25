@@ -286,6 +286,11 @@ export default {
   billing: {
     proNeedsAccount:
       "Scryve Pro는 계정에 연결됩니다. 로그인하여 Pro를 구매하거나 이미 보유한 Pro를 이용하세요.",
+    signInPrompt: {
+      title: "모든 기기에서 Pro를 사용하시겠습니까?",
+      body: "로그인하면 다른 기기와 웹에서도 Scryve Pro를 사용할 수 있습니다.",
+      notNow: "나중에",
+    },
     renewalPrompt: {
       title: "갱신 전에 알려 드릴까요?",
       body_other: "다음 연간 결제 {{count}}일 전에 알림을 받습니다.",

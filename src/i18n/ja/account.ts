@@ -284,6 +284,11 @@ export default {
   billing: {
     proNeedsAccount:
       "Scryve Proはアカウントに紐づいています。Proを購入する、または購入済みのProを使うにはサインインしてください。",
+    signInPrompt: {
+      title: "Proをすべてのデバイスで使いますか？",
+      body: "サインインすると、他のデバイスやWeb版でもScryve Proを使えます。",
+      notNow: "今はしない",
+    },
     renewalPrompt: {
       title: "更新前にお知らせしますか？",
       body_other: "次の年額課金の{{count}}日前に通知を受け取れます。",

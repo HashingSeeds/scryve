@@ -191,7 +191,17 @@ function mostRecentlyFetchedCustomerInfo(current: CustomerInfo | null, next: Cus
   return current && Date.parse(current.requestDate) > Date.parse(next.requestDate) ? current : next
 }
 
-async function configureForUser(apiKey: string, appUserID: string) {
+type Purchases = Awaited<ReturnType<typeof loadPurchases>>
+
+/** why: a null appUserID is the anonymous player RevenueCat makes for a signed-out phone. */
+async function isCurrentUser(Purchases: Purchases, appUserID: string | null) {
+  return appUserID === null
+    ? await Purchases.isAnonymous()
+    : (await Purchases.getAppUserID()) === appUserID
+}
+
+/** why: logging in from the anonymous player moves its purchases onto the account. */
+async function configureForUser(apiKey: string, appUserID: string | null) {
   const Purchases = await loadPurchases()
   const configured = await Purchases.isConfigured()
   if (!configured) {
@@ -204,9 +214,21 @@ async function configureForUser(apiKey: string, appUserID: string) {
     return Purchases
   }
 
-  const currentUserId = await Purchases.getAppUserID()
-  if (currentUserId !== appUserID) await Purchases.logIn(appUserID)
+  if (await isCurrentUser(Purchases, appUserID)) return Purchases
+  if (appUserID === null) await Purchases.logOut()
+  else await Purchases.logIn(appUserID)
   return Purchases
+}
+
+function offerAccountForPro(signIn: () => void) {
+  Alert.alert(
+    translate("account:billing.signInPrompt.title"),
+    translate("account:billing.signInPrompt.body"),
+    [
+      { text: translate("account:billing.signInPrompt.notNow"), style: "cancel" },
+      { text: translate("account:signIn"), onPress: signIn },
+    ],
+  )
 }
 
 function packageForProduct(offering: PurchasesOffering | null, productId: CountProductId) {
@@ -218,27 +240,29 @@ export function RevenueCatProvider({
   apiKey,
   appUserID,
   configurationMessage,
+  signIn,
   children,
 }: {
   apiKey?: string
-  appUserID?: string
+  appUserID?: string | null
   configurationMessage?: string
+  signIn?: () => void
   children: ReactNode
 }) {
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null)
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null)
-  const [isLoading, setIsLoading] = useState(Boolean(apiKey && appUserID))
+  const [isLoading, setIsLoading] = useState(Boolean(apiKey && appUserID !== undefined))
   const [error, setError] = useState<string>()
-  const [configuredUserId, setConfiguredUserId] = useState<string>()
+  const [configuredUserId, setConfiguredUserId] = useState<string | null>()
   const configured = Boolean(apiKey)
-  const isReady = Boolean(apiKey && appUserID && configuredUserId === appUserID)
+  const isReady = Boolean(apiKey && appUserID !== undefined && configuredUserId === appUserID)
   const acceptCustomerInfo = useCallback((next: CustomerInfo) => {
     setCustomerInfo((current) => mostRecentlyFetchedCustomerInfo(current, next))
   }, [])
 
   const refreshCustomerInfo = useCallback(
     async (force = false) => {
-      if (!apiKey || !appUserID) return null
+      if (!apiKey || appUserID === undefined) return null
       try {
         const Purchases = await loadPurchases()
         if (force && Platform.OS !== "web") await Purchases.invalidateCustomerInfoCache()
@@ -256,7 +280,7 @@ export function RevenueCatProvider({
 
   useEffect(() => {
     setConfiguredUserId(undefined)
-    if (!apiKey || !appUserID) {
+    if (!apiKey || appUserID === undefined) {
       setCustomerInfo(null)
       setCurrentOffering(null)
       setIsLoading(false)
@@ -319,7 +343,7 @@ export function RevenueCatProvider({
             : packageForProduct(currentOffering, productId)
         if (!selectedPackage)
           throw new Error(translate("account:billing.errors.productNotInStore", { productId }))
-        if ((await Purchases.getAppUserID()) !== appUserID)
+        if (!(await isCurrentUser(Purchases, appUserID ?? null)))
           throw new Error(translate("account:billing.errors.waitForBilling"))
         const result = await Purchases.purchasePackage(selectedPackage)
         acceptCustomerInfo(result.customerInfo)
@@ -358,21 +382,24 @@ export function RevenueCatProvider({
       }
       try {
         setError(undefined)
-        if (!isReady || (await (await loadPurchases()).getAppUserID()) !== appUserID)
+        if (!isReady || !(await isCurrentUser(await loadPurchases(), appUserID ?? null)))
           throw new Error(translate("account:billing.errors.waitForBilling"))
         const { presentCountProPaywall } = await import("./sdk")
         const result = await presentCountProPaywall(currentOffering)
         if (result === "error") return fail(translate("account:billing.errors.paywallFailed"))
         if (result === "purchased" || result === "restored") {
           const next = await refreshCustomerInfo()
-          if (result === "purchased" && renewsYearly(next)) offerRenewalReminder()
+          // why: renewal reminders arrive through the account, so an anonymous buyer is asked to sign in instead.
+          if (appUserID === null) {
+            if (signIn) offerAccountForPro(signIn)
+          } else if (result === "purchased" && renewsYearly(next)) offerRenewalReminder()
         }
         return result
       } catch (cause) {
         return fail(revenueCatErrorMessage(cause))
       }
     },
-    [appUserID, currentOffering, isReady, refreshCustomerInfo],
+    [appUserID, currentOffering, isReady, refreshCustomerInfo, signIn],
   )
 
   const presentCustomerCenter = useCallback(async () => {

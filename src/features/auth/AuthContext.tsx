@@ -13,7 +13,7 @@ import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
 
 import { APP_ROOT_URL, readPublicCloudConfig } from "@/features/auth/config"
-import { readRevenueCatConfig } from "@/features/billing/config"
+import { readRevenueCatConfig, SIGNED_OUT_PURCHASES } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
 import {
@@ -90,6 +90,10 @@ export function ConfiguredAuth({
     userId: user?.id,
   })
   const accountGeneration = useAccountGeneration(user?.id ?? sessionHint?.userId ?? undefined)
+  // why: anonymous only once Clerk confirms no session, since an anonymous player that later logs in to an account blocks the next anonymous purchase from merging into it.
+  const billingUserId =
+    user?.id ?? (isLoaded && !isSignedIn && SIGNED_OUT_PURCHASES ? null : undefined)
+  const openAuth = useCallback(() => setVisible(true), [])
   const value = useMemo<AuthAccess>(
     () => ({
       configured: true,
@@ -100,10 +104,10 @@ export function ConfiguredAuth({
       authVisible: visible,
       signingOut,
       setSigningOut,
-      openAuth: () => setVisible(true),
+      openAuth,
       closeAuth: () => setVisible(false),
     }),
-    [isLoaded, isSignedIn, user?.id, sessionHint, visible, signingOut],
+    [isLoaded, isSignedIn, user?.id, sessionHint, visible, signingOut, openAuth],
   )
   const client = useMemo(
     () =>
@@ -139,8 +143,9 @@ export function ConfiguredAuth({
       <RevenueCatProvider
         key={accountGeneration}
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
-        appUserID={user?.id}
+        appUserID={billingUserId}
         configurationMessage={revenueCat.configured ? undefined : revenueCat.message}
+        signIn={openAuth}
       >
         <AuthAccessContext.Provider value={value}>
           {revenueCat.configured && isLoaded && isSignedIn ? <RevenueCatSyncSession /> : null}

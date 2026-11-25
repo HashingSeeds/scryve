@@ -8,6 +8,7 @@ import { useAuthAccess } from "@/features/auth/AuthContext"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { SIGNED_OUT_PURCHASES } from "./config"
 import { useRevenueCat } from "./RevenueCatContext"
 
 type Step = "idle" | "explaining" | "signingIn"
@@ -36,7 +37,10 @@ export function useProSignIn(openPaywall: () => void) {
 
   return {
     explaining: step === "explaining",
-    request: () => (auth.isSignedIn ? openPaywall() : setStep("explaining")),
+    request: () =>
+      auth.isSignedIn || (SIGNED_OUT_PURCHASES && billing.configured)
+        ? openPaywall()
+        : setStep("explaining"),
     dismiss: () => setStep((current) => (current === "explaining" ? "idle" : current)),
     signIn: () => {
       setStep("signingIn")

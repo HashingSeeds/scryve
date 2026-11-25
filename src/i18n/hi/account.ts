@@ -285,6 +285,11 @@ export default {
   billing: {
     proNeedsAccount:
       "Scryve Pro खाते से जुड़ा है। Pro लेने या अपना मौजूदा Pro इस्तेमाल करने के लिए साइन इन करें।",
+    signInPrompt: {
+      title: "Pro अपने सभी डिवाइस पर रखना चाहते हैं?",
+      body: "अपने बाकी डिवाइस और वेब पर Scryve Pro इस्तेमाल करने के लिए साइन इन करें।",
+      notNow: "अभी नहीं",
+    },
     renewalPrompt: {
       title: "रिन्यू होने से पहले याद दिलाएँ?",
       body_one: "अगले सालाना चार्ज से {{count}} दिन पहले नोटिफ़िकेशन पाएँ।",

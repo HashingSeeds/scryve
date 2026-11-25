@@ -292,6 +292,11 @@ export default {
   billing: {
     proNeedsAccount:
       "Scryve Pro est lié à un compte. Connectez-vous pour obtenir Pro ou utiliser votre Pro existant.",
+    signInPrompt: {
+      title: "Garder Pro sur tous vos appareils ?",
+      body: "Connectez-vous pour utiliser Scryve Pro sur vos autres appareils et sur le web.",
+      notNow: "Plus tard",
+    },
     renewalPrompt: {
       title: "Un rappel avant le renouvellement ?",
       body_one: "Recevez une notification {{count}} jour avant votre prochain paiement annuel.",
