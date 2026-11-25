@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 import { State, type LegacyPanGesture } from "react-native-gesture-handler"
 import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils"
+import * as Reanimated from "react-native-reanimated"
 
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
@@ -73,28 +74,31 @@ describe("SegmentedControl", () => {
     expect(width()).toBe(300)
   })
 
-  it("moves the thumb on tap before the new selection renders", () => {
-    const { view, onSelect } = renderControl("none")
-    layoutOf(view)("system", 308)
-    const thumbX = () =>
-      StyleSheet.flatten(
-        view.getByTestId("system-thumb", { includeHiddenElements: true }).props.style,
-      ).transform?.[0]
-    expect(thumbX()).toEqual({ translateX: 0 })
+  it("starts the thumb on tap before onSelect, and returns it when the selection stays", () => {
+    const realUseSharedValue = Reanimated.useSharedValue
+    const sharedValues = new Set<{ get(): unknown }>()
+    const spy = jest.spyOn(Reanimated, "useSharedValue").mockImplementation((init) => {
+      const value = realUseSharedValue(init)
+      sharedValues.add(value)
+      return value
+    })
+    try {
+      let thumbAtSelect: unknown
+      const { view } = renderControl(
+        "none",
+        jest.fn(() => {
+          thumbAtSelect = offset().get()
+        }),
+      )
+      const offset = () => [...sharedValues][0]
+      layoutOf(view)("system", 308)
 
-    fireEvent.press(view.getByTestId("system-ygo"))
-    expect(onSelect).toHaveBeenCalledWith("ygo")
-    view.rerender(
-      <ThemeProvider initialContext="dark">
-        <SegmentedControl
-          testID="system"
-          segments={SEGMENTS}
-          selectedId="none"
-          onSelect={onSelect}
-        />
-      </ThemeProvider>,
-    )
-    expect(thumbX()).toEqual({ translateX: 200 })
+      fireEvent.press(view.getByTestId("system-ygo"))
+      expect(thumbAtSelect).toBe(200)
+      expect(offset().get()).toBe(0)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it("selects the segment a drag is released over", () => {

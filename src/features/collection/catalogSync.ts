@@ -68,7 +68,7 @@ function isScryfallSystem(game: string): boolean {
   return systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
 }
 
-// why: a check stamps *_checked_at only after rows exist, so a fresh stamp means no row queries.
+// why: a check stamps *_checked_at only after rows exist (empty packs are rejected below), so a fresh stamp means no row queries.
 function checkIsStale(key: string, maxAgeMs: number, now: number): boolean {
   const checkedAt = Number(catalogDb.getMeta(key))
   return !Number.isFinite(checkedAt) || checkedAt === 0 || now - checkedAt >= maxAgeMs
@@ -188,6 +188,7 @@ async function fetchStaleCatalog(
         imageUrl: item.imageUrl,
         smallImageUrl: item.smallImageUrl,
       }))
+      if (rows.length === 0) throw new Error("Catalog printings pack is empty")
       await catalogDb.replacePrintingsAsync(game, rows, pack.version)
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRINTINGS_ETAG), response.etag)
       printingsUpdated = true
@@ -286,6 +287,7 @@ async function fetchStaleCatalog(
           })
         }
       }
+      if (rows.length === 0) throw new Error("Catalog prices pack is empty")
       await catalogDb.replacePricesAsync(game, rows)
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRICES_ETAG), response.etag)
       pricesUpdated = true

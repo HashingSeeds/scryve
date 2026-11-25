@@ -19,6 +19,10 @@ function notify() {
 
 // why: clearing storage empties the collection tables without a write here, so shelves and valuedCollection kept showing the old cards.
 onStorageClear(notify)
+// why: on web another tab writes the collection to localStorage without a write here, so a cached list would let a stepper tap overwrite that tab's newer quantity.
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("storage", notify)
+}
 
 export function subscribeCollection(listener: () => void) {
   listeners.add(listener)

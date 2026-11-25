@@ -104,8 +104,9 @@ export function CollectionShelf({
   const allValued = useMemo(() => {
     void revision
     void sync.version
+    if (mode === "scans" && scanSessions.length === 0) return []
     return valuedCollection(game)
-  }, [revision, sync.version, game])
+  }, [revision, sync.version, game, mode, scanSessions])
 
   const valuedEntries = useMemo(() => {
     if (mode === "scans") return []

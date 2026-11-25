@@ -65,6 +65,7 @@ export function SegmentedControl({
   const thumbScale = useSharedValue(1)
   const placedWidth = useRef(0)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [tapCount, setTapCount] = useState(0)
   const fingerIndex = useRef(0)
   const selectedIndex = Math.max(
     0,
@@ -91,7 +92,8 @@ export function SegmentedControl({
     const animate = placedWidth.current === segmentWidth && reducedMotion === false
     offset.set(animate ? withSpring(target, SETTLE_SPRING) : target)
     placedWidth.current = segmentWidth
-  }, [dragging, offset, reducedMotion, segmentWidth, selectedIndex])
+    // why: tapCount re-runs this after a tap commits, so the thumb returns when the parent keeps the old selection.
+  }, [dragging, offset, reducedMotion, segmentWidth, selectedIndex, tapCount])
 
   function tick() {
     if (reducedMotion === false && localGameRepository.loadSettings().hapticsEnabled) {
@@ -110,6 +112,7 @@ export function SegmentedControl({
       const target = segmentWidth * segments.findIndex((segment) => segment.id === id)
       offset.set(reducedMotion === false ? withSpring(target, SETTLE_SPRING) : target)
     }
+    setTapCount((count) => count + 1)
     tick()
     onSelect(id)
   }
@@ -189,7 +192,6 @@ export function SegmentedControl({
         {segmentWidth > 0 ? (
           <Animated.View
             pointerEvents="none"
-            testID={testID ? `${testID}-thumb` : undefined}
             style={[themed($thumbShape), { width: segmentWidth, backgroundColor: accent }, $thumb]}
           />
         ) : null}
