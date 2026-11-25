@@ -190,14 +190,12 @@ export function TradeCalculatorModal({
       imageUrl: update.imageUrl ?? printing?.imageUrl,
       smallImageUrl: update.smallImageUrl ?? printing?.smallImageUrl ?? update.imageUrl,
     }
-    const nextKey = itemKey(next)
-    if (nextKey === fromKey) return true
     setSideItems(targetSide, (prev) =>
       prev.some((entry) => entry.key === fromKey)
         ? withCopy(changeQuantity(prev, fromKey, -1), next)
         : prev,
     )
-    scanItemKeys.current.set(scanId, nextKey)
+    scanItemKeys.current.set(scanId, itemKey(next))
     return true
   }
 
