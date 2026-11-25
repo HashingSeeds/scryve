@@ -6,7 +6,7 @@ import {
   importCollectionText,
   parseCollectionImport,
 } from "./collectionImportExport"
-import { listCollectionEntries } from "./collectionStore"
+import { listCollectionEntries, subscribeCollection } from "./collectionStore"
 
 describe("collectionImportExport", () => {
   beforeEach(() => {
@@ -66,8 +66,15 @@ describe("collectionImportExport", () => {
       "v1",
     )
 
+    const notified = jest.fn()
+    const unsubscribe = subscribeCollection(notified)
+    const byName = jest.spyOn(catalogDb, "findPrintingsByName")
     const result = importCollectionText(csv, "mtg")
+    unsubscribe()
     expect(result).toEqual({ imported: 2, skipped: 0 })
+    expect(notified).toHaveBeenCalledTimes(1)
+    expect(byName.mock.calls.map(([, name]) => name)).toEqual(["demonic tutor"])
+    byName.mockRestore()
 
     const entries = listCollectionEntries({ game: "mtg" })
     expect(entries).toHaveLength(2)

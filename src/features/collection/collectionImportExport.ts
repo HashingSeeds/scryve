@@ -1,11 +1,10 @@
 import { randomUUID } from "expo-crypto"
 
 import { catalogDb } from "@/storage/catalogDb"
-import { localCardDb } from "@/storage/localDb"
 import type { StoredCollectionEntry } from "@/storage/localDbTypes"
 
 import { normalizePrintingName } from "./catalogSync"
-import { addCollectionCard } from "./collectionStore"
+import { addCollectionCards, type AddCollectionCardInput } from "./collectionStore"
 
 export interface ParsedCollectionRow {
   quantity: number
@@ -219,52 +218,49 @@ export function importCollectionText(
   const { rows, skipped } = parseCollectionImport(text)
   if (rows.length === 0) return { imported: 0, skipped }
 
-  let imported = 0
-  localCardDb.transaction(() => {
-    for (const row of rows) {
-      const normalized = normalizePrintingName(row.name)
-      const byName = catalogDb.findPrintingsByName(game, normalized)
-      const exactCandidate =
-        row.setCode && row.collectorNumber
-          ? catalogDb.findPrintingBySetNumber(game, row.setCode, row.collectorNumber)
-          : undefined
-      const exact =
-        exactCandidate && exactCandidate.nameNormalized === normalized ? exactCandidate : undefined
+  const inputs = rows.map((row): AddCollectionCardInput => {
+    const normalized = normalizePrintingName(row.name)
+    const exactCandidate =
+      row.setCode && row.collectorNumber
+        ? catalogDb.findPrintingBySetNumber(game, row.setCode, row.collectorNumber)
+        : undefined
+    const exact =
+      exactCandidate && exactCandidate.nameNormalized === normalized ? exactCandidate : undefined
+    const byName = exact ? [] : catalogDb.findPrintingsByName(game, normalized)
 
-      let matched = exact
-      if (!matched && row.setCode && !row.collectorNumber) {
-        matched = byName.find((item) => item.setCode === row.setCode)
-      }
-      if (!matched && !row.setCode && !row.collectorNumber) {
-        matched = byName[0]
-      }
+    let matched = exact
+    if (!matched && row.setCode && !row.collectorNumber) {
+      matched = byName.find((item) => item.setCode === row.setCode)
+    }
+    if (!matched && !row.setCode && !row.collectorNumber) {
+      matched = byName[0]
+    }
 
-      const cardId = matched?.cardId ?? byName[0]?.cardId ?? `name:${normalized}`
-      const printingId =
-        matched?.printingId ??
-        (row.setCode || row.collectorNumber
-          ? `custom:${normalized}:${row.setCode}:${row.collectorNumber}`
-          : `custom:${randomUUID()}`)
+    const cardId = matched?.cardId ?? byName[0]?.cardId ?? `name:${normalized}`
+    const printingId =
+      matched?.printingId ??
+      (row.setCode || row.collectorNumber
+        ? `custom:${normalized}:${row.setCode}:${row.collectorNumber}`
+        : `custom:${randomUUID()}`)
 
-      addCollectionCard({
-        game,
-        cardId,
-        printingId,
-        name: matched?.name ?? row.name,
-        setCode: matched?.setCode ?? row.setCode,
-        collectorNumber: matched?.collectorNumber ?? row.collectorNumber,
-        finish: row.finish,
-        condition: row.condition,
-        language: row.language,
-        quantity: row.quantity,
-        binderId,
-        acquiredCents: row.acquiredCents,
-        notes: row.notes,
-        imageUrl: matched?.imageUrl,
-        smallImageUrl: matched?.smallImageUrl,
-      })
-      imported += 1
+    return {
+      game,
+      cardId,
+      printingId,
+      name: matched?.name ?? row.name,
+      setCode: matched?.setCode ?? row.setCode,
+      collectorNumber: matched?.collectorNumber ?? row.collectorNumber,
+      finish: row.finish,
+      condition: row.condition,
+      language: row.language,
+      quantity: row.quantity,
+      binderId,
+      acquiredCents: row.acquiredCents,
+      notes: row.notes,
+      imageUrl: matched?.imageUrl,
+      smallImageUrl: matched?.smallImageUrl,
     }
   })
-  return { imported, skipped }
+  addCollectionCards(inputs)
+  return { imported: inputs.length, skipped }
 }

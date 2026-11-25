@@ -111,6 +111,21 @@ export interface AddCollectionCardInput {
 }
 
 export function addCollectionCard(input: AddCollectionCardInput): StoredCollectionEntry {
+  const entry = putCollectionCard(input)
+  notify()
+  return entry
+}
+
+// why: an import of 1,000 lines notified once per line, and each notify re-rendered every collection subscriber.
+export function addCollectionCards(inputs: readonly AddCollectionCardInput[]): void {
+  if (inputs.length === 0) return
+  localCardDb.transaction(() => {
+    for (const input of inputs) putCollectionCard(input)
+  })
+  notify()
+}
+
+function putCollectionCard(input: AddCollectionCardInput): StoredCollectionEntry {
   const now = input.now ?? Date.now()
   const finish = input.finish ?? "nonfoil"
   const condition = input.condition ?? "NM"
@@ -172,7 +187,6 @@ export function addCollectionCard(input: AddCollectionCardInput): StoredCollecti
       if (binder) localCardDb.upsertBinder({ ...binder, updatedAt: now })
     }
   })
-  notify()
   return entry
 }
 
