@@ -109,6 +109,6 @@ export function useLocalCardSearch(game: string, query: string): LocalCard[] {
     const ruleNumber = normalizeRuleNumber(query.trim().toLowerCase())
     if (!RULES_TEXT_IN_APP || !isLocalCardGame(game) || key.length < 2 || ruleNumber) return []
     return catalogDb.searchLocalCards(game, key, SEARCH_LIMIT)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- why: a finished import has new rows to read for the same query.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, query, imported])
 }
