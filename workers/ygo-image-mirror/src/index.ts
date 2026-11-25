@@ -10,9 +10,12 @@ import {
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_REQUEST_BYTES = 8 * 1024
-const MAX_DATASET_BYTES = 16 * 1024 * 1024
-const DATASET_PATH = "/datasets/mtg/cards.json"
-const DATASET_KEY = "datasets/mtg/cards.json"
+const MAX_DATASET_BYTES = 32 * 1024 * 1024
+const DATASET_KEYS: Record<string, string> = {
+  "/datasets/mtg/cards.json": "datasets/mtg/cards.json",
+  "/datasets/mtg/printings.json": "datasets/mtg/printings.json",
+  "/datasets/mtg/prices.json": "datasets/mtg/prices.json",
+}
 const DATASET_CACHE = "public, max-age=86400"
 const FETCH_TIMEOUT_MS = 10_000
 const BROWSER_CACHE = "public, max-age=3600"
@@ -146,7 +149,7 @@ async function serveObject(
   return new Response(object.body, { headers, encodeBody })
 }
 
-async function putDataset(request: Request, env: Env): Promise<Response> {
+async function putDataset(request: Request, env: Env, key: string): Promise<Response> {
   requireAuthorization(request, env)
   const declaredLength = Number(request.headers.get("content-length"))
   if (Number.isFinite(declaredLength) && declaredLength > MAX_DATASET_BYTES) {
@@ -155,7 +158,7 @@ async function putDataset(request: Request, env: Env): Promise<Response> {
   const bytes = await readBoundedBody(request.body, MAX_DATASET_BYTES, "Dataset is too large")
   if (!isGzip(bytes)) throw new RequestFailure(415, "Dataset must be gzip")
 
-  const object = await env.YGO_IMAGES.put(DATASET_KEY, bytes, {
+  const object = await env.YGO_IMAGES.put(key, bytes, {
     httpMetadata: {
       contentType: "application/json",
       contentEncoding: "gzip",
@@ -163,8 +166,8 @@ async function putDataset(request: Request, env: Env): Promise<Response> {
     },
     customMetadata: { uploadedAt: new Date().toISOString() },
   })
-  log("info", "dataset_uploaded", { key: DATASET_KEY, bytes: object.size })
-  return noStoreJson({ key: DATASET_KEY, bytes: object.size, etag: object.httpEtag })
+  log("info", "dataset_uploaded", { key, bytes: object.size })
+  return noStoreJson({ key, bytes: object.size, etag: object.httpEtag })
 }
 
 async function fetchAndStoreImage(env: Env, input: MirrorTarget) {
@@ -296,13 +299,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   if (request.method === "OPTIONS" && url.pathname.startsWith("/images/")) {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
-  if (url.pathname === DATASET_PATH) {
+  const datasetKey = DATASET_KEYS[url.pathname]
+  if (datasetKey) {
     if (request.method === "OPTIONS")
       return new Response(null, { status: 204, headers: CORS_HEADERS })
     if (request.method === "GET" || request.method === "HEAD") {
-      return await serveObject(request, env, DATASET_KEY, datasetHeaders)
+      return await serveObject(request, env, datasetKey, datasetHeaders)
     }
-    if (request.method === "PUT") return await putDataset(request, env)
+    if (request.method === "PUT") return await putDataset(request, env, datasetKey)
   }
   if (request.method === "POST" && url.pathname === "/mirror") {
     return await mirrorImage(request, env)

@@ -11,6 +11,7 @@ export type DeckSearchHost = {
   format: string
   onAdd: (card: SearchCard) => string | undefined
   onRemove: (card: SearchCard) => void
+  onReplace?: (previous: SearchCard, next: SearchCard) => string | undefined
   offlineCandidates?: KnownCardEntry[]
   // why: screens freeze on blur, so the deck screen under /cards never re-renders; read the draft through its store.
   cards: () => DeckCard[]

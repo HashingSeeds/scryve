@@ -40,6 +40,7 @@ import {
 import { VISIBLE_SYSTEM_IDS } from "@/features/game/systemVisibility"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
+import { catalogDb } from "@/storage/catalogDb"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
@@ -71,7 +72,12 @@ import {
   querySuggestions,
   type CardQuery,
 } from "./cardQuery"
-import { CardScanner, type CardScan, type ScannedCardAdd } from "./CardScanner"
+import {
+  CardScanner,
+  type CardScan,
+  type ScannedCardAdd,
+  type ScannedPrintingOverride,
+} from "./CardScanner"
 import { cardSource, SCRYFALL_SOURCE } from "./cardSources"
 import {
   COLOR_MATCHES,
@@ -183,6 +189,10 @@ type CardSearchProps = {
   format: string
   onAdd?: AddCard
   onRemove?: (card: GuestDeckPayload["cards"][number]) => void
+  onReplace?: (
+    previous: GuestDeckPayload["cards"][number],
+    next: GuestDeckPayload["cards"][number],
+  ) => string | undefined
   onClose: () => void
   /**
    * The account's fully-cached cards to search while offline. Offline adds draw from
@@ -209,6 +219,7 @@ export function CardSearch({
   format,
   onAdd,
   onRemove,
+  onReplace,
   onClose,
   offlineCandidates,
   initialSection,
@@ -259,6 +270,7 @@ export function CardSearch({
   )
   const [scanning, setScanning] = useState(false)
   const scannedEntries = useRef(new Map<string, GuestDeckPayload["cards"][number]>())
+  const scannedEntriesById = useRef(new Map<number, GuestDeckPayload["cards"][number]>())
   const magicCards = useMagicCards(game)
   const [results, setResults] = useState<SearchCard[]>()
   const [nameResults, setNameResults] = useState<SearchCard[]>()
@@ -726,35 +738,147 @@ export function CardSearch({
     return error
   }
 
-  async function addScannedCards(names: string[]): Promise<ScannedCardAdd[]> {
-    try {
-      if (!convex) throw new Error("Card search unavailable")
-      const { cards, lookupFailed } = await convex.action(api.cards.byNames, { names, deviceId })
-      const byName = new Map(cards.map((card) => [card.name, card]))
-      return names.map((name) => {
-        const card = byName.get(name)
-        if (!card)
-          return lookupFailed
-            ? { error: translate("decks:cardScan.addFailed"), retryable: true }
-            : { error: translate("decks:cardScan.notFound", { card: name }) }
-        const error = add(card)
-        // why: a deck refuses uncached cards while offline; a retry adds them once it reconnects.
-        if (error) return { error, retryable: offline }
-        scannedEntries.current.set(name, searchEntry(card))
-        if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: card.name })}`)
-        return { imageUrl: card.smallImageUrl ?? card.imageUrl }
-      })
-    } catch (cause) {
-      const error = convexErrorMessage(cause, translate("decks:cardScan.addFailed"))
-      const retryAfterMs = convexRetryAfterMs(cause)
-      return names.map(() => ({ error, retryable: true, retryAfterMs }))
+  function applyPrintingOverride(card: SearchCard, override?: ScannedPrintingOverride): SearchCard {
+    if (!override?.printingId || !("scryfallId" in card)) return card
+    const printing = catalogDb.getPrinting(game, override.printingId)
+    return {
+      ...card,
+      scryfallId: override.printingId,
+      imageUrl: printing?.imageUrl ?? override.imageUrl ?? card.imageUrl,
+      smallImageUrl:
+        printing?.smallImageUrl ??
+        override.smallImageUrl ??
+        override.imageUrl ??
+        card.smallImageUrl,
     }
   }
 
-  function removeScannedCard(name: string) {
-    const entry = scannedEntries.current.get(name)
+  async function addScannedCards(
+    names: string[],
+    overrides?: readonly (ScannedPrintingOverride | undefined)[],
+  ): Promise<ScannedCardAdd[]> {
+    const resolved: (ScannedCardAdd | undefined)[] = new Array(names.length)
+    const missingIndexes: number[] = []
+    const missingNames: string[] = []
+
+    names.forEach((name, index) => {
+      const localCard = magicCards?.byName.get(name)
+      if (!localCard) {
+        missingIndexes.push(index)
+        missingNames.push(name)
+        return
+      }
+      try {
+        const chosen = applyPrintingOverride(localCard, overrides?.[index])
+        const error = add(chosen)
+        if (error) {
+          resolved[index] = { error, retryable: offline }
+          return
+        }
+        const entry = searchEntry(chosen)
+        scannedEntries.current.set(name, entry)
+        if (overrides?.[index]?.scanId !== undefined) {
+          scannedEntriesById.current.set(overrides[index]!.scanId!, entry)
+        }
+        if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: chosen.name, local: true })}`)
+        resolved[index] = { imageUrl: chosen.smallImageUrl ?? chosen.imageUrl }
+      } catch (cause) {
+        resolved[index] = {
+          error: convexErrorMessage(cause, translate("decks:cardScan.addFailed")),
+          retryable: false,
+        }
+      }
+    })
+
+    if (missingNames.length === 0) {
+      return resolved.map((item) => item ?? { error: translate("decks:cardScan.addFailed") })
+    }
+
+    try {
+      if (!convex) throw new Error("Card search unavailable")
+      const { cards, lookupFailed } = await convex.action(api.cards.byNames, {
+        names: missingNames,
+        deviceId,
+      })
+      const byName = new Map(cards.map((card) => [card.name, card]))
+      missingIndexes.forEach((slot, idx) => {
+        const name = missingNames[idx]
+        const card = byName.get(name)
+        if (!card) {
+          resolved[slot] = lookupFailed
+            ? { error: translate("decks:cardScan.addFailed"), retryable: true }
+            : { error: translate("decks:cardScan.notFound", { card: name }) }
+          return
+        }
+        try {
+          const chosen = applyPrintingOverride(card, overrides?.[slot])
+          const error = add(chosen)
+          // why: a deck refuses uncached cards while offline; a retry adds them once it reconnects.
+          if (error) {
+            resolved[slot] = { error, retryable: offline }
+            return
+          }
+          const entry = searchEntry(chosen)
+          scannedEntries.current.set(name, entry)
+          if (overrides?.[slot]?.scanId !== undefined) {
+            scannedEntriesById.current.set(overrides[slot]!.scanId!, entry)
+          }
+          if (__DEV__) console.log(`SCANADD ${JSON.stringify({ added: chosen.name })}`)
+          resolved[slot] = { imageUrl: chosen.smallImageUrl ?? chosen.imageUrl }
+        } catch (cause) {
+          resolved[slot] = {
+            error: convexErrorMessage(cause, translate("decks:cardScan.addFailed")),
+            retryable: false,
+          }
+        }
+      })
+      return resolved.map((item) => item ?? { error: translate("decks:cardScan.addFailed") })
+    } catch (cause) {
+      const error = convexErrorMessage(cause, translate("decks:cardScan.addFailed"))
+      const retryAfterMs = convexRetryAfterMs(cause)
+      missingIndexes.forEach((slot) => {
+        if (resolved[slot] === undefined) {
+          resolved[slot] = { error, retryable: true, retryAfterMs }
+        }
+      })
+      return resolved.map((item) => item ?? { error, retryable: true, retryAfterMs })
+    }
+  }
+
+  function updateScannedPrinting(
+    id: number,
+    update: {
+      name: string
+      printingId: string
+      imageUrl?: string
+      smallImageUrl?: string
+    },
+  ): boolean {
+    const previous = scannedEntriesById.current.get(id)
+    if (!previous || !onAdd) return false
+    if (previous.scryfallId === update.printingId) return true
+    const updated: GuestDeckPayload["cards"][number] = {
+      ...previous,
+      scryfallId: update.printingId,
+      imageUrl: update.imageUrl ?? previous.imageUrl,
+      smallImageUrl: update.smallImageUrl ?? update.imageUrl ?? previous.smallImageUrl,
+    }
+    const error = onReplace ? onReplace(previous, updated) : onAdd(updated)
+    if (error) return false
+    if (!onReplace) onRemove?.(previous)
+    scannedEntries.current.set(update.name, updated)
+    scannedEntriesById.current.set(id, updated)
+    return true
+  }
+
+  function removeScannedCard(name: string, scanId?: number) {
+    const entry =
+      (scanId !== undefined ? scannedEntriesById.current.get(scanId) : undefined) ??
+      scannedEntries.current.get(name)
     if (!entry || !onRemove) return
     onRemove(entry)
+    if (scanId !== undefined) scannedEntriesById.current.delete(scanId)
+    if (scannedEntries.current.get(name) === entry) scannedEntries.current.delete(name)
     if (__DEV__) console.log(`SCANREMOVE ${JSON.stringify({ removed: name })}`)
   }
 
@@ -1334,9 +1458,15 @@ export function CardSearch({
             )
           }
           addCards={addScannedCards}
+          instantLocalLookup={Boolean(magicCards)}
           removeCard={onRemove ? removeScannedCard : undefined}
+          onUpdatePrinting={onRemove ? updateScannedPrinting : undefined}
           onRead={__DEV__ ? recordScanRead : undefined}
-          onClose={() => setScanning(false)}
+          onClose={() => {
+            scannedEntries.current.clear()
+            scannedEntriesById.current.clear()
+            setScanning(false)
+          }}
         />
       ) : null}
       {shownCandidate ? (

@@ -12,6 +12,7 @@ import android.util.Range
 import android.util.Size
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -24,21 +25,24 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
+import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
+import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 import kotlinx.coroutines.launch
 
 // why: reading text is most of the phone's work, so reads slow down as it heats up.
 private fun msBetweenReads(heat: String) = when (heat) {
   "nominal" -> 120L
-  "fair" -> 160L
-  "serious" -> 250L
-  else -> 400L
+  "fair" -> 180L
+  "serious" -> 280L
+  else -> 450L
 }
 private val ANALYSIS_SIZE = Size(1280, 960)
 private const val DETECTION_SHORT_SIDE = 200
@@ -47,7 +51,7 @@ private const val READ_MARGIN = 0.03f
 // but reads slow down when the phone is hot, so a count of misses would leave it up too long.
 private const val LOSE_CARD_AFTER_MS = 350L
 // why: frames are read at most about 8 a second, so 30 fps only heats the phone.
-private val CAMERA_FPS = Range(15, 20)
+private val CAMERA_FPS = Range(12, 15)
 
 class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val onText by EventDispatcher()
@@ -57,15 +61,22 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
   private val outline = CardOutline(context)
   private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
   private val analysisExecutor = Executors.newSingleThreadExecutor()
+  private val motionGate = CardMotionGate()
   private var cameraProvider: ProcessCameraProvider? = null
+  private var camera: Camera? = null
   private var useCases: UseCaseGroup? = null
   private var lastFrameAt = 0L
   private var released = false
   private var plane = ByteArray(0)
+  private var topNv21Buffer: ByteArray? = null
+  private var bottomNv21Buffer: ByteArray? = null
   private var lastCardAt = 0L
   private var showingCard = false
+  private var pendingSceneChanged = false
 
   @Volatile var active = false
+  @Volatile var torchEnabled = false
+  @Volatile var bulkMode = false
 
   /** why: in view points, as React Native lays it out, not pixels. */
   @Volatile var guide: Box? = null
@@ -80,6 +91,21 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     addView(previewView, 0)
     addView(outline, 1)
     appContext.mainQueue.launch { bind(ProcessCameraProvider.awaitInstance(context)) }
+  }
+
+  fun setTorch(on: Boolean) {
+    torchEnabled = on
+    appContext.mainQueue.launch {
+      camera?.cameraControl?.enableTorch(on && !released)
+    }
+  }
+
+  fun setScanMode(mode: String) {
+    bulkMode = mode == "bulk"
+  }
+
+  fun setAcceptedToken(token: Int) {
+    motionGate.onAccepted(token)
   }
 
   override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -125,7 +151,8 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
       .also { it.setAnalyzer(analysisExecutor, ::analyze) }
     val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(analysis).build()
     provider.unbindAll()
-    provider.bindToLifecycle(activity, CameraSelector.DEFAULT_BACK_CAMERA, group)
+    camera = provider.bindToLifecycle(activity, CameraSelector.DEFAULT_BACK_CAMERA, group)
+    camera?.cameraControl?.enableTorch(torchEnabled && !released)
     cameraProvider = provider
     useCases = group
   }
@@ -138,6 +165,23 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
       PowerManager.THERMAL_STATUS_LIGHT -> "fair"
       PowerManager.THERMAL_STATUS_MODERATE -> "serious"
       else -> "critical"
+    }
+  }
+
+  private fun serializeLines(text: Text?, shiftX: Int, shiftY: Int, rotation: Int): List<Map<String, Any>> {
+    if (text == null) return emptyList()
+    return text.textBlocks.flatMap { block -> block.lines }.mapNotNull { line ->
+      val box = line.boundingBox ?: return@mapNotNull null
+      mapOf(
+        "text" to line.text,
+        "x" to box.left + shiftX,
+        "y" to box.top + shiftY,
+        "width" to box.width(),
+        "height" to box.height(),
+        // why: ML Kit reports angles against the sensor but boxes against the upright frame.
+        "angle" to uprightAngle(line.angle + rotation),
+        "confidence" to line.confidence,
+      )
     }
   }
 
@@ -156,51 +200,90 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
     val sideways = rotation == 90 || rotation == 270
     val width = if (sideways) frame.height else frame.width
     val height = if (sideways) frame.width else frame.height
-    val detection = findCard(frame, rotation, width, height)
-    // why: reading only the outlined card is most of the work saved on a phone that runs hot.
-    val crop = detection.card?.let { cropAround(it.corners, frame.width, frame.height, rotation, READ_MARGIN) }
-    val input = if (crop == null) {
-      InputImage.fromMediaImage(image, rotation)
-    } else {
-      InputImage.fromByteArray(nv21(image, crop), crop.width, crop.height, rotation, InputImage.IMAGE_FORMAT_NV21)
+    val luma = extractLuma(frame, rotation)
+    val gate = motionGate.evaluate(luma, bulkMode)
+    if (gate.sceneChanged) pendingSceneChanged = true
+    if (!gate.shouldRead) {
+      frame.close()
+      return
     }
-    val shiftX = crop?.uprightX ?: 0
-    val shiftY = crop?.uprightY ?: 0
-    recognizer.process(input)
-      .addOnSuccessListener { text ->
-        if (!active) return@addOnSuccessListener
-        val lines = text.textBlocks.flatMap { block -> block.lines }.mapNotNull { line ->
-          val box = line.boundingBox ?: return@mapNotNull null
-          mapOf(
-            "text" to line.text,
-            "x" to box.left + shiftX,
-            "y" to box.top + shiftY,
-            "width" to box.width(),
-            "height" to box.height(),
-            // why: ML Kit reports angles against the sensor but boxes against the upright frame.
-            "angle" to uprightAngle(line.angle + rotation),
-            "confidence" to line.confidence,
-          )
+    val detection = findCard(luma, width, height)
+    val card = detection.card
+    if (card != null) {
+      val (topCrop, bottomCrop) = cropCardBands(card.corners, frame.width, frame.height, rotation, READ_MARGIN)
+      val topBytes = nv21(image, topCrop, topNv21Buffer).also { topNv21Buffer = it }
+      val bottomBytes = nv21(image, bottomCrop, bottomNv21Buffer).also { bottomNv21Buffer = it }
+      val topInput = InputImage.fromByteBuffer(
+        ByteBuffer.wrap(topBytes, 0, topCrop.width * topCrop.height * 3 / 2),
+        topCrop.width,
+        topCrop.height,
+        rotation,
+        InputImage.IMAGE_FORMAT_NV21,
+      )
+      val bottomInput = InputImage.fromByteBuffer(
+        ByteBuffer.wrap(bottomBytes, 0, bottomCrop.width * bottomCrop.height * 3 / 2),
+        bottomCrop.width,
+        bottomCrop.height,
+        rotation,
+        InputImage.IMAGE_FORMAT_NV21,
+      )
+      val topTask = recognizer.process(topInput)
+      val bottomTask = recognizer.process(bottomInput)
+      Tasks.whenAllComplete(topTask, bottomTask)
+        .addOnCompleteListener {
+          try {
+            if (!active) return@addOnCompleteListener
+            val topText = if (topTask.isSuccessful) topTask.result else null
+            val bottomText = if (bottomTask.isSuccessful) bottomTask.result else null
+            val photo = mutableMapOf<String, Any>(
+              "width" to width,
+              "height" to height,
+              "lines" to serializeLines(topText, topCrop.uprightX, topCrop.uprightY, rotation),
+              "bottomLines" to serializeLines(bottomText, bottomCrop.uprightX, bottomCrop.uprightY, rotation),
+              "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
+              "cardCorners" to card.corners.map { mapOf("x" to it.x, "y" to it.y) },
+            )
+            if (pendingSceneChanged) {
+              photo["sceneChanged"] = true
+              pendingSceneChanged = false
+            }
+            onText(photo)
+          } finally {
+            frame.close()
+          }
         }
-        val photo = mutableMapOf(
-          "width" to width,
-          "height" to height,
-          "lines" to lines,
-          "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
-        )
-        detection.card?.let { card -> photo["cardCorners"] = card.corners.map { mapOf("x" to it.x, "y" to it.y) } }
-        onText(photo)
-      }
-      .addOnCompleteListener { frame.close() }
+    } else {
+      val input = InputImage.fromMediaImage(image, rotation)
+      recognizer.process(input)
+        .addOnSuccessListener { text ->
+          if (!active) return@addOnSuccessListener
+          val photo = mutableMapOf<String, Any>(
+            "width" to width,
+            "height" to height,
+            "lines" to serializeLines(text, 0, 0, rotation),
+            "bottomLines" to emptyList<Map<String, Any>>(),
+            "detection" to mapOf("rectangles" to detection.rectangles.map(::describe), "thermal" to heat),
+          )
+          if (pendingSceneChanged) {
+            photo["sceneChanged"] = true
+            pendingSceneChanged = false
+          }
+          onText(photo)
+        }
+        .addOnCompleteListener { frame.close() }
+    }
   }
 
-  private fun findCard(frame: ImageProxy, rotation: Int, width: Int, height: Int): CardDetection {
+  private fun extractLuma(frame: ImageProxy, rotation: Int): Luma {
     val y = frame.planes[0]
     val buffer = y.buffer.duplicate().apply { rewind() }
     if (plane.size < buffer.remaining()) plane = ByteArray(buffer.remaining())
     buffer.get(plane, 0, buffer.remaining())
     val step = maxOf(1, minOf(frame.width, frame.height) / DETECTION_SHORT_SIDE)
-    val luma = lumaFromPlane(plane, y.rowStride, frame.width, frame.height, rotation, step)
+    return lumaFromPlane(plane, y.rowStride, frame.width, frame.height, rotation, step)
+  }
+
+  private fun findCard(luma: Luma, width: Int, height: Int): CardDetection {
     val cover = cover(width, height)
     val guide = guide?.let { guide -> cover?.toFrame(guide, resources.displayMetrics.density) }
     val detection = CardDetector.detect(luma, guide)
@@ -230,6 +313,11 @@ class CardTextCameraView(context: Context, appContext: AppContext) : ExpoView(co
   fun release() {
     released = true
     active = false
+    torchEnabled = false
+    pendingSceneChanged = false
+    motionGate.reset()
+    camera?.cameraControl?.enableTorch(false)
+    camera = null
     useCases?.let { group -> cameraProvider?.unbind(*group.useCases.toTypedArray()) }
     recognizer.close()
     analysisExecutor.shutdown()
@@ -259,15 +347,15 @@ private class CardOutline(context: Context) : View(context) {
   }
   private var path: Path? = null
 
-  fun show(corners: List<Point>?) = post {
-    path = corners?.let {
+  fun show(corners: List<Point>?) {
+    path = corners?.let { points ->
       Path().apply {
-        moveTo(it[0].x, it[0].y)
-        it.drop(1).forEach { corner -> lineTo(corner.x, corner.y) }
+        moveTo(points[0].x, points[0].y)
+        for (index in 1 until points.size) lineTo(points[index].x, points[index].y)
         close()
       }
     }
-    invalidate()
+    postInvalidate()
   }
 
   override fun onDraw(canvas: Canvas) {

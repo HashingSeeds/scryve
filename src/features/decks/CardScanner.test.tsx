@@ -2,6 +2,7 @@ import { View } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
+import { catalogDb } from "@/storage/catalogDb"
 import { ThemeProvider } from "@/theme/context"
 import { captureAnalytics } from "@/utils/analytics"
 
@@ -20,6 +21,8 @@ jest.mock("../../../modules/card-text-reader", () => ({
 }))
 jest.mock("./cardTextLayout", () => ({
   framedLinesFromCardTop: (photo: CardPhotoText) => photo.lines.map((line) => line.text),
+  framedLinesFromCardBottom: (photo: CardPhotoText) =>
+    photo.lines.slice(1).map((line) => line.text),
 }))
 jest.mock("@/utils/analytics", () => ({ captureAnalytics: jest.fn() }))
 jest.mock("expo-camera", () => ({
@@ -80,6 +83,7 @@ function show(...texts: string[]) {
 function scan(...lines: string[]) {
   show(...lines)
   show(...lines)
+  show()
   show()
 }
 
@@ -161,7 +165,7 @@ test("Wrong card removes a card whose add was still in flight once it lands", as
     fireEvent.press(view.getByText("Remove it"))
     expect(removeCard).not.toHaveBeenCalled()
     await slow.land()
-    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring", 0)
   } finally {
     jest.useRealTimers()
   }
@@ -179,7 +183,7 @@ test("an earlier scanned card can be checked and removed from the review list", 
     expect(within(list).getByText("Sol Ring")).toBeTruthy()
     fireEvent.press(within(list).getAllByText("Wrong card")[1])
     await act(async () => fireEvent.press(view.getByText("Remove it")))
-    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring", 0)
     expect(within(list).queryByText("Sol Ring")).toBeNull()
   } finally {
     jest.useRealTimers()
@@ -215,7 +219,7 @@ test("Done keeps an alternate chosen while the wrong card was still being added"
     fireEvent.press(view.getByText("Done"))
     await act(async () => land())
     await act(async () => land())
-    expect(removeCard).toHaveBeenCalledWith("Sol Ring")
+    expect(removeCard).toHaveBeenCalledWith("Sol Ring", 0)
     expect(addCards.mock.calls.flat(2)).toEqual(["Sol Ring", "Arcane Signet"])
     expect(onClose).toHaveBeenCalledTimes(1)
   } finally {
@@ -382,7 +386,7 @@ test("Done reports how the scan went without naming any card", async () => {
     failed_count: 0,
     skipped_count: 1,
     fixed_count: 0,
-    read_count: 7,
+    read_count: 8,
     outlined_read_count: 1,
     peak_heat: "fair",
   })
@@ -421,4 +425,227 @@ test("the scanner hides detection details with Stats for nerds off", () => {
   const { view } = renderScanner({ singleton: true })
   show("Sol Ring")
   expect(view.queryByTestId("card-scan-stats")).toBeNull()
+})
+
+test("locks on 1 frame in bulk mode, scans duplicates on sceneChanged, and fires hit haptics for high-value printings", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "lea-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "lea",
+        setName: "Limited Edition Alpha",
+        collectorNumber: "269",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+      {
+        game: "mtg",
+        printingId: "cmm-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "cmm",
+        setName: "Commander Masters",
+        collectorNumber: "410",
+        rarity: "uncommon",
+        finishes: ["nonfoil", "foil"],
+      },
+    ],
+    "v1",
+  )
+  catalogDb.replacePrices(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "lea-sol",
+        finish: "nonfoil",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 45000,
+        updatedAt: "2026-11-24T00:00:00Z",
+      },
+      {
+        game: "mtg",
+        printingId: "cmm-sol",
+        finish: "foil",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 850,
+        updatedAt: "2026-11-24T00:00:00Z",
+      },
+    ],
+    "2026-11-24T00:00:00Z",
+  )
+
+  const { view, addCards } = renderScanner({ singleton: false })
+  fireEvent.press(view.getByTestId("card-scan-mode"))
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+        bottomLines: [
+          {
+            text: "LEA • EN 269/302",
+            x: 0,
+            y: 1200,
+            width: 100,
+            height: 20,
+            angle: 0,
+            confidence: 1,
+          },
+        ],
+      },
+    }),
+  )
+  expect(scanHaptic).toHaveBeenLastCalledWith("bigHit")
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        sceneChanged: true,
+        lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+        bottomLines: [
+          { text: "CMM ★ EN 0410", x: 0, y: 1200, width: 100, height: 20, angle: 0, confidence: 1 },
+        ],
+      },
+    }),
+  )
+  expect(scanHaptic).toHaveBeenLastCalledWith("hit")
+
+  await finish(view)
+  expect(addCards).toHaveBeenCalledWith(
+    ["Sol Ring", "Sol Ring"],
+    [
+      expect.objectContaining({ printingId: "lea-sol", setCode: "lea", collectorNumber: "269" }),
+      expect.objectContaining({ printingId: "cmm-sol", setCode: "cmm", collectorNumber: "410" }),
+    ],
+  )
+  catalogDb.clearAll()
+})
+
+test("blocks adding a card outside the locked set and allows re-arming identical copies in bulk mode", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "cmm-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "cmm",
+        setName: "Commander Masters",
+        collectorNumber: "410",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+    ],
+    "v1",
+  )
+
+  const { view, addCards } = renderScanner({ singleton: false })
+  fireEvent.press(view.getByTestId("card-scan-mode"))
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.changeText(view.getByTestId("card-scan-set-lock-input"), "FDN")
+  fireEvent.press(view.getAllByText("Done").at(-1)!)
+
+  act(() =>
+    mockOnText?.({
+      nativeEvent: {
+        width: 960,
+        height: 1280,
+        lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+      },
+    }),
+  )
+  expect(view.getByText("Sol Ring isn't in FDN.")).toBeTruthy()
+  expect(addCards).not.toHaveBeenCalled()
+
+  fireEvent.press(view.getByTestId("card-scan-set-lock"))
+  fireEvent.press(view.getByText("Clear set lock"))
+  fireEvent.press(view.getByTestId("card-scan-next-copy"))
+
+  const frame = {
+    nativeEvent: {
+      width: 960,
+      height: 1280,
+      lines: [{ text: "Sol Ring", x: 0, y: 0, width: 100, height: 20, angle: 0, confidence: 1 }],
+    },
+  }
+  act(() => mockOnText?.(frame))
+  fireEvent.press(view.getByTestId("card-scan-next-copy"))
+  act(() => mockOnText?.(frame))
+
+  await finish(view)
+  expect(addCards).toHaveBeenCalledWith(
+    ["Sol Ring", "Sol Ring"],
+    [
+      expect.objectContaining({ printingId: "cmm-sol" }),
+      expect.objectContaining({ printingId: "cmm-sol" }),
+    ],
+  )
+  catalogDb.clearAll()
+})
+
+test("ignores a single empty frame so the same card is not double-scanned, and resolves set from full-frame bottom lines", async () => {
+  catalogDb.clearAll()
+  catalogDb.replacePrintings(
+    "mtg",
+    [
+      {
+        game: "mtg",
+        printingId: "pw26-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "pw26",
+        setName: "Promo",
+        collectorNumber: "1",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+      {
+        game: "mtg",
+        printingId: "trk-sol",
+        cardId: "ora-sol",
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: "trk",
+        setName: "Star Trek",
+        collectorNumber: "50",
+        rarity: "uncommon",
+        finishes: ["nonfoil"],
+      },
+    ],
+    "v1",
+  )
+
+  const { view, addCards } = renderScanner({ singleton: false })
+  show("Sol Ring", "TRK")
+  show("unreadable blur")
+  show("Sol Ring")
+  show()
+  show("Sol Ring", "TRK")
+  show("Sol Ring", "TRK", "will defend", "2/3")
+  show("Sol Ring", "TRK", "stop it", "2/3")
+
+  await finish(view)
+  expect(addCards).toHaveBeenCalledWith(
+    ["Sol Ring"],
+    [expect.objectContaining({ printingId: "trk-sol", setCode: "trk" })],
+  )
+  catalogDb.clearAll()
 })
