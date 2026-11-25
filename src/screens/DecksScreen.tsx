@@ -555,6 +555,7 @@ export function DecksScreen({
   initialSystem,
   onSelect,
   onAddDeck,
+  onSystemChange,
   unavailableMessage,
   access,
 }: {
@@ -562,6 +563,7 @@ export function DecksScreen({
   initialSystem?: string
   onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
+  onSystemChange?: (system: string) => void
   unavailableMessage?: string
   access?: CloudAccess
 }) {
@@ -587,6 +589,7 @@ export function DecksScreen({
       setGame(initialSystem, ALL_FORMATS)
     }
   }, [initialSystem, setGame])
+  useEffect(() => onSystemChange?.(system), [onSystemChange, system])
   const [search, setSearch] = useState("")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
