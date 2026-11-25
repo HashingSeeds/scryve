@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react-native"
+import { act, renderHook } from "@testing-library/react-native"
 
 import { catalogDb } from "@/storage/catalogDb"
 
@@ -53,4 +53,16 @@ it("accepts a card file with only its header", async () => {
   const fetcher = jest.fn().mockResolvedValue(new Response(encodeLocalCards("v2", [])))
   await expect(syncLocalCards("mtg", { fetcher, now: 0 })).resolves.toBe(true)
   expect(catalogDb.getMeta("localCards:mtg:version")).toBe("v2")
+})
+
+it("shows cards in an open search once a later download lands", async () => {
+  const offline = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
+  const search = renderHook(() => useLocalCardSearch("mtg", "lightning"))
+  await act(async () => {})
+  expect(search.result.current).toEqual([])
+  offline.mockRestore()
+
+  const fetcher = jest.fn().mockResolvedValue(new Response(file))
+  await act(() => syncLocalCards("mtg", { fetcher }))
+  expect(search.result.current.map((card) => card.name)).toEqual(["Lightning Bolt"])
 })

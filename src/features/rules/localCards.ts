@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useSyncExternalStore } from "react"
 
 import { catalogDb } from "@/storage/catalogDb"
 import type { LocalCardRow } from "@/storage/catalogDbTypes"
@@ -45,6 +45,16 @@ async function localCardRows(text: string) {
   return { version, rows }
 }
 
+let imports = 0
+const importListeners = new Set<() => void>()
+
+function subscribeToImports(listener: () => void) {
+  importListeners.add(listener)
+  return () => {
+    importListeners.delete(listener)
+  }
+}
+
 export async function syncLocalCards(
   game: LocalCardGame,
   { fetcher = fetch, now = Date.now() }: { fetcher?: typeof fetch; now?: number } = {},
@@ -66,6 +76,8 @@ export async function syncLocalCards(
     await catalogDb.replaceLocalCardsAsync(game, rows, version)
     const nextEtag = response.headers.get("etag")
     if (nextEtag) catalogDb.setMeta(etagKey(game), nextEtag)
+    imports += 1
+    importListeners.forEach((listener) => listener())
   }
   catalogDb.setMeta(checkedAtKey(game), String(now))
   return updated
@@ -88,25 +100,15 @@ export function prefetchLocalCards(game: string) {
 }
 
 export function useLocalCardSearch(game: string, query: string): LocalCard[] {
-  const [refreshed, setRefreshed] = useState(0)
+  const imported = useSyncExternalStore(subscribeToImports, () => imports)
   useEffect(() => {
-    if (!RULES_TEXT_IN_APP || !isLocalCardGame(game)) return
-    let active = true
-    ensureLocalCards(game).then(
-      (updated) => {
-        if (active && updated) setRefreshed((count) => count + 1)
-      },
-      () => {},
-    )
-    return () => {
-      active = false
-    }
+    if (RULES_TEXT_IN_APP && isLocalCardGame(game)) ensureLocalCards(game).catch(() => {})
   }, [game])
   return useMemo(() => {
     const key = textSearchKey(query)
     const ruleNumber = normalizeRuleNumber(query.trim().toLowerCase())
     if (!RULES_TEXT_IN_APP || !isLocalCardGame(game) || key.length < 2 || ruleNumber) return []
     return catalogDb.searchLocalCards(game, key, SEARCH_LIMIT)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- why: a finished refresh has new rows to read for the same query.
-  }, [game, query, refreshed])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- why: a finished import has new rows to read for the same query.
+  }, [game, query, imported])
 }
