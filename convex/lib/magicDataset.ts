@@ -60,7 +60,7 @@ const PAPER_FORMATS = [
  * Unfinity's black-bordered cards are legal. Legality alone can't decide: a new release is legal
  * nowhere until its legal date.
  */
-function outsidePaperDecks(raw: Record<string, unknown>) {
+function outsidePaperDecks(raw: Record<string, unknown>, keepMeldResults: boolean) {
   const legalities = objectRecord(raw.legalities)
   const parts = Array.isArray(raw.all_parts) ? raw.all_parts.map(objectRecord) : []
   const promoTypes = Array.isArray(raw.promo_types) ? raw.promo_types : []
@@ -76,7 +76,7 @@ function outsidePaperDecks(raw: Record<string, unknown>) {
   const paperLegal = PAPER_FORMATS.some(
     (format) => legalities?.[format] !== undefined && legalities[format] !== "not_legal",
   )
-  return meldResult || (unusual && !paperLegal)
+  return (meldResult && !keepMeldResults) || (unusual && !paperLegal)
 }
 
 export function textSearchKey(text: string) {
@@ -127,18 +127,17 @@ function faceDetailsWithoutOracleText(faceDetails: string): string {
   )
 }
 
-function deckCard(value: unknown) {
+function deckCard(value: unknown, keepMeldResults = false) {
   const raw = objectRecord(value)
   if (!raw) return null
   if (typeof raw.layout === "string" && NON_DECK_LAYOUTS.has(raw.layout)) return null
-  if (raw.set_type === "memorabilia" || outsidePaperDecks(raw)) return null
+  if (raw.set_type === "memorabilia" || outsidePaperDecks(raw, keepMeldResults)) return null
   const card = normalizeScryfallCard(raw)
   return card && { raw, card }
 }
 
-/** why: the rules sheet shows a card's full text offline, which the deck search file leaves out to stay small. */
 export function magicLocalCard(value: unknown): LocalCard | null {
-  const found = deckCard(value)
+  const found = deckCard(value, true)
   if (!found) return null
   const { raw, card } = found
   return {

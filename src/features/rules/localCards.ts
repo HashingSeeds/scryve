@@ -29,7 +29,7 @@ const nextSlice = () => new Promise((resolve) => setTimeout(resolve, 0))
 /** why: the file is about 20 MB of text, so lines are read by index a slice at a time instead of split and parsed in one block on the JS thread. */
 async function localCardRows(text: string) {
   let start = text.indexOf("\n")
-  const version = localCardsVersion(text.slice(0, start))
+  const version = localCardsVersion(start === -1 ? text : text.slice(0, start))
   const rows: LocalCardRow[] = []
   while (start !== -1) {
     for (let read = 0; read < PARSE_SLICE_LINES && start !== -1; read += 1) {

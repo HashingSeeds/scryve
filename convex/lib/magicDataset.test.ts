@@ -1,4 +1,4 @@
-import { magicDatasetCard, magicTextIndex, textIndexCards } from "./magicDataset"
+import { magicDatasetCard, magicLocalCard, magicTextIndex, textIndexCards } from "./magicDataset"
 
 const card = {
   id: "22222222-2222-2222-2222-222222222222",
@@ -130,5 +130,21 @@ describe("magicTextIndex", () => {
     expect(textIndexCards(index.draw)).toEqual([0, 2])
     expect(textIndexCards(index.cards)).toEqual([2])
     expect(index.flying).toBe("")
+  })
+})
+
+describe("magicLocalCard", () => {
+  it("keeps the text of both faces that the deck file drops", () => {
+    const local = magicLocalCard(card)
+    expect(local?.oracleText).toContain("look at the top card")
+    expect(local?.oracleText).toContain("Flying")
+    expect(local?.faceDetails).toContain("Flying")
+    expect(magicDatasetCard(card)?.faceDetails).not.toContain("Flying")
+  })
+
+  it("keeps a meld result, which no deck allows but players still look up", () => {
+    const melded = { ...card, all_parts: [{ component: "meld_result", name: card.name }] }
+    expect(magicLocalCard(melded)?.name).toBe(card.name)
+    expect(magicDatasetCard(melded)).toBeNull()
   })
 })

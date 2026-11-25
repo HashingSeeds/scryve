@@ -48,3 +48,9 @@ it("searches cards for names that start with a number, but not for rule numbers"
   expect(names("701.3")).toEqual([])
   expect(names("rule 100")).toEqual([])
 })
+
+it("accepts a card file with only its header", async () => {
+  const fetcher = jest.fn().mockResolvedValue(new Response(encodeLocalCards("v2", [])))
+  await expect(syncLocalCards("mtg", { fetcher, now: 0 })).resolves.toBe(true)
+  expect(catalogDb.getMeta("localCards:mtg:version")).toBe("v2")
+})
