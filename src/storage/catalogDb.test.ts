@@ -118,6 +118,35 @@ describe("local catalog SQLite database", () => {
     expect(batch.get("missing")).toBeUndefined()
   })
 
+  it("finishes imports that start at the same time", async () => {
+    await Promise.all([
+      catalogDb.replacePricesAsync("mtg", [
+        {
+          game: "mtg",
+          printingId: "sol",
+          finish: "normal",
+          source: "tcgplayer",
+          currency: "USD",
+          retailCents: 100,
+          updatedAt: "2026-11-25",
+        },
+      ]),
+      catalogDb.replaceLocalCardsAsync(
+        "mtg",
+        [
+          {
+            cardId: "sol",
+            nameKey: "sol ring",
+            json: JSON.stringify({ cardId: "sol", name: "Sol Ring" }),
+          },
+        ],
+        "v1",
+      ),
+    ])
+    expect(catalogDb.getPricesForPrinting("mtg", "sol")).toHaveLength(1)
+    expect(catalogDb.searchLocalCards("mtg", "sol", 3)).toHaveLength(1)
+  })
+
   it("finds offline cards by exact name, then whole word, then name prefix, then word start, more played first", async () => {
     const row = (cardId: string, nameKey: string, rank?: number) => ({
       cardId,

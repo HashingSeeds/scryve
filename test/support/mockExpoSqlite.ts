@@ -98,10 +98,6 @@ function wrapDatabase(db: NodeSqliteDatabase) {
       }
     },
     async withTransactionAsync(task: () => Promise<void>) {
-      if (inTransaction) {
-        await task()
-        return
-      }
       inTransaction = true
       db.exec("BEGIN")
       try {

@@ -518,7 +518,6 @@ const nativeCatalogDb: CatalogDb = {
 
 let importQueue: Promise<unknown> = Promise.resolve()
 
-/** why: expo-sqlite answers a failed BEGIN with ROLLBACK, so imports overlapping on this one connection would undo each other's open transaction. */
 function queued<T>(run: () => Promise<T>): Promise<T> {
   const next = importQueue.then(run, run)
   importQueue = next.catch(() => {})
