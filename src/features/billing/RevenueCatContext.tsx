@@ -222,7 +222,7 @@ async function configureForUser(apiKey: string, appUserID: string | null) {
   const anonymousPro =
     (await Purchases.isAnonymous()) && hasCountPro(await Purchases.getCustomerInfo())
   const { customerInfo } = await Purchases.logIn(appUserID)
-  if (anonymousPro && !hasCountPro(customerInfo)) await Purchases.syncPurchases()
+  if (anonymousPro && !hasCountPro(customerInfo)) await Purchases.syncPurchasesForResult()
   return Purchases
 }
 

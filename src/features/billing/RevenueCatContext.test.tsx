@@ -75,7 +75,7 @@ jest.mock("react-native-purchases", () => {
       isAnonymous: jest.fn(),
       logIn: jest.fn(),
       logOut: jest.fn(),
-      syncPurchases: jest.fn(),
+      syncPurchasesForResult: jest.fn(),
     },
   }
 })
@@ -229,7 +229,7 @@ describe("RevenueCatProvider", () => {
     purchasesMock.isAnonymous.mockResolvedValue(true)
     purchasesMock.logIn.mockResolvedValue({ customerInfo: expiredCustomerInfo, created: false })
     renderHook(() => useRevenueCat(), { wrapper })
-    await waitFor(() => expect(Purchases.syncPurchases).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(Purchases.syncPurchasesForResult).toHaveBeenCalledTimes(1))
     expect(Purchases.logIn).toHaveBeenCalledWith("user_123")
   })
 
