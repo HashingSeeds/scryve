@@ -1,4 +1,12 @@
-import { Children, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import {
+  Children,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react"
 import {
   ActivityIndicator,
   Modal,
@@ -19,7 +27,7 @@ import { CardFocusDialog, cardColorIdentityLabel, colorLabel } from "@/component
 import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { FilterPill, FilterGroup } from "@/components/FilterPill"
-import { Header, HeaderIcon } from "@/components/Header"
+import { Header, HeaderBack, HeaderIcon } from "@/components/Header"
 import { SectionHeader } from "@/components/NumberLane"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
@@ -30,6 +38,7 @@ import { Text } from "@/components/Text"
 import { TextAction } from "@/components/TextAction"
 import { TextField } from "@/components/TextField"
 import { useSheetPresence } from "@/components/useSheetPresence"
+import type { ValuedCollectionEntry } from "@/features/collection/catalogSync"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import {
   cardFilterLabel,
@@ -38,9 +47,11 @@ import {
   playSystemShortLabel,
 } from "@/features/game/playSystems"
 import { VISIBLE_SYSTEM_IDS } from "@/features/game/systemVisibility"
+import type { BackAction } from "@/features/game/useBackToBoard"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { translate } from "@/i18n/translate"
 import { catalogDb } from "@/storage/catalogDb"
+import type { StoredCollectionEntry } from "@/storage/localDbTypes"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
@@ -119,7 +130,20 @@ import {
 } from "../../../convex/lib/systems"
 import { canReadCardText } from "../../../modules/card-text-reader"
 
-type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
+export type SearchCard = FunctionReturnType<typeof api.cards.search>[number]
+type OwnedCard = ValuedCollectionEntry<StoredCollectionEntry>
+
+export type CardSearchCollection = {
+  actions: (openFilters: (() => void) | undefined) => ReactNode
+  sort: ReactNode
+  scopes: ReactNode
+  summary: ReactNode
+  entries: readonly OwnedCard[]
+  renderEntry: (owned: OwnedCard) => ReactElement
+  catalogDetail: (card: SearchCard) => string | undefined
+  catalogAction: (card: SearchCard) => ReactNode
+}
+type ResultItem = SearchCard | { kind: "owned"; owned: OwnedCard } | { kind: "catalog" }
 
 const SCRYFALL = "Scryfall"
 const CAN_READ_CARDS = Platform.OS !== "web" && canReadCardText
@@ -129,6 +153,7 @@ const COLORS_BEFORE = "cost"
 const QUERY_LINE_HEIGHT = 19
 /** why: a result row's usual height, which the list uses to place rows before it measures them. */
 const RESULT_HEIGHT = 77
+const COLLECTION_DRAW_DISTANCE = 500
 /** why: a filter's search field has its row of matches under it, which the keyboard must leave in view. */
 const SUGGESTIONS_BELOW_FIELD = 56
 const NO_RESULTS = [] as const
@@ -205,6 +230,8 @@ type CardSearchProps = {
   presentation?: "modal" | "screen"
   onGameChange?: (game: SystemId) => void
   onOpenRules?: (options?: { query?: string; rule?: string }) => void
+  back?: BackAction
+  collection?: CardSearchCollection
 }
 
 const GAME_OPTIONS = VISIBLE_SYSTEM_IDS.map((id) => ({ id, label: playSystemShortLabel(id) }))
@@ -228,6 +255,8 @@ export function CardSearch({
   presentation = "modal",
   onGameChange,
   onOpenRules,
+  back,
+  collection,
 }: CardSearchProps) {
   const convex = useConvex()
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
@@ -367,7 +396,7 @@ export function CardSearch({
   // why: the sheet's groups skip renders their picks didn't change, so their handlers keep one identity.
   const stable = useStableCallbacks()
   // why: iOS keeps a multiline field's height when its text changes from outside, so the bar is rebuilt after the sheet edits it or it is cleared.
-  const [bar, setBar] = useState({ build: 0, focused: !choosingCommander })
+  const [bar, setBar] = useState({ build: 0, focused: !choosingCommander && !back })
   function closeFilters() {
     setFiltersOpen(false)
     setBar(({ build }) => ({ build: build + 1, focused: false }))
@@ -931,10 +960,33 @@ export function CardSearch({
           ("scryfallId" in card && eligible(card) && matchesPickedColors(card) && !inDeck(card)),
       )
     : undefined
+  const needle = text.toLocaleLowerCase()
+  const collectionEntries = collection?.entries
+  const ownedNames = useMemo(
+    () => new Set(collectionEntries?.map(({ entry }) => entry.name)),
+    [collectionEntries],
+  )
+  const ownedMatches = useMemo(
+    () =>
+      needle
+        ? collectionEntries?.filter(({ entry }) => entry.name.toLocaleLowerCase().includes(needle))
+        : collectionEntries,
+    [collectionEntries, needle],
+  )
+  const shownCards = collection
+    ? catalogResults?.filter((card) => !ownedNames.has(card.name))
+    : catalogResults
+  const listData: readonly ResultItem[] = collection
+    ? [
+        ...(ownedMatches ?? []).map((owned) => ({ kind: "owned" as const, owned })),
+        ...(shownCards?.length ? [{ kind: "catalog" as const }, ...shownCards] : []),
+      ]
+    : (shownCards ?? NO_RESULTS)
+  const cardsStart = listData.length - (shownCards?.length ?? 0)
   const searchPicked = useCardSearchAnalytics(
     game,
-    resultsQuery !== undefined && !busy && catalogResults
-      ? { query: resultsQuery, results: catalogResults.map((card) => card.name) }
+    resultsQuery !== undefined && !busy && shownCards
+      ? { query: resultsQuery, results: shownCards.map((card) => card.name) }
       : undefined,
   )
   function pick(card: SearchCard, index: number, to = section) {
@@ -954,7 +1006,6 @@ export function CardSearch({
         matchesFilters(entry.card.name, cachedRules[cardDetailsKey(entry.card, game)])),
   )
 
-  const needle = text.toLocaleLowerCase()
   const inDeckMatches = needle
     ? deckCards?.filter((card) => card.name.toLocaleLowerCase().includes(needle))
     : undefined
@@ -989,11 +1040,49 @@ export function CardSearch({
         ? translate("decks:cardSearch.showCard", { card: card.name })
         : undefined
 
+  const queryField = (
+    <TextField
+      key={bar.build}
+      testID="card-search-input"
+      accessibilityLabel={translate("decks:cardSearch.searchLabel")}
+      placeholderTx={collection ? "decks:collection.searchCards" : "decks:cardSearch.placeholder"}
+      // why: React Native styles the parts of a field's text only through children, which web ignores.
+      value={Platform.OS === "web" ? query : undefined}
+      maxLength={filtersCards ? 400 : 120}
+      autoCorrect={false}
+      autoFocus={bar.focused}
+      returnKeyType="search"
+      // why: a query with filter terms wraps onto more lines instead of scrolling out of sight.
+      multiline
+      submitBehavior="blurAndSubmit"
+      onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
+      clearable={() => setBar(({ build }) => ({ build: build + 1, focused: true }))}
+      inputWrapperStyle={$queryWrapper}
+      style={$queryInput}
+      textAlignVertical="center"
+    >
+      {Platform.OS === "web"
+        ? undefined
+        : spans.map((span, index) => (
+            <Text
+              key={index}
+              style={{
+                lineHeight: QUERY_LINE_HEIGHT,
+                color:
+                  sectionColor(span.section) ??
+                  (span.joiner ? theme.colors.textDim : theme.colors.text),
+              }}
+              text={span.text}
+            />
+          ))}
+    </TextField>
+  )
+
   const content = (
     <>
       <Screen
         preset="fixed"
-        safeAreaEdges={["bottom"]}
+        safeAreaEdges={back ? [] : ["bottom"]}
         backgroundColor={theme.colors.surface}
         contentContainerStyle={$screen}
       >
@@ -1014,15 +1103,20 @@ export function CardSearch({
             ) : undefined
           }
           LeftActionComponent={
-            <HeaderIcon
-              testID="card-search-close"
-              icon="x"
-              label={translate("common:close")}
-              onPress={onClose}
-            />
+            back ? (
+              <HeaderBack testID="card-search-back" {...back} />
+            ) : (
+              <HeaderIcon
+                testID="card-search-close"
+                icon="x"
+                label={translate("common:close")}
+                onPress={onClose}
+              />
+            )
           }
           RightActionComponent={
             <View style={$headerActions}>
+              {collection?.actions(filtersCards ? () => setFiltersOpen(true) : undefined)}
               {scans ? (
                 <HeaderIcon
                   testID="card-scan-button"
@@ -1031,7 +1125,7 @@ export function CardSearch({
                   onPress={() => setScanning(true)}
                 />
               ) : null}
-              {filtersCards ? (
+              {filtersCards && !collection ? (
                 <HeaderIcon
                   testID="card-filters-button"
                   icon="sliders"
@@ -1044,41 +1138,14 @@ export function CardSearch({
           backgroundColor={theme.colors.surface}
         />
         <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
-          <TextField
-            key={bar.build}
-            testID="card-search-input"
-            accessibilityLabel={translate("decks:cardSearch.searchLabel")}
-            placeholderTx="decks:cardSearch.placeholder"
-            // why: React Native styles the parts of a field's text only through children, which web ignores.
-            value={Platform.OS === "web" ? query : undefined}
-            maxLength={filtersCards ? 400 : 120}
-            autoCorrect={false}
-            autoFocus={bar.focused}
-            returnKeyType="search"
-            // why: a query with filter terms wraps onto more lines instead of scrolling out of sight.
-            multiline
-            submitBehavior="blurAndSubmit"
-            onChangeText={(value) => setQuery(value.replace(/\n/g, " "))}
-            clearable={() => setBar(({ build }) => ({ build: build + 1, focused: true }))}
-            inputWrapperStyle={$queryWrapper}
-            style={$queryInput}
-            textAlignVertical="center"
-          >
-            {Platform.OS === "web"
-              ? undefined
-              : spans.map((span, index) => (
-                  <Text
-                    key={index}
-                    style={{
-                      lineHeight: QUERY_LINE_HEIGHT,
-                      color:
-                        sectionColor(span.section) ??
-                        (span.joiner ? theme.colors.textDim : theme.colors.text),
-                    }}
-                    text={span.text}
-                  />
-                ))}
-          </TextField>
+          {collection ? (
+            <View style={themed($queryRow)}>
+              <View style={$name}>{queryField}</View>
+              {collection.sort}
+            </View>
+          ) : (
+            queryField
+          )}
           {suggestions.length ? (
             <ScrollView
               horizontal
@@ -1121,6 +1188,7 @@ export function CardSearch({
               }}
             />
           ) : null}
+          {collection?.scopes}
         </View>
         <LegendList
           {...NATIVE_RESULTS_PROPS}
@@ -1130,12 +1198,22 @@ export function CardSearch({
             $resultsContent,
             choosingCommander ? $searchResults : undefined,
           ]}
-          columnWrapperStyle={themed($resultGap)}
-          data={catalogResults ?? NO_RESULTS}
-          keyExtractor={(card, index) => `${index}:${card.name}`}
+          columnWrapperStyle={collection ? undefined : themed($resultGap)}
+          data={listData}
+          // why: the default window rendered every row of a 1,000-card collection soon after it opened.
+          drawDistance={collection ? COLLECTION_DRAW_DISTANCE : undefined}
+          keyExtractor={(item, index) =>
+            "kind" in item
+              ? item.kind === "owned"
+                ? item.owned.entry.id
+                : item.kind
+              : `${index}:${item.name}`
+          }
+          getItemType={(item) => ("kind" in item ? item.kind : "card")}
           estimatedItemSize={RESULT_HEIGHT}
           ListHeaderComponent={
             <ResultSlot edge="above">
+              {collection && !needle ? collection.summary : null}
               {inDeckMatches?.length ? (
                 <SectionHeader
                   label={translate("decks:cardSearch.inDeck")}
@@ -1293,50 +1371,66 @@ export function CardSearch({
               ) : null}
             </ResultSlot>
           }
-          renderItem={({ item: card, index }) => (
-            <ResultRow
-              style={themed($result)}
-              accessibilityRole={tapsRows ? "button" : undefined}
-              accessibilityLabel={rowLabel(card)}
-              onPress={tapsRows ? () => pick(card, index) : undefined}
-            >
-              <CardImage
-                game={game}
-                source={card.smallImageUrl ?? card.imageUrl}
-                accessibilityLabel={card.name}
-                compact
-                style={$image}
-              />
-              <View style={$name}>
-                <Text weight="medium" text={card.name} />
-                <Text
-                  size="meta"
-                  tone="dim"
-                  text={"scryfallId" in card ? card.typeLine : card.typeLabel}
+          renderItem={({ item, index: position }) => {
+            if ("kind" in item) {
+              return item.kind === "owned" ? (
+                (collection?.renderEntry(item.owned) ?? null)
+              ) : (
+                <View style={themed($catalogLabel)}>
+                  <SectionHeader label={translate("decks:collection.catalog")} />
+                </View>
+              )
+            }
+            const card = item
+            const index = position - cardsStart
+            const detail = collection?.catalogDetail(card)
+            return (
+              <ResultRow
+                style={themed($result)}
+                accessibilityRole={tapsRows ? "button" : undefined}
+                accessibilityLabel={rowLabel(card)}
+                onPress={tapsRows ? () => pick(card, index) : undefined}
+              >
+                <CardImage
+                  game={game}
+                  source={card.smallImageUrl ?? card.imageUrl}
+                  accessibilityLabel={card.name}
+                  compact
+                  style={$image}
                 />
-                {textExcerpts?.has(card.name) ? (
+                <View style={$name}>
+                  <Text weight="medium" text={card.name} />
                   <Text
                     size="meta"
                     tone="dim"
-                    numberOfLines={2}
-                    text={textExcerpts.get(card.name)}
+                    numberOfLines={detail ? 1 : undefined}
+                    text={detail ?? ("scryfallId" in card ? card.typeLine : card.typeLabel)}
+                  />
+                  {textExcerpts?.has(card.name) ? (
+                    <Text
+                      size="meta"
+                      tone="dim"
+                      numberOfLines={2}
+                      text={textExcerpts.get(card.name)}
+                    />
+                  ) : null}
+                  {choosingCommander && "scryfallId" in card ? (
+                    <Text size="meta" tone="dim" text={cardColorIdentityLabel(card, card.name)} />
+                  ) : null}
+                </View>
+                {!tapsRows ? (
+                  <TextAction
+                    style={$add}
+                    accessibilityLabel={translate("decks:cardSearch.addCard", { card: card.name })}
+                    tx="decks:cardSearch.add"
+                    onPress={() => pick(card, index)}
                   />
                 ) : null}
-                {choosingCommander && "scryfallId" in card ? (
-                  <Text size="meta" tone="dim" text={cardColorIdentityLabel(card, card.name)} />
-                ) : null}
-              </View>
-              {!tapsRows ? (
-                <TextAction
-                  style={$add}
-                  accessibilityLabel={translate("decks:cardSearch.addCard", { card: card.name })}
-                  tx="decks:cardSearch.add"
-                  onPress={() => pick(card, index)}
-                />
-              ) : null}
-              {!tapsRows ? sideAction(card, (to) => pick(card, index, to)) : null}
-            </ResultRow>
-          )}
+                {!tapsRows ? sideAction(card, (to) => pick(card, index, to)) : null}
+                {collection?.catalogAction(card)}
+              </ResultRow>
+            )
+          }}
           ListFooterComponent={
             <ResultSlot edge="below">
               {!busy && catalogResults?.length === 0 ? (
@@ -1553,6 +1647,12 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 
 const $suggestions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $headerActions: ViewStyle = { flexDirection: "row" }
+const $queryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+const $catalogLabel: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingTop: spacing.md })
 const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112, alignItems: "center" }
 /** why: iOS draws multiline text at the top of its box, so the field hugs its lines (no minimum height) and centers instead, scrolling past the bar's height. */
 const $queryInput: TextStyle = { alignSelf: "center", minHeight: 0, maxHeight: 100 }

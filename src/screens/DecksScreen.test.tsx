@@ -8,7 +8,6 @@ import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
 import { colors as darkColors } from "@/theme/colorsDark"
 import { ThemeProvider } from "@/theme/context"
-import { spacing } from "@/theme/spacing"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { clear, loadString } from "@/utils/storage"
 
@@ -135,10 +134,6 @@ function shelf(
         back={{ label: "Play", onPress: jest.fn() }}
         onSelect={jest.fn()}
         onAddDeck={jest.fn()}
-        onHistory={jest.fn()}
-        onSettings={jest.fn()}
-        onSupport={jest.fn()}
-        onAccount={jest.fn()}
         {...props}
       />
     </ThemeProvider>
@@ -457,14 +452,10 @@ describe("DecksScreen", () => {
     mockTotals = []
   })
 
-  it("puts app navigation at the bottom and names the game it returns to", () => {
+  it("names the game its back chevron returns to", () => {
     const onPress = jest.fn()
     const view = renderShelf({ back: { label: "Game", onPress } })
 
-    expect(view.getByTestId("utility-menu-button")).toBeTruthy()
-    expect(StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style).bottom).toBe(
-      spacing.md,
-    )
     fireEvent.press(view.getByLabelText("Game"))
     expect(onPress).toHaveBeenCalledTimes(1)
   })
@@ -680,17 +671,6 @@ describe("DecksScreen", () => {
     expect(onAddDeck).toHaveBeenCalledTimes(1)
   })
 
-  it("opens card lookup for the picked game, or with no game when showing all", () => {
-    const onCards = jest.fn()
-    const all = renderShelf({ onCards })
-    fireEvent.press(all.getByText("Cards"))
-    expect(onCards).toHaveBeenLastCalledWith(undefined)
-    all.unmount()
-    const pokemon = renderShelf({ onCards, initialSystem: "pokemon" })
-    fireEvent.press(pokemon.getByText("Cards"))
-    expect(onCards).toHaveBeenLastCalledWith("pokemon")
-  })
-
   it("shows synced favorites and toggles them without opening the deck", () => {
     const onSelect = jest.fn()
     mockListMine.value = {
@@ -796,7 +776,6 @@ describe("DecksScreen", () => {
     const view = renderShelf()
 
     expect(view.getAllByText("Decks").length).toBeGreaterThan(0)
-    expect(view.getByTestId("decks-area-segment")).toBeTruthy()
     expect(view.getByTestId("collection-filter")).toBeTruthy()
     expect(view.getByTestId("deck-filters-button")).toBeTruthy()
     expect(view.getByTestId("deck-search-input")).toBeTruthy()
@@ -825,10 +804,6 @@ describe("DecksScreen", () => {
           back={back}
           onSelect={jest.fn()}
           onAddDeck={jest.fn()}
-          onHistory={jest.fn()}
-          onSettings={jest.fn()}
-          onSupport={jest.fn()}
-          onAccount={jest.fn()}
         />
       </ThemeProvider>,
     )

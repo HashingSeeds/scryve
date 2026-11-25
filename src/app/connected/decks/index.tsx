@@ -1,13 +1,9 @@
-import { useCallback, useMemo } from "react"
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
+import { useMemo } from "react"
+import { router, useLocalSearchParams } from "expo-router"
 
-import { useAuthAccess } from "@/features/auth/AuthContext"
-import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
-import { useAccountEntry } from "@/features/auth/useAccountEntry"
 import { useBackToBoard } from "@/features/game/useBackToBoard"
+import { LibraryTabs } from "@/features/library/LibraryTabs"
 import { translate } from "@/i18n/translate"
-import { DecksScreen } from "@/screens/DecksScreen"
-import { captureAnalytics } from "@/utils/analytics"
 
 export default function DecksRoute() {
   const { lobbyId, system } = useLocalSearchParams<{ lobbyId?: string; system?: string }>()
@@ -26,47 +22,5 @@ export default function DecksRoute() {
         : boardBack,
     [boardBack, lobbyId],
   )
-  useFocusEffect(
-    useCallback(() => {
-      captureAnalytics("deck_used", { feature: "library" })
-    }, []),
-  )
-  const auth = useAuthAccess()
-  const account = useAccountEntry()
-  const screen = (access?: CloudAccess) => (
-    <DecksScreen
-      access={access}
-      initialSystem={system}
-      back={back}
-      onHistory={() => router.push("/history")}
-      onSettings={() => router.push("/settings")}
-      onSupport={() => router.push("/support")}
-      accountEntry={account.accountEntry}
-      onAccount={account.onAccount}
-      onAddDeck={() => router.push("/connected/decks/add")}
-      onCards={(game) => router.push({ pathname: "/cards", params: game ? { game } : {} })}
-      onSelect={(deck) =>
-        router.push({
-          pathname: "/connected/decks/[deckId]",
-          params: {
-            deckId: deck.deckId,
-            ...(deck.reviewChanges ? { reviewChanges: "true" } : {}),
-            deckName: deck.name,
-            deckGame: deck.game,
-            deckFormat: deck.format,
-            ...(deck.cardQuantity !== undefined
-              ? { deckCardQuantity: String(deck.cardQuantity) }
-              : {}),
-          },
-        })
-      }
-      unavailableMessage={
-        !auth.configured
-          ? auth.configurationMessage || translate("decks:shelf.syncUnavailable")
-          : undefined
-      }
-    />
-  )
-  if (!auth.configured) return screen()
-  return <CloudScreen onBack={() => router.back()}>{screen}</CloudScreen>
+  return <LibraryTabs initial="decks" back={back} decksSystem={system} />
 }

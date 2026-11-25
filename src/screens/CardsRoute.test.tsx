@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { router } from "expo-router"
 
 import CardsRoute from "@/app/cards"
 import { ThemeProvider } from "@/theme/context"
@@ -10,8 +11,13 @@ jest.mock("convex/react", () => ({
   useConvexConnectionState: () => ({ isWebSocketConnected: true }),
 }))
 jest.mock("@/features/decks/useCardNameIndex", () => ({ useCardNameIndex: () => undefined }))
+jest.mock("@/features/auth/AuthContext", () => ({
+  useAuthAccess: () => ({ configured: false, isSignedIn: false, openAuth: jest.fn() }),
+}))
+jest.mock("@/features/auth/CloudScreen", () => ({ CloudScreen: () => null }))
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), canGoBack: () => true, replace: jest.fn() },
+  router: { back: jest.fn(), canGoBack: () => true, replace: jest.fn(), push: jest.fn() },
+  useFocusEffect: jest.fn(),
   useLocalSearchParams: () => ({}),
 }))
 
@@ -33,4 +39,21 @@ it("searches the game picked on the standalone Cards screen", async () => {
     expect.anything(),
     expect.objectContaining({ game: "pokemon", query: expect.stringContaining("pikachu") }),
   )
+})
+
+it("switches to Decks and back in place, keeping the search", () => {
+  const view = render(
+    <ThemeProvider initialContext="dark">
+      <CardsRoute />
+    </ThemeProvider>,
+  )
+  fireEvent.changeText(view.getByTestId("card-search-input"), "bolt")
+  fireEvent.press(view.getByTestId("app-tab-decks"))
+  expect(view.getByTestId("deck-search-input")).toBeTruthy()
+  expect(view.queryByTestId("card-search-input")).toBeNull()
+  fireEvent.press(view.getByTestId("app-tab-cards"))
+  expect(view.getByText("bolt")).toBeTruthy()
+  expect(view.queryByTestId("deck-search-input")).toBeNull()
+  expect(router.push).not.toHaveBeenCalled()
+  expect(router.replace).not.toHaveBeenCalled()
 })
