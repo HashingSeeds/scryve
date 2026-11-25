@@ -3,6 +3,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { catalogDb } from "@/storage/catalogDb"
 import { localCardDb } from "@/storage/localDb"
 import { ThemeProvider } from "@/theme/context"
+import { clear } from "@/utils/storage"
 
 import { syncCatalogPrintingsAndPrices } from "./catalogSync"
 import { CollectionShelf } from "./CollectionShelf"
@@ -30,7 +31,7 @@ jest.mock("../../../modules/card-text-reader", () => ({
 
 describe("CollectionShelf", () => {
   beforeEach(() => {
-    localCardDb.clearAll()
+    clear()
     catalogDb.clearAll()
     catalogDb.replacePrintings(
       "mtg",
@@ -199,6 +200,73 @@ describe("CollectionShelf", () => {
 
     expect(view.getByText("$3.00")).toBeTruthy()
     expect(view.queryByText("$2.50")).toBeNull()
+  })
+
+  it("holds the shelf while scanning and refreshes it once when the session view closes", async () => {
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+    })
+    const list = jest.spyOn(localCardDb, "listCollectionEntries")
+    const shelfLists = () =>
+      list.mock.calls.filter(([filter]) => filter?.game === "mtg" && !filter.cardId).length
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <CollectionShelf mode="collection" />
+        </ThemeProvider>,
+      )
+      expect(shelfLists()).toBe(1)
+
+      fireEvent.press(view.getByTestId("collection-scan-button"))
+      const [session] = listBinders("scan_session")
+      act(() => {
+        addCollectionCard({
+          game: "mtg",
+          cardId: "ora-sol",
+          printingId: "cmm-410",
+          name: "Sol Ring",
+          setCode: "cmm",
+          collectorNumber: "410",
+          binderId: session.id,
+        })
+      })
+      await act(async () => fireEvent.press(view.getByText("Done")))
+      expect(shelfLists()).toBe(1)
+
+      fireEvent.press(view.getByText("Back"))
+      expect(shelfLists()).toBe(2)
+    } finally {
+      list.mockRestore()
+    }
+  })
+
+  it("lists the collection once across remounts when nothing changed", () => {
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+    })
+    const list = jest.spyOn(localCardDb, "listCollectionEntries")
+    try {
+      const shelf = (
+        <ThemeProvider initialContext="dark">
+          <CollectionShelf mode="collection" />
+        </ThemeProvider>
+      )
+      render(shelf).unmount()
+      render(shelf).unmount()
+      expect(list.mock.calls.filter(([filter]) => filter?.game === "mtg")).toHaveLength(1)
+    } finally {
+      list.mockRestore()
+    }
   })
 
   it("refreshes quick-add matches when initial catalog sync completes", async () => {

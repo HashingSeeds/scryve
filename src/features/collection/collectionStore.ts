@@ -3,6 +3,9 @@ import { randomUUID } from "expo-crypto"
 
 import { localCardDb } from "@/storage/localDb"
 import type { BinderKind, StoredBinder, StoredCollectionEntry } from "@/storage/localDbTypes"
+import { onStorageClear } from "@/utils/storage"
+
+import { catalogVersion, valueCollectionEntries, type ValuedCollectionEntry } from "./catalogSync"
 
 export type { BinderKind, StoredBinder, StoredCollectionEntry }
 
@@ -13,6 +16,9 @@ function notify() {
   revision += 1
   for (const listener of listeners) listener()
 }
+
+// why: clearing storage empties the collection tables without a write here, so shelves and valuedCollection kept showing the old cards.
+onStorageClear(notify)
 
 export function subscribeCollection(listener: () => void) {
   listeners.add(listener)
@@ -249,6 +255,30 @@ export function listCollectionEntries(filter?: {
   cardId?: string
 }): StoredCollectionEntry[] {
   return localCardDb.listCollectionEntries(filter)
+}
+
+let valuedCache:
+  | {
+      game: string
+      revision: number
+      catalogVersion: number
+      items: ValuedCollectionEntry<StoredCollectionEntry>[]
+    }
+  | undefined
+
+// why: DecksScreen remounts the shelf on every segment switch; without this one-slot cache each remount re-listed and re-valued the whole collection.
+export function valuedCollection(game: string): ValuedCollectionEntry<StoredCollectionEntry>[] {
+  const version = catalogVersion(game)
+  if (
+    valuedCache?.game === game &&
+    valuedCache.revision === revision &&
+    valuedCache.catalogVersion === version
+  ) {
+    return valuedCache.items
+  }
+  const items = valueCollectionEntries(game, localCardDb.listCollectionEntries({ game })).items
+  valuedCache = { game, revision, catalogVersion: version, items }
+  return items
 }
 
 export function ownedQuantitiesByCardId(game: string, cardIds: readonly string[]) {

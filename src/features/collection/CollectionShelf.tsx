@@ -30,6 +30,7 @@ import {
   listCollectionEntries,
   updateCollectionEntry,
   useCollectionRevision,
+  valuedCollection,
   type StoredBinder,
   type StoredCollectionEntry,
 } from "./collectionStore"
@@ -51,7 +52,7 @@ export function CollectionShelf({
 }) {
   const { themed, theme } = useAppTheme()
   const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
-  const revision = useCollectionRevision()
+  const liveRevision = useCollectionRevision()
   const sync = useCatalogSync(game, true)
 
   const [selectedBinderId, setSelectedBinderId] = useState<string | "all">("all")
@@ -69,6 +70,12 @@ export function CollectionShelf({
   const [editingEntry, setEditingEntry] = useState<StoredCollectionEntry>()
   const [addCardOpen, setAddCardOpen] = useState(false)
   const [addCardQuery, setAddCardQuery] = useState("")
+
+  // why: the shelf stays mounted under the scanner and session view; following each scan's revision re-listed and re-valued the whole collection behind them.
+  const scanOpen = Boolean(scanningSession || activeScanSession)
+  const [shelfRevision, setShelfRevision] = useState(liveRevision)
+  if (!scanOpen && shelfRevision !== liveRevision) setShelfRevision(liveRevision)
+  const revision = scanOpen ? shelfRevision : liveRevision
 
   const activeScanGame = scanningSession?.game ?? game
   const nameIndex = useCardNameIndex(activeScanGame, deviceId, Boolean(scanningSession))
@@ -88,39 +95,33 @@ export function CollectionShelf({
       ? selectedBinderId
       : "all"
 
-  const allEntries = useMemo(() => {
-    if (mode === "scans") return []
-    void revision
-    return listCollectionEntries({ game })
-  }, [mode, revision, game])
-
   const scanSessionIds = useMemo(
     () => new Set(scanSessions.map((session) => session.id)),
     [scanSessions],
   )
 
-  const collectionEntries = useMemo(() => {
+  const allValued = useMemo(() => {
+    void revision
+    void sync.version
+    return valuedCollection(game)
+  }, [revision, sync.version, game])
+
+  const valuedEntries = useMemo(() => {
     if (mode === "scans") return []
-    return allEntries.filter((entry) => {
+    return allValued.filter(({ entry }) => {
       if (activeBinderId === "all") return !entry.binderId || !scanSessionIds.has(entry.binderId)
       return entry.binderId === activeBinderId
     })
-  }, [mode, allEntries, activeBinderId, scanSessionIds])
-
-  const valuedCollection = useMemo(() => {
-    if (mode === "scans") return []
-    void sync.version
-    return valueCollectionEntries(game, collectionEntries).items
-  }, [mode, game, collectionEntries, sync.version])
+  }, [mode, allValued, activeBinderId, scanSessionIds])
 
   const pricedEntries = useMemo(() => {
     if (mode === "scans") return []
     const term = search.trim().toLowerCase()
     const items = term
-      ? valuedCollection.filter(
+      ? valuedEntries.filter(
           ({ entry }) => entry.name.toLowerCase().includes(term) || entry.setCode.includes(term),
         )
-      : [...valuedCollection]
+      : [...valuedEntries]
     if (sort === "name") return items.sort((a, b) => a.entry.name.localeCompare(b.entry.name))
     if (sort === "recent") return items.sort((a, b) => b.entry.updatedAt - a.entry.updatedAt)
     return items.sort(
@@ -128,7 +129,7 @@ export function CollectionShelf({
         b.retailCents * b.entry.quantity - a.retailCents * a.entry.quantity ||
         a.entry.name.localeCompare(b.entry.name),
     )
-  }, [mode, valuedCollection, search, sort])
+  }, [mode, valuedEntries, search, sort])
 
   const totals = useMemo(() => {
     let cards = 0
@@ -143,21 +144,17 @@ export function CollectionShelf({
   }, [pricedEntries])
 
   const scanSessionSummaries = useMemo(() => {
-    if (mode !== "scans") return new Map<string, { count: number; retailCents: number }>()
-    void revision
-    void sync.version
     const summaryById = new Map<string, { count: number; retailCents: number }>()
-    for (const session of scanSessions) {
-      const entries = listCollectionEntries({ binderId: session.id })
-      const sessionGame = session.game ?? game
-      const { totals: sessionTotals } = valueCollectionEntries(sessionGame, entries)
-      summaryById.set(session.id, {
-        count: sessionTotals.cards,
-        retailCents: sessionTotals.retailCents,
-      })
+    if (mode !== "scans") return summaryById
+    for (const { entry, retailCents } of allValued) {
+      if (!entry.binderId || !scanSessionIds.has(entry.binderId)) continue
+      const summary = summaryById.get(entry.binderId) ?? { count: 0, retailCents: 0 }
+      summary.count += entry.quantity
+      summary.retailCents += retailCents * entry.quantity
+      summaryById.set(entry.binderId, summary)
     }
     return summaryById
-  }, [mode, revision, sync.version, scanSessions, game])
+  }, [mode, allValued, scanSessionIds])
 
   const quickAddMatches = useMemo(() => {
     void sync.version
@@ -263,12 +260,12 @@ export function CollectionShelf({
 
   const scanningTotalCents = useMemo(() => {
     if (!scanningSession) return undefined
-    void revision
+    void liveRevision
     void sync.version
     const sessionGame = scanningSession.game ?? game
     const entries = listCollectionEntries({ binderId: scanningSession.id })
     return valueCollectionEntries(sessionGame, entries).totals.retailCents
-  }, [scanningSession, revision, sync.version, game])
+  }, [scanningSession, liveRevision, sync.version, game])
 
   if (mode === "scans") {
     return (
@@ -657,7 +654,9 @@ export function CollectionShelf({
               testID="collection-export-copy"
               tx="decks:collection.exportCopy"
               onPress={() => {
-                void Clipboard.setStringAsync(exportCollectionCsv(collectionEntries)).then(() => {
+                void Clipboard.setStringAsync(
+                  exportCollectionCsv(valuedEntries.map(({ entry }) => entry)),
+                ).then(() => {
                   setImportMessage(translate("decks:collection.exportCopied"))
                 })
               }}
