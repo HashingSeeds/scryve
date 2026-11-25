@@ -117,4 +117,76 @@ describe("local catalog SQLite database", () => {
     expect(batch.get("sol-cmm-412")).toHaveLength(2)
     expect(batch.get("missing")).toBeUndefined()
   })
+
+  it("finishes imports that start at the same time", async () => {
+    await Promise.all([
+      catalogDb.replacePricesAsync("mtg", [
+        {
+          game: "mtg",
+          printingId: "sol",
+          finish: "normal",
+          source: "tcgplayer",
+          currency: "USD",
+          retailCents: 100,
+          updatedAt: "2026-11-25",
+        },
+      ]),
+      catalogDb.replaceLocalCardsAsync(
+        "mtg",
+        [
+          {
+            cardId: "sol",
+            nameKey: "sol ring",
+            json: JSON.stringify({ cardId: "sol", name: "Sol Ring" }),
+          },
+        ],
+        "v1",
+      ),
+    ])
+    expect(catalogDb.getPricesForPrinting("mtg", "sol")).toHaveLength(1)
+    expect(catalogDb.searchLocalCards("mtg", "sol", 3)).toHaveLength(1)
+  })
+
+  it("finds offline cards by exact name, then whole word, then name prefix, then word start, more played first", async () => {
+    const row = (cardId: string, nameKey: string, rank?: number) => ({
+      cardId,
+      nameKey,
+      rank,
+      json: JSON.stringify({ cardId, name: nameKey }),
+    })
+    await catalogDb.replaceLocalCardsAsync(
+      "mtg",
+      [
+        row("bolt-bend", "lightning bolt", 2),
+        row("helix", "lightning helix", 1),
+        row("lightning", "lightning"),
+        row("ball", "ball lightning", 0),
+        row("glint", "glint hawk"),
+        row("wave", "boltwave", 3),
+        row("bend", "bolt bend", 9),
+      ],
+      "v1",
+    )
+
+    const names = (key: string) =>
+      catalogDb.searchLocalCards("mtg", key, 5).map((card) => card.name)
+    expect(names("lightning")).toEqual([
+      "lightning",
+      "ball lightning",
+      "lightning helix",
+      "lightning bolt",
+    ])
+    expect(names("light")).toEqual([
+      "lightning helix",
+      "lightning bolt",
+      "lightning",
+      "ball lightning",
+    ])
+    expect(catalogDb.searchLocalCards("mtg", "bolt", 1).map((card) => card.name)).toEqual([
+      "lightning bolt",
+    ])
+    expect(names("ight")).toEqual([])
+    expect(catalogDb.searchLocalCards("pokemon", "light", 5)).toEqual([])
+    expect(catalogDb.getMeta("localCards:mtg:version")).toBe("v1")
+  })
 })

@@ -1,3 +1,4 @@
+import type { LocalCard } from "./localCards"
 import { type CardReference, normalizeScryfallCard, objectRecord } from "./scryfall"
 import { LEGALITY_FORMATS } from "./systems"
 
@@ -59,7 +60,7 @@ const PAPER_FORMATS = [
  * Unfinity's black-bordered cards are legal. Legality alone can't decide: a new release is legal
  * nowhere until its legal date.
  */
-function outsidePaperDecks(raw: Record<string, unknown>) {
+function outsidePaperDecks(raw: Record<string, unknown>, keepMeldResults: boolean) {
   const legalities = objectRecord(raw.legalities)
   const parts = Array.isArray(raw.all_parts) ? raw.all_parts.map(objectRecord) : []
   const promoTypes = Array.isArray(raw.promo_types) ? raw.promo_types : []
@@ -75,7 +76,7 @@ function outsidePaperDecks(raw: Record<string, unknown>) {
   const paperLegal = PAPER_FORMATS.some(
     (format) => legalities?.[format] !== undefined && legalities[format] !== "not_legal",
   )
-  return meldResult || (unusual && !paperLegal)
+  return (meldResult && !keepMeldResults) || (unusual && !paperLegal)
 }
 
 export function textSearchKey(text: string) {
@@ -126,14 +127,38 @@ function faceDetailsWithoutOracleText(faceDetails: string): string {
   )
 }
 
-export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
+function deckCard(value: unknown, keepMeldResults = false) {
   const raw = objectRecord(value)
   if (!raw) return null
   if (typeof raw.layout === "string" && NON_DECK_LAYOUTS.has(raw.layout)) return null
-  if (raw.set_type === "memorabilia" || outsidePaperDecks(raw)) return null
-
+  if (raw.set_type === "memorabilia" || outsidePaperDecks(raw, keepMeldResults)) return null
   const card = normalizeScryfallCard(raw)
-  if (!card) return null
+  return card && { raw, card }
+}
+
+export function magicLocalCard(value: unknown): LocalCard | null {
+  const found = deckCard(value, true)
+  if (!found) return null
+  const { raw, card } = found
+  return {
+    cardId: card.scryfallId,
+    name: card.name,
+    ...(typeof raw.edhrec_rank === "number" ? { rank: raw.edhrec_rank } : {}),
+    imageUrl: card.imageUrl,
+    smallImageUrl: card.smallImageUrl,
+    manaCost: card.manaCost,
+    typeLine: card.typeLine,
+    oracleText: card.oracleText,
+    faceDetails: card.faceDetails,
+    keywords: card.keywords,
+    colorIdentity: card.colorIdentity,
+  }
+}
+
+export function magicDatasetCard(value: unknown): MagicDatasetCard | null {
+  const found = deckCard(value)
+  if (!found) return null
+  const { raw, card } = found
   const {
     oracleText,
     commanderRulesUpdatedAt: _commanderRulesUpdatedAt,

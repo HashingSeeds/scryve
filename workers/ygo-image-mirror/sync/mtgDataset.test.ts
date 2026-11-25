@@ -17,6 +17,7 @@ function fetcherFor(lines: string[]) {
     .mockResolvedValueOnce(Response.json(BULK))
     .mockResolvedValueOnce(new Response(gzipSync(lines.join("\n") + "\n")))
     .mockResolvedValueOnce(Response.json({ ok: true }))
+    .mockResolvedValueOnce(Response.json({ ok: true }))
 }
 
 describe("Magic dataset sync", () => {
@@ -46,6 +47,15 @@ describe("Magic dataset sync", () => {
     expect(uploaded.cards[0]).not.toHaveProperty("oracleText")
     expect(uploaded.cards[0].textKey).toBe("text")
     expect(uploaded.textIndex).toEqual({ text: "0,1" })
+
+    const [localUrl, localInit] = fetcher.mock.calls[3]
+    expect(localUrl).toBe("https://images.example/datasets/mtg/local-cards.jsonl")
+    const [header, ...lines] = gunzipSync(localInit.body).toString().split("\n")
+    expect(JSON.parse(header)).toEqual({ version: BULK.updated_at })
+    expect(lines.map((line) => JSON.parse(line))).toEqual([
+      expect.objectContaining({ cardId: "b", name: "Card b", oracleText: "Text" }),
+      expect.objectContaining({ cardId: "a", name: "Card a", oracleText: "Text" }),
+    ])
   })
 
   it("refuses to upload a short dataset and skips the upload on a dry run", async () => {

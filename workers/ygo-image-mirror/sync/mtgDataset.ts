@@ -1,11 +1,13 @@
 import { pathToFileURL } from "node:url"
 import { gzipSync } from "node:zlib"
 
+import { encodeLocalCards, type LocalCard, localCardsPath } from "../../../convex/lib/localCards"
 import {
   compareCardNames,
   type MagicDataset,
   type MagicDatasetCard,
   magicDatasetCard,
+  magicLocalCard,
   magicTextIndex,
 } from "../../../convex/lib/magicDataset"
 import { objectRecord, SCRYFALL_BASE_URL, SCRYFALL_HEADERS } from "../../../convex/lib/scryfall"
@@ -58,7 +60,9 @@ async function* jsonLines(body: ReadableStream<Uint8Array>) {
   if (buffered.trim()) yield buffered
 }
 
-export async function buildMagicDataset(fetcher: Fetch = fetch): Promise<MagicDataset> {
+export async function buildMagicDataset(
+  fetcher: Fetch = fetch,
+): Promise<{ dataset: MagicDataset; localCards: LocalCard[] }> {
   const { version, downloadUrl } = await bulkFile(fetcher)
   const response = await fetcher(downloadUrl, {
     headers: SCRYFALL_HEADERS,
@@ -69,12 +73,33 @@ export async function buildMagicDataset(fetcher: Fetch = fetch): Promise<MagicDa
   }
 
   const cards: MagicDatasetCard[] = []
+  const localCards: LocalCard[] = []
   for await (const line of jsonLines(response.body)) {
-    const card = magicDatasetCard(JSON.parse(line))
+    const raw: unknown = JSON.parse(line)
+    const card = magicDatasetCard(raw)
+    const localCard = magicLocalCard(raw)
     if (card) cards.push(card)
+    if (localCard) localCards.push(localCard)
   }
   cards.sort(compareCardNames)
-  return { version, cards, textIndex: magicTextIndex(cards) }
+  return { dataset: { version, cards, textIndex: magicTextIndex(cards) }, localCards }
+}
+
+async function upload(
+  fetcher: Fetch,
+  { origin, token, path, gzip }: { origin: string; token: string; path: string; gzip: Buffer },
+) {
+  const response = await fetcher(`${origin}${path}`, {
+    method: "PUT",
+    headers: {
+      "authorization": `Bearer ${token}`,
+      "content-type": "application/gzip",
+      "user-agent": "Scryve dataset sync/1.0",
+    },
+    body: gzip,
+    signal: AbortSignal.timeout(120_000),
+  })
+  if (!response.ok) throw new Error(`Mirror returned status ${response.status} for ${path}`)
 }
 
 export async function syncMagicDataset(options: SyncOptions) {
@@ -82,37 +107,33 @@ export async function syncMagicDataset(options: SyncOptions) {
   const report = options.report ?? ((entry) => console.log(JSON.stringify(entry)))
   const minCards = options.minCards ?? MIN_CARDS
 
-  const dataset = await buildMagicDataset(fetcher)
+  const { dataset, localCards } = await buildMagicDataset(fetcher)
   const json = JSON.stringify(dataset)
   const gzip = gzipSync(json, { level: 9 })
+  const localJson = encodeLocalCards(dataset.version, localCards)
+  const localGzip = gzipSync(localJson, { level: 9 })
   const result = {
     version: dataset.version,
     cards: dataset.cards.length,
     rawBytes: Buffer.byteLength(json),
     gzipBytes: gzip.byteLength,
+    localCards: localCards.length,
+    localRawBytes: Buffer.byteLength(localJson),
+    localGzipBytes: localGzip.byteLength,
   }
   report({ event: "dataset_built", ...result })
 
-  if (dataset.cards.length < minCards) {
-    throw new Error(
-      `Refusing to upload ${dataset.cards.length} cards; expected at least ${minCards}`,
-    )
+  const fewest = Math.min(dataset.cards.length, localCards.length)
+  if (fewest < minCards) {
+    throw new Error(`Refusing to upload ${fewest} cards; expected at least ${minCards}`)
   }
   if (options.dryRun) return result
   const origin = mirrorOrigin(options.mirrorBaseUrl)
   if (!options.mirrorToken) throw new Error("YGO_MIRROR_TOKEN is required")
 
-  const response = await fetcher(`${origin}${DATASET_PATH}`, {
-    method: "PUT",
-    headers: {
-      "authorization": `Bearer ${options.mirrorToken}`,
-      "content-type": "application/gzip",
-      "user-agent": "Scryve dataset sync/1.0",
-    },
-    body: gzip,
-    signal: AbortSignal.timeout(120_000),
-  })
-  if (!response.ok) throw new Error(`Mirror returned status ${response.status}`)
+  const token = options.mirrorToken
+  await upload(fetcher, { origin, token, path: DATASET_PATH, gzip })
+  await upload(fetcher, { origin, token, path: localCardsPath("mtg"), gzip: localGzip })
   report({ event: "dataset_uploaded", ...result })
   return result
 }

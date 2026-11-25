@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react"
-import { FlatList, Pressable, View } from "react-native"
+import { FlatList, Keyboard, Pressable, useWindowDimensions, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
+import type { ImageStyle } from "expo-image"
 import { useFocusEffect } from "expo-router"
 import { GestureDetector } from "react-native-gesture-handler"
 import { useKeyboardState } from "react-native-keyboard-controller"
@@ -13,13 +14,17 @@ import Animated, {
 } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { CardImage } from "@/components/CardImage"
+import { CardSymbolText } from "@/components/CardSymbolText"
 import { Header, HeaderBack } from "@/components/Header"
 import { Icon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { SegmentedControl } from "@/components/SegmentedControl"
-import { Text } from "@/components/Text"
+import { $sizeStyles, Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { useSheetPresence } from "@/components/useSheetPresence"
 import type { BackAction } from "@/features/game/useBackToBoard"
 import {
   adjacentSections,
@@ -36,9 +41,11 @@ import {
   type RuleSection,
 } from "@/features/rules/comprehensiveRules"
 import { RULES_TEXT_IN_APP, type TextRules } from "@/features/rules/gameRules"
+import { useLocalCardSearch } from "@/features/rules/localCards"
 import { recentRules, rememberRule } from "@/features/rules/recentRules"
 import { useComprehensiveRules } from "@/features/rules/rulesSource"
 import { useRulesSearchAnalytics } from "@/features/rules/useRulesSearchAnalytics"
+import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import type { SheetDragGesture } from "@/screens/RulesSheet"
 import { useAppTheme } from "@/theme/context"
@@ -46,6 +53,9 @@ import { textEnd } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
 import { openUrl } from "@/utils/openUrl"
 import { useReducedMotion } from "@/utils/useReducedMotion"
+
+import type { LocalCard } from "../../convex/lib/localCards"
+import { textSearchKey } from "../../convex/lib/magicDataset"
 
 const TABS_COLLAPSE_MS = 180
 const TABS_FALLBACK_HEIGHT = 44
@@ -60,6 +70,7 @@ type Row =
   | { kind: "section"; key: string; section: RuleSection }
   | { kind: "recent"; key: string; id: string; title: string }
   | { kind: "term"; key: string; entry: GlossaryEntry }
+  | { kind: "card"; key: string; card: LocalCard }
   | { kind: "result"; key: string; rule: Rule; matched?: ReadonlySet<string>; partial?: string }
   | { kind: "rule"; key: string; rule: Rule; target: boolean }
   | { kind: "all"; key: string; section: RuleSection }
@@ -106,14 +117,36 @@ function homeRows(
     query,
     open,
     recent,
-  }: { tab: Tab; query: string; open: ReadonlySet<string>; recent: string[] },
+    cards,
+  }: {
+    tab: Tab
+    query: string
+    open: ReadonlySet<string>
+    recent: string[]
+    cards: readonly LocalCard[]
+  },
 ): Row[] {
-  if (query.trim())
-    return searchRules(rules, query).map((result): Row =>
+  if (query.trim()) {
+    const found = searchRules(rules, query).map((result): Row =>
       result.kind === "term"
         ? { kind: "term", key: `term-${result.entry.term}`, entry: result.entry }
         : { ...result, kind: "result", key: result.rule.id },
     )
+    const exact = found.find(
+      (row) => row.kind === "term" && row.entry.term.toLowerCase() === query.trim().toLowerCase(),
+    )
+    const rest = found.filter((row) => row !== exact)
+    const asked = textSearchKey(query).split(" ")
+    const isNamed = (card: LocalCard) => {
+      const words = new Set(textSearchKey(card.name).split(" "))
+      return asked.every((word) => words.has(word))
+    }
+    const cardRows = (named: boolean) =>
+      cards
+        .filter((card) => named === isNamed(card))
+        .map((card): Row => ({ kind: "card", key: `card-${card.cardId}`, card }))
+    return [...(exact ? [exact] : []), ...cardRows(true), ...rest, ...cardRows(false)]
+  }
   if (tab === "glossary")
     return rules.glossary.map((entry) => ({ kind: "term", key: entry.term, entry }))
   if (tab === "recent")
@@ -161,6 +194,11 @@ export function RulesScreen({
   )
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
   const [peek, setPeek] = useState<Peek>()
+  const [card, setCard] = useState<LocalCard>()
+  const cardSheet = useSheetPresence(card)
+  const shownCard = cardSheet.shown
+  const pendingRule = useRef<string | undefined>(undefined)
+  const cards = useLocalCardSearch(system, ruleId ? "" : query)
   useFocusEffect(useCallback(() => setRecent(recentRules(source.cacheKey)), [source.cacheKey]))
   const rows = useMemo(
     () =>
@@ -168,8 +206,8 @@ export function RulesScreen({
         ? []
         : ruleId
           ? readerRows(rules, ruleId)
-          : homeRows(rules, { tab, query, open, recent }),
-    [rules, ruleId, tab, query, open, recent],
+          : homeRows(rules, { tab, query, open, recent, cards }),
+    [rules, ruleId, tab, query, open, recent, cards],
   )
   const targetIndex = rows.findIndex((row) => row.kind === "rule" && row.target)
   const list = useRef<FlatList<Row>>(null)
@@ -201,8 +239,21 @@ export function RulesScreen({
   const title = section ? `${section.id}. ${section.title}` : translate("play:rules.title")
   const home = !ruleId
   const searching = home && Boolean(query.trim())
+  const { fontScale } = useWindowDimensions()
+  const resultText = Math.ceil(
+    ($sizeStyles.sm.lineHeight + theme.spacing.xxxs + 2 * $sizeStyles.xs.lineHeight) * fontScale,
+  )
+  const resultRow: ViewStyle | undefined = searching
+    ? { height: resultText + 2 * theme.spacing.sm + 1, overflow: "hidden" }
+    : undefined
   const searchResults = rows.flatMap((row) =>
-    row.kind === "result" ? [row.rule.id] : row.kind === "term" ? ["glossary"] : [],
+    row.kind === "result"
+      ? [row.rule.id]
+      : row.kind === "term"
+        ? ["glossary"]
+        : row.kind === "card"
+          ? ["card"]
+          : [],
   )
   const searchOpened = useRulesSearchAnalytics(
     system,
@@ -291,11 +342,13 @@ export function RulesScreen({
         )
         const body = (
           <>
-            <Text size="sm" weight="medium" text={item.entry.term} />
+            <Text size="sm" weight="medium" numberOfLines={1} text={item.entry.term} />
             <RuleText
               reference={source.references}
               text={item.entry.text}
               onPressReference={(id) => openResult(id, index)}
+              lines={searching ? 2 : undefined}
+              size={searching ? "xs" : "sm"}
               dim
             />
           </>
@@ -304,15 +357,53 @@ export function RulesScreen({
           <Pressable
             accessibilityRole="link"
             onPress={() => openResult(firstCitedRule.id, index)}
-            style={({ pressed }) => [themed($entry), pressed && $pressed]}
+            style={({ pressed }) => [themed($entry), resultRow, pressed && $pressed]}
             testID={`rules-term-${item.entry.term}`}
           >
             {body}
           </Pressable>
         ) : (
-          <View style={themed($entry)}>{body}</View>
+          <View style={[themed($entry), resultRow]}>{body}</View>
         )
       }
+      case "card":
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={joinParts([item.card.name, item.card.typeLine])}
+            onPress={() => {
+              searchOpened(index + 1, "card")
+              Keyboard.dismiss()
+              setCard(item.card)
+            }}
+            style={({ pressed }) => [themed($cardRow), resultRow, pressed && $pressed]}
+            testID={`rules-card-${item.card.cardId}`}
+          >
+            <CardImage
+              game={system}
+              cardId={item.card.cardId}
+              source={item.card.smallImageUrl ?? item.card.imageUrl}
+              compact
+              style={[themed($thumbnail), { height: resultText - 2 * theme.spacing.xs }]}
+              accessibilityLabel={item.card.name}
+            />
+            <View style={$flex}>
+              <Text size="sm" weight="medium" numberOfLines={1} text={item.card.name} />
+              {item.card.typeLine ? (
+                <Text size="xs" tone="dim" numberOfLines={1} text={item.card.typeLine} />
+              ) : null}
+              {item.card.oracleText ? (
+                <CardSymbolText
+                  game={system}
+                  size="xs"
+                  tone="dim"
+                  numberOfLines={1}
+                  text={item.card.oracleText}
+                />
+              ) : null}
+            </View>
+          </Pressable>
+        )
       case "result": {
         // why: a search lists up to 50 results, so each excerpt is built only when its row renders.
         const context = rules && ruleContext(rules, item.rule.id)
@@ -328,7 +419,7 @@ export function RulesScreen({
           <Pressable
             accessibilityRole="link"
             onPress={() => openResult(item.rule.id, index)}
-            style={({ pressed }) => [themed($entry), pressed && $pressed]}
+            style={({ pressed }) => [themed($entry), resultRow, pressed && $pressed]}
             testID={`rule-${item.rule.id}`}
           >
             <View style={themed($resultHeader)}>
@@ -338,7 +429,7 @@ export function RulesScreen({
                 <Text size="xs" tone="dim" numberOfLines={1} style={$flex} text={title} />
               ) : null}
             </View>
-            <Text size="xs" tone="dim" numberOfLines={3}>
+            <Text size="xs" tone="dim" numberOfLines={2}>
               {segments.map((segment, segmentIndex) =>
                 segment.matched ? (
                   <Text key={segmentIndex} size="xs" weight="medium" text={segment.text} />
@@ -569,6 +660,34 @@ export function RulesScreen({
     />
   ) : null
 
+  const cardDialog = shownCard ? (
+    <CardFocusDialog
+      card={{
+        game: system,
+        cardId: shownCard.cardId,
+        name: shownCard.name,
+        imageUrl: shownCard.imageUrl,
+        smallImageUrl: shownCard.smallImageUrl,
+        quantity: 0,
+        boardLabel: "",
+      }}
+      details={shownCard}
+      showQuantity={false}
+      visible={cardSheet.visible}
+      onClose={() => setCard(undefined)}
+      onDismissed={() => {
+        cardSheet.onDismissed()
+        const rule = pendingRule.current
+        pendingRule.current = undefined
+        if (rule) onOpenRule(rule)
+      }}
+      onOpenRule={(id) => {
+        pendingRule.current = id
+        setCard(undefined)
+      }}
+    />
+  ) : null
+
   if (sheet) {
     return (
       <View style={$flex}>
@@ -578,6 +697,7 @@ export function RulesScreen({
             {listNode}
           </>
         )}
+        {cardDialog}
       </View>
     )
   }
@@ -604,6 +724,7 @@ export function RulesScreen({
           {listNode}
         </>
       )}
+      {cardDialog}
     </Screen>
   )
 }
@@ -687,23 +808,27 @@ function RuleText({
   onPressReference,
   active,
   dim,
+  lines,
+  size = "sm",
 }: {
   text: string
   reference: RegExp
   onPressReference: (id: string) => void
   active?: string
   dim?: boolean
+  lines?: number
+  size?: "sm" | "xs"
 }) {
   const { themed } = useAppTheme()
   return (
-    <Text size="sm" tone={dim ? "dim" : undefined}>
+    <Text size={size} tone={dim ? "dim" : undefined} numberOfLines={lines}>
       {ruleReferences(text, reference).map((part, index) =>
         typeof part === "string" ? (
           part
         ) : (
           <Text
             key={index}
-            size="sm"
+            size={size}
             accessibilityRole="link"
             style={[themed($link), part.id === active && $active]}
             onPress={() => onPressReference(part.id)}
@@ -761,9 +886,23 @@ const $recentRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $entry: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $thumbnail: ThemedStyle<ImageStyle> = ({ colors }) => ({
+  aspectRatio: 488 / 680,
+  backgroundColor: colors.separator,
+})
+const $cardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  paddingVertical: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $entry: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xxxs,
-  paddingVertical: spacing.xs,
+  paddingVertical: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
 })
 const $resultHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

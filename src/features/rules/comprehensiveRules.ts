@@ -87,7 +87,7 @@ const COMPLETION_WEIGHT = 0.3
 const RULE_NUMBER = /^\d+(\.\d*)*[a-z]*$/
 const RULE_NUMBER_PREFIX = /^(?:rules?\s+|§\s*|#\s*)/
 
-function normalizeRuleNumber(needle: string): string | undefined {
+export function normalizeRuleNumber(needle: string): string | undefined {
   const stripped = needle.replace(RULE_NUMBER_PREFIX, "")
   return RULE_NUMBER.test(stripped) ? stripped : undefined
 }
