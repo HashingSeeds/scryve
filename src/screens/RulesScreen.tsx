@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react"
 import { FlatList, Keyboard, Pressable, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
-import type { ImageStyle } from "expo-image"
 import { useFocusEffect } from "expo-router"
 import { GestureDetector } from "react-native-gesture-handler"
 import { useKeyboardState } from "react-native-keyboard-controller"
@@ -15,7 +14,6 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { CardFocusDialog } from "@/components/CardFocusDialog"
-import { CardImage } from "@/components/CardImage"
 import { Header, HeaderBack } from "@/components/Header"
 import { Icon } from "@/components/Icon"
 import { RetryableError } from "@/components/RetryableError"
@@ -54,6 +52,7 @@ import { openUrl } from "@/utils/openUrl"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import type { LocalCard } from "../../convex/lib/localCards"
+import { textSearchKey } from "../../convex/lib/magicDataset"
 
 const TABS_COLLAPSE_MS = 180
 const TABS_FALLBACK_HEIGHT = 44
@@ -136,8 +135,16 @@ function homeRows(
       first?.kind === "term" && first.entry.term.toLowerCase() === query.trim().toLowerCase()
         ? 1
         : 0
-    const cardRows = cards.map((card): Row => ({ kind: "card", key: `card-${card.cardId}`, card }))
-    return [...found.slice(0, after), ...cardRows, ...found.slice(after)]
+    const asked = textSearchKey(query).split(" ")
+    const isNamed = (card: LocalCard) => {
+      const words = new Set(textSearchKey(card.name).split(" "))
+      return asked.every((word) => words.has(word))
+    }
+    const cardRows = (named: boolean) =>
+      cards
+        .filter((card) => named === isNamed(card))
+        .map((card): Row => ({ kind: "card", key: `card-${card.cardId}`, card }))
+    return [...found.slice(0, after), ...cardRows(true), ...found.slice(after), ...cardRows(false)]
   }
   if (tab === "glossary")
     return rules.glossary.map((entry) => ({ kind: "term", key: entry.term, entry }))
@@ -359,23 +366,25 @@ export function RulesScreen({
               Keyboard.dismiss()
               setCard(item.card)
             }}
-            style={({ pressed }) => [themed($cardRow), pressed && $pressed]}
+            style={({ pressed }) => [themed($entry), pressed && $pressed]}
             testID={`rules-card-${item.card.cardId}`}
           >
-            <CardImage
-              game={system}
-              cardId={item.card.cardId}
-              source={item.card.smallImageUrl ?? item.card.imageUrl}
-              compact
-              style={$thumbnail}
-              accessibilityLabel={item.card.name}
-            />
-            <View style={$flex}>
-              <Text size="sm" weight="medium" numberOfLines={1} text={item.card.name} />
+            <View style={themed($resultHeader)}>
+              <Text size="sm" style={themed($link)} tx="play:rules.card" />
+              <Text size="xs" weight="medium" numberOfLines={1} text={item.card.name} />
               {item.card.typeLine ? (
-                <Text size="xs" tone="dim" numberOfLines={1} text={item.card.typeLine} />
+                <Text
+                  size="xs"
+                  tone="dim"
+                  numberOfLines={1}
+                  style={$flex}
+                  text={item.card.typeLine}
+                />
               ) : null}
             </View>
+            {item.card.oracleText ? (
+              <Text size="xs" tone="dim" numberOfLines={3} text={item.card.oracleText} />
+            ) : null}
           </Pressable>
         )
       case "result": {
@@ -819,7 +828,6 @@ const $gutter: TextStyle = { width: 60, paddingTop: 2, fontVariant: ["tabular-nu
 const $caretOpen = { transform: [{ rotate: "90deg" }] }
 const $active: TextStyle = { textDecorationLine: "underline" }
 const $pressed: ViewStyle = { opacity: 0.7 }
-const $thumbnail: ImageStyle = { width: 32, aspectRatio: 488 / 680 }
 const $tabsClip: ViewStyle = { overflow: "hidden" }
 const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
@@ -856,12 +864,6 @@ const $recentRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.xs,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
-})
-const $cardRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  paddingVertical: spacing.xs,
 })
 const $entry: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,

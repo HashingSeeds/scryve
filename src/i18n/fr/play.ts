@@ -436,6 +436,7 @@ export default {
   rules: {
     title: "Règles",
     cards: "Cartes",
+    card: "Carte",
     search: "Rechercher dans les règles",
     recent: "Récentes",
     contents: "Sommaire",

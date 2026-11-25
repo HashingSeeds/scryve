@@ -406,6 +406,7 @@ export default {
   rules: {
     title: "ルール",
     cards: "カード",
+    card: "カード",
     search: "ルールを検索",
     recent: "最近",
     contents: "目次",

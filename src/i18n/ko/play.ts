@@ -402,6 +402,7 @@ export default {
   rules: {
     title: "룰",
     cards: "카드",
+    card: "카드",
     search: "룰 검색",
     recent: "최근",
     contents: "목차",

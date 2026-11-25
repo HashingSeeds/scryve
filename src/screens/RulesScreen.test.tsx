@@ -87,7 +87,7 @@ const mockCard = {
 }
 jest.mock("@/features/rules/localCards", () => ({
   useLocalCardSearch: (_game: string, query: string) =>
-    query.toLowerCase().startsWith("illegal") ? [mockCard] : [],
+    query.toLowerCase().startsWith("ille") ? [mockCard] : [],
 }))
 jest.mock("expo-router", () => ({
   useFocusEffect: (effect: () => void) =>
@@ -218,16 +218,21 @@ it("reports a search after typing settles, and drops one cleared before then", (
   jest.useRealTimers()
 })
 
-it("lists matching cards above rules, except under an exact glossary term, and opens one", () => {
+it("lists a card by name above rules, a half-typed one below them, and opens it", () => {
   const view = renderRules()
-  const order = () => view.getAllByTestId(/^rules-(card|term)-/).map((row) => row.props.testID)
+  const order = () =>
+    view.getAllByTestId(/^(rules-card|rules-term|rule)-/).map((row) => row.props.testID)
 
   fireEvent.changeText(view.getByTestId("rules-search"), "Illegal")
-  expect(order()).toEqual(["rules-card-card-1", "rules-term-Illegal Action"])
+  expect(order()[0]).toBe("rules-card-card-1")
 
   fireEvent.changeText(view.getByTestId("rules-search"), "illegal action")
-  expect(order()).toEqual(["rules-term-Illegal Action", "rules-card-card-1"])
+  expect(order().slice(0, 2)).toEqual(["rules-term-Illegal Action", "rule-733.1"])
+  expect(order().at(-1)).toBe("rules-card-card-1")
+
+  fireEvent.changeText(view.getByTestId("rules-search"), "illeg")
+  expect(order().at(-1)).toBe("rules-card-card-1")
 
   fireEvent.press(view.getByTestId("rules-card-card-1"))
-  expect(view.getByText("Counter target spell.")).toBeTruthy()
+  expect(view.getAllByText("Counter target spell.")).toHaveLength(2)
 })
