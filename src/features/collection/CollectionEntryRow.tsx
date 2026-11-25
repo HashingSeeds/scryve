@@ -14,7 +14,7 @@ import { updateCollectionEntry } from "./collectionStore"
 import { cardKingdomCardUrl, tcgplayerCardUrl } from "./storeLinks"
 import { CONDITION_MULTIPLIERS, type CardCondition } from "../../../convex/lib/cardPricing"
 
-export function entryDetail(
+function entryDetail(
   entry: Pick<StoredCollectionEntry, "setCode" | "collectorNumber" | "finish" | "condition">,
 ) {
   const { finish, condition } = entry
@@ -67,6 +67,7 @@ export function CollectionEntryRow({
           <TouchableOpacity
             accessibilityRole="link"
             hitSlop={LINK_HIT_SLOP}
+            style={$link}
             onPress={() => {
               const printing = catalogDb.getPrinting(entry.game, entry.printingId)
               void Linking.openURL(
@@ -81,13 +82,14 @@ export function CollectionEntryRow({
             <Text
               size="meta"
               numberOfLines={1}
-              style={themed($link)}
+              style={themed($linkText)}
               tx="decks:collection.tcgplayer"
             />
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="link"
             hitSlop={LINK_HIT_SLOP}
+            style={$link}
             onPress={() =>
               void Linking.openURL(cardKingdomCardUrl({ name: entry.name }, { buylist: true }))
             }
@@ -95,7 +97,7 @@ export function CollectionEntryRow({
             <Text
               size="meta"
               numberOfLines={1}
-              style={themed($link)}
+              style={themed($linkText)}
               tx="decks:collection.cardKingdomBuylist"
             />
           </TouchableOpacity>
@@ -157,7 +159,8 @@ const $links: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.md,
   marginStart: THUMB_WIDTH + spacing.sm,
 })
-const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
+const $link: ViewStyle = { flexShrink: 1 }
+const $linkText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $step: ViewStyle = {
   width: 32,
   minHeight: 44,
@@ -165,5 +168,5 @@ const $step: ViewStyle = {
   justifyContent: "center",
 }
 const $stepGlyph: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
-// why: a fixed width keeps the − button still when a count gains a digit.
-const $quantity: TextStyle = { width: 28, textAlign: "center", fontVariant: ["tabular-nums"] }
+// why: a minimum width keeps the − button still while a count stays under three digits.
+const $quantity: TextStyle = { minWidth: 28, textAlign: "center", fontVariant: ["tabular-nums"] }

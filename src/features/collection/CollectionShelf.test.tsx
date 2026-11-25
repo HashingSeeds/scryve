@@ -19,9 +19,10 @@ import { encodeFinishes, encodeRarity } from "../../../convex/lib/cardPricing"
 jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn(async () => true),
 }))
+const mockNames = { list: ["Sol Ring"] }
 jest.mock("@/features/decks/useCardNameIndex", () => {
-  const index = jest.requireActual("@/features/decks/cardNameMatch").cardNameIndex(["Sol Ring"])
-  return { useCardNameIndex: () => index }
+  const { cardNameIndex } = jest.requireActual("@/features/decks/cardNameMatch")
+  return { useCardNameIndex: () => cardNameIndex(mockNames.list) }
 })
 jest.mock("@/features/decks/CardScanner", () => {
   const { Pressable } = jest.requireActual("react-native")
@@ -123,6 +124,23 @@ describe("CollectionShelf", () => {
     expect(listCollectionEntries({ game: "mtg" }).map((entry) => entry.printingId)).toEqual([
       "cmm-410",
     ])
+  })
+
+  it("finds an exact cached name when the name index is empty", () => {
+    mockNames.list = []
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <CollectionShelf mode="collection" />
+        </ThemeProvider>,
+      )
+      fireEvent.press(view.getByTestId("collection-add-card-button"))
+      fireEvent.changeText(view.getByTestId("collection-add-card-input"), "sol ring")
+      fireEvent.press(view.getByText("Sol Ring"))
+      expect(view.getByText("CMM · #410 · Commander Masters")).toBeTruthy()
+    } finally {
+      mockNames.list = ["Sol Ring"]
+    }
   })
 
   it("deletes a scan session the scanner closes with no cards", () => {
