@@ -5,7 +5,7 @@ import { localCardDb } from "./localDb"
 export interface CardKvStorage {
   getString(key: string): string | undefined
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
   getAllKeys(): string[]
   addOnValueChangedListener(listener: (key: string) => void): { remove: () => void }
 }
@@ -25,7 +25,7 @@ export const cardKvStorage: CardKvStorage = {
     if (legacy === undefined) return undefined
     try {
       localCardDb.setKv(key, legacy)
-      storage.delete(key)
+      storage.remove(key)
     } catch {}
     return legacy
   },
@@ -34,17 +34,17 @@ export const cardKvStorage: CardKvStorage = {
     localCardDb.setKv(key, value)
     if (!localCardDb.sharesLegacyStorage) {
       try {
-        storage.delete(key)
+        storage.remove(key)
       } catch {}
     }
     emitChange(key)
   },
 
-  delete(key) {
+  remove(key) {
     localCardDb.deleteKv(key)
     if (!localCardDb.sharesLegacyStorage) {
       try {
-        storage.delete(key)
+        storage.remove(key)
       } catch {}
     }
     emitChange(key)

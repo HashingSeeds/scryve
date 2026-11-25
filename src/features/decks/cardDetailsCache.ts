@@ -64,7 +64,7 @@ function readLegacyCardDetails(): Record<string, FocusedCardDetails> {
     parsed = JSON.parse(raw)
   } catch {
     try {
-      storage.delete(DETAILS_KEY)
+      storage.remove(DETAILS_KEY)
     } catch {}
     return {}
   }
@@ -94,7 +94,7 @@ function readLegacyCardDetails(): Record<string, FocusedCardDetails> {
     }
   }
   try {
-    storage.delete(DETAILS_KEY)
+    storage.remove(DETAILS_KEY)
   } catch {}
   return legacy
 }
@@ -254,7 +254,7 @@ export function clearCardDetails(store?: CardDetailStore): void {
   if (blobStore) {
     sessionDetails.delete(blobStore)
     try {
-      blobStore.delete(DETAILS_KEY)
+      blobStore.remove(DETAILS_KEY)
     } catch (error) {
       console.error("[card-details-cache] failed to clear", error)
     }
@@ -262,7 +262,7 @@ export function clearCardDetails(store?: CardDetailStore): void {
   }
   try {
     localCardDb.clearCardDetails()
-    storage.delete(DETAILS_KEY)
+    storage.remove(DETAILS_KEY)
     pendingSqliteDetails.clear()
     cachedSqliteDetails = undefined
   } catch (error) {

@@ -293,8 +293,8 @@ function readStore() {
 
 function clearLegacyKeys() {
   try {
-    storage.delete(GUEST_DECKS_KEY)
-    storage.delete(LEGACY_GUEST_DECK_KEY)
+    storage.remove(GUEST_DECKS_KEY)
+    storage.remove(LEGACY_GUEST_DECK_KEY)
     return true
   } catch {
     return false
@@ -655,8 +655,8 @@ export function deleteGuestDeck(localId: string) {
 export function clearGuestDecks() {
   try {
     localCardDb.clearGuestDecks()
-    storage.delete(GUEST_DECKS_KEY)
-    storage.delete(LEGACY_GUEST_DECK_KEY)
+    storage.remove(GUEST_DECKS_KEY)
+    storage.remove(LEGACY_GUEST_DECK_KEY)
   } catch {
     throw new GuestDeckStorageError(translate("decks:guestStorage.deleteAllFailed"))
   }

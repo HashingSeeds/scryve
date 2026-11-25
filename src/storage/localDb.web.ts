@@ -63,7 +63,7 @@ export const localCardDb: LocalCardDb = {
   },
 
   deleteKv(key) {
-    storage.delete(key)
+    storage.remove(key)
   },
 
   getAllKvKeys() {
@@ -90,13 +90,13 @@ export const localCardDb: LocalCardDb = {
   },
 
   deleteGuestDeck(localId) {
-    storage.delete(`${GUEST_DECK_PREFIX}${localId}`)
+    storage.remove(`${GUEST_DECK_PREFIX}${localId}`)
   },
 
   clearGuestDecks() {
     for (const key of storage.getAllKeys()) {
       if (key.startsWith(GUEST_DECK_PREFIX) || key.startsWith(GUEST_META_PREFIX)) {
-        storage.delete(key)
+        storage.remove(key)
       }
     }
   },
@@ -110,7 +110,7 @@ export const localCardDb: LocalCardDb = {
   },
 
   deleteGuestMeta(key) {
-    storage.delete(`${GUEST_META_PREFIX}${key}`)
+    storage.remove(`${GUEST_META_PREFIX}${key}`)
   },
 
   listCardDetails(): StoredCardDetailRow[] {
@@ -138,7 +138,7 @@ export const localCardDb: LocalCardDb = {
   },
 
   clearCardDetails() {
-    storage.delete(DETAILS_MAP_KEY)
+    storage.remove(DETAILS_MAP_KEY)
     detailsRevision += 1
   },
 

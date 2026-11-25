@@ -102,7 +102,7 @@ describe("guest deck storage", () => {
 
   it("keeps a deleted deck from returning when legacy-key cleanup fails", () => {
     storage.set("decks.guest.v1", JSON.stringify(legacy))
-    const del = jest.spyOn(storage, "delete").mockImplementation(() => {
+    const del = jest.spyOn(storage, "remove").mockImplementation(() => {
       throw new Error("cleanup failed")
     })
     expect(loadGuestDecks()).toEqual([legacy])
