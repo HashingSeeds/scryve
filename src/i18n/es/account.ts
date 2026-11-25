@@ -293,6 +293,11 @@ export default {
   billing: {
     proNeedsAccount:
       "Scryve Pro está vinculado a una cuenta. Inicia sesión para obtener Pro o usar el Pro que ya tienes.",
+    signInPrompt: {
+      title: "¿Quieres usar Pro en todos tus dispositivos?",
+      body: "Inicia sesión para usar Scryve Pro en tus otros dispositivos y en la web.",
+      notNow: "Ahora no",
+    },
     renewalPrompt: {
       title: "¿Quieres un aviso antes de la renovación?",
       body_one: "Recibe una notificación un día antes de tu próximo cobro anual.",

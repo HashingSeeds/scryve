@@ -8,7 +8,6 @@ import {
 } from "expo-alternate-app-icons"
 
 import { Text } from "@/components/Text"
-import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ProSignInNote, useProSignIn } from "@/features/billing/ProSignIn"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { translate } from "@/i18n/translate"
@@ -104,9 +103,7 @@ const ANDROID = Platform.OS === "android"
 export function AppIconPicker() {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
-  const auth = useAuthAccess()
-  const planLoading = auth.isSignedIn && billing.customerInfo === null
-  const planFailed = planLoading && !billing.isLoading && Boolean(billing.error)
+  const planFailed = !billing.isLoading && billing.customerInfo === null && Boolean(billing.error)
   const [current, setCurrent] = useState(() => (supportsAlternateIcons ? getAppIconName() : null))
   const [error, setError] = useState("")
   const pro = useProSignIn(() => void billing.presentPaywall())
@@ -156,7 +153,7 @@ export function AppIconPicker() {
     lapsed,
   }: (typeof options)[number]) => {
     const selected = name === current
-    const disabled = lapsed || (locked && planLoading)
+    const disabled = lapsed || (locked && billing.isLoading)
     return (
       <TouchableOpacity
         key={id}

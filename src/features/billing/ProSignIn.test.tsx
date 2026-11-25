@@ -4,13 +4,19 @@ import { useProSignIn } from "./ProSignIn"
 
 const mockOpenAuth = jest.fn()
 let mockAuth = { isSignedIn: false, authVisible: false }
-let mockBilling = { isReady: false, isLoading: false, isCountPro: false }
+let mockBilling = { configured: true, isReady: false, isLoading: false, isCountPro: false }
+let mockSignedOutPurchases = false
 
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ ...mockAuth, openAuth: mockOpenAuth }),
 }))
 jest.mock("./RevenueCatContext", () => ({
   useRevenueCat: () => mockBilling,
+}))
+jest.mock("./config", () => ({
+  get SIGNED_OUT_PURCHASES() {
+    return mockSignedOutPurchases
+  },
 }))
 
 function setup() {
@@ -30,10 +36,19 @@ describe("useProSignIn", () => {
       mockAuth = { ...mockAuth, authVisible: true }
     })
     mockAuth = { isSignedIn: false, authVisible: false }
-    mockBilling = { isReady: false, isLoading: false, isCountPro: false }
+    mockBilling = { configured: true, isReady: false, isLoading: false, isCountPro: false }
+    mockSignedOutPurchases = false
   })
 
-  it("explains first, then opens the paywall once billing loads an account without Pro", () => {
+  it("opens the paywall for a signed-out player where store purchases restore", () => {
+    mockSignedOutPurchases = true
+    const { result, openPaywall } = setup()
+    act(() => result.current.request())
+    expect(openPaywall).toHaveBeenCalledTimes(1)
+    expect(result.current.explaining).toBe(false)
+  })
+
+  it("on web, explains first, then opens the paywall once billing loads an account without Pro", () => {
     const { result, openPaywall, update } = setup()
     act(() => result.current.request())
     expect(result.current.explaining).toBe(true)

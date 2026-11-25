@@ -318,6 +318,12 @@ const account = {
     // ja: Keep both halves, buying Pro and using Pro already bought: Proを購入する、または購入済みのProを使うにはサインインしてください。
     proNeedsAccount:
       "Scryve Pro is tied to an account. Sign in to get Pro or use Pro you already have.",
+    // Asked right after a signed-out player buys or restores Scryve Pro on a phone, beside a Sign in button. Until they sign in, Pro works only on this device.
+    signInPrompt: {
+      title: "Keep Pro on all your devices?",
+      body: "Sign in to use Scryve Pro on your other devices and on the web.",
+      notNow: "Not now",
+    },
     // Asked right after someone buys a yearly plan.
     renewalPrompt: {
       title: "Remind you before it renews?",

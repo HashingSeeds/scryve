@@ -34,6 +34,13 @@ import {
 } from "../../test/support/connectedHarness"
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }))
+jest.mock("@/features/billing/config", () => ({
+  ...jest.requireActual<typeof import("@/features/billing/config")>("@/features/billing/config"),
+  SIGNED_OUT_PURCHASES: true,
+}))
+const mockBillingConfig = jest.requireMock<{ SIGNED_OUT_PURCHASES: boolean }>(
+  "@/features/billing/config",
+)
 jest.mock("@clerk/expo", () =>
   jest
     .requireActual<typeof import("../../test/support/connectedHarness")>(
@@ -146,6 +153,7 @@ function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
 
 describe("NewGameScreen", () => {
   beforeEach(() => {
+    mockBillingConfig.SIGNED_OUT_PURCHASES = true
     const {
       freeMulligans: _rules,
       firstPlayer: _modes,
@@ -627,7 +635,19 @@ describe("NewGameScreen", () => {
     })
   })
 
-  it("gives a signed-out device free marks and explains sign in before opening it", () => {
+  it("keeps a signed-out phone's saved Pro marks, since it can buy Pro without an account", () => {
+    authAs(false)
+    const view = setup({ initialGame: crownGame() })
+
+    fireEvent.press(view.getByTestId("player-appearance-1"))
+    expect(view.getByTestId("appearance-shape-crown")).toHaveProp("accessibilityState", {
+      selected: true,
+      disabled: false,
+    })
+  })
+
+  it("on web, gives a signed-out device free marks and explains sign in before opening it", () => {
+    mockBillingConfig.SIGNED_OUT_PURCHASES = false
     const openAuth = authAs(false)
     const view = setup({ initialGame: crownGame() })
 

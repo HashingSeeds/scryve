@@ -12,6 +12,9 @@ export const COUNT_PRODUCT_IDS = {
   monthly: "monthly",
 } as const
 
+/** why: an anonymous web purchase has no store receipt to restore, so clearing site data would lose it. */
+export const SIGNED_OUT_PURCHASES = Platform.OS !== "web"
+
 export type CountProductId = (typeof COUNT_PRODUCT_IDS)[keyof typeof COUNT_PRODUCT_IDS]
 
 export const COUNT_PACKAGE_IDS: Record<CountProductId, string> = {

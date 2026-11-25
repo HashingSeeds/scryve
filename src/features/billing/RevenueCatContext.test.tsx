@@ -72,7 +72,10 @@ jest.mock("react-native-purchases", () => {
       purchasePackage: jest.fn(),
       restorePurchases: jest.fn(),
       getAppUserID: jest.fn(),
+      isAnonymous: jest.fn(),
       logIn: jest.fn(),
+      logOut: jest.fn(),
+      syncPurchasesForResult: jest.fn(),
     },
   }
 })
@@ -176,6 +179,142 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "failed" })
     })
     expect(Purchases.purchasePackage).not.toHaveBeenCalled()
+  })
+
+  it("lets a signed-out player buy anonymously, then offers sign in", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    const signIn = jest.fn()
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null} signIn={signIn}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    expect(Purchases.configure).toHaveBeenCalledWith(expect.objectContaining({ appUserID: null }))
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("purchased")
+    })
+    expect(alert).toHaveBeenCalledTimes(1)
+    const [title, , buttons] = alert.mock.calls[0]
+    expect(title).toBe("Keep Pro on all your devices?")
+    buttons?.find((button) => button.text === "Sign in")?.onPress?.()
+    expect(signIn).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not offer sign in when a restore finds no Pro", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined)
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    jest.mocked(presentCountProPaywall).mockResolvedValueOnce("restored")
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null} signIn={jest.fn()}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    await act(async () => {
+      expect(await result.current.presentPaywall()).toBe("restored")
+    })
+    expect(alert).not.toHaveBeenCalled()
+  })
+
+  it("syncs an anonymous buyer's purchase to an account RevenueCat will not merge", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("$RCAnonymousID:abc")
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    purchasesMock.logIn.mockResolvedValue({ customerInfo: expiredCustomerInfo, created: false })
+    renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(Purchases.syncPurchasesForResult).toHaveBeenCalledTimes(1))
+    expect(Purchases.logIn).toHaveBeenCalledWith("user_123")
+  })
+
+  it("still loads billing when that sync fails, so Restore Purchases stays reachable", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("$RCAnonymousID:abc")
+    purchasesMock.isAnonymous.mockResolvedValue(true)
+    purchasesMock.logIn.mockResolvedValue({ customerInfo: expiredCustomerInfo, created: false })
+    purchasesMock.syncPurchasesForResult.mockRejectedValueOnce(
+      Object.assign(new Error("offline"), { code: "10" }),
+    )
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isReady).toBe(true)
+    expect(result.current.error).toBeTruthy()
+  })
+
+  it("logs out the account an earlier build left saved when a signed-out phone configures, even offline", async () => {
+    let anonymous = false
+    purchasesMock.isAnonymous.mockImplementation(async () => anonymous)
+    purchasesMock.logOut.mockImplementationOnce(async () => {
+      anonymous = true
+      throw Object.assign(new Error("offline"), { code: "35" })
+    })
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    expect(Purchases.logOut).toHaveBeenCalledTimes(1)
+  })
+
+  it("still logs out when the player signs out while signing in is pending", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("$RCAnonymousID:abc")
+    let loggedIn = false
+    purchasesMock.isAnonymous.mockImplementation(async () => !loggedIn)
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    let finishLogin!: () => void
+    purchasesMock.logIn.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishLogin = () => {
+          loggedIn = true
+          resolve({ customerInfo: expiredCustomerInfo, created: false })
+        }
+      }),
+    )
+    const billingFor = (appUserID: string | null) => (
+      <RevenueCatProvider apiKey="test_public" appUserID={appUserID}>
+        {null}
+      </RevenueCatProvider>
+    )
+    const { rerender } = render(billingFor("user_123"))
+    await waitFor(() => expect(Purchases.logIn).toHaveBeenCalledWith("user_123"))
+    rerender(billingFor(null))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+    await act(async () => finishLogin())
+    await waitFor(() => expect(Purchases.logOut).toHaveBeenCalledTimes(1))
+  })
+
+  it("retries a failed setup until billing loads", async () => {
+    purchasesMock.isConfigured.mockRejectedValueOnce(new Error("offline"))
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.error).toBeTruthy())
+    expect(result.current.isReady).toBe(false)
+    await waitFor(() => expect(result.current.isReady).toBe(true), { timeout: 3000 })
+    expect(result.current.isCountPro).toBe(true)
+  })
+
+  it("logs RevenueCat out of the previous account when the player signs out", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.isAnonymous.mockResolvedValue(false)
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={null}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(Purchases.logOut).toHaveBeenCalledTimes(1))
+    expect(Purchases.logIn).not.toHaveBeenCalled()
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
   })
 
   it("tells the player when the paywall itself errors, and stays quiet when they close it", async () => {

@@ -20,6 +20,7 @@ import { TeamPicker } from "@/components/TeamPicker"
 import { Text } from "@/components/Text"
 import type { NextPageState } from "@/features/async/remoteState"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { SIGNED_OUT_PURCHASES } from "@/features/billing/config"
 import { ProSignInNote, useProSignIn } from "@/features/billing/ProSignIn"
 import { useRevenueCat } from "@/features/billing/RevenueCatContext"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
@@ -244,9 +245,11 @@ function NewGameForm({
     Math.max(inset - (width - Math.min(width, CONTENT_MAX_WIDTH)) / 2 - spacing.md, 0)
   const auth = useAuthAccess()
   const billing = useRevenueCat()
-  // why: until RevenueCat answers, a Pro player's saved marks look unpaid; trading them then would save the downgrade.
+  // why: until RevenueCat answers, a Pro player's saved marks look unpaid; trading them then would save the downgrade. A signed-out phone can own Pro too.
   const confirmedFree =
-    (auth.isLoaded && !auth.isSignedIn) || (billing.customerInfo !== null && !billing.isCountPro)
+    billing.customerInfo !== null
+      ? !billing.isCountPro
+      : auth.isLoaded && !auth.isSignedIn && !SIGNED_OUT_PURCHASES
   const [draft, dispatch] = useReducer(
     gameDraftReducer,
     { defaults, replaying, initialGame, defaultMeSeat: account?.defaultMeSeat },
