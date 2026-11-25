@@ -116,16 +116,7 @@ function renderRules(
   )
 }
 
-beforeEach(() => {
-  storage.clearAll()
-  jest.useFakeTimers()
-})
-afterEach(() => jest.useRealTimers())
-
-function search(view: ReturnType<typeof renderRules>, text: string) {
-  fireEvent.changeText(view.getByTestId("rules-search"), text)
-  act(() => jest.advanceTimersByTime(200))
-}
+beforeEach(() => storage.clearAll())
 
 it("opens a chapter in place to list its sections", () => {
   const view = renderRules()
@@ -157,7 +148,7 @@ it("peeks from the referenced subrule, not the start of its group", () => {
 it("opens the rule a glossary entry cites from anywhere on its row", () => {
   const onOpenRule = jest.fn()
   const view = renderRules({ onOpenRule })
-  search(view, "Illegal")
+  fireEvent.changeText(view.getByTestId("rules-search"), "Illegal")
   fireEvent.press(view.getByTestId("rules-term-Illegal Action"))
   expect(onOpenRule).toHaveBeenCalledWith("733.2")
   expect(view.queryByTestId("rules-term-Illegal Target")).toBeNull()
@@ -165,7 +156,7 @@ it("opens the rule a glossary entry cites from anywhere on its row", () => {
 
 it("shows keyword topic titles on search results and in Recent", () => {
   const view = renderRules()
-  search(view, "trample")
+  fireEvent.changeText(view.getByTestId("rules-search"), "trample")
   expect(view.getByTestId("rule-702.19")).toBeTruthy()
   expect(view.getAllByText("Trample").length).toBeGreaterThanOrEqual(2)
   expect(view.getByText("Keyword Abilities")).toBeTruthy()
@@ -193,10 +184,10 @@ it("reports a search once, and each result opened from it with its rule and the 
   const capture = jest.mocked(captureAnalytics)
   capture.mockClear()
   const view = renderRules()
-  search(view, "Block")
+  fireEvent.changeText(view.getByTestId("rules-search"), "Block")
   fireEvent.press(view.getByTestId("rule-509.1"))
   fireEvent.press(view.getByTestId("rule-733.2"))
-  search(view, "Banding")
+  fireEvent.changeText(view.getByTestId("rules-search"), "Banding")
   view.unmount()
   expect(capture.mock.calls).toEqual([
     [
@@ -210,6 +201,7 @@ it("reports a search once, and each result opened from it with its rule and the 
 })
 
 it("reports a search after typing settles, and drops one cleared before then", () => {
+  jest.useFakeTimers()
   const capture = jest.mocked(captureAnalytics)
   capture.mockClear()
   const view = renderRules()
@@ -218,11 +210,12 @@ it("reports a search after typing settles, and drops one cleared before then", (
   fireEvent.changeText(field, "")
   act(() => jest.advanceTimersByTime(2000))
   expect(capture).not.toHaveBeenCalled()
-  search(view, "Block")
+  fireEvent.changeText(field, "Block")
   act(() => jest.advanceTimersByTime(1500))
   expect(capture).toHaveBeenCalledTimes(1)
   view.unmount()
   expect(capture).toHaveBeenCalledTimes(1)
+  jest.useRealTimers()
 })
 
 it("lists a card by name above rules, a half-typed one below them, and opens it", () => {
@@ -230,14 +223,14 @@ it("lists a card by name above rules, a half-typed one below them, and opens it"
   const order = () =>
     view.getAllByTestId(/^(rules-card|rules-term|rule)-/).map((row) => row.props.testID)
 
-  search(view, "Illegal")
+  fireEvent.changeText(view.getByTestId("rules-search"), "Illegal")
   expect(order()[0]).toBe("rules-card-card-1")
 
-  search(view, "illegal action")
+  fireEvent.changeText(view.getByTestId("rules-search"), "illegal action")
   expect(order().slice(0, 2)).toEqual(["rules-term-Illegal Action", "rule-733.1"])
   expect(order().at(-1)).toBe("rules-card-card-1")
 
-  search(view, "illeg")
+  fireEvent.changeText(view.getByTestId("rules-search"), "illeg")
   expect(order().at(-1)).toBe("rules-card-card-1")
 
   fireEvent.press(view.getByTestId("rules-card-card-1"))
