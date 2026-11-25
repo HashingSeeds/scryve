@@ -57,6 +57,7 @@ import type { LocalCard } from "../../convex/lib/localCards"
 import { textSearchKey } from "../../convex/lib/magicDataset"
 
 const TABS_COLLAPSE_MS = 180
+const SEARCH_SETTLE_MS = 200
 const TABS_FALLBACK_HEIGHT = 44
 const TABS_EASE = Easing.bezier(0.32, 0.72, 0, 1)
 
@@ -186,6 +187,11 @@ export function RulesScreen({
   const keyboard = useKeyboardState((state) => (state.isVisible ? state.height : 0))
   const { rules, failed, retry } = useComprehensiveRules(source)
   const [query, setQuery] = useState(initialQuery ?? "")
+  const [searched, setSearched] = useState(query)
+  useEffect(() => {
+    const timer = setTimeout(() => setSearched(query), query.trim() ? SEARCH_SETTLE_MS : 0)
+    return () => clearTimeout(timer)
+  }, [query])
   const [autoFocusSearch, setAutoFocusSearch] = useState(
     () => !ruleId && !glossary && !initialQuery,
   )
@@ -199,7 +205,7 @@ export function RulesScreen({
   const cardSheet = useSheetPresence(card)
   const shownCard = cardSheet.shown
   const pendingRule = useRef<string | undefined>(undefined)
-  const cards = useLocalCardSearch(system, ruleId ? "" : query)
+  const cards = useLocalCardSearch(system, ruleId ? "" : searched)
   useFocusEffect(useCallback(() => setRecent(recentRules(source.cacheKey)), [source.cacheKey]))
   const rows = useMemo(
     () =>
@@ -207,8 +213,8 @@ export function RulesScreen({
         ? []
         : ruleId
           ? readerRows(rules, ruleId)
-          : homeRows(rules, { tab, query, open, recent, cards }),
-    [rules, ruleId, tab, query, open, recent, cards],
+          : homeRows(rules, { tab, query: searched, open, recent, cards }),
+    [rules, ruleId, tab, searched, open, recent, cards],
   )
   const targetIndex = rows.findIndex((row) => row.kind === "rule" && row.target)
   const list = useRef<FlatList<Row>>(null)
@@ -239,7 +245,7 @@ export function RulesScreen({
   }, [section, ruleId, source.cacheKey])
   const title = section ? `${section.id}. ${section.title}` : translate("play:rules.title")
   const home = !ruleId
-  const searching = home && Boolean(query.trim())
+  const searching = home && Boolean(searched.trim())
   const searchResults = rows.flatMap((row) =>
     row.kind === "result"
       ? [row.rule.id]
@@ -251,7 +257,7 @@ export function RulesScreen({
   )
   const searchOpened = useRulesSearchAnalytics(
     system,
-    searching && rules ? { query, results: searchResults } : undefined,
+    searching && rules ? { query: searched, results: searchResults } : undefined,
   )
   const openResult = (id: string, index: number) => {
     if (searching) searchOpened(index + 1, id)
@@ -341,6 +347,7 @@ export function RulesScreen({
               reference={source.references}
               text={item.entry.text}
               onPressReference={(id) => openResult(id, index)}
+              lines={searching ? 3 : undefined}
               dim
             />
           </>
@@ -791,16 +798,18 @@ function RuleText({
   onPressReference,
   active,
   dim,
+  lines,
 }: {
   text: string
   reference: RegExp
   onPressReference: (id: string) => void
   active?: string
   dim?: boolean
+  lines?: number
 }) {
   const { themed } = useAppTheme()
   return (
-    <Text size="sm" tone={dim ? "dim" : undefined}>
+    <Text size="sm" tone={dim ? "dim" : undefined} numberOfLines={lines}>
       {ruleReferences(text, reference).map((part, index) =>
         typeof part === "string" ? (
           part
@@ -870,15 +879,19 @@ const $thumbnail: ThemedStyle<ImageStyle> = ({ colors }) => ({
   aspectRatio: 488 / 680,
   backgroundColor: colors.separator,
 })
-const $cardRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $cardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
-  paddingVertical: spacing.xs,
+  paddingVertical: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
 })
-const $entry: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $entry: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xxxs,
-  paddingVertical: spacing.xs,
+  paddingVertical: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
 })
 const $resultHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
