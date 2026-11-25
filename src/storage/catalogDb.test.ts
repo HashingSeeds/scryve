@@ -163,6 +163,7 @@ describe("local catalog SQLite database", () => {
         row("ball", "ball lightning", 0),
         row("glint", "glint hawk"),
         row("wave", "boltwave", 3),
+        row("bend", "bolt bend", 9),
       ],
       "v1",
     )
@@ -171,9 +172,9 @@ describe("local catalog SQLite database", () => {
       catalogDb.searchLocalCards("mtg", key, 5).map((card) => card.name)
     expect(names("lightning")).toEqual([
       "lightning",
+      "ball lightning",
       "lightning helix",
       "lightning bolt",
-      "ball lightning",
     ])
     expect(names("light")).toEqual([
       "lightning helix",

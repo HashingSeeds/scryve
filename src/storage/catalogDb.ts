@@ -498,9 +498,21 @@ const nativeCatalogDb: CatalogDb = {
         `SELECT json FROM local_cards
           WHERE game = ? AND ((name_key >= ? AND name_key < ?) OR instr(' ' || name_key, ?) > 0)
           ORDER BY name_key = ? DESC, instr(' ' || name_key || ' ', ?) > 0 DESC,
-            (name_key >= ? AND name_key < ?) DESC, rank IS NULL, rank, name_key
+            (instr(' ' || name_key || ' ', ?) = 0 AND name_key >= ? AND name_key < ?) DESC,
+            rank IS NULL, rank, name_key
           LIMIT ?`,
-        [game, nameKey, end, ` ${nameKey}`, nameKey, ` ${nameKey} `, nameKey, end, limit],
+        [
+          game,
+          nameKey,
+          end,
+          ` ${nameKey}`,
+          nameKey,
+          ` ${nameKey} `,
+          ` ${nameKey} `,
+          nameKey,
+          end,
+          limit,
+        ],
       )
       .map((row): LocalCard => JSON.parse(row.json))
   },
