@@ -75,4 +75,26 @@ describe("local SQLite card database", () => {
     resetLocalCardDbConnection()
     expect(localCardDb.getKv("persisted")).toBe("value")
   })
+
+  it("reads one collection entry by id and hides it once deleted", () => {
+    const entry = {
+      id: "entry-1",
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+      finish: "nonfoil",
+      condition: "NM",
+      language: "en",
+      quantity: 2,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    localCardDb.upsertCollectionEntry(entry)
+    expect(localCardDb.getCollectionEntry("entry-1")).toEqual(entry)
+    localCardDb.deleteCollectionEntry("entry-1", 2)
+    expect(localCardDb.getCollectionEntry("entry-1")).toBeUndefined()
+  })
 })

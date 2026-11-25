@@ -468,30 +468,26 @@ test("locks on 1 frame in bulk mode, scans duplicates on sceneChanged, and fires
     ],
     "v1",
   )
-  catalogDb.replacePrices(
-    "mtg",
-    [
-      {
-        game: "mtg",
-        printingId: "lea-sol",
-        finish: "nonfoil",
-        source: "tcgplayer",
-        currency: "USD",
-        retailCents: 45000,
-        updatedAt: "2026-11-24T00:00:00Z",
-      },
-      {
-        game: "mtg",
-        printingId: "cmm-sol",
-        finish: "foil",
-        source: "tcgplayer",
-        currency: "USD",
-        retailCents: 850,
-        updatedAt: "2026-11-24T00:00:00Z",
-      },
-    ],
-    "2026-11-24T00:00:00Z",
-  )
+  catalogDb.replacePrices("mtg", [
+    {
+      game: "mtg",
+      printingId: "lea-sol",
+      finish: "nonfoil",
+      source: "tcgplayer",
+      currency: "USD",
+      retailCents: 45000,
+      updatedAt: "2026-11-24T00:00:00Z",
+    },
+    {
+      game: "mtg",
+      printingId: "cmm-sol",
+      finish: "foil",
+      source: "tcgplayer",
+      currency: "USD",
+      retailCents: 850,
+      updatedAt: "2026-11-24T00:00:00Z",
+    },
+  ])
 
   const { view, addCards } = renderScanner({ singleton: false })
   fireEvent.press(view.getByTestId("card-scan-mode"))

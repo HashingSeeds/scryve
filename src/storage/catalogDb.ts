@@ -227,7 +227,7 @@ export const catalogDb: CatalogDb = {
     })
   },
 
-  replacePrices(game, rows, updatedAt) {
+  replacePrices(game, rows) {
     const db = openCatalogNativeDb()
     db.withTransactionSync(() => {
       db.runSync("DELETE FROM prices WHERE game = ?", [game])
@@ -248,10 +248,6 @@ export const catalogDb: CatalogDb = {
           ],
         )
       }
-      db.runSync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
-        `prices:${game}:updatedAt`,
-        updatedAt,
-      ])
     })
   },
 
@@ -310,7 +306,7 @@ export const catalogDb: CatalogDb = {
     } catch {}
   },
 
-  async replacePricesAsync(game, rows, updatedAt) {
+  async replacePricesAsync(game, rows) {
     const db = openCatalogNativeDb()
     await db.runAsync("DELETE FROM prices_staging WHERE game = ?", [game])
     for (let offset = 0; offset < rows.length; offset += ASYNC_IMPORT_BATCH_SIZE) {
@@ -348,10 +344,6 @@ export const catalogDb: CatalogDb = {
         game,
       ])
       db.runSync("DELETE FROM prices_staging WHERE game = ?", [game])
-      db.runSync("INSERT OR REPLACE INTO catalog_meta (key, value) VALUES (?, ?)", [
-        `prices:${game}:updatedAt`,
-        updatedAt,
-      ])
     })
     try {
       db.execSync("PRAGMA wal_checkpoint(TRUNCATE);")
@@ -432,20 +424,16 @@ export const catalogDb: CatalogDb = {
     return result
   },
 
-  countPrintings(game) {
-    const row = openCatalogNativeDb().getFirstSync<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM printings WHERE game = ?",
-      [game],
+  hasPrintings(game) {
+    return Boolean(
+      openCatalogNativeDb().getFirstSync("SELECT 1 FROM printings WHERE game = ? LIMIT 1", [game]),
     )
-    return row?.count ?? 0
   },
 
-  countPrices(game) {
-    const row = openCatalogNativeDb().getFirstSync<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM prices WHERE game = ?",
-      [game],
+  hasPrices(game) {
+    return Boolean(
+      openCatalogNativeDb().getFirstSync("SELECT 1 FROM prices WHERE game = ? LIMIT 1", [game]),
     )
-    return row?.count ?? 0
   },
 
   clearAll() {

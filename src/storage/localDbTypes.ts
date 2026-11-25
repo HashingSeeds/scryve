@@ -82,6 +82,7 @@ export interface LocalCardDb {
     cardId?: string
     includeDeleted?: boolean
   }): StoredCollectionEntry[]
+  getCollectionEntry(id: string): StoredCollectionEntry | undefined
   upsertCollectionEntry(entry: StoredCollectionEntry): void
   upsertCollectionEntries(entries: readonly StoredCollectionEntry[]): void
   deleteCollectionEntry(id: string, deletedAt: number): void

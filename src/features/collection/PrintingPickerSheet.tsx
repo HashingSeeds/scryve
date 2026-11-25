@@ -49,17 +49,17 @@ export function PrintingPickerSheet({
   onClose: () => void
 }) {
   const { themed, theme } = useAppTheme()
-  const { printingCount } = useCatalogSync(game, visible)
+  const { version } = useCatalogSync(game, visible)
   const [finish, setFinish] = useState<CardFinish>(initialFinish)
   const [condition, setCondition] = useState<CardCondition>(initialCondition)
 
   const printings = useMemo(() => {
     if (!visible) return []
-    void printingCount
+    void version
     const byId = cardId ? catalogDb.findPrintingsByCardId(game, cardId) : []
     if (byId.length > 0) return byId
     return catalogDb.findPrintingsByName(game, normalizePrintingName(cardName))
-  }, [visible, game, cardId, cardName, printingCount])
+  }, [visible, game, cardId, cardName, version])
 
   return (
     <Sheet visible={visible} onClose={onClose} testID="printing-picker-sheet">

@@ -3,6 +3,9 @@ import { randomUUID } from "expo-crypto"
 
 import { localCardDb } from "@/storage/localDb"
 import type { BinderKind, StoredBinder, StoredCollectionEntry } from "@/storage/localDbTypes"
+import { onStorageClear } from "@/utils/storage"
+
+import { catalogVersion, valueCollectionEntries, type ValuedCollectionEntry } from "./catalogSync"
 
 export type { BinderKind, StoredBinder, StoredCollectionEntry }
 
@@ -12,6 +15,13 @@ let revision = 0
 function notify() {
   revision += 1
   for (const listener of listeners) listener()
+}
+
+// why: clearing storage empties the collection tables without a write here, so shelves and valuedCollection kept showing the old cards.
+onStorageClear(notify)
+// why: on web another tab writes the collection to localStorage without a write here, so a cached list would let a stepper tap overwrite that tab's newer quantity.
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("storage", notify)
 }
 
 export function subscribeCollection(listener: () => void) {
@@ -105,6 +115,21 @@ export interface AddCollectionCardInput {
 }
 
 export function addCollectionCard(input: AddCollectionCardInput): StoredCollectionEntry {
+  const entry = putCollectionCard(input)
+  notify()
+  return entry
+}
+
+// why: an import of 1,000 lines notified once per line, and each notify re-rendered every collection subscriber.
+export function addCollectionCards(inputs: readonly AddCollectionCardInput[]): void {
+  if (inputs.length === 0) return
+  localCardDb.transaction(() => {
+    for (const input of inputs) putCollectionCard(input)
+  })
+  notify()
+}
+
+function putCollectionCard(input: AddCollectionCardInput): StoredCollectionEntry {
   const now = input.now ?? Date.now()
   const finish = input.finish ?? "nonfoil"
   const condition = input.condition ?? "NM"
@@ -166,7 +191,6 @@ export function addCollectionCard(input: AddCollectionCardInput): StoredCollecti
       if (binder) localCardDb.upsertBinder({ ...binder, updatedAt: now })
     }
   })
-  notify()
   return entry
 }
 
@@ -192,7 +216,7 @@ export function updateCollectionEntry(
   >,
   now = Date.now(),
 ): StoredCollectionEntry | undefined {
-  const current = localCardDb.listCollectionEntries().find((entry) => entry.id === id)
+  const current = localCardDb.getCollectionEntry(id)
   if (!current) return undefined
   if (patch.quantity !== undefined && patch.quantity <= 0) {
     localCardDb.deleteCollectionEntry(id, now)
@@ -243,12 +267,40 @@ export function moveBinderEntries(
   return entries.length
 }
 
+export function getCollectionEntry(id: string): StoredCollectionEntry | undefined {
+  return localCardDb.getCollectionEntry(id)
+}
+
 export function listCollectionEntries(filter?: {
   game?: string
   binderId?: string | null
   cardId?: string
 }): StoredCollectionEntry[] {
   return localCardDb.listCollectionEntries(filter)
+}
+
+let valuedCache:
+  | {
+      game: string
+      revision: number
+      catalogVersion: number
+      items: ValuedCollectionEntry<StoredCollectionEntry>[]
+    }
+  | undefined
+
+// why: DecksScreen remounts the shelf on every segment switch; without this one-slot cache each remount re-listed and re-valued the whole collection.
+export function valuedCollection(game: string): ValuedCollectionEntry<StoredCollectionEntry>[] {
+  const version = catalogVersion(game)
+  if (
+    valuedCache?.game === game &&
+    valuedCache.revision === revision &&
+    valuedCache.catalogVersion === version
+  ) {
+    return valuedCache.items
+  }
+  const items = valueCollectionEntries(game, localCardDb.listCollectionEntries({ game })).items
+  valuedCache = { game, revision, catalogVersion: version, items }
+  return items
 }
 
 export function ownedQuantitiesByCardId(game: string, cardIds: readonly string[]) {

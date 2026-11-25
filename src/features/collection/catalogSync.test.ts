@@ -69,7 +69,7 @@ describe("catalogSync", () => {
 
     const first = await syncCatalogPrintingsAndPrices("mtg", { fetcher: mockFetch, now: 1000 })
     expect(first).toEqual({ printingsUpdated: true, pricesUpdated: true })
-    expect(catalogDb.countPrintings("mtg")).toBe(2)
+    expect(catalogDb.hasPrintings("mtg")).toBe(true)
 
     const resolvedExact = resolveScannedPrinting("mtg", "Sol Ring", {
       setCode: "cmm",
@@ -268,5 +268,34 @@ describe("catalogSync", () => {
     )
     const fuzzyMatch = resolveScannedPrinting("mtg", "Mind Stone", { setCode: "30k" })
     expect(fuzzyMatch.printing?.printingId).toBe("40k-mind")
+  })
+
+  it("keeps the catalog and retries later when a pack arrives empty", async () => {
+    catalogDb.replacePrintings(
+      "mtg",
+      [
+        {
+          game: "mtg",
+          printingId: "cmm-sol",
+          cardId: "ora-sol",
+          name: "Sol Ring",
+          nameNormalized: "sol ring",
+          setCode: "cmm",
+          collectorNumber: "410",
+          finishes: ["nonfoil"],
+        },
+      ],
+      "v1",
+    )
+    const emptyPack = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ version: "v2", sets: {}, rows: [] }), { status: 200 }),
+    ) as unknown as typeof fetch
+
+    await expect(
+      syncCatalogPrintingsAndPrices("mtg", { fetcher: emptyPack, now: 1000 }),
+    ).rejects.toThrow("empty")
+    expect(catalogDb.getPrinting("mtg", "cmm-sol")).toBeDefined()
+    expect(catalogDb.getMeta("mtg:printings_checked_at")).toBeUndefined()
   })
 })

@@ -65,6 +65,7 @@ export function SegmentedControl({
   const thumbScale = useSharedValue(1)
   const placedWidth = useRef(0)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [tapCount, setTapCount] = useState(0)
   const fingerIndex = useRef(0)
   const selectedIndex = Math.max(
     0,
@@ -91,7 +92,8 @@ export function SegmentedControl({
     const animate = placedWidth.current === segmentWidth && reducedMotion === false
     offset.set(animate ? withSpring(target, SETTLE_SPRING) : target)
     placedWidth.current = segmentWidth
-  }, [dragging, offset, reducedMotion, segmentWidth, selectedIndex])
+    // why: tapCount re-runs this after a tap commits, so the thumb returns when the parent keeps the old selection.
+  }, [dragging, offset, reducedMotion, segmentWidth, selectedIndex, tapCount])
 
   function tick() {
     if (reducedMotion === false && localGameRepository.loadSettings().hapticsEnabled) {
@@ -105,6 +107,12 @@ export function SegmentedControl({
 
   function tap(id: string) {
     if (disabled || id === selectedId) return
+    // why: the spring starts on the UI thread before onSelect, so the thumb moves while JS renders the new tab; the effect alone waited for that commit.
+    if (segmentWidth > 0) {
+      const target = segmentWidth * segments.findIndex((segment) => segment.id === id)
+      offset.set(reducedMotion === false ? withSpring(target, SETTLE_SPRING) : target)
+    }
+    setTapCount((count) => count + 1)
     tick()
     onSelect(id)
   }
