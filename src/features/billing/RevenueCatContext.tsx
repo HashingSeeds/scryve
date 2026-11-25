@@ -285,6 +285,7 @@ export function RevenueCatProvider({
   const [isLoading, setIsLoading] = useState(Boolean(apiKey && appUserID !== undefined))
   const [error, setError] = useState<string>()
   const [configuredUserId, setConfiguredUserId] = useState<string | null>()
+  const [configureAttempt, setConfigureAttempt] = useState(0)
   const configured = Boolean(apiKey)
   const isReady = Boolean(apiKey && appUserID !== undefined && configuredUserId === appUserID)
   const acceptCustomerInfo = useCallback((next: CustomerInfo) => {
@@ -319,6 +320,7 @@ export function RevenueCatProvider({
     }
 
     let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | undefined
     let subscribedSdk: Awaited<ReturnType<typeof loadPurchases>> | undefined
     setCustomerInfo(null)
     const listener: CustomerInfoUpdateListener = (next) => {
@@ -328,6 +330,11 @@ export function RevenueCatProvider({
     setError(undefined)
 
     void configureForUser(apiKey, appUserID)
+      .catch((cause: unknown) => {
+        const delay = Math.min(1_000 * 2 ** configureAttempt, 30_000)
+        if (!cancelled) retry = setTimeout(() => setConfigureAttempt((n) => n + 1), delay)
+        throw cause
+      })
       .then(async ({ Purchases, linkError }) => {
         if (cancelled) return
         setConfiguredUserId(appUserID)
@@ -351,9 +358,10 @@ export function RevenueCatProvider({
 
     return () => {
       cancelled = true
+      clearTimeout(retry)
       subscribedSdk?.removeCustomerInfoUpdateListener(listener)
     }
-  }, [acceptCustomerInfo, apiKey, appUserID])
+  }, [acceptCustomerInfo, apiKey, appUserID, configureAttempt])
 
   const purchase = useCallback(
     async (productId: CountProductId | typeof FOIL_PRODUCT_ID): Promise<PurchaseResult> => {

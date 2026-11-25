@@ -293,6 +293,15 @@ describe("RevenueCatProvider", () => {
     await waitFor(() => expect(Purchases.logOut).toHaveBeenCalledTimes(1))
   })
 
+  it("retries a failed setup until billing loads", async () => {
+    purchasesMock.isConfigured.mockRejectedValueOnce(new Error("offline"))
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.error).toBeTruthy())
+    expect(result.current.isReady).toBe(false)
+    await waitFor(() => expect(result.current.isReady).toBe(true), { timeout: 3000 })
+    expect(result.current.isCountPro).toBe(true)
+  })
+
   it("logs RevenueCat out of the previous account when the player signs out", async () => {
     purchasesMock.isConfigured.mockResolvedValue(true)
     purchasesMock.isAnonymous.mockResolvedValue(false)
