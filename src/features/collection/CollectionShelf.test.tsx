@@ -4,6 +4,7 @@ import { catalogDb } from "@/storage/catalogDb"
 import { localCardDb } from "@/storage/localDb"
 import { ThemeProvider } from "@/theme/context"
 
+import { syncCatalogPrintingsAndPrices } from "./catalogSync"
 import { CollectionShelf } from "./CollectionShelf"
 import {
   addCollectionCard,
@@ -48,21 +49,17 @@ describe("CollectionShelf", () => {
       ],
       "v1",
     )
-    catalogDb.replacePrices(
-      "mtg",
-      [
-        {
-          game: "mtg",
-          printingId: "cmm-410",
-          finish: "nonfoil",
-          source: "tcgplayer",
-          currency: "USD",
-          retailCents: 250,
-          updatedAt: "2026-11-24T00:00:00Z",
-        },
-      ],
-      "2026-11-24T00:00:00Z",
-    )
+    catalogDb.replacePrices("mtg", [
+      {
+        game: "mtg",
+        printingId: "cmm-410",
+        finish: "nonfoil",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 250,
+        updatedAt: "2026-11-24T00:00:00Z",
+      },
+    ])
   })
 
   it("creates binders, imports CSV entries, and renders valued collection rows", () => {
@@ -166,6 +163,42 @@ describe("CollectionShelf", () => {
     expect(after.find((entry) => entry.condition === "LP")?.quantity).toBe(1)
     expect(after.find((entry) => entry.binderId === scanSession.id)?.quantity).toBe(2)
     expect(after.find((entry) => !entry.binderId && entry.condition === "NM")).toBeUndefined()
+  })
+
+  it("revalues the shelf when a price sync keeps the same row count", async () => {
+    catalogDb.setMeta("mtg:printings_checked_at", String(Date.now()))
+    catalogDb.setMeta("mtg:prices_checked_at", String(Date.now()))
+    addCollectionCard({
+      game: "mtg",
+      cardId: "ora-sol",
+      printingId: "cmm-410",
+      name: "Sol Ring",
+      setCode: "cmm",
+      collectorNumber: "410",
+    })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CollectionShelf mode="collection" />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("$2.50")).toBeTruthy()
+
+    const fetcher = jest.fn(async (input: string | URL | Request) =>
+      String(input).endsWith("/datasets/mtg/prices.json")
+        ? new Response(
+            JSON.stringify({
+              version: "v2",
+              asOf: 1_764_000_000_000,
+              prices: { "cmm-410": [300] },
+            }),
+            { status: 200 },
+          )
+        : new Response(null, { status: 304 }),
+    ) as unknown as typeof fetch
+    await act(() => syncCatalogPrintingsAndPrices("mtg", { fetcher, force: true }))
+
+    expect(view.getByText("$3.00")).toBeTruthy()
+    expect(view.queryByText("$2.50")).toBeNull()
   })
 
   it("refreshes quick-add matches when initial catalog sync completes", async () => {

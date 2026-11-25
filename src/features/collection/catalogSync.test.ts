@@ -69,7 +69,7 @@ describe("catalogSync", () => {
 
     const first = await syncCatalogPrintingsAndPrices("mtg", { fetcher: mockFetch, now: 1000 })
     expect(first).toEqual({ printingsUpdated: true, pricesUpdated: true })
-    expect(catalogDb.countPrintings("mtg")).toBe(2)
+    expect(catalogDb.hasPrintings("mtg")).toBe(true)
 
     const resolvedExact = resolveScannedPrinting("mtg", "Sol Ring", {
       setCode: "cmm",

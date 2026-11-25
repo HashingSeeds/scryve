@@ -40,7 +40,7 @@ describe("local catalog SQLite database", () => {
       "2026-11-24",
     )
 
-    expect(catalogDb.countPrintings("mtg")).toBe(2)
+    expect(catalogDb.hasPrintings("mtg")).toBe(true)
     expect(catalogDb.getMeta("printings:mtg:version")).toBe("2026-11-24")
     expect(catalogDb.findPrintingBySetNumber("mtg", "cmm", "0412")?.printingId).toBe("sol-cmm-412")
     expect(catalogDb.findPrintingBySetNumber("mtg", "FDN", "0259")?.printingId).toBe("sol-fdn-259")
@@ -86,31 +86,27 @@ describe("local catalog SQLite database", () => {
       ],
       "v1",
     )
-    catalogDb.replacePrices(
-      "mtg",
-      [
-        {
-          game: "mtg",
-          printingId: "sol-cmm-412",
-          finish: "normal",
-          source: "tcgplayer",
-          currency: "USD",
-          retailCents: 185,
-          updatedAt: "2026-11-24",
-        },
-        {
-          game: "mtg",
-          printingId: "sol-cmm-412",
-          finish: "normal",
-          source: "cardkingdom",
-          currency: "USD",
-          retailCents: 249,
-          buylistCents: 95,
-          updatedAt: "2026-11-24",
-        },
-      ],
-      "2026-11-24",
-    )
+    catalogDb.replacePrices("mtg", [
+      {
+        game: "mtg",
+        printingId: "sol-cmm-412",
+        finish: "normal",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 185,
+        updatedAt: "2026-11-24",
+      },
+      {
+        game: "mtg",
+        printingId: "sol-cmm-412",
+        finish: "normal",
+        source: "cardkingdom",
+        currency: "USD",
+        retailCents: 249,
+        buylistCents: 95,
+        updatedAt: "2026-11-24",
+      },
+    ])
 
     expect(catalogDb.findPrintingBySetNumber("pokemon", "sv01", "081")?.finishes).toEqual([
       "holofoil",

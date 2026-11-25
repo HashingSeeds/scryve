@@ -29,13 +29,13 @@ export interface CatalogDb {
   getMeta(key: string): string | undefined
   setMeta(key: string, value: string): void
   replacePrintings(game: string, rows: readonly CatalogPrinting[], version: string): void
-  replacePrices(game: string, rows: readonly CatalogPrice[], updatedAt: string): void
+  replacePrices(game: string, rows: readonly CatalogPrice[]): void
   replacePrintingsAsync(
     game: string,
     rows: readonly CatalogPrinting[],
     version: string,
   ): Promise<void>
-  replacePricesAsync(game: string, rows: readonly CatalogPrice[], updatedAt: string): Promise<void>
+  replacePricesAsync(game: string, rows: readonly CatalogPrice[]): Promise<void>
   getPrinting(game: string, printingId: string): CatalogPrinting | undefined
   findPrintingBySetNumber(
     game: string,
@@ -46,7 +46,7 @@ export interface CatalogDb {
   findPrintingsByCardId(game: string, cardId: string): CatalogPrinting[]
   getPricesForPrinting(game: string, printingId: string): CatalogPrice[]
   getPricesBatch(game: string, printingIds: readonly string[]): Map<string, CatalogPrice[]>
-  countPrintings(game: string): number
-  countPrices(game: string): number
+  hasPrintings(game: string): boolean
+  hasPrices(game: string): boolean
   clearAll(): void
 }

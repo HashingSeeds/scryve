@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useSyncExternalStore } from "react"
 
 import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { catalogDb } from "@/storage/catalogDb"
@@ -28,7 +28,6 @@ const META_PRINTINGS_ETAG = "printings_etag"
 const META_PRINTINGS_CHECKED_AT = "printings_checked_at"
 const META_PRICES_ETAG = "prices_etag"
 const META_PRICES_CHECKED_AT = "prices_checked_at"
-const META_PRICES_UPDATED_AT = "prices_updated_at"
 
 export interface PrintingPriceSummary {
   retailCents?: number
@@ -69,11 +68,10 @@ function isScryfallSystem(game: string): boolean {
   return systemDefinition(game)?.integration.capabilities.cardCatalog.provider === "scryfall"
 }
 
-function metaNumber(key: string): number {
-  const raw = catalogDb.getMeta(key)
-  if (!raw) return 0
-  const parsed = Number(raw)
-  return Number.isFinite(parsed) ? parsed : 0
+// why: a check stamps *_checked_at only after rows exist, so a fresh stamp means no row queries.
+function checkIsStale(key: string, maxAgeMs: number, now: number): boolean {
+  const checkedAt = Number(catalogDb.getMeta(key))
+  return !Number.isFinite(checkedAt) || checkedAt === 0 || now - checkedAt >= maxAgeMs
 }
 
 function metaKey(game: string, suffix: string): string {
@@ -106,6 +104,36 @@ async function fetchJsonFromOrigins(
   throw new Error(`Catalog fetch failed (${lastStatus})`)
 }
 
+// why: memos key on `version`, bumped per committed replace, since a row count misses a price change that keeps the count.
+interface CatalogSnapshot {
+  syncing: boolean
+  version: number
+}
+
+const IDLE_SNAPSHOT: CatalogSnapshot = { syncing: false, version: 0 }
+const catalogSnapshots = new Map<string, CatalogSnapshot>()
+const catalogListeners = new Set<() => void>()
+
+function catalogSnapshot(game: string): CatalogSnapshot {
+  return catalogSnapshots.get(game) ?? IDLE_SNAPSHOT
+}
+
+function updateCatalogSnapshot(game: string, patch: Partial<CatalogSnapshot>) {
+  catalogSnapshots.set(game, { ...catalogSnapshot(game), ...patch })
+  for (const listener of catalogListeners) listener()
+}
+
+function subscribeCatalog(listener: () => void) {
+  catalogListeners.add(listener)
+  return () => {
+    catalogListeners.delete(listener)
+  }
+}
+
+export function catalogVersion(game: string): number {
+  return catalogSnapshot(game).version
+}
+
 export async function syncCatalogPrintingsAndPrices(
   game: string,
   options: { fetcher?: typeof fetch; force?: boolean; now?: number } = {},
@@ -113,15 +141,33 @@ export async function syncCatalogPrintingsAndPrices(
   if (!isScryfallSystem(game)) return { printingsUpdated: false, pricesUpdated: false }
   const fetcher = options.fetcher ?? fetch
   const now = options.now ?? Date.now()
-  const origins = pricingDatasetOrigins()
 
+  const printingsStale =
+    options.force ||
+    checkIsStale(metaKey(game, META_PRINTINGS_CHECKED_AT), PRINTINGS_MAX_AGE_MS, now)
+  const pricesStale =
+    options.force || checkIsStale(metaKey(game, META_PRICES_CHECKED_AT), PRICES_MAX_AGE_MS, now)
+  if (!printingsStale && !pricesStale) return { printingsUpdated: false, pricesUpdated: false }
+
+  updateCatalogSnapshot(game, { syncing: true })
+  try {
+    return await fetchStaleCatalog(game, { printingsStale, pricesStale, fetcher, now })
+  } finally {
+    updateCatalogSnapshot(game, { syncing: false })
+  }
+}
+
+async function fetchStaleCatalog(
+  game: string,
+  options: { printingsStale: boolean; pricesStale: boolean; fetcher: typeof fetch; now: number },
+): Promise<{ printingsUpdated: boolean; pricesUpdated: boolean }> {
+  const { fetcher, now } = options
+  const origins = pricingDatasetOrigins()
   let printingsUpdated = false
   let pricesUpdated = false
 
-  const printingsCheckedAt = metaNumber(metaKey(game, META_PRINTINGS_CHECKED_AT))
-  const hasPrintings = catalogDb.countPrintings(game) > 0
-  if (options.force || !hasPrintings || now - printingsCheckedAt >= PRINTINGS_MAX_AGE_MS) {
-    const prevEtag = hasPrintings
+  if (options.printingsStale) {
+    const prevEtag = catalogDb.hasPrintings(game)
       ? catalogDb.getMeta(metaKey(game, META_PRINTINGS_ETAG))
       : undefined
     const response = await fetchJsonFromOrigins(origins, MTG_PRINTINGS_PATH, prevEtag, fetcher)
@@ -145,14 +191,15 @@ export async function syncCatalogPrintingsAndPrices(
       await catalogDb.replacePrintingsAsync(game, rows, pack.version)
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRINTINGS_ETAG), response.etag)
       printingsUpdated = true
+      updateCatalogSnapshot(game, { version: catalogVersion(game) + 1 })
     }
     catalogDb.setMeta(metaKey(game, META_PRINTINGS_CHECKED_AT), String(now))
   }
 
-  const pricesCheckedAt = metaNumber(metaKey(game, META_PRICES_CHECKED_AT))
-  const hasPrices = catalogDb.countPrices(game) > 0
-  if (options.force || !hasPrices || now - pricesCheckedAt >= PRICES_MAX_AGE_MS) {
-    const prevEtag = hasPrices ? catalogDb.getMeta(metaKey(game, META_PRICES_ETAG)) : undefined
+  if (options.pricesStale) {
+    const prevEtag = catalogDb.hasPrices(game)
+      ? catalogDb.getMeta(metaKey(game, META_PRICES_ETAG))
+      : undefined
     const response = await fetchJsonFromOrigins(origins, MTG_PRICES_PATH, prevEtag, fetcher)
     if (response.status === "ok") {
       const pack = decodeMtgPricesPack(response.data)
@@ -239,10 +286,10 @@ export async function syncCatalogPrintingsAndPrices(
           })
         }
       }
-      await catalogDb.replacePricesAsync(game, rows, updatedAt)
-      catalogDb.setMeta(metaKey(game, META_PRICES_UPDATED_AT), updatedAt)
+      await catalogDb.replacePricesAsync(game, rows)
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRICES_ETAG), response.etag)
       pricesUpdated = true
+      updateCatalogSnapshot(game, { version: catalogVersion(game) + 1 })
     }
     catalogDb.setMeta(metaKey(game, META_PRICES_CHECKED_AT), String(now))
   }
@@ -496,51 +543,22 @@ export function ensureCatalogSynced(game: string) {
   return pending
 }
 
-function readCatalogSnapshot(game: string, supported: boolean) {
-  return {
-    game,
-    printingCount: supported ? catalogDb.countPrintings(game) : 0,
-    priceCount: supported ? catalogDb.countPrices(game) : 0,
-    updatedAt: supported ? catalogDb.getMeta(metaKey(game, META_PRICES_UPDATED_AT)) : undefined,
-  }
-}
-
 export function useCatalogSync(game: string, enabled = true) {
   const supported = isScryfallSystem(game)
-  const [syncing, setSyncing] = useState(false)
-  const [snapshot, setSnapshot] = useState(() => readCatalogSnapshot(game, supported))
+  const snapshot = useSyncExternalStore(
+    subscribeCatalog,
+    () => catalogSnapshot(game),
+    () => catalogSnapshot(game),
+  )
 
   useEffect(() => {
-    setSnapshot(readCatalogSnapshot(game, supported))
-    if (!enabled || !supported) {
-      setSyncing(false)
-      return
-    }
-    let active = true
-    setSyncing(true)
-    ensureCatalogSynced(game)
-      .catch(() => {})
-      .finally(() => {
-        if (!active) return
-        setSnapshot(readCatalogSnapshot(game, supported))
-        setSyncing(false)
-      })
-    return () => {
-      active = false
-    }
+    if (!enabled || !supported) return
+    ensureCatalogSynced(game).catch(() => {})
   }, [enabled, game, supported])
-
-  const current =
-    snapshot.game === game && supported
-      ? snapshot
-      : { game, printingCount: 0, priceCount: 0, updatedAt: undefined }
 
   return {
     supported,
-    syncing,
-    ready: current.printingCount > 0,
-    printingCount: current.printingCount,
-    priceCount: current.priceCount,
-    updatedAt: current.updatedAt,
+    syncing: supported && snapshot.syncing,
+    version: snapshot.version,
   }
 }

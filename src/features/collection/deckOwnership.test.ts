@@ -37,30 +37,26 @@ describe("deckOwnership", () => {
       ],
       "v1",
     )
-    catalogDb.replacePrices(
-      "mtg",
-      [
-        {
-          game: "mtg",
-          printingId: "scry-bolt",
-          finish: "nonfoil",
-          source: "tcgplayer",
-          currency: "USD",
-          retailCents: 200,
-          updatedAt: "2026-11-24T00:00:00Z",
-        },
-        {
-          game: "mtg",
-          printingId: "scry-sol",
-          finish: "nonfoil",
-          source: "tcgplayer",
-          currency: "USD",
-          retailCents: 150,
-          updatedAt: "2026-11-24T00:00:00Z",
-        },
-      ],
-      "2026-11-24T00:00:00Z",
-    )
+    catalogDb.replacePrices("mtg", [
+      {
+        game: "mtg",
+        printingId: "scry-bolt",
+        finish: "nonfoil",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 200,
+        updatedAt: "2026-11-24T00:00:00Z",
+      },
+      {
+        game: "mtg",
+        printingId: "scry-sol",
+        finish: "nonfoil",
+        source: "tcgplayer",
+        currency: "USD",
+        retailCents: 150,
+        updatedAt: "2026-11-24T00:00:00Z",
+      },
+    ])
 
     addCollectionCard({
       game: "mtg",

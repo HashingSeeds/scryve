@@ -79,7 +79,7 @@ export const catalogDb: CatalogDb = {
     metaMap.set(`printings:${game}:version`, version)
   },
 
-  replacePrices(game, rows, updatedAt) {
+  replacePrices(game, rows) {
     for (const key of pricesByPrinting.keys()) {
       if (key.startsWith(`${game}\u0000`)) pricesByPrinting.delete(key)
     }
@@ -89,15 +89,14 @@ export const catalogDb: CatalogDb = {
       list.push(row)
       pricesByPrinting.set(key, list)
     }
-    metaMap.set(`prices:${game}:updatedAt`, updatedAt)
   },
 
   async replacePrintingsAsync(game, rows, version) {
     this.replacePrintings(game, rows, version)
   },
 
-  async replacePricesAsync(game, rows, updatedAt) {
-    this.replacePrices(game, rows, updatedAt)
+  async replacePricesAsync(game, rows) {
+    this.replacePrices(game, rows)
   },
 
   getPrinting(game, printingId) {
@@ -133,20 +132,18 @@ export const catalogDb: CatalogDb = {
     return result
   },
 
-  countPrintings(game) {
-    let count = 0
+  hasPrintings(game) {
     for (const entry of printingsByKey.values()) {
-      if (entry.game === game) count += 1
+      if (entry.game === game) return true
     }
-    return count
+    return false
   },
 
-  countPrices(game) {
-    let count = 0
-    for (const [key, list] of pricesByPrinting) {
-      if (key.startsWith(`${game}\u0000`)) count += list.length
+  hasPrices(game) {
+    for (const key of pricesByPrinting.keys()) {
+      if (key.startsWith(`${game}\u0000`)) return true
     }
-    return count
+    return false
   },
 
   clearAll() {

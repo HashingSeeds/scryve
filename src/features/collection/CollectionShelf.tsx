@@ -109,10 +109,9 @@ export function CollectionShelf({
 
   const valuedCollection = useMemo(() => {
     if (mode === "scans") return []
-    void sync.priceCount
-    void sync.updatedAt
+    void sync.version
     return valueCollectionEntries(game, collectionEntries).items
-  }, [mode, game, collectionEntries, sync.priceCount, sync.updatedAt])
+  }, [mode, game, collectionEntries, sync.version])
 
   const pricedEntries = useMemo(() => {
     if (mode === "scans") return []
@@ -146,8 +145,7 @@ export function CollectionShelf({
   const scanSessionSummaries = useMemo(() => {
     if (mode !== "scans") return new Map<string, { count: number; retailCents: number }>()
     void revision
-    void sync.priceCount
-    void sync.updatedAt
+    void sync.version
     const summaryById = new Map<string, { count: number; retailCents: number }>()
     for (const session of scanSessions) {
       const entries = listCollectionEntries({ binderId: session.id })
@@ -159,14 +157,14 @@ export function CollectionShelf({
       })
     }
     return summaryById
-  }, [mode, revision, sync.priceCount, sync.updatedAt, scanSessions, game])
+  }, [mode, revision, sync.version, scanSessions, game])
 
   const quickAddMatches = useMemo(() => {
-    void sync.printingCount
+    void sync.version
     const norm = normalizePrintingName(addCardQuery)
     if (norm.length < 2) return []
     return catalogDb.findPrintingsByName(game, norm).slice(0, 8)
-  }, [addCardQuery, game, sync.printingCount])
+  }, [addCardQuery, game, sync.version])
 
   function startNewScanSession() {
     const session = createBinder({
@@ -266,12 +264,11 @@ export function CollectionShelf({
   const scanningTotalCents = useMemo(() => {
     if (!scanningSession) return undefined
     void revision
-    void sync.priceCount
-    void sync.updatedAt
+    void sync.version
     const sessionGame = scanningSession.game ?? game
     const entries = listCollectionEntries({ binderId: scanningSession.id })
     return valueCollectionEntries(sessionGame, entries).totals.retailCents
-  }, [scanningSession, revision, sync.priceCount, sync.updatedAt, game])
+  }, [scanningSession, revision, sync.version, game])
 
   if (mode === "scans") {
     return (

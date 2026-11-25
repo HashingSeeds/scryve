@@ -177,20 +177,10 @@ export function DeckView({
   const catalogSync = useCatalogSync(game, showOwnership)
   const ownership = useMemo(() => {
     void collectionRevision
-    void catalogSync.printingCount
-    void catalogSync.priceCount
-    void catalogSync.updatedAt
+    void catalogSync.version
     if (!showOwnership) return undefined
     return computeDeckOwnership(game, shownCards)
-  }, [
-    catalogSync.priceCount,
-    catalogSync.printingCount,
-    catalogSync.updatedAt,
-    collectionRevision,
-    game,
-    showOwnership,
-    shownCards,
-  ])
+  }, [catalogSync.version, collectionRevision, game, showOwnership, shownCards])
   const issues = useDeckIssues(game, format, shownCards)
   const side = sideboardSection({ game, format })
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))

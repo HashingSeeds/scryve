@@ -41,7 +41,7 @@ describe("collection SQLite scale benchmark (30,000 cards)", () => {
       }
     }
     catalogDb.replacePrintings("mtg", printings, "bench-v1")
-    catalogDb.replacePrices("mtg", prices, "2026-11-24T00:00:00Z")
+    catalogDb.replacePrices("mtg", prices)
 
     for (let i = 0; i < totalEntries; i += 1) {
       const cardIndex = i % 2_000
