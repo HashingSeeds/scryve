@@ -247,16 +247,22 @@ describe("RevenueCatProvider", () => {
     expect(result.current.error).toBeTruthy()
   })
 
-  it("logs out the account an earlier build left saved when a signed-out phone configures", async () => {
-    purchasesMock.isAnonymous.mockResolvedValue(false)
-    renderHook(() => useRevenueCat(), {
+  it("logs out the account an earlier build left saved when a signed-out phone configures, even offline", async () => {
+    let anonymous = false
+    purchasesMock.isAnonymous.mockImplementation(async () => anonymous)
+    purchasesMock.logOut.mockImplementationOnce(async () => {
+      anonymous = true
+      throw Object.assign(new Error("offline"), { code: "35" })
+    })
+    const { result } = renderHook(() => useRevenueCat(), {
       wrapper: ({ children }: { children: ReactNode }) => (
         <RevenueCatProvider apiKey="test_public" appUserID={null}>
           {children}
         </RevenueCatProvider>
       ),
     })
-    await waitFor(() => expect(Purchases.logOut).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    expect(Purchases.logOut).toHaveBeenCalledTimes(1)
   })
 
   it("still logs out when the player signs out while signing in is pending", async () => {

@@ -200,6 +200,13 @@ async function isCurrentUser(Purchases: Purchases, appUserID: string | null) {
 }
 
 /** why: logging in from the anonymous player moves its purchases onto the account, but RevenueCat merges only an account's first anonymous player, so a later anonymous buyer's store purchase is synced over instead. */
+/** why: offline, iOS switches to the anonymous player and then rejects logOut when it can't fetch that player's CustomerInfo. */
+async function logOut(Purchases: Purchases) {
+  await Purchases.logOut().catch(async (cause: unknown) => {
+    if (!(await Purchases.isAnonymous())) throw cause
+  })
+}
+
 async function switchUser(
   apiKey: string,
   appUserID: string | null,
@@ -214,13 +221,13 @@ async function switchUser(
       entitlementVerificationMode: Purchases.ENTITLEMENT_VERIFICATION_MODE.INFORMATIONAL,
     })
     // why: configuring without an ID reuses the SDK's saved one, which earlier builds left on the account after sign out.
-    if (appUserID === null && !(await Purchases.isAnonymous())) await Purchases.logOut()
+    if (appUserID === null && !(await Purchases.isAnonymous())) await logOut(Purchases)
     return { Purchases }
   }
 
   if (await isCurrentUser(Purchases, appUserID)) return { Purchases }
   if (appUserID === null) {
-    await Purchases.logOut()
+    await logOut(Purchases)
     return { Purchases }
   }
   const anonymousPro =
