@@ -296,7 +296,7 @@ describe("CollectionShelf", () => {
           binderId: session.id,
         })
       })
-      await act(async () => fireEvent.press(view.getByText("Done")))
+      fireEvent.press(view.getByTestId("card-scanner-close"))
       expect(shelfLists()).toBe(1)
 
       fireEvent.press(view.getByText("Back"))

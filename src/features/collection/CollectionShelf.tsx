@@ -167,12 +167,12 @@ export function CollectionShelf({
   }, [mode, allValued, scanSessionIds])
 
   const addCardNames = useMemo(() => {
-    void sync.printingCount
+    void sync.version
     if (addCardQuery.trim().length < 2) return []
     const fuzzy = nameIndex ? searchCardNames(nameIndex, addCardQuery, ADD_CARD_LIMIT) : []
     const exact = catalogDb.findPrintingsByName(game, normalizePrintingName(addCardQuery))[0]?.name
     return exact && !fuzzy.includes(exact) ? [exact, ...fuzzy].slice(0, ADD_CARD_LIMIT) : fuzzy
-  }, [nameIndex, addCardQuery, game, sync.printingCount])
+  }, [nameIndex, addCardQuery, game, sync.version])
 
   const addCardPrintings = useMemo(() => {
     void sync.version
