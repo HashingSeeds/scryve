@@ -29,9 +29,10 @@ it("searches the game picked on the standalone Cards screen", async () => {
       <CardsRoute />
     </ThemeProvider>,
   )
-  fireEvent.press(view.getByTestId("card-search-game"))
-  await waitFor(() => expect(view.getByTestId("card-search-game-option-pokemon")).toBeTruthy())
-  fireEvent.press(view.getByTestId("card-search-game-option-pokemon"))
+  fireEvent.press(view.getByTestId("collection-actions-button"))
+  fireEvent.press(view.getByTestId("deck-action-game"))
+  await waitFor(() => expect(view.getByTestId("deck-action-game-pokemon")).toBeTruthy())
+  fireEvent.press(view.getByTestId("deck-action-game-pokemon"))
   fireEvent.changeText(view.getByTestId("card-search-input"), "pikachu")
   await act(async () => jest.advanceTimersByTime(400))
   jest.useRealTimers()

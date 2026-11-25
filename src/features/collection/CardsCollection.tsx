@@ -19,7 +19,8 @@ import {
 } from "@/features/decks/CardSearchScreen"
 import { useCardNameIndex } from "@/features/decks/useCardNameIndex"
 import { LocalGameRepository } from "@/features/game/localPersistence"
-import type { PlaySystemId } from "@/features/game/playSystems"
+import { playSystemShortLabel, type PlaySystemId } from "@/features/game/playSystems"
+import { VISIBLE_SYSTEM_IDS } from "@/features/game/systemVisibility"
 import type { BackAction } from "@/features/game/useBackToBoard"
 import { formatCurrency, joinParts } from "@/i18n/format"
 import { translate, translateForStorage } from "@/i18n/translate"
@@ -64,7 +65,7 @@ const SORTS = [
 
 const ALL = "all"
 
-type Menu = { kind: "sort" } | { kind: "actions"; openFilters?: () => void }
+type Menu = { kind: "sort" } | { kind: "game" } | { kind: "actions"; openFilters?: () => void }
 type Dialog = "newBinder" | "importExport" | "move"
 
 export function CardsCollection({
@@ -309,7 +310,19 @@ export function CardsCollection({
       closeMenu()
     },
   }))
+  const gameActions: DeckAction[] = VISIBLE_SYSTEM_IDS.map((id) => ({
+    id: `game-${id}`,
+    label: playSystemShortLabel(id),
+    selected: id === game,
+    onPress: () => closeMenu(() => onGameChange(id)),
+  }))
   const scopeActions = (openFilters?: () => void): DeckAction[] => [
+    {
+      id: "game",
+      label: translate("decks:shelf.system"),
+      detail: playSystemShortLabel(game),
+      onPress: () => closeMenu(() => setMenu({ kind: "game" })),
+    },
     ...(openFilters
       ? [
           {
@@ -415,6 +428,7 @@ export function CardsCollection({
         ]}
         selectedId={scopeId}
         onSelect={setSelectedScope}
+        scrolls
       />
     ),
     summary: (
@@ -512,7 +526,13 @@ export function CardsCollection({
       <DeckActionsSheet
         testID="collection-menu"
         visible={menu !== undefined}
-        actions={menu?.kind === "sort" ? sortActions : scopeActions(menu?.openFilters)}
+        actions={
+          menu?.kind === "sort"
+            ? sortActions
+            : menu?.kind === "game"
+              ? gameActions
+              : scopeActions(menu?.openFilters)
+        }
         onClose={() => closeMenu()}
         onDismissed={() => {
           const then = afterMenu.current

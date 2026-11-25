@@ -153,7 +153,6 @@ const COLORS_BEFORE = "cost"
 const QUERY_LINE_HEIGHT = 19
 /** why: a result row's usual height, which the list uses to place rows before it measures them. */
 const RESULT_HEIGHT = 77
-const COLLECTION_DRAW_DISTANCE = 500
 /** why: a filter's search field has its row of matches under it, which the keyboard must leave in view. */
 const SUGGESTIONS_BELOW_FIELD = 56
 const NO_RESULTS = [] as const
@@ -1164,7 +1163,7 @@ export function CardSearch({
               ))}
             </ScrollView>
           ) : null}
-          {onGameChange ? (
+          {onGameChange && !collection ? (
             <SelectField
               testID="card-search-game"
               label={translate("decks:shelf.system")}
@@ -1197,11 +1196,12 @@ export function CardSearch({
             themed($search),
             $resultsContent,
             choosingCommander ? $searchResults : undefined,
+            collection ? $collectionResults : undefined,
           ]}
           columnWrapperStyle={collection ? undefined : themed($resultGap)}
           data={listData}
-          // why: the default window rendered every row of a 1,000-card collection soon after it opened.
-          drawDistance={collection ? COLLECTION_DRAW_DISTANCE : undefined}
+          // why: the list places its rows in effects, which a hidden tab doesn't run, so the first tap on Cards draws them; each row past the screen made that tap slower.
+          drawDistance={collection ? 0 : undefined}
           keyExtractor={(item, index) =>
             "kind" in item
               ? item.kind === "owned"
@@ -1376,9 +1376,12 @@ export function CardSearch({
               return item.kind === "owned" ? (
                 (collection?.renderEntry(item.owned) ?? null)
               ) : (
-                <View style={themed($catalogLabel)}>
-                  <SectionHeader label={translate("decks:collection.catalog")} />
-                </View>
+                <Text
+                  size="sm"
+                  weight="bold"
+                  style={themed($catalogLabel)}
+                  tx="decks:collection.catalog"
+                />
               )
             }
             const card = item
@@ -1652,7 +1655,12 @@ const $queryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xs,
 })
-const $catalogLabel: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingTop: spacing.md })
+const $catalogLabel: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
+  paddingTop: spacing.md,
+  paddingBottom: spacing.xs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
 const $queryWrapper: ViewStyle = { minHeight: 44, maxHeight: 112, alignItems: "center" }
 /** why: iOS draws multiline text at the top of its box, so the field hugs its lines (no minimum height) and centers instead, scrolling past the bar's height. */
 const $queryInput: TextStyle = { alignSelf: "center", minHeight: 0, maxHeight: 100 }
@@ -1661,6 +1669,7 @@ const $filterSection: ViewStyle = { gap: 8 }
 
 const $searchHeader: ViewStyle = { paddingBottom: 4 }
 const $searchResults: ViewStyle = { paddingTop: 8 }
+const $collectionResults: ViewStyle = { paddingTop: 0 }
 
 /** why: the list spaces its rows but not its header or footer, so content beside the rows keeps that gap, and an empty slot adds none. */
 function ResultSlot({ edge, children }: { edge: "above" | "below"; children: ReactNode }) {

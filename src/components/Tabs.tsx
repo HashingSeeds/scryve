@@ -1,11 +1,12 @@
 import type { ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { TouchableOpacity, View } from "react-native"
+import { ScrollView, TouchableOpacity, View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { Text } from "./Text"
+import { useRevealSelected } from "./useRevealSelected"
 
 export interface Tab<Id extends string> {
   id: Id
@@ -21,6 +22,7 @@ export function Tabs<Id extends string>({
   accessibilityLabel,
   testID,
   trailing,
+  scrolls = false,
 }: {
   tabs: readonly Tab<Id>[]
   selectedId: Id
@@ -29,11 +31,14 @@ export function Tabs<Id extends string>({
   accessibilityLabel?: string
   testID?: string
   trailing?: ReactNode
+  // why: a list of tabs that grows with the player's data, such as binders, would wrap into rows that push the content off screen.
+  scrolls?: boolean
 }) {
   const { themed } = useAppTheme()
-  return (
+  const { scrollProps, itemLayout } = useRevealSelected(scrolls ? selectedId : undefined)
+  const bar = (
     <View
-      style={themed($bar)}
+      style={[themed($bar), scrolls && $scrollingBar]}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
       testID={testID}
@@ -48,6 +53,7 @@ export function Tabs<Id extends string>({
             accessibilityState={{ selected, disabled: Boolean(disabled) }}
             disabled={disabled}
             style={[themed($tab), selected && themed($selectedTab)]}
+            onLayout={scrolls ? itemLayout(tab.id) : undefined}
             onPress={() => onSelect(tab.id)}
           >
             <Text size="sm" weight="medium" tone={selected ? undefined : "dim"}>
@@ -65,6 +71,18 @@ export function Tabs<Id extends string>({
       {trailing ? <View style={$trailing}>{trailing}</View> : null}
     </View>
   )
+  return scrolls ? (
+    <ScrollView
+      {...scrollProps}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={$scrollContent}
+    >
+      {bar}
+    </ScrollView>
+  ) : (
+    bar
+  )
 }
 
 const $bar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
@@ -75,6 +93,8 @@ const $bar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
+const $scrollingBar: ViewStyle = { flexWrap: "nowrap", flexGrow: 1 }
+const $scrollContent: ViewStyle = { flexGrow: 1 }
 const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,
   justifyContent: "center",

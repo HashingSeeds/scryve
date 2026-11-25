@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { Activity, memo, useCallback, useState } from "react"
 import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 import { router, useFocusEffect } from "expo-router"
@@ -41,17 +41,18 @@ export function LibraryTabs({
 
   return (
     <View style={$fill}>
-      {TABS.map((id) =>
-        opened.has(id) ? (
-          <View key={id} style={tab === id ? $fill : $hidden}>
+      {TABS.map((id) => (
+        // why: a tab not yet opened renders at idle priority while hidden, so its first tap only shows it; once opened it stays mounted, since hiding it again would drop its Convex subscriptions.
+        <Activity key={id} mode={opened.has(id) ? "visible" : "hidden"}>
+          <View style={tab === id ? $fill : $hidden}>
             {id === "decks" ? (
               <DecksTab back={back} initialSystem={decksSystem} />
             ) : (
               <CardsTab back={back} initialGame={cardsGame} />
             )}
           </View>
-        ) : null,
-      )}
+        </Activity>
+      ))}
       <AppTabBar
         tab={tab}
         onSelect={(next) => {
@@ -70,7 +71,13 @@ export function LibraryTabs({
   )
 }
 
-function DecksTab({ back, initialSystem }: { back: BackAction; initialSystem?: string }) {
+const DecksTab = memo(function DecksTab({
+  back,
+  initialSystem,
+}: {
+  back: BackAction
+  initialSystem?: string
+}) {
   const auth = useAuthAccess()
   const screen = (access?: CloudAccess) => (
     <DecksScreen
@@ -102,9 +109,15 @@ function DecksTab({ back, initialSystem }: { back: BackAction; initialSystem?: s
   )
   if (!auth.configured) return screen()
   return <CloudScreen onBack={() => router.back()}>{screen}</CloudScreen>
-}
+})
 
-function CardsTab({ back, initialGame }: { back: BackAction; initialGame?: string }) {
+const CardsTab = memo(function CardsTab({
+  back,
+  initialGame,
+}: {
+  back: BackAction
+  initialGame?: string
+}) {
   const [system, setSystem] = useState(() =>
     playSystemId(initialGame ?? localGameRepository.loadActiveGame()?.system),
   )
@@ -125,7 +138,7 @@ function CardsTab({ back, initialGame }: { back: BackAction; initialGame?: strin
   ) : (
     <CardSearch key={system} {...shared} presentation="screen" onClose={back.onPress} />
   )
-}
+})
 
 const TABS: readonly AppTab[] = ["decks", "cards"]
 
