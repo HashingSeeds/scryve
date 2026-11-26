@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { router } from "expo-router"
+import { router, useNavigation } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { LocalDeckChoicesSource, type DeckChoices } from "@/features/decks/LocalDeckChoicesSource"
@@ -10,6 +10,7 @@ import { LogGameScreen } from "@/screens/LogGameScreen"
 export default function LogGameRoute() {
   const auth = useAuthAccess()
   const ownerId = auth.configured && auth.isSignedIn ? auth.userId : undefined
+  const navigation = useNavigation()
   const [decks, setDecks] = useState<DeckChoices>()
   const [initialDraft] = useState(() => {
     const { defaultSystem, defaultFormat } = localGameRepository.loadSettings()
@@ -24,6 +25,7 @@ export default function LogGameRoute() {
         account={ownerId ? { ownerId, decks } : undefined}
         onBack={leave}
         onSave={(game) => {
+          if (!navigation.isFocused()) return
           localGameRepository.archiveGame(game, "logged", ownerId)
           leave()
         }}
