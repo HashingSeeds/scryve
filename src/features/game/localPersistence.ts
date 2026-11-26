@@ -1246,7 +1246,7 @@ export class LocalGameRepository {
     if (active?.id === game.id) this.clearActiveGame()
     const analyticsGame = { ...game, playerCount: game.players.length, shape: gameShape(game) }
     if (game.status === "finished") {
-      recordReviewCompletion(`local:${game.id}`)
+      if (!game.logged) recordReviewCompletion(`local:${game.id}`)
       captureGame("game_completed", analyticsGame, "local", endSource)
       this.finishListeners.forEach((listener) => listener())
     } else if (hasLocalGameStarted(game))

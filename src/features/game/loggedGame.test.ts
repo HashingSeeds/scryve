@@ -45,6 +45,7 @@ describe("buildLoggedGame", () => {
     expect(error({ date: "2026-11-27" })).toBeDefined()
     expect(error({ winnerSeat: undefined })).toBeDefined()
     expect(error({ winnerSeat: 2 })).toBeDefined()
+    expect(error({ minutes: "0" })).toBeDefined()
     expect(error({ winnerSeat: "draw" })).toBeUndefined()
   })
 

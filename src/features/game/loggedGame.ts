@@ -41,7 +41,10 @@ export function buildLoggedGame(
   const today = parseIsoDate(isoDate(new Date(now)))!
   if (day > today) return { ok: false, error: translate("play:recordMatch.error.dateFuture") }
   const minutes = draft.minutes.trim() === "" ? 0 : Number(draft.minutes)
-  if (!Number.isInteger(minutes) || minutes < 0 || minutes > MAX_LOGGED_MINUTES)
+  if (
+    draft.minutes.trim() !== "" &&
+    (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOGGED_MINUTES)
+  )
     return {
       ok: false,
       error: translate("play:logGame.error.minutesRange", { min: 1, max: MAX_LOGGED_MINUTES }),
