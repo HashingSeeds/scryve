@@ -710,7 +710,7 @@ export function CardSearch({
     lookup,
   ])
 
-  /** why: a Legend or Extra Deck card added while the search adds to the main deck goes to its own section; a picked section or Side stays as picked. */
+  /** why: the main deck can't hold a Legend, Battlefield, Rune, or Extra Deck card, so one added there goes to its own section; any other picked section or Side stays as picked. */
   function landingSection(card: SectionCard, to: string) {
     return (to === "main" && cardTypeSection(game, card)) || to
   }
