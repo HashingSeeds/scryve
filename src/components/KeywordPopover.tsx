@@ -4,7 +4,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 
 import { Icon, PressableIcon } from "@/components/Icon"
 import { Text } from "@/components/Text"
-import type { KeywordRule } from "@/features/rules/magicKeywords"
+import type { KeywordRule } from "@/features/rules/keywords"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { startFromLeft, towardEnd } from "@/theme/direction"

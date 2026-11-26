@@ -16,6 +16,7 @@ const DATASET_KEYS: Record<string, string> = {
   "/datasets/mtg/printings.json": "datasets/mtg/printings.json",
   "/datasets/mtg/prices.json": "datasets/mtg/prices.json",
   "/datasets/mtg/local-cards.jsonl": "datasets/mtg/local-cards.jsonl",
+  "/datasets/fab/local-cards.jsonl": "datasets/fab/local-cards.jsonl",
 }
 const DATASET_CACHE = "public, max-age=86400"
 const FETCH_TIMEOUT_MS = 10_000

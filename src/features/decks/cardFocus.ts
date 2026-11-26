@@ -1,5 +1,7 @@
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 
+import { facetKeywords } from "../../../convex/lib/games/cards"
+
 export function catalogCardDetails(card: {
   imageUrl?: string
   smallImageUrl?: string
@@ -19,5 +21,6 @@ export function catalogCardDetails(card: {
     collectorNumber: card.collectorNumber,
     rarity: card.rarity,
     facets: card.facets && JSON.stringify(card.facets),
+    keywords: facetKeywords(card.facets),
   }
 }

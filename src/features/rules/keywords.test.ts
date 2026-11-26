@@ -1,5 +1,5 @@
 import type { ComprehensiveRules } from "./comprehensiveRules"
-import { magicKeyword } from "./magicKeywords"
+import { fabKeyword, magicKeyword } from "./keywords"
 
 const rules: ComprehensiveRules = {
   chapters: [
@@ -50,4 +50,36 @@ it("finds a glossary entry whose heading lists variants", () => {
   expect(magicKeyword(rules, "Kicker")?.definition).toBe(
     "A keyword ability that represents an optional cost.",
   )
+})
+
+it("finds a Flesh and Blood keyword by its rule's title line", () => {
+  const fab: ComprehensiveRules = {
+    chapters: [
+      {
+        id: "8",
+        title: "Keywords",
+        sections: [
+          {
+            id: "8.3",
+            title: "Ability Keywords",
+            rules: [
+              { id: "8.3.5", text: "Go again\nGo again means gain 1 action point.", examples: [] },
+              { id: "8.3.5a", text: "It resolves last.", examples: [] },
+            ],
+          },
+        ],
+      },
+    ],
+    glossary: [{ term: "Go again", text: "An ability keyword that gives an action point.[8.3.5]" }],
+    notice: [],
+  }
+  expect(fabKeyword(fab, "Go again")).toEqual({
+    id: "8.3.5",
+    definition: "An ability keyword that gives an action point.",
+    rules: [fab.chapters[0].sections[0].rules[1]],
+  })
+})
+
+it("finds a keyword whose card gives it a value", () => {
+  expect(magicKeyword(rules, "Kicker 2")?.id).toBe("702.33")
 })

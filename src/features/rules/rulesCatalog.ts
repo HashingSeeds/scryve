@@ -1,7 +1,7 @@
 // why: kept free of React Native so Node scripts can load the same rules the app does.
 import type { ComprehensiveRules } from "./comprehensiveRules"
 import { FAB_RULE_REFERENCE, parseFabRules } from "./fabRules"
-import { magicKeyword, type KeywordRule } from "./magicKeywords"
+import { fabKeyword, magicKeyword, type KeywordRule } from "./keywords"
 import { MAGIC_RULE_REFERENCE, parseMagicRules } from "./magicRules"
 import { MAGIC_PHRASINGS } from "./phrasings"
 import { FAB_SLANG, MAGIC_SLANG } from "./slang"
@@ -70,6 +70,7 @@ export const GAME_RULES = {
       searchable(parseFabRules(text), { slang: FAB_SLANG, references: FAB_RULE_REFERENCE }),
     references: FAB_RULE_REFERENCE,
     revalidate: true,
+    keyword: fabKeyword,
     tableItemRules: { marked: "9.3" } satisfies Partial<Record<FabTableItemId, string>>,
   },
   riftbound: {
