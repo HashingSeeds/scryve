@@ -145,12 +145,6 @@ export const RIFTHUNT_DATASET = {
   load: async () => normalizeRiftHuntCards(await fetchDatasetJson(RIFTHUNT_CARDS_URL)),
 } satisfies BulkDataset
 
-const SECTION_BY_TYPE: Partial<Record<string, string>> = {
-  Legend: "legend",
-  Battlefield: "battlefields",
-  Rune: "runes",
-}
-
 export const RIFTBOUND_DECK_LIST = {
   sectionHeadings: {
     legend: ["legend"],
@@ -160,5 +154,4 @@ export const RIFTBOUND_DECK_LIST = {
     runes: ["runes", "rune deck", "rune"],
     sideboard: ["sideboard", "side deck"],
   },
-  defaultSection: (card) => SECTION_BY_TYPE[card.category ?? ""] ?? "main",
 } satisfies DeckListRules

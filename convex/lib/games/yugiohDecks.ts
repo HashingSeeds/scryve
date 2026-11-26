@@ -10,7 +10,7 @@ import {
   type DeckListEntry,
   type DeckListRules,
 } from "./decks"
-import { cardsByYgoIdBatches, ygoSection } from "./yugioh"
+import { cardsByYgoIdBatches } from "./yugioh"
 import { internal } from "../../_generated/api"
 import type { ActionCtx } from "../../_generated/server"
 import { deckSourceUrl, fetchDeckSource, invalidSourceDeck } from "../deckSources"
@@ -244,7 +244,6 @@ export const YDK_DECK_LIST = {
       ],
       includeImages,
     ),
-  defaultSection: ygoSection,
 } satisfies DeckListRules
 
 export const YGOPRODECK_LINK = {
