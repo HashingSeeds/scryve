@@ -257,6 +257,8 @@ async function play({ apply }) {
     const releaseNotes = Object.entries(PLAY_LANGUAGES).flatMap(([locale, languages]) =>
       languages.map((language) => ({ language, text: copy[locale].releaseNotes })),
     )
+    // why: EAS names a release by its version alone, so a retried build shares its name.
+    const release = newest && `${newest.name} (version code ${code(newest)})`
     const currentNotes = new Map(newest?.releaseNotes?.map((note) => [note.language, note.text]))
     const notesChanged =
       Boolean(newest) &&
@@ -279,7 +281,7 @@ async function play({ apply }) {
       )
     console.log(
       newest
-        ? `${PLAY_TRACK} release ${newest.name}: ${notesChanged ? "changes release notes" : "release notes up to date"}`
+        ? `${PLAY_TRACK} release ${release}: ${notesChanged ? "changes release notes" : "release notes up to date"}`
         : `${PLAY_TRACK} track has no release for release notes`,
     )
     console.log(`Full text: ${preview}`)
@@ -302,7 +304,7 @@ async function play({ apply }) {
       await call("POST", `/edits/${edit.id}:commit`)
       committed = true
       console.log(
-        `Committed ${changes.length} listing(s)${notesChanged ? ` and ${newest.name}'s release notes` : ""}; Google reviews listings before they go live.`,
+        `Committed ${changes.length} listing(s)${notesChanged ? ` and ${release}'s release notes` : ""}; Google reviews listings before they go live.`,
       )
     }
     if (titleChanges.length) {
