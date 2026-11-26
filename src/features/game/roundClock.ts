@@ -3,6 +3,7 @@ import { translate } from "@/i18n/translate"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
 import type { PlaySystemId } from "./playSystems"
+import type { LocalGame } from "./types"
 import { systemDefinition } from "../../../convex/lib/systems"
 import type { TableAction } from "../../../convex/lib/table"
 
@@ -166,6 +167,15 @@ export function roundClockAfterTurn(
   const { steppedBy: _counted, ...rest } = stepRoundTurn(clock, system, -1)
   return rest
 }
+
+export const withRoundClockAfter = (
+  game: LocalGame,
+  action: TableAction,
+  operationId: string,
+): LocalGame =>
+  game.clock
+    ? { ...game, clock: roundClockAfterTurn(game.clock, game.system, action, operationId) }
+    : game
 
 export function addRoundBonusTurns(clock: RoundClock, turns: number): RoundClock {
   return { ...clock, bonusTurns: (clock.bonusTurns ?? 0) + turns }

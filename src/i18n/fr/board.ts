@@ -656,6 +656,12 @@ export default {
     counterRow: "{{name}} {{counter}} {{delta}} → {{value}}",
     undoLast: "Annuler le dernier changement",
     undoMine: "Annuler votre dernier changement",
+    goBackHint: "Revenir à ce point",
+    goBackTitle: "Revenir à ce point ?",
+    goBackMessage_one: "Annule {{count}} modification.",
+    goBackMessage_many: "Annule {{count}} modifications.",
+    goBackMessage_other: "Annule {{count}} modifications.",
+    goBack: "Revenir en arrière",
   },
   calculator: {
     damage: "− Dégâts",

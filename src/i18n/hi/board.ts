@@ -632,6 +632,11 @@ export default {
     counterRow: "{{name}} {{counter}} {{delta}}, अब {{value}}",
     undoLast: "आखिरी बदलाव अनडू करें",
     undoMine: "अपना आखिरी बदलाव अनडू करें",
+    goBackHint: "यहाँ तक वापस जाएँ",
+    goBackTitle: "यहाँ तक वापस जाएँ?",
+    goBackMessage_one: "{{count}} बदलाव वापस हो जाएगा।",
+    goBackMessage_other: "{{count}} बदलाव वापस हो जाएँगे।",
+    goBack: "वापस जाएँ",
   },
   calculator: {
     damage: "− डैमेज",

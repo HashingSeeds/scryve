@@ -25,9 +25,9 @@ import {
   withFirstTurn,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
-import { newestLogUndo, undoLogRow } from "./logUndo"
+import { newestLogUndo, rollBack, rollbackFloor, undoLogStep } from "./logUndo"
 import type { PlayerGridLayoutVariant, SeatOrder } from "./playerLayouts"
-import { roundClockAfterTurn, type RoundClock } from "./roundClock"
+import { withRoundClockAfter, type RoundClock } from "./roundClock"
 import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
   CommanderSlot,
@@ -210,14 +210,7 @@ export function useLocalGame(
           const previous = gameRef.current
           const applied = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
           if (applied === previous) return false
-          const next = withFirstPlayerSettled(
-            applied.clock
-              ? {
-                  ...applied,
-                  clock: roundClockAfterTurn(applied.clock, applied.system, action, operationId),
-                }
-              : applied,
-          )
+          const next = withFirstPlayerSettled(withRoundClockAfter(applied, action, operationId))
           save(next)
           if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
             captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
@@ -355,11 +348,14 @@ export function useLocalGame(
       const current = gameRef.current
       const undo = current.status === "active" ? newestLogUndo(current, { turns }) : undefined
       if (!undo) return
-      if (undo.kind === "turn") tableActions.undoTurn(undo.playerId, undo.turnOperationId)
-      else {
-        const next = undoLogRow(current, undo, context)
-        if (next !== current) replaceBoard(next)
-      }
+      const next = undoLogStep(current, undo, context)
+      if (next !== current) replaceBoard(next)
+    },
+    rollbackFloor: (turns: boolean) => rollbackFloor(game, { turns }),
+    rollBack: (place: number, turns: boolean) => {
+      const current = gameRef.current
+      const next = rollBack(current, place, { turns }, context).game
+      if (next !== current) replaceBoard(next)
     },
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
       dispatch({ type: "game.finish", result }, endSource),

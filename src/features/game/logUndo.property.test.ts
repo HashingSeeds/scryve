@@ -9,8 +9,8 @@ import {
   withFirstTurn,
 } from "./domain"
 import { counterLog, gameLog, LIFE_BURST_MS, mergedLog, rowPosition } from "./LifeLog"
-import { newestLogUndo } from "./logUndo"
-import type { LocalGame } from "./types"
+import { newestLogUndo, rollBack, rollbackFloor } from "./logUndo"
+import type { CommandContext, LocalGame } from "./types"
 import type { TableAction } from "../../../convex/lib/table"
 import { seededRandom } from "../../../test/support/seededRandom"
 
@@ -57,7 +57,7 @@ function randomSteps(seed: number) {
 
 function play(seats: number, steps: readonly Step[]) {
   let sequence = 0
-  const nextId = () => `op-${String(sequence++).padStart(3, "0")}`
+  const nextId = () => `operation-step-${String(sequence++).padStart(3, "0")}`
   const created = createLocalGame({
     startingLife: 40,
     system: "mtg",
@@ -163,11 +163,66 @@ function expectLogLaws(seats: number, steps: readonly Step[], context: string) {
   expect({ context, undone }).toEqual({ context, undone: newestShown })
 }
 
+const logOf = (game: LocalGame) => {
+  const positionOf = localLogPositions(game)
+  return mergedLog(
+    gameLog(game.players, game.events),
+    counterLog(game.counterLog ?? []),
+    positionOf,
+  ).map((row) => ({ row, place: rowPosition(row, positionOf) }))
+}
+
+function expectRollbackLaws(seats: number, steps: readonly Step[], pick: number, context: string) {
+  const { game } = play(seats, steps)
+  const positionOf = localLogPositions(game)
+  const log = logOf(game)
+  const floor = rollbackFloor(game, { turns: true })
+  const pass = game.turn?.previous ? (positionOf(game.turn.operationId) ?? -Infinity) : -Infinity
+  const places = [...log.map(({ place }) => place), pass].filter((place) => place > floor)
+  if (places.length === 0) return
+  const place = places[pick % places.length]
+  let sequence = 0
+  const undoContext: CommandContext = {
+    actorId: asActorId("local"),
+    deviceId: asDeviceId("device"),
+    now: () => 200_000,
+    operationId: () => asOperationId(`operation-back-${String(sequence++).padStart(3, "0")}`),
+  }
+  const { game: after, changes } = rollBack(game, place, { turns: true }, undoContext)
+
+  expect({ context, changes }).toEqual({
+    context,
+    changes: places.filter((at) => at >= place).length,
+  })
+  const kept = log.filter((entry) => entry.place < place).map(({ row }) => row)
+  expect({ context, rows: logOf(after).map(({ row }) => row) }).toEqual({ context, rows: kept })
+  const gone = log.filter((entry) => entry.place >= place).map(({ row }) => row)
+  for (const player of after.players) {
+    const delta = gone.reduce(
+      (sum, row) => (row.kind === undefined && row.playerId === player.id ? sum + row.delta : sum),
+      0,
+    )
+    const before = game.players.find(({ id }) => id === player.id)?.life ?? 0
+    expect({ context, life: player.life }).toEqual({ context, life: before - delta })
+  }
+  expect({ context, turn: after.turn?.operationId }).toEqual({
+    context,
+    turn: pass >= place ? game.turn?.previous?.operationId : game.turn?.operationId,
+  })
+}
+
 describe("the local log's order", () => {
   it("is the sequence, folds only neighbors, and undoes the newest change, for any clocks", () => {
     for (let seed = 1; seed <= 400; seed += 1) {
       const { seats, steps } = randomSteps(seed)
       expectLogLaws(seats, steps, `seed ${seed}`)
+    }
+  })
+
+  it("goes back to any row it offers, taking back exactly that row and the ones after it", () => {
+    for (let seed = 1; seed <= 400; seed += 1) {
+      const { seats, steps } = randomSteps(seed)
+      expectRollbackLaws(seats, steps, seed, `seed ${seed}`)
     }
   })
 

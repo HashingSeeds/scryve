@@ -827,6 +827,14 @@ const board = {
     undoLast: "Undo the last change",
     // Connected games: Undo takes back the newest change this player made, not anyone else's.
     undoMine: "Undo your last change",
+    // Spoken hint on a game log row: tapping it undoes that change and every change after it.
+    goBackHint: "Go back to here",
+    // Asked after a player taps a game log row: undo that change and every change after it?
+    goBackTitle: "Go back to here?",
+    goBackMessage_one: "Undoes {{count}} change.",
+    goBackMessage_other: "Undoes {{count}} changes.",
+    // The button that confirms going back: undo the tapped change and every change after it.
+    goBack: "Go back",
   },
   // Only Yu-Gi-Oh! seats open this calculator, so use Yu-Gi-Oh!'s official words for damage and Life Points.
   calculator: {
