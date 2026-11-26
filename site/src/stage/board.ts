@@ -740,12 +740,19 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
       : undefined
     inner.innerHTML = pokemonHtml(placement) + bags.sheetHtml(seat, seatName(game, seat))
     fitDeltas(inner)
-    if (!focused?.pk) return
-    const id = focused.id ? `[data-id="${focused.id}"]` : ""
-    const dir = focused.dir ? `[data-dir="${focused.dir}"]` : ""
-    inner
-      .querySelector<HTMLElement>(`[data-pk="${focused.pk}"]${id}${dir}`)
-      ?.focus({ preventScroll: true })
+    coverWithBag(inner, seat)
+    const control = focused?.pk
+      ? `[data-pk="${focused.pk}"]${focused.id ? `[data-id="${focused.id}"]` : ""}${focused.dir ? `[data-dir="${focused.dir}"]` : ""}`
+      : focused?.bag
+        ? `[data-bag="${focused.bag}"]${focused.tool ? `[data-tool="${focused.tool}"]` : ""}`
+        : undefined
+    if (control) inner.querySelector<HTMLElement>(control)?.focus({ preventScroll: true })
+  }
+
+  // Like the calculator, an open bag takes the seat's controls out of reach until it closes.
+  function coverWithBag(inner: HTMLElement, seat: number) {
+    for (const child of inner.children)
+      if (!child.classList.contains("bag-sheet")) child.toggleAttribute("inert", bags.isOpen(seat))
   }
 
   // Like the app's LifeControls: the running change replaces the glyph on its side.
@@ -799,6 +806,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
       who?.querySelector(".roll-chip")?.remove()
       who?.insertAdjacentHTML("beforeend", bags.chipHtml(seat))
       inner.querySelector(".bag")?.setAttribute("aria-expanded", String(bags.isOpen(seat)))
+      coverWithBag(inner, seat)
     }
     const focus = focusSheet && bags.isOpen(seat) ? ".bag-sheet button" : ".bag"
     inner.querySelector<HTMLElement>(focus)?.focus({ preventScroll: true })

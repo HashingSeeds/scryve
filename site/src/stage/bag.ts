@@ -64,7 +64,7 @@ export function createBags(system: () => PlaySystemId) {
     return `<div class="bag-sheet" role="group" aria-label="${translate("board:dice.openBag", { identity: name })}">
       ${top}
       <div class="bag-row">
-        ${quick ? `<div class="bag-dice">${QUICK_DICE.map((tool) => toolHtml(seat, tool)).join("")}${more}</div>` : ""}
+        ${quick ? `<div class="bag-dice">${every ? "" : QUICK_DICE.map((tool) => toolHtml(seat, tool)).join("")}${more}</div>` : ""}
         <button class="bag-close" type="button" data-bag="close" data-seat="${seat}" aria-label="${translate("board:menu.closeDice")}">${tableGlyphSvg("close")}</button>
       </div>
     </div>`
