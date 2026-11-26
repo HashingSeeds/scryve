@@ -6,7 +6,8 @@ import { SYSTEM_IDS, systemDefinition, type SystemDefinition } from "../../../co
 const environment = buildEnvironment()
 const RELEASES_SHOWN: Readonly<Record<SystemDefinition["release"], boolean>> = {
   general: true,
-  beta: environment !== "production",
+  // why: riot-review only. Riot's reviewer sees released games plus Riftbound, not unreleased betas. Never merge to main.
+  beta: false,
   alpha: environment !== "production" && environment !== "beta",
 }
 
