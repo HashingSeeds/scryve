@@ -14,13 +14,13 @@ import ko from "../src/i18n/ko/storefront.ts"
 const APP_ROOT = fileURLToPath(new URL("..", import.meta.url))
 
 export const APP_LANGUAGES = {
-  "en-US": { language: "en", appleLocale: "en_US", copy: en },
-  "es-MX": { language: "es", appleLocale: "es_MX", copy: es },
-  "fr-FR": { language: "fr", appleLocale: "fr_FR", copy: fr },
-  "ja": { language: "ja", appleLocale: "ja_JP", copy: ja },
-  "ko": { language: "ko", appleLocale: "ko_KR", copy: ko },
-  "hi": { language: "hi", appleLocale: "hi_IN", copy: hi },
-  "ar-SA": { language: "ar", appleLocale: "ar_SA", copy: ar },
+  "en-US": { appleLocale: "en_US", copy: en },
+  "es-MX": { appleLocale: "es_MX", copy: es },
+  "fr-FR": { appleLocale: "fr_FR", copy: fr },
+  "ja": { appleLocale: "ja_JP", copy: ja },
+  "ko": { appleLocale: "ko_KR", copy: ko },
+  "hi": { appleLocale: "hi_IN", copy: hi },
+  "ar-SA": { appleLocale: "ar_SA", copy: ar },
 }
 type Locale = keyof typeof APP_LANGUAGES
 type Storefront = (typeof APP_LANGUAGES)[Locale]["copy"]

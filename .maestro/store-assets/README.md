@@ -9,8 +9,8 @@ pnpm convex:local                # in the background; the build bakes in its URL
 ./goldie/build-ios.sh            # Release simulator app with prerelease features off
 node goldie/seed.cjs             # riley's decks, games and named bots, then a snapshot
 bun goldie/maestro.ts            # every device and locale; --device, --locale, --scene, --no-preview
-export GOLDIE_CONFIG=$PWD/goldie/goldie.config.ts
-bun $GOLDIE_ROOT/src/cli.ts frame && bun $GOLDIE_ROOT/src/cli.ts preview && bun $GOLDIE_ROOT/src/cli.ts verify
+export GOLDIE_CONFIG="$PWD/goldie/goldie.config.ts" GOLDIE_ROOT="${GOLDIE_ROOT:-$HOME/oss/goldie}"
+bun "$GOLDIE_ROOT/src/cli.ts" frame && bun "$GOLDIE_ROOT/src/cli.ts" preview && bun "$GOLDIE_ROOT/src/cli.ts" verify
 ```
 
 `goldie/maestro.ts` signs riley+clerk_test@sow.care in once per simulator (`GOLDIE_STORE_PASSWORD`, from the shell or `~/.argent/secrets.env`), restores the seed snapshot before each language, and serves `goldie/table.mjs` so flows can seat and play bots. Output lands in `goldie/out/`.

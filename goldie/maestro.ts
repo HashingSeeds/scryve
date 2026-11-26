@@ -6,6 +6,7 @@
 import { execFileSync, spawn } from "node:child_process"
 import {
   copyFileSync,
+  rmSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -46,7 +47,9 @@ const scenes = cfg.scenes.filter(
 )
 const preview = values["no-preview"] ? undefined : cfg.scenes.find(isPreview)
 
-const env = (() => {
+const env = { APP_ID: cfg.bundleId, TABLE: `http://127.0.0.1:${TABLE_PORT}` }
+
+function storePassword() {
   const secrets = join(homedir(), ".argent/secrets.env")
   const password =
     process.env.GOLDIE_STORE_PASSWORD ??
@@ -54,8 +57,8 @@ const env = (() => {
       ? readFileSync(secrets, "utf8").match(/^GOLDIE_STORE_PASSWORD=(.*)$/m)?.[1]
       : undefined)
   if (!password) throw new Error("Set GOLDIE_STORE_PASSWORD for the store account's sign-in")
-  return { APP_ID: cfg.bundleId, PASSWORD: password, TABLE: `http://127.0.0.1:${TABLE_PORT}` }
-})()
+  return password
+}
 
 function simulator(name: string): string {
   const { devices } = JSON.parse(
@@ -104,6 +107,7 @@ async function runMaestro(udid: string, flows: string[], vars: Record<string, st
   for (const [key, value] of Object.entries({ ...env, ...vars })) args.push("-e", `${key}=${value}`)
   // why: async, so this process keeps answering the table server while flows call it.
   const run = spawn("maestro", [...args, ...flows], { stdio: ["ignore", "pipe", "inherit"] })
+  const exited = new Promise((done) => run.once("close", done))
   for await (const line of createInterface({ input: run.stdout }))
     if (/FAILED|Element not found|^\s*>/.test(line)) console.log(`    ${line.trim()}`)
   const files = new Map<string, string>()
@@ -114,7 +118,7 @@ async function runMaestro(udid: string, flows: string[], vars: Record<string, st
     }
   }
   walk(out)
-  return files
+  return { files, out, ok: (await exited) === 0 }
 }
 
 const seconds = (file: string) =>
@@ -135,23 +139,27 @@ try {
     const udid = simulator(DEVICES[deviceKey].simulatorName)
     prepareSimulator(udid)
     // why: the session lives in the simulator's keychain, which clearState keeps, so one sign-in per device covers every scene.
-    await runMaestro(udid, [flowPath(cfg, "sign-in")], {})
+    const signIn = await runMaestro(udid, [flowPath(cfg, "sign-in")], { PASSWORD: storePassword() })
+    // why: Maestro's logs record every -e value, the password included.
+    rmSync(signIn.out, { recursive: true, force: true })
+    if (!signIn.ok) throw new Error(`Sign-in failed on ${deviceKey}`)
     for (const locale of locales) {
-      const { language, appleLocale } = APP_LANGUAGES[locale]
+      const { appleLocale } = APP_LANGUAGES[locale]
       const rawDir = rawDirFor(cfg, deviceKey, locale)
       mkdirSync(rawDir, { recursive: true })
       const manifestFile = join(rawDir, "manifest.json")
       const manifest = existsSync(manifestFile)
         ? JSON.parse(readFileSync(manifestFile, "utf8"))
         : { device: deviceKey, udid, screenshots: [], preview: null }
-      const vars = { LANGUAGE: language, LOCALE: appleLocale }
-      restoreSeed()
+      // why: Expo reads the app's locale from AppleLanguages, so it carries the region that formats numbers and dates.
+      const vars = { LANGUAGE: appleLocale.replace("_", "-"), LOCALE: appleLocale }
+      await restoreSeed()
 
       console.log(
         `> ${deviceKey} ${locale}: ${scenes.map((scene: { id: string }) => scene.id).join(", ")}`,
       )
       // why: each scene flow ends with `takeScreenshot: <its id>`, so files map back by name.
-      const shots = await runMaestro(
+      const { files: shots } = await runMaestro(
         udid,
         scenes.map((scene: { flow: string }) => flowPath(cfg, scene.flow)),
         vars,
@@ -173,7 +181,7 @@ try {
       if (preview && DEVICES[deviceKey].preview) {
         console.log(`> ${deviceKey} ${locale}: preview`)
         // why: each segment flow wraps its filmed steps in `startRecording: <segment id>`.
-        const clips = await runMaestro(
+        const { files: clips } = await runMaestro(
           udid,
           preview.segments.map((segment: { flow: string }) => flowPath(cfg, segment.flow)),
           vars,

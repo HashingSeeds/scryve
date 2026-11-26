@@ -257,9 +257,15 @@ async function recordTodayGames(client) {
 const HERE = path.dirname(require.resolve("./seed.cjs"))
 const SNAPSHOT = path.join(HERE, "out", "seed.zip")
 
-function convex(args) {
+/** why: the restore is --replace-all, so every command names the running local backend instead of trusting the CLI's env files. */
+async function convex(args) {
+  const { deploymentName } = await backendCredentials()
   const bin = path.join(HERE, "..", "node_modules", ".bin", "convex")
-  const result = spawnSync(bin, args, { cwd: localDir(), env: cliEnv(), encoding: "utf8" })
+  const result = spawnSync(bin, [...args, "--deployment", deploymentName], {
+    cwd: localDir(),
+    env: cliEnv(),
+    encoding: "utf8",
+  })
   if (result.status !== 0)
     throw new Error(`convex ${args[0]} ${args[1] ?? ""} failed\n${result.stderr}`)
 }
@@ -267,8 +273,8 @@ function convex(args) {
 const runInternal = (name, args) => convex(["run", name, JSON.stringify(args)])
 
 /** why: captures publish games to the store account, so each locale starts from the seeded backend instead of piling up the last locale's games. */
-function restoreSeed() {
-  convex(["import", "--replace-all", "--yes", SNAPSHOT])
+async function restoreSeed() {
+  await convex(["import", "--replace-all", "--yes", SNAPSHOT])
 }
 
 // why: bots have no Clerk username, so seats would read "Player 2"; store art needs real names.
@@ -279,7 +285,7 @@ async function nameBots(credentials) {
     client.setAdminAuth(credentials.adminKey, bot.identity)
     await client.mutation(api.users.syncCurrent, { displayName: username })
     await client.close()
-    runInternal("users:applyClerkUsername", {
+    await runInternal("users:applyClerkUsername", {
       clerkUserId: bot.identity.subject,
       username,
     })
@@ -299,11 +305,11 @@ async function main() {
   try {
     // why: a fresh backend has never seen the store account sign in, so its user record is missing.
     await client.mutation(api.users.syncCurrent, { displayName: STORE_ACCOUNT.username })
-    runInternal("users:applyClerkUsername", {
+    await runInternal("users:applyClerkUsername", {
       clerkUserId,
       username: STORE_ACCOUNT.username,
     })
-    runInternal("entitlements:setUserFeature", {
+    await runInternal("entitlements:setUserFeature", {
       clerkUserId,
       feature: "pro_decks_limit",
       enabled: true,
@@ -316,7 +322,7 @@ async function main() {
   }
   fs.mkdirSync(path.dirname(SNAPSHOT), { recursive: true })
   fs.rmSync(SNAPSHOT, { force: true })
-  convex(["export", "--path", SNAPSHOT])
+  await convex(["export", "--path", SNAPSHOT])
   console.log(`snapshot ${SNAPSHOT}`)
 }
 
