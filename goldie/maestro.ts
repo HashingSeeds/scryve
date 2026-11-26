@@ -34,6 +34,7 @@ const { values } = parseArgs({
     "locale": { type: "string" },
     "scene": { type: "string" },
     "no-preview": { type: "boolean" },
+    "no-scenes": { type: "boolean" },
   },
 })
 const pick = (value: string | undefined) => value?.split(",")
@@ -42,9 +43,11 @@ const cfg = await loadConfig(resolve(import.meta.dir, "goldie.config.ts"))
 const devices: string[] = pick(values.device) ?? cfg.devices
 const locales: string[] = pick(values.locale) ?? cfg.locales
 const sceneIds = pick(values.scene)
-const scenes = cfg.scenes.filter(
-  (scene: { id: string }) => isCaptured(scene) && (!sceneIds || sceneIds.includes(scene.id)),
-)
+const scenes = values["no-scenes"]
+  ? []
+  : cfg.scenes.filter(
+      (scene: { id: string }) => isCaptured(scene) && (!sceneIds || sceneIds.includes(scene.id)),
+    )
 const preview = values["no-preview"] ? undefined : cfg.scenes.find(isPreview)
 
 const env = { APP_ID: cfg.bundleId, TABLE: `http://127.0.0.1:${TABLE_PORT}` }
@@ -155,21 +158,23 @@ try {
       const vars = { LANGUAGE: appleLocale.replace("_", "-"), LOCALE: appleLocale }
       await restoreSeed()
 
-      console.log(
-        `> ${deviceKey} ${locale}: ${scenes.map((scene: { id: string }) => scene.id).join(", ")}`,
-      )
-      // why: each scene flow ends with `takeScreenshot: <its id>`, so files map back by name.
-      const { files: shots, ok: scenesOk } = await runMaestro(
-        udid,
-        scenes.map((scene: { flow: string }) => flowPath(cfg, scene.flow)),
-        vars,
-      )
-      for (const scene of scenes) {
-        const shot = shots.get(`${scene.id}.png`)
-        if (shot) copyFileSync(shot, join(rawDir, `${scene.id}.png`))
-        else missing.push(`${deviceKey}/${locale}/${scene.id}`)
+      if (scenes.length) {
+        console.log(
+          `> ${deviceKey} ${locale}: ${scenes.map((scene: { id: string }) => scene.id).join(", ")}`,
+        )
+        // why: each scene flow ends with `takeScreenshot: <its id>`, so files map back by name.
+        const { files: shots, ok: scenesOk } = await runMaestro(
+          udid,
+          scenes.map((scene: { flow: string }) => flowPath(cfg, scene.flow)),
+          vars,
+        )
+        for (const scene of scenes) {
+          const shot = shots.get(`${scene.id}.png`)
+          if (shot) copyFileSync(shot, join(rawDir, `${scene.id}.png`))
+          else missing.push(`${deviceKey}/${locale}/${scene.id}`)
+        }
+        if (!scenesOk) missing.push(`${deviceKey}/${locale}: a scene flow failed`)
       }
-      if (!scenesOk) missing.push(`${deviceKey}/${locale}: a scene flow failed`)
       // why: a run of some scenes keeps the captures earlier runs left, so the manifest lists every one on disk.
       manifest.screenshots = cfg.scenes
         .filter(isCaptured)

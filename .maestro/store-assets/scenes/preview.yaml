@@ -26,6 +26,5 @@ appId: ${APP_ID}
 - runScript: {file: _table.js, env: {ACTION: play-live}}
 - runFlow: {file: _Life.yaml, env: {SEAT: 4, STEP: -1, TIMES: 3}}
 - runScript: {file: _table.js, env: {ACTION: damage}}
-- extendedWaitUntil: {visible: {id: goldie-hold}, timeout: 2000, optional: true}
 - stopRecording
 - runScript: {file: _table.js, env: {ACTION: reset}}
