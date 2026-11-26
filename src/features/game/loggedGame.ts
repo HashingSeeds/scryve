@@ -3,7 +3,7 @@ import { translate } from "@/i18n/translate"
 
 import { createLocalGame, validatePlayerNames } from "./domain"
 import type { LocalGameAccountInput } from "./localPersistence"
-import { defaultStartingLife, type PlaySystemId } from "./playSystems"
+import { defaultStartingLife, playSystemFormat, type PlaySystemId } from "./playSystems"
 import type { LocalGame } from "./types"
 
 const MAX_LOGGED_MINUTES = 24 * 60
@@ -21,7 +21,13 @@ export function defaultLoggedGameDraft(
   setup: Pick<LoggedGameDraft, "system" | "format">,
   today = new Date(),
 ): LoggedGameDraft {
-  return { ...setup, names: ["", ""], date: isoDate(today), minutes: "" }
+  return {
+    system: setup.system,
+    format: setup.system ? playSystemFormat(setup.system, setup.format) : undefined,
+    names: ["", ""],
+    date: isoDate(today),
+    minutes: "",
+  }
 }
 
 export function buildLoggedGame(

@@ -218,6 +218,7 @@ export function GameSummaryScreen({
   useStoreReview(
     summary.status === "ready" &&
       summary.value?.status === "finished" &&
+      !summary.value.logged &&
       !timelineOpen &&
       !playerActionsOpen,
   )

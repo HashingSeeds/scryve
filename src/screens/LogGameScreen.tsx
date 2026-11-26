@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 
@@ -55,6 +55,13 @@ export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGame
   const [deck, setDeck] = useState<SelectedDeck>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const mounted = useRef(true)
+  useEffect(
+    () => () => {
+      mounted.current = false
+    },
+    [],
+  )
   const guestDecks = useGuestDecks()
   const [sharedDecks] = useState(loadSharedDecks)
   const seatNames = draft.names.map((name, seat) => name.trim() || defaultName(seat))
@@ -110,7 +117,7 @@ export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGame
         setBusy(false)
         return
       }
-      onSave(built.game)
+      if (mounted.current) onSave(built.game)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : translate("play:recordMatch.saveFailed"))
       setBusy(false)

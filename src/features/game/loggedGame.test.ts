@@ -37,6 +37,10 @@ describe("buildLoggedGame", () => {
     expect(game.result).toEqual({ kind: "win", winnerPlayerIds: [game.players[0].id] })
   })
 
+  it("starts the draft on the system's default format when none is saved", () => {
+    expect(defaultLoggedGameDraft({ system: "mtg" }).format).toBe("standard")
+  })
+
   it("rejects a future day, a missing winner, and a winner seat that was removed", () => {
     const error = (overrides: Partial<LoggedGameDraft>) => {
       const result = buildLoggedGame(draft(overrides), undefined, NOW)
