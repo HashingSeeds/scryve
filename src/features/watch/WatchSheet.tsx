@@ -52,6 +52,8 @@ export function WatchSheet({
 
   async function share() {
     if (!url) return
+    setCopied(false)
+    setError(undefined)
     try {
       // why: browsers without a share sheet (desktop Firefox) reject Share.share, so the link is copied instead.
       if (Platform.OS === "web" && typeof navigator.share !== "function") {
