@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react"
-import { Linking, View } from "react-native"
+import { Linking, Platform, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { router } from "expo-router"
 import { SectionList } from "@legendapp/list/section-list"
@@ -214,7 +214,7 @@ export function DeckView({
         }
       />
       <SectionList
-        testID="deck-cards-list"
+        {...NATIVE_LIST_PROPS}
         style={$flex}
         contentContainerStyle={themed($content)}
         sections={sections}
@@ -222,7 +222,6 @@ export function DeckView({
         stickySectionHeadersEnabled={false}
         estimatedItemSize={DECK_ROW_HEIGHT}
         recycleItems
-        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <>
             <View style={themed($title)}>
@@ -509,6 +508,9 @@ export function DeckView({
   )
 }
 const DECK_ROW_HEIGHT = 66
+const NATIVE_LIST_PROPS = Platform.select({
+  native: { keyboardShouldPersistTaps: "handled" } as const,
+})
 const $flex: ViewStyle = { flex: 1 }
 const $stretch: ViewStyle = { alignItems: "stretch" }
 const $row: ViewStyle = { flexDirection: "row", alignItems: "center" }
@@ -520,12 +522,15 @@ const $touch: ViewStyle = {
 }
 const $noteInput: TextStyle = { minHeight: 120, textAlignVertical: "top" }
 const $barButton: ViewStyle = { minHeight: 44 }
+// why: Legend List's web build styles a plain div, so RN-only keys like paddingHorizontal and alignSelf do nothing there.
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  paddingHorizontal: spacing.md,
+  paddingLeft: spacing.md,
+  paddingRight: spacing.md,
   paddingBottom: spacing.lg,
   width: "100%",
   maxWidth: 720,
-  alignSelf: "center",
+  marginLeft: "auto",
+  marginRight: "auto",
 })
 const $title: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
