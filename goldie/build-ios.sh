@@ -16,9 +16,11 @@ case "$EXPO_PUBLIC_CONVEX_URL" in
 esac
 # why: a RevenueCat test key alerts "Wrong API Key" in a Release build, over the first screen.
 unset EXPO_PUBLIC_POSTHOG_KEY EXPO_PUBLIC_POSTHOG_HOST EXPO_PUBLIC_REVENUECAT_API_KEY
+# why: the "production" environment hides beta and alpha games the way store builds do; the empty
+# DSN keeps captures out of production Sentry.
 export APP_VARIANT=production SCRYVE_PROFILE_BUILD=1 EXPO_NO_DOTENV=1 \
   EXPO_PUBLIC_INVITE_ORIGIN=https://scryve.sow.care \
-  EXPO_PUBLIC_SENTRY_ENVIRONMENT=goldie SENTRY_DISABLE_AUTO_UPLOAD=true
+  EXPO_PUBLIC_SENTRY_ENVIRONMENT=production EXPO_PUBLIC_SENTRY_DSN= SENTRY_DISABLE_AUTO_UPLOAD=true
 
 npx expo prebuild --platform ios
 workspace=$(ls -d ios/*.xcworkspace)

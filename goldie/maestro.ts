@@ -39,7 +39,9 @@ const { values } = parseArgs({
 })
 const pick = (value: string | undefined) => value?.split(",")
 
-const cfg = await loadConfig(resolve(import.meta.dir, "goldie.config.ts"))
+const cfg = await loadConfig(
+  process.env.GOLDIE_CONFIG ?? resolve(import.meta.dir, "goldie.config.ts"),
+)
 const devices: string[] = pick(values.device) ?? cfg.devices
 const locales: string[] = pick(values.locale) ?? cfg.locales
 const sceneIds = pick(values.scene)
