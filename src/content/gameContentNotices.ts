@@ -9,6 +9,12 @@ const requiredNotices = (system: SystemId) =>
     text,
   }))
 
+/** why: a game's notices belong only in builds that show the game. */
+const shownFor = <const Section extends LegalDocumentContent["sections"][number]>(
+  system: SystemId,
+  section: Section,
+) => (isSystemVisible(system) ? [section] : [])
+
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
@@ -69,7 +75,7 @@ export const gameContentNotices = {
         },
       ],
     },
-    {
+    ...shownFor("lorcana", {
       heading: "Disney Lorcana",
       blocks: [
         ...requiredNotices("lorcana"),
@@ -78,8 +84,8 @@ export const gameContentNotices = {
           text: "Scryve uses these materials for card identification, deck management, play tracking, and reference. Card data and official starter deck lists are provided through LorcanaJSON, and card images load from Ravensburger. Scryve is not affiliated with or endorsed by LorcanaJSON.",
         },
       ],
-    },
-    {
+    }),
+    ...shownFor("fab", {
       heading: "Flesh and Blood",
       blocks: [
         ...requiredNotices("fab"),
@@ -92,10 +98,8 @@ export const gameContentNotices = {
           text: "In the iOS and Android apps, the Flesh and Blood Comprehensive Rules are downloaded from Legend Story Studios to your device when you start a Flesh and Blood game or open Rules, and shown with their original notices. On the web, Rules links to the official page instead. Scryve does not host or distribute them. The official rules are at https://rules.fabtcg.com/en/.",
         },
       ],
-    },
-    ...(isSystemVisible("riftbound")
-      ? [{ heading: "Riftbound", blocks: requiredNotices("riftbound") }]
-      : []),
+    }),
+    ...shownFor("riftbound", { heading: "Riftbound", blocks: requiredNotices("riftbound") }),
     {
       heading: "Open source",
       blocks: [

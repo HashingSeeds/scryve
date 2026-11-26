@@ -21,4 +21,25 @@ describe("required game notices", () => {
     expect(notices.length).toBeGreaterThan(0)
     expect(paragraphs).toEqual(expect.arrayContaining([...notices]))
   })
+
+  it("leaves out notices for games this build hides", () => {
+    jest.isolateModules(() => {
+      jest.doMock("@/features/game/systemVisibility", () => ({
+        isSystemVisible: (id: string) => SYSTEMS[id as keyof typeof SYSTEMS].release === "general",
+      }))
+      const { gameContentNotices: released } =
+        jest.requireActual<typeof import("./gameContentNotices")>("./gameContentNotices")
+      const paragraphs = released.sections.flatMap((section) =>
+        section.blocks.map((block) => block.text),
+      )
+      expect(paragraphs).toEqual(
+        expect.arrayContaining([...SYSTEMS.mtg.integration.rights.requiredNotices]),
+      )
+      for (const hidden of ["lorcana", "fab", "riftbound"] as const) {
+        for (const notice of SYSTEMS[hidden].integration.rights.requiredNotices) {
+          expect(paragraphs).not.toContain(notice)
+        }
+      }
+    })
+  })
 })
