@@ -26,7 +26,7 @@ const values = {
   surface: ["history", "deck", "deck_stats", "compare"],
   deck_sync_action: ["sync", "move_to_device", "add_as_new"],
   outcome: ["ok", "conflict", "limit", "other_account", "kept_newer_edits", "failed"],
-  end_source: ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"],
+  end_source: ["game_menu", "new_game_prompt", "stale_game_prompt", "logged", "unknown"],
   timing: ["join.completed", "join.failed", "mutation.ack"],
   write: ["life", "table", "commander.claim", "commander.resolve"],
   tool: DICE_TOOLS,

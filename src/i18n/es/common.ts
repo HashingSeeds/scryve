@@ -68,6 +68,7 @@ export default {
       planechase: "Abre las opciones de mazo planar",
       archenemy: "Abre las opciones de archienemigo",
       schemes: "Abre las opciones de mazo de planes",
+      winner: "Abre las opciones de victoria",
     },
     closeLabel: {
       format: "Cerrar opciones de formato",
@@ -81,6 +82,7 @@ export default {
       planechase: "Cerrar opciones de mazo planar",
       archenemy: "Cerrar opciones de archienemigo",
       schemes: "Cerrar opciones de mazo de planes",
+      winner: "Cerrar opciones de victoria",
     },
   },
   valueField: {

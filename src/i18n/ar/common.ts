@@ -68,6 +68,7 @@ export default {
       planechase: "يفتح خيارات مجموعة العوالم",
       archenemy: "يفتح خيارات العدو اللدود",
       schemes: "يفتح خيارات مجموعة المخططات",
+      winner: "يفتح خيارات الفوز",
     },
     closeLabel: {
       format: "إغلاق خيارات النمط",
@@ -81,6 +82,7 @@ export default {
       planechase: "إغلاق خيارات مجموعة العوالم",
       archenemy: "إغلاق خيارات العدو اللدود",
       schemes: "إغلاق خيارات مجموعة المخططات",
+      winner: "إغلاق خيارات الفوز",
     },
   },
   valueField: {

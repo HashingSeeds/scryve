@@ -279,6 +279,8 @@ export default {
     title: "기록",
     addResult: "결과 추가",
     addPastGames: "지난 게임 추가",
+    logGame: "게임 기록 추가",
+    logged: "직접 기록됨",
     source: {
       all: "전체",
       local: "로컬",
@@ -363,6 +365,16 @@ export default {
     deleteTitle: "이 결과를 삭제할까요?",
     cancelDelete: "결과 유지",
     deleteMessage: "이 결과가 포함된 덱 통계가 업데이트됩니다.",
+  },
+  logGame: {
+    title: "게임 기록 추가",
+    addPlayer: "플레이어 추가",
+    minutes: "플레이 시간(분)",
+    save: "게임 저장",
+    error: {
+      noWinner: "승자 또는 무승부를 선택하세요",
+      minutesRange: "분은 {{min}}~{{max}} 범위여야 합니다",
+    },
   },
   recordMatch: {
     title: "매치 결과 추가",

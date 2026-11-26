@@ -68,6 +68,7 @@ export default {
       planechase: "次元デッキの選択肢を開きます",
       archenemy: "魔王の選択肢を開きます",
       schemes: "計略デッキの選択肢を開きます",
+      winner: "勝者の選択肢を開きます",
     },
     closeLabel: {
       format: "フォーマットの選択肢を閉じる",
@@ -81,6 +82,7 @@ export default {
       planechase: "次元デッキの選択肢を閉じる",
       archenemy: "魔王の選択肢を閉じる",
       schemes: "計略デッキの選択肢を閉じる",
+      winner: "勝者の選択肢を閉じる",
     },
   },
   valueField: {

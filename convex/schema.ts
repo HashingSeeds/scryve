@@ -365,6 +365,7 @@ export default defineSchema({
     matchId: v.optional(v.id("matches")),
     turnGroups: v.optional(turnGroupsValidator),
     nearby: v.optional(v.literal(true)),
+    logged: v.optional(v.literal(true)),
   })
     .index("by_game", ["gameId"])
     .index("by_public_id", ["publicId"]),

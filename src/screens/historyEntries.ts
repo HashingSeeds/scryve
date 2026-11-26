@@ -53,6 +53,7 @@ export interface HistoryEntry {
   key: string
   source: HistorySource
   nearby?: true
+  logged?: true
   routeId: string
   finishedAt: number
   status: "finished" | "abandoned"
@@ -206,6 +207,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
     key: `local:${game.id}`,
     source: "local",
     ...(game.seatPassHashes ? { nearby: true as const } : {}),
+    ...(game.logged ? { logged: true as const } : {}),
     routeId: game.id,
     finishedAt: game.finishedAt,
     status: game.status,
@@ -278,6 +280,7 @@ export function connectedHistoryEntry(game: {
   match?: ScryveMatchSummary
   matchGameNumber?: number
   nearby?: boolean
+  logged?: boolean
   winnerPlayerIds?: readonly string[]
   turnGroups?: readonly (readonly string[])[]
   players: {
@@ -306,6 +309,7 @@ export function connectedHistoryEntry(game: {
     status: game.terminalStatus === "abandoned" ? "abandoned" : "finished",
     outcome: toHistoryOutcome(game.outcome),
     ...(game.nearby ? { nearby: true as const } : {}),
+    ...(game.logged ? { logged: true as const } : {}),
     ...(winnerNames.length > 0 ? { winnerNames } : {}),
     ...(game.match ? { scryveMatch: serverMatchRef(game.match, game.matchGameNumber) } : {}),
     eventCount: game.eventCount,

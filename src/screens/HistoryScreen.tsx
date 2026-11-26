@@ -60,6 +60,7 @@ export interface HistoryScreenProps {
   onSelectManual: (publicId: string) => void
   onAddMatch?: () => void
   onAddPastGames?: () => void
+  onLogGame?: () => void
   connected?: ConnectedHistoryFeed
   initialSource?: HistorySource
 }
@@ -136,7 +137,7 @@ function subtitleFor(entry: HistoryEntry) {
     gameNumber === undefined
       ? sourceLabel(entry)
       : translate("play:history.gameNumber", { number: gameNumber }),
-    formatTime(entry.finishedAt),
+    entry.logged ? translate("play:history.logged") : formatTime(entry.finishedAt),
     entry.winnerNames?.length
       ? translate("play:history.wonBy", { names: formatConjunction(entry.winnerNames) })
       : undefined,
@@ -284,6 +285,7 @@ export function HistoryScreen({
   onSelectManual,
   onAddMatch,
   onAddPastGames,
+  onLogGame,
   connected,
   initialSource,
 }: HistoryScreenProps) {
@@ -434,6 +436,16 @@ export function HistoryScreen({
           <View style={themed($headerBlock)}>
             <Text preset="heading" tx="play:history.title" />
             <Text size="xs" tone="dim" text={countLabel} />
+            {onLogGame ? (
+              <TouchableOpacity
+                testID="history-log-game"
+                accessibilityRole="button"
+                style={$pastGames}
+                onPress={onLogGame}
+              >
+                <Text size="xs" tone="dim" tx="play:history.logGame" />
+              </TouchableOpacity>
+            ) : null}
             {onAddPastGames ? (
               <TouchableOpacity
                 testID="history-add-past-games"

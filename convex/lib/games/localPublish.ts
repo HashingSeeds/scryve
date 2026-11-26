@@ -490,6 +490,7 @@ export const publishFinishedLocalGame = mutationHandler({
     finishedAt: v.number(),
     eventCount: v.number(),
     nearby: v.optional(v.boolean()),
+    logged: v.optional(v.boolean()),
     firstPlayerLocalId: v.optional(v.string()),
     freeMulligans: v.optional(freeMulligansValidator),
     players: v.array(
@@ -749,6 +750,7 @@ export const publishFinishedLocalGame = mutationHandler({
         finishedAt: args.finishedAt,
         historySource: "local",
         nearby: args.nearby ?? seatPassHashes.length > 0,
+        logged: args.logged,
         clientGameId: args.publicId,
         ...(firstPlayerLocalId !== undefined
           ? { firstPlayerId: playerIdsByLocalId.get(firstPlayerLocalId)! }

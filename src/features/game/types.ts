@@ -145,6 +145,7 @@ export interface LocalGame {
   modeSetup?: ModeSetup
   variant?: GameVariant
   logOrder?: string[]
+  logged?: true
 }
 
 export interface CounterLogEntry {
@@ -212,4 +213,5 @@ export interface LocalGameSummary {
   matchPublish?: "pending" | "published" | "failed"
   seatPassHashes?: SeatPassHashes
   turnGroups?: string[][]
+  logged?: true
 }

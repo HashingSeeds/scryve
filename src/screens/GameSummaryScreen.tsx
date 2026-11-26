@@ -63,12 +63,14 @@ function StandingRow({
   startingLife,
   system,
   showOutcome,
+  logged,
 }: {
   player: SummaryPlayer
   rank: number
   startingLife?: number
   system?: PlaySystemId
   showOutcome: boolean
+  logged?: true
 }) {
   const { theme, themed } = useAppTheme()
   const badge = OUTCOME_BADGES[player.outcome]
@@ -90,13 +92,15 @@ function StandingRow({
     player.deleted ? translate("play:summary.deletedPlayer") : undefined,
   ])
   const value = counterValueLabel(system, player.life)
-  const rowLabel = showOutcome
-    ? translate("play:summary.standingWithOutcome", {
-        outcome: translate(badge.accessibilityTx),
-        name: player.name,
-        value,
-      })
-    : translate("play:summary.standing", { name: player.name, value })
+  const rowLabel = logged
+    ? joinParts([showOutcome ? translate(badge.accessibilityTx) : undefined, player.name])
+    : showOutcome
+      ? translate("play:summary.standingWithOutcome", {
+          outcome: translate(badge.accessibilityTx),
+          name: player.name,
+          value,
+        })
+      : translate("play:summary.standing", { name: player.name, value })
 
   return (
     <View style={themed($standingRow)} accessibilityLabel={rowLabel}>
@@ -119,12 +123,14 @@ function StandingRow({
           text={detail || translate("play:summary.seat", { seat: player.seat })}
         />
       </View>
-      <View style={themed($lifeColumn)}>
-        <Text size="lg" weight="bold" text={player.life} />
-        {changeFromStart === undefined ? null : (
-          <Text size="xxs" tone="dim" text={changeFromStart} />
-        )}
-      </View>
+      {logged ? null : (
+        <View style={themed($lifeColumn)}>
+          <Text size="lg" weight="bold" text={player.life} />
+          {changeFromStart === undefined ? null : (
+            <Text size="xxs" tone="dim" text={changeFromStart} />
+          )}
+        </View>
+      )}
     </View>
   )
 }
@@ -284,6 +290,7 @@ export function GameSummaryScreen({
               model.source === "local"
                 ? translate("play:summary.local")
                 : translate("play:summary.connected"),
+              model.logged ? translate("play:history.logged") : undefined,
             ])}
           />
           <Text size="xs" tone="dim" text={metaLine(model)} />
@@ -309,6 +316,7 @@ export function GameSummaryScreen({
               startingLife={model.startingLife}
               system={model.system}
               showOutcome={showOutcome}
+              logged={model.logged}
             />
           ))}
         </View>

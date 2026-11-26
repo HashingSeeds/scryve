@@ -120,6 +120,7 @@ export const entries = query({
           : {}),
         ...(summary.turnGroups ? { turnGroups: summary.turnGroups } : {}),
         ...(summary.nearby ? { nearby: true as const } : {}),
+        ...(summary.logged ? { logged: true as const } : {}),
       })
     }
     return {

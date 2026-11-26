@@ -473,6 +473,7 @@ export async function terminalizeGame(
     finishedAt?: number
     historySource?: "local"
     nearby?: boolean
+    logged?: boolean
     matchId?: Id<"matches">
     clientGameId?: string
     firstPlayerId?: Id<"gamePlayers">
@@ -588,6 +589,7 @@ export async function terminalizeGame(
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
     ...(game.variant ? { variant: game.variant } : {}),
     ...(options.nearby ? { nearby: true as const } : {}),
+    ...(options.logged ? { logged: true as const } : {}),
   })
   const summary = (await ctx.db.get(summaryId))!
   const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()

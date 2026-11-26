@@ -77,6 +77,7 @@ const common = {
       planechase: "Opens the planar deck choices",
       archenemy: "Opens the archenemy choices",
       schemes: "Opens the scheme deck choices",
+      winner: "Opens the winner choices",
     },
     closeLabel: {
       format: "Close format choices",
@@ -96,6 +97,7 @@ const common = {
       planechase: "Close planar deck choices",
       archenemy: "Close archenemy choices",
       schemes: "Close scheme deck choices",
+      winner: "Close winner choices",
     },
   },
   valueField: {

@@ -56,6 +56,7 @@ export interface GameSummaryModel {
   changeCount: number
   players: SummaryPlayer[]
   terminalReason?: string
+  logged?: true
 }
 
 export interface SummaryChangeFeed {
@@ -85,11 +86,12 @@ export function localOutcome(result: LocalGame["result"], playerId: string): Sum
 
 export function localSummaryModel(game: LocalGame): GameSummaryModel {
   const system = isPlaySystemId(game.system) ? game.system : undefined
+  const finishedAt = game.finishedAt ?? game.updatedAt
   return {
     source: "local",
     status: game.status === "abandoned" ? "abandoned" : "finished",
-    finishedAt: game.finishedAt ?? game.updatedAt,
-    startedAt: game.createdAt,
+    finishedAt,
+    ...(game.logged && game.createdAt === finishedAt ? {} : { startedAt: game.createdAt }),
     startingLife: game.startingLife,
     system,
     format:
@@ -109,6 +111,7 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
       outcome: localOutcome(game.result, player.id),
       ...teamOf(game.players, game.turnGroups, player.id),
     })),
+    ...(game.logged ? { logged: true as const } : {}),
   }
 }
 
@@ -137,6 +140,7 @@ export interface ConnectedSummaryDocument {
   ruleset: string
   eventCount: number
   finishedAt: number
+  logged?: true
   turnGroups?: string[][]
   players: {
     playerId: string
@@ -184,6 +188,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
       : counterValueLabel(system, summary.startingLife),
     changeCount: summary.eventCount,
     terminalReason: unusualEnding(summary.terminalReason),
+    ...(summary.logged ? { logged: true as const } : {}),
     players: summary.players.map((player) => ({
       id: player.playerId,
       seat: player.seat,
@@ -275,6 +280,6 @@ export function metaLine(model: GameSummaryModel) {
     translate("play:summary.playerCount", { count: model.players.length }),
     model.format,
     playedFor(model),
-    counterChangeLabel(model.system, model.changeCount),
+    model.logged ? undefined : counterChangeLabel(model.system, model.changeCount),
   ])
 }

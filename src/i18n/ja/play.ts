@@ -282,6 +282,8 @@ export default {
     title: "履歴",
     addResult: "結果を追加",
     addPastGames: "過去のゲームを追加",
+    logGame: "ゲームを記録",
+    logged: "記録済み",
     source: {
       all: "すべて",
       local: "ローカル",
@@ -367,6 +369,16 @@ export default {
     deleteTitle: "この結果を削除しますか？",
     cancelDelete: "結果を残す",
     deleteMessage: "この結果を含むデッキの統計も更新されます。",
+  },
+  logGame: {
+    title: "ゲームを記録",
+    addPlayer: "プレイヤーを追加",
+    minutes: "プレイ時間（分）",
+    save: "ゲームを保存",
+    error: {
+      noWinner: "勝者または引き分けを選んでください",
+      minutesRange: "分は{{min}}〜{{max}}で入力してください",
+    },
   },
   recordMatch: {
     title: "マッチ結果を追加",
