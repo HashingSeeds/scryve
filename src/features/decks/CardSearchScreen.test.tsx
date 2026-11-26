@@ -1101,6 +1101,45 @@ describe("adding into a deck's draft", () => {
     expect(onAdd.mock.calls.map(([card]) => card.section)).toEqual(["extra", "side"])
   })
 
+  it("adds a Riftbound Legend, Battlefield, or Rune to its own section unless one is picked", async () => {
+    const card = (name: string, category: string) => ({
+      game: "riftbound",
+      cardId: name,
+      name,
+      category,
+      facets: [],
+    })
+    mockAction.mockResolvedValue([
+      card("Annie, Dark Child", "Legend"),
+      card("Void Gate", "Battlefield"),
+      card("Fury Rune", "Rune"),
+      card("Annie, Fiery", "Unit"),
+    ])
+    const { view, onAdd } = await searchDeck({
+      game: "riftbound",
+      format: "constructed",
+      deckCards: [],
+    })
+
+    for (const name of ["Annie, Dark Child", "Void Gate", "Fury Rune", "Annie, Fiery"])
+      fireEvent.press(view.getByLabelText(`Add ${name} to deck`))
+    fireEvent.press(view.getByLabelText("Add Fury Rune to Sideboard"))
+    fireEvent.press(view.getByTestId("card-search-section"))
+    await waitFor(() =>
+      expect(view.getByTestId("card-search-section-option-champion")).toBeTruthy(),
+    )
+    fireEvent.press(view.getByTestId("card-search-section-option-champion"))
+    fireEvent.press(view.getByLabelText("Add Annie, Dark Child to deck"))
+    expect(onAdd.mock.calls.map(([added]) => [added.name, added.section])).toEqual([
+      ["Annie, Dark Child", "legend"],
+      ["Void Gate", "battlefields"],
+      ["Fury Rune", "runes"],
+      ["Annie, Fiery", "main"],
+      ["Fury Rune", "sideboard"],
+      ["Annie, Dark Child", "champion"],
+    ])
+  })
+
   it("keeps the picker for Brawl, whose Commander has no commander flow", async () => {
     mockAction.mockResolvedValue([])
     const { view } = await searchDeck({ game: "mtg", format: "brawl", deckCards: [] })

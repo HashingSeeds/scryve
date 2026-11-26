@@ -10,7 +10,6 @@ import {
   type CardCatalog,
   type NormalizedCard,
 } from "./cards"
-import type { SectionCard } from "./decks"
 import rushCards from "./rushCards.json"
 import { internal } from "../../_generated/api"
 import type { ActionCtx } from "../../_generated/server"
@@ -172,21 +171,6 @@ export async function cardsByYgoIds(ctx: ActionCtx, ids: readonly string[], incl
     ),
     status: response.status,
   }
-}
-
-export function ygoSection(card: SectionCard) {
-  const frameType = card.facets.find((item) => item.key === "frameType")?.value
-  return [
-    "fusion",
-    "fusion_pendulum",
-    "synchro",
-    "synchro_pendulum",
-    "xyz",
-    "xyz_pendulum",
-    "link",
-  ].includes(frameType ?? "")
-    ? "extra"
-    : "main"
 }
 
 export async function cardsByYgoIdBatches(

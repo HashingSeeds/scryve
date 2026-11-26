@@ -1,4 +1,5 @@
-import { cardsByYgoIds, normalizeYgoCards, ygoImageUrl, ygoSection } from "./yugioh"
+import { cardTypeSection } from "./deckSections"
+import { cardsByYgoIds, normalizeYgoCards, ygoImageUrl } from "./yugioh"
 import type { ActionCtx } from "../../_generated/server"
 
 function card(frameType: string) {
@@ -17,7 +18,7 @@ describe("Yu-Gi-Oh normalization", () => {
   it.each(["fusion_pendulum", "synchro_pendulum", "xyz_pendulum"])(
     "classifies %s as extra deck",
     (frameType) => {
-      expect(ygoSection(card(frameType))).toBe("extra")
+      expect(cardTypeSection("ygo", card(frameType))).toBe("extra")
     },
   )
 

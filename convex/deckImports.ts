@@ -21,8 +21,8 @@ import {
   type DeckListEntry,
   type DeckListRules,
   type ParsedDeckList,
-  type SectionCard,
 } from "./lib/games/decks"
+import { cardTypeSection, type SectionCard } from "./lib/games/deckSections"
 import { GAME_PROVIDERS, isProviderGame, type ProviderGame } from "./lib/games/providers"
 import { assertGameSystem, integrationFor, type GameSystemId } from "./lib/integrations"
 import {
@@ -180,8 +180,7 @@ export function parseGenericDeckList(list: string, game: ProviderGame): ParsedDe
 }
 
 function entrySection(game: ProviderGame, card: SectionCard, entry: DeckListEntry) {
-  const defaultSection = GAME_PROVIDERS[game].deckList.defaultSection
-  return entry.sectionExplicit || !defaultSection ? entry.section : defaultSection(card)
+  return (!entry.sectionExplicit && cardTypeSection(game, card)) || entry.section
 }
 
 function genericDeckCard(

@@ -120,6 +120,7 @@ import { useCardNameIndex } from "./useCardNameIndex"
 import { useCardSearchAnalytics } from "./useCardSearchAnalytics"
 import { useMagicCards } from "./useMagicCards"
 import { api } from "../../../convex/_generated/api"
+import { cardTypeSection, type SectionCard } from "../../../convex/lib/games/deckSections"
 import {
   isSystemId,
   MAGIC_CARD_FILTERS,
@@ -709,11 +710,15 @@ export function CardSearch({
     lookup,
   ])
 
+  function landingSection(card: SectionCard, to: string) {
+    return (to === "main" && cardTypeSection(game, card)) || to
+  }
+
   function searchEntry(card: SearchCard, to = section) {
     return {
       name: card.name,
       quantity: 1,
-      section: to,
+      section: "scryfallId" in card ? to : landingSection(card, to),
       imageUrl: card.imageUrl,
       smallImageUrl: card.smallImageUrl,
       ...("scryfallId" in card
@@ -919,7 +924,7 @@ export function CardSearch({
       preview(entry.card)
       return
     }
-    const error = onAdd({ ...entry.card, quantity: 1, section: to })
+    const error = onAdd({ ...entry.card, quantity: 1, section: landingSection(entry.card, to) })
     setMessage(error ?? translate("decks:cardSearch.added", { card: entry.card.name }))
   }
 
