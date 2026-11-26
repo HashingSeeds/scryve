@@ -3,7 +3,6 @@ import { translate } from "@/i18n/translate"
 import { formatElapsed } from "@/utils/useElapsedSince"
 
 import type { PlaySystemId } from "./playSystems"
-import type { LocalGame } from "./types"
 import { systemDefinition } from "../../../convex/lib/systems"
 import type { TableAction } from "../../../convex/lib/table"
 
@@ -168,11 +167,11 @@ export function roundClockAfterTurn(
   return rest
 }
 
-export const withRoundClockAfter = (
-  game: LocalGame,
+export const withRoundClockAfter = <Game extends { clock?: RoundClock; system?: PlaySystemId }>(
+  game: Game,
   action: TableAction,
   operationId: string,
-): LocalGame =>
+): Game =>
   game.clock
     ? { ...game, clock: roundClockAfterTurn(game.clock, game.system, action, operationId) }
     : game
