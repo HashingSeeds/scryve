@@ -8,7 +8,7 @@ appId: ${APP_ID}
 - tapOn: {id: utility-menu-button}
 - tapOn: {id: utility-decks-button}
 - extendedWaitUntil:
-    visible: "Ur-Dragon.*"
+    visible: ".*Ur-Dragon.*"
     timeout: 20000
 - waitForAnimationToEnd
 - takeScreenshot: decks

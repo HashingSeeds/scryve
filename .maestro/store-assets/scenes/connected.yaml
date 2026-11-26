@@ -13,7 +13,7 @@ appId: ${APP_ID}
     visible: {id: start-connected-game-button}
     timeout: 20000
 - runScript: {file: _table.js, env: {ACTION: join}}
-- tapOn: "Lorehold Spirits.*"
+- tapOn: ".*Lorehold Spirits.*"
 - tapOn: {id: start-connected-game-button}
 - extendedWaitUntil:
     visible: {id: connected-game-board}
