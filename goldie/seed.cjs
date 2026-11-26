@@ -257,7 +257,7 @@ async function recordTodayGames(client) {
 const HERE = path.dirname(require.resolve("./seed.cjs"))
 const SNAPSHOT = path.join(HERE, "out", "seed.zip")
 
-/** why: the restore is --replace-all, so commands carry the verified local URL and admin key; with those set the CLI refuses any deployment an env file names. */
+/** why: the restore is --replace-all, so every command names the verified local URL and admin key, which win over any deploy key an env file holds. */
 async function convex(args) {
   const { url, adminKey } = await backendCredentials()
   const cwd = path.join(HERE, "out", "convex-cli")
@@ -265,9 +265,9 @@ async function convex(args) {
   fs.writeFileSync(path.join(cwd, "convex.json"), JSON.stringify({ functions: "../../../convex" }))
   fs.copyFileSync(path.join(HERE, "..", "package.json"), path.join(cwd, "package.json"))
   const bin = path.join(HERE, "..", "node_modules", ".bin", "convex")
-  const result = spawnSync(bin, args, {
+  const result = spawnSync(bin, [...args, "--url", url, "--admin-key", adminKey], {
     cwd,
-    env: { ...cliEnv(), CONVEX_SELF_HOSTED_URL: url, CONVEX_SELF_HOSTED_ADMIN_KEY: adminKey },
+    env: cliEnv(),
     encoding: "utf8",
   })
   if (result.status !== 0)
