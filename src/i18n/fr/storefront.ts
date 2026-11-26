@@ -58,6 +58,6 @@ export default {
       privacy: "Politique de confidentialité : {{url}}",
     },
     whatsNew:
-      "• Achetez Pro sur votre téléphone sans vous connecter au préalable.\n• Pro reste déverrouillé même quand votre connexion se coupe.\n• Les coins du plateau suivent les angles arrondis de l’écran de votre téléphone.\n• Les demandes d’autorisation s’affichent dans votre langue.\n• Recherche des règles plus rapide, et vos decks s’enregistrent désormais dans une base de données plus rapide sur votre téléphone.\n\nEt de nombreuses corrections.",
+      "• Achetez Pro sur votre téléphone sans vous connecter au préalable.\n• Pro reste déverrouillé quand votre connexion s’interrompt.\n• Les coins du plateau suivent l’arrondi de l’écran de votre téléphone.\n• Les demandes d’autorisation s’affichent dans votre langue.\n• Recherche des règles plus rapide.\n\nEt de nombreuses corrections.",
   },
 } satisfies LocaleNamespace

@@ -93,9 +93,9 @@ const storefront = {
       terms: "Terms of Service: {{url}}",
       privacy: "Privacy Policy: {{url}}",
     },
-    // The App Store's release notes for this version. Keep the • bullets and the line breaks.
+    // The App Store's release notes for this version. Keep the • bullets and the line breaks. "Your language" means whichever language the player's phone uses, so don't name a language.
     whatsNew:
-      "• Buy Pro on your phone without signing in first.\n• Pro stays unlocked when your connection drops.\n• The board's corners follow your phone's rounded screen.\n• Permission prompts appear in your language.\n• Faster rules search, and your decks now save to a faster database on your phone.\n\nPlus many fixes.",
+      "• Buy Pro on your phone without signing in first.\n• Pro stays unlocked when your connection drops.\n• The board's corners follow your phone's rounded screen.\n• Permission prompts appear in your language.\n• Faster rules search.\n\nPlus many fixes.",
   },
 }
 

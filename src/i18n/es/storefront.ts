@@ -58,6 +58,6 @@ export default {
       privacy: "Política de privacidad: {{url}}",
     },
     whatsNew:
-      "• Compra Pro en tu teléfono sin iniciar sesión antes.\n• Pro sigue desbloqueado cuando se corta la conexión.\n• Las esquinas del tablero se adaptan a la pantalla redondeada de tu teléfono.\n• Los avisos de permisos aparecen en tu idioma.\n• Búsqueda de reglas más rápida, y ahora tus mazos se guardan en una base de datos más rápida en tu teléfono.\n\nAdemás, muchas correcciones.",
+      "• Compra Pro en tu teléfono sin iniciar sesión antes.\n• Pro sigue desbloqueado aunque se corte la conexión.\n• Las esquinas del tablero se adaptan a la pantalla redondeada de tu teléfono.\n• Los avisos de permisos aparecen en tu idioma.\n• Búsqueda de reglas más rápida.\n\nY muchas correcciones más.",
   },
 } satisfies LocaleNamespace
