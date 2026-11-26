@@ -720,6 +720,7 @@ export function CurrentGameScreen({
           backdropAccessibilityLabel={translate("common:cancel")}
           onConfirm={() => {
             runtime.rollBack(goingBack.place, turnsEnabled)
+            setPassUndo(undefined)
             setGoingBack(undefined)
           }}
           onClose={() => {

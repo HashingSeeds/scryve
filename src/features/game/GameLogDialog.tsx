@@ -136,7 +136,7 @@ export function GameLogDialog({
         <Pressable
           testID={`game-log-turn-${item.number}`}
           accessible
-          accessibilityRole="header"
+          accessibilityRole={goBack ? "button" : "header"}
           accessibilityLabel={label}
           {...press}
           style={(state) => [themed($turnRow), goBack && state.pressed && $pressed]}
