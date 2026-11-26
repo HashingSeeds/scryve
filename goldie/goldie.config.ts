@@ -66,7 +66,8 @@ const config: GoldieConfig = {
     background: "radial-gradient(120% 80% at 50% 0%, #3C2A24 0%, #191015 45%, #000000 100%)",
     headlineColor: "#F4F2F1",
     subheadColor: "#B6ACA6",
-    fontFamily: "Rubik",
+    // why: goldie's canvas falls back only to fonts it is named, and Rubik and its bundled CJK and Arabic faces have no Devanagari.
+    fontFamily: 'Rubik, "Kohinoor Devanagari"',
     fontFiles: [
       {
         family: "Rubik",
@@ -84,15 +85,15 @@ const config: GoldieConfig = {
     // why: two player boards put an upside-down seat on top, so their tiles show the whole device or its bottom half.
     template: [
       "hero",
-      "classic",
-      "tilt",
       "offset",
+      "tilt",
+      "hero",
       "tilt-right",
       "classic",
       "copy-below",
-      "hero",
+      "copy-below",
       "offset",
-      "classic",
+      "hero",
     ],
   },
 
