@@ -1,0 +1,16 @@
+# The rules sheet over a Commander board, searched for a keyword.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: commander, TURNS: life}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: rules-button}
+- tapOn: {id: rules-search}
+- inputText: deathtouch
+- hideKeyboard
+- extendedWaitUntil:
+    visible: {id: rules-term-Deathtouch}
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: rules

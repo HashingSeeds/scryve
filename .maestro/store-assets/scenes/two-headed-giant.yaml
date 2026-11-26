@@ -1,0 +1,18 @@
+# Two-Headed Giant: two teams of two, each sharing one life total.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: commander, TURNS: life}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: setup-button}
+- tapOn: {id: game-type-2hg}
+- tapOn: {id: start-game-button}
+- extendedWaitUntil:
+    visible: {id: game-menu-button}
+    timeout: 15000
+- waitForAnimationToEnd
+- runFlow: {file: _Life.yaml, env: {SEAT: 1, STEP: -1, TIMES: 8}}
+- runFlow: {file: _Life.yaml, env: {SEAT: 3, STEP: -5, TIMES: 3}}
+- waitForAnimationToEnd
+- takeScreenshot: two-headed-giant

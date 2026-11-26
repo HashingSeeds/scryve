@@ -1,0 +1,16 @@
+# Player 1's commander, at power 6, hits each opponent.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: commander, TURNS: life}
+- tapOn: {id: commander-mark-seat-1}
+- repeat: {times: 5, commands: [{tapOn: {id: commander-power-up-seat-1}}]}
+- tapOn: {id: commander-hit-seat-3}
+- tapOn: {id: commander-hit-seat-3}
+- tapOn: {id: commander-hit-seat-3}
+- tapOn: {id: commander-hit-seat-2}
+- tapOn: {id: commander-hit-seat-4}
+- tapOn: {id: commander-hit-seat-4}
+- waitForAnimationToEnd
+- takeScreenshot: commander-damage

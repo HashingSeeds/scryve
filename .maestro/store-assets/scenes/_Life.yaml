@@ -1,0 +1,10 @@
+# Changes one seat's life through its life controls, which every board size can reach.
+# env: SEAT, STEP (-5, -1, 1 or 5), TIMES
+appId: ${APP_ID}
+---
+- tapOn: {id: "life-total-target-seat-${SEAT}"}
+- repeat:
+    times: ${TIMES}
+    commands:
+      - tapOn: {id: "life-editor-step-${SEAT}-${STEP}"}
+- tapOn: {id: "life-editor-close-seat-${SEAT}"}

@@ -28,6 +28,41 @@ const storefront = {
     // A short link to the Privacy Policy, next to the Terms link at the bottom.
     privacy: "Privacy",
   },
+  // Captions on the App Store screenshots, one pair per screenshot: a headline in large type and a subhead under it. Write them the way top apps in your language caption their screenshots. Keep each headline as short as the English, at most about 18 Latin letters wide, and each subhead to one short line, so each fits on one line.
+  screenshots: {
+    // A game started on one phone can be shared with friends' phones by a code.
+    connected: {
+      headline: "Local or connected",
+      subhead: "Starts on your phone. Connect with a code.",
+    },
+    // One phone in the middle of the table, each player's life total turned to face them.
+    tenPlayers: {
+      headline: "Up to {{maxPlayers}} players",
+      subhead: "Every seat faces its player.",
+    },
+    commanderDamage: {
+      headline: "Commander damage",
+      subhead: "Track each opponent on their own card.",
+    },
+    // Two-Headed Giant is a Magic format where two teams of two each share one life total.
+    twoHeadedGiant: { headline: "Two-Headed Giant", subhead: "Teammates share one life total." },
+    // A chess clock gives each player their own time, which runs only during their turn.
+    chessClock: {
+      headline: "Turns and clocks",
+      subhead: "One tap passes the turn and the clock.",
+    },
+    // A match is several games against the same opponent; the first to win two of three takes it.
+    bestOf: { headline: "Best of three", subhead: "Game wins add up, with a round clock." },
+    // Pokémon: HP is a Pokémon's hit points. The Active is the Pokémon in play, in front of the bench.
+    pokemon: { headline: "HP, card by card", subhead: "Pick your Active. HP stays up front." },
+    rules: { headline: "Rules at the table", subhead: "Search the official rules mid-game." },
+    // A deck's win rate: the share of games played with that deck that the player won.
+    decks: {
+      headline: "Win rates per deck",
+      subhead: "Every game you play counts toward its deck.",
+    },
+    history: { headline: "Every game saved", subhead: "Local and connected games, one history." },
+  },
   // The app's page on the App Store and Google Play. Write store copy that sells, the way top apps in your language do.
   listing: {
     // The app's name on the App Store. At most 30 characters.

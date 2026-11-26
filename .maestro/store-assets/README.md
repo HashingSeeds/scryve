@@ -1,5 +1,22 @@
 # Store asset capture flows
 
+## App Store screenshots and preview (goldie)
+
+`scenes/` holds one Maestro flow per App Store screenshot, plus `preview.yaml` for the app preview video. goldie (the mchisolm0/goldie fork, checked out at `$GOLDIE_ROOT`, default `~/oss/goldie`) frames and captions them, with captions from `src/i18n/<language>/storefront.ts` (`screenshots`). Every language's captures show the app running in that language.
+
+```bash
+pnpm convex:local                # in the background; the build bakes in its URL
+./goldie/build-ios.sh            # Release simulator app with prerelease features off
+node goldie/seed.cjs             # riley's decks, games and named bots, then a snapshot
+bun goldie/maestro.ts            # every device and locale; --device, --locale, --scene, --no-preview
+export GOLDIE_CONFIG=$PWD/goldie/goldie.config.ts
+bun $GOLDIE_ROOT/src/cli.ts frame && bun $GOLDIE_ROOT/src/cli.ts preview && bun $GOLDIE_ROOT/src/cli.ts verify
+```
+
+`goldie/maestro.ts` signs riley+clerk_test@sow.care in once per simulator (`GOLDIE_STORE_PASSWORD`, from the shell or `~/.argent/secrets.env`), restores the seed snapshot before each language, and serves `goldie/table.mjs` so flows can seat and play bots. Output lands in `goldie/out/`.
+
+## Board captures
+
 The capture suite prioritizes the in-game board at three representative player counts:
 
 - `01-two-player-game.png`

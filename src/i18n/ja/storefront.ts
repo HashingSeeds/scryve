@@ -19,6 +19,48 @@ export default {
     terms: "利用規約",
     privacy: "プライバシー",
   },
+  screenshots: {
+    connected: {
+      headline: "ローカルも通信対戦も",
+      subhead: "自分のスマホで開始、コードで接続",
+    },
+    tenPlayers: {
+      headline: "最大{{maxPlayers}}人",
+      subhead: "どの席も各プレイヤーの向き",
+    },
+    commanderDamage: {
+      headline: "統率者ダメージ",
+      subhead: "相手ごとのカードで記録",
+    },
+    twoHeadedGiant: {
+      headline: "双頭巨人戦",
+      subhead: "チームでライフを共有",
+    },
+    chessClock: {
+      headline: "ターンとクロック",
+      subhead: "タップでターンも時間も交代",
+    },
+    bestOf: {
+      headline: "3本勝負",
+      subhead: "勝ったゲーム数を集計、タイマー付き",
+    },
+    pokemon: {
+      headline: "HPをカードごとに管理",
+      subhead: "バトルポケモンを選んでHPを確認",
+    },
+    rules: {
+      headline: "対戦中にルール確認",
+      subhead: "公式ルールをゲーム中に検索",
+    },
+    decks: {
+      headline: "デッキ別の勝率",
+      subhead: "プレイしたゲームがデッキに反映",
+    },
+    history: {
+      headline: "全ゲームを保存",
+      subhead: "ローカルも通信対戦も履歴にまとめて",
+    },
+  },
   listing: {
     appStoreName: "Scryve TCGライフカウンター＆戦績管理",
     playTitle: "Scryve TCGライフカウンター＆戦績管理",

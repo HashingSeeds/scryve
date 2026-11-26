@@ -1,0 +1,31 @@
+# The App Store preview: a local Commander board goes connected, three friends join by code, and
+# their life changes arrive live. Everything before startRecording runs off camera, so the video
+# opens on a live board rather than the splash.
+appId: ${APP_ID}
+---
+- runScript: {file: _table.js, env: {ACTION: reset}}
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: commander, TURNS: life}
+- startRecording: play
+# Connect is offered only before any life changes.
+- tapOn: {id: game-menu-button}
+- tapOn: {id: connect-button}
+- tapOn: {id: host-connected-button}
+- extendedWaitUntil:
+    visible: {id: start-connected-game-button}
+    timeout: 20000
+- runScript: {file: _table.js, env: {ACTION: join}}
+- tapOn: "Lorehold Spirits.*"
+- tapOn: {id: start-connected-game-button}
+- extendedWaitUntil:
+    visible: {id: connected-game-board}
+    timeout: 20000
+- extendedWaitUntil: {visible: {id: mulligan-keep}, timeout: 5000, optional: true}
+- tapOn: {id: mulligan-keep, optional: true}
+- runScript: {file: _table.js, env: {ACTION: play-live}}
+- runFlow: {file: _Life.yaml, env: {SEAT: 4, STEP: -1, TIMES: 3}}
+- runScript: {file: _table.js, env: {ACTION: damage}}
+- extendedWaitUntil: {visible: {id: goldie-hold}, timeout: 2000, optional: true}
+- stopRecording
+- runScript: {file: _table.js, env: {ACTION: reset}}

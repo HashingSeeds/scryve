@@ -19,6 +19,48 @@ export default {
     terms: "الشروط",
     privacy: "الخصوصية",
   },
+  screenshots: {
+    connected: {
+      headline: "مباراة محلية أو متصلة",
+      subhead: "تبدأ على هاتفك. اتصل برمز.",
+    },
+    tenPlayers: {
+      headline: "حتى {{maxPlayers}} لاعبين",
+      subhead: "كل مقعد يواجه صاحبه.",
+    },
+    commanderDamage: {
+      headline: "ضرر القائد",
+      subhead: "تتبّع كل خصم على بطاقته.",
+    },
+    twoHeadedGiant: {
+      headline: "العملاق ذو الرأسين",
+      subhead: "زملاء الفريق يتشاركون نقاط حياة واحدة.",
+    },
+    chessClock: {
+      headline: "الأدوار والمؤقتات",
+      subhead: "ضغطة واحدة تمرّر الدور والمؤقت.",
+    },
+    bestOf: {
+      headline: "الأفضل من ثلاث",
+      subhead: "تُجمع الانتصارات مع مؤقت الجولة.",
+    },
+    pokemon: {
+      headline: "نقاط الصحة لكل بطاقة",
+      subhead: "اختر بوكيمون نشطًا. وتبقى الصحة أمامك.",
+    },
+    rules: {
+      headline: "القواعد على الطاولة",
+      subhead: "ابحث في القواعد الرسمية أثناء المباراة.",
+    },
+    decks: {
+      headline: "نسب الفوز لكل مجموعة",
+      subhead: "كل مباراة تلعبها تُحتسب لمجموعتها.",
+    },
+    history: {
+      headline: "كل مباراة محفوظة",
+      subhead: "المباريات المحلية والمتصلة في سجل واحد.",
+    },
+  },
   listing: {
     appStoreName: "Scryve: عداد نقاط الحياة",
     playTitle: "Scryve: عداد نقاط الحياة",

@@ -19,6 +19,48 @@ export default {
     terms: "Términos",
     privacy: "Privacidad",
   },
+  screenshots: {
+    connected: {
+      headline: "Local o conectada",
+      subhead: "Empieza en tu teléfono. Conecta con un código.",
+    },
+    tenPlayers: {
+      headline: "Hasta {{maxPlayers}} jugadores",
+      subhead: "Cada asiento mira a su jugador.",
+    },
+    commanderDamage: {
+      headline: "Daño de comandante",
+      subhead: "Sigue a cada rival en su propia carta.",
+    },
+    twoHeadedGiant: {
+      headline: "Gigante de dos cabezas",
+      subhead: "Los compañeros comparten las vidas.",
+    },
+    chessClock: {
+      headline: "Turnos y relojes",
+      subhead: "Un toque pasa el turno y el reloj.",
+    },
+    bestOf: {
+      headline: "Al mejor de 3",
+      subhead: "Las victorias suman, con reloj de ronda.",
+    },
+    pokemon: {
+      headline: "PS, carta por carta",
+      subhead: "Elige tu Activo. Los PS siempre a la vista.",
+    },
+    rules: {
+      headline: "Reglas en la mesa",
+      subhead: "Busca en las reglas oficiales en plena partida.",
+    },
+    decks: {
+      headline: "% de victorias por mazo",
+      subhead: "Cada partida cuenta para su mazo.",
+    },
+    history: {
+      headline: "Cada partida guardada",
+      subhead: "Partidas locales y conectadas, un historial.",
+    },
+  },
   listing: {
     appStoreName: "Scryve: contador de vidas TCG",
     playTitle: "Scryve: contador de vidas TCG",
