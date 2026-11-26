@@ -2,7 +2,6 @@ import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
 import { gameTypeLabel } from "@/features/game/gameTypes"
 import {
   counterChangeLabel,
-  counterValueLabel,
   isPlaySystemId,
   playFormatLabel,
   storedPlaySystem,
@@ -18,7 +17,7 @@ import { type TxKeyPath } from "@/i18n"
 import { formatDate, formatTime, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
-import type { HistoryOutcome, HistorySource } from "./historyEntries"
+import { noFormatLabel, type HistoryOutcome, type HistorySource } from "./historyEntries"
 import type { GameVariant } from "../../convex/lib/treachery"
 import { turnGroupOf, type TurnGroups } from "../../convex/lib/turns"
 
@@ -99,7 +98,7 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
         ? game.variant
           ? gameTypeLabel({ id: game.variant, system, format: game.format, variant: game.variant })
           : playFormatLabel(system, game.format)
-        : counterValueLabel(system, game.startingLife),
+        : noFormatLabel(system, game.startingLife, game.logged),
     changeCount: localChanges(game).length,
     players: game.players.map((player) => ({
       id: player.id,
@@ -140,6 +139,7 @@ export interface ConnectedSummaryDocument {
   ruleset: string
   eventCount: number
   finishedAt: number
+  startedAt?: number
   logged?: true
   turnGroups?: string[][]
   players: {
@@ -174,6 +174,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
     source: "connected",
     status: summary.terminalStatus === "abandoned" ? "abandoned" : "finished",
     finishedAt: summary.finishedAt,
+    ...(summary.startedAt === undefined ? {} : { startedAt: summary.startedAt }),
     startingLife: summary.startingLife,
     system,
     format: system
@@ -185,7 +186,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
             variant: summary.variant,
           })
         : playFormatLabel(system, summary.format || summary.ruleset)
-      : counterValueLabel(system, summary.startingLife),
+      : noFormatLabel(system, summary.startingLife, summary.logged),
     changeCount: summary.eventCount,
     terminalReason: unusualEnding(summary.terminalReason),
     ...(summary.logged ? { logged: true as const } : {}),

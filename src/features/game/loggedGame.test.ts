@@ -4,6 +4,7 @@ import { localHistoryEntry } from "@/screens/historyEntries"
 
 import { LocalGameRepository } from "./localPersistence"
 import { buildLoggedGame, defaultLoggedGameDraft, type LoggedGameDraft } from "./loggedGame"
+import { playSystemShortLabel } from "./playSystems"
 import { MemoryStorage } from "../../../test/support/memoryStorage"
 
 const NOW = new Date(2026, 10, 26, 19, 30).getTime()
@@ -76,5 +77,8 @@ describe("buildLoggedGame", () => {
       metaLine({ ...localSummaryModel(detail), changeCount: 99 }),
     )
     expect(localSummaryModel(built({ minutes: "30" })).startedAt).toBeDefined()
+    expect(localSummaryModel(built({ system: undefined, format: undefined })).format).toBe(
+      playSystemShortLabel(undefined),
+    )
   })
 })

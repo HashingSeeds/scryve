@@ -77,6 +77,14 @@ const SOURCE_TX = {
   manual: "play:history.source.manual",
 } as const satisfies Record<HistorySource, TxKeyPath>
 
+export function noFormatLabel(
+  system: PlaySystemId | undefined,
+  startingLife: number,
+  logged?: boolean,
+) {
+  return logged ? playSystemShortLabel(NO_PLAY_SYSTEM) : counterValueLabel(system, startingLife)
+}
+
 export function sourceLabel({ source, nearby }: Pick<HistoryEntry, "source" | "nearby">) {
   return translate(nearby ? "play:newGame.nearby" : SOURCE_TX[source])
 }
@@ -227,7 +235,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
     format:
       system && game.format
         ? playFormatLabel(system, game.format)
-        : counterValueLabel(system, game.startingLife),
+        : noFormatLabel(system, game.startingLife, game.logged),
   }
 }
 
@@ -319,7 +327,7 @@ export function connectedHistoryEntry(game: {
       system && (game.format || game.ruleset)
         ? playFormatLabel(system, game.format || game.ruleset)
         : game.startingLife !== undefined
-          ? counterValueLabel(system, game.startingLife)
+          ? noFormatLabel(system, game.startingLife, game.logged)
           : translate("play:history.source.connected"),
   }
 }
