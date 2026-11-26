@@ -116,9 +116,11 @@ export const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.md,
   paddingBottom: spacing.xl,
 })
+// why: Legend List's web build styles a plain div, so RN-only keys like paddingHorizontal do nothing there.
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  paddingVertical: spacing.lg,
-  paddingHorizontal: spacing.md,
+  paddingTop: spacing.lg,
+  paddingLeft: spacing.md,
+  paddingRight: spacing.md,
   paddingBottom: spacing.xl,
 })
 const $listHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({

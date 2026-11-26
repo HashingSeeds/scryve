@@ -1650,12 +1650,14 @@ const $add: ViewStyle = {
   justifyContent: "center",
   alignItems: "flex-end",
 }
+// why: the results list's web build styles a plain div, where alignSelf can't center it.
 const $search: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.md,
   gap: spacing.sm,
   width: "100%",
   maxWidth: 720,
-  alignSelf: "center",
+  marginLeft: "auto",
+  marginRight: "auto",
 })
 const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
