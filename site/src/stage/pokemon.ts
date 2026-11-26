@@ -66,7 +66,7 @@ const SAMPLE_DAMAGE: readonly (readonly number[])[] = [
   [30, 50, 0],
   [150, 0],
 ]
-export const SAMPLE_PRIZES = [3, 4, 5, 6, 4, 5] as const
+export const SAMPLE_PRIZES = [3, 4, 5, 6, 4, 5, 2, 6, 3, 5] as const
 
 const deckOf = (seat: number) => SAMPLE_DECKS[seat % SAMPLE_DECKS.length] ?? []
 

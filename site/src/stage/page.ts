@@ -13,9 +13,21 @@ import { createPokemonDemo, SAMPLE_PRIZES } from "./pokemon"
 import { SITE_SYSTEM_IDS, type SiteSystemId } from "./systems"
 import { createYugiohDemo } from "./yugioh"
 
-const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
-const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
-const SAMPLE_LIFE_POINTS = [8000, 5300, 6800, 2350, 7400, 4100] as const
+// One name and sample total per seat, up to the app's 10.
+const NAMES = [
+  "Maya",
+  "Devon",
+  "Priya",
+  "Jonas",
+  "Sam",
+  "Alex",
+  "Rosa",
+  "Theo",
+  "Nia",
+  "Kai",
+] as const
+const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23, 29, 38, 21, 33] as const
+const SAMPLE_LIFE_POINTS = [8000, 5300, 6800, 2350, 7400, 4100, 6200, 3900, 7800, 5600] as const
 // Seats a game starts with when it's picked: the landing's Commander table, or a duel.
 const SEATS_FOR = { mtg: 5, ygo: 2, pokemon: 2 } as const satisfies Record<SiteSystemId, number>
 // Demo taps land far enough apart that each change shows on its own before the next.
@@ -78,7 +90,7 @@ function stepAnchor() {
   return Number.parseFloat(getComputedStyle(query<HTMLElement>(".step-copy")).top)
 }
 
-// The hero, the Features steps, and connected play all show one game. The pickers reset it
+// The hero, the Features steps, and nearby play all show one game. The pickers reset it
 // the way the app would and follow whatever the game shows.
 function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   const board = query<HTMLElement>("[data-board='features']", stage)
@@ -309,10 +321,23 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   }
 }
 
-function setUpConnected(stage: HTMLElement, game: DemoGame) {
-  stage
-    .querySelectorAll<HTMLElement>("[data-board='connected']")
-    .forEach((el) => mountBoard(el, game))
+function setUpNearby(stage: HTMLElement, game: DemoGame) {
+  stage.querySelectorAll<HTMLElement>("[data-board='nearby']").forEach((el) => mountBoard(el, game))
+}
+
+// The rules screen's Rules and Cards tabs, as in the app's rules sheet.
+function setUpRules(stage: HTMLElement) {
+  const screen = query<HTMLElement>(".rules-screen", stage)
+  screen.addEventListener("click", (event) => {
+    const tab = (event.target as Element).closest<HTMLButtonElement>("[data-rules-tab]")
+    if (!tab) return
+    screen.querySelectorAll<HTMLButtonElement>("[data-rules-tab]").forEach((other) => {
+      other.setAttribute("aria-pressed", String(other === tab))
+    })
+    screen.querySelectorAll<HTMLElement>("[data-rules-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.rulesPanel !== tab.dataset.rulesTab
+    })
+  })
 }
 
 // Keep the sample deck's tabs and version picker in the same places as the app.
@@ -402,7 +427,8 @@ function setUpStage() {
   const stage = query<HTMLElement>("[data-stage]")
   const game = createDemoGame(commanderSetup(SEATS_FOR.mtg))
   const onFeatureStep = setUpFeatures(stage, game)
-  setUpConnected(stage, game)
+  setUpNearby(stage, game)
+  setUpRules(stage)
   const closeDeckSettings = setUpDeck(stage)
 
   const steps = document.querySelectorAll<HTMLElement>(".steps [data-step]")
@@ -461,7 +487,7 @@ function setUpStage() {
 
 // Scenes whose screen is portrait only. On small screens the phone stands up in a strip too
 // short to use, so tapping it opens the same phone full screen.
-const PORTRAIT_SCENES = new Set(["record", "pro"])
+const PORTRAIT_SCENES = new Set(["rules", "record", "pro"])
 
 function setUpFullScreen(stage: HTMLElement) {
   const toggle = (open: boolean) => {
