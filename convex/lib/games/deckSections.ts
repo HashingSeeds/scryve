@@ -26,7 +26,6 @@ const SECTION_BY_GAME: Partial<Record<string, (card: SectionCard) => string>> = 
   riftbound: (card) => RIFTBOUND_SECTION_BY_TYPE[card.category ?? ""] ?? "main",
 }
 
-/** why: an imported line under no heading and a card added from search both land in the section its type belongs to. */
 export function cardTypeSection(game: string, card: SectionCard) {
   return SECTION_BY_GAME[game]?.(card)
 }

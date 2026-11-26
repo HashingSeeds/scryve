@@ -1123,20 +1123,20 @@ describe("adding into a deck's draft", () => {
 
     for (const name of ["Annie, Dark Child", "Void Gate", "Fury Rune", "Annie, Fiery"])
       fireEvent.press(view.getByLabelText(`Add ${name} to deck`))
-    fireEvent.press(view.getByLabelText("Add Annie, Fiery to Sideboard"))
+    fireEvent.press(view.getByLabelText("Add Fury Rune to Sideboard"))
     fireEvent.press(view.getByTestId("card-search-section"))
     await waitFor(() =>
       expect(view.getByTestId("card-search-section-option-champion")).toBeTruthy(),
     )
     fireEvent.press(view.getByTestId("card-search-section-option-champion"))
-    fireEvent.press(view.getByLabelText("Add Annie, Fiery to deck"))
+    fireEvent.press(view.getByLabelText("Add Annie, Dark Child to deck"))
     expect(onAdd.mock.calls.map(([added]) => [added.name, added.section])).toEqual([
       ["Annie, Dark Child", "legend"],
       ["Void Gate", "battlefields"],
       ["Fury Rune", "runes"],
       ["Annie, Fiery", "main"],
-      ["Annie, Fiery", "sideboard"],
-      ["Annie, Fiery", "champion"],
+      ["Fury Rune", "sideboard"],
+      ["Annie, Dark Child", "champion"],
     ])
   })
 
