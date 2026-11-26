@@ -267,11 +267,11 @@ export function playedFor(model: GameSummaryModel) {
   })
 }
 
-export function finishedOnLabel(finishedAt?: number) {
+export function finishedOnLabel(finishedAt?: number, logged?: true) {
   if (!finishedAt) return undefined
   return joinParts([
     formatDate(finishedAt, { month: "short", day: "numeric", year: "numeric" }),
-    formatTime(finishedAt),
+    logged ? undefined : formatTime(finishedAt),
   ])
 }
 

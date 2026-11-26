@@ -31,7 +31,7 @@ import {
   sharedDeckChoices,
   type SelectedDeck,
 } from "@/features/stats/deckChoices"
-import { translate } from "@/i18n/translate"
+import { translate, translateForStorage } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -96,7 +96,13 @@ export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGame
     try {
       const pinned = account && showsDecks && deck ? await pinDeckChoice(deck, account.ownerId) : {}
       const built = buildLoggedGame(
-        { ...draft, names: seatNames },
+        {
+          ...draft,
+          names: draft.names.map(
+            (name, seat) =>
+              name.trim() || translateForStorage("board:playerNames.default", { number: seat + 1 }),
+          ),
+        },
         account ? { ownerId: account.ownerId, meSeat, ...pinned } : undefined,
       )
       if (!built.ok) {

@@ -46,7 +46,7 @@ export function buildLoggedGame(
       ok: false,
       error: translate("play:logGame.error.minutesRange", { min: 1, max: MAX_LOGGED_MINUTES }),
     }
-  const finishedAt = day + (now - today)
+  const finishedAt = day === today ? now : new Date(day).setHours(12)
   const created = createLocalGame({
     players: names.names.map((name) => ({ name, color: "" })),
     startingLife: defaultStartingLife(draft.system, draft.format, names.names.length),

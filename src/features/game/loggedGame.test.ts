@@ -28,9 +28,10 @@ function built(overrides: Partial<LoggedGameDraft> = {}, account?: { meSeat?: nu
 }
 
 describe("buildLoggedGame", () => {
-  it("finishes on the chosen day at the current time, started the given minutes earlier", () => {
+  it("finishes now when logged for today, at noon on an earlier day, started the given minutes earlier", () => {
+    expect(built().finishedAt).toBe(NOW)
     const game = built({ date: "2026-11-20", minutes: "45" })
-    expect(new Date(game.finishedAt!)).toEqual(new Date(2026, 10, 20, 19, 30))
+    expect(new Date(game.finishedAt!)).toEqual(new Date(2026, 10, 20, 12))
     expect(game.finishedAt! - game.createdAt).toBe(45 * 60_000)
     expect(game).toMatchObject({ status: "finished", logged: true, events: [], startingLife: 40 })
     expect(game.result).toEqual({ kind: "win", winnerPlayerIds: [game.players[0].id] })

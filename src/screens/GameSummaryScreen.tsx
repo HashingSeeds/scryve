@@ -286,7 +286,7 @@ export function GameSummaryScreen({
             size="xs"
             tone="dim"
             text={joinParts([
-              finishedOnLabel(model.finishedAt),
+              finishedOnLabel(model.finishedAt, model.logged),
               model.source === "local"
                 ? translate("play:summary.local")
                 : translate("play:summary.connected"),
