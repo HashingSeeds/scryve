@@ -249,16 +249,18 @@ async function play({ apply }) {
     )
 
     const track = await call("GET", `/edits/${edit.id}/tracks/${PLAY_TRACK}`)
-    const newest = track.releases.reduce((a, b) =>
-      Math.max(...b.versionCodes.map(Number)) > Math.max(...a.versionCodes.map(Number)) ? b : a,
+    const code = (release) => Math.max(...release.versionCodes.map(Number))
+    const newest = (track.releases ?? []).reduce(
+      (a, b) => (!a || code(b) > code(a) ? b : a),
+      undefined,
     )
     const releaseNotes = Object.entries(PLAY_LANGUAGES).flatMap(([locale, languages]) =>
       languages.map((language) => ({ language, text: copy[locale].releaseNotes })),
     )
-    const currentNotes = new Map(newest.releaseNotes?.map((note) => [note.language, note.text]))
-    const notesChanged = releaseNotes.some(
-      ({ language, text }) => currentNotes.get(language) !== text,
-    )
+    const currentNotes = new Map(newest?.releaseNotes?.map((note) => [note.language, note.text]))
+    const notesChanged =
+      Boolean(newest) &&
+      releaseNotes.some(({ language, text }) => currentNotes.get(language) !== text)
 
     const preview = path.join(os.tmpdir(), "scryve-play-listing.json")
     fs.writeFileSync(
@@ -275,7 +277,11 @@ async function play({ apply }) {
       console.log(
         `subscription ${PLAY_SUBSCRIPTION} ${languageCode}: ${JSON.stringify(subscriptionListings.get(languageCode)?.title ?? null)} → ${JSON.stringify(title)}`,
       )
-    if (notesChanged) console.log(`${PLAY_TRACK} release ${newest.name}: changes release notes`)
+    console.log(
+      newest
+        ? `${PLAY_TRACK} release ${newest.name}: ${notesChanged ? "changes release notes" : "release notes up to date"}`
+        : `${PLAY_TRACK} track has no release for release notes`,
+    )
     console.log(`Full text: ${preview}`)
     if (!changes.length && !titleChanges.length && !notesChanged)
       return console.log("Play is up to date.")
