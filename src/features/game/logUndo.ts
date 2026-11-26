@@ -104,17 +104,24 @@ export function undoLogStep(game: LocalGame, undo: LogUndo, context: CommandCont
   return undone === game ? game : withRoundClockAfter(undone, action, operationId)
 }
 
-/** why: modes have no undo and a turn keeps only its own pass, so going back past either would leave it standing. */
 export function rollbackFloor(game: LocalGame, { turns }: { turns: boolean }) {
   if (game.status !== "active") return Infinity
   const positionOf = localLogPositions(game)
   const placeOf = (operationId: string | undefined) =>
     operationId === undefined ? -Infinity : (positionOf(operationId) ?? -Infinity)
   const turn = turns ? game.turn : undefined
-  return Math.max(
+  const floor = Math.max(
     placeOf(turn?.previous?.operationId ?? turn?.operationId),
     ...(game.table?.modes?.log ?? []).map(({ operationId }) => placeOf(operationId)),
   )
+  const straddling = mergedLog(
+    gameLog(game.players, game.events),
+    counterLog(game.counterLog ?? []),
+    positionOf,
+  ).flatMap((row) =>
+    Math.min(...row.operationIds.map(placeOf)) <= floor ? [rowPosition(row, positionOf)] : [],
+  )
+  return Math.max(floor, ...straddling)
 }
 
 export function rollBack(
@@ -124,7 +131,6 @@ export function rollBack(
   context: CommandContext,
 ) {
   if (place <= rollbackFloor(game, { turns })) return { game, changes: 0 }
-  // why: undo trims logOrder, so later steps are placed by the log as it stood when the rollback began.
   const positionOf = localLogPositions(game)
   const placeOf = (undo: LogUndo) =>
     undo.kind === "turn"

@@ -222,6 +222,50 @@ describe("going back in the log", () => {
   })
 })
 
+describe("going back past a change with no undo", () => {
+  const planechase = () => {
+    const created = createLocalGame({
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      modeSetup: { planechase: {} },
+      now: 0,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Bo", color: "#111" },
+      ],
+    })
+    return { created, ada: created.players[0], bo: created.players[1] }
+  }
+  const tap = (current: LocalGame, playerId: LocalGame["players"][number]["id"], now: number) => {
+    clock = now
+    return applyGameCommand(current, { type: "life.change", playerId, delta: -1 }, context)
+  }
+
+  it("stops at a planar roll", () => {
+    const { created, ada, bo } = planechase()
+    let current = tap(created, bo.id, 1_000)
+    current = table(current, { kind: "planar.rolled", playerId: ada.id, face: "blank" }, 5_000)
+    current = tap(current, ada.id, 9_000)
+
+    const floor = rollbackFloor(current, { turns: false })
+    expect(placeOfRow(current, 0)).toBeGreaterThan(floor)
+    expect(placeOfRow(current, 1)).toBeLessThan(floor)
+  })
+
+  it("keeps a burst whose taps straddle a planar roll", () => {
+    const { created, ada, bo } = planechase()
+    let current = tap(created, bo.id, 1_000)
+    current = table(current, { kind: "planar.rolled", playerId: ada.id, face: "blank" }, 1_100)
+    current = tap(current, bo.id, 1_200)
+    current = tap(current, ada.id, 9_000)
+
+    const floor = rollbackFloor(current, { turns: false })
+    expect(placeOfRow(current, 0)).toBeGreaterThan(floor)
+    expect(placeOfRow(current, 1)).toBeLessThanOrEqual(floor)
+  })
+})
+
 describe("log undo in Two-Headed Giant", () => {
   it("takes shared poison back from both heads", () => {
     const created = createLocalGame({
