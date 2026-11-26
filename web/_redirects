@@ -12,6 +12,8 @@
 /join/:token /play/join/:token  302
 # Shared deck links stay public at /deck/<token> (iOS app links claim /deck).
 /deck/:token /play/deck/:token  302
+# Watch links stay public at /watch/<code> (iOS app links claim /watch).
+/watch/:code /play/watch/:code  302
 
 # Old web app URLs (also linked from store listings and legal text)
 /history /play/history  301
@@ -45,6 +47,7 @@
 # SPA deep links: serve the app shell for each app route
 /play/join/* /play/  200
 /play/deck/* /play/  200
+/play/watch/* /play/  200
 /play/history /play/  200
 /play/history/* /play/  200
 /play/game/* /play/  200

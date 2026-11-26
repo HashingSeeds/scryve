@@ -53,6 +53,7 @@ export function PlayerActionsDialog({
   onClose,
   onRole,
   onInvite,
+  onWatch,
   visible = true,
   onDismissed,
 }: {
@@ -62,6 +63,7 @@ export function PlayerActionsDialog({
   onClose: () => void
   onRole?: () => void
   onInvite?: () => void
+  onWatch?: () => void
   visible?: boolean
   onDismissed?: () => void
 }) {
@@ -195,6 +197,13 @@ export function PlayerActionsDialog({
               testID="invite-from-players-button"
               tx="connected:invite.label"
               onPress={onInvite}
+            />
+          ) : null}
+          {onWatch ? (
+            <Button
+              testID="watch-from-players-button"
+              tx="connected:watch.label"
+              onPress={onWatch}
             />
           ) : null}
           {error ? (
