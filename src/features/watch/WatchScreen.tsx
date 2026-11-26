@@ -300,6 +300,13 @@ function SeatTile({
                     insetGlyph="none"
                     size={Math.round(s.unit * 1.2)}
                   />
+                  {row.commander === 1 ? (
+                    <Text
+                      weight="medium"
+                      tx="board:commander.unnamedPartner"
+                      style={[s.detail, { color: chipInk }]}
+                    />
+                  ) : null}
                   <Text
                     weight="bold"
                     text={row.total}

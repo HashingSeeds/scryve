@@ -8,7 +8,7 @@ export function watchUrl(origin: string, code: string) {
   return site && watchCode ? `${site}/watch/${watchCode}` : null
 }
 
-// why: apple-app-site-association hands /watch links to the app, which would otherwise open them on Home.
+// why: this ships before apple-app-site-association claims /watch, so installs that get that claim already open the board, not Home.
 export function watchCodeFromLink(link: string, trustedOrigin: string | undefined) {
   const origin = normalizeHttpsOrigin(trustedOrigin)
   if (!origin) return null

@@ -12,7 +12,7 @@
 /join/:token /play/join/:token  302
 # Shared deck links stay public at /deck/<token> (iOS app links claim /deck).
 /deck/:token /play/deck/:token  302
-# Watch links stay public at /watch/<code> (iOS app links claim /watch).
+# Watch links stay public at /watch/<code>; the web app lives at /play.
 /watch/:code /play/watch/:code  302
 
 # Old web app URLs (also linked from store listings and legal text)
