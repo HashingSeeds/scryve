@@ -332,10 +332,12 @@ function apple() {
     )
   const { copy, keywords } = allCopy()
   const config = JSON.parse(fs.readFileSync(APPLE_CONFIG_PATH, "utf8"))
-  // why: pull reads the live version until this one exists; push creates the version it names.
-  config.apple.version = JSON.parse(
-    fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
-  ).version
+  // why: pull reads the live version until this one exists, and push creates the version it names or renames the editable one, so a newer draft means this checkout is stale.
+  const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"))
+  const pulled = config.apple.version ?? "0"
+  if (pulled.localeCompare(version, undefined, { numeric: true }) > 0)
+    throw new Error(`App Store Connect has ${pulled}, newer than package.json's ${version}.`)
+  config.apple.version = version
   fs.rmSync(path.join(ROOT, "store/apple/preview"), { recursive: true, force: true })
   const info = (config.apple.info ??= {})
   for (const localized of Object.values(info)) delete localized.screenshots
