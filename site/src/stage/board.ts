@@ -22,6 +22,7 @@ import {
   pokemonBoardOf,
   type TableAction,
 } from "../../../convex/lib/table"
+import { createBags } from "./bag"
 import { HINT_PRESS_MS, showTapHint } from "./hint"
 import { createDemoScript } from "./script"
 import {
@@ -650,7 +651,12 @@ function seatName(game: DemoGame, seat: number) {
   return game.setup.names[seat] ?? `Player ${seat + 1}`
 }
 
-function seatInnerHtml(game: DemoGame, seat: number, interactive: boolean) {
+function seatInnerHtml(
+  game: DemoGame,
+  seat: number,
+  interactive: boolean,
+  bag: { button: string; roll: string },
+) {
   const value = game.life[seat] ?? 0
   const name = seatName(game, seat)
   const controls = interactive
@@ -659,8 +665,8 @@ function seatInnerHtml(game: DemoGame, seat: number, interactive: boolean) {
   return `<span class="glyph minus" data-glyph="${seat}:-1">−</span>
       <span class="center"><span class="life" data-life="${seat}" data-digits="${String(value).length}">${value}</span></span>
       <span class="glyph plus" data-glyph="${seat}:1">+</span>
-      <span class="who">${markSvg(seatShape(seat), "#fff")}<span>${name}</span></span>
-      ${controls}`
+      <span class="who">${markSvg(seatShape(seat), "#fff")}<span>${name}</span>${bag.roll}</span>
+      ${controls}${bag.button}`
 }
 
 export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true } = {}) {
@@ -668,6 +674,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
   const placements = new Map<number, SeatPlacement>()
   const pokemon = createPokemonSeats(game, (seat) => renderSeat(seat))
   const calculators = createCalculators(el, game)
+  const bags = createBags(() => game.setup.system)
   const isPokemon = () => game.setup.system === "pokemon"
   // The board is the app's 390 point wide screen, scaled, so the calculator can size in points.
   new ResizeObserver(() => el.style.setProperty("--app-pt", `${el.offsetWidth / 390}px`)).observe(
@@ -679,18 +686,26 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
       ...placement,
       name: seatName(game, placement.seat),
       mark: croppedMarkSvg(seatShape(placement.seat), "#fff"),
+      bag: bags.buttonHtml(placement.seat, seatName(game, placement.seat)),
+      roll: bags.chipHtml(placement.seat),
     })
   }
 
   function seatHtml(placement: SeatPlacement) {
     const { seat, rotation } = placement
-    const inner = isPokemon() ? pokemonHtml(placement) : seatInnerHtml(game, seat, interactive)
+    const name = seatName(game, seat)
+    const inner = isPokemon()
+      ? pokemonHtml(placement)
+      : seatInnerHtml(game, seat, interactive, {
+          button: bags.buttonHtml(seat, name),
+          roll: bags.chipHtml(seat),
+        })
     const calculator =
       interactive && !isPokemon() && hasCalculator(game.setup.system)
         ? calculators.html({ ...placement, name: seatName(game, seat), color: seatColor(seat) })
         : ""
     return `<div class="seat${isPokemon() ? " pk-seat" : ""}" data-player="${seat}" data-rotation="${rotation}" style="--seat:${seatColor(seat)}"${interactive ? "" : " inert"}>
-    <div class="seat-in">${inner}${calculator}</div>
+    <div class="seat-in">${inner}${calculator}${bags.sheetHtml(seat, name)}</div>
   </div>`
   }
 
@@ -723,14 +738,21 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     const focused = inner.contains(document.activeElement)
       ? (document.activeElement as HTMLElement).dataset
       : undefined
-    inner.innerHTML = pokemonHtml(placement)
+    inner.innerHTML = pokemonHtml(placement) + bags.sheetHtml(seat, seatName(game, seat))
     fitDeltas(inner)
-    if (!focused?.pk) return
-    const id = focused.id ? `[data-id="${focused.id}"]` : ""
-    const dir = focused.dir ? `[data-dir="${focused.dir}"]` : ""
-    inner
-      .querySelector<HTMLElement>(`[data-pk="${focused.pk}"]${id}${dir}`)
-      ?.focus({ preventScroll: true })
+    coverWithBag(inner, seat)
+    const control = focused?.pk
+      ? `[data-pk="${focused.pk}"]${focused.id ? `[data-id="${focused.id}"]` : ""}${focused.dir ? `[data-dir="${focused.dir}"]` : ""}`
+      : focused?.bag
+        ? `[data-bag="${focused.bag}"]${focused.tool ? `[data-tool="${focused.tool}"]` : ""}`
+        : undefined
+    if (control) inner.querySelector<HTMLElement>(control)?.focus({ preventScroll: true })
+  }
+
+  // Like the calculator, an open bag takes the seat's controls out of reach until it closes.
+  function coverWithBag(inner: HTMLElement, seat: number) {
+    for (const child of inner.children)
+      if (!child.classList.contains("bag-sheet")) child.toggleAttribute("inert", bags.isOpen(seat))
   }
 
   // Like the app's LifeControls: the running change replaces the glyph on its side.
@@ -771,8 +793,29 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     })
   }
 
+  // Redraws a seat's bag, its sheet, and its last roll, then puts focus where the app does: into
+  // the sheet when it opens, back on the pouch when it closes.
+  function renderBag(seat: number, focusSheet: boolean) {
+    const inner = el.querySelector<HTMLElement>(`.seat[data-player="${seat}"] .seat-in`)
+    if (!inner) return
+    if (isPokemon()) renderSeat(seat)
+    else {
+      inner.querySelector(".bag-sheet")?.remove()
+      inner.insertAdjacentHTML("beforeend", bags.sheetHtml(seat, seatName(game, seat)))
+      const who = inner.querySelector(".who")
+      who?.querySelector(".roll-chip")?.remove()
+      who?.insertAdjacentHTML("beforeend", bags.chipHtml(seat))
+      inner.querySelector(".bag")?.setAttribute("aria-expanded", String(bags.isOpen(seat)))
+      coverWithBag(inner, seat)
+    }
+    const focus = focusSheet && bags.isOpen(seat) ? ".bag-sheet button" : ".bag"
+    inner.querySelector<HTMLElement>(focus)?.focus({ preventScroll: true })
+  }
+
   el.addEventListener("click", (event) => {
     const target = event.target as Element
+    const bag = target.closest<HTMLElement>("[data-bag]")
+    if (bag) return renderBag(bags.click(bag), bag.dataset.bag !== "roll")
     const control = target.closest<HTMLElement>("[data-pk]")
     if (control) return pokemon.click(control)
     const calculator = target.closest<HTMLElement>("[data-calc]")
@@ -781,14 +824,15 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     if (!hit) return
     game.change(Number(hit.dataset.seat), hit.dataset.dir === "1" ? 1 : -1)
   })
-  // Escape closes a calculator before the page's own Escape handling sees it.
+  // Escape closes a calculator or a bag before the page's own Escape handling sees it.
   el.addEventListener("keydown", (event) => {
-    if (
-      event.key === "Escape" &&
-      event.target instanceof Element &&
-      calculators.escape(event.target)
-    )
+    if (event.key !== "Escape" || !(event.target instanceof Element)) return
+    const close = event.target.closest(".bag-sheet")?.querySelector<HTMLElement>(".bag-close")
+    if (close) {
       event.stopPropagation()
+      return renderBag(bags.click(close), false)
+    }
+    if (calculators.escape(event.target)) event.stopPropagation()
   })
   game.subscribe((event) => {
     if (event.type === "change") return showChange(event.seat, event.delta)
@@ -796,6 +840,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
     recent.forEach(({ timer }) => window.clearTimeout(timer))
     recent.clear()
     pokemon.reset()
+    bags.reset()
     calculators.reset()
     render()
   })

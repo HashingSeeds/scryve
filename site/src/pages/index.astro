@@ -8,6 +8,7 @@ import { APP_LINKS } from "../links"
 import { demoCards } from "../stage/deck-demo"
 import { SITE_SYSTEM_IDS } from "../stage/systems"
 import { playSystemRules } from "@/features/game/playSystems"
+import { MAX_PLAYERS, MIN_PLAYERS } from "../../../convex/lib/policy"
 
 const qr = await qrcode.toString(new URL("/", Astro.site).href, {
   type: "svg",
@@ -15,13 +16,13 @@ const qr = await qrcode.toString(new URL("/", Astro.site).href, {
   color: { dark: "#000000", light: "#ffffff" },
 })
 
+const playerCounts = Array.from({ length: MAX_PLAYERS - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i)
 const versions = [
   { name: "Current", record: "6–1" },
   { name: "Proliferate package", record: "5–3–1" },
   { name: "Budget swap", record: "3–5" },
 ]
 const GITHUB = "https://github.com/HashingSeeds/scryve"
-const GITHUB_ISSUES = `${GITHUB}/issues`
 // The History screen's sample games. Deck names are made up so no card names appear.
 const history = [
   {
@@ -48,25 +49,46 @@ const history = [
   },
 ]
 const plans = [
-  ["Life counter for 2 to 6 players", "Yes", "Yes"],
-  ["Connected play", "Yes", "Yes"],
-  ["Game history", "Yes", "Yes"],
-  ["Decks", "2", "100"],
-  ["Deck versioning", "No", "Up to 5 versions"],
-  ["Win rate by deck and version", "Yes", "Yes"],
+  ["Life counter for 2 to 10 players", "Yes", "Yes"],
+  ["Nearby and connected play", "Yes", "Yes"],
+  ["Rules and card search", "Yes", "Yes"],
+  ["Game history and win rates", "Yes", "Yes"],
+  ["Synced decks", "2", "100"],
+  ["Versions per deck", "2", "5"],
+  ["Compare lists side by side", "No", "Yes"],
+  ["Pro seat mark and app icons", "No", "Yes"],
+]
+// The store TV's sample event, laid out like the app's store screen. Names are made up.
+const pairings = [
+  ["1", "Maya", "Devon", "Reported"],
+  ["2", "Priya", "Jonas", "Playing"],
+  ["3", "Sam", "Alex", "Confirmed"],
+  ["4", "Rosa", "Theo", "Playing"],
+  ["5", "Nia", "Kai", "Reported"],
+  ["6", "Lena", "Omar", "Playing"],
+]
+const standings = [
+  ["1", "Maya", "6", "2-0-0"],
+  ["2", "Priya", "6", "2-0-0"],
+  ["3", "Sam", "4", "1-0-1"],
+  ["4", "Devon", "3", "1-1-0"],
+  ["5", "Rosa", "3", "1-1-0"],
+  ["6", "Nia", "3", "1-1-0"],
+  ["7", "Jonas", "1", "0-1-1"],
 ]
 ---
 
 <Base
   title="Scryve: life counter and deck tracker for Magic, Yu-Gi-Oh!, and Pokémon"
-  description="A fast life counter for 2 to 6 players with commander damage, Pokémon HP and prizes, connected games across phones, and deck tracking. Works offline. Play in your browser or on iPhone and Android."
+  description="A fast life counter for 2 to 10 players with commander damage, Pokémon HP and prizes, nearby games with no signal, offline rules and card search, store events, and deck tracking. Play in your browser or on iPhone and Android."
 >
   <header class="header">
     <a class="brand" href="/"><img src={appIcon} alt="" width="30" height="30" />Scryve</a>
     <nav class="header-nav" aria-label="Sections">
       <a href="#features">Features</a>
-      <a href="#connected">Connected play</a>
+      <a href="#nearby">No signal</a>
       <a href="#record">History</a>
+      <a href="#stores">Stores</a>
       <a href="#pro">Pro</a>
     </nav>
     <div class="header-actions">
@@ -89,7 +111,6 @@ const plans = [
                 <button type="button" data-value={id} aria-pressed={String(id === "mtg")}>{playSystemRules(id).shortLabel}</button>
               ))}
             </div>
-            <a class="quiet" href="#next">What's next</a>
           </div>
         </div>
         <GetTheApp play={false} />
@@ -102,24 +123,18 @@ const plans = [
           <div class="step" data-step="intro">
             <div class="step-copy">
               <h2>On the table in seconds.</h2>
-              <p>Browser, iPhone, iPad, or Android. A local game needs no account, and the apps need no signal.</p>
-            </div>
-          </div>
-        </section>
-
-        <section id="features" data-scene="features" aria-label="Features">
-          <div class="step" data-step="players">
-            <div class="step-copy">
-              <h2>Two to six players.</h2>
-              <p>Pick the layout that matches how you sit.</p>
+              <p>Two to ten players, seated the way you sit. Browser, iPhone, iPad, or Android, and a local game needs no account.</p>
               <div class="picker" data-pick="count" role="group" aria-label="Players">
-                {[2, 3, 4, 5, 6].map((count) => (
+                {playerCounts.map((count) => (
                   <button type="button" data-value={count} aria-pressed={String(count === 5)}>{count}</button>
                 ))}
               </div>
               <div class="picker" data-pick="layout" role="group" aria-label="Layout"></div>
             </div>
           </div>
+        </section>
+
+        <section id="features" data-scene="features" aria-label="Features">
           <div class="step" data-step="details">
             <div class="step-copy">
               <div class="demo-copy" data-demo-copy="commander">
@@ -144,31 +159,23 @@ const plans = [
               </div>
             </div>
           </div>
-          <div class="step" id="next" data-step="next">
+        </section>
+
+        <section id="nearby" data-scene="nearby" aria-label="Nearby play">
+          <div class="step" data-step="nearby">
             <div class="step-copy">
-              <h2>Next up: Lorcana.</h2>
-              <p>Life, Life Points, and Pokémon HP and prizes are in, with each game's formats. Lore counts up to 20, so it's the first game where the board counts the other way. After that, your vote decides.</p>
-              <ul class="next-list">
-                <li><b>Lorcana</b><span>Lore, 0 to 20</span><em>Next</em></li>
-                <li><b>Star Wars Unlimited</b><span>Base damage, usually to 30, up to six players</span><em>Vote</em></li>
-                <li><b>Riftbound</b><span>Points to 8, two to four players</span><em>Vote</em></li>
-              </ul>
-              <a class="demo-replay" href={GITHUB_ISSUES}>Vote on GitHub</a>
+              <h2>No signal? Still one game.</h2>
+              <p>Phones on the same Wi-Fi join a nearby game with a code or QR. No internet, no account, and every tap shows on every phone. Tap either one.</p>
+              <p class="note">With signal, share a link and play from anywhere.</p>
             </div>
           </div>
         </section>
 
-        <section id="connected" data-scene="connected" aria-label="Connected play">
-          <div class="step" data-step="join">
+        <section data-scene="rules" aria-label="Rules and cards">
+          <div class="step" data-step="rules">
             <div class="step-copy">
-              <h2>One game, every phone.</h2>
-              <p>Share a code, a QR, or a link. The whole table is on every phone. Tap either one.</p>
-            </div>
-          </div>
-          <div class="step" data-step="seats">
-            <div class="step-copy">
-              <h2>Seats, colors, and marks.</h2>
-              <p>Pick a seat, a color, and a mark. When everyone is in, the host starts the game.</p>
+              <h2>Rules and cards at the table.</h2>
+              <p>Search the Magic rules or any Magic card from the game menu. Once they download, both answer with no signal.</p>
             </div>
           </div>
         </section>
@@ -177,7 +184,7 @@ const plans = [
           <div class="step" data-step="record">
             <div class="step-copy">
               <h2>Every game, one record.</h2>
-              <p>Commander on Thursday, Yu-Gi-Oh! locals on Tuesday, a Pokémon League Cup on Saturday. Local and connected games land in one history, with a win rate for every deck.</p>
+              <p>Commander on Thursday, Yu-Gi-Oh! locals on Tuesday, a Pokémon League Cup on Saturday. Every game lands in one history, with a win rate for every deck.</p>
             </div>
           </div>
         </section>
@@ -185,8 +192,8 @@ const plans = [
         <section id="pro" data-scene="pro" aria-label="Decks and Scryve Pro">
           <div class="step" data-step="decks">
             <div class="step-copy">
-              <h2>Decks that keep score.</h2>
-              <p>Tap a card to see its details. Tap ••• to compare version records with Pro.</p>
+              <h2>Did your last change help?</h2>
+              <p>Save a version before you swap cards, and each version keeps its own record. Tap ••• to see them. Share synced decks with a link.</p>
             </div>
           </div>
           <div class="step" data-step="plans">
@@ -200,7 +207,7 @@ const plans = [
                   ))}
                 </tbody>
               </table>
-              <p class="note">Pro is monthly or yearly. Upgrade from Account in the app.</p>
+              <p class="note">Pro is monthly or yearly. Get it from Account in the app.</p>
             </div>
           </div>
         </section>
@@ -213,7 +220,14 @@ const plans = [
               <div class="scene-screen" data-for="intro features">
                 <div class="board-holder" data-board="features"></div>
               </div>
-              <div class="scene-screen" data-for="connected"><div class="board-holder" data-board="connected"></div></div>
+              <div class="scene-screen" data-for="nearby"><div class="board-holder" data-board="nearby"></div></div>
+              <div class="scene-screen rules-screen" data-for="rules">
+                <div class="board-holder" data-board="rules" aria-hidden="true"></div>
+                <div class="rules-sheet" role="group" aria-label="Rules">
+                  <div class="rules-field"><span data-rules-query>deathtouch</span><i aria-hidden="true"></i></div>
+                  <div class="rules-results" data-rules-results></div>
+                </div>
+              </div>
               <div class="scene-screen hist" data-for="record" role="group" aria-label="History">
                 <div class="deck-top"><span>Account</span><b>History</b><span>Filter</span></div>
                 <div class="hist-tabs"><span aria-current="true">All</span><span>Local</span><span>Connected</span></div>
@@ -299,8 +313,8 @@ const plans = [
               </div>
             </div>
           </div>
-          <div class="phone second" data-for="connected">
-            <div class="screen"><div class="board-holder" data-board="connected"></div></div>
+          <div class="phone second" data-for="nearby">
+            <div class="screen"><div class="board-holder" data-board="nearby"></div></div>
           </div>
         </div>
         <div class="full-bar">
@@ -310,13 +324,45 @@ const plans = [
       </div>
     </div>
 
+    <section id="stores" class="stores" aria-labelledby="stores-heading">
+      <div class="stores-copy">
+        <h2 id="stores-heading">Bring it to your store.</h2>
+        <p>Run a Magic event from one phone, with Swiss rounds or Commander pods. Players join with a code and report their own results, and the store TV shows pairings, the round clock, and standings.</p>
+        <p class="note">Internet down? Run the event over the store's Wi-Fi, with pairings and results on every phone.</p>
+      </div>
+      <figure class="tv" aria-label="Store screen">
+        <div class="tv-screen">
+          <div class="tv-head">
+            <div><b>Friday Modern</b><span>Modern · Swiss · Best of 3</span></div>
+            <div class="tv-clock"><span>Round 3 of 4</span><b>31:42</b></div>
+            <div class="tv-code"><span>Code</span><b>K7Q2</b></div>
+          </div>
+          <div class="tv-panels">
+            <div class="tv-panel">
+              <b>Pairings</b>
+              {pairings.map(([table, a, b, status]) => (
+                <div class="tv-row"><em>{table}</em><span>{a}</span><span>{b}</span><small data-status={status}>{status}</small></div>
+              ))}
+            </div>
+            <div class="tv-panel">
+              <b>Standings</b>
+              <div class="tv-row tv-label"><em></em><span></span><span>Pts</span><small>W-L-D</small></div>
+              {standings.map(([rank, name, points, record]) => (
+                <div class="tv-row"><em>{rank}</em><span>{name}</span><span>{points}</span><small>{record}</small></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </figure>
+    </section>
+
     <section class="facts" aria-label="Facts">
-      <div><b>No account for local play</b><span>Open it and count. Sign in only for connected games and synced decks.</span></div>
-      <div><b>No signal needed</b><span>The iPhone, iPad, and Android apps save games on the phone and never wait on a network.</span></div>
+      <div><b>No account for local play</b><span>Open it and count. Sign in only to sync decks and history, and to play over the internet.</span></div>
+      <div><b>No internet needed</b><span>Games, and nearby play over shared Wi-Fi, need no internet. Rules and Magic card search work offline once downloaded.</span></div>
+      <div><b>Seven languages</b><span>English, Spanish, French, Japanese, Korean, Hindi, and Arabic, right to left.</span></div>
       <div><b>Open source</b><span>MIT licensed <a href={GITHUB}>on GitHub</a>. Read it, fork it, file a bug.</span></div>
       <div><b>No ads</b><span>Pro pays for the servers. The counter stays free.</span></div>
       <div><b>Straight to the game</b><span>No loading screen, no login screen. Your first tap is a life change.</span></div>
-      <div><b>One history</b><span>Magic, Yu-Gi-Oh!, and Pokémon games, local and connected, with a win rate per deck.</span></div>
     </section>
 
     <section class="closing">

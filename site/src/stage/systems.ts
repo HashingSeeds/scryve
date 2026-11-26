@@ -9,3 +9,8 @@ export type SiteSystemId = (typeof DEMO_SYSTEM_IDS)[number]
 export const SITE_SYSTEM_IDS: readonly SiteSystemId[] = DEMO_SYSTEM_IDS.filter(
   (id) => SYSTEMS[id].release === "general",
 )
+
+// The site's Magic demo is a Commander table, so its life and counters are Commander's.
+export function demoFormat(system: PlaySystemId) {
+  return system === "mtg" ? "commander" : undefined
+}

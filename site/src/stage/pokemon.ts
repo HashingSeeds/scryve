@@ -66,7 +66,7 @@ const SAMPLE_DAMAGE: readonly (readonly number[])[] = [
   [30, 50, 0],
   [150, 0],
 ]
-export const SAMPLE_PRIZES = [3, 4, 5, 6, 4, 5] as const
+export const SAMPLE_PRIZES = [3, 4, 5, 6, 4, 5, 2, 6, 3, 5] as const
 
 const deckOf = (seat: number) => SAMPLE_DECKS[seat % SAMPLE_DECKS.length] ?? []
 
@@ -123,8 +123,8 @@ const CONTENT_EDGES: Record<number, Record<Edge, Edge>> = {
   180: { top: "bottom", right: "left", bottom: "top", left: "right" },
 }
 
-// pokemonCardLayout's benchMenuClearance: what sits on the seat content's inner (top) edge, the
-// bench or the calculator's header, steps aside from the pentagon when the pentagon touches it.
+// pokemonCardLayout's menuClearance: what sits on the seat content's inner (top) edge steps
+// aside from the pentagon when the pentagon touches it.
 export function innerEdgeClearance(rotation: number, spot: MenuSpot | undefined) {
   const edges = CONTENT_EDGES[rotation] ?? CONTENT_EDGES[0]
   if (!edges || !spot) return undefined
@@ -142,6 +142,9 @@ export interface PokemonSeatContext {
   rowLength: number
   name: string
   mark: string
+  // The seat's dice bag button and its last roll, which sit in the bottom row as in the app.
+  bag: string
+  roll: string
 }
 
 export type PokemonTableEvent = {
@@ -406,8 +409,8 @@ export function createPokemonSeats(game: DemoGame, refresh: (seat: number) => vo
     </div>`
   }
 
-  // The inside of one Pokémon seat: bench on the inner edge, the shown Pokémon's HP in the
-  // middle, and the seat's mark and prizes along the outer edge.
+  // The inside of one Pokémon seat: the shown Pokémon's HP, the bench below it like the
+  // playmat, and the seat's mark and prizes along the outer edge.
   function html(context: PokemonSeatContext) {
     const { seat } = context
     const board = boardOf(seat)
@@ -420,13 +423,13 @@ export function createPokemonSeats(game: DemoGame, refresh: (seat: number) => vo
       : ""
     const hint = board.bench.length ? "<small>or tap a bench Pokémon</small>" : ""
     return `<div class="pk"${clearance}>
-      <div class="pk-bench" role="group" aria-label="${context.name}, bench, ${board.bench.length} of ${RULES.benchSize}">${benchHtml(seat, board.bench, focused?.id)}</div>
       ${
         shown
           ? heroHtml(seat, shown, Boolean(focused))
           : `<button class="pk-place" type="button" data-pk="place" data-slot="active" data-seat="${seat}">Place Active${hint}</button>`
       }
-      <div class="pk-foot"><span class="who">${context.mark}<span>${context.name}</span></span>${prizesHtml(seat)}</div>
+      <div class="pk-bench" role="group" aria-label="${context.name}, bench, ${board.bench.length} of ${RULES.benchSize}">${benchHtml(seat, board.bench, focused?.id)}</div>
+      <div class="pk-foot"><span class="who">${context.mark}<span>${context.name}</span>${context.roll}</span><span class="pk-foot-end">${context.bag}${prizesHtml(seat)}</span></div>
       ${barHtml(seat)}
       ${sheetHtml(seat)}
     </div>`

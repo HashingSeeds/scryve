@@ -1,4 +1,4 @@
-The dice bag shape in DiceGlyph.tsx is copied from this icon set.
+The dice bag shape in tableGlyphs.ts is copied from this icon set.
 
 @icons (https://github.com/Voxybuns/at-icons): pouch
 

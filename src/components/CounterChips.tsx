@@ -35,6 +35,7 @@ import {
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { seatIdentityMetrics } from "./SeatIdentity"
+import { RINGED_GLYPHS, TABLE_GLYPHS } from "./tableGlyphs"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 import { targetSlop } from "./touchTarget"
@@ -118,24 +119,8 @@ export function counterOutReason({ id, label }: { id: string; label: string }) {
   return isOutReasonId(id) ? translate(`board:outReason.${id}`) : label.toLowerCase()
 }
 
-const LEVEL_UP = "M6 13l6-6 6 6M6 19l6-6 6 6"
-
-const GLYPHS: Record<string, string> = {
-  poison: "M12 2v20",
-  energy: "M13 2 4 14h7l-1 8 9-12h-7z",
-  experience: LEVEL_UP,
-  xp: LEVEL_UP,
-  commanderTax: "M6 3h12v18l-6-4-6 4zM12 7v6M9 10h6",
-  monarch: "M3 19h18M4.5 15.5 3 7l5 4 4-6 4 6 5-4-1.5 8.5z",
-  initiative: "M6 21V10a6 6 0 0 1 12 0v11M3 21h18M12 13v4",
-  marked: "M12 5a7 7 0 1 0 0 14 7 7 0 1 0 0-14M12 2v6M12 16v6M2 12h6M16 12h6",
-  plus: "M12 5v14M5 12h14",
-  close: "M6 6l12 12M18 6 6 18",
-}
-const RINGED = new Set(["poison"])
-
 export function TableGlyph({ id, size, color }: { id: string; size: number; color: string }) {
-  const path = GLYPHS[id]
+  const path = TABLE_GLYPHS[id]
   return (
     <Svg
       width={size}
@@ -148,7 +133,7 @@ export function TableGlyph({ id, size, color }: { id: string; size: number; colo
       strokeLinejoin="round"
     >
       {path ? null : <Circle cx={12} cy={12} r={4} fill={color} />}
-      {RINGED.has(id) ? <Circle cx={12} cy={12} r={7} /> : null}
+      {RINGED_GLYPHS.has(id) ? <Circle cx={12} cy={12} r={7} /> : null}
       {path ? <Path d={path} /> : null}
     </Svg>
   )
