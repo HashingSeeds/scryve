@@ -231,12 +231,17 @@ export function isValidTurnGroups(
 export const turnElapsed = (turn: Pick<Turn, "startedAt" | "waiting" | "paused">, now: number) =>
   turn.waiting || turn.paused ? 0 : Math.max(0, now - turn.startedAt)
 
-export function turnTimeSpent(turn: Turn, playerId: string, now: number) {
+type ClockTurn = Pick<
+  Turn,
+  "playerId" | "priorityPlayerId" | "startedAt" | "waiting" | "paused" | "spent" | "bank"
+>
+
+export function turnTimeSpent(turn: ClockTurn, playerId: string, now: number) {
   const before = turn.spent?.[playerId] ?? 0
   return clockOwner(turn) === playerId ? before + turnElapsed(turn, now) : before
 }
 
-export function bankLeft(turn: Turn, playerId: string, now: number) {
+export function bankLeft(turn: ClockTurn, playerId: string, now: number) {
   if (!turn.bank) return undefined
   return turn.bank.ms - (turnTimeSpent(turn, playerId, now) - (turn.bank.base[playerId] ?? 0))
 }

@@ -171,6 +171,6 @@ async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">, seats: Doc<"gam
 
 function liveTurn(game: Doc<"games">) {
   if (game.status !== "active" || !game.turn) return undefined
-  const { previous: _previous, ...turn } = game.turn
+  const { previous: _previous, operationId: _operationId, ...turn } = game.turn
   return turn
 }

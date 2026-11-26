@@ -55,7 +55,7 @@ export function WatchSheet({
     try {
       // why: browsers without a share sheet (desktop Firefox) reject Share.share, so the link is copied instead.
       if (Platform.OS === "web" && typeof navigator.share !== "function") {
-        await Clipboard.setStringAsync(url)
+        if (!(await Clipboard.setStringAsync(url))) throw new Error("Clipboard write failed")
         setCopied(true)
         return
       }

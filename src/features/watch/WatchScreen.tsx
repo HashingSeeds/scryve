@@ -31,7 +31,7 @@ import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import { api } from "../../../convex/_generated/api"
 import { tableRules } from "../../../convex/lib/systems"
 import { holdsDesignation, type TableState } from "../../../convex/lib/table"
-import { bankLeft, clockOwner, turnLead, type Turn } from "../../../convex/lib/turns"
+import { bankLeft, clockOwner, turnLead } from "../../../convex/lib/turns"
 
 type Board = NonNullable<FunctionReturnType<typeof api.games.watchBoard>>
 type LiveBoard = Extract<Board, { players: unknown }>
@@ -284,6 +284,7 @@ function SeatTile({
                 <View
                   key={`${row.fromPlayerId}:${row.commander ?? 0}`}
                   accessible
+                  accessibilityRole="image"
                   accessibilityLabel={translate(
                     row.commander === 1
                       ? "connected:watch.partnerDamage"
@@ -320,7 +321,7 @@ function BankClock({
   ink,
   s,
 }: {
-  turn: Turn
+  turn: NonNullable<LiveBoard["turn"]>
   playerId: string
   ink: string
   s: Styles
