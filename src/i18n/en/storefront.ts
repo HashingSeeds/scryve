@@ -93,9 +93,9 @@ const storefront = {
       terms: "Terms of Service: {{url}}",
       privacy: "Privacy Policy: {{url}}",
     },
-    // The App Store's release notes for this version. Keep the section headings, the • bullets and the line breaks.
+    // The App Store's release notes for this version. Keep the • bullets and the line breaks. "Your language" means whichever language the player's phone uses, so don't name a language.
     whatsNew:
-      "Decks\n• Share any deck with a link. Friends can play it right away in local, cloud, or nearby games, or save their own copy.\n• New Play and Build views: choose the version you bring, see recent results, and edit cards, sideboard, and partner commanders.\n• Sideboard between games of a match.\n• Stats for every deck, with list comparison in Pro.\n• Filter decks by color and find them by commander.\n• Keep unlimited decks on this device and choose which ones sync. Record matches offline.\n• Look up any card without opening a deck. Search handles misspellings.\n\nGames\n• Tap a player to deal commander damage. Partner commanders attack together.\n• Pick who goes first. Deck stats show your record going first and second.\n• Nearby games are open to everyone. Join with a code or QR.\n\nEvents\n• Run Swiss or pod events from your phone, even over store Wi-Fi without internet. Players report from their phones, and a store TV can show pairings, the clock, and standings.\n\nFeedback\n• Send feedback in the app and see replies, with optional notifications.\n\nPlus faster nearby play and many fixes.",
+      "• Buy Pro on your phone without signing in first.\n• Pro stays unlocked when your connection drops.\n• The board's corners follow your phone's rounded screen.\n• Permission prompts appear in your language.\n• Faster rules search.\n\nPlus many fixes.",
   },
 }
 
