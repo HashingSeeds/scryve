@@ -82,4 +82,32 @@ it("finds a Flesh and Blood keyword by its rule's title line", () => {
 
 it("finds a keyword whose card gives it a value", () => {
   expect(magicKeyword(rules, "Kicker 2")?.id).toBe("702.33")
+  expect(magicKeyword(rules, "Kicker X")?.id).toBe("702.33")
+})
+
+it("finds a Flesh and Blood keyword printed with its element or hero", () => {
+  const fab: ComprehensiveRules = {
+    chapters: [
+      {
+        id: "8",
+        title: "Keywords",
+        sections: [
+          {
+            id: "8.3",
+            title: "Ability Keywords",
+            rules: [
+              { id: "8.3.7", text: "Specialization\nOnly that hero.", examples: [] },
+              { id: "8.3.16", text: "Essence\nAn essence of a talent.", examples: [] },
+              { id: "8.3.17", text: "Fusion\nReveal a card.", examples: [] },
+            ],
+          },
+        ],
+      },
+    ],
+    glossary: [],
+    notice: [],
+  }
+  expect(fabKeyword(fab, "Ice Fusion")?.id).toBe("8.3.17")
+  expect(fabKeyword(fab, "Essence of Lightning")?.id).toBe("8.3.16")
+  expect(fabKeyword(fab, "Kano Specialization")?.id).toBe("8.3.7")
 })

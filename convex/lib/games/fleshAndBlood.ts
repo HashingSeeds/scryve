@@ -106,7 +106,8 @@ export function normalizeFabCubeCards(value: unknown): DatasetCard[] {
 
 /** why: the rules sheet's offline file reads the same normalized cards decks use. */
 export function fabLocalCard(card: DatasetCard): LocalCard {
-  const printing = card.printings[0]
+  const printing =
+    card.printings.find((candidate) => candidate.faces[0]?.imageUrl) ?? card.printings[0]
   const face = printing?.faces[0]
   return {
     cardId: card.cardId,
