@@ -156,6 +156,14 @@ export function facet(key: string, value: unknown) {
   return parsed ? { key, value: parsed } : undefined
 }
 
+/** why: catalogs store keywords as one comma-joined facet, and card views link each one on its own line. */
+export function facetKeywords(facets: readonly { key: string; value: string }[] | undefined) {
+  return facets
+    ?.find((candidate) => candidate.key === "keywords")
+    ?.value.split(", ")
+    .join("\n")
+}
+
 export function httpsUrl(value: unknown) {
   const url = stringValue(value)
   return url?.startsWith("https://") ? url : undefined

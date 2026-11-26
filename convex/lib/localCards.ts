@@ -15,7 +15,7 @@ export type LocalCard = {
   colorIdentity?: string
 }
 
-export const LOCAL_CARD_GAMES = ["mtg"] as const satisfies readonly SystemId[]
+export const LOCAL_CARD_GAMES = ["mtg", "fab"] as const satisfies readonly SystemId[]
 export type LocalCardGame = (typeof LOCAL_CARD_GAMES)[number]
 
 export function isLocalCardGame(game: string): game is LocalCardGame {

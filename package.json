@@ -52,6 +52,7 @@
     "sync:ygo-images": "tsx workers/ygo-image-mirror/sync/index.ts",
     "sync:mtg-dataset": "tsx workers/ygo-image-mirror/sync/mtgDataset.ts",
     "sync:mtg-prices": "tsx workers/ygo-image-mirror/sync/mtgPrintingsAndPrices.ts",
+    "sync:local-cards": "tsx workers/ygo-image-mirror/sync/localCards.ts",
     "app-icons": "tsx scripts/app-icons.ts",
     "rules:eval": "tsx scripts/rules-search-eval.ts",
     "cards:eval": "tsx scripts/card-search-eval.ts",

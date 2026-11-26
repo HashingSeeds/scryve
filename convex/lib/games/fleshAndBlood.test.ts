@@ -1,7 +1,12 @@
 import fabPrecons from "./fabPrecons.json"
 import fabCube from "./fixtures/fabCube.json"
 import fabPreconCards from "./fixtures/fabPreconCards.json"
-import { FAB_CUBE_DATASET, fabPreconEntries, normalizeFabCubeCards } from "./fleshAndBlood"
+import {
+  FAB_CUBE_DATASET,
+  fabLocalCard,
+  fabPreconEntries,
+  normalizeFabCubeCards,
+} from "./fleshAndBlood"
 import { SYSTEMS } from "../systems"
 
 const cards = normalizeFabCubeCards(fabCube)
@@ -85,6 +90,28 @@ describe("the-fab-cube normalizer", () => {
       ]),
     ).toEqual([])
     expect(normalizeFabCubeCards({ cards: fabCube })).toEqual([])
+  })
+})
+
+it("keeps what the rules sheet shows offline, one keyword per line", () => {
+  expect(fabLocalCard(card("Ball Lightning (red)"))).toEqual({
+    cardId: card("Ball Lightning (red)").cardId,
+    name: "Ball Lightning (red)",
+    imageUrl: expect.stringMatching(/^https:/),
+    smallImageUrl: expect.stringMatching(/^https:/),
+    typeLine: expect.stringContaining("Action"),
+    oracleText: expect.stringContaining("Lightning"),
+    keywords: "Go again",
+  })
+})
+
+it("shows a card's art from its first printing that has any", () => {
+  const ball = card("Ball Lightning (red)")
+  const [printing] = ball.printings
+  const bare = { ...printing, printingId: "bare", faces: [{ index: 0, text: "Text" }] }
+  expect(fabLocalCard({ ...ball, printings: [bare, printing] })).toMatchObject({
+    imageUrl: printing.faces[0].imageUrl,
+    smallImageUrl: printing.faces[0].smallImageUrl,
   })
 })
 

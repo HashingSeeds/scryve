@@ -1,6 +1,7 @@
 import {
   compact,
   facet,
+  facetKeywords,
   fetchDatasetJson,
   httpsUrl,
   normalizeCardName,
@@ -14,6 +15,7 @@ import type { DeckFeed, DeckListRules } from "./decks"
 import fabPrecons from "./fabPrecons.json"
 import { internal } from "../../_generated/api"
 import type { ActionCtx } from "../../_generated/server"
+import type { LocalCard } from "../localCards"
 
 /** why: the dataset's develop branch can break, so sync reads a release tag. Bump it to ship new sets. */
 const FAB_CUBE_TAG = "v8.2.0"
@@ -100,6 +102,21 @@ export function normalizeFabCubeCards(value: unknown): DatasetCard[] {
       },
     ]
   })
+}
+
+export function fabLocalCard(card: DatasetCard): LocalCard {
+  const printing =
+    card.printings.find((candidate) => candidate.faces[0]?.imageUrl) ?? card.printings[0]
+  const face = printing?.faces[0]
+  return {
+    cardId: card.cardId,
+    name: card.name,
+    imageUrl: face?.imageUrl,
+    smallImageUrl: face?.smallImageUrl,
+    typeLine: printing?.typeLabel,
+    oracleText: face?.text,
+    keywords: facetKeywords(card.facets),
+  }
 }
 
 export const FAB_CUBE_DATASET = {

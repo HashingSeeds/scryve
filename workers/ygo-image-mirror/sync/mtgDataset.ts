@@ -85,7 +85,7 @@ export async function buildMagicDataset(
   return { dataset: { version, cards, textIndex: magicTextIndex(cards) }, localCards }
 }
 
-async function upload(
+export async function upload(
   fetcher: Fetch,
   { origin, token, path, gzip }: { origin: string; token: string; path: string; gzip: Buffer },
 ) {
