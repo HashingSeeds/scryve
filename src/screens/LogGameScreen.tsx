@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -51,7 +51,7 @@ type LogGameScreenProps = {
 export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGameScreenProps) {
   const { themed, theme } = useAppTheme()
   const [draft, setDraft] = useState(initialDraft)
-  const [meSeat, setMeSeat] = useState<number | undefined>(account ? 0 : undefined)
+  const [meSeat, setMeSeat] = useState<number | undefined>(0)
   const [deck, setDeck] = useState<SelectedDeck>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -234,6 +234,7 @@ export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGame
         <View style={themed($row)}>
           <TextField
             testID="log-date"
+            style={$shrinkInput}
             labelTx="play:recordMatch.date"
             value={draft.date}
             placeholder={ISO_DATE_PLACEHOLDER}
@@ -244,6 +245,7 @@ export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGame
           />
           <TextField
             testID="log-minutes"
+            style={$shrinkInput}
             labelTx="play:logGame.minutes"
             optional
             value={draft.minutes}
@@ -271,6 +273,7 @@ export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGame
 
 const $screen: ViewStyle = { flex: 1 }
 const $flex: ViewStyle = { flex: 1 }
+const $shrinkInput: TextStyle = { minWidth: 0 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.md,
   paddingHorizontal: spacing.md,
