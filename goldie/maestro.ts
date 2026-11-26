@@ -103,7 +103,7 @@ function prepareSimulator(udid: string) {
 
 async function runMaestro(udid: string, flows: string[], vars: Record<string, string>) {
   const out = mkdtempSync(join(tmpdir(), "goldie-maestro-"))
-  const args = ["--device", udid, "test", "--test-output-dir", out]
+  const args = ["--device", udid, "test", "--test-output-dir", out, "--debug-output", out]
   for (const [key, value] of Object.entries({ ...env, ...vars })) args.push("-e", `${key}=${value}`)
   // why: async, so this process keeps answering the table server while flows call it.
   const run = spawn("maestro", [...args, ...flows], { stdio: ["ignore", "pipe", "inherit"] })
@@ -159,7 +159,7 @@ try {
         `> ${deviceKey} ${locale}: ${scenes.map((scene: { id: string }) => scene.id).join(", ")}`,
       )
       // why: each scene flow ends with `takeScreenshot: <its id>`, so files map back by name.
-      const { files: shots } = await runMaestro(
+      const { files: shots, ok: scenesOk } = await runMaestro(
         udid,
         scenes.map((scene: { flow: string }) => flowPath(cfg, scene.flow)),
         vars,
@@ -169,6 +169,7 @@ try {
         if (shot) copyFileSync(shot, join(rawDir, `${scene.id}.png`))
         else missing.push(`${deviceKey}/${locale}/${scene.id}`)
       }
+      if (!scenesOk) missing.push(`${deviceKey}/${locale}: a scene flow failed`)
       // why: a run of some scenes keeps the captures earlier runs left, so the manifest lists every one on disk.
       manifest.screenshots = cfg.scenes
         .filter(isCaptured)
@@ -181,7 +182,7 @@ try {
       if (preview && DEVICES[deviceKey].preview) {
         console.log(`> ${deviceKey} ${locale}: preview`)
         // why: each segment flow wraps its filmed steps in `startRecording: <segment id>`.
-        const { files: clips } = await runMaestro(
+        const { files: clips, ok: previewOk } = await runMaestro(
           udid,
           preview.segments.map((segment: { flow: string }) => flowPath(cfg, segment.flow)),
           vars,
@@ -195,6 +196,7 @@ try {
         })
         if (recorded.every(Boolean)) manifest.preview = { sceneId: preview.id, clips: recorded }
         else missing.push(`${deviceKey}/${locale}/${preview.id}`)
+        if (!previewOk) missing.push(`${deviceKey}/${locale}: the preview flow failed`)
       }
 
       manifest.capturedAt = new Date().toISOString()
@@ -205,6 +207,6 @@ try {
   table.close()
 }
 if (missing.length) {
-  console.error(`Not captured: ${missing.join(", ")}`)
+  console.error(`Not captured or failed: ${missing.join(", ")}`)
   process.exitCode = 1
 }

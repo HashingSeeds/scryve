@@ -15,7 +15,7 @@ const path = require("node:path")
 const { setTimeout } = require("node:timers")
 
 const { backendCredentials, botIdentity } = require("../scripts/bots.cjs")
-const { cliEnv, localDir } = require("../scripts/local-backend.cjs")
+const { cliEnv } = require("../scripts/local-backend.cjs")
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -257,13 +257,17 @@ async function recordTodayGames(client) {
 const HERE = path.dirname(require.resolve("./seed.cjs"))
 const SNAPSHOT = path.join(HERE, "out", "seed.zip")
 
-/** why: the restore is --replace-all, so every command names the running local backend instead of trusting the CLI's env files. */
+/** why: the restore is --replace-all, so commands carry the verified local URL and admin key; with those set the CLI refuses any deployment an env file names. */
 async function convex(args) {
-  const { deploymentName } = await backendCredentials()
+  const { url, adminKey } = await backendCredentials()
+  const cwd = path.join(HERE, "out", "convex-cli")
+  fs.mkdirSync(cwd, { recursive: true })
+  fs.writeFileSync(path.join(cwd, "convex.json"), JSON.stringify({ functions: "../../../convex" }))
+  fs.copyFileSync(path.join(HERE, "..", "package.json"), path.join(cwd, "package.json"))
   const bin = path.join(HERE, "..", "node_modules", ".bin", "convex")
-  const result = spawnSync(bin, [...args, "--deployment", deploymentName], {
-    cwd: localDir(),
-    env: cliEnv(),
+  const result = spawnSync(bin, args, {
+    cwd,
+    env: { ...cliEnv(), CONVEX_SELF_HOSTED_URL: url, CONVEX_SELF_HOSTED_ADMIN_KEY: adminKey },
     encoding: "utf8",
   })
   if (result.status !== 0)
