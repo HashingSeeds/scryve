@@ -56,12 +56,12 @@ export function LogGameScreen({ initialDraft, account, onBack, onSave }: LogGame
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const mounted = useRef(true)
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true
+    return () => {
       mounted.current = false
-    },
-    [],
-  )
+    }
+  }, [])
   const guestDecks = useGuestDecks()
   const [sharedDecks] = useState(loadSharedDecks)
   const seatNames = draft.names.map((name, seat) => name.trim() || defaultName(seat))
