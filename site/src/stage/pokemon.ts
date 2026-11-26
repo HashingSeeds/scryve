@@ -142,6 +142,9 @@ export interface PokemonSeatContext {
   rowLength: number
   name: string
   mark: string
+  // The seat's dice bag button and its last roll, which sit in the bottom row as in the app.
+  bag: string
+  roll: string
 }
 
 export type PokemonTableEvent = {
@@ -426,7 +429,7 @@ export function createPokemonSeats(game: DemoGame, refresh: (seat: number) => vo
           : `<button class="pk-place" type="button" data-pk="place" data-slot="active" data-seat="${seat}">Place Active${hint}</button>`
       }
       <div class="pk-bench" role="group" aria-label="${context.name}, bench, ${board.bench.length} of ${RULES.benchSize}">${benchHtml(seat, board.bench, focused?.id)}</div>
-      <div class="pk-foot"><span class="who">${context.mark}<span>${context.name}</span></span>${prizesHtml(seat)}</div>
+      <div class="pk-foot"><span class="who">${context.mark}<span>${context.name}</span>${context.roll}</span><span class="pk-foot-end">${context.bag}${prizesHtml(seat)}</span></div>
       ${barHtml(seat)}
       ${sheetHtml(seat)}
     </div>`

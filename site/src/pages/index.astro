@@ -58,18 +58,6 @@ const plans = [
   ["Compare lists side by side", "No", "Yes"],
   ["Pro seat mark and app icons", "No", "Yes"],
 ]
-// The rules sheet's sample search: Atraxa's deathtouch, quoted from the Comprehensive Rules.
-const atraxa = demoCards[0]
-const rulesHits = [
-  {
-    title: "702.2 Deathtouch",
-    text: "702.2b A creature with toughness greater than 0 that’s been dealt damage by a source with deathtouch since the last time state-based actions were checked is destroyed as a state-based action.",
-  },
-  {
-    title: "702.2c",
-    text: "Any nonzero amount of combat damage assigned to a creature by a source with deathtouch is considered to be lethal damage for the purposes of determining if excess damage is being dealt.",
-  },
-]
 // The store TV's sample event, laid out like the app's store screen. Names are made up.
 const pairings = [
   ["1", "Maya", "Devon", "Reported"],
@@ -233,26 +221,12 @@ const standings = [
                 <div class="board-holder" data-board="features"></div>
               </div>
               <div class="scene-screen" data-for="nearby"><div class="board-holder" data-board="nearby"></div></div>
-              <div class="scene-screen rules-screen" data-for="rules" role="group" aria-label="Rules">
-                <div class="deck-top"><span>Game</span><b>Rules</b><span></span></div>
-                <div class="deck-tabs" role="group" aria-label="Search">
-                  <button type="button" data-rules-tab="rules" aria-pressed="true">Rules</button>
-                  <button type="button" data-rules-tab="cards" aria-pressed="false">Cards</button>
+              <div class="scene-screen rules-screen" data-for="rules">
+                <div class="board-holder" data-board="rules" aria-hidden="true"></div>
+                <div class="rules-sheet" role="group" aria-label="Rules">
+                  <div class="rules-field"><span data-rules-query aria-live="polite">deathtouch</span><i aria-hidden="true"></i></div>
+                  <div class="rules-results" data-rules-results></div>
                 </div>
-                <div class="rules-search">deathtouch</div>
-                <div class="rules-list" data-rules-panel="rules">
-                  {rulesHits.map((hit) => (
-                    <div class="rules-hit"><b>{hit.title}</b><p>{hit.text}</p></div>
-                  ))}
-                </div>
-                <div class="rules-list" data-rules-panel="cards" hidden>
-                  <div class="deck-row deck-card">
-                    <img src={atraxa.thumbnail} alt="" width="32" height="45" loading="lazy" />
-                    <span>{atraxa.name}<small>{atraxa.typeLine}</small></span>
-                  </div>
-                  <p class="rules-oracle">{atraxa.oracleText}</p>
-                </div>
-                <div class="hist-record">Saved on this phone</div>
               </div>
               <div class="scene-screen hist" data-for="record" role="group" aria-label="History">
                 <div class="deck-top"><span>Account</span><b>History</b><span>Filter</span></div>

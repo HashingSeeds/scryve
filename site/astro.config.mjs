@@ -14,6 +14,10 @@ export default defineConfig({
           find: /^@\/i18n\/translate$/,
           replacement: fileURLToPath(new URL("./src/translate.ts", import.meta.url)),
         },
+        {
+          find: /^@\/i18n\/format$/,
+          replacement: fileURLToPath(new URL("./src/format.ts", import.meta.url)),
+        },
         { find: "@/", replacement: fileURLToPath(new URL("../src/", import.meta.url)) },
       ],
     },

@@ -10,7 +10,8 @@ import {
 } from "./board"
 import { center, HINT_PRESS_MS, seatAxis, showTapHint } from "./hint"
 import { createPokemonDemo, SAMPLE_PRIZES } from "./pokemon"
-import { SITE_SYSTEM_IDS, type SiteSystemId } from "./systems"
+import { setUpRulesSheet } from "./rules"
+import { demoFormat, SITE_SYSTEM_IDS, type SiteSystemId } from "./systems"
 import { createYugiohDemo } from "./yugioh"
 
 // One name and sample total per seat, up to the app's 10.
@@ -37,7 +38,7 @@ const PRESS_MS = 220
 const SAMPLE_COMMANDER_DAMAGE = [3, 3] as const
 
 function startingLife(system: PlaySystemId) {
-  return defaultStartingLife(system, system === "mtg" ? "commander" : undefined)
+  return defaultStartingLife(system, demoFormat(system))
 }
 
 // Totals mid-game, so the board looks played.
@@ -325,19 +326,20 @@ function setUpNearby(stage: HTMLElement, game: DemoGame) {
   stage.querySelectorAll<HTMLElement>("[data-board='nearby']").forEach((el) => mountBoard(el, game))
 }
 
-// The rules screen's Rules and Cards tabs, as in the app's rules sheet.
+// The rules sheet opens over a Commander game of its own, as it does from the app's game menu.
 function setUpRules(stage: HTMLElement) {
   const screen = query<HTMLElement>(".rules-screen", stage)
-  screen.addEventListener("click", (event) => {
-    const tab = (event.target as Element).closest<HTMLButtonElement>("[data-rules-tab]")
-    if (!tab) return
-    screen.querySelectorAll<HTMLButtonElement>("[data-rules-tab]").forEach((other) => {
-      other.setAttribute("aria-pressed", String(other === tab))
-    })
-    screen.querySelectorAll<HTMLElement>("[data-rules-panel]").forEach((panel) => {
-      panel.hidden = panel.dataset.rulesPanel !== tab.dataset.rulesTab
-    })
-  })
+  mountBoard(
+    query<HTMLElement>("[data-board='rules']", screen),
+    createDemoGame(commanderSetup(4)),
+    {
+      interactive: false,
+    },
+  )
+  return setUpRulesSheet(
+    query<HTMLElement>(".rules-sheet", screen),
+    () => stage.dataset.scene === "rules",
+  )
 }
 
 // Keep the sample deck's tabs and version picker in the same places as the app.
@@ -428,7 +430,7 @@ function setUpStage() {
   const game = createDemoGame(commanderSetup(SEATS_FOR.mtg))
   const onFeatureStep = setUpFeatures(stage, game)
   setUpNearby(stage, game)
-  setUpRules(stage)
+  const syncRules = setUpRules(stage)
   const closeDeckSettings = setUpDeck(stage)
 
   const steps = document.querySelectorAll<HTMLElement>(".steps [data-step]")
@@ -444,6 +446,7 @@ function setUpStage() {
     screens.forEach((screen) => {
       screen.inert = !screen.dataset.for?.split(" ").includes(scene)
     })
+    syncRules()
   }
   const activate = (step: HTMLElement) => {
     if (stage.dataset.step === step.dataset.step && step.classList.contains("active")) return

@@ -280,6 +280,156 @@ figure {
   height: 1.1em;
 }
 
+/* The seat's dice bag, in the bottom corner across from the name, as in the app's CounterChips.
+   A Yu-Gi-Oh! seat's calculator holds that corner, so the bag sits just inside it. */
+.bag {
+  --pt: var(--app-pt, 1px);
+  position: absolute;
+  z-index: 2;
+  /* The button is a 2.6em target around a pouch the size of the name's mark, centered on it. */
+  right: calc(7% - 0.6em);
+  bottom: calc(7% - 0.75em);
+  display: grid;
+  width: 2.6em;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: rgb(255 255 255 / 80%);
+  cursor: pointer;
+  font-size: max(9px, calc(min(100cqw, 100cqh) * 0.06));
+  place-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bag svg {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+/* Centered on the calculator button's row, just inside it. */
+.seat-in:has(> .calc-open) .bag {
+  --calc: min(calc(var(--pt) * 40), 15cqmin);
+  right: calc(7% + var(--calc));
+  bottom: calc(7% + var(--calc) / 2 - 1.3em);
+}
+
+.bag:active {
+  opacity: 0.72;
+}
+
+.bag:focus-visible,
+.bag-sheet button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+/* A roll's result stays beside the name, like the app's dice chip. */
+.roll-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15em 0.45em;
+  gap: 0.3em;
+  border: 1.5px solid rgb(255 255 255 / 80%);
+  border-radius: 0.5em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.roll-chip svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+/* The open bag covers its seat: what it holds above the divider, the dice and close below. */
+.bag-sheet {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  inset: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 7%;
+  background: color-mix(in srgb, var(--seat) 82%, #000);
+  color: #fff;
+  font-size: max(9px, calc(min(100cqw, 100cqh) * 0.075));
+  font-weight: 500;
+}
+
+.bag-items {
+  display: grid;
+  min-height: 0;
+  gap: 0.7em 1em;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.bag-items span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4em;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.bag-items svg {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+}
+
+.bag-row {
+  display: flex;
+  align-items: center;
+}
+
+.bag-items + .bag-row {
+  padding-top: 0.6em;
+  border-top: 1px solid rgb(255 255 255 / 35%);
+}
+
+.bag-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+}
+
+.bag-sheet button {
+  display: grid;
+  width: 2.2em;
+  height: 2.2em;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5em;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  place-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bag-sheet button svg {
+  width: 1.6em;
+  height: 1.6em;
+}
+
+.bag-sheet button:active,
+.bag-sheet button[aria-pressed="true"] {
+  background: rgb(255 255 255 / 18%);
+}
+
+.bag-sheet .bag-close {
+  margin-left: auto;
+}
+
+.bag-sheet .bag-close svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
 /* Pokémon seats, mirroring the app's PokemonSeatCard: the shown Pokémon's HP, the bench below
    it like the playmat, and the mark and prize cards along the outer edge. --w and --h
    are the seat content's own width and height, whichever way it turns. */
@@ -566,6 +716,25 @@ figure {
   width: auto;
   height: var(--prizes);
   flex: none;
+}
+
+.pk-foot-end {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: calc(var(--u) * 0.03);
+}
+
+/* In a Pokémon seat the bag sits just inside the prize grid, as tall as it. */
+.pk .bag {
+  position: static;
+  width: auto;
+  height: var(--prizes);
+}
+
+.pk .bag svg {
+  width: 100%;
+  height: 100%;
 }
 
 .pk .pk-prizes {
@@ -2104,8 +2273,7 @@ figure {
 
 /* The bar above the screen replaces the notch the deck's top padding leaves room for. */
 .stage.full .deck,
-.stage.full .hist,
-.stage.full .rules-screen {
+.stage.full .hist {
   padding-top: 1.385em;
 }
 
@@ -2160,10 +2328,9 @@ html:has(.stage.full) {
   font-size: 14px;
 }
 
-/* ---------- History and rules screens, drawn like the deck screen ---------- */
+/* ---------- History screen, drawn like the deck screen ---------- */
 
-.hist,
-.rules-screen {
+.hist {
   display: flex;
   flex-direction: column;
   padding: 3.385em 1.385em 1.385em;
@@ -2275,51 +2442,171 @@ html:has(.stage.full) {
   font-size: 0.846em;
 }
 
-.rules-screen .deck-tabs {
-  flex-shrink: 0;
+/* ---------- Rules: the app's rules sheet over a game ---------- */
+
+.rules-screen {
+  font-size: max(8px, 4.25cqw);
 }
 
-.rules-search {
+/* Keeps the board's menu button under the dimming and the sheet. */
+.rules-screen .board-holder {
+  z-index: 0;
+}
+
+/* The board dims behind the sheet, as it does behind the app's sheets. */
+.rules-screen::after {
+  position: absolute;
+  z-index: 1;
+  background: rgb(0 0 0 / 55%);
+  content: "";
+  inset: 0;
+}
+
+.rules-sheet {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  inset: 18% 0 0;
+  padding: 1.6em 1.385em 0;
+  border-radius: 2em 2em 0 0;
+  background: #000;
+}
+
+/* The sheet's grab handle. */
+.rules-sheet::before {
+  position: absolute;
+  top: 0.55em;
+  left: 50%;
+  width: 2.6em;
+  height: 0.3em;
+  border-radius: 1em;
+  background: var(--dim);
+  content: "";
+  translate: -50% 0;
+}
+
+.rules-field {
+  display: flex;
+  min-height: 3.2em;
   flex-shrink: 0;
-  margin: 0.923em 0 0.308em;
-  padding: 0.692em 0.923em;
+  align-items: center;
+  padding: 0 1em;
+  border: 1px solid var(--raised);
   border-radius: 0.769em;
   background: var(--surface);
 }
 
-.rules-list {
+.rules-field span {
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
 }
 
-.rules-hit {
+/* The caret while the sample search types, and the field's clear button after. */
+.rules-field span.typing::after {
+  display: inline-block;
+  width: 1.5px;
+  height: 1.1em;
+  margin-left: 1px;
+  background: var(--tint);
+  content: "";
+  vertical-align: text-bottom;
+}
+
+.rules-field i::before {
+  color: var(--dim);
+  content: "×";
+  font-size: 1.4em;
+  font-style: normal;
+}
+
+.rules-results {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  animation: rules-in 0.25s ease-out;
+}
+
+@keyframes rules-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rules-results {
+    animation: none;
+  }
+}
+
+.rules-row {
   display: grid;
   gap: 0.308em;
   padding: 0.923em 0;
   border-bottom: 1px solid var(--raised);
 }
 
-.rules-hit p,
-.rules-oracle {
+.rules-row p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
   color: var(--dim);
   font-size: 0.923em;
+  -webkit-line-clamp: 2;
   line-height: 1.4;
 }
 
-.rules-list .deck-card {
-  cursor: default;
+.rules-row p b {
+  color: var(--text);
 }
 
-.rules-list .deck-card small {
-  display: block;
+.rules-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.5em;
+  white-space: nowrap;
+}
+
+.rules-head small {
+  overflow: hidden;
   color: var(--dim);
   font-size: 0.846em;
+  text-overflow: ellipsis;
 }
 
-.rules-oracle {
-  padding-top: 0.923em;
-  white-space: pre-line;
+.rules-link {
+  color: var(--tint);
+}
+
+.rules-card {
+  display: flex;
+  align-items: center;
+  gap: 0.923em;
+}
+
+.rules-card img {
+  width: 2.8em;
+  height: auto;
+  flex: none;
+  border-radius: 0.2em;
+}
+
+.rules-card span {
+  display: grid;
+  min-width: 0;
+}
+
+.rules-card b,
+.rules-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rules-card small {
+  color: var(--dim);
+  font-size: 0.846em;
 }
 
 /* ---------- stores: the store TV beside its copy ---------- */
