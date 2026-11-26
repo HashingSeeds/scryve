@@ -82,10 +82,10 @@ const config: GoldieConfig = {
     deviceWidthRatio: 0.84,
     copyBand: 0.16,
     copyScale: 0.95,
-    // why: two player boards put an upside-down seat on top, so their tiles show the whole device or its bottom half.
+    // why: two player boards put an upside-down seat on top, so their tiles show the whole device or its bottom half; ten seats show the whole device.
     template: [
       "hero",
-      "offset",
+      "classic",
       "tilt",
       "hero",
       "tilt-right",
