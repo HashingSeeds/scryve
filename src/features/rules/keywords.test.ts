@@ -111,3 +111,33 @@ it("finds a Flesh and Blood keyword printed with its element or hero", () => {
   expect(fabKeyword(fab, "Essence of Lightning")?.id).toBe("8.3.16")
   expect(fabKeyword(fab, "Kano Specialization")?.id).toBe("8.3.7")
 })
+
+it("explains a Flesh and Blood keyword with its rule text when the glossary has no entry", () => {
+  const fab: ComprehensiveRules = {
+    chapters: [
+      {
+        id: "8",
+        title: "Keywords",
+        sections: [
+          {
+            id: "8.3",
+            title: "Ability Keywords",
+            rules: [
+              { id: "8.3.20", text: "Ward\nWard prevents damage.", examples: [] },
+              { id: "8.3.26", text: "Pairs [with CARD]\nPlay it with CARD.", examples: [] },
+            ],
+          },
+        ],
+      },
+    ],
+    glossary: [],
+    notice: [],
+  }
+  expect(fabKeyword(fab, "Ward X")).toEqual({
+    id: "8.3.20",
+    definition: "Ward prevents damage.",
+    rules: [],
+  })
+  expect(fabKeyword(fab, "Ward 10")?.id).toBe("8.3.20")
+  expect(fabKeyword(fab, "Pairs")?.definition).toBe("Play it with CARD.")
+})

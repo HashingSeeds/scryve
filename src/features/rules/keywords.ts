@@ -1,10 +1,5 @@
 import { findRules, type ComprehensiveRules } from "./comprehensiveRules"
 
-/**
- * why: a keyword's rule opens with its name, alone in Magic ("702.9 Flying") and as a title line
- * in Flesh and Blood ("8.3.5 Go again"), so both games find it the same way. A card's value
- * ("Arcane Barrier 1", "Ward X") is dropped, since the rule covers every value.
- */
 function sectionKeyword(
   sections: ReadonlySet<string>,
   glossaryReference: RegExp,
@@ -38,9 +33,11 @@ function sectionKeyword(
     if (!rule) return undefined
     return {
       id: rule.id,
-      definition: rules.glossary
-        .find((entry) => entry.term.toLowerCase().split(/,\s*/).includes(name))
-        ?.text.replace(glossaryReference, ""),
+      definition:
+        rules.glossary
+          .find((entry) => entry.term.toLowerCase().split(/,\s*/).includes(name))
+          ?.text.replace(glossaryReference, "") ??
+        (rule.text.split("\n").slice(1).join("\n") || undefined),
       rules: findRules(rules, rule.id)?.rules.filter((sub) => sub.id !== rule.id) ?? [],
     }
   }
@@ -48,7 +45,6 @@ function sectionKeyword(
 
 export const magicKeyword = sectionKeyword(new Set(["701", "702"]), /\s*See rules? [\s\S]*$/)
 
-/** why: FaB prints a keyword's element or hero around it ("Ice Fusion", "Essence of Lightning", "Kano Specialization"), and the rule is titled with the keyword alone. */
 export const fabKeyword = sectionKeyword(
   new Set(["8.3", "8.4", "8.5"]),
   /(?:\[[^\]]+\])+$/,

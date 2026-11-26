@@ -105,6 +105,16 @@ it("keeps what the rules sheet shows offline, one keyword per line", () => {
   })
 })
 
+it("shows a card's art from its first printing that has any", () => {
+  const ball = card("Ball Lightning (red)")
+  const [printing] = ball.printings
+  const bare = { ...printing, printingId: "bare", faces: [{ index: 0, text: "Text" }] }
+  expect(fabLocalCard({ ...ball, printings: [bare, printing] })).toMatchObject({
+    imageUrl: printing.faces[0].imageUrl,
+    smallImageUrl: printing.faces[0].smallImageUrl,
+  })
+})
+
 describe("official precons", () => {
   it("each list one hero, a FaB format, and counted cards by their pinned fab-cube ids", async () => {
     expect(fabPreconCards.tag).toBe(await FAB_CUBE_DATASET.version())
