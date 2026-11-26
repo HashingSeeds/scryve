@@ -248,6 +248,7 @@ export default {
     counter: "{{name}} {{value}}",
     out: "बाहर",
     commanderDamage: "{{name}} के कमांडर से {{total}} कमांडर डैमेज",
+    partnerDamage: "{{name}} के पार्टनर कमांडर से {{total}} कमांडर डैमेज",
   },
   invalidInvite: {
     header: "इनवाइट",

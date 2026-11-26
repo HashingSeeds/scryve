@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
-import { ActivityIndicator, Share } from "react-native"
+import { ActivityIndicator, Platform, Share } from "react-native"
+import * as Clipboard from "expo-clipboard"
 import { useMutation } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -31,6 +32,7 @@ export function WatchSheet({
   const getCode = useMutation(api.games.watchCode)
   const [code, setCode] = useState<string>()
   const [error, setError] = useState<string>()
+  const [copied, setCopied] = useState(false)
   useEffect(() => {
     let cancelled = false
     getCode({ publicId }).then(
@@ -51,10 +53,18 @@ export function WatchSheet({
   async function share() {
     if (!url) return
     try {
+      // why: browsers without a share sheet (desktop Firefox) reject Share.share, so the link is copied instead.
+      if (Platform.OS === "web" && typeof navigator.share !== "function") {
+        await Clipboard.setStringAsync(url)
+        setCopied(true)
+        return
+      }
       // why: the message already holds the link; also passing `url` makes iOS Messages attach it twice.
       await Share.share({ message: translate("connected:watch.shareMessage", { url }) })
-    } catch {
-      setError(translate("connected:invite.shareFailed"))
+    } catch (cause) {
+      // why: closing the browser's share sheet rejects with AbortError, which is not a failure.
+      if (!(cause instanceof Error && cause.name === "AbortError"))
+        setError(translate("connected:invite.shareFailed"))
     }
   }
 
@@ -81,6 +91,7 @@ export function WatchSheet({
       ) : error ? null : (
         <ActivityIndicator />
       )}
+      {copied ? <Text size="xs" tone="dim" tx="decks:shared.linkCopied" /> : null}
       {error ? <AlertNote text={error} /> : null}
       <Button tx="common:close" onPress={onClose} />
     </Sheet>

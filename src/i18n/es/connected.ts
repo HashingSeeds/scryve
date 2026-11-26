@@ -263,6 +263,7 @@ export default {
     counter: "{{name}} {{value}}",
     out: "Fuera",
     commanderDamage: "Daño de comandante de {{name}}: {{total}}",
+    partnerDamage: "Daño de comandante del comandante pareja de {{name}}: {{total}}",
   },
   invalidInvite: {
     header: "Invitación",

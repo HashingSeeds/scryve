@@ -269,6 +269,8 @@ export default {
     counter: "{{name}} {{value}}",
     out: "Hors jeu",
     commanderDamage: "{{total}} blessures de commandant infligées par {{name}}",
+    partnerDamage:
+      "Blessures de commandant infligées par le commandant partenaire de {{name}} : {{total}}",
   },
   invalidInvite: {
     header: "Invitation",

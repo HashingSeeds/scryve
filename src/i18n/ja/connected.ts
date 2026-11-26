@@ -236,6 +236,7 @@ export default {
     counter: "{{name}} {{value}}",
     out: "敗退",
     commanderDamage: "{{name}}からの統率者ダメージ{{total}}",
+    partnerDamage: "{{name}}のパートナーの統率者から{{total}}の統率者ダメージ",
   },
   invalidInvite: {
     header: "招待",

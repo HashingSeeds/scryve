@@ -291,6 +291,7 @@ export default {
     counter: "{{name}}: {{value}}",
     out: "خارج المباراة",
     commanderDamage: "ضرر القائد من {{name}}: {{total}}",
+    partnerDamage: "ضرر القائد: {{total}} من القائد الشريك لدى {{name}}",
   },
   invalidInvite: {
     header: "دعوة",

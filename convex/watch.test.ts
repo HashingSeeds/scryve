@@ -88,6 +88,7 @@ describe("Watch link", () => {
           seat: 1,
           name: "host_name",
           color: "#7C3AED",
+          shape: expect.any(String),
           life: 37,
         },
         {
@@ -95,6 +96,7 @@ describe("Watch link", () => {
           seat: 2,
           name: "joiner_name",
           color: "#2563EB",
+          shape: expect.any(String),
           life: 40,
         },
       ],
@@ -141,6 +143,30 @@ describe("Watch link", () => {
     await expect(
       game.host.mutation(api.games.watchCode, { publicId: "rematch-public-game-123" }),
     ).resolves.toBe(code)
+    await game.host.mutation(api.games.abandonGame, { publicId: "rematch-public-game-123" })
+    await expect(t.query(api.games.watchBoard, { code })).resolves.toEqual({ status: "abandoned" })
+  })
+
+  it("keeps the result for a code first asked in a rematch the table never plays", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    await game.host.mutation(api.games.finishGame, {
+      publicId: game.publicId,
+      result: { kind: "win", winnerPlayerIds: [game.hostPlayerId] },
+      rematch: {
+        publicId: "rematch-public-game-123",
+        inviteToken: "r".repeat(43),
+        manualCodeCandidates: ["REM234"],
+      },
+    })
+    const code = await game.host.mutation(api.games.watchCode, {
+      publicId: "rematch-public-game-123",
+    })
+    await game.host.mutation(api.games.abandonGame, { publicId: "rematch-public-game-123" })
+
+    await expect(t.query(api.games.watchBoard, { code })).resolves.toMatchObject({
+      status: "finished",
+    })
   })
 
   it("shows nothing for a code no game holds", async () => {

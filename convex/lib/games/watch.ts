@@ -2,6 +2,7 @@ import { v } from "convex/values"
 
 import type { Doc, Id } from "../../_generated/dataModel"
 import type { QueryCtx } from "../../_generated/server"
+import { shownMarkShape } from "../appearance"
 import { requireUser } from "../auth"
 import { DEFAULT_DECK_GAME } from "../deckGames"
 import { commanderField } from "../gameRules"
@@ -20,6 +21,7 @@ import {
 } from "./projection"
 import {
   MAX_COMMANDER_DAMAGE_ROWS,
+  appearanceOf,
   assertPublicId,
   findGameByPublicId,
   gameByPublicId,
@@ -41,7 +43,9 @@ export const watchCode = mutationHandler({
     if (game.hostUserId !== user._id || game.mode !== "connected" || game.status === "abandoned")
       throw gameUnavailable()
     let earlier: Doc<"games"> | null = game
+    let first = game
     for (let hop = 0; earlier && hop <= MAX_REMATCH_HOPS; hop++) {
+      first = earlier
       const gameId: Id<"games"> = earlier._id
       const watch = await ctx.db
         .query("gameWatches")
@@ -56,7 +60,8 @@ export const watchCode = mutationHandler({
       .withIndex("by_code", (q) => q.eq("code", code))
       .first()
     if (taken) throw new Error("Watch code collision; retry")
-    await ctx.db.insert("gameWatches", { gameId: game._id, code, createdAt: Date.now() })
+    // why: an untouched rematch can be abandoned, so the code sits on the table's first game and the board walks forward from it.
+    await ctx.db.insert("gameWatches", { gameId: first._id, code, createdAt: Date.now() })
     return code
   },
 })
@@ -81,7 +86,7 @@ export const watchBoard = queryHandler({
     if (!game) return null
     const players = await playersForGame(ctx, game._id)
     // why: finishing a game always opens its rematch, so the room keeps the result until the next game's first change.
-    if (previous && (game.status === "abandoned" || isUntouchedRematch(game, players)))
+    if (previous && game.status !== "finished" && isUntouchedRematch(game, players))
       return await spectatorBoard(ctx, previous, await playersForGame(ctx, previous._id))
     if (game.status === "abandoned") return { status: game.status }
     return await spectatorBoard(ctx, game, players)
@@ -143,8 +148,9 @@ async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">, seats: Doc<"gam
       seat: player.seat,
       name: names[index] ?? seatLabelFor(player),
       color: player.color,
+      shape: shownMarkShape(player) ?? appearanceOf(player).shape,
       life: player.currentLife,
-      ...(game.status === "active" && outReason(outState, player._id) ? { out: true } : {}),
+      ...(outReason(outState, player._id) ? { out: true } : {}),
       ...(player.counters && Object.keys(player.counters).length > 0
         ? { counters: player.counters }
         : {}),

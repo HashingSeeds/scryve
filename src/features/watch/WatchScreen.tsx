@@ -12,6 +12,7 @@ import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import Head from "expo-router/head"
 
+import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
 import { useNow } from "@/components/TurnChip"
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -278,20 +279,30 @@ function SeatTile({
             {damage.map((row) => {
               const from = seatsById.get(row.fromPlayerId)
               if (!from) return null
+              const chipInk = accessibleForeground(from.color)
               return (
                 <View
                   key={`${row.fromPlayerId}:${row.commander ?? 0}`}
                   accessible
-                  accessibilityLabel={translate("connected:watch.commanderDamage", {
-                    total: row.total,
-                    name: from.name,
-                  })}
+                  accessibilityLabel={translate(
+                    row.commander === 1
+                      ? "connected:watch.partnerDamage"
+                      : "connected:watch.commanderDamage",
+                    { total: row.total, name: from.name },
+                  )}
                   style={[s.damage, { backgroundColor: from.color, borderColor: ink }]}
                 >
+                  <PlayerMark
+                    seatNumber={from.seat}
+                    color={chipInk}
+                    shape={from.shape}
+                    insetGlyph="none"
+                    size={Math.round(s.unit * 1.2)}
+                  />
                   <Text
                     weight="bold"
                     text={row.total}
-                    style={[s.damageTotal, { color: accessibleForeground(from.color) }]}
+                    style={[s.damageTotal, { color: chipInk }]}
                   />
                 </View>
               )
@@ -368,7 +379,8 @@ function watchStyles(u: number) {
     life: { textAlign: "center", fontVariant: ["tabular-nums"] },
     damageRow: { flexDirection: "row", flexWrap: "wrap", gap: u / 2 },
     damage: {
-      minWidth: 2.2 * u,
+      flexDirection: "row",
+      columnGap: u / 4,
       alignItems: "center",
       borderWidth: 2,
       borderRadius: u / 3,

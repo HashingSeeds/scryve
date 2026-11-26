@@ -304,6 +304,8 @@ const connected = {
     out: "Out",
     // Screen reader text for a mark showing damage from one player's commander, as in "7 commander damage from Ada".
     commanderDamage: "{{total}} commander damage from {{name}}",
+    // Screen reader text for damage from the second of a player's two partner commanders, as in "7 commander damage from Ada's partner commander".
+    partnerDamage: "{{total}} commander damage from {{name}}'s partner commander",
   },
   invalidInvite: {
     header: "Invitation",
