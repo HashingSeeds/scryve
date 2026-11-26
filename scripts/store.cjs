@@ -47,7 +47,9 @@ const APPLE_LOCALES = {
   ko: ["ko"],
   ar: ["ar-SA"],
 }
-const LIMITS = { description: 4000, releaseNotes: 4000, keywords: 100 }
+const LIMITS = { description: 4000, releaseNotes: 4000, playReleaseNotes: 500, keywords: 100 }
+// why: release:native uploads Android here, and promoting the release in Play Console carries its notes along.
+const PLAY_TRACK = "internal"
 // why: keywords may name these games and no others, even once more games release.
 const KEYWORD_GAMES = ["mtg", "ygo", "pokemon"]
 
@@ -149,7 +151,8 @@ function allCopy() {
       ...[
         ["App Store description", appleDescription, LIMITS.description],
         ["Play description", playDescription, LIMITS.description],
-        ["release notes", releaseNotes, LIMITS.releaseNotes],
+        ["App Store release notes", releaseNotes, LIMITS.releaseNotes],
+        ["Play release notes", releaseNotes, LIMITS.playReleaseNotes],
       ].flatMap(([name, text, limit]) =>
         [...text].length > limit
           ? [`${locale}: ${name} is ${[...text].length} characters; the limit is ${limit}`]
@@ -245,10 +248,22 @@ async function play({ apply }) {
       ({ languageCode, title }) => subscriptionListings.get(languageCode)?.title !== title,
     )
 
+    const track = await call("GET", `/edits/${edit.id}/tracks/${PLAY_TRACK}`)
+    const newest = track.releases.reduce((a, b) =>
+      Math.max(...b.versionCodes.map(Number)) > Math.max(...a.versionCodes.map(Number)) ? b : a,
+    )
+    const releaseNotes = Object.entries(PLAY_LANGUAGES).flatMap(([locale, languages]) =>
+      languages.map((language) => ({ language, text: copy[locale].releaseNotes })),
+    )
+    const currentNotes = new Map(newest.releaseNotes?.map((note) => [note.language, note.text]))
+    const notesChanged = releaseNotes.some(
+      ({ language, text }) => currentNotes.get(language) !== text,
+    )
+
     const preview = path.join(os.tmpdir(), "scryve-play-listing.json")
     fs.writeFileSync(
       preview,
-      `${JSON.stringify({ listings: changes, subscriptionTitles: titleChanges }, null, 2)}\n`,
+      `${JSON.stringify({ listings: changes, subscriptionTitles: titleChanges, releaseNotes: notesChanged ? releaseNotes : [] }, null, 2)}\n`,
     )
     for (const listing of changes) {
       const before = current.get(listing.language)
@@ -260,8 +275,10 @@ async function play({ apply }) {
       console.log(
         `subscription ${PLAY_SUBSCRIPTION} ${languageCode}: ${JSON.stringify(subscriptionListings.get(languageCode)?.title ?? null)} → ${JSON.stringify(title)}`,
       )
+    if (notesChanged) console.log(`${PLAY_TRACK} release ${newest.name}: changes release notes`)
     console.log(`Full text: ${preview}`)
-    if (!changes.length && !titleChanges.length) return console.log("Play is up to date.")
+    if (!changes.length && !titleChanges.length && !notesChanged)
+      return console.log("Play is up to date.")
     if (!apply) return console.log("Dry run; nothing changed. Run again with --apply to publish.")
 
     for (const listing of changes) {
@@ -271,11 +288,15 @@ async function play({ apply }) {
         ...(video ? { video } : {}),
       })
     }
-    if (changes.length) {
+    if (notesChanged) {
+      newest.releaseNotes = releaseNotes
+      await call("PUT", `/edits/${edit.id}/tracks/${PLAY_TRACK}`, track)
+    }
+    if (changes.length || notesChanged) {
       await call("POST", `/edits/${edit.id}:commit`)
       committed = true
       console.log(
-        `Committed ${changes.length} listing(s); Google reviews them before they go live.`,
+        `Committed ${changes.length} listing(s)${notesChanged ? ` and ${newest.name}'s release notes` : ""}; Google reviews listings before they go live.`,
       )
     }
     if (titleChanges.length) {
@@ -303,7 +324,7 @@ async function play({ apply }) {
   }
 }
 
-// why: eas metadata:push sends the whole file, so this fills only the localized text in a pulled copy and keeps every other answer as App Store Connect has it.
+// why: eas metadata:push sends the whole file, so this fills only the localized text in a pulled copy and keeps every other answer as App Store Connect has it. Media stays as Apple has it: push skips a locale with no screenshots, and a preview whose file is missing, but pull saves previews as HLS playlists that push would upload over the real videos.
 function apple() {
   if (!fs.existsSync(APPLE_CONFIG_PATH))
     throw new Error(
@@ -311,7 +332,13 @@ function apple() {
     )
   const { copy, keywords } = allCopy()
   const config = JSON.parse(fs.readFileSync(APPLE_CONFIG_PATH, "utf8"))
+  // why: pull reads the live version until this one exists; push creates the version it names.
+  config.apple.version = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
+  ).version
+  fs.rmSync(path.join(ROOT, "store/apple/preview"), { recursive: true, force: true })
   const info = (config.apple.info ??= {})
+  for (const localized of Object.values(info)) delete localized.screenshots
   const urls = (({ marketingUrl, supportUrl, privacyPolicyUrl, privacyChoicesUrl }) => ({
     marketingUrl,
     supportUrl,
@@ -333,7 +360,7 @@ function apple() {
       )
   fs.writeFileSync(APPLE_CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`)
   console.log(
-    `Filled ${Object.values(APPLE_LOCALES).flat().join(", ")} in store.config.json. Review it, then run eas metadata:push.`,
+    `Filled ${Object.values(APPLE_LOCALES).flat().join(", ")} for ${config.apple.version} in store.config.json. Review it, then run eas metadata:push.`,
   )
 }
 

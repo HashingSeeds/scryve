@@ -119,3 +119,4 @@ build-*.tar.gz
 
 # why: pulled from App Store Connect with eas metadata:pull; it can hold review contact details.
 store.config.json
+/store/
