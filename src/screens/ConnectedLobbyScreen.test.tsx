@@ -354,7 +354,6 @@ describe("ConnectedLobbyScreen", () => {
     await waitFor(() =>
       expect(share).toHaveBeenCalledWith({
         message: `Join my Scryve game: ${inviteUrl}`,
-        url: inviteUrl,
       }),
     )
     view.unmount()

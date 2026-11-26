@@ -2208,7 +2208,9 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("deck-settings-button"))
     fireEvent.press(view.getByTestId("deck-action-share"))
     const url = `https://scryve.example/deck/${"t".repeat(43)}`
-    await waitFor(() => expect(share).toHaveBeenCalledWith(expect.objectContaining({ url })))
+    await waitFor(() =>
+      expect(share).toHaveBeenCalledWith({ message: `Existing Deck on Scryve: ${url}` }),
+    )
     expect(mockShareDeck).toHaveBeenCalledWith({ deckId: "deck-1" })
   })
 

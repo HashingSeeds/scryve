@@ -920,9 +920,9 @@ function DeckDetailContent({
             return
           }
           const name = deck?.name ?? ""
+          // why: the message already holds the link; also passing `url` makes iOS Messages attach it twice.
           await Share.share({
             message: translate("decks:shared.message", { name, url }),
-            url,
           }).catch((cause: unknown) => {
             // why: closing the browser's share sheet rejects with AbortError, which is not a failure.
             if (!(cause instanceof Error && cause.name === "AbortError")) throw cause

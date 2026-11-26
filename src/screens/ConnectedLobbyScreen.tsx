@@ -261,9 +261,9 @@ function ConnectedLobbyContent({
     try {
       setActionError(undefined)
       if (inviteUrl) {
+        // why: the message already holds the link; also passing `url` makes iOS Messages attach it twice.
         await Share.share({
           message: translate("connected:invite.shareMessage", { url: inviteUrl }),
-          url: inviteUrl,
         })
       } else if (manualCode) {
         await Share.share({

@@ -892,9 +892,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     try {
       setInviteError(undefined)
       if (inviteUrl)
+        // why: the message already holds the link; also passing `url` makes iOS Messages attach it twice.
         await Share.share({
           message: translate("connected:invite.shareMessage", { url: inviteUrl }),
-          url: inviteUrl,
         })
       else
         await Share.share({
