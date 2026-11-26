@@ -280,8 +280,8 @@ figure {
   height: 1.1em;
 }
 
-/* Pokémon seats, mirroring the app's PokemonSeatCard: the bench on the inner edge, the shown
-   Pokémon's HP in the middle, and the mark and prize cards along the outer edge. --w and --h
+/* Pokémon seats, mirroring the app's PokemonSeatCard: the shown Pokémon's HP, the bench below
+   it like the playmat, and the mark and prize cards along the outer edge. --w and --h
    are the seat content's own width and height, whichever way it turns. */
 
 .pk-seat .seat-in {
@@ -304,6 +304,7 @@ figure {
   --pip-gap: max(1px, round(down, var(--u) * 0.008, 1px));
   --pip: max(3px, round((var(--u) * 0.12 - var(--pip-gap) * 2) / 3, 1px));
   --prizes: calc(var(--pip) * 3 + var(--pip-gap) * 2);
+  --bench: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
   position: absolute;
   display: flex;
   inset: 0;
@@ -329,22 +330,25 @@ figure {
 /* Like the app's benchChipMetrics, the bench grows to fit its chips: on a phone the border, bar
    and name size floors outgrow a bench sized only by the seat. */
 .pk-bench {
-  --bench: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
   display: flex;
   min-height: var(--bench);
   flex: none;
   gap: calc(var(--u) * 0.018);
 }
 
-.pk[data-clear="top"] :is(.pk-bench, .pk-sheet-head) {
+.pk[data-clear="top"] {
+  padding-top: max(var(--pad), var(--clear));
+}
+
+.pk[data-clear="top"] .pk-sheet-head {
   margin-top: var(--clear);
 }
 
-.pk[data-clear="left"] :is(.pk-bench, .pk-sheet-head) {
+.pk[data-clear="left"] .pk-sheet-head {
   margin-left: var(--clear);
 }
 
-.pk[data-clear="right"] :is(.pk-bench, .pk-sheet-head) {
+.pk[data-clear="right"] .pk-sheet-head {
   margin-right: var(--clear);
 }
 
@@ -592,7 +596,8 @@ figure {
   position: absolute;
   z-index: 3;
   right: var(--pad);
-  bottom: calc(var(--pad) + var(--u) * 0.14);
+  /* A padding above the bench, which sits on the bottom row, as in the app. */
+  bottom: calc(var(--pad) * 2 + var(--u) * 0.14 + var(--bench));
   left: var(--pad);
   display: flex;
   flex-wrap: wrap;
