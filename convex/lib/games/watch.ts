@@ -2,7 +2,6 @@ import { v } from "convex/values"
 
 import type { Doc, Id } from "../../_generated/dataModel"
 import type { QueryCtx } from "../../_generated/server"
-import { shownMarkShape } from "../appearance"
 import { requireUser } from "../auth"
 import { DEFAULT_DECK_GAME } from "../deckGames"
 import { commanderField } from "../gameRules"
@@ -21,10 +20,10 @@ import {
 } from "./projection"
 import {
   MAX_COMMANDER_DAMAGE_ROWS,
-  appearanceOf,
   assertPublicId,
   findGameByPublicId,
   gameByPublicId,
+  isUntouchedRematch,
   playersForGame,
   seatLabelFor,
 } from "./shared"
@@ -72,16 +71,25 @@ export const watchBoard = queryHandler({
       .withIndex("by_code", (q) => q.eq("code", code))
       .first()
     let game = watch ? await ctx.db.get(watch.gameId) : null
-    for (let hop = 0; game?.rematchPublicId && hop < MAX_REMATCH_HOPS; hop++)
-      game = (await findGameByPublicId(ctx, game.rematchPublicId)) ?? game
+    let previous: Doc<"games"> | undefined
+    for (let hop = 0; game?.rematchPublicId && hop < MAX_REMATCH_HOPS; hop++) {
+      const next = await findGameByPublicId(ctx, game.rematchPublicId)
+      if (!next) break
+      previous = game
+      game = next
+    }
     if (!game) return null
+    const players = await playersForGame(ctx, game._id)
+    // why: finishing a game always opens its rematch, so the room keeps the result until the next game's first change.
+    if (previous && (game.status === "abandoned" || isUntouchedRematch(game, players)))
+      return await spectatorBoard(ctx, previous, await playersForGame(ctx, previous._id))
     if (game.status === "abandoned") return { status: game.status }
-    return await spectatorBoard(ctx, game)
+    return await spectatorBoard(ctx, game, players)
   },
 })
 
-async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">) {
-  const players = (await playersForGame(ctx, game._id)).sort((a, b) => a.seat - b.seat)
+async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">, seats: Doc<"gamePlayers">[]) {
+  const players = [...seats].sort((a, b) => a.seat - b.seat)
   const system = game.system ?? game.game ?? DEFAULT_DECK_GAME
   const lethal = gameCommanderLethal(game)
   const commanderDamage =
@@ -127,7 +135,6 @@ async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">) {
     status: game.status,
     system,
     format: game.format ?? game.ruleset,
-    ...(game.variant ? { variant: game.variant } : {}),
     ...(game.matchBestOf
       ? { match: await matchProjection(ctx, game, { isHost: false, eventCount: 0 }) }
       : {}),
@@ -136,7 +143,6 @@ async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">) {
       seat: player.seat,
       name: names[index] ?? seatLabelFor(player),
       color: player.color,
-      shape: shownMarkShape(player) ?? appearanceOf(player).shape,
       life: player.currentLife,
       ...(game.status === "active" && outReason(outState, player._id) ? { out: true } : {}),
       ...(player.counters && Object.keys(player.counters).length > 0

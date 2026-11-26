@@ -88,7 +88,6 @@ describe("Watch link", () => {
           seat: 1,
           name: "host_name",
           color: "#7C3AED",
-          shape: expect.any(String),
           life: 37,
         },
         {
@@ -96,7 +95,6 @@ describe("Watch link", () => {
           seat: 2,
           name: "joiner_name",
           color: "#2563EB",
-          shape: expect.any(String),
           life: 40,
         },
       ],
@@ -104,7 +102,7 @@ describe("Watch link", () => {
     })
   })
 
-  it("follows the table into its rematch under the same code", async () => {
+  it("shows the result until the table plays its rematch, under the same code", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)
     const code = await game.host.mutation(api.games.watchCode, { publicId: game.publicId })
@@ -119,9 +117,24 @@ describe("Watch link", () => {
     })
 
     await expect(t.query(api.games.watchBoard, { code })).resolves.toMatchObject({
+      status: "finished",
+      players: [{ name: "host_name" }, { name: "joiner_name" }],
+    })
+    const { players } = await game.host.query(api.games.lobbyProjection, {
+      publicId: "rematch-public-game-123",
+    })
+    await game.host.mutation(api.games.changeLife, {
+      publicId: "rematch-public-game-123",
+      playerId: players[0].playerId,
+      operationId: "operation-watch-rematch",
+      delta: -2,
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+    })
+    await expect(t.query(api.games.watchBoard, { code })).resolves.toMatchObject({
       status: "active",
       players: [
-        { name: "host_name", life: 40 },
+        { name: "host_name", life: 38 },
         { name: "joiner_name", life: 40 },
       ],
     })

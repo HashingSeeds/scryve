@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import {
+  Platform,
   useWindowDimensions,
   View,
   type LayoutChangeEvent,
@@ -22,6 +23,7 @@ import { joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { goBack } from "@/utils/navigation"
 import { formatElapsed } from "@/utils/useElapsedSince"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
@@ -45,6 +47,16 @@ export default function WatchScreen() {
   useStoreKeepAwake()
   return (
     <View style={[s.screen, insets]}>
+      {/* why: a Watch link can cold-launch the app straight onto this screen, which then has nothing to go back to. */}
+      {Platform.OS === "web" ? null : (
+        <Text
+          weight="bold"
+          accessibilityRole="button"
+          tx="common:close"
+          onPress={() => goBack("/")}
+          style={s.close}
+        />
+      )}
       {auth.configured ? (
         <WatchBoard code={code ?? ""} s={s} />
       ) : (
@@ -325,6 +337,7 @@ function watchStyles(u: number) {
       lineHeight: 2 * u,
       textAlign: "center",
     },
+    close: { color: colors.text, fontSize: u, lineHeight: 1.4 * u, padding: u / 2 },
     board: { flex: 1, paddingHorizontal: u / 2, paddingBottom: u / 2 },
     header: {
       flexDirection: "row",
