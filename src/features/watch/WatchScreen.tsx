@@ -303,10 +303,7 @@ function SeatTile({
   const ink = accessibleForeground(seat.color)
   // why: the total fills the room the name, counters and grid leave it, measured, since a crowded board leaves far less than half a tile.
   const [lifeRoom, setLifeRoom] = useState<number>()
-  const lifeSize = Math.max(
-    s.unit * 2,
-    Math.min(size.height * 0.5, size.width * 0.3, (lifeRoom ?? Infinity) / LIFE_LINE),
-  )
+  const lifeSize = Math.min(size.height * 0.5, size.width * 0.3, (lifeRoom ?? Infinity) / LIFE_LINE)
   const status = won
     ? translate("connected:watch.won")
     : out
