@@ -7,6 +7,7 @@ import { LifeStrip, lifeScale } from "@/components/LifeStrip"
 import { MARK_VIEW_BOX, MarkShape } from "@/components/PlayerMark"
 import { playSystemShortLabel } from "@/features/game/playSystems"
 import { formatNumber, joinParts } from "@/i18n/format"
+import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { typography } from "@/theme/typography"
 import { shareImage } from "@/utils/shareImage"
@@ -53,9 +54,10 @@ const ROWS_TOP = PAD + 74
 const ROWS_BOTTOM = IMAGE_HEIGHT - PAD - 22
 const ROW_MAX = 73
 const STRIP_LEFT = 212
-const EXPORT_SIZE = { width: 1080, height: 1350 }
-// why: iOS reads toDataURL's size as points and draws at the screen's scale, while web reads pixels.
+const LIFE_COLUMN = 80
+// why: iOS reads sizes as points and draws at the screen's scale while web reads pixels, so the image mounts at the export size and scales its 360x450 drawing to fill it.
 const EXPORT_SCALE = Platform.OS === "web" ? 1 : PixelRatio.get()
+const EXPORT_SIZE = { width: 1080 / EXPORT_SCALE, height: 1350 / EXPORT_SCALE }
 // why: names and life totals are clipped by length, but wide glyphs still run long, so each column clips to its own box.
 const NAMES_CLIP = "recap-names"
 const HEADER_CLIP = "recap-header"
@@ -101,17 +103,23 @@ function RecapImage({ model, svgRef }: { model: GameSummaryModel; svgRef: React.
   const rows = standings(model)
   const height = Math.min(ROW_MAX, (ROWS_BOTTOM - ROWS_TOP) / rows.length)
   const roomy = height >= 50
-  const lifeSize = roomy ? 25 : 20
-  const lifeWidth = Math.max(...rows.map(({ life }) => formatNumber(life).length)) * lifeSize * 0.62
-  const stripWidth = Math.max(32, IMAGE_WIDTH - PAD - lifeWidth - 10 - STRIP_LEFT)
+  const lifeChars = Math.max(...rows.map(({ life }) => formatNumber(life).length)) * 0.68
+  const lifeSize = Math.min(roomy ? 25 : 20, LIFE_COLUMN / lifeChars)
+  const stripWidth = IMAGE_WIDTH - PAD - lifeChars * lifeSize - 10 - STRIP_LEFT
   const meta = joinParts([
     model.system ? playSystemShortLabel(model.system) : undefined,
     model.format,
     playedFor(model),
-    finishedOnLabel(model.finishedAt),
+    finishedOnLabel(model.finishedAt, model.logged),
+    model.logged ? translate("play:history.logged") : undefined,
   ])
   return (
-    <Svg ref={svgRef} width={IMAGE_WIDTH} height={IMAGE_HEIGHT}>
+    <Svg
+      ref={svgRef}
+      width={EXPORT_SIZE.width}
+      height={EXPORT_SIZE.height}
+      viewBox={`0 0 ${IMAGE_WIDTH} ${IMAGE_HEIGHT}`}
+    >
       <Defs>
         <ClipPath id={NAMES_CLIP}>
           <Rect width={STRIP_LEFT - 8} height={IMAGE_HEIGHT} />
@@ -193,16 +201,18 @@ function RecapImage({ model, svgRef }: { model: GameSummaryModel; svgRef: React.
                 />
               </G>
             ) : null}
-            <SvgText
-              x={IMAGE_WIDTH - PAD}
-              y={middle + (roomy ? 9 : 7)}
-              textAnchor="end"
-              {...IMAGE_FONT.bold}
-              fontSize={lifeSize}
-              fill={out ? colors.textDim : colors.text}
-            >
-              {formatNumber(player.life)}
-            </SvgText>
+            {model.logged ? null : (
+              <SvgText
+                x={IMAGE_WIDTH - PAD}
+                y={middle + (roomy ? 9 : 7)}
+                textAnchor="end"
+                {...IMAGE_FONT.bold}
+                fontSize={lifeSize}
+                fill={out ? colors.textDim : colors.text}
+              >
+                {formatNumber(player.life)}
+              </SvgText>
+            )}
           </G>
         )
       })}
@@ -232,15 +242,9 @@ export function RecapShare({
   useEffect(() => {
     let active = true
     const frame = requestAnimationFrame(() =>
-      svgRef.current?.toDataURL(
-        (base64) => {
-          if (active) shareImage(base64, "scryve-recap.png").then(() => done(), done)
-        },
-        {
-          width: EXPORT_SIZE.width / EXPORT_SCALE,
-          height: EXPORT_SIZE.height / EXPORT_SCALE,
-        },
-      ),
+      svgRef.current?.toDataURL((base64) => {
+        if (active) shareImage(base64, "scryve-recap.png").then(() => done(), done)
+      }, EXPORT_SIZE),
     )
     return () => {
       active = false
@@ -263,6 +267,5 @@ const $offscreen: ViewStyle = {
   position: "absolute",
   left: -10_000,
   top: 0,
-  width: IMAGE_WIDTH,
-  height: IMAGE_HEIGHT,
+  ...EXPORT_SIZE,
 }

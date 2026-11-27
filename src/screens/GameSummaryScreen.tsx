@@ -104,7 +104,7 @@ function StandingRow({
     : standing
 
   return (
-    <View style={themed($standingRow)} accessible accessibilityLabel={rowLabel}>
+    <View style={themed($standingRow)} accessible role="listitem" accessibilityLabel={rowLabel}>
       <View style={$styles.flex1}>
         <View style={themed($nameLine)}>
           <MarkArt
@@ -295,7 +295,7 @@ export function GameSummaryScreen({
           {model.terminalReason ? <Text size="xs" tone="dim" text={model.terminalReason} /> : null}
         </View>
 
-        <View>
+        <View role="list">
           {rows.map((player) => (
             <StandingRow
               key={player.id}
