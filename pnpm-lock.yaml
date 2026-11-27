@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   convex-test@0.0.54:
-    hash: ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3
+    hash: 603159f4f117038e3e1e842a4d83225680152d2729d59f809777d4f77693e0c2
     path: js-patches/convex-test@0.0.54.patch
   convex@1.42.3:
     hash: fd2caf358817c80296dfc7bd155a390d926d7ef0d1fdc11be4e9aea148c83d01
@@ -289,7 +289,7 @@ importers:
         version: 30.5.2(@babel/core@7.29.7)
       convex-test:
         specifier: 0.0.54
-        version: 0.0.54(patch_hash=ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3)(convex@1.42.3(patch_hash=fd2caf358817c80296dfc7bd155a390d926d7ef0d1fdc11be4e9aea148c83d01)(@clerk/react@6.19.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0))
+        version: 0.0.54(patch_hash=603159f4f117038e3e1e842a4d83225680152d2729d59f809777d4f77693e0c2)(convex@1.42.3(patch_hash=fd2caf358817c80296dfc7bd155a390d926d7ef0d1fdc11be4e9aea148c83d01)(@clerk/react@6.19.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0))
       dependency-cruiser:
         specifier: ^17.0.2
         version: 17.4.3
@@ -12552,7 +12552,7 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-test@0.0.54(patch_hash=ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3)(convex@1.42.3(patch_hash=fd2caf358817c80296dfc7bd155a390d926d7ef0d1fdc11be4e9aea148c83d01)(@clerk/react@6.19.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0)):
+  convex-test@0.0.54(patch_hash=603159f4f117038e3e1e842a4d83225680152d2729d59f809777d4f77693e0c2)(convex@1.42.3(patch_hash=fd2caf358817c80296dfc7bd155a390d926d7ef0d1fdc11be4e9aea148c83d01)(@clerk/react@6.19.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0)):
     dependencies:
       convex: 1.42.3(patch_hash=fd2caf358817c80296dfc7bd155a390d926d7ef0d1fdc11be4e9aea148c83d01)(@clerk/react@6.19.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0)
 

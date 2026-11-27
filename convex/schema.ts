@@ -584,6 +584,8 @@ export default defineSchema({
     publishedAt: v.optional(v.number()),
     fetchedAt: v.number(),
     identityColors: v.optional(v.array(v.string())),
+    // why: precon rows carry their set code (40K, C16) so Browse search finds a deck by its set.
+    setCode: v.optional(v.string()),
   })
     .index("by_game_and_source_and_external_id", ["game", "source", "externalId"])
     .index("by_game_and_fetched_at", ["game", "fetchedAt"])
@@ -594,6 +596,10 @@ export default defineSchema({
     .searchIndex("search_name_by_format", {
       searchField: "name",
       filterFields: ["game", "format", "kind"],
+    })
+    .searchIndex("search_set_code_by_format", {
+      searchField: "setCode",
+      filterFields: ["game", "format"],
     }),
 
   deckCatalogCards: defineTable({

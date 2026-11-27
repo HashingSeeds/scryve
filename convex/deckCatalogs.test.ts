@@ -787,6 +787,40 @@ describe("Browse list", () => {
     }
   })
 
+  it("finds Magic precons in Browse by their set code", async () => {
+    jest.useFakeTimers()
+    try {
+      const t = makeConvexTest()
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [
+          {
+            fileName: "ForcesOfTheImperium_40K",
+            name: "Forces of the Imperium",
+            code: "40K",
+            type: "Commander Deck",
+            releaseDate: "2022-10-07",
+          },
+          {
+            fileName: "Old_C16",
+            name: "Old Commander",
+            code: "C16",
+            type: "Commander Deck",
+            releaseDate: "2016-11-11",
+          },
+        ],
+      })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      const searched = await t.query(api.deckCatalogs.list, {
+        game: "mtg",
+        format: "commander",
+        query: "40k",
+      })
+      expect(searched.map((deck) => deck.externalId)).toEqual(["ForcesOfTheImperium_40K"])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("syncs every precon across batches and updates a changed one in place", async () => {
     jest.useFakeTimers()
     try {

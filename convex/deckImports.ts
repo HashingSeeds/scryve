@@ -707,6 +707,7 @@ export const syncPreconRows = internalMutation({
         name: deck.name,
         format: preconstructedFormat(deck.type),
         ...(Number.isNaN(publishedAt) ? {} : { publishedAt }),
+        ...(deck.code ? { setCode: deck.code } : {}),
       }
       const existing = await ctx.db
         .query("deckCatalogs")
@@ -718,9 +719,14 @@ export const syncPreconRows = internalMutation({
       else if (
         existing.name !== row.name ||
         existing.format !== row.format ||
-        existing.publishedAt !== row.publishedAt
+        existing.publishedAt !== row.publishedAt ||
+        existing.setCode !== row.setCode
       )
-        await ctx.db.patch(existing._id, { ...row, publishedAt: row.publishedAt })
+        await ctx.db.patch(existing._id, {
+          ...row,
+          publishedAt: row.publishedAt,
+          setCode: row.setCode,
+        })
     }
     if (offset + PRECON_ROW_BATCH < decks.length)
       await ctx.scheduler.runAfter(0, internal.deckImports.syncPreconRows, {
