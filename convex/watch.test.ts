@@ -100,7 +100,10 @@ describe("Watch link", () => {
           life: 40,
         },
       ],
-      commanderDamage: [{ fromPlayerId: game.joinerId, toPlayerId: game.hostPlayerId, total: 7 }],
+      commanderDamage: {
+        lethal: 21,
+        totals: [{ fromPlayerId: game.joinerId, toPlayerId: game.hostPlayerId, total: 7 }],
+      },
     })
   })
 
@@ -118,10 +121,12 @@ describe("Watch link", () => {
       },
     })
 
-    await expect(t.query(api.games.watchBoard, { code })).resolves.toMatchObject({
+    const final = await t.query(api.games.watchBoard, { code })
+    expect(final).toMatchObject({
       status: "finished",
-      players: [{ name: "host_name" }, { name: "joiner_name" }],
+      players: [{ name: "host_name", won: true }, { name: "joiner_name" }],
     })
+    expect(final && "players" in final && final.players[1]).not.toHaveProperty("won")
     const { players } = await game.host.query(api.games.lobbyProjection, {
       publicId: "rematch-public-game-123",
     })
@@ -152,7 +157,7 @@ describe("Watch link", () => {
     const game = await activeGame(t)
     await game.host.mutation(api.games.finishGame, {
       publicId: game.publicId,
-      result: { kind: "win", winnerPlayerIds: [game.hostPlayerId] },
+      result: { kind: "draw" },
       rematch: {
         publicId: "rematch-public-game-123",
         inviteToken: "r".repeat(43),
@@ -166,7 +171,60 @@ describe("Watch link", () => {
 
     await expect(t.query(api.games.watchBoard, { code })).resolves.toMatchObject({
       status: "finished",
+      draw: true,
     })
+  })
+
+  it("names a team variant's teams, which win together", async () => {
+    const t = makeConvexTest()
+    const token = "t".repeat(43)
+    const publicId = "riftbound-watch-teams-01"
+    const host = await signedIn(t, "host-subject", "Host")
+    await host.mutation(api.games.createLobby, {
+      publicId,
+      playerCount: 4,
+      startingLife: 0,
+      ruleset: "constructed",
+      system: "riftbound",
+      format: "constructed",
+      variant: "twoVsTwo",
+      inviteToken: token,
+      manualCodeCandidates: ["ABC234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: "device-host-0001",
+    })
+    for (const [index, color] of ["#2563EB", "#16A34A", "#DC2626"].entries()) {
+      const player = await signedIn(t, `player-${index}`, `Player ${index}`)
+      await player.mutation(api.games.claimSeat, {
+        token,
+        displayName: `Player ${index}`,
+        color,
+        deviceId: `device-player-${index}`,
+        variants: ["twoVsTwo"],
+        systems: ["riftbound"],
+      })
+    }
+    await host.mutation(api.games.startGame, { publicId })
+    const ids = (await host.query(api.games.lobbyProjection, { publicId })).players.map(
+      ({ playerId }) => playerId,
+    )
+    const code = await host.mutation(api.games.watchCode, { publicId })
+    await expect(t.query(api.games.watchBoard, { code })).resolves.toMatchObject({
+      teams: [ids.slice(0, 2), ids.slice(2)],
+    })
+
+    await host.mutation(api.games.finishGame, {
+      publicId,
+      result: { kind: "win", winnerPlayerIds: ids.slice(2) },
+    })
+    const board = await t.query(api.games.watchBoard, { code })
+    expect(board && "players" in board && board.players.map(({ won }) => !!won)).toEqual([
+      false,
+      false,
+      true,
+      true,
+    ])
   })
 
   it("shows nothing for a code no game holds", async () => {

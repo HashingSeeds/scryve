@@ -234,8 +234,8 @@ export default {
     final: "최종 결과",
     counter: "{{name}} {{value}}",
     out: "탈락",
-    commanderDamage: "{{name}}님의 커맨더 피해 {{total}}점",
-    partnerDamage: "{{name}}님의 파트너 커맨더가 준 커맨더 피해 {{total}}점",
+    won: "승리",
+    draw: "무승부",
   },
   invalidInvite: {
     header: "초대",

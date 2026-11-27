@@ -302,10 +302,10 @@ const connected = {
     counter: "{{name}} {{value}}",
     // On a player's tile once they have lost and are out of the game.
     out: "Out",
-    // Screen reader text for a mark showing damage from one player's commander, as in "7 commander damage from Ada".
-    commanderDamage: "{{total}} commander damage from {{name}}",
-    // Screen reader text for damage from the second of a player's two partner commanders, as in "7 commander damage from Ada's partner commander".
-    partnerDamage: "{{total}} commander damage from {{name}}'s partner commander",
+    // On the tile of the player or team that won the finished game.
+    won: "Won",
+    // After "Final" on the TV when the game ended in a draw, as in "Final · Draw".
+    draw: "Draw",
   },
   invalidInvite: {
     header: "Invitation",

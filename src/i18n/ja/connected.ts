@@ -235,8 +235,8 @@ export default {
     final: "結果",
     counter: "{{name}} {{value}}",
     out: "敗退",
-    commanderDamage: "{{name}}からの統率者ダメージ{{total}}",
-    partnerDamage: "{{name}}のパートナーの統率者から{{total}}の統率者ダメージ",
+    won: "勝ち",
+    draw: "引き分け",
   },
   invalidInvite: {
     header: "招待",

@@ -262,8 +262,8 @@ export default {
     final: "Final",
     counter: "{{name}} {{value}}",
     out: "Fuera",
-    commanderDamage: "Daño de comandante de {{name}}: {{total}}",
-    partnerDamage: "Daño de comandante del comandante pareja de {{name}}: {{total}}",
+    won: "Victoria",
+    draw: "Empate",
   },
   invalidInvite: {
     header: "Invitación",

@@ -247,8 +247,8 @@ export default {
     final: "फ़ाइनल",
     counter: "{{name}} {{value}}",
     out: "बाहर",
-    commanderDamage: "{{name}} के कमांडर से {{total}} कमांडर डैमेज",
-    partnerDamage: "{{name}} के पार्टनर कमांडर से {{total}} कमांडर डैमेज",
+    won: "जीते",
+    draw: "ड्रॉ",
   },
   invalidInvite: {
     header: "इनवाइट",

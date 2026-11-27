@@ -12,15 +12,17 @@ import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import Head from "expo-router/head"
 
-import { PlayerMark } from "@/components/PlayerMark"
+import type { CommanderBoardSeat } from "@/components/commanderDamageLayout"
+import { CommanderStrip } from "@/components/CommanderStrip"
 import { Text } from "@/components/Text"
 import { useNow } from "@/components/TurnChip"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { treacheryRoleLabel } from "@/features/connected/TreacheryRoleDialog"
 import { useStoreKeepAwake } from "@/features/eventDisplay/EventDisplayScreen"
-import { matchContextLabel } from "@/features/game/domain"
+import { asPlayerId, matchContextLabel } from "@/features/game/domain"
 import { formatName, tableItemShortLabel } from "@/features/game/playSystems"
-import { joinParts } from "@/i18n/format"
+import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
+import { formatList, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { colors } from "@/theme/colorsDark"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -28,10 +30,12 @@ import { goBack } from "@/utils/navigation"
 import { formatElapsed } from "@/utils/useElapsedSince"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
+import { incomingFor } from "./watchDamage"
 import { api } from "../../../convex/_generated/api"
 import { tableRules } from "../../../convex/lib/systems"
 import { holdsDesignation, type TableState } from "../../../convex/lib/table"
 import { bankLeft, clockOwner, turnLead } from "../../../convex/lib/turns"
+import { teamTableRules } from "../../../convex/lib/twoHeadedGiant"
 
 type Board = NonNullable<FunctionReturnType<typeof api.games.watchBoard>>
 type LiveBoard = Extract<Board, { players: unknown }>
@@ -99,10 +103,18 @@ function LiveWatchBoard({ board, s }: { board: LiveBoard; s: Styles }) {
   }
   const seats = board.players
   const seatsById = new Map<string, Seat>(seats.map((seat) => [seat.playerId, seat]))
+  // why: a team variant's teammates share one total, so each team gets one tile, as on the phones.
+  const units = board.teams
+    ? board.teams.flatMap((group) => {
+        const members = seats.filter(({ playerId }) => group.includes(playerId))
+        return members.length > 0 ? [members] : []
+      })
+    : seats.map((seat) => [seat])
   const turn = board.turn
   const turnSeat = turn ? seatsById.get(turn.playerId) : undefined
   const turnTeam = turn ? turnLead(board.turnGroups, turn.playerId) : undefined
-  const rules = tableRules(board.system, board.format)
+  const systemRules = tableRules(board.system, board.format)
+  const rules = board.teams ? teamTableRules(systemRules) : systemRules
   const table: TableState = {
     designations: board.designations ?? {},
     players: Object.fromEntries(
@@ -130,10 +142,26 @@ function LiveWatchBoard({ board, s }: { board: LiveBoard; s: Styles }) {
     board.status === "lobby"
       ? translate("connected:watch.waiting")
       : board.status === "finished"
-        ? translate("connected:watch.final")
+        ? joinParts([
+            translate("connected:watch.final"),
+            board.draw ? translate("connected:watch.draw") : undefined,
+          ])
         : undefined
-  const columns = area ? gridColumns(seats.length, area.width, area.height) : 1
-  const rows = Math.ceil(seats.length / columns)
+  const columns = area ? gridColumns(units.length, area.width, area.height) : 1
+  const rows = Math.ceil(units.length / columns)
+  const damage = board.commanderDamage
+  const commanderPlayers = units.map((members): CommanderBoardPlayer => ({
+    id: asPlayerId(members[0].playerId),
+    name: unitName(members),
+    color: members[0].color,
+    shape: members[0].shape,
+  }))
+  // why: the grid mirrors this board, one square per tile.
+  const commanderSeats = commanderPlayers.map(({ id }, index): CommanderBoardSeat => ({
+    playerId: id,
+    row: Math.floor(index / columns),
+    column: index % columns,
+  }))
   const title = formatName(board.system, board.format)
 
   return (
@@ -160,34 +188,50 @@ function LiveWatchBoard({ board, s }: { board: LiveBoard; s: Styles }) {
       </View>
       <View style={s.grid} onLayout={onLayout}>
         {area
-          ? seats.map((seat) => (
-              <SeatTile
-                key={seat.playerId}
-                seat={seat}
-                board={board}
-                seatsById={seatsById}
-                labels={[
-                  ...rules.designations
-                    .filter((designation) => holdsDesignation(table, designation, seat.playerId))
-                    .map(tableItemShortLabel),
-                  ...(seat.role ? [treacheryRoleLabel(seat.role)] : []),
-                ]}
-                counters={[
-                  ...rules.counters.flatMap((counter) => {
-                    const value = seat.counters?.[counter.id] ?? 0
-                    return value ? [counterText(tableItemShortLabel(counter), value)] : []
-                  }),
-                  ...(seat.customCounters ?? []).flatMap(({ name, value }) =>
-                    value ? [counterText(name, value)] : [],
-                  ),
-                ]}
-                turnHolder={
-                  turn !== undefined && turnLead(board.turnGroups, seat.playerId) === turnTeam
-                }
-                size={{ width: area.width / columns, height: area.height / rows }}
-                s={s}
-              />
-            ))
+          ? units.map((members, index) => {
+              const [lead] = members
+              return (
+                <SeatTile
+                  key={lead.playerId}
+                  seat={lead}
+                  name={commanderPlayers[index].name}
+                  out={members.some(({ out }) => out)}
+                  won={members.some(({ won }) => won)}
+                  board={board}
+                  labels={members.flatMap((seat) => [
+                    ...rules.designations
+                      .filter((designation) => holdsDesignation(table, designation, seat.playerId))
+                      .map(tableItemShortLabel),
+                    ...(seat.role ? [treacheryRoleLabel(seat.role)] : []),
+                  ])}
+                  counters={members.flatMap((seat) => [
+                    ...rules.counters.flatMap((counter) => {
+                      const value = seat.counters?.[counter.id] ?? 0
+                      return value && (seat === lead || !counter.shared)
+                        ? [counterText(tableItemShortLabel(counter), value)]
+                        : []
+                    }),
+                    ...(seat.customCounters ?? []).flatMap(({ name, value }) =>
+                      value ? [counterText(name, value)] : [],
+                    ),
+                  ])}
+                  turnHolder={
+                    turn !== undefined && turnLead(board.turnGroups, lead.playerId) === turnTeam
+                  }
+                  size={{ width: area.width / columns, height: area.height / rows }}
+                  commander={
+                    damage && {
+                      seatNumber: index + 1,
+                      players: commanderPlayers,
+                      seats: commanderSeats,
+                      lethal: damage.lethal,
+                      ...incomingFor(units, members, damage.totals),
+                    }
+                  }
+                  s={s}
+                />
+              )
+            })
           : null}
       </View>
     </View>
@@ -196,6 +240,15 @@ function LiveWatchBoard({ board, s }: { board: LiveBoard; s: Styles }) {
 
 const counterText = (name: string, value: number) =>
   translate("connected:watch.counter", { name, value })
+
+function unitName(members: readonly Seat[]) {
+  const names = members.map(({ name }) => name)
+  if (names.length < 2) return names[0] ?? ""
+  return translate("board:teams.name", {
+    first: formatList(names.slice(0, -1)),
+    second: names[names.length - 1],
+  })
+}
 
 export function gridColumns(count: number, width: number, height: number) {
   let best = { columns: 1, size: 0 }
@@ -211,49 +264,64 @@ export function gridColumns(count: number, width: number, height: number) {
 
 function SeatTile({
   seat,
+  name,
+  out,
+  won,
   board,
-  seatsById,
   labels,
   counters,
   turnHolder,
   size,
+  commander,
   s,
 }: {
   seat: Seat
+  name: string
+  out: boolean
+  won: boolean
   board: LiveBoard
-  seatsById: ReadonlyMap<string, Seat>
   labels: readonly string[]
   counters: readonly string[]
   turnHolder: boolean
   size: { width: number; height: number }
+  commander?: {
+    seatNumber: number
+    players: readonly CommanderBoardPlayer[]
+    seats: readonly CommanderBoardSeat[]
+    lethal: number
+    incoming: Record<PlayerId, number>
+    split: Record<PlayerId, readonly number[]>
+  }
   s: Styles
 }) {
   const ink = accessibleForeground(seat.color)
   const lifeSize = Math.max(s.unit * 2, Math.min(size.height * 0.5, size.width * 0.3))
-  const damage = (board.commanderDamage ?? []).filter(
-    ({ toPlayerId }) => toPlayerId === seat.playerId,
-  )
+  const status = won
+    ? translate("connected:watch.won")
+    : out
+      ? translate("connected:watch.out")
+      : undefined
   return (
     <View style={[s.cell, size]}>
       <View
         style={[
           s.tile,
           { backgroundColor: seat.color },
-          turnHolder && { borderColor: colors.text },
-          seat.out && s.out,
+          (turnHolder || won) && { borderColor: colors.text },
+          out && s.out,
         ]}
       >
         <View style={s.tileTop}>
-          <Text weight="bold" numberOfLines={1} text={seat.name} style={[s.name, { color: ink }]} />
+          <Text weight="bold" numberOfLines={1} text={name} style={[s.name, { color: ink }]} />
           {board.turn?.bank && turnLead(board.turnGroups, seat.playerId) === seat.playerId ? (
             <BankClock turn={board.turn} playerId={seat.playerId} ink={ink} s={s} />
           ) : null}
         </View>
-        {labels.length > 0 || seat.out ? (
+        {labels.length > 0 || status ? (
           <Text
             weight="medium"
             numberOfLines={1}
-            text={joinParts([seat.out ? translate("connected:watch.out") : undefined, ...labels])}
+            text={joinParts([status, ...labels])}
             style={[s.detail, { color: ink }]}
           />
         ) : null}
@@ -274,47 +342,21 @@ function SeatTile({
             style={[s.detail, { color: ink }]}
           />
         ) : null}
-        {damage.length > 0 ? (
-          <View style={s.damageRow}>
-            {damage.map((row) => {
-              const from = seatsById.get(row.fromPlayerId)
-              if (!from) return null
-              const chipInk = accessibleForeground(from.color)
-              return (
-                <View
-                  key={`${row.fromPlayerId}:${row.commander ?? 0}`}
-                  accessible
-                  accessibilityRole="image"
-                  accessibilityLabel={translate(
-                    row.commander === 1
-                      ? "connected:watch.partnerDamage"
-                      : "connected:watch.commanderDamage",
-                    { total: row.total, name: from.name },
-                  )}
-                  style={[s.damage, { backgroundColor: from.color, borderColor: ink }]}
-                >
-                  <PlayerMark
-                    seatNumber={from.seat}
-                    color={chipInk}
-                    shape={from.shape}
-                    insetGlyph="none"
-                    size={Math.round(s.unit * 1.2)}
-                  />
-                  {row.commander === 1 ? (
-                    <Text
-                      weight="medium"
-                      tx="board:commander.unnamedPartner"
-                      style={[s.detail, { color: chipInk }]}
-                    />
-                  ) : null}
-                  <Text
-                    weight="bold"
-                    text={row.total}
-                    style={[s.damageTotal, { color: chipInk }]}
-                  />
-                </View>
-              )
-            })}
+        {commander ? (
+          <View style={s.commander}>
+            <CommanderStrip
+              seatNumber={commander.seatNumber}
+              identity={name}
+              ownerPlayerId={asPlayerId(seat.playerId)}
+              players={commander.players}
+              seats={commander.seats}
+              incoming={commander.incoming}
+              split={commander.split}
+              lethal={commander.lethal}
+              foreground={ink}
+              contentRotation={0}
+              standalone={{ cell: Math.round(s.unit * 1.8) }}
+            />
           </View>
         ) : null}
       </View>
@@ -385,15 +427,6 @@ function watchStyles(u: number) {
     detail: { fontSize: u, lineHeight: 1.3 * u },
     lifeArea: { flex: 1, alignItems: "center", justifyContent: "center" },
     life: { textAlign: "center", fontVariant: ["tabular-nums"] },
-    damageRow: { flexDirection: "row", flexWrap: "wrap", gap: u / 2 },
-    damage: {
-      flexDirection: "row",
-      columnGap: u / 4,
-      alignItems: "center",
-      borderWidth: 2,
-      borderRadius: u / 3,
-      paddingHorizontal: u / 3,
-    },
-    damageTotal: { fontSize: 1.3 * u, lineHeight: 1.8 * u, fontVariant: ["tabular-nums"] },
+    commander: { flexDirection: "row" },
   } satisfies Record<string, number | ViewStyle | TextStyle>
 }

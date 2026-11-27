@@ -58,6 +58,8 @@ export interface CommanderStripProps {
   foot?: { from?: number }
   attack?: CommanderStripAttack
   onBoundsChange?: (bounds: LayoutRectangle) => void
+  /** why: the Watch board draws the grid at its screen's scale and places it in its tile itself, outside any seat corner. */
+  standalone?: { cell: number }
 }
 
 /** why: while a commander attacks this seat, the strip stays over the shadow with that attacker's total lit and the rest faded, and taps fall through to the hit target. The look eases in as the shadow's edge reaches the strip and back out as it drains, so the card passes the attack on until its flood has drained. With no `wave` the look is fully on. */
@@ -122,6 +124,7 @@ export const CommanderStrip = memo(function CommanderStrip({
   foot,
   attack,
   onBoundsChange,
+  standalone,
 }: CommanderStripProps) {
   const {
     themed,
@@ -138,20 +141,27 @@ export const CommanderStrip = memo(function CommanderStrip({
       })
     }
   }, [stripBounds, mapBounds, onBoundsChange])
-  const cell = compact ? COMPACT_CELL_SIZE : CELL_SIZE
-  const pad = spacing.xxs
+  const cell = standalone?.cell ?? (compact ? COMPACT_CELL_SIZE : CELL_SIZE)
+  const scale = standalone ? standalone.cell / CELL_SIZE : 1
+  const pad = spacing.xxs * scale
+  const gap = standalone && { gap: spacing.xxxs * scale }
   const turned: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
   const dealt = commanderDamageDealers(players, ownerPlayerId, incoming)
   const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
     .sort((a, b) => a - b)
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
   const corner = (foot ? FOOT_CORNER : HEAD_CORNER)[contentRotation]
-  const offsets = stripEdge(corner, seatIdentityMetrics(compact).edge - pad, {
-    insets: contentInsets,
-    screenEdges,
-    from: foot?.from,
-    menu: foot ? 0 : menuCornerStep(menuCorner, corner[0], corner[1], compact),
-  })
+  const placed = standalone
+    ? undefined
+    : [
+        themed($strip),
+        stripEdge(corner, seatIdentityMetrics(compact).edge - pad, {
+          insets: contentInsets,
+          screenEdges,
+          from: foot?.from,
+          menu: foot ? 0 : menuCornerStep(menuCorner, corner[0], corner[1], compact),
+        }),
+      ]
   const attackerId = attack?.attackerId
   const flood = attack?.flood
   const lit: Lit = {
@@ -186,8 +196,7 @@ export const CommanderStrip = memo(function CommanderStrip({
       onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
       pointerEvents="none"
       style={[
-        themed($strip),
-        offsets,
+        placed,
         { flexDirection: stripDirection(contentRotation) },
         attackerId && $aboveShadow,
       ]}
@@ -204,14 +213,14 @@ export const CommanderStrip = memo(function CommanderStrip({
         lit={lit}
         rest={attackOnly ? 0 : 1}
         attacked={1}
-        style={[themed($map), { padding: pad }]}
+        style={[themed($map), { padding: pad }, gap]}
       >
         {boardRows.map((row, rowIndex) => (
           <View
             key={rowIndex}
             accessibilityElementsHidden={!attackerId}
             importantForAccessibility={attackerId ? "auto" : "no-hide-descendants"}
-            style={themed($mapRow)}
+            style={[themed($mapRow), gap]}
           >
             {row.map(({ playerId }) => {
               const playerIndex = players.findIndex(({ id }) => id === playerId)
@@ -240,12 +249,17 @@ export const CommanderStrip = memo(function CommanderStrip({
               const attacking = playerId === attackerId
               const totals = chips(playerId)
               const partners = totals.length > 1
-              const half = partners ? (cell - HALF_GAP) / 2 : cell
+              const half = partners ? (cell - HALF_GAP * scale) / 2 : cell
               const halves = totals.map((total, index) => {
                 const partner = index > 0
                 const tier = commanderDamageTier(total, lethal)
                 const filled = tier === "nearLethal"
-                const rim = tier === "calm" ? 1 : RIM_WIDTH
+                const rim = (tier === "calm" ? 1 : RIM_WIDTH) * scale
+                const count = StyleSheet.flatten([
+                  themed(compact ? $compactCount : $count),
+                  partners && (compact ? $compactPartnerCount : $partnerCount),
+                  total > 99 && (compact ? $compactThreeDigits : $threeDigits),
+                ])
                 const ends = partners
                   ? partner
                     ? { borderBottomLeftRadius: radius, borderBottomRightRadius: radius }
@@ -287,8 +301,11 @@ export const CommanderStrip = memo(function CommanderStrip({
                       weight="bold"
                       maxFontSizeMultiplier={1}
                       style={[
-                        themed(compact ? $compactCount : $count),
-                        partners && (compact ? $compactPartnerCount : $partnerCount),
+                        count,
+                        standalone && {
+                          fontSize: (count.fontSize ?? 0) * scale,
+                          lineHeight: (count.lineHeight ?? 0) * scale,
+                        },
                         {
                           color: !filled
                             ? accessibleForeground(player.color)
@@ -296,13 +313,14 @@ export const CommanderStrip = memo(function CommanderStrip({
                               ? player.color
                               : accessibleForeground(foreground),
                         },
-                        total > 99 && (compact ? $compactThreeDigits : $threeDigits),
                       ]}
                     />
                   </View>
                 )
               })
-              const square = <View style={[size, partners && $partners, turned]}>{halves}</View>
+              const square = (
+                <View style={[size, partners && { gap: HALF_GAP * scale }, turned]}>{halves}</View>
+              )
               return (
                 <Eased
                   key={playerId}
@@ -452,7 +470,6 @@ const $mapRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $cell: ViewStyle = { alignItems: "center", justifyContent: "center" }
 const $half: ViewStyle = { alignItems: "center", justifyContent: "center", overflow: "hidden" }
-const $partners: ViewStyle = { gap: 1 }
 // why: a partner half has no rim along the cut, so the pair reads as one square.
 const $cutTop: ViewStyle = { borderTopWidth: 0 }
 const $cutBottom: ViewStyle = { borderBottomWidth: 0 }

@@ -136,6 +136,14 @@ async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">, seats: Doc<"gam
     }),
   )
   const turn = liveTurn(game)
+  const summary =
+    game.status === "finished"
+      ? await ctx.db
+          .query("gameSummaries")
+          .withIndex("by_game", (q) => q.eq("gameId", game._id))
+          .first()
+      : null
+  const winners = summary?.resultKind === "win" ? (summary.winnerPlayerIds ?? []) : []
   return {
     status: game.status,
     system,
@@ -151,6 +159,7 @@ async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">, seats: Doc<"gam
       shape: shownMarkShape(player) ?? appearanceOf(player).shape,
       life: player.currentLife,
       ...(outReason(outState, player._id) ? { out: true } : {}),
+      ...(winners.includes(player._id) ? { won: true } : {}),
       ...(player.counters && Object.keys(player.counters).length > 0
         ? { counters: player.counters }
         : {}),
@@ -160,12 +169,17 @@ async function spectatorBoard(ctx: QueryCtx, game: Doc<"games">, seats: Doc<"gam
         ? { role: player.role }
         : {}),
     })),
-    ...(commanderDamage.length > 0 ? { commanderDamage } : {}),
+    ...(summary?.resultKind === "draw" ? { draw: true } : {}),
+    ...(lethal !== undefined && commanderDamage.length > 0
+      ? { commanderDamage: { lethal, totals: commanderDamage } }
+      : {}),
     ...(game.designations && Object.keys(game.designations).length > 0
       ? { designations: game.designations }
       : {}),
     ...(turn ? { turn } : {}),
     ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+    // why: archenemy also groups turns, so only a team variant's groups are teams that share one tile.
+    ...(teams && game.turnGroups ? { teams: game.turnGroups } : {}),
   }
 }
 
