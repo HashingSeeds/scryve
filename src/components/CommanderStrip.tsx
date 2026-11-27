@@ -145,6 +145,8 @@ export const CommanderStrip = memo(function CommanderStrip({
   const scale = standalone ? standalone.cell / CELL_SIZE : 1
   const pad = spacing.xxs * scale
   const gap = standalone && { gap: spacing.xxxs * scale }
+  // why: the Watch board's last row starts at the left, so its grid's does too.
+  const rowStart = standalone && { justifyContent: "flex-start" as const }
   const turned: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
   const dealt = commanderDamageDealers(players, ownerPlayerId, incoming)
   const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
@@ -183,8 +185,11 @@ export const CommanderStrip = memo(function CommanderStrip({
   const chips = (playerId: PlayerId) => chipTotals(incoming[playerId] ?? 0, split?.[playerId])
   const sources = formatList(
     dealt.flatMap((player) =>
-      chips(player.id).map((amount) =>
-        translate("board:commander.amountFrom", { amount, name: player.name }),
+      chips(player.id).map((amount, index) =>
+        translate(index > 0 ? "board:commander.amountFromPartner" : "board:commander.amountFrom", {
+          amount,
+          name: player.name,
+        }),
       ),
     ),
   )
@@ -220,7 +225,7 @@ export const CommanderStrip = memo(function CommanderStrip({
             key={rowIndex}
             accessibilityElementsHidden={!attackerId}
             importantForAccessibility={attackerId ? "auto" : "no-hide-descendants"}
-            style={[themed($mapRow), gap]}
+            style={[themed($mapRow), gap, rowStart]}
           >
             {row.map(({ playerId }) => {
               const playerIndex = players.findIndex(({ id }) => id === playerId)

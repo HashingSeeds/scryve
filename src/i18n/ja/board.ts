@@ -367,6 +367,7 @@ export default {
     unnamedPartner: "パートナー",
     totalFrom: "{{name}}からの統率者ダメージ{{damage}}",
     amountFrom: "{{name}}から{{amount}}",
+    amountFromPartner: "{{name}}のパートナーから{{amount}}",
     unknownAttacker: "統率者",
     assignFrom: "{{identity}}からの統率者ダメージを記録する",
     assignFromStale: "{{identity}}からの統率者ダメージを記録する、情報が古い状態",

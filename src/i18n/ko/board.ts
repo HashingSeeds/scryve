@@ -369,6 +369,7 @@ export default {
     unnamedPartner: "파트너",
     totalFrom: "{{name}}의 커맨더 피해 {{damage}}점",
     amountFrom: "{{name}}: {{amount}}점",
+    amountFromPartner: "{{name}}님의 파트너에게서 받은 피해 {{amount}}점",
     unknownAttacker: "커맨더",
     assignFrom: "{{identity}}의 커맨더 피해 지정",
     assignFromStale: "{{identity}}의 커맨더 피해 지정, 최신 상태 아님",

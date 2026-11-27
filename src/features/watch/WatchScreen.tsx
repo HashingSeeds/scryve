@@ -43,6 +43,7 @@ type Seat = LiveBoard["players"][number]
 type Styles = ReturnType<typeof watchStyles>
 
 const TILE_ASPECT = 1.5
+const LIFE_LINE = 1.1
 
 export default function WatchScreen() {
   const { code } = useLocalSearchParams<{ code: string }>()
@@ -106,7 +107,7 @@ function LiveWatchBoard({ board, s }: { board: LiveBoard; s: Styles }) {
   // why: a team variant's teammates share one total, so each team gets one tile, as on the phones.
   const units = board.teams
     ? board.teams.flatMap((group) => {
-        const members = seats.filter(({ playerId }) => group.includes(playerId))
+        const members = group.flatMap((playerId) => seatsById.get(playerId) ?? [])
         return members.length > 0 ? [members] : []
       })
     : seats.map((seat) => [seat])
@@ -150,6 +151,8 @@ function LiveWatchBoard({ board, s }: { board: LiveBoard; s: Styles }) {
   const columns = area ? gridColumns(units.length, area.width, area.height) : 1
   const rows = Math.ceil(units.length / columns)
   const damage = board.commanderDamage
+  // why: the grid has a row per row of tiles and keeps to a quarter of a tile, so the total stays the biggest thing on it.
+  const cell = Math.min(Math.round(s.unit * 1.8), Math.floor((area?.height ?? 0) / rows / rows / 4))
   const commanderPlayers = units.map((members): CommanderBoardPlayer => ({
     id: asPlayerId(members[0].playerId),
     name: unitName(members),
@@ -219,6 +222,7 @@ function LiveWatchBoard({ board, s }: { board: LiveBoard; s: Styles }) {
                     turn !== undefined && turnLead(board.turnGroups, lead.playerId) === turnTeam
                   }
                   size={{ width: area.width / columns, height: area.height / rows }}
+                  cell={cell}
                   commander={
                     damage && {
                       seatNumber: index + 1,
@@ -272,6 +276,7 @@ function SeatTile({
   counters,
   turnHolder,
   size,
+  cell,
   commander,
   s,
 }: {
@@ -284,6 +289,7 @@ function SeatTile({
   counters: readonly string[]
   turnHolder: boolean
   size: { width: number; height: number }
+  cell: number
   commander?: {
     seatNumber: number
     players: readonly CommanderBoardPlayer[]
@@ -295,7 +301,12 @@ function SeatTile({
   s: Styles
 }) {
   const ink = accessibleForeground(seat.color)
-  const lifeSize = Math.max(s.unit * 2, Math.min(size.height * 0.5, size.width * 0.3))
+  // why: the total fills the room the name, counters and grid leave it, measured, since a crowded board leaves far less than half a tile.
+  const [lifeRoom, setLifeRoom] = useState<number>()
+  const lifeSize = Math.max(
+    s.unit * 2,
+    Math.min(size.height * 0.5, size.width * 0.3, (lifeRoom ?? Infinity) / LIFE_LINE),
+  )
   const status = won
     ? translate("connected:watch.won")
     : out
@@ -325,13 +336,13 @@ function SeatTile({
             style={[s.detail, { color: ink }]}
           />
         ) : null}
-        <View style={s.lifeArea}>
+        <View style={s.lifeArea} onLayout={(event) => setLifeRoom(event.nativeEvent.layout.height)}>
           <Text
             weight="bold"
             numberOfLines={1}
             adjustsFontSizeToFit
             text={seat.life}
-            style={[s.life, { color: ink, fontSize: lifeSize, lineHeight: lifeSize * 1.1 }]}
+            style={[s.life, { color: ink, fontSize: lifeSize, lineHeight: lifeSize * LIFE_LINE }]}
           />
         </View>
         {counters.length > 0 ? (
@@ -355,7 +366,7 @@ function SeatTile({
               lethal={commander.lethal}
               foreground={ink}
               contentRotation={0}
-              standalone={{ cell: Math.round(s.unit * 1.8) }}
+              standalone={{ cell }}
             />
           </View>
         ) : null}

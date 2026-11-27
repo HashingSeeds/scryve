@@ -391,6 +391,7 @@ export default {
     unnamedPartner: "Partenaire",
     totalFrom: "{{damage}} blessures de commandant infligées par {{name}}",
     amountFrom: "{{amount}} de {{name}}",
+    amountFromPartner: "{{amount}} du partenaire de {{name}}",
     unknownAttacker: "Commandant",
     assignFrom: "Attribuer des blessures de commandant infligées par {{identity}}",
     assignFromStale: "Attribuer des blessures de commandant infligées par {{identity}}, pas à jour",

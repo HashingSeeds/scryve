@@ -416,6 +416,7 @@ export default {
     unnamedPartner: "الشريك",
     totalFrom: "ضرر القائد {{damage}} من {{name}}",
     amountFrom: "{{amount}} من {{name}}",
+    amountFromPartner: "الضرر {{amount}} من شريك قائد {{name}}",
     unknownAttacker: "القائد",
     assignFrom: "تعيين ضرر القائد من {{identity}}",
     assignFromStale: "تعيين ضرر القائد من {{identity}}، قديم",
