@@ -277,7 +277,7 @@ export default {
   },
   history: {
     title: "기록",
-    addResult: "결과 추가",
+    add: "추가",
     addPastGames: "지난 게임 추가",
     logGame: "게임 기록 추가",
     logged: "직접 기록됨",

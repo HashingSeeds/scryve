@@ -297,7 +297,7 @@ export default {
   },
   history: {
     title: "السجل",
-    addResult: "إضافة نتيجة",
+    add: "إضافة",
     addPastGames: "إضافة مباريات سابقة",
     logGame: "تسجيل مباراة",
     logged: "مسجَّلة يدويًا",

@@ -280,7 +280,7 @@ export default {
   },
   history: {
     title: "履歴",
-    addResult: "結果を追加",
+    add: "追加",
     addPastGames: "過去のゲームを追加",
     logGame: "ゲームを記録",
     logged: "記録済み",
