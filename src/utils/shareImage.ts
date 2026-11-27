@@ -5,7 +5,6 @@ import { File, Paths } from "expo-file-system"
 // why: updates reach binaries built before expo-sharing; they lack its native module, and its JS throws on import there.
 const hasExpoSharing = requireOptionalNativeModule("ExpoSharing") !== null
 
-// why: React Native's Android share sheet takes text only, so Android shares an image only through expo-sharing.
 export const canShareImage = hasExpoSharing || Platform.OS === "ios"
 
 export async function shareImage(base64: string, fileName: string) {
