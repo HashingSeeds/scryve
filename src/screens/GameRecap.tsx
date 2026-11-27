@@ -55,9 +55,15 @@ const ROWS_BOTTOM = IMAGE_HEIGHT - PAD - 22
 const ROW_MAX = 73
 const STRIP_LEFT = 212
 const LIFE_COLUMN = 80
-// why: iOS reads sizes as points and draws at the screen's scale while web reads pixels, so the image mounts at the export size and scales its 360x450 drawing to fill it.
-const EXPORT_SCALE = Platform.OS === "web" ? 1 : PixelRatio.get()
-const EXPORT_SIZE = { width: 1080 / EXPORT_SCALE, height: 1350 / EXPORT_SCALE }
+const EXPORT_PIXELS = { width: 1080, height: 1350 }
+
+export function recapExportSize(os: typeof Platform.OS, pixelRatio: number) {
+  const scale = os === "web" ? 1 : pixelRatio
+  const layout = { width: EXPORT_PIXELS.width / scale, height: EXPORT_PIXELS.height / scale }
+  return { layout, request: os === "ios" ? layout : EXPORT_PIXELS }
+}
+
+const EXPORT = recapExportSize(Platform.OS, PixelRatio.get())
 // why: names and life totals are clipped by length, but wide glyphs still run long, so each column clips to its own box.
 const NAMES_CLIP = "recap-names"
 const HEADER_CLIP = "recap-header"
@@ -116,8 +122,8 @@ function RecapImage({ model, svgRef }: { model: GameSummaryModel; svgRef: React.
   return (
     <Svg
       ref={svgRef}
-      width={EXPORT_SIZE.width}
-      height={EXPORT_SIZE.height}
+      width={EXPORT.layout.width}
+      height={EXPORT.layout.height}
       viewBox={`0 0 ${IMAGE_WIDTH} ${IMAGE_HEIGHT}`}
     >
       <Defs>
@@ -244,7 +250,7 @@ export function RecapShare({
     const frame = requestAnimationFrame(() =>
       svgRef.current?.toDataURL((base64) => {
         if (active) shareImage(base64, "scryve-recap.png").then(() => done(), done)
-      }, EXPORT_SIZE),
+      }, EXPORT.request),
     )
     return () => {
       active = false
@@ -267,5 +273,5 @@ const $offscreen: ViewStyle = {
   position: "absolute",
   left: -10_000,
   top: 0,
-  ...EXPORT_SIZE,
+  ...EXPORT.layout,
 }
