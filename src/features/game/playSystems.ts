@@ -5,7 +5,6 @@ import { deckFormats, deckSections } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
   isSystemId,
-  lowerLeads,
   NO_TABLE,
   SYSTEM_IDS,
   startingValueRange,
@@ -187,21 +186,6 @@ export function counterValueLabel(value: unknown, count: number): string {
 
 export function counterChangeLabel(value: unknown, count: number): string {
   return translate(`systems:counterChange.${playSystemRules(value).id}`, { count })
-}
-
-export function counterDeltaFromStartLabel(
-  value: unknown,
-  current: number,
-  startingValue: number,
-): string {
-  const delta = current - startingValue
-  if (lowerLeads(playSystemRules(value).counter)) {
-    const taken = startingValue - current
-    return taken === 0
-      ? translate("systems:noneTaken")
-      : translate("systems:taken", { count: taken })
-  }
-  return delta === 0 ? translate("systems:even") : translate("systems:fromStart", { delta })
 }
 
 function hasOwnKey<Table extends object>(

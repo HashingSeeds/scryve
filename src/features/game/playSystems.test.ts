@@ -1,5 +1,4 @@
 import {
-  counterDeltaFromStartLabel,
   counterHeading,
   counterLabel,
   defaultStartingLife,
@@ -34,11 +33,6 @@ describe("play system defaults", () => {
     expect(storedPlaySystem("pokemon")).toBe("pokemon")
     expect(storedPlaySystem("none")).toBeUndefined()
     expect(storedPlaySystem("a-later-system")).toBeUndefined()
-  })
-
-  it("reports prizes taken for down counters", () => {
-    expect(counterDeltaFromStartLabel("pokemon", 4, 6)).toBe("2 prizes taken")
-    expect(counterDeltaFromStartLabel("mtg", 18, 20)).toBe("\u22122 from start")
   })
 
   it("offers each format's life presets, including its own default", () => {

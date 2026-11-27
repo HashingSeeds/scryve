@@ -285,13 +285,4 @@ export default {
     riftbound_many: "{{count}} تغييرًا في النقاط",
     riftbound_other: "{{count}} تغيير في النقاط",
   },
-  noneTaken: "لم تُؤخذ أي بطاقة جائزة",
-  taken_zero: "بطاقات الجائزة المأخوذة: {{count}}",
-  taken_one: "بطاقة جائزة واحدة مأخوذة",
-  taken_two: "بطاقتا جائزة مأخوذتان",
-  taken_few: "{{count}} بطاقات جائزة مأخوذة",
-  taken_many: "{{count}} بطاقة جائزة مأخوذةً",
-  taken_other: "بطاقات الجائزة المأخوذة: {{count}}",
-  even: "دون تغيير",
-  fromStart: "الفرق عن البداية: {{delta, signed}}",
 } satisfies LocaleNamespace

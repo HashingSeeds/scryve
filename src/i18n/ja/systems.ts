@@ -215,8 +215,4 @@ export default {
     fab_other: "ライフ変動{{count}}回",
     riftbound_other: "ポイント変動{{count}}回",
   },
-  noneTaken: "サイドをとっていません",
-  taken_other: "サイド{{count}}枚をとった",
-  even: "変化なし",
-  fromStart: "開始時から{{delta, signed}}",
 } satisfies LocaleNamespace

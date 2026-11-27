@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { fireEvent, render, screen } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
+import { localGameRecap } from "@/features/game/localRecap"
 import { counterChangeLabel } from "@/features/game/playSystems"
 import type { GameEvent, LocalGame } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
@@ -14,6 +15,8 @@ import {
   connectedSummaryModel,
   localChanges,
   localSummaryModel,
+  recapDetail,
+  standings,
 } from "./gameSummary"
 import { GameSummaryScreen } from "./GameSummaryScreen"
 
@@ -149,18 +152,12 @@ describe("game summary", () => {
     expect(counterChangeLabel("pokemon", 2)).toBe("2 prize cards changes")
   })
 
-  it("summarises a local game above each seat's final life and swing", () => {
+  it("summarises a local game with each seat's final life", () => {
     renderLocal()
 
     expect(screen.getByText("Finished")).toBeTruthy()
-    expect(screen.getByText("2 players · 20 life · 34 min · 0 life changes")).toBeTruthy()
-    expect(screen.getByText("Final Life")).toBeTruthy()
-    expect(screen.getByText("Seat 1")).toBeTruthy()
-    expect(screen.getByText("Seat 2")).toBeTruthy()
-    expect(screen.queryByText("Seat 0")).toBeNull()
+    expect(screen.getByText(/ · 20 life · 34 min$/)).toBeTruthy()
     expect(screen.getByText("3")).toBeTruthy()
-    expect(screen.getByText("−17 from start")).toBeTruthy()
-    expect(screen.getByText("unchanged")).toBeTruthy()
     expect(screen.getByText("No life changes were recorded.")).toBeTruthy()
     expect(screen.getByTestId("summary-timeline-toggle").props.accessibilityState.disabled).toBe(
       true,
@@ -225,9 +222,56 @@ describe("game summary", () => {
   it("ranks a local game by the winner its host recorded", () => {
     renderLocal(localGame({ result: { kind: "win", winnerPlayerIds: [asPlayerId("p2")] } }))
 
-    expect(screen.getByText("Result")).toBeTruthy()
+    expect(screen.getByText("Grace won")).toBeTruthy()
     expect(screen.getByLabelText("Winner, Grace, 20 life")).toBeTruthy()
     expect(screen.getByLabelText("Loss, Ada, 3 life")).toBeTruthy()
+  })
+
+  it("lists seats that went out after the seat still in, latest out first", () => {
+    const game = localGame({
+      players: [
+        { id: "p1", name: "Ada", color: "#7C3AED", life: 0, seat: 0 },
+        { id: "p2", name: "Grace", color: "#2563EB", life: 12, seat: 1 },
+        { id: "p3", name: "Linus", color: "#16A34A", life: 9, seat: 2 },
+      ] as LocalGame["players"],
+      result: { kind: "win", winnerPlayerIds: [asPlayerId("p3")] },
+    })
+    const model = localSummaryModel(game, {
+      lives: [
+        [20, 20, 20],
+        [20, 12, 20],
+        [0, 12, 20],
+        [0, 12, 9],
+      ],
+      outs: [
+        { seat: 0, cause: "life" },
+        { seat: 1, cause: "commanderDamage", from: 2, total: 21 },
+      ],
+    })
+
+    expect(standings(model).map(({ name }) => name)).toEqual(["Linus", "Ada", "Grace"])
+    expect(recapDetail(model, model.players[0])).toBe("out: life")
+    expect(recapDetail(model, model.players[1])).toBe("out: 21 commander damage from Linus")
+    render(
+      themed(
+        <GameSummaryScreen
+          summary={{ status: "ready", value: model }}
+          timeline={{ status: "unavailable" }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
+    expect(
+      screen.getByLabelText("Loss, Grace, 20 life to 12 life, out: 21 commander damage from Linus"),
+    ).toBeTruthy()
+  })
+
+  it("stores no recap for a logged game, which has no life changes", () => {
+    expect(
+      localGameRecap(
+        localGame({ logged: true, result: { kind: "win", winnerPlayerIds: [asPlayerId("p2")] } }),
+      ),
+    ).toBeUndefined()
   })
 
   it("shows a local draw as a draw for everyone", () => {
@@ -248,41 +292,10 @@ describe("game summary", () => {
       ),
     )
 
-    expect(screen.getByText("Result")).toBeTruthy()
-    expect(screen.getByText("@token · Krenko v3")).toBeTruthy()
-    expect(screen.getByLabelText("Winner, Player, 7 life")).toBeTruthy()
-    expect(screen.getByLabelText("Loss, Player, −1 life")).toBeTruthy()
-    expect(screen.getByText("2 players · Commander · 48 life changes")).toBeTruthy()
-  })
-
-  it("measures a connected seat's change from its own starting life", () => {
-    const [hero, other] = connectedSummary().players
-    const render36 = (finalLife: number) =>
-      render(
-        themed(
-          <GameSummaryScreen
-            summary={{
-              status: "ready",
-              value: connectedSummaryModel(
-                connectedSummary({
-                  players: [
-                    { ...hero, startingLife: 36, finalLife },
-                    { ...other, finalLife: 40 },
-                  ],
-                }),
-              ),
-            }}
-            timeline={{ status: "ready", items: [], nextPage: { status: "exhausted" } }}
-            onBack={jest.fn()}
-          />,
-        ),
-      )
-
-    render36(36)
-    expect(screen.getAllByText("unchanged")).toHaveLength(2)
-    screen.unmount()
-    render36(33)
-    expect(screen.getByText("−3 from start")).toBeTruthy()
+    expect(screen.getByText("Winner · @token · Krenko v3")).toBeTruthy()
+    expect(screen.getByLabelText("Winner, Player, 7 life, @token · Krenko v3")).toBeTruthy()
+    expect(screen.getByLabelText("Loss, Player, −1 life, @mchisolm0")).toBeTruthy()
+    expect(screen.getByText(/ · Commander$/)).toBeTruthy()
   })
 
   it.each([
@@ -324,7 +337,6 @@ describe("game summary", () => {
       ),
     )
 
-    expect(screen.getByText("Final Life")).toBeTruthy()
     expect(screen.getByText("No winner was recorded for this game.")).toBeTruthy()
   })
 
@@ -433,7 +445,7 @@ describe("game summary", () => {
 
     fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
 
-    expect(screen.getByText("Finished")).toBeTruthy()
+    expect(screen.getByText("Player won")).toBeTruthy()
     expect(screen.getByTestId("summary-timeline-error")).toBeTruthy()
     fireEvent.press(screen.getByTestId("summary-timeline-retry"))
     expect(retry).toHaveBeenCalledTimes(1)

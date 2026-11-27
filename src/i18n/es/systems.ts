@@ -243,10 +243,4 @@ export default {
     riftbound_many: "{{count}} cambios de puntos",
     riftbound_other: "{{count}} cambios de puntos",
   },
-  noneTaken: "sin cartas de Premio tomadas",
-  taken_one: "{{count}} carta de Premio tomada",
-  taken_many: "{{count}} de cartas de Premio tomadas",
-  taken_other: "{{count}} cartas de Premio tomadas",
-  even: "sin cambios",
-  fromStart: "{{delta, signed}} desde el inicio",
 } satisfies LocaleNamespace

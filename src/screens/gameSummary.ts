@@ -1,9 +1,11 @@
+import { counterOutReason } from "@/components/CounterChips"
+import { lastChangeRow } from "@/components/LifeStrip"
 import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
 import { gameTypeLabel } from "@/features/game/gameTypes"
 import {
-  counterChangeLabel,
   isPlaySystemId,
   playFormatLabel,
+  playSystemRules,
   storedPlaySystem,
   type PlaySystemId,
 } from "@/features/game/playSystems"
@@ -14,10 +16,12 @@ import type {
   LocalGame,
 } from "@/features/game/types"
 import { type TxKeyPath } from "@/i18n"
-import { formatDate, formatTime, joinParts } from "@/i18n/format"
+import { formatConjunction, formatDate, formatTime, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
 import { noFormatLabel, type HistoryOutcome, type HistorySource } from "./historyEntries"
+import { isPlayerMarkShape, type PlayerMarkShape } from "../../convex/lib/appearance"
+import type { GameRecap } from "../../convex/lib/gameRecap"
 import type { GameVariant } from "../../convex/lib/treachery"
 import { turnGroupOf, type TurnGroups } from "../../convex/lib/turns"
 
@@ -30,6 +34,7 @@ export interface SummaryPlayer {
   username?: string
   deckLabel?: string
   color: string
+  shape?: PlayerMarkShape
   life: number
   startingLife?: number
   outcome: SummaryOutcome
@@ -56,6 +61,7 @@ export interface GameSummaryModel {
   players: SummaryPlayer[]
   terminalReason?: string
   logged?: true
+  recap?: GameRecap
 }
 
 export interface SummaryChangeFeed {
@@ -83,7 +89,7 @@ export function localOutcome(result: LocalGame["result"], playerId: string): Sum
   return result.winnerPlayerIds.some((id) => id === playerId) ? "win" : "loss"
 }
 
-export function localSummaryModel(game: LocalGame): GameSummaryModel {
+export function localSummaryModel(game: LocalGame, recap?: GameRecap): GameSummaryModel {
   const system = isPlaySystemId(game.system) ? game.system : undefined
   const finishedAt = game.finishedAt ?? game.updatedAt
   return {
@@ -100,16 +106,20 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
           : playFormatLabel(system, game.format)
         : noFormatLabel(system, game.startingLife, game.logged),
     changeCount: localChanges(game).length,
-    players: game.players.map((player) => ({
-      id: player.id,
-      seat: player.seat + 1,
-      name: player.name,
-      color: player.color,
-      life: player.life,
-      ...(player.startingLife === undefined ? {} : { startingLife: player.startingLife }),
-      outcome: localOutcome(game.result, player.id),
-      ...teamOf(game.players, game.turnGroups, player.id),
-    })),
+    ...(recap ? { recap } : {}),
+    players: [...game.players]
+      .sort((left, right) => left.seat - right.seat)
+      .map((player) => ({
+        id: player.id,
+        seat: player.seat + 1,
+        name: player.name,
+        color: player.color,
+        ...(player.shape ? { shape: player.shape } : {}),
+        life: player.life,
+        ...(player.startingLife === undefined ? {} : { startingLife: player.startingLife }),
+        outcome: localOutcome(game.result, player.id),
+        ...teamOf(game.players, game.turnGroups, player.id),
+      })),
     ...(game.logged ? { logged: true as const } : {}),
   }
 }
@@ -138,10 +148,11 @@ export interface ConnectedSummaryDocument {
   variant?: GameVariant
   ruleset: string
   eventCount: number
-  finishedAt: number
   startedAt?: number
+  finishedAt: number
   logged?: true
   turnGroups?: string[][]
+  recap?: GameRecap
   players: {
     playerId: string
     seat: number
@@ -151,6 +162,7 @@ export interface ConnectedSummaryDocument {
     deckVersionNumber?: number
     outcome?: "win" | "loss" | "draw" | "unknown"
     color: string
+    shape?: string
     finalLife: number
     startingLife?: number
     deletedAt?: number
@@ -190,6 +202,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
     changeCount: summary.eventCount,
     terminalReason: unusualEnding(summary.terminalReason),
     ...(summary.logged ? { logged: true as const } : {}),
+    ...(summary.recap ? { recap: summary.recap } : {}),
     players: summary.players.map((player) => ({
       id: player.playerId,
       seat: player.seat,
@@ -205,6 +218,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
           : player.deckNameAtFinish
         : undefined,
       color: player.color,
+      ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
       life: player.finalLife,
       ...(player.startingLife === undefined ? {} : { startingLife: player.startingLife }),
       outcome:
@@ -247,9 +261,22 @@ export function connectedChanges(
   )
 }
 
+export function recapOut(model: GameSummaryModel, player: SummaryPlayer) {
+  return model.recap?.outs?.find(({ seat }) => model.players[seat] === player)
+}
+
+function lastInRow(model: GameSummaryModel, player: SummaryPlayer) {
+  if (!recapOut(model, player)) return Number.MAX_SAFE_INTEGER
+  const lives = model.recap?.lives
+  return lives ? lastChangeRow(lives, model.players.indexOf(player)) : 0
+}
+
 export function standings(model: GameSummaryModel) {
   return [...model.players].sort(
-    (a, b) => OUTCOME_ORDER[a.outcome] - OUTCOME_ORDER[b.outcome] || a.seat - b.seat,
+    (a, b) =>
+      OUTCOME_ORDER[a.outcome] - OUTCOME_ORDER[b.outcome] ||
+      lastInRow(model, b) - lastInRow(model, a) ||
+      a.seat - b.seat,
   )
 }
 
@@ -278,9 +305,42 @@ export function finishedOnLabel(finishedAt?: number, logged?: true) {
 
 export function metaLine(model: GameSummaryModel) {
   return joinParts([
-    translate("play:summary.playerCount", { count: model.players.length }),
+    finishedOnLabel(model.finishedAt, model.logged),
+    model.logged ? translate("play:history.logged") : undefined,
     model.format,
     playedFor(model),
-    model.logged ? undefined : counterChangeLabel(model.system, model.changeCount),
   ])
+}
+
+export function recapDetail(model: GameSummaryModel, player: SummaryPlayer) {
+  const out = recapOut(model, player)
+  if (!out)
+    return player.outcome === "win" || player.outcome === "draw"
+      ? translate(`play:summary.outcome.${player.outcome}`)
+      : undefined
+  if (out.cause === "life")
+    return translate("board:lifeCard.out", {
+      reason: translate(`board:lifeCard.outOn.${playSystemRules(model.system).id}`),
+    })
+  if (out.cause === "counter")
+    return translate("board:lifeCard.out", {
+      reason: counterOutReason({ id: out.counterId, label: out.counterId }),
+    })
+  const attacker = model.players[out.from]
+  return translate("board:lifeCard.out", {
+    reason: attacker
+      ? translate("board:lifeCard.outFrom", { total: out.total, name: attacker.name })
+      : translate("board:outReason.commanderDamage"),
+  })
+}
+
+export function recapHeadline(model: GameSummaryModel) {
+  const winners = model.players.filter(({ outcome }) => outcome === "win")
+  if (winners.length > 0)
+    return translate("play:summary.recap.won", {
+      names: formatConjunction(winners.map(({ name }) => name)),
+    })
+  if (model.players.some(({ outcome }) => outcome === "draw"))
+    return translate("play:summary.outcome.draw")
+  return translate(model.status === "finished" ? "play:summary.finished" : "play:summary.abandoned")
 }

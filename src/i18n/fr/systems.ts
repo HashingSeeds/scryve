@@ -245,10 +245,4 @@ export default {
     riftbound_many: "{{count}} de changements de points",
     riftbound_other: "{{count}} changements de points",
   },
-  noneTaken: "aucune Récompense récupérée",
-  taken_one: "{{count}} carte Récompense récupérée",
-  taken_many: "{{count}} cartes Récompense récupérées",
-  taken_other: "{{count}} cartes Récompense récupérées",
-  even: "inchangé",
-  fromStart: "{{delta, signed}} depuis le départ",
 } satisfies LocaleNamespace

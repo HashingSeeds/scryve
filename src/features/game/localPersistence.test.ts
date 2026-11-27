@@ -15,6 +15,7 @@ import {
   LOCAL_KEYS,
   LocalGameRepository,
   MAX_ACTIVE_EVENTS,
+  MAX_HISTORY_EVENTS,
   MAX_HISTORY_GAMES,
 } from "./localPersistence"
 import type { LocalGame } from "./types"
@@ -706,6 +707,29 @@ describe("LocalGameRepository", () => {
     expect(repository.loadActiveGame()).toBeNull()
     expect(repository.loadHistory()).toHaveLength(1)
     expect(repository.loadHistoryDetail(finished.id)?.game.status).toBe("finished")
+  })
+
+  it("keeps a long game's whole life graph after its saved events are cut", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const context = defaultCommandContext(asDeviceId("device"))
+    let game = createLocalGame({
+      startingLife: 400,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+    })
+    for (let index = 0; index < MAX_HISTORY_EVENTS + 10; index += 1)
+      game = applyGameCommand(
+        game,
+        { type: "life.change", playerId: game.players[index % 2].id, delta: -1 },
+        context,
+      )
+    repository.archiveGame(applyGameCommand(game, { type: "game.finish" }, context))
+    const detail = repository.loadHistoryDetail(game.id)
+    expect(detail?.eventsTruncated).toBe(true)
+    expect(detail?.recap?.lives?.[0]).toEqual([400, 400])
+    expect(detail?.recap?.lives?.at(-1)).toEqual([270, 270])
   })
 
   it("keeps a nearby guest's mulligans in both the history row and its detail", () => {

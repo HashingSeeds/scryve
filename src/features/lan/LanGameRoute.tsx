@@ -10,6 +10,8 @@ import { ConnectedBoardWithRuntime } from "@/screens/ConnectedBoardScreen"
 
 const backToLobby = () => (router.canGoBack() ? router.back() : router.replace("/lan"))
 const backToPlay = () => router.dismissTo({ pathname: "/", params: { destination: "play" } })
+const openRecap = (publicId: string) =>
+  router.replace({ pathname: "/history/[gameId]", params: { gameId: publicId } })
 // why: leaving clears the game, and the gameGone effect takes the player to Play without stopping at the lobby's closed screen.
 const leaveGame = () => lanSession.leave()
 const nearbyPregame = {
@@ -52,7 +54,7 @@ export default function LanGameRoute() {
       onEndMatch={role === "host" ? lanSession.endMatch : undefined}
       roleRevealOnline={role === "host" || status === "connected"}
       peerLatency={role === "host" ? lanSession.peerLatency : undefined}
-      onGameEnded={backToLobby}
+      onGameEnded={role === "host" ? openRecap : backToLobby}
       onGameAbandoned={leaveGame}
       onLeave={leaveGame}
       onBack={backToLobby}

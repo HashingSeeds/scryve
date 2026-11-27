@@ -11,6 +11,7 @@ import type { LocalGame, LocalGameSummary, PlayerId } from "@/features/game/type
 
 import type { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+import type { GameRecap } from "../../../convex/lib/gameRecap"
 import { MAX_SNAPSHOT_LIFE } from "../../../convex/lib/gameRules"
 import { isSystemId } from "../../../convex/lib/systems"
 import { isValidTableSnapshot, type TableState } from "../../../convex/lib/table"
@@ -20,7 +21,10 @@ type FinishedGameArgs = FunctionArgs<typeof api.games.publishFinishedLocalGame>
 type MatchFinishArgs = FunctionArgs<typeof api.matches.finishScryveMatch>
 
 // why: seats rebase to 1..n like `buildLocalGameSnapshot`, and local ids double as winner references so the server needs no id translation.
-export function buildFinishedLocalGameSnapshot(game: LocalGameSummary): FinishedGameArgs {
+export function buildFinishedLocalGameSnapshot(
+  game: LocalGameSummary,
+  recap?: GameRecap,
+): FinishedGameArgs {
   const ordered = [...game.players].sort((left, right) => left.seat - right.seat)
   const me = game.account?.mePlayerId
   const deckVersionId = game.account?.deckVersionId
@@ -67,6 +71,7 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary): Finished
         : result?.kind === "draw"
           ? { kind: "draw" }
           : { kind: "unknown" },
+    recap,
   }
 }
 

@@ -180,7 +180,7 @@ export const connectedSummary = queryHandler({
     })
     return {
       ...summary,
-      ...(summary.logged && game.startedAt !== undefined && game.startedAt < summary.finishedAt
+      ...(game.startedAt !== undefined && game.startedAt < summary.finishedAt
         ? { startedAt: game.startedAt }
         : {}),
       game: summary.game ?? DEFAULT_DECK_GAME,

@@ -17,6 +17,7 @@ import { sharedSeatDeck, type SharedSeatDeck } from "../deckShares"
 import { gatedTableState } from "../gameEngine"
 import { storedDesignations } from "../gameEngineConvex"
 import { limitGameRate } from "../gameRateLimits"
+import { gameRecapValidator } from "../gameRecap"
 import {
   commanderField,
   isCommanderFormat,
@@ -25,6 +26,7 @@ import {
   MAX_SNAPSHOT_LIFE,
   type CommanderSlot,
 } from "../gameRules"
+import { mutationHandler } from "./handlers"
 import { insertGame } from "./setup"
 import { assertGameSystem, requireReleasedCapability } from "../integrations"
 import { playerGridLayoutValidator } from "../layouts"
@@ -55,7 +57,6 @@ import {
 } from "../table"
 import { isTeamVariant } from "../teamVariants"
 import { gameVariantValidator } from "../treachery"
-import { mutationHandler } from "./handlers"
 import {
   JOIN_ATTEMPT_WINDOW_MS,
   MAX_COMMANDER_DAMAGE_ROWS,
@@ -511,6 +512,7 @@ export const publishFinishedLocalGame = mutationHandler({
       v.object({ kind: v.literal("unknown") }),
     ),
     match: v.optional(publishedMatchValidator),
+    recap: v.optional(gameRecapValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -751,6 +753,7 @@ export const publishFinishedLocalGame = mutationHandler({
         historySource: "local",
         nearby: args.nearby ?? seatPassHashes.length > 0,
         logged: args.logged,
+        recap: args.recap,
         clientGameId: args.publicId,
         ...(firstPlayerLocalId !== undefined
           ? { firstPlayerId: playerIdsByLocalId.get(firstPlayerLocalId)! }
