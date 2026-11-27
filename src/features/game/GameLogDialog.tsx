@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { FlatList, View } from "react-native"
+import { FlatList, Pressable, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { TableGlyph } from "@/components/CounterChips"
@@ -25,6 +25,7 @@ import {
   counterLog,
   gameLog,
   mergedLog,
+  rowPosition,
   withModeRows,
   withTurnDividers,
   type GameLogItem,
@@ -52,7 +53,9 @@ export function GameLogDialog({
   origin,
   onMore,
   positionOf,
+  rollbackFloor = Infinity,
   onUndo,
+  onGoBack,
   onClose,
 }: {
   players: readonly Pick<GamePlayer, "id" | "name" | "life" | "color" | "shape">[]
@@ -67,7 +70,9 @@ export function GameLogDialog({
   origin?: DialogOrigin
   onMore?: () => void
   positionOf: (operationId: string) => number | undefined
+  rollbackFloor?: number
   onUndo: () => void
+  onGoBack?: (place: number, changes: number) => void
   onClose: () => void
 }) {
   const {
@@ -105,7 +110,22 @@ export function GameLogDialog({
     [players],
   )
 
+  const placeOf = (item: GameLogItem) =>
+    item.kind === "turn"
+      ? (positionOf(item.operationId) ?? -Infinity)
+      : rowPosition(item, positionOf)
+  const goBackTo = (item: GameLogItem) => {
+    const place = placeOf(item)
+    if (!onGoBack || place <= rollbackFloor) return undefined
+    return () => onGoBack(place, rows.filter((row) => placeOf(row) >= place).length)
+  }
+
   function renderRow({ item }: { item: GameLogItem }) {
+    const goBack = goBackTo(item)
+    const press = {
+      onPress: goBack,
+      accessibilityHint: goBack ? translate("board:log.goBackHint") : undefined,
+    }
     if (item.kind === "turn") {
       const holder = seats.get(item.playerId)
       const label = translate("board:turn.divider", {
@@ -113,12 +133,13 @@ export function GameLogDialog({
         name: teamName(players, groups, item.playerId) ?? "",
       })
       return (
-        <View
+        <Pressable
           testID={`game-log-turn-${item.number}`}
           accessible
-          accessibilityRole="header"
+          accessibilityRole={goBack ? "button" : "header"}
           accessibilityLabel={label}
-          style={themed($turnRow)}
+          {...press}
+          style={(state) => [themed($turnRow), goBack && state.pressed && $pressed]}
         >
           {holder ? (
             <PlayerMark
@@ -135,7 +156,7 @@ export function GameLogDialog({
             size="xxs"
             style={{ color: colors.textDim }}
           />
-        </View>
+        </Pressable>
       )
     }
     if (item.kind === "mode") {
@@ -168,16 +189,18 @@ export function GameLogDialog({
       const counter = custom ?? tableItemLabel({ id: item.counterId, label: item.counterId })
       const delta = formatSigned(item.delta)
       return (
-        <View
+        <Pressable
           testID={`game-log-counter-${item.id}`}
           accessible
+          accessibilityRole={goBack ? "button" : undefined}
+          {...press}
           accessibilityLabel={translate("board:log.counterRow", {
             name,
             counter,
             delta,
             value: item.value,
           })}
-          style={themed($row)}
+          style={(state) => [themed($row), goBack && state.pressed && $pressed]}
         >
           {seat ? (
             <PlayerMark
@@ -206,7 +229,7 @@ export function GameLogDialog({
               />
             </View>
           </View>
-        </View>
+        </Pressable>
       )
     }
     const seat = seats.get(item.playerId)
@@ -216,9 +239,11 @@ export function GameLogDialog({
     const delta = formatSigned(item.delta)
     const when = relativeTime(item.at, openedAt)
     return (
-      <View
+      <Pressable
         testID={`game-log-row-${item.id}`}
         accessible
+        accessibilityRole={goBack ? "button" : undefined}
+        {...press}
         accessibilityLabel={
           source === undefined
             ? translate("board:log.row", { name, delta, life: item.life })
@@ -229,7 +254,7 @@ export function GameLogDialog({
                 life: item.life,
               })
         }
-        style={themed($row)}
+        style={(state) => [themed($row), goBack && state.pressed && $pressed]}
       >
         {seat ? (
           <PlayerMark
@@ -280,7 +305,7 @@ export function GameLogDialog({
             <Text text={when} size="xxs" numberOfLines={1} style={{ color: colors.textDim }} />
           </View>
         </View>
-      </View>
+      </Pressable>
     )
   }
 
@@ -365,4 +390,5 @@ const $detail: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
 })
 const $shrink: TextStyle = { flexShrink: 1 }
+const $pressed: ViewStyle = { opacity: 0.6 }
 const $number: TextStyle = { minWidth: 32, textAlign: textEnd, fontVariant: ["tabular-nums"] }

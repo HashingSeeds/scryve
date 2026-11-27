@@ -5,9 +5,11 @@ import {
   asDeviceId,
   asOperationId,
   createLocalGame,
+  localLogPositions,
   withFirstTurn,
 } from "./domain"
-import { newestLogUndo, undoLogRow, type LogUndo } from "./logUndo"
+import { counterLog, gameLog, mergedLog, rowPosition } from "./LifeLog"
+import { newestLogUndo, rollBack, rollbackFloor, undoLogRow, type LogUndo } from "./logUndo"
 import type { CommandContext, LocalGame } from "./types"
 import type { TableAction } from "../../../convex/lib/table"
 
@@ -135,6 +137,132 @@ describe("the game log's Undo", () => {
       kind: "turn",
       playerId: ada.id,
     })
+  })
+})
+
+const placeOfRow = (current: LocalGame, index: number) => {
+  const positionOf = localLogPositions(current)
+  const rows = mergedLog(
+    gameLog(current.players, current.events),
+    counterLog(current.counterLog ?? []),
+    positionOf,
+  )
+  return rowPosition(rows[index], positionOf)
+}
+
+describe("going back in the log", () => {
+  it("takes back the chosen row and every row after it in one step", () => {
+    let current = game()
+    const [ada, bo] = current.players
+    clock = 1_000
+    current = applyGameCommand(
+      current,
+      { type: "life.change", playerId: bo.id, delta: -3 },
+      context,
+    )
+    current = table(
+      current,
+      { kind: "counter.changed", playerId: bo.id, counterId: "poison", delta: 1 },
+      4_000,
+    )
+    clock = 8_000
+    current = applyGameCommand(
+      current,
+      { type: "life.change", playerId: ada.id, delta: -2 },
+      context,
+    )
+
+    const { game: after, changes } = rollBack(
+      current,
+      placeOfRow(current, 1),
+      { turns: true },
+      context,
+    )
+    expect(changes).toBe(2)
+    expect(after.players.map(({ life }) => life)).toEqual([40, 37])
+    expect(after.table?.players[bo.id].counters).toEqual({ poison: 0 })
+    expect(newestLogUndo(after, { turns: true })).toMatchObject({ kind: "life" })
+  })
+
+  it("goes back across this turn's pass but not past the turn before it", () => {
+    const base = game()
+    const [ada, bo] = base.players
+    const poison = (now: number) =>
+      table(
+        current,
+        { kind: "counter.changed", playerId: bo.id, counterId: "poison", delta: 1 },
+        now,
+      )
+    let current = base
+    current = poison(1_000)
+    current = table(current, { kind: "turn.passed", playerId: ada.id, toPlayerId: bo.id }, 5_000)
+    const secondTurn = current.turn
+    current = poison(10_000)
+    current = table(current, { kind: "turn.passed", playerId: bo.id, toPlayerId: ada.id }, 15_000)
+    current = poison(20_000)
+
+    const floor = rollbackFloor(current, { turns: true })
+    expect(placeOfRow(current, 1)).toBeGreaterThan(floor)
+    expect(placeOfRow(current, 2)).toBeLessThan(floor)
+
+    const { game: after, changes } = rollBack(
+      current,
+      placeOfRow(current, 1),
+      { turns: true },
+      context,
+    )
+    expect(changes).toBe(3)
+    expect(after.turn).toMatchObject({ number: 2, operationId: secondTurn?.operationId })
+    expect(after.table?.players[bo.id].counters).toEqual({ poison: 1 })
+
+    expect(rollBack(current, placeOfRow(current, 2), { turns: true }, context)).toEqual({
+      game: current,
+      changes: 0,
+    })
+  })
+})
+
+describe("going back past a change with no undo", () => {
+  const planechase = () => {
+    const created = createLocalGame({
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      modeSetup: { planechase: {} },
+      now: 0,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Bo", color: "#111" },
+      ],
+    })
+    return { created, ada: created.players[0], bo: created.players[1] }
+  }
+  const tap = (current: LocalGame, playerId: LocalGame["players"][number]["id"], now: number) => {
+    clock = now
+    return applyGameCommand(current, { type: "life.change", playerId, delta: -1 }, context)
+  }
+
+  it("stops at a planar roll", () => {
+    const { created, ada, bo } = planechase()
+    let current = tap(created, bo.id, 1_000)
+    current = table(current, { kind: "planar.rolled", playerId: ada.id, face: "blank" }, 5_000)
+    current = tap(current, ada.id, 9_000)
+
+    const floor = rollbackFloor(current, { turns: false })
+    expect(placeOfRow(current, 0)).toBeGreaterThan(floor)
+    expect(placeOfRow(current, 1)).toBeLessThan(floor)
+  })
+
+  it("keeps a burst whose taps straddle a planar roll", () => {
+    const { created, ada, bo } = planechase()
+    let current = tap(created, bo.id, 1_000)
+    current = table(current, { kind: "planar.rolled", playerId: ada.id, face: "blank" }, 1_100)
+    current = tap(current, bo.id, 1_200)
+    current = tap(current, ada.id, 9_000)
+
+    const floor = rollbackFloor(current, { turns: false })
+    expect(placeOfRow(current, 0)).toBeGreaterThan(floor)
+    expect(placeOfRow(current, 1)).toBeLessThanOrEqual(floor)
   })
 })
 

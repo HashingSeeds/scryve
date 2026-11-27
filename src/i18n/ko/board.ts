@@ -614,6 +614,10 @@ export default {
     counterRow: "{{name}}님 {{counter}} {{delta}}, 현재 {{value}}",
     undoLast: "마지막 변경 되돌리기",
     undoMine: "내 마지막 변경 되돌리기",
+    goBackHint: "여기로 되돌리기",
+    goBackTitle: "여기로 되돌릴까요?",
+    goBackMessage_other: "변경 {{count}}건을 되돌립니다.",
+    goBack: "되돌리기",
   },
   calculator: {
     damage: "− 데미지",

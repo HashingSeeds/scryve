@@ -660,6 +660,12 @@ export default {
     counterRow: "{{name}} {{counter}} {{delta}} a {{value}}",
     undoLast: "Deshacer el último cambio",
     undoMine: "Deshacer tu último cambio",
+    goBackHint: "Volver a este punto",
+    goBackTitle: "¿Volver a este punto?",
+    goBackMessage_one: "Deshará {{count}} cambio.",
+    goBackMessage_many: "Deshará {{count}} cambios.",
+    goBackMessage_other: "Deshará {{count}} cambios.",
+    goBack: "Volver",
   },
   calculator: {
     damage: "− Daño",

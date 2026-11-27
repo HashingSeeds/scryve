@@ -167,6 +167,15 @@ export function roundClockAfterTurn(
   return rest
 }
 
+export const withRoundClockAfter = <Game extends { clock?: RoundClock; system?: PlaySystemId }>(
+  game: Game,
+  action: TableAction,
+  operationId: string,
+): Game =>
+  game.clock
+    ? { ...game, clock: roundClockAfterTurn(game.clock, game.system, action, operationId) }
+    : game
+
 export function addRoundBonusTurns(clock: RoundClock, turns: number): RoundClock {
   return { ...clock, bonusTurns: (clock.bonusTurns ?? 0) + turns }
 }

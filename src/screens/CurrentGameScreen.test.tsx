@@ -220,6 +220,29 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-log-undo").props.accessibilityState.disabled).toBe(true)
   })
 
+  it("goes back to a tapped row in the log after saying how many changes go", () => {
+    const view = renderGame()
+    fireEvent.press(view.getByTestId("life-seat-1--1"))
+    fireEvent.press(view.getByTestId("life-seat-2--1"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("history-button"))
+    const oldest = () =>
+      within(view.getByTestId("game-log-dialog"))
+        .getAllByTestId(/^game-log-row-/)
+        .at(-1)!
+
+    fireEvent.press(oldest())
+    expect(view.getByText("Undoes 2 changes.")).toBeTruthy()
+    fireEvent.press(view.getByText("Cancel"))
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("1")
+
+    fireEvent.press(oldest())
+    fireEvent.press(view.getByTestId("game-log-go-back-confirm"))
+    expect(view.queryByTestId("game-log-dialog")).toBeNull()
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("2")
+    expect(view.getByTestId("life-total-seat-2").props.children).toBe("2")
+  })
+
   it("leaves the board alone when setup turns first player off", () => {
     const view = renderGame(game(), turnsOff())
     layoutSeats(view)

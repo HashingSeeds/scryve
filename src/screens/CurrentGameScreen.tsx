@@ -4,6 +4,7 @@ import { Platform, TouchableOpacity, View } from "react-native"
 
 import type { AccountEntry } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
@@ -157,6 +158,7 @@ export function CurrentGameScreen({
   }>()
   const [passUndo, setPassUndo] = useState<{ operationId: string; passerId: string }>()
   const [logOpen, setLogOpen] = useState(false)
+  const [goingBack, setGoingBack] = useState<{ place: number; changes: number }>()
   const openLog = useCallback(() => setLogOpen(true), [])
   const clock = runtime.game.clock
   const isFresh = runtime.game.id !== resumedGameId && !hasLocalGameStarted(runtime.game)
@@ -694,9 +696,37 @@ export function CurrentGameScreen({
           modes={boardModes.log.map(modeLogRow)}
           positionOf={localLogPositions(runtime.game)}
           canUndo={runtime.canUndo(turnsEnabled)}
+          rollbackFloor={runtime.rollbackFloor(turnsEnabled)}
           origin={chrome.dialogOrigin}
           onUndo={() => runtime.undo(turnsEnabled)}
+          onGoBack={(place, changes) => {
+            setLogOpen(false)
+            setGoingBack({ place, changes })
+          }}
           onClose={() => setLogOpen(false)}
+        />
+      ) : null}
+
+      {goingBack ? (
+        <ConfirmDialog
+          visible
+          title={translate("board:log.goBackTitle")}
+          message={translate("board:log.goBackMessage", { count: goingBack.changes })}
+          confirmText={translate("board:log.goBack")}
+          destructive
+          origin={chrome.dialogOrigin}
+          dialogTestID="game-log-go-back-dialog"
+          confirmTestID="game-log-go-back-confirm"
+          backdropAccessibilityLabel={translate("common:cancel")}
+          onConfirm={() => {
+            runtime.rollBack(goingBack.place, turnsEnabled)
+            setPassUndo(undefined)
+            setGoingBack(undefined)
+          }}
+          onClose={() => {
+            setGoingBack(undefined)
+            setLogOpen(true)
+          }}
         />
       ) : null}
 

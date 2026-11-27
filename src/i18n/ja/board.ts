@@ -611,6 +611,10 @@ export default {
     counterRow: "{{name}} {{counter}} {{delta}} → {{value}}",
     undoLast: "直前の変更を元に戻す",
     undoMine: "自分の直前の変更を元に戻す",
+    goBackHint: "ここまで戻る",
+    goBackTitle: "ここまで戻しますか？",
+    goBackMessage_other: "{{count}}件の変更を取り消します。",
+    goBack: "戻る",
   },
   calculator: {
     damage: "− ダメージ",
