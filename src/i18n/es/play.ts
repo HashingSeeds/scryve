@@ -291,6 +291,8 @@ export default {
     title: "Historial",
     addResult: "Añadir resultado",
     addPastGames: "Añadir partidas anteriores",
+    logGame: "Registrar una partida",
+    logged: "Registrada",
     source: {
       all: "Todas",
       local: "Local",
@@ -390,6 +392,16 @@ export default {
     deleteTitle: "¿Eliminar este resultado?",
     cancelDelete: "Conservar este resultado",
     deleteMessage: "Se actualizarán las estadísticas de los mazos que lo cuenten.",
+  },
+  logGame: {
+    title: "Registrar una partida",
+    addPlayer: "Añadir jugador",
+    minutes: "Minutos jugados",
+    save: "Guardar partida",
+    error: {
+      noWinner: "Elige una victoria o un empate",
+      minutesRange: "Los minutos deben estar entre {{min}} y {{max}}",
+    },
   },
   recordMatch: {
     title: "Añadir resultado del encuentro",

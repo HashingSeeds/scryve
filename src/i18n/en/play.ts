@@ -343,6 +343,10 @@ const play = {
     title: "History",
     addResult: "Add result",
     addPastGames: "Add past games",
+    // Opens a form to record a game that was played without tracking it in the app.
+    logGame: "Log a game",
+    // Marks a game entered by hand after it was played, so it has no life changes or duration.
+    logged: "Logged",
     source: {
       all: "All",
       local: "Local",
@@ -441,6 +445,17 @@ const play = {
     deleteTitle: "Delete this result?",
     cancelDelete: "Keep this result",
     deleteMessage: "Deck stats that count it will be updated.",
+  },
+  // A form to record a game played without tracking it in the app.
+  logGame: {
+    title: "Log a game",
+    addPlayer: "Add player",
+    minutes: "Minutes played",
+    save: "Save game",
+    error: {
+      noWinner: "Pick a winner or a draw",
+      minutesRange: "Minutes must be {{min}}–{{max}}",
+    },
   },
   recordMatch: {
     title: "Add match result",

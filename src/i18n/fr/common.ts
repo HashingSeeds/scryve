@@ -68,6 +68,7 @@ export default {
       planechase: "Ouvre les choix de deck de plans",
       archenemy: "Ouvre les choix d’archennemi",
       schemes: "Ouvre les choix de deck de machinations",
+      winner: "Ouvre les choix de victoire",
     },
     closeLabel: {
       format: "Fermer les choix de format",
@@ -81,6 +82,7 @@ export default {
       planechase: "Fermer les choix de deck de plans",
       archenemy: "Fermer les choix d’archennemi",
       schemes: "Fermer les choix de deck de machinations",
+      winner: "Fermer les choix de victoire",
     },
   },
   valueField: {

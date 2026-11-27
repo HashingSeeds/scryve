@@ -193,6 +193,35 @@ describe("publishFinishedLocalGame", () => {
     expect(history.page[0]).toMatchObject({ system: "none", format: "none" })
   })
 
+  it("marks a logged game in history and counts it toward its deck's stats", async () => {
+    const t = makeConvexTest()
+    const owner = await signedIn(t, "owner", "Owner")
+    const args = finishedGame({ startedAt: FINISHED_AT, eventCount: 1, logged: true })
+    args.players[0] = { ...args.players[0], me: true, deckKey: "deck_atraxa", deckName: "Atraxa" }
+
+    await owner.mutation(api.games.publishFinishedLocalGame, args)
+
+    const entries = await owner.query(api.history.entries, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(entries.page[0]).toMatchObject({ publicId: args.publicId, outcome: "win", logged: true })
+    const synced = await owner.query(api.games.connectedSummary, { publicId: args.publicId })
+    expect(synced).toMatchObject({ logged: true })
+    expect(synced).not.toHaveProperty("startedAt")
+    const timed = finishedGame({ publicId: "game_local_logged_timed01", logged: true })
+    await owner.mutation(api.games.publishFinishedLocalGame, timed)
+    expect(
+      await owner.query(api.games.connectedSummary, { publicId: timed.publicId }),
+    ).toMatchObject({ logged: true, startedAt: timed.startedAt })
+    const stats = await owner.query(api.deckStats.summary, { deckKey: "deck_atraxa" })
+    expect(stats.all).toMatchObject({ games: 1, wins: 1, losses: 0 })
+
+    const tracked = finishedGame({ publicId: "game_local_finished_000002" })
+    await owner.mutation(api.games.publishFinishedLocalGame, tracked)
+    const summaries = await t.run((ctx) => ctx.db.query("gameSummaries").collect())
+    expect(summaries.map((summary) => summary.logged)).toEqual([true, true, undefined])
+  })
+
   it("stays finished through stale-game cleanup", async () => {
     const t = makeConvexTest()
     const owner = await signedIn(t, "owner", "Owner")

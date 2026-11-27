@@ -285,6 +285,8 @@ export default {
     title: "हिस्ट्री",
     addResult: "नतीजा जोड़ें",
     addPastGames: "पिछले गेम जोड़ें",
+    logGame: "गेम लॉग करें",
+    logged: "लॉग किया हुआ",
     source: {
       all: "सभी",
       local: "लोकल",
@@ -377,6 +379,16 @@ export default {
     deleteTitle: "यह नतीजा हटाएँ?",
     cancelDelete: "नतीजा रखें",
     deleteMessage: "जिन डेक स्टैट्स में यह गिना गया है, वे अपडेट हो जाएँगे।",
+  },
+  logGame: {
+    title: "गेम लॉग करें",
+    addPlayer: "खिलाड़ी जोड़ें",
+    minutes: "खेले गए मिनट",
+    save: "गेम सेव करें",
+    error: {
+      noWinner: "विजेता चुनें या ड्रॉ चुनें",
+      minutesRange: "मिनट {{min}}–{{max}} के बीच होने चाहिए",
+    },
   },
   recordMatch: {
     title: "मैच का नतीजा जोड़ें",

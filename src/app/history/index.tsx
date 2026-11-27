@@ -97,6 +97,7 @@ export default function HistoryRoute() {
       router.push({ pathname: "/history/[gameId]", params: { gameId, source: "connected" } }),
     onSelectManual: (publicId: string) =>
       router.push({ pathname: "/history/match/[publicId]", params: { publicId } }),
+    onLogGame: () => router.push("/history/log"),
     ...(ownerId !== undefined && hasPastGames
       ? { onAddPastGames: () => localGameRepository.reopenClaims(ownerId) }
       : {}),

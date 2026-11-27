@@ -53,6 +53,7 @@ export interface HistoryEntry {
   key: string
   source: HistorySource
   nearby?: true
+  logged?: true
   routeId: string
   finishedAt: number
   status: "finished" | "abandoned"
@@ -75,6 +76,14 @@ const SOURCE_TX = {
   connected: "play:history.source.connected",
   manual: "play:history.source.manual",
 } as const satisfies Record<HistorySource, TxKeyPath>
+
+export function noFormatLabel(
+  system: PlaySystemId | undefined,
+  startingLife: number,
+  logged?: boolean,
+) {
+  return logged ? playSystemShortLabel(NO_PLAY_SYSTEM) : counterValueLabel(system, startingLife)
+}
 
 export function sourceLabel({ source, nearby }: Pick<HistoryEntry, "source" | "nearby">) {
   return translate(nearby ? "play:newGame.nearby" : SOURCE_TX[source])
@@ -206,6 +215,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
     key: `local:${game.id}`,
     source: "local",
     ...(game.seatPassHashes ? { nearby: true as const } : {}),
+    ...(game.logged ? { logged: true as const } : {}),
     routeId: game.id,
     finishedAt: game.finishedAt,
     status: game.status,
@@ -225,7 +235,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
     format:
       system && game.format
         ? playFormatLabel(system, game.format)
-        : counterValueLabel(system, game.startingLife),
+        : noFormatLabel(system, game.startingLife, game.logged),
   }
 }
 
@@ -278,6 +288,7 @@ export function connectedHistoryEntry(game: {
   match?: ScryveMatchSummary
   matchGameNumber?: number
   nearby?: boolean
+  logged?: boolean
   winnerPlayerIds?: readonly string[]
   turnGroups?: readonly (readonly string[])[]
   players: {
@@ -306,6 +317,7 @@ export function connectedHistoryEntry(game: {
     status: game.terminalStatus === "abandoned" ? "abandoned" : "finished",
     outcome: toHistoryOutcome(game.outcome),
     ...(game.nearby ? { nearby: true as const } : {}),
+    ...(game.logged ? { logged: true as const } : {}),
     ...(winnerNames.length > 0 ? { winnerNames } : {}),
     ...(game.match ? { scryveMatch: serverMatchRef(game.match, game.matchGameNumber) } : {}),
     eventCount: game.eventCount,
@@ -315,7 +327,7 @@ export function connectedHistoryEntry(game: {
       system && (game.format || game.ruleset)
         ? playFormatLabel(system, game.format || game.ruleset)
         : game.startingLife !== undefined
-          ? counterValueLabel(system, game.startingLife)
+          ? noFormatLabel(system, game.startingLife, game.logged)
           : translate("play:history.source.connected"),
   }
 }

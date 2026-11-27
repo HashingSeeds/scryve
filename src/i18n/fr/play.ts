@@ -295,6 +295,8 @@ export default {
     title: "Historique",
     addResult: "Ajouter un résultat",
     addPastGames: "Ajouter des parties passées",
+    logGame: "Saisir une partie",
+    logged: "Saisie manuelle",
     source: {
       all: "Toutes",
       local: "Locales",
@@ -396,6 +398,16 @@ export default {
     deleteTitle: "Supprimer ce résultat ?",
     cancelDelete: "Garder ce résultat",
     deleteMessage: "Les statistiques des decks qui le comptent seront mises à jour.",
+  },
+  logGame: {
+    title: "Saisir une partie",
+    addPlayer: "Ajouter un joueur",
+    minutes: "Minutes jouées",
+    save: "Enregistrer la partie",
+    error: {
+      noWinner: "Choisissez une victoire ou une égalité",
+      minutesRange: "Les minutes doivent être comprises entre {{min}} et {{max}}",
+    },
   },
   recordMatch: {
     title: "Ajouter un résultat de match",

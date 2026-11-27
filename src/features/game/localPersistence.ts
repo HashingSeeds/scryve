@@ -568,6 +568,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(Array.isArray(value.logOrder)
       ? { logOrder: value.logOrder.filter((id): id is string => typeof id === "string") }
       : {}),
+    ...(value.logged === true ? { logged: true } : {}),
   }
 }
 
@@ -786,6 +787,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
           : {}),
         ...(seatPassHashes ? { seatPassHashes } : {}),
         ...(turnGroups ? { turnGroups } : {}),
+        ...(value.logged === true ? { logged: true } : {}),
       }
     : null
 }
@@ -1222,6 +1224,7 @@ export class LocalGameRepository {
       ...(game.match ? { match: game.match } : {}),
       ...(game.seatPassHashes ? { seatPassHashes: game.seatPassHashes } : {}),
       ...(game.turnGroups ? { turnGroups: game.turnGroups } : {}),
+      ...(game.logged ? { logged: true as const } : {}),
       ...(account && game.status === "finished" && game.match?.result
         ? { matchPublish: "pending" as const }
         : {}),
@@ -1243,7 +1246,7 @@ export class LocalGameRepository {
     if (active?.id === game.id) this.clearActiveGame()
     const analyticsGame = { ...game, playerCount: game.players.length, shape: gameShape(game) }
     if (game.status === "finished") {
-      recordReviewCompletion(`local:${game.id}`)
+      if (!game.logged) recordReviewCompletion(`local:${game.id}`)
       captureGame("game_completed", analyticsGame, "local", endSource)
       this.finishListeners.forEach((listener) => listener())
     } else if (hasLocalGameStarted(game))

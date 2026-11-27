@@ -2,7 +2,6 @@ import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
 import { gameTypeLabel } from "@/features/game/gameTypes"
 import {
   counterChangeLabel,
-  counterValueLabel,
   isPlaySystemId,
   playFormatLabel,
   storedPlaySystem,
@@ -18,7 +17,7 @@ import { type TxKeyPath } from "@/i18n"
 import { formatDate, formatTime, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 
-import type { HistoryOutcome, HistorySource } from "./historyEntries"
+import { noFormatLabel, type HistoryOutcome, type HistorySource } from "./historyEntries"
 import type { GameVariant } from "../../convex/lib/treachery"
 import { turnGroupOf, type TurnGroups } from "../../convex/lib/turns"
 
@@ -56,6 +55,7 @@ export interface GameSummaryModel {
   changeCount: number
   players: SummaryPlayer[]
   terminalReason?: string
+  logged?: true
 }
 
 export interface SummaryChangeFeed {
@@ -85,11 +85,12 @@ export function localOutcome(result: LocalGame["result"], playerId: string): Sum
 
 export function localSummaryModel(game: LocalGame): GameSummaryModel {
   const system = isPlaySystemId(game.system) ? game.system : undefined
+  const finishedAt = game.finishedAt ?? game.updatedAt
   return {
     source: "local",
     status: game.status === "abandoned" ? "abandoned" : "finished",
-    finishedAt: game.finishedAt ?? game.updatedAt,
-    startedAt: game.createdAt,
+    finishedAt,
+    ...(game.logged && game.createdAt === finishedAt ? {} : { startedAt: game.createdAt }),
     startingLife: game.startingLife,
     system,
     format:
@@ -97,7 +98,7 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
         ? game.variant
           ? gameTypeLabel({ id: game.variant, system, format: game.format, variant: game.variant })
           : playFormatLabel(system, game.format)
-        : counterValueLabel(system, game.startingLife),
+        : noFormatLabel(system, game.startingLife, game.logged),
     changeCount: localChanges(game).length,
     players: game.players.map((player) => ({
       id: player.id,
@@ -109,6 +110,7 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
       outcome: localOutcome(game.result, player.id),
       ...teamOf(game.players, game.turnGroups, player.id),
     })),
+    ...(game.logged ? { logged: true as const } : {}),
   }
 }
 
@@ -137,6 +139,8 @@ export interface ConnectedSummaryDocument {
   ruleset: string
   eventCount: number
   finishedAt: number
+  startedAt?: number
+  logged?: true
   turnGroups?: string[][]
   players: {
     playerId: string
@@ -170,6 +174,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
     source: "connected",
     status: summary.terminalStatus === "abandoned" ? "abandoned" : "finished",
     finishedAt: summary.finishedAt,
+    ...(summary.startedAt === undefined ? {} : { startedAt: summary.startedAt }),
     startingLife: summary.startingLife,
     system,
     format: system
@@ -181,9 +186,10 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
             variant: summary.variant,
           })
         : playFormatLabel(system, summary.format || summary.ruleset)
-      : counterValueLabel(system, summary.startingLife),
+      : noFormatLabel(system, summary.startingLife, summary.logged),
     changeCount: summary.eventCount,
     terminalReason: unusualEnding(summary.terminalReason),
+    ...(summary.logged ? { logged: true as const } : {}),
     players: summary.players.map((player) => ({
       id: player.playerId,
       seat: player.seat,
@@ -262,11 +268,11 @@ export function playedFor(model: GameSummaryModel) {
   })
 }
 
-export function finishedOnLabel(finishedAt?: number) {
+export function finishedOnLabel(finishedAt?: number, logged?: true) {
   if (!finishedAt) return undefined
   return joinParts([
     formatDate(finishedAt, { month: "short", day: "numeric", year: "numeric" }),
-    formatTime(finishedAt),
+    logged ? undefined : formatTime(finishedAt),
   ])
 }
 
@@ -275,6 +281,6 @@ export function metaLine(model: GameSummaryModel) {
     translate("play:summary.playerCount", { count: model.players.length }),
     model.format,
     playedFor(model),
-    counterChangeLabel(model.system, model.changeCount),
+    model.logged ? undefined : counterChangeLabel(model.system, model.changeCount),
   ])
 }

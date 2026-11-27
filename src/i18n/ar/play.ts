@@ -299,6 +299,8 @@ export default {
     title: "السجل",
     addResult: "إضافة نتيجة",
     addPastGames: "إضافة مباريات سابقة",
+    logGame: "تسجيل مباراة",
+    logged: "مسجَّلة يدويًا",
     source: {
       all: "الكل",
       local: "مباريات محلية",
@@ -418,6 +420,16 @@ export default {
     deleteTitle: "هل تريد حذف هذه النتيجة؟",
     cancelDelete: "إبقاء هذه النتيجة",
     deleteMessage: "سيتم تحديث إحصاءات المجموعات التي تحتسبها.",
+  },
+  logGame: {
+    title: "تسجيل مباراة",
+    addPlayer: "إضافة لاعب",
+    minutes: "مدة اللعب بالدقائق",
+    save: "حفظ المباراة",
+    error: {
+      noWinner: "اختر الفوز لأحد اللاعبين أو التعادل",
+      minutesRange: "عدد الدقائق يجب أن يكون بين {{min}} و{{max}}",
+    },
   },
   recordMatch: {
     title: "إضافة نتيجة المواجهة",

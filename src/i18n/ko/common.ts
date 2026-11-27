@@ -68,6 +68,7 @@ export default {
       planechase: "차원 덱 선택지를 엽니다",
       archenemy: "아치에너미 선택지를 엽니다",
       schemes: "책략 덱 선택지를 엽니다",
+      winner: "승자 선택지를 엽니다",
     },
     closeLabel: {
       format: "포맷 선택지 닫기",
@@ -81,6 +82,7 @@ export default {
       planechase: "차원 덱 선택지 닫기",
       archenemy: "아치에너미 선택지 닫기",
       schemes: "책략 덱 선택지 닫기",
+      winner: "승자 선택지 닫기",
     },
   },
   valueField: {
