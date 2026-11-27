@@ -1,0 +1,22 @@
+# Fresh install in the capture's language, through "What do you play?" onto a board.
+# Right to left labels can carry direction marks, so text selectors match with a leading .*
+# env: LANGUAGE (ja), LOCALE (ja_JP), GAME (game-type id suffix), TURNS (life, turns or chess)
+appId: ${APP_ID}
+---
+# A hosted game left by a failed connected scene would turn every setup's Start into End.
+- runScript: {file: _table.js, env: {ACTION: reset}}
+- launchApp:
+    clearState: true
+    arguments:
+      AppleLanguages: "(${LANGUAGE})"
+      AppleLocale: ${LOCALE}
+- extendedWaitUntil:
+    visible: {id: what-you-play-start}
+    timeout: 30000
+- tapOn: {id: "turns-choice-${TURNS}"}
+- tapOn: {id: "game-type-${GAME}"}
+- tapOn: {id: what-you-play-start}
+- extendedWaitUntil:
+    visible: {id: game-menu-button}
+    timeout: 30000
+- waitForAnimationToEnd

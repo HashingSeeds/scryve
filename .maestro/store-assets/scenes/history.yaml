@@ -1,0 +1,16 @@
+# History mixes two local games from today with the seeded ones and the connected scene's game.
+appId: ${APP_ID}
+---
+- runScript: {file: _table.js, env: {ACTION: reset}}
+- runScript: {file: _table.js, env: {ACTION: local-games}}
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: commander, TURNS: life}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: utility-menu-button}
+- tapOn: {id: utility-history-button}
+- extendedWaitUntil:
+    visible: {id: history-list}
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: history

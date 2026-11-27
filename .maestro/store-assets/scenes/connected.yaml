@@ -1,0 +1,28 @@
+# riley hosts a connected Commander game; bots on the local backend take the other seats and
+# lose life on their own phones (goldie/table.mjs) while riley drops to 33.
+appId: ${APP_ID}
+---
+- runScript: {file: _table.js, env: {ACTION: reset}}
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: commander, TURNS: life}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: connect-button}
+- tapOn: {id: host-connected-button}
+- extendedWaitUntil:
+    visible: {id: start-connected-game-button}
+    timeout: 20000
+- runScript: {file: _table.js, env: {ACTION: join}}
+- tapOn: ".*Lorehold Spirits.*"
+- tapOn: {id: start-connected-game-button}
+- extendedWaitUntil:
+    visible: {id: connected-game-board}
+    timeout: 20000
+- extendedWaitUntil: {visible: {id: mulligan-keep}, timeout: 5000, optional: true}
+- tapOn: {id: mulligan-keep, optional: true}
+- runScript: {file: _table.js, env: {ACTION: damage}}
+- runFlow: {file: _Life.yaml, env: {SEAT: 4, STEP: -1, TIMES: 7}}
+- waitForAnimationToEnd
+- takeScreenshot: connected
+# The hosted game would otherwise stay in progress, and later scenes' setup offers to end it.
+- runScript: {file: _table.js, env: {ACTION: reset}}

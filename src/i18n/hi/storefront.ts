@@ -19,6 +19,48 @@ export default {
     terms: "शर्तें",
     privacy: "गोपनीयता",
   },
+  screenshots: {
+    connected: {
+      headline: "लोकल या कनेक्टेड",
+      subhead: "फ़ोन पर शुरू करें, कोड से जुड़ें।",
+    },
+    tenPlayers: {
+      headline: "{{maxPlayers}} खिलाड़ी तक",
+      subhead: "हर सीट खिलाड़ी के सामने।",
+    },
+    commanderDamage: {
+      headline: "कमांडर डैमेज",
+      subhead: "हर ऑपोनेंट का हिसाब, अलग कार्ड पर।",
+    },
+    twoHeadedGiant: {
+      headline: "टू-हेडेड जायंट",
+      subhead: "टीममेट की एक ही लाइफ़।",
+    },
+    chessClock: {
+      headline: "टर्न और क्लॉक",
+      subhead: "एक टैप में टर्न और क्लॉक पास।",
+    },
+    bestOf: {
+      headline: "बेस्ट ऑफ़ 3",
+      subhead: "गेम की जीत जुड़ती है, राउंड क्लॉक के साथ।",
+    },
+    pokemon: {
+      headline: "कार्ड-दर-कार्ड HP",
+      subhead: "ऐक्टिव चुनें। HP सबसे आगे।",
+    },
+    rules: {
+      headline: "टेबल पर रूल्स",
+      subhead: "गेम के बीच आधिकारिक रूल्स खोजें।",
+    },
+    decks: {
+      headline: "हर डेक की जीत का रेट",
+      subhead: "आपका हर गेम उसके डेक में गिना जाता है।",
+    },
+    history: {
+      headline: "हर गेम सेव",
+      subhead: "लोकल और कनेक्टेड गेम, एक हिस्ट्री।",
+    },
+  },
   listing: {
     appStoreName: "Scryve: टीसीजी लाइफ़ ट्रैकर",
     playTitle: "Scryve: टीसीजी लाइफ़ काउंटर",

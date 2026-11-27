@@ -31,5 +31,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "test/**/*", "workers/**/*", "site/**/*"]
+  "exclude": ["node_modules", "test/**/*", "workers/**/*", "site/**/*", "goldie/**/*"]
 }

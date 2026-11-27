@@ -1,0 +1,26 @@
+# Signs the store account in once per simulator. The session stays in the keychain, which
+# clearState keeps, so every later launch is signed in. Test accounts take the code 424242.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: _Start.yaml
+    env: {LANGUAGE: en, LOCALE: en_US, GAME: commander, TURNS: life}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: utility-menu-button}
+- tapOn: {id: utility-account-button}
+- runFlow:
+    when:
+      visible: {id: clerk.auth.start.identifier}
+    commands:
+      - tapOn: {id: clerk.auth.start.identifier}
+      - inputText: riley+clerk_test@sow.care
+      - tapOn: {id: clerk.auth.start.continue}
+      - tapOn: {id: clerk.auth.signIn.password, index: 0}
+      - inputText: ${PASSWORD}
+      - tapOn: {id: clerk.auth.signIn.continue}
+      # why: the iPad covers the code screen with a keypad popover that hides its ids.
+      - waitForAnimationToEnd: {timeout: 8000}
+      - inputText: "424242"
+      - extendedWaitUntil:
+          visible: {id: game-board}
+          timeout: 30000

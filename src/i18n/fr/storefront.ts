@@ -19,6 +19,48 @@ export default {
     terms: "Conditions",
     privacy: "Confidentialité",
   },
+  screenshots: {
+    connected: {
+      headline: "Locale ou connectée",
+      subhead: "Démarrez sur votre téléphone. Connectez-vous avec un code.",
+    },
+    tenPlayers: {
+      headline: "Jusqu’à {{maxPlayers}} joueurs",
+      subhead: "Chaque place face à son joueur.",
+    },
+    commanderDamage: {
+      headline: "Blessures de commandant",
+      subhead: "Suivez chaque adversaire sur sa carte.",
+    },
+    twoHeadedGiant: {
+      headline: "Troll à deux têtes",
+      subhead: "Les équipiers partagent un total de points de vie.",
+    },
+    chessClock: {
+      headline: "Tours et chronos",
+      subhead: "Un seul toucher passe le tour et le chrono.",
+    },
+    bestOf: {
+      headline: "Au meilleur des 3",
+      subhead: "Les victoires s’additionnent, avec chrono de ronde.",
+    },
+    pokemon: {
+      headline: "Les PV, carte par carte",
+      subhead: "Choisissez votre Pokémon Actif. Les PV restent en vue.",
+    },
+    rules: {
+      headline: "Les règles à table",
+      subhead: "Cherchez les règles officielles en pleine partie.",
+    },
+    decks: {
+      headline: "Taux de victoire par deck",
+      subhead: "Chaque partie jouée compte pour son deck.",
+    },
+    history: {
+      headline: "Chaque partie enregistrée",
+      subhead: "Parties locales et connectées, un seul historique.",
+    },
+  },
   listing: {
     appStoreName: "Scryve : compteur de vie JCC",
     playTitle: "Scryve : compteur de vie JCC",

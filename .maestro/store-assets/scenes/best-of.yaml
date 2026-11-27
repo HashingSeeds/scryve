@@ -1,0 +1,27 @@
+# Standard, best of three on a 50 minute round clock: game 1 just ended.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: mtg-standard, TURNS: life}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: setup-button}
+- tapOn: {id: setup-change-button}
+- tapOn: {id: match-mode-on}
+- tapOn: {id: clock-mode-countdown}
+- scrollUntilVisible: {element: {id: setup-options-done}, direction: DOWN}
+- tapOn: {id: setup-options-done}
+- tapOn: {id: start-game-button}
+- extendedWaitUntil:
+    visible: {id: round-clock-tab}
+    timeout: 15000
+- runFlow: {file: _Life.yaml, env: {SEAT: 1, STEP: -1, TIMES: 7}}
+- runFlow: {file: _Life.yaml, env: {SEAT: 2, STEP: -5, TIMES: 4}}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: end-game-button}
+- tapOn: {id: confirm-end-game-button}
+- extendedWaitUntil:
+    visible: {id: next-game-button}
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: best-of

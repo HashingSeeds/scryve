@@ -1,0 +1,85 @@
+# Pokémon: Charizard ex against Pikachu, HP up front and a bench behind Charizard.
+# Card search goes through the backend's card catalog.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: pokemon-standard, TURNS: life}
+- extendedWaitUntil:
+    visible: {id: pokemon-place-active-seat-2}
+    timeout: 15000
+# Each pick is the top hit by id: a text tap can hit the search box holding the same words.
+- tapOn: {id: pokemon-place-active-seat-2}
+- tapOn: {id: pokemon-edit-active-seat-2}
+- tapOn: {id: pokemon-key-c-seat-2}
+- tapOn: {id: pokemon-key-h-seat-2}
+- tapOn: {id: pokemon-key-a-seat-2}
+- tapOn: {id: pokemon-key-r-seat-2}
+- tapOn: {id: pokemon-key-i-seat-2}
+- tapOn: {id: pokemon-key-z-seat-2}
+- tapOn: {id: pokemon-key-a-seat-2}
+- tapOn: {id: pokemon-key-r-seat-2}
+- tapOn: {id: pokemon-key-d-seat-2}
+- extendedWaitUntil:
+    visible: {id: "pokemon-result-.*", index: 0}
+    timeout: 20000
+- tapOn: {id: "pokemon-result-.*", index: 0}
+- extendedWaitUntil:
+    visible: {id: pokemon-damage-seat-2-10}
+    timeout: 10000
+# Seat 1's sheet is upside down and short, so hide the keypad before taking the first hit.
+- tapOn: {id: pokemon-place-active-seat-1}
+- tapOn: {id: pokemon-edit-active-seat-1}
+- tapOn: {id: pokemon-key-p-seat-1}
+- tapOn: {id: pokemon-key-i-seat-1}
+- tapOn: {id: pokemon-key-k-seat-1}
+- tapOn: {id: pokemon-key-a-seat-1}
+- tapOn: {id: pokemon-key-c-seat-1}
+- tapOn: {id: pokemon-key-h-seat-1}
+- tapOn: {id: pokemon-key-u-seat-1}
+- tapOn: {id: pokemon-key-hide-keypad-seat-1}
+- extendedWaitUntil:
+    visible: {id: pokemon-result-fut2020-1}
+    timeout: 20000
+- tapOn: {id: pokemon-result-fut2020-1}
+- extendedWaitUntil:
+    visible: {id: pokemon-damage-seat-1-10}
+    timeout: 10000
+- longPressOn: {id: pokemon-bench-add-seat-2}
+- tapOn: {id: pokemon-key-c-seat-2}
+- tapOn: {id: pokemon-key-h-seat-2}
+- tapOn: {id: pokemon-key-a-seat-2}
+- tapOn: {id: pokemon-key-r-seat-2}
+- tapOn: {id: pokemon-key-m-seat-2}
+- tapOn: {id: pokemon-key-a-seat-2}
+- tapOn: {id: pokemon-key-n-seat-2}
+- tapOn: {id: pokemon-key-d-seat-2}
+- tapOn: {id: pokemon-key-e-seat-2}
+- tapOn: {id: pokemon-key-r-seat-2}
+- extendedWaitUntil:
+    visible: {id: "pokemon-result-.*", index: 0}
+    timeout: 20000
+- tapOn: {id: "pokemon-result-.*", index: 0}
+- waitForAnimationToEnd
+- longPressOn: {id: pokemon-bench-add-seat-2}
+- tapOn: {id: pokemon-key-c-seat-2}
+- tapOn: {id: pokemon-key-h-seat-2}
+- tapOn: {id: pokemon-key-a-seat-2}
+- tapOn: {id: pokemon-key-r-seat-2}
+- tapOn: {id: pokemon-key-m-seat-2}
+- tapOn: {id: pokemon-key-e-seat-2}
+- tapOn: {id: pokemon-key-l-seat-2}
+- tapOn: {id: pokemon-key-e-seat-2}
+- tapOn: {id: pokemon-key-o-seat-2}
+- tapOn: {id: pokemon-key-n-seat-2}
+- extendedWaitUntil:
+    visible: {id: "pokemon-result-.*", index: 0}
+    timeout: 20000
+- tapOn: {id: "pokemon-result-.*", index: 0}
+- waitForAnimationToEnd
+# Damage zones take no id taps, so these are points on each Active's HP row: seat 1 is upside
+# down and adds damage on the right of the top card; seat 2 adds damage on its left half.
+- repeat: {times: 3, commands: [{tapOn: {point: "85%,31%"}}]}
+- repeat: {times: 6, commands: [{tapOn: {point: "15%,72%"}}]}
+- waitForAnimationToEnd
+- takeScreenshot: pokemon

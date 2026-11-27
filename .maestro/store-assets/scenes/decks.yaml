@@ -1,0 +1,14 @@
+# riley's decks, each with a record from the games goldie/seed.cjs publishes.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: _Start.yaml
+    env: {GAME: commander, TURNS: life}
+- tapOn: {id: game-menu-button}
+- tapOn: {id: utility-menu-button}
+- tapOn: {id: utility-decks-button}
+- extendedWaitUntil:
+    visible: ".*Ur-Dragon.*"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: decks

@@ -19,6 +19,48 @@ export default {
     terms: "이용약관",
     privacy: "개인정보 처리방침",
   },
+  screenshots: {
+    connected: {
+      headline: "로컬 또는 연결",
+      subhead: "내 폰에서 시작, 코드로 연결",
+    },
+    tenPlayers: {
+      headline: "최대 {{maxPlayers}}명",
+      subhead: "모든 자리가 플레이어를 향합니다",
+    },
+    commanderDamage: {
+      headline: "커맨더 피해",
+      subhead: "상대별로 카드에 따로 기록",
+    },
+    twoHeadedGiant: {
+      headline: "쌍두거인",
+      subhead: "팀원끼리 생명점 공유",
+    },
+    chessClock: {
+      headline: "턴과 체스 시계",
+      subhead: "탭 한 번에 턴과 시계 넘기기",
+    },
+    bestOf: {
+      headline: "3판 승부",
+      subhead: "게임 승수 합산, 라운드 타이머 지원",
+    },
+    pokemon: {
+      headline: "카드별 HP",
+      subhead: "배틀 포켓몬 선택, HP는 앞에",
+    },
+    rules: {
+      headline: "테이블 위의 룰",
+      subhead: "게임 중 공식 룰 검색",
+    },
+    decks: {
+      headline: "덱별 승률",
+      subhead: "모든 게임이 덱 기록에 반영",
+    },
+    history: {
+      headline: "모든 게임 저장",
+      subhead: "로컬·연결 게임을 한곳에",
+    },
+  },
   listing: {
     appStoreName: "Scryve: 카드 게임 생명점 기록",
     playTitle: "Scryve: 카드 게임 생명점 카운터",
