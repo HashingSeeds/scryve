@@ -232,6 +232,14 @@ export default defineSchema({
     .index("by_manual_code", ["manualCode"])
     .index("by_game", ["gameId"]),
 
+  gameWatches: defineTable({
+    gameId: v.id("games"),
+    code: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_code", ["code"])
+    .index("by_game", ["gameId"]),
+
   joinAttempts: defineTable({
     clerkUserId: v.string(),
     windowStartedAt: v.number(),

@@ -395,6 +395,7 @@ export default {
     unnamedPartner: "Compañero",
     totalFrom: "{{damage}} de daño de comandante de {{name}}",
     amountFrom: "{{amount}} de {{name}}",
+    amountFromPartner: "{{amount}} del compañero de {{name}}",
     unknownAttacker: "Comandante",
     assignFrom: "Asignar daño de comandante desde {{identity}}",
     assignFromStale: "Asignar daño de comandante desde {{identity}}, desactualizado",

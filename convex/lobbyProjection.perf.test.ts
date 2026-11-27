@@ -83,4 +83,25 @@ describe("lobbyProjection websocket budget", () => {
       },
     )
   })
+
+  it("each life change re-sends about 0.5 KB to each Watch screen", async () => {
+    const { host, publicId, hostPlayerId } = await fourPlayerGame()
+    const code = await host.mutation(api.games.watchCode, { publicId })
+    const watchBytes = async () => websocketBytes(await host.query(api.games.watchBoard, { code }))
+    const fresh = await watchBytes()
+    for (let index = 0; index < 30; index++)
+      await host.mutation(api.games.changeLife, {
+        publicId,
+        playerId: hostPlayerId,
+        operationId: appShapedOperationId(index),
+        delta: -1,
+        deviceId: "device-host-0001",
+        clientCreatedAt: 1_700_000_000_000 + index,
+      })
+
+    expectWithinBudget(
+      { "watch board": fresh, "watch board after 30 changes": await watchBytes() },
+      { "watch board": 549, "watch board after 30 changes": 549 },
+    )
+  })
 })

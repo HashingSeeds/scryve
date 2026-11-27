@@ -460,6 +460,8 @@ const board = {
     unnamedPartner: "Partner",
     totalFrom: "{{damage}} commander damage from {{name}}",
     amountFrom: "{{amount}} from {{name}}",
+    // Screen reader text for damage from the second of two partner commanders, as in "4 from Ada's partner".
+    amountFromPartner: "{{amount}} from {{name}}'s partner",
     unknownAttacker: "Commander",
     assignFrom: "Assign commander damage from {{identity}}",
     // fr: Out of date: "pas à jour", never périmé.

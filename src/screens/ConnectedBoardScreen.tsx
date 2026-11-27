@@ -110,6 +110,7 @@ import { modeLogRow } from "@/features/modes/modeLogRow"
 import { ModesDialog } from "@/features/modes/ModesDialog"
 import { bagWithPlane, modeSeamFor, teamSeat } from "@/features/modes/modeSeamFor"
 import { useBoardModes } from "@/features/modes/useBoardModes"
+import { WatchSheet } from "@/features/watch/WatchSheet"
 import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -681,9 +682,11 @@ type BoardOverlay =
   | "finish"
   | "leave"
   | "players"
-  // why: iOS can't present the invite sheet until the player actions Modal has faded out.
+  // why: iOS can't present the invite or watch sheet until the player actions Modal has faded out.
   | "inviteAfterPlayers"
   | "invite"
+  | "watchAfterPlayers"
+  | "watch"
   | "role"
   | "turn"
   | "log"
@@ -694,6 +697,7 @@ const GRID_LOCKING_OVERLAYS: ReadonlySet<BoardOverlay> = new Set([
   "finish",
   "players",
   "inviteAfterPlayers",
+  "watchAfterPlayers",
   "role",
 ])
 
@@ -948,6 +952,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   })
 
   const canEnd = active && game.isHost && !view.finishing
+  const canWatch = cloud && game.isHost && game.status !== "abandoned"
   const myRole = onRevealRole
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
@@ -1183,7 +1188,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   )
 
   const inviteDialogOpen = invitation !== undefined && overlay === "invite"
-  const inviteSheet = useSheetPresence(inviteDialogOpen || undefined)
+  const boardSheet = useSheetPresence(
+    inviteDialogOpen ? "invite" : overlay === "watch" ? "watch" : undefined,
+  )
   // why: the invite sheet must stay mounted to animate out after its invitation is gone.
   const lastInvitation = useRef(invitation)
   if (invitation) lastInvitation.current = invitation
@@ -1195,7 +1202,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     menuOpen ||
     chrome.layoutOpen ||
     inviteDialogOpen ||
-    Boolean(inviteSheet.shown) ||
+    Boolean(boardSheet.shown) ||
     abandoned.shown ||
     matchEnd.shown ||
     (overlay !== undefined && GRID_LOCKING_OVERLAYS.has(overlay))
@@ -1324,11 +1331,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
-      {inviteSheet.shown && shownInvitation ? (
+      {boardSheet.shown === "invite" && shownInvitation ? (
         <Sheet
-          visible={inviteSheet.visible}
+          visible={boardSheet.visible}
           onClose={() => close("invite")}
-          onDismissed={inviteSheet.onDismissed}
+          onDismissed={boardSheet.onDismissed}
           testID="invite-dialog"
         >
           <Text preset="subheading" tx="connected:invite.title" style={themed($dialogText)} />
@@ -1338,8 +1345,20 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             onShare={() => void shareInvite()}
           />
           {inviteError ? <AlertNote text={inviteError} /> : null}
+          {canWatch ? (
+            <Button tx="connected:watch.label" onPress={() => setOverlay("watch")} />
+          ) : null}
           <Button tx="common:close" onPress={() => close("invite")} />
         </Sheet>
+      ) : null}
+
+      {boardSheet.shown === "watch" ? (
+        <WatchSheet
+          publicId={publicId}
+          visible={boardSheet.visible}
+          onClose={() => close("watch")}
+          onDismissed={boardSheet.onDismissed}
+        />
       ) : null}
 
       {overlay === "status" ? (
@@ -1473,10 +1492,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
-      {(overlay === "players" || overlay === "inviteAfterPlayers") && cloud ? (
+      {(overlay === "players" ||
+        overlay === "inviteAfterPlayers" ||
+        overlay === "watchAfterPlayers") &&
+      cloud ? (
         <PlayerActionsDialog
           visible={overlay === "players"}
-          onDismissed={overlay === "inviteAfterPlayers" ? () => setOverlay("invite") : undefined}
+          onDismissed={
+            overlay === "inviteAfterPlayers"
+              ? () => setOverlay("invite")
+              : overlay === "watchAfterPlayers"
+                ? () => setOverlay("watch")
+                : undefined
+          }
           publicId={publicId}
           players={reportablePlayers}
           origin={menuDialogOrigin}
@@ -1493,6 +1521,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               ? () => {
                   setOverlay(Platform.OS === "ios" ? "inviteAfterPlayers" : "invite")
                 }
+              : undefined
+          }
+          onWatch={
+            canWatch
+              ? () => setOverlay(Platform.OS === "ios" ? "watchAfterPlayers" : "watch")
               : undefined
           }
         />
@@ -1549,7 +1582,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         />
       ) : null}
 
-      {abandoned.shown && !inviteSheet.shown ? (
+      {abandoned.shown && !boardSheet.shown ? (
         <DialogCard
           visible
           onClose={abandoned.dismiss}

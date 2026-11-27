@@ -73,7 +73,7 @@ export default function EventDisplayScreen() {
 
 const KEEP_AWAKE_TAG = "event-display"
 
-function useStoreKeepAwake() {
+export function useStoreKeepAwake() {
   useKeepAwake(KEEP_AWAKE_TAG, { suppressDeactivateWarnings: true })
   useEffect(() => {
     if (Platform.OS !== "web") return
