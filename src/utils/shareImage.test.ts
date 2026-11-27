@@ -1,10 +1,14 @@
-import type { Platform } from "react-native"
-
 let mockSharingModule: object | null = null
+const mockPlatform = { OS: "ios" }
+const mockShare = jest.fn(async () => ({ action: "sharedAction" }))
 const mockShareAsync = jest.fn(async () => undefined)
 
+jest.mock("react-native", () => ({ Platform: mockPlatform, Share: { share: mockShare } }))
 jest.mock("expo", () => ({ requireOptionalNativeModule: () => mockSharingModule }))
-jest.mock("expo-sharing", () => ({ shareAsync: mockShareAsync }))
+jest.mock("expo-sharing", () => {
+  if (!mockSharingModule) throw new Error("Cannot find native module 'ExpoSharing'")
+  return { shareAsync: mockShareAsync }
+})
 jest.mock("expo-file-system", () => ({
   Paths: { cache: "cache" },
   File: jest.fn().mockImplementation((_dir: string, name: string) => ({
@@ -13,12 +17,11 @@ jest.mock("expo-file-system", () => ({
   })),
 }))
 
-function loadShareImage(os: typeof Platform.OS, hasModule: boolean) {
+function loadShareImage(os: "ios" | "android", hasModule: boolean) {
+  mockPlatform.OS = os
   mockSharingModule = hasModule ? {} : null
   let loaded: typeof import("./shareImage") | undefined
   jest.isolateModules(() => {
-    const reactNative = jest.requireActual<typeof import("react-native")>("react-native")
-    reactNative.Platform.OS = os
     loaded = jest.requireActual<typeof import("./shareImage")>("./shareImage")
   })
   if (!loaded) throw new Error("shareImage did not load")
@@ -44,7 +47,12 @@ describe("shareImage", () => {
     })
   })
 
-  it("keeps the share button on an older iOS binary, which shares through React Native", () => {
-    expect(loadShareImage("ios", false).canShareImage).toBe(true)
+  it("shares through React Native on an older iOS binary", async () => {
+    const { canShareImage, shareImage } = loadShareImage("ios", false)
+
+    await shareImage("aGk=", "recap.png")
+
+    expect(canShareImage).toBe(true)
+    expect(mockShare).toHaveBeenCalledWith({ url: "file:///cache/recap.png" })
   })
 })

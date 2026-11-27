@@ -55,9 +55,15 @@ const ROWS_BOTTOM = IMAGE_HEIGHT - PAD - 22
 const ROW_MAX = 73
 const STRIP_LEFT = 212
 const LIFE_COLUMN = 80
-// why: iOS reads sizes as points and draws at the screen's scale while web reads pixels, so the image mounts at the export size and scales its 360x450 drawing to fill it.
-const EXPORT_SCALE = Platform.OS === "web" ? 1 : PixelRatio.get()
-const EXPORT_SIZE = { width: 1080 / EXPORT_SCALE, height: 1350 / EXPORT_SCALE }
+const EXPORT_PIXELS = { width: 1080, height: 1350 }
+const LAYOUT_SCALE = Platform.OS === "web" ? 1 : PixelRatio.get()
+// why: the image mounts at the export size in layout units and scales its 360x450 drawing to fill it, so every screen scale draws the whole recap.
+const EXPORT_SIZE = {
+  width: EXPORT_PIXELS.width / LAYOUT_SCALE,
+  height: EXPORT_PIXELS.height / LAYOUT_SCALE,
+}
+// why: toDataURL reads its size as points on iOS but as bitmap pixels on Android and web.
+const EXPORT_REQUEST = Platform.OS === "ios" ? EXPORT_SIZE : EXPORT_PIXELS
 // why: names and life totals are clipped by length, but wide glyphs still run long, so each column clips to its own box.
 const NAMES_CLIP = "recap-names"
 const HEADER_CLIP = "recap-header"
@@ -244,7 +250,7 @@ export function RecapShare({
     const frame = requestAnimationFrame(() =>
       svgRef.current?.toDataURL((base64) => {
         if (active) shareImage(base64, "scryve-recap.png").then(() => done(), done)
-      }, EXPORT_SIZE),
+      }, EXPORT_REQUEST),
     )
     return () => {
       active = false
