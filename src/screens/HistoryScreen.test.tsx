@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistorySource"
 import type { LocalGameSummary } from "@/features/game/types"
@@ -7,6 +7,12 @@ import { ThemeProvider } from "@/theme/context"
 
 import { connectedHistoryEntry, manualHistoryEntry } from "./historyEntries"
 import { HistoryScreen } from "./HistoryScreen"
+
+const sheets = jest.requireMock<{
+  holdSheetDismissals: () => void
+  finishSheetDismissals: () => void
+  releaseSheetDismissals: () => void
+}>("@expo/ui/swift-ui")
 
 const NOW = new Date("2026-08-11T20:00:00Z").getTime()
 const HOUR = 60 * 60 * 1000
@@ -369,7 +375,7 @@ describe("unified history screen", () => {
     expect(onSelectManual).toHaveBeenCalledWith("manual-1")
   })
 
-  it("lists the add actions the route provides, runs the chosen one, and skips the list for a single one", async () => {
+  it("lists the add actions the route provides, runs the chosen one once the sheet closes, and skips the list for a single one", () => {
     const onLogGame = jest.fn()
     const onAddMatch = jest.fn()
     const onAddPastGames = jest.fn()
@@ -377,8 +383,12 @@ describe("unified history screen", () => {
     fireEvent.press(screen.getByText("Add"))
     expect(screen.getByTestId("deck-action-log")).toBeTruthy()
     expect(screen.getByTestId("deck-action-pastGames")).toBeTruthy()
+    sheets.holdSheetDismissals()
     fireEvent.press(screen.getByText("Add match result"))
-    await waitFor(() => expect(onAddMatch).toHaveBeenCalledTimes(1))
+    expect(onAddMatch).not.toHaveBeenCalled()
+    act(sheets.finishSheetDismissals)
+    sheets.releaseSheetDismissals()
+    expect(onAddMatch).toHaveBeenCalledTimes(1)
     expect(onLogGame).not.toHaveBeenCalled()
     expect(onAddPastGames).not.toHaveBeenCalled()
 
