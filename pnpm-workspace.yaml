@@ -29,6 +29,10 @@ patchedDependencies:
   # disabling the component the app launched from closes it.
   # Drop it once pchalupa/expo-alternate-app-icons#278 ships an update path for 8.0.0 installs (#1121).
   expo-alternate-app-icons@11.0.0: patches/expo-alternate-app-icons@11.0.0.patch
+  # expo-router 58.0.32 unbinds the module-level router when the old root unmounts after an Android
+  # Activity relaunch (a font scale change or a quick deep-link reopen), so every later router call
+  # throws "The imperative router is unavailable". Backports expo/expo#53447; drop it at 58.0.33.
+  expo-router@58.0.32: js-patches/expo-router@58.0.32.patch
   # react-native-mmkv 4.3.2's Jest mock clears its map before walking the keys it cleared, so
   # clearAll() never notifies value listeners under Jest. Native MMKV does.
   react-native-mmkv@4.3.2: js-patches/react-native-mmkv@4.3.2.patch

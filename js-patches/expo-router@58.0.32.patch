@@ -1,0 +1,98 @@
+diff --git a/build/ExpoRoot.js b/build/ExpoRoot.js
+index 16d2be77b70c22a06a881853092ffaf80d0aed07..ca8749f2e5d4561edb9b21f561c8ecf8a88672ad 100644
+--- a/build/ExpoRoot.js
++++ b/build/ExpoRoot.js
+@@ -160,7 +160,7 @@ function ContextNavigator({ context, location: initialLocation = initialUrl, wra
+         value: routerConfig,
+         children: /*#__PURE__*/ (0, _jsxruntime().jsx)(_removalPrevention.RemovalPreventionProvider, {
+             children: /*#__PURE__*/ (0, _jsxruntime().jsx)(_NavigationContainer.NavigationContainer, {
+-                ref: _navigationRef.navigationRef,
++                ref: _navigationRef.setNavigationRef,
+                 linking: linkingConfig,
+                 children: /*#__PURE__*/ (0, _jsxruntime().jsx)(WrapperComponent, {
+                     children: /*#__PURE__*/ (0, _jsxruntime().jsx)(Content, {
+diff --git a/build/global-state/navigationRef.js b/build/global-state/navigationRef.js
+index 4964dc3c5e624d5a3fa51b7fd1dd0d4afb590f0f..6ab049d6c8b8e6a5b002b38c72a6dd5fd6ea4078 100644
+--- a/build/global-state/navigationRef.js
++++ b/build/global-state/navigationRef.js
+@@ -2,13 +2,34 @@
+ Object.defineProperty(exports, "__esModule", {
+     value: true
+ });
+-Object.defineProperty(exports, "navigationRef", {
+-    enumerable: true,
+-    get: function() {
++0 && (module.exports = {
++    navigationRef: null,
++    setNavigationRef: null
++});
++function _export(target, all) {
++    for(var name in all)Object.defineProperty(target, name, {
++        enumerable: true,
++        get: Object.getOwnPropertyDescriptor(all, name).get
++    });
++}
++_export(exports, {
++    get navigationRef () {
+         return navigationRef;
++    },
++    get setNavigationRef () {
++        return setNavigationRef;
+     }
+ });
+ const _createNavigationContainerRef = require("../react-navigation/core/createNavigationContainerRef");
+ const navigationRef = (0, _createNavigationContainerRef.createNavigationContainerRef)();
++function setNavigationRef(navigation) {
++    navigationRef.current = navigation;
++    return ()=>{
++        // A newer root may own `navigationRef` now. An Android Activity relaunch unmounts the old root last.
++        if (navigationRef.current === navigation) {
++            navigationRef.current = null;
++        }
++    };
++}
+ 
+ //# sourceMappingURL=navigationRef.js.map
+diff --git a/build/global-state/routingQueueContext.js b/build/global-state/routingQueueContext.js
+index 54629aaf6eb7a8fd169c94405ff167884217106f..3d80b2d50818ed677cf0c5bb4b1da06cd9229ce8 100644
+--- a/build/global-state/routingQueueContext.js
++++ b/build/global-state/routingQueueContext.js
+@@ -59,7 +59,7 @@ const _useClientLayoutEffect = require("../react-navigation/core/useClientLayout
+ const _router = require("./router");
+ const _routingQueue = require("./routingQueue");
+ const EMPTY = [];
+-let boundBridges = 0;
++let boundRouter;
+ const throwMissingRoutingQueue = ()=>{
+     throw new Error('Attempted to navigate from a component rendered outside the Expo Router root. Render the component inside `ExpoRoot`. If this happened inside `ExpoRoot`, please report a bug at https://github.com/expo/expo/issues.');
+ };
+@@ -122,19 +122,19 @@ function useSetRoutingTransitionMode() {
+ }
+ function ImperativeRoutingQueueBridge({ enqueue, setTransitionMode }) {
+     (0, _useClientLayoutEffect.useClientLayoutEffect)(()=>{
+-        if (__DEV__ && boundBridges > 0) {
+-            console.error([
+-                'Looks like you have multiple navigation containers consuming the shared imperative routing queue. Only one container will receive queued actions. Make sure that:',
+-                "- You don't have multiple NavigationContainers in the app",
+-                '- Only a single instance of the root component is rendered'
+-            ].join('\n'));
++        if (__DEV__ && boundRouter) {
++            console.warn('Your app mounted a second time while the first instance was still running. This can happen during an Android Activity relaunch when a configuration change is not listed in `android:configChanges`. Expo Router keeps working, but the app state may reset.');
+         }
+-        boundBridges++;
++        const imperativeRouter = (0, _router.createImperativeRouter)(enqueue, setTransitionMode);
++        boundRouter = imperativeRouter;
+         // The exported router identity must stay stable, so the bridge mutates it in place.
+-        Object.assign(_router.router, (0, _router.createImperativeRouter)(enqueue, setTransitionMode));
++        Object.assign(_router.router, imperativeRouter);
+         return ()=>{
+-            boundBridges--;
+-            Object.assign(_router.router, _router.unboundRouter);
++            // A newer root may own `router` now. An Android Activity relaunch unmounts the old root last.
++            if (boundRouter === imperativeRouter) {
++                boundRouter = undefined;
++                Object.assign(_router.router, _router.unboundRouter);
++            }
+         };
+     }, [
+         enqueue,
