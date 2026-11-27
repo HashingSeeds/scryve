@@ -6,6 +6,7 @@ import * as localPublish from "./lib/games/localPublish"
 import * as pregame from "./lib/games/pregame"
 import * as projection from "./lib/games/projection"
 import * as tableWrites from "./lib/games/tableWrites"
+import * as watch from "./lib/games/watch"
 
 export { maskSummaryPlayersForViewer, terminalizeGameForAccountDeletion } from "./lib/games/shared"
 
@@ -51,3 +52,5 @@ export const migrateMyGameMemberships = mutation(history.migrateMyGameMembership
 export const activeConnectedGames = query(lobby.activeConnectedGames)
 export const connectedSummary = query(history.connectedSummary)
 export const connectedEvents = query(history.connectedEvents)
+export const watchCode = mutation(watch.watchCode)
+export const watchBoard = query(watch.watchBoard)

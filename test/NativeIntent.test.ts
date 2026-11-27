@@ -35,6 +35,17 @@ describe("connected invite native intent", () => {
       "/",
     )
   })
+  it("opens Watch links only from the trusted origin", () => {
+    expect(
+      redirectSystemPath({ path: "https://count.example/watch/k7qxm2pd", initial: true }),
+    ).toBe("/watch/K7QXM2PD")
+    expect(redirectSystemPath({ path: "https://evil.example/watch/K7QXM2PD", initial: true })).toBe(
+      "/",
+    )
+    expect(
+      redirectSystemPath({ path: "https://count.example/watch/K7QXM2PD?x=1", initial: true }),
+    ).toBe("/")
+  })
   it("fails closed for malformed initial URLs", () =>
     expect(redirectSystemPath({ path: "%%%", initial: true })).toBe("/"))
 

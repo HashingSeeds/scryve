@@ -44,7 +44,7 @@ const WHOLE_MINUTES_FROM_MS = 10 * 60_000
 const MENU_HALF_RUN = 48
 const EDGE_GAP = 8
 
-function useNow(ticking: boolean) {
+export function useNow(ticking: boolean) {
   const [, tick] = useReducer((count: number) => count + 1, 0)
   useEffect(() => {
     if (!ticking) return

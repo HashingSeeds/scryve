@@ -53,18 +53,18 @@ import {
   totalEventCount,
 } from "./shared"
 
-function gameCommanderLethal(game: Doc<"games">) {
+export function gameCommanderLethal(game: Doc<"games">) {
   return commanderLethalDamage(
     game.system ?? game.game ?? DEFAULT_DECK_GAME,
     game.format ?? game.ruleset,
   )
 }
 
-function gameUnavailable() {
+export function gameUnavailable() {
   return new ConvexError({ code: "forbidden", message: "Game unavailable" })
 }
 
-function displayNameForViewer(
+export function displayNameForViewer(
   player: Doc<"gamePlayers">,
   user: Doc<"users"> | null,
   { blocked, viewerIsHost }: { blocked: boolean; viewerIsHost: boolean },
@@ -189,7 +189,7 @@ const connectedOperation = v.union(
   }),
 )
 
-async function matchProjection(
+export async function matchProjection(
   ctx: QueryCtx,
   game: Doc<"games">,
   viewer: { isHost: boolean; eventCount: number },
@@ -489,6 +489,6 @@ async function statusForOperation(
   return matches ? acknowledged() : conflict(reused)
 }
 
-function gameTableRules(game: Doc<"games">) {
+export function gameTableRules(game: Doc<"games">) {
   return tableRules(game.system ?? game.game ?? DEFAULT_DECK_GAME, game.format ?? game.ruleset)
 }

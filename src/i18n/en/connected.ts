@@ -276,6 +276,37 @@ const connected = {
     shareMessageCode: "Join my Scryve game with code {{code}}",
     shareFailed: "Could not open sharing",
   },
+  // A read-only live view of a game that anyone with the link can open on a TV, laptop or stream. Never "Spectate" or "Stream".
+  watch: {
+    // Button that opens the Watch link for this game.
+    label: "Watch link",
+    title: "Watch this game",
+    // Label above the code a viewer types after the site's address.
+    code: "Watch code",
+    // Under the QR code. {{url}} is the full address, as in "scryve.app/watch/K7QXM2PD".
+    hint: "Scan or open {{url}} on any screen. Watchers can't change the game.",
+    share: "Share watch link",
+    shareMessage: "Watch my Scryve game live: {{url}}",
+    failed: "Could not get a watch link",
+    // On the TV when the link's code matches no game.
+    notFound: "No game with that watch code",
+    // On the TV when the host ended the game without a result.
+    ended: "This game has ended",
+    // On the TV before the host starts the game.
+    waiting: "Waiting for the game to start",
+    // On the TV once the game has a result.
+    // ko: The game is over, not a finals match: '최종 결과'. Never 결승.
+    // fr: Shown once the game is over, not a final match: "Terminé". Never Finale.
+    final: "Final",
+    // A counter on a player's tile, as in "Poison 3". {{name}} is the counter's short name.
+    counter: "{{name}} {{value}}",
+    // On a player's tile once they have lost and are out of the game.
+    out: "Out",
+    // On the tile of the player or team that won the finished game.
+    won: "Won",
+    // After "Final" on the TV when the game ended in a draw, as in "Final · Draw".
+    draw: "Draw",
+  },
   invalidInvite: {
     header: "Invitation",
     title: "Invalid invitation",

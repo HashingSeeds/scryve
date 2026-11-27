@@ -377,6 +377,7 @@ export default {
     unnamedPartner: "पार्टनर",
     totalFrom: "{{name}} से {{damage}} कमांडर डैमेज",
     amountFrom: "{{name}} से {{amount}}",
+    amountFromPartner: "{{name}} के पार्टनर से {{amount}}",
     unknownAttacker: "कमांडर",
     assignFrom: "{{identity}} से कमांडर डैमेज दें",
     assignFromStale: "{{identity}} से कमांडर डैमेज दें, पुराना",

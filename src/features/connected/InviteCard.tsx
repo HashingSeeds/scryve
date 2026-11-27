@@ -4,6 +4,7 @@ import QRCode from "react-native-qrcode-svg"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
+import type { TxKeyPath } from "@/i18n"
 import { useAppTheme } from "@/theme/context"
 import { textStart } from "@/theme/direction"
 import type { ThemedStyle } from "@/theme/types"
@@ -26,10 +27,12 @@ export function InviteCard({
   qrPayload,
   manualCode,
   onShare,
+  copy,
 }: {
   qrPayload?: string | null
   manualCode?: string
   onShare?: () => void
+  copy?: { code: TxKeyPath; share: TxKeyPath }
 }) {
   const { themed } = useAppTheme()
   const { height } = useWindowDimensions()
@@ -54,7 +57,7 @@ export function InviteCard({
       <View style={[themed($details), sideBySide && themed($sideBySideDetails)]}>
         {manualCode ? (
           <View style={[themed($codeBlock), sideBySide && themed($sideBySideCodeBlock)]}>
-            <Text size="xxs" style={themed($label)} tx="connected:invite.code" />
+            <Text size="xxs" style={themed($label)} tx={copy?.code ?? "connected:invite.code"} />
             <Text
               testID="manual-code"
               preset={sideBySide ? "subheading" : "heading"}
@@ -64,7 +67,7 @@ export function InviteCard({
               selectable
               text={manualCode}
             />
-            {sideBySide ? null : (
+            {sideBySide || copy ? null : (
               <Text
                 size="xs"
                 style={themed($hint)}
@@ -77,7 +80,7 @@ export function InviteCard({
         {onShare ? (
           <Button
             testID="share-invite-button"
-            tx="connected:invite.share"
+            tx={copy?.share ?? "connected:invite.share"}
             style={themed($share)}
             onPress={onShare}
           />
