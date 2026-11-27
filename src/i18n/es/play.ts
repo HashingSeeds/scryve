@@ -289,7 +289,7 @@ export default {
   },
   history: {
     title: "Historial",
-    addResult: "Añadir resultado",
+    add: "Añadir",
     addPastGames: "Añadir partidas anteriores",
     logGame: "Registrar una partida",
     logged: "Registrada",

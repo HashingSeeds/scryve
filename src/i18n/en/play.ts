@@ -341,7 +341,8 @@ const play = {
   },
   history: {
     title: "History",
-    addResult: "Add result",
+    // Header action that opens a menu: log a game, add a match result, or add past games.
+    add: "Add",
     addPastGames: "Add past games",
     // Opens a form to record a game that was played without tracking it in the app.
     logGame: "Log a game",

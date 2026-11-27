@@ -283,7 +283,7 @@ export default {
   },
   history: {
     title: "हिस्ट्री",
-    addResult: "नतीजा जोड़ें",
+    add: "जोड़ें",
     addPastGames: "पिछले गेम जोड़ें",
     logGame: "गेम लॉग करें",
     logged: "लॉग किया हुआ",

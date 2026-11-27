@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
+import { DeckActionsSheet, type DeckAction } from "@/components/DeckActionsSheet"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { EmptyState } from "@/components/EmptyState"
 import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
@@ -298,6 +299,8 @@ export function HistoryScreen({
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [expandedMatches, setExpandedMatches] = useState<string[]>([])
   const [pastGamesFailed, setPastGamesFailed] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const afterAdd = useRef<() => void>(undefined)
   const connectedPage = connected?.page
 
   const entries = useMemo(() => {
@@ -328,6 +331,23 @@ export function HistoryScreen({
       setPastGamesFailed(true)
     }
   }
+
+  const addChoices = (
+    [
+      ["log", "play:history.logGame", onLogGame],
+      ["result", "play:recordMatch.title", onAddMatch],
+      ["pastGames", "play:history.addPastGames", onAddPastGames && addPastGames],
+    ] satisfies [string, TxKeyPath, (() => void) | undefined][]
+  ).flatMap(([id, tx, run]) => (run ? [{ id, tx, run }] : []))
+  const addActions: DeckAction[] = addChoices.map(({ id, tx, run }) => ({
+    id,
+    label: translate(tx),
+    onPress: () => {
+      afterAdd.current = run
+      setAddOpen(false)
+    },
+  }))
+  const onlyAdd = addChoices.length === 1 ? addChoices[0].run : undefined
   const formats = formatChoices(options.formats, filters.systems)
   const visibleGames = visible.flatMap((entry) => entry.match?.games ?? [entry])
   const record = tallyOutcomes(visibleGames)
@@ -420,8 +440,8 @@ export function HistoryScreen({
       <Header
         title={titleVisible ? translate("play:history.title") : ""}
         onBack={onBack}
-        rightTx={onAddMatch ? "play:history.addResult" : undefined}
-        onRightPress={onAddMatch}
+        rightTx={addChoices.length > 0 ? "play:history.add" : undefined}
+        onRightPress={onlyAdd ?? (() => setAddOpen(true))}
       />
       <SectionList
         testID="history-list"
@@ -436,26 +456,6 @@ export function HistoryScreen({
           <View style={themed($headerBlock)}>
             <Text preset="heading" tx="play:history.title" />
             <Text size="xs" tone="dim" text={countLabel} />
-            {onLogGame ? (
-              <TouchableOpacity
-                testID="history-log-game"
-                accessibilityRole="button"
-                style={$pastGames}
-                onPress={onLogGame}
-              >
-                <Text size="xs" tone="dim" tx="play:history.logGame" />
-              </TouchableOpacity>
-            ) : null}
-            {onAddPastGames ? (
-              <TouchableOpacity
-                testID="history-add-past-games"
-                accessibilityRole="button"
-                style={$pastGames}
-                onPress={addPastGames}
-              >
-                <Text size="xs" tone="dim" tx="play:history.addPastGames" />
-              </TouchableOpacity>
-            ) : null}
             {pastGamesFailed ? <AlertNote text={translate("board:claim.saveFailed")} /> : null}
             <View style={$chipRow}>
               <ScrollView
@@ -704,6 +704,17 @@ export function HistoryScreen({
           />
         </View>
       </DialogCard>
+      <DeckActionsSheet
+        testID="history-add-sheet"
+        visible={addOpen}
+        actions={addActions}
+        onClose={() => setAddOpen(false)}
+        onDismissed={() => {
+          const then = afterAdd.current
+          afterAdd.current = undefined
+          then?.()
+        }}
+      />
     </Screen>
   )
 }
@@ -821,4 +832,3 @@ const $dot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: DOT_SIZE / 2,
   backgroundColor: colors.separator,
 })
-const $pastGames: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }

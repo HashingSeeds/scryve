@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { fireEvent, render, screen } from "@testing-library/react-native"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
 import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistorySource"
 import type { LocalGameSummary } from "@/features/game/types"
@@ -369,33 +369,36 @@ describe("unified history screen", () => {
     expect(onSelectManual).toHaveBeenCalledWith("manual-1")
   })
 
-  it("offers to add a result only when the route provides a destination", () => {
+  it("lists the add actions the route provides, runs the chosen one, and skips the list for a single one", async () => {
+    const onLogGame = jest.fn()
     const onAddMatch = jest.fn()
-    renderHistory({ onAddMatch })
-    fireEvent.press(screen.getByText("Add result"))
-    expect(onAddMatch).toHaveBeenCalledTimes(1)
-
-    renderHistory()
-    expect(screen.queryByText("Add result")).toBeNull()
-  })
-
-  it("offers past games only when the route provides a way to add them", () => {
     const onAddPastGames = jest.fn()
-    renderHistory({ onAddPastGames })
-    fireEvent.press(screen.getByText("Add past games"))
-    expect(onAddPastGames).toHaveBeenCalledTimes(1)
+    renderHistory({ onLogGame, onAddMatch, onAddPastGames })
+    fireEvent.press(screen.getByText("Add"))
+    expect(screen.getByTestId("deck-action-log")).toBeTruthy()
+    expect(screen.getByTestId("deck-action-pastGames")).toBeTruthy()
+    fireEvent.press(screen.getByText("Add match result"))
+    await waitFor(() => expect(onAddMatch).toHaveBeenCalledTimes(1))
+    expect(onLogGame).not.toHaveBeenCalled()
+    expect(onAddPastGames).not.toHaveBeenCalled()
+
+    renderHistory({ onLogGame })
+    fireEvent.press(screen.getByText("Add"))
+    expect(onLogGame).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId("deck-action-log")).toBeNull()
 
     renderHistory()
-    expect(screen.queryByText("Add past games")).toBeNull()
+    expect(screen.queryByText("Add")).toBeNull()
   })
 
-  it("says so when reopening past games fails", () => {
+  it("says so when reopening past games fails", async () => {
     const onAddPastGames = jest.fn(() => {
       throw new Error("disk full")
     })
-    renderHistory({ onAddPastGames })
+    renderHistory({ onLogGame: jest.fn(), onAddPastGames })
+    fireEvent.press(screen.getByText("Add"))
     fireEvent.press(screen.getByText("Add past games"))
-    expect(screen.getByText("Could not save your choice. Try again.")).toBeTruthy()
+    expect(await screen.findByText("Could not save your choice. Try again.")).toBeTruthy()
   })
 
   it("names the winner a local game recorded", () => {
