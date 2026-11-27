@@ -800,6 +800,7 @@ describe("Browse list", () => {
             kind: "official",
             name: "Forces of the Imperium",
             format: "commander",
+            publishedAt: Date.parse("2022-10-07"),
             fetchedAt: 1,
           }),
       )

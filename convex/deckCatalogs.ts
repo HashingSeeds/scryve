@@ -150,7 +150,7 @@ export const list = query({
     const byName = await catalogQuery(ctx, { game, format, query: term })
       .filter((q) => (identity ? q.eq(q.field("identityColors"), identity) : true))
       .take(BROWSE_LIMIT)
-    if (!term) return byName
+    if (!term || byName.length === BROWSE_LIMIT) return byName
     const bySetCode = await ctx.db
       .query("deckCatalogs")
       .withSearchIndex("search_set_code_by_format", (search) =>
