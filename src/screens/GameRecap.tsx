@@ -52,7 +52,7 @@ const PAD = 24
 const ROWS_TOP = PAD + 74
 const ROWS_BOTTOM = IMAGE_HEIGHT - PAD - 22
 const ROW_MAX = 73
-const STRIP_LEFT = 206
+const STRIP_LEFT = 212
 const EXPORT_SIZE = { width: 1080, height: 1350 }
 // why: iOS reads toDataURL's size as points and draws at the screen's scale, while web reads pixels.
 const EXPORT_SCALE = Platform.OS === "web" ? 1 : PixelRatio.get()
@@ -171,10 +171,10 @@ function RecapImage({ model, svgRef }: { model: GameSummaryModel; svgRef: React.
                   x={PAD}
                   y={middle + (roomy ? 14 : 11)}
                   {...IMAGE_FONT.regular}
-                  fontSize={roomy ? 10 : 9}
+                  fontSize={roomy ? 9.5 : 9}
                   fill={colors.textDim}
                 >
-                  {clipped(detail, 36)}
+                  {clipped(detail, 34)}
                 </SvgText>
               ) : null}
             </G>
