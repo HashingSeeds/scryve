@@ -107,11 +107,11 @@ function RecapImage({ model, svgRef }: { model: GameSummaryModel; svgRef: React.
   const lifeSize = Math.min(roomy ? 25 : 20, LIFE_COLUMN / lifeChars)
   const stripWidth = IMAGE_WIDTH - PAD - lifeChars * lifeSize - 10 - STRIP_LEFT
   const meta = joinParts([
+    model.logged ? translate("play:history.logged") : undefined,
     model.system ? playSystemShortLabel(model.system) : undefined,
     model.format,
     playedFor(model),
     finishedOnLabel(model.finishedAt, model.logged),
-    model.logged ? translate("play:history.logged") : undefined,
   ])
   return (
     <Svg
