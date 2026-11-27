@@ -18,6 +18,7 @@ import { isSharedDeckKey } from "../deckShares"
 import { hasFeature, PREMIUM_FEATURES } from "../entitlements"
 import { checkDeviceId, checkOperationId } from "../gameEngine"
 import { codeGuessWait, countCodeMiss } from "../gameRateLimits"
+import { fittedRecap, type GameRecap } from "../gameRecap"
 import { isLifeDelta } from "../gameRules"
 import { gameWriteError } from "../gameWriteErrors"
 import { publicUsernameFor } from "../moderation"
@@ -35,6 +36,7 @@ import {
   type GameVariant,
 } from "../treachery"
 import { lobbyTeammateSeat } from "../twoHeadedGiant"
+import { connectedRecap } from "./recap"
 
 export const MAX_PLAYERS_PER_GAME_READ = MAX_PLAYERS + 1
 
@@ -479,6 +481,7 @@ export async function terminalizeGame(
     firstPlayerId?: Id<"gamePlayers">
     localIds?: Map<Id<"gamePlayers">, string>
     deckNames?: Map<Id<"gamePlayers">, string>
+    recap?: GameRecap
   } = {},
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
@@ -512,6 +515,15 @@ export async function terminalizeGame(
         : winnerIds.has(playerId)
           ? "win"
           : "loss"
+  const recap =
+    status !== "finished"
+      ? undefined
+      : game.mode === "local"
+        ? fittedRecap(
+            options.recap,
+            [...players].sort((a, b) => a.seat - b.seat).map(({ currentLife }) => currentLife),
+          )
+        : await connectedRecap(ctx, game, players, winnerIds)
   const now = Date.now()
   const finishedAt = options.finishedAt ?? now
   const hostedMatchId = game.mode === "connected" ? game.matchId : undefined
@@ -590,6 +602,7 @@ export async function terminalizeGame(
     ...(game.variant ? { variant: game.variant } : {}),
     ...(options.nearby ? { nearby: true as const } : {}),
     ...(options.logged ? { logged: true as const } : {}),
+    ...(recap ? { recap } : {}),
   })
   const summary = (await ctx.db.get(summaryId))!
   const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()

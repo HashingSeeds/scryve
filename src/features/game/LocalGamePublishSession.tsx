@@ -114,7 +114,10 @@ function ActivePublish({
     void (async () => {
       for (const game of repository.pendingPublishes(ownerId)) {
         if (cancelled) return
-        const snapshot = buildFinishedLocalGameSnapshot(game)
+        const snapshot = buildFinishedLocalGameSnapshot(
+          game,
+          repository.loadHistoryDetail(game.id)?.recap,
+        )
         let deckRejectionCode = "unknown"
         try {
           await publish(snapshot)

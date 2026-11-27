@@ -4,6 +4,7 @@ import { v } from "convex/values"
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
 import { eventClock, eventPoints, eventTableResult } from "./lib/events/validators"
 import { feedbackFix, feedbackKind } from "./lib/feedback"
+import { gameRecapValidator } from "./lib/gameRecap"
 import { lifeEditingValidator } from "./lib/gameRules"
 import { playerGridLayoutValidator } from "./lib/layouts"
 import {
@@ -366,6 +367,7 @@ export default defineSchema({
     turnGroups: v.optional(turnGroupsValidator),
     nearby: v.optional(v.literal(true)),
     logged: v.optional(v.literal(true)),
+    recap: v.optional(gameRecapValidator),
   })
     .index("by_game", ["gameId"])
     .index("by_public_id", ["publicId"]),

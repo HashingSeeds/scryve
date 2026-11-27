@@ -70,7 +70,10 @@ export default function GameSummaryRoute() {
 
   return (
     <GameSummaryScreen
-      summary={{ status: "ready", value: detail ? localSummaryModel(detail.game) : null }}
+      summary={{
+        status: "ready",
+        value: detail ? localSummaryModel(detail.game, detail.recap) : null,
+      }}
       timeline={
         detail
           ? {

@@ -241,7 +241,8 @@ const play = {
     deletedPlayer: "deleted player",
     standing: "{{name}}, {{value}}",
     standingWithOutcome: "{{outcome}}, {{name}}, {{value}}",
-    seat: "Seat {{seat}}",
+    // Read aloud for one player's row: {{standing}} is their name and result, {{detail}} how they went out, or their team, username or deck.
+    standingDetail: "{{standing}}, {{detail}}",
     loading: "Loading game summary",
     unavailableHeading: "Summary unavailable",
     unavailableContent: "Check your connection and try again.",
@@ -249,19 +250,6 @@ const play = {
     notFoundContent: "This game summary is no longer available.",
     finished: "Finished",
     abandoned: "Abandoned",
-    local: "Local",
-    connected: "Connected",
-    result: "Result",
-    finalCounter: {
-      none: "Final Life",
-      mtg: "Final Life",
-      ygo: "Final Life Points",
-      pokemon: "Final Prize cards",
-      lorcana: "Final lore",
-      fab: "Final Life",
-      // hi: Copy the life wording: “आखिरी पॉइंट”.
-      riftbound: "Final points",
-    },
     noWinner: "No winner was recorded for this game.",
     reportPlayer: "Report or block a player",
     hide: "Hide",
@@ -278,6 +266,14 @@ const play = {
     // ko: '되돌리기는 지워지지 않고 반대 방향의 변경으로 기록에 남습니다.'
     // hi: “अनडू भी रिकॉर्ड में एक उल्टे बदलाव की तरह दिखता है।”
     undoNote: "Undo stays in the record as a compensating change.",
+    recap: {
+      // {{names}} is one or more player names already joined, as in "Ana and Ben".
+      won: "{{names}} won",
+      share: "Share",
+      shareFailed: "Could not share this recap.",
+      // Read aloud for a player's life line: where their counter started and ended, like "40 life to 28 life".
+      lifeLine: "{{from}} to {{to}}",
+    },
     helpPrompt: "Having trouble?",
     openHelp: "Open Support",
     dismiss: "Dismiss",

@@ -215,8 +215,4 @@ export default {
     fab_other: "생명점 변경 {{count}}회",
     riftbound_other: "점수 변경 {{count}}회",
   },
-  noneTaken: "가져간 프라이즈 없음",
-  taken_other: "프라이즈 {{count}}장 가져옴",
-  even: "변동 없음",
-  fromStart: "시작 대비 {{delta, signed}}",
 } satisfies LocaleNamespace

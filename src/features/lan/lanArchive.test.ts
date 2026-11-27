@@ -1,5 +1,6 @@
 import { buildFinishedLocalGameSnapshot } from "@/features/connected/localGameSnapshot"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { localGameRecap } from "@/features/game/localRecap"
 import type { PlayerId } from "@/features/game/types"
 
 import { archiveLanGame, lanLocalGame } from "./lanArchive"
@@ -18,7 +19,10 @@ import { MemoryStorage } from "../../../test/support/memoryStorage"
 const NOW = 1_700_000_000_000
 const HASH = "a".repeat(64)
 
-function finishedRound(hostDeck?: Parameters<typeof setLanDeck>[2]) {
+function finishedRound(
+  hostDeck?: Parameters<typeof setLanDeck>[2],
+  laterWrites: [string, Record<string, unknown>][] = [],
+) {
   const lobby = createLanGame(
     "lan_game",
     "host",
@@ -91,6 +95,7 @@ function finishedRound(hostDeck?: Parameters<typeof setLanDeck>[2]) {
         accepted: true,
       },
     ],
+    ...laterWrites,
   ]
   const game = writes.reduce(
     (current, [sender, event]) =>
@@ -106,6 +111,104 @@ function finishedRound(hostDeck?: Parameters<typeof setLanDeck>[2]) {
 }
 
 describe("lanLocalGame", () => {
+  it("moves a Two-Headed Giant team's shared life together in the recap", () => {
+    let game = createLanGame(
+      "lan_game",
+      "host",
+      "Host",
+      {
+        playerCount: 4,
+        startingLife: 30,
+        lifeStep: 1,
+        ruleset: "limited",
+        system: "mtg",
+        format: "limited",
+        variant: "twoHeadedGiant",
+      },
+      NOW,
+    )
+    for (const key of ["guest-1", "guest-2", "guest-3"]) {
+      const admitted = admitLanGuest(
+        game,
+        new Map(),
+        { type: "join", protocol: LAN_PROTOCOL, name: key, variants: ["twoHeadedGiant"] },
+        { key, token: `token-${key}` },
+      )
+      if ("rejected" in admitted) throw new Error(admitted.rejected)
+      game = admitted.game
+    }
+    const started = startLanRound(game, NOW + 1)
+    const played = applyLanWrite(
+      started,
+      "host",
+      {
+        type: "life.changed",
+        operationId: "life-operation-0001",
+        playerId: "host",
+        delta: -6,
+        actorId: "host",
+        gameId: lanRoundId(started),
+        deviceId: "device-0001",
+        clientCreatedAt: NOW + 2,
+      } as Parameters<typeof applyLanWrite>[2],
+      NOW + 2,
+    ).game
+    const archived = lanLocalGame(endLanRound(played, "finished", NOW + 3), {})
+    expect(archived.variant).toBe("twoHeadedGiant")
+    expect(localGameRecap(archived)?.lives).toEqual([
+      [30, 30, 30, 30],
+      [24, 24, 30, 30],
+    ])
+  })
+
+  it("keeps undone life and commander damage out of the recap", () => {
+    const game = lanLocalGame(
+      finishedRound(undefined, [
+        [
+          "host",
+          { type: "life.changed", operationId: "life-operation-0002", playerId: "host", delta: -4 },
+        ],
+        [
+          "host",
+          {
+            type: "life.changed",
+            operationId: "life-operation-0003",
+            playerId: "host",
+            delta: 4,
+            compensatesOperationId: "life-operation-0002",
+          },
+        ],
+        [
+          "host",
+          {
+            type: "commanderDamage.submitted",
+            operationId: "claim-operation-0003",
+            fromPlayerId: "host",
+            toPlayerId: "guest",
+            delta: -5,
+            undoOf: "claim-operation-0001",
+          },
+        ],
+        [
+          "guest",
+          {
+            type: "commanderDamage.resolved",
+            operationId: "resolve-operation-0003",
+            claimOperationId: "claim-operation-0003",
+            toPlayerId: "guest",
+            accepted: true,
+          },
+        ],
+      ]),
+      {},
+    )
+    expect(game.players.map(({ life }) => life)).toEqual([40, 30])
+    expect(localGameRecap(game)?.lives).toEqual([
+      [40, 40],
+      [40, 30],
+    ])
+  })
+
   it("archives the host's round as a local game that uploads each guest's pass hash", () => {
     const game = lanLocalGame(finishedRound(), {
       result: { kind: "win", winnerPlayerIds: ["host"] },

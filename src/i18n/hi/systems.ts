@@ -229,9 +229,4 @@ export default {
     riftbound_one: "{{count}} पॉइंट बदलाव",
     riftbound_other: "{{count}} पॉइंट बदलाव",
   },
-  noneTaken: "कोई प्राइज़ कार्ड नहीं लिया",
-  taken_one: "{{count}} प्राइज़ कार्ड लिया",
-  taken_other: "{{count}} प्राइज़ कार्ड लिए",
-  even: "कोई बदलाव नहीं",
-  fromStart: "शुरुआत से {{delta, signed}}",
 } satisfies LocaleNamespace

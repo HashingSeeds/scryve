@@ -6,6 +6,7 @@ import { Button } from "@/components/Button"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { EmptyState } from "@/components/EmptyState"
 import { Header } from "@/components/Header"
+import { MarkArt } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import {
@@ -14,27 +15,35 @@ import {
 } from "@/features/connected/PlayerActionsDialog"
 import {
   counterChangeLabel,
-  counterDeltaFromStartLabel,
   counterValueLabel,
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { TxKeyPath } from "@/i18n"
 import { formatSigned, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { canShareImage } from "@/utils/shareImage"
 import { claimSecondGameHelp } from "@/utils/storeReview"
 import { useStoreReview } from "@/utils/useStoreReview"
 
+import { RecapShare, RecapStrip } from "./GameRecap"
 import type {
+  GameSummaryModel,
   GameSummaryState,
-  SummaryOutcome,
   SummaryPlayer,
   SummaryTimelineState,
 } from "./gameSummary"
-import { anyResultRecorded, finishedOnLabel, metaLine, standings } from "./gameSummary"
+import {
+  anyResultRecorded,
+  metaLine,
+  recapDetail,
+  recapHeadline,
+  recapOut,
+  standings,
+} from "./gameSummary"
+import { shapeForSeat } from "../../convex/lib/appearance"
 
 export interface GameSummaryScreenProps {
   summary: GameSummaryState
@@ -47,89 +56,80 @@ export interface GameSummaryScreenProps {
 
 type CounterSystemId = ReturnType<typeof playSystemRules>["id"]
 
-const OUTCOME_BADGES = {
-  win: { labelTx: "play:summary.badge.win", accessibilityTx: "play:summary.outcome.win" },
-  loss: { labelTx: "play:summary.badge.loss", accessibilityTx: "play:summary.outcome.loss" },
-  draw: { labelTx: "play:summary.badge.draw", accessibilityTx: "play:summary.outcome.draw" },
-  unrecorded: {
-    labelTx: "play:summary.badge.unrecorded",
-    accessibilityTx: "play:summary.outcome.unrecorded",
-  },
-} as const satisfies Record<SummaryOutcome, { labelTx: TxKeyPath; accessibilityTx: TxKeyPath }>
+const MARK_SIZE = 16
 
 function StandingRow({
+  model,
   player,
-  rank,
-  startingLife,
   system,
   showOutcome,
-  logged,
 }: {
+  model: GameSummaryModel
   player: SummaryPlayer
-  rank: number
-  startingLife?: number
   system?: PlaySystemId
   showOutcome: boolean
-  logged?: true
 }) {
   const { theme, themed } = useAppTheme()
-  const badge = OUTCOME_BADGES[player.outcome]
-  const badgeTone =
-    player.outcome === "win"
-      ? theme.colors.tint
-      : player.outcome === "loss"
-        ? theme.colors.error
-        : theme.colors.textDim
-  const seatStartingLife = player.startingLife ?? startingLife
-  const changeFromStart =
-    seatStartingLife === undefined
-      ? undefined
-      : counterDeltaFromStartLabel(system, player.life, seatStartingLife)
-  const detail = joinParts([
+  const out = recapOut(model, player) !== undefined
+  const facts = [
     player.team,
     player.username ? `@${player.username}` : undefined,
     player.deckLabel,
     player.deleted ? translate("play:summary.deletedPlayer") : undefined,
-  ])
-  const value = counterValueLabel(system, player.life)
-  const rowLabel = logged
-    ? joinParts([showOutcome ? translate(badge.accessibilityTx) : undefined, player.name])
+  ]
+  const detail = joinParts([recapDetail(model, player), ...facts])
+  const spokenDetail = joinParts([out ? recapDetail(model, player) : undefined, ...facts])
+  const lives = model.recap?.lives
+  const column = model.players.indexOf(player)
+  const value = lives
+    ? translate("play:summary.recap.lifeLine", {
+        from: counterValueLabel(system, lives[0][column]),
+        to: counterValueLabel(system, player.life),
+      })
+    : counterValueLabel(system, player.life)
+  const standing = model.logged
+    ? joinParts([
+        showOutcome ? translate(`play:summary.outcome.${player.outcome}`) : undefined,
+        player.name,
+      ])
     : showOutcome
       ? translate("play:summary.standingWithOutcome", {
-          outcome: translate(badge.accessibilityTx),
+          outcome: translate(`play:summary.outcome.${player.outcome}`),
           name: player.name,
           value,
         })
       : translate("play:summary.standing", { name: player.name, value })
+  const rowLabel = spokenDetail
+    ? translate("play:summary.standingDetail", { standing, detail: spokenDetail })
+    : standing
 
   return (
-    <View style={themed($standingRow)} accessibilityLabel={rowLabel}>
-      <View style={[themed($colorBar), { backgroundColor: player.color }]} />
-      {showOutcome ? (
-        <View style={[themed($badge), { borderColor: badgeTone }]}>
-          <Text weight="bold" size="xxs" tx={badge.labelTx} style={{ color: badgeTone }} />
-        </View>
-      ) : (
-        <View style={themed($badge)}>
-          <Text size="xxs" tone="dim" text={rank} />
-        </View>
-      )}
+    <View style={themed($standingRow)} accessible accessibilityLabel={rowLabel}>
       <View style={$styles.flex1}>
-        <Text size="sm" weight="medium" numberOfLines={1} text={player.name} />
-        <Text
-          size="xxs"
-          numberOfLines={1}
-          tone="dim"
-          text={detail || translate("play:summary.seat", { seat: player.seat })}
-        />
-      </View>
-      {logged ? null : (
-        <View style={themed($lifeColumn)}>
-          <Text size="lg" weight="bold" text={player.life} />
-          {changeFromStart === undefined ? null : (
-            <Text size="xxs" tone="dim" text={changeFromStart} />
-          )}
+        <View style={themed($nameLine)}>
+          <MarkArt
+            shape={player.shape ?? shapeForSeat(player.seat)}
+            color={player.color}
+            size={MARK_SIZE}
+          />
+          <Text
+            size="sm"
+            weight="bold"
+            numberOfLines={1}
+            style={$styles.flex1}
+            text={player.name}
+          />
         </View>
+        {detail ? <Text size="xxs" numberOfLines={1} tone="dim" text={detail} /> : null}
+      </View>
+      <RecapStrip model={model} player={player} />
+      {model.logged ? null : (
+        <Text
+          size="xl"
+          weight="bold"
+          style={[themed($life), out ? { color: theme.colors.textDim } : undefined]}
+          text={player.life}
+        />
       )}
     </View>
   )
@@ -151,11 +151,8 @@ function SummaryLoadingShell({ onBack }: { onBack: () => void }) {
             <View style={themed($skeletonMeta)} />
             <View style={themed($skeletonMetaShort)} />
           </View>
-          <View style={themed($skeletonSectionHeading)} />
           {Array.from({ length: 2 }).map((_, index) => (
             <View key={index} testID="summary-skeleton-standing" style={themed($standingRow)}>
-              <View style={themed($skeletonColorBar)} />
-              <View style={themed($skeletonBadge)} />
               <View style={themed($skeletonPlayerCopy)}>
                 <View style={themed($skeletonPlayerName)} />
                 <View style={themed($skeletonPlayerDetail)} />
@@ -206,6 +203,8 @@ export function GameSummaryScreen({
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [shareFailed, setShareFailed] = useState(false)
   const helpGameId =
     summary.status === "ready" && summary.value?.status === "finished" && gameId
       ? `${summary.value.source}:${gameId}`
@@ -254,6 +253,7 @@ export function GameSummaryScreen({
   }
 
   const showOutcome = anyResultRecorded(model)
+  const shareable = canShareImage && model.status === "finished"
   const systemId = playSystemRules(model.system).id
   const rows = standings(model)
   const playersById = new Map(model.players.map((player) => [player.id, player]))
@@ -270,7 +270,19 @@ export function GameSummaryScreen({
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($fixedScreen)}>
-      <Header title={titleVisible ? translate("play:gameSummary") : ""} onBack={onBack} />
+      <Header
+        title={titleVisible ? translate("play:gameSummary") : ""}
+        onBack={onBack}
+        rightTx={shareable ? "play:summary.recap.share" : undefined}
+        onRightPress={
+          shareable
+            ? () => {
+                setShareFailed(false)
+                setSharing(true)
+              }
+            : undefined
+        }
+      />
       <ScrollView
         style={$styles.flex1}
         contentContainerStyle={themed($screen)}
@@ -278,49 +290,30 @@ export function GameSummaryScreen({
         scrollEventThrottle={16}
       >
         <View style={themed($block)}>
-          <Text
-            preset="heading"
-            accessibilityRole="header"
-            tx={model.status === "finished" ? "play:summary.finished" : "play:summary.abandoned"}
-          />
-          <Text
-            size="xs"
-            tone="dim"
-            text={joinParts([
-              finishedOnLabel(model.finishedAt, model.logged),
-              model.source === "local"
-                ? translate("play:summary.local")
-                : translate("play:summary.connected"),
-              model.logged ? translate("play:history.logged") : undefined,
-            ])}
-          />
+          <Text preset="heading" accessibilityRole="header" text={recapHeadline(model)} />
           <Text size="xs" tone="dim" text={metaLine(model)} />
           {model.terminalReason ? <Text size="xs" tone="dim" text={model.terminalReason} /> : null}
         </View>
 
-        <Text
-          weight="bold"
-          size="xs"
-          style={themed($sectionHeading)}
-          text={
-            showOutcome
-              ? translate("play:summary.result")
-              : translate(`play:summary.finalCounter.${systemId}`)
-          }
-        />
         <View>
-          {rows.map((player, index) => (
+          {rows.map((player) => (
             <StandingRow
               key={player.id}
+              model={model}
               player={player}
-              rank={index + 1}
-              startingLife={model.startingLife}
               system={model.system}
               showOutcome={showOutcome}
-              logged={model.logged}
             />
           ))}
         </View>
+        {shareFailed ? (
+          <Text
+            size="xxs"
+            accessibilityRole="alert"
+            style={themed($footnote)}
+            tx="play:summary.recap.shareFailed"
+          />
+        ) : null}
         {!showOutcome && model.source === "connected" ? (
           <Text size="xxs" style={themed($footnote)} tx="play:summary.noWinner" />
         ) : null}
@@ -472,6 +465,15 @@ export function GameSummaryScreen({
           />
         </View>
       ) : null}
+      {sharing ? (
+        <RecapShare
+          model={model}
+          onDone={(error) => {
+            setSharing(false)
+            setShareFailed(error !== undefined)
+          }}
+        />
+      ) : null}
       {playerActionsOpen && moderation ? (
         <PlayerActionsDialog
           publicId={moderation.publicId}
@@ -483,8 +485,6 @@ export function GameSummaryScreen({
   )
 }
 
-const BADGE_SIZE = 24
-const BAR_WIDTH = 4
 const EVENT_DOT = 8
 
 const $fixedScreen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
@@ -519,26 +519,6 @@ const $skeletonMetaShort: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
   width: "48%",
   height: 12,
   borderRadius: radius.xs,
-  backgroundColor: colors.separator,
-})
-const $skeletonSectionHeading: ThemedStyle<ViewStyle> = ({ colors, spacing, radius }) => ({
-  width: 96,
-  height: 12,
-  borderRadius: radius.xs,
-  marginTop: spacing.md,
-  marginBottom: spacing.xs,
-  backgroundColor: colors.separator,
-})
-const $skeletonColorBar: ThemedStyle<ViewStyle> = ({ colors, radius }) => ({
-  width: BAR_WIDTH,
-  height: 40,
-  borderRadius: radius.sm,
-  backgroundColor: colors.separator,
-})
-const $skeletonBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: BADGE_SIZE,
-  height: BADGE_SIZE,
-  borderRadius: BADGE_SIZE / 2,
   backgroundColor: colors.separator,
 })
 const $skeletonPlayerCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -597,50 +577,37 @@ const $footnote: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.textDim,
   marginTop: spacing.xs,
 })
-const $sectionHeading: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
-  color: colors.textDim,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-  marginTop: spacing.md,
-  marginBottom: spacing.xs,
-})
 const $toggleHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
   textTransform: "uppercase",
   letterSpacing: 1,
 })
-const $timelineToggle: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $timelineToggle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
-  marginTop: spacing.lg,
+  marginTop: spacing.md,
   paddingVertical: spacing.sm,
-  borderTopWidth: 1,
-  borderTopColor: colors.separator,
 })
 const $standingRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
+  minHeight: 64,
   paddingVertical: spacing.sm,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $colorBar: ThemedStyle<ViewStyle> = ({ radius }) => ({
-  width: BAR_WIDTH,
-  height: 40,
-  borderRadius: radius.sm,
-})
-const $badge: ThemedStyle<ViewStyle> = () => ({
-  width: BADGE_SIZE,
-  height: BADGE_SIZE,
-  borderRadius: BADGE_SIZE / 2,
-  borderWidth: 1,
-  borderColor: "transparent",
+const $nameLine: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
   alignItems: "center",
-  justifyContent: "center",
+  gap: spacing.xxs,
 })
-const $lifeColumn: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-end", minWidth: 88 })
+const $life: ThemedStyle<TextStyle> = () => ({
+  minWidth: 44,
+  textAlign: "right",
+  fontVariant: ["tabular-nums"],
+})
 const $timeline: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,
   borderStartWidth: 2,

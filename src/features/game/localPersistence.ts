@@ -23,6 +23,7 @@ import {
 } from "./domain"
 import { gameShape } from "./gameShape"
 import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
+import { localGameRecap } from "./localRecap"
 import { isSeatOrder, playerGridLayoutForCount } from "./playerLayouts"
 import {
   defaultStartingLife,
@@ -56,6 +57,7 @@ import type {
   TurnLogEntry,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { fittedRecap, type GameRecap } from "../../../convex/lib/gameRecap"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
 import {
   defaultFreeMulligans,
@@ -171,6 +173,7 @@ interface HistoryDetail {
   schemaVersion: 1
   game: LocalGame
   eventsTruncated: boolean
+  recap?: GameRecap
 }
 
 export const syncStatsEnabled = (settings: string | undefined) =>
@@ -1235,10 +1238,12 @@ export class LocalGameRepository {
       ...(account ? { account } : {}),
       events: game.events.slice(-MAX_HISTORY_EVENTS),
     }
+    const recap = game.status === "finished" ? localGameRecap(game) : undefined
     const detail: HistoryDetail = {
       schemaVersion: 1,
       game: boundedGame,
       eventsTruncated: game.events.length > MAX_HISTORY_EVENTS,
+      ...(recap ? { recap } : {}),
     }
     this.storage.set(LOCAL_KEYS.historyDetail(game.id), JSON.stringify(detail))
     this.saveHistory([summary, ...current], current)
@@ -1493,7 +1498,9 @@ export class LocalGameRepository {
     return repaired
   }
 
-  loadHistoryDetail(gameId: string): { game: LocalGame; eventsTruncated: boolean } | null {
+  loadHistoryDetail(
+    gameId: string,
+  ): { game: LocalGame; eventsTruncated: boolean; recap?: GameRecap } | null {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.historyDetail(gameId)))
     if (
       !isRecord(raw) ||
@@ -1508,7 +1515,17 @@ export class LocalGameRepository {
     const events = rawEvents.map(parseEvent)
     if (events.some((event) => event === null)) return null
     const game = parseGame(raw.game, events as GameEvent[])
-    return game ? { game, eventsTruncated: raw.eventsTruncated } : null
+    if (!game) return null
+    const finalLives = [...game.players]
+      .sort((left, right) => left.seat - right.seat)
+      .map(({ life }) => life)
+    const recap =
+      game.status !== "finished"
+        ? undefined
+        : raw.eventsTruncated
+          ? fittedRecap(raw.recap, finalLives)
+          : (fittedRecap(raw.recap, finalLives) ?? localGameRecap(game))
+    return { game, eventsTruncated: raw.eventsTruncated, ...(recap ? { recap } : {}) }
   }
 }
 

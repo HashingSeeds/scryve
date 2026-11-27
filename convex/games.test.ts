@@ -3700,3 +3700,69 @@ describe("games where anyone edits any seat", () => {
     ).resolves.toMatchObject({ status: "active", lifeEditing: "anyone" })
   })
 })
+
+describe("finished game recap", () => {
+  it("keeps the commander damage that took a seat out when the rest draw", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, { system: "mtg", ruleset: "commander", startingLife: 40 })
+    await game.host.mutation(api.games.submitCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-hit-0001",
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      fromPlayerId: game.hostPlayerId,
+      toPlayerId: game.joinerPlayerId,
+      delta: 21,
+    })
+    await game.host.mutation(api.games.finishGame, {
+      publicId: game.publicId,
+      result: { kind: "draw" },
+    })
+    const summary = await game.host.query(api.games.connectedSummary, {
+      publicId: game.publicId,
+    })
+    expect(summary?.recap?.outs).toEqual([
+      { seat: 1, cause: "commanderDamage", from: 0, total: 21 },
+    ])
+  })
+
+  it("stores each seat's life over the game and the commander damage that took a seat out", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, { system: "mtg", ruleset: "commander", startingLife: 40 })
+    const joinerLife = (operationId: string, delta: number) =>
+      lifeArgs(game.publicId, game.joinerPlayerId, operationId, delta, "device-joiner-001")
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(game.publicId, game.hostPlayerId, "operation-life-0001", -3),
+    )
+    await game.joiner.mutation(api.games.changeLife, joinerLife("operation-life-0002", -9))
+    await game.joiner.mutation(api.games.changeLife, {
+      ...joinerLife("operation-life-0003", 9),
+      undoOf: "operation-life-0002",
+    })
+    await game.host.mutation(api.games.submitCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-hit-0001",
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      fromPlayerId: game.hostPlayerId,
+      toPlayerId: game.joinerPlayerId,
+      delta: 21,
+    })
+    await game.host.mutation(api.games.finishGame, {
+      publicId: game.publicId,
+      result: { kind: "win", winnerPlayerIds: [game.hostPlayerId] },
+    })
+    const summary = await game.host.query(api.games.connectedSummary, {
+      publicId: game.publicId,
+    })
+    expect(summary?.recap).toEqual({
+      lives: [
+        [40, 40],
+        [37, 40],
+        [37, 19],
+      ],
+      outs: [{ seat: 1, cause: "commanderDamage", from: 0, total: 21 }],
+    })
+  })
+})

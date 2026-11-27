@@ -46,7 +46,22 @@ export function lanLocalGame(
 ): LocalGame {
   const { setup, memory } = game
   const id = asGameId(lanRoundId(game))
-  const events = [...(memory?.events.values() ?? [])].flatMap((event): GameEvent[] => {
+  const recorded = [...(memory?.events.values() ?? [])]
+  const undoneClaims = new Map(
+    recorded.flatMap((event) =>
+      event.kind === "commanderDamage.claimed" && event.undoOfOperationId
+        ? [[event.operationId, event.undoOfOperationId] as const]
+        : [],
+    ),
+  )
+  const confirmedByClaim = new Map(
+    recorded.flatMap((event) =>
+      event.kind === "commanderDamage.confirmed" && event.claimOperationId
+        ? [[event.claimOperationId, event.operationId] as const]
+        : [],
+    ),
+  )
+  const events = recorded.flatMap((event): GameEvent[] => {
     const { delta, fromPlayerId, toPlayerId } = event
     if (delta === undefined) return []
     const base = {
@@ -57,8 +72,20 @@ export function lanLocalGame(
       clientCreatedAt: event.clientCreatedAt,
     }
     if (event.kind === "life.changed")
-      return [{ type: "life.changed", ...base, playerId: asPlayerId(event.playerId), delta }]
-    if (event.kind === "commanderDamage.confirmed" && fromPlayerId && toPlayerId)
+      return [
+        {
+          type: "life.changed",
+          ...base,
+          playerId: asPlayerId(event.playerId),
+          delta,
+          ...(event.undoOfOperationId
+            ? { compensatesOperationId: asOperationId(event.undoOfOperationId) }
+            : {}),
+        },
+      ]
+    if (event.kind === "commanderDamage.confirmed" && fromPlayerId && toPlayerId) {
+      const undone = event.claimOperationId && undoneClaims.get(event.claimOperationId)
+      const compensates = undone && confirmedByClaim.get(undone)
       return [
         {
           type: "commanderDamage.assigned",
@@ -67,8 +94,10 @@ export function lanLocalGame(
           toPlayerId: asPlayerId(toPlayerId),
           ...commanderField(event.commander),
           delta,
+          ...(compensates ? { compensatesOperationId: asOperationId(compensates) } : {}),
         },
       ]
+    }
     return []
   })
   const commanderDamage = Object.fromEntries(
@@ -94,6 +123,9 @@ export function lanLocalGame(
     status: "finished",
     ...(setup.system ? { system: setup.system } : {}),
     ...(setup.format ? { format: setup.format } : {}),
+    ...(memory?.variant && memory.turnGroups
+      ? { variant: memory.variant, turnGroups: memory.turnGroups }
+      : {}),
     lifeStep: setup.lifeStep,
     startingLife: setup.startingLife,
     players: game.seats.map((seat) => {

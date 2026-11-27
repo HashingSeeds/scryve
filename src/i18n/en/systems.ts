@@ -271,14 +271,6 @@ const systems = {
     // ja: A count of changes, like the other games: ポイント変動{{count}}回.
     riftbound_other: "{{count}} point changes",
   },
-  // Pokémon only: no Prize cards taken yet.
-  noneTaken: "no prizes taken",
-  // Pokémon only: Prize cards the player has taken so far. Not damage.
-  taken_one: "{{count}} prize taken",
-  taken_other: "{{count}} prizes taken",
-  // A counter back at its starting value: unchanged, not a tie.
-  even: "unchanged",
-  fromStart: "{{delta, signed}} from start",
 }
 
 export default systems
