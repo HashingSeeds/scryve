@@ -787,10 +787,22 @@ describe("Browse list", () => {
     }
   })
 
-  it("finds Magic precons in Browse by their set code", async () => {
+  it("finds Magic precons in Browse by their set code, including rows synced before it was stored", async () => {
     jest.useFakeTimers()
     try {
       const t = makeConvexTest()
+      const stored = await t.run(
+        async (ctx) =>
+          await ctx.db.insert("deckCatalogs", {
+            game: "mtg",
+            source: "mtgjson",
+            externalId: "ForcesOfTheImperium_40K",
+            kind: "official",
+            name: "Forces of the Imperium",
+            format: "commander",
+            fetchedAt: 1,
+          }),
+      )
       await t.mutation(internal.deckImports.storeCatalog, {
         decks: [
           {
@@ -815,7 +827,7 @@ describe("Browse list", () => {
         format: "commander",
         query: "40k",
       })
-      expect(searched.map((deck) => deck.externalId)).toEqual(["ForcesOfTheImperium_40K"])
+      expect(searched.map((deck) => deck._id)).toEqual([stored])
     } finally {
       jest.useRealTimers()
     }
