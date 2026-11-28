@@ -58,7 +58,6 @@ export async function fetchScryfall(
       {},
     )
     if (cooldownUntil > Date.now()) {
-      /** why: usage counts are diagnostics, so a failed correction must not replace the rate-limit error callers handle. */
       await ctx
         .runMutation(internal.externalApiRateLimits.cancelScryfallRequest, { path, day })
         .catch(() => undefined)

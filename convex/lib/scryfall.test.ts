@@ -1,4 +1,27 @@
-import { normalizeScryfallCard } from "./scryfall"
+import { getFunctionName, type FunctionReference } from "convex/server"
+
+import { fetchScryfall, normalizeScryfallCard } from "./scryfall"
+import type { ActionCtx } from "../_generated/server"
+
+describe("fetchScryfall", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("still reports the rate limit when uncounting a queued request fails", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch")
+    const ctx = {
+      runMutation: (reference: FunctionReference<"mutation", "internal">) =>
+        getFunctionName(reference) === "externalApiRateLimits:acquireScryfall"
+          ? Promise.resolve({ waitMs: 1, blocked: false, day: "2026-11-28" })
+          : Promise.reject(new Error("write conflict")),
+      runQuery: () => Promise.resolve(Date.now() + 30_000),
+    } as unknown as ActionCtx
+
+    await expect(fetchScryfall(ctx, "/cards/search?q=elves")).rejects.toMatchObject({
+      data: { code: "scryfall_rate_limited" },
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
 
 describe("normalizeScryfallCard", () => {
   it("keeps the top-level printing details", () => {
