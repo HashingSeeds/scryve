@@ -144,6 +144,8 @@ type Events = {
     player_count: number
     mode: "local" | "connected"
   }
+  recap_share_tapped: Record<string, never>
+  recap_shared: Record<string, never>
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -174,6 +176,8 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   card_search: ["system", "result_count", "query"],
   card_picked: ["system", "rank", "pick_count", "card", "query"],
   turns_game_ended: ["turns_enabled", "pass_count", "player_count", "mode"],
+  recap_share_tapped: [],
+  recap_shared: [],
 }
 
 const RULE_ID = /^\d{1,3}(\.\d{1,3}){0,2}[a-z]{0,2}$/

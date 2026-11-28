@@ -24,6 +24,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 import { canShareImage } from "@/utils/shareImage"
 import { claimSecondGameHelp } from "@/utils/storeReview"
 import { useStoreReview } from "@/utils/useStoreReview"
@@ -277,6 +278,7 @@ export function GameSummaryScreen({
         onRightPress={
           shareable
             ? () => {
+                captureAnalytics("recap_share_tapped", {})
                 setShareFailed(false)
                 setSharing(true)
               }

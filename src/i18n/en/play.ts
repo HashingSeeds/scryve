@@ -274,6 +274,30 @@ const play = {
       // Read aloud for a player's life line: where their counter started and ended, like "40 life to 28 life".
       lifeLine: "{{from}} to {{to}}",
     },
+    // The image a player shares after a game. Player names stay as written.
+    receipt: {
+      // {{names}} is one or more winners already joined, as in "Ana and Ben". {{value}} is their final total with its unit, like "3 life" or "800 Life Points".
+      claim: "{{names}} won at {{value}}",
+      // Short turn stamp before one fact from the game log, like "T9 Ana took 9". T stands for turn.
+      onTurn: "T{{turn}} {{event}}",
+      // {{source}} dealt {{count}} commander damage to {{name}} in one go. Kept short.
+      // ar: {{count}} is the damage dealt, not a number of hits: "{{source}} أصاب {{name}} بـ{{count}}" in every form. Never ضربة or ضربتان.
+      hit_one: "{{source}} hit {{name}} for {{count}}",
+      hit_other: "{{source}} hit {{name}} for {{count}}",
+      // {{name}} lost {{count}} life in one go. Kept short.
+      // ja: Life lost, not damage: "{{name}}のライフが{{count}}減少". Never ダメージ.
+      took_one: "{{name}} took {{count}}",
+      took_other: "{{name}} took {{count}}",
+      // {{count}} is how many players {{names}} lists.
+      wins_one: "{{names}} wins",
+      wins_other: "{{names}} win",
+      // Under a player's total: the turn they were knocked out. T stands for turn.
+      outTurn: "T{{turn}}",
+      // Text sent with the image. {{claim}} is a sentence like "Ana won at 3 life", {{players}} everyone at the table, {{format}} a format like "Commander".
+      caption: "{{claim}}. {{players}}, {{format}}.",
+      // Same as the caption, plus the turn the game ended on.
+      captionOnTurn: "{{claim}}. {{players}}, {{format}}, turn {{turn}}.",
+    },
     helpPrompt: "Having trouble?",
     openHelp: "Open Support",
     dismiss: "Dismiss",

@@ -3,7 +3,10 @@ const mockPlatform = { OS: "ios" }
 const mockShare = jest.fn(async () => ({ action: "sharedAction" }))
 const mockShareAsync = jest.fn(async () => undefined)
 
-jest.mock("react-native", () => ({ Platform: mockPlatform, Share: { share: mockShare } }))
+jest.mock("react-native", () => ({
+  Platform: mockPlatform,
+  Share: { share: mockShare, sharedAction: "sharedAction", dismissedAction: "dismissedAction" },
+}))
 jest.mock("expo", () => ({ requireOptionalNativeModule: () => mockSharingModule }))
 jest.mock("expo-sharing", () => {
   if (!mockSharingModule) throw new Error("Cannot find native module 'ExpoSharing'")
@@ -35,24 +38,29 @@ describe("shareImage", () => {
     expect(loadShareImage("android", false).canShareImage).toBe(false)
   })
 
-  it("shares the PNG through expo-sharing where the module exists", async () => {
+  it("shares the PNG through expo-sharing on Android, which does not report the outcome", async () => {
     const { canShareImage, shareImage } = loadShareImage("android", true)
 
-    await shareImage("aGk=", "recap.png")
+    await expect(shareImage("aGk=", "recap.png", "Bea won at 3 life.")).resolves.toBe("unreported")
 
     expect(canShareImage).toBe(true)
     expect(mockShareAsync).toHaveBeenCalledWith("file:///cache/recap.png", {
       mimeType: "image/png",
-      UTI: "public.png",
     })
   })
 
-  it("shares through React Native on an older iOS binary", async () => {
-    const { canShareImage, shareImage } = loadShareImage("ios", false)
+  it("sends the caption with the PNG on iOS and reports whether it was shared", async () => {
+    const { canShareImage, shareImage } = loadShareImage("ios", true)
 
-    await shareImage("aGk=", "recap.png")
+    await expect(shareImage("aGk=", "recap.png", "Bea won at 3 life.")).resolves.toBe("shared")
+    mockShare.mockResolvedValueOnce({ action: "dismissedAction" })
+    await expect(shareImage("aGk=", "recap.png", "Bea won at 3 life.")).resolves.toBe("dismissed")
 
     expect(canShareImage).toBe(true)
-    expect(mockShare).toHaveBeenCalledWith({ url: "file:///cache/recap.png" })
+    expect(mockShare).toHaveBeenCalledWith({
+      url: "file:///cache/recap.png",
+      message: "Bea won at 3 life.",
+    })
+    expect(mockShareAsync).not.toHaveBeenCalled()
   })
 })
