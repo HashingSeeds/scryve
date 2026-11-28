@@ -46,6 +46,7 @@ type PreconstructedDeck = {
   fileName: string
   name: string
   code?: string
+  setName?: string
   releaseDate?: string
   type?: string
 }
@@ -84,6 +85,7 @@ const preconDeckValidator = v.object({
   fileName: v.string(),
   name: v.string(),
   code: v.optional(v.string()),
+  setName: v.optional(v.string()),
   releaseDate: v.optional(v.string()),
   type: v.optional(v.string()),
 })
@@ -355,13 +357,18 @@ export function parsePastedDeckList(list: string) {
   return readPastedDeckList(list)
 }
 
-function preconFromValue(value: unknown): PreconstructedDeck | null {
+function preconFromValue(
+  value: unknown,
+  setNames: ReadonlyMap<string, string>,
+): PreconstructedDeck | null {
   const deck = objectRecord(value)
   if (!deck || typeof deck.fileName !== "string" || typeof deck.name !== "string") return null
+  const setName = typeof deck.code === "string" ? setNames.get(deck.code) : undefined
   return {
     fileName: deck.fileName,
     name: deck.name,
     ...(typeof deck.code === "string" ? { code: deck.code } : {}),
+    ...(setName ? { setName } : {}),
     ...(typeof deck.releaseDate === "string" ? { releaseDate: deck.releaseDate } : {}),
     ...(typeof deck.type === "string" ? { type: deck.type } : {}),
   }
@@ -388,7 +395,18 @@ export function mtgJsonIdentity(format: string, payload: unknown) {
       return [{ name: card.name, board, ...(colors ? { colorIdentity: colors.join("") } : {}) }]
     }),
   )
-  return magicDeckIdentity(format, cards).identityColors
+  return magicDeckIdentity(format, cards)
+}
+
+// why: MTGJSON names deck files `<Name>_<SET>`, so the set code comes from the file name.
+function preconSearchText(row: {
+  externalId: string
+  setName?: string
+  commanderNames?: string[]
+}) {
+  return [row.externalId.split("_").at(-1), row.setName, ...(row.commanderNames ?? [])]
+    .filter(Boolean)
+    .join(" ")
 }
 
 function mtgJsonEntries(payload: unknown) {
@@ -707,7 +725,7 @@ export const syncPreconRows = internalMutation({
         name: deck.name,
         format: preconstructedFormat(deck.type),
         ...(Number.isNaN(publishedAt) ? {} : { publishedAt }),
-        ...(deck.code ? { setCode: deck.code } : {}),
+        ...(deck.setName ? { setName: deck.setName } : {}),
       }
       const existing = await ctx.db
         .query("deckCatalogs")
@@ -715,17 +733,21 @@ export const syncPreconRows = internalMutation({
           q.eq("game", row.game).eq("source", row.source).eq("externalId", row.externalId),
         )
         .unique()
-      if (!existing) await ctx.db.insert("deckCatalogs", { ...row, fetchedAt: catalog.fetchedAt })
+      const searchText = preconSearchText({ ...row, commanderNames: existing?.commanderNames })
+      if (!existing)
+        await ctx.db.insert("deckCatalogs", { ...row, searchText, fetchedAt: catalog.fetchedAt })
       else if (
         existing.name !== row.name ||
         existing.format !== row.format ||
         existing.publishedAt !== row.publishedAt ||
-        existing.setCode !== row.setCode
+        existing.setName !== row.setName ||
+        existing.searchText !== searchText
       )
         await ctx.db.patch(existing._id, {
           ...row,
           publishedAt: row.publishedAt,
-          setCode: row.setCode,
+          setName: row.setName,
+          searchText,
         })
     }
     if (offset + PRECON_ROW_BATCH < decks.length)
@@ -746,8 +768,10 @@ export const preconIdentityPage = internalQuery({
       )
       .paginate({ cursor, numItems: PRECON_IDENTITY_PAGE })
     return {
-      missing: page.page.flatMap(({ _id, externalId, format, identityColors }) =>
-        identityColors === undefined && hasCommandZone(DEFAULT_DECK_GAME, format) && format
+      missing: page.page.flatMap(({ _id, externalId, format, identityColors, commanderNames }) =>
+        (identityColors === undefined || commanderNames === undefined) &&
+        hasCommandZone(DEFAULT_DECK_GAME, format) &&
+        format
           ? [{ id: _id, fileName: externalId, format }]
           : [],
       ),
@@ -757,15 +781,20 @@ export const preconIdentityPage = internalQuery({
 })
 
 export const storePreconIdentity = internalMutation({
-  args: { id: v.id("deckCatalogs"), identityColors: v.array(v.string()) },
-  handler: async (ctx, { id, identityColors }) => {
+  args: {
+    id: v.id("deckCatalogs"),
+    identityColors: v.optional(v.array(v.string())),
+    commanderNames: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { id, ...identity }) => {
     const row = await ctx.db.get(id)
-    if (row && row.identityColors === undefined) await ctx.db.patch(id, { identityColors })
+    if (row)
+      await ctx.db.patch(id, { ...identity, searchText: preconSearchText({ ...row, ...identity }) })
     return null
   },
 })
 
-/** why: MTGJSON's deck list has no colors, so each command-zone precon's file is read once; failed fetches retry on the next refresh. */
+/** why: MTGJSON's deck list has no colors or commanders, so each command-zone precon's file is read once; failed fetches retry on the next refresh. */
 export const fillPreconIdentity = internalAction({
   args: { cursor: v.union(v.string(), v.null()) },
   handler: async (ctx, { cursor }): Promise<null> => {
@@ -774,18 +803,12 @@ export const fillPreconIdentity = internalAction({
       cursor: string | null
     } = await ctx.runQuery(internal.deckImports.preconIdentityPage, { cursor })
     for (const row of page.missing) {
-      const identityColors = await fetchMtgJsonDeck(
-        ctx,
-        withPreconstructedExtension(row.fileName),
-      ).then(
+      const identity = await fetchMtgJsonDeck(ctx, withPreconstructedExtension(row.fileName)).then(
         (payload) => mtgJsonIdentity(row.format, payload),
         () => undefined,
       )
-      if (identityColors)
-        await ctx.runMutation(internal.deckImports.storePreconIdentity, {
-          id: row.id,
-          identityColors,
-        })
+      if (identity?.identityColors || identity?.commanderNames)
+        await ctx.runMutation(internal.deckImports.storePreconIdentity, { id: row.id, ...identity })
     }
     if (page.cursor !== null)
       await ctx.scheduler.runAfter(0, internal.deckImports.fillPreconIdentity, {
@@ -814,10 +837,29 @@ export async function ensurePreconRows(ctx: ActionCtx) {
   await ctx.runMutation(internal.deckImports.startPreconRowSync, {})
 }
 
-async function fetchPreconCatalog() {
-  const response = await fetch(`${MTGJSON_BASE_URL}/DeckList.json`, {
+// why: set names only add search terms, so a failed set list still refreshes the decks.
+async function fetchSetNames() {
+  const envelope: unknown = await fetch(`${MTGJSON_BASE_URL}/SetList.json`, {
     signal: AbortSignal.timeout(10_000),
   })
+    .then((response) => (response.ok ? response.json() : undefined))
+    .catch(() => undefined)
+  const sets = objectRecord(envelope)?.data
+  return new Map(
+    (Array.isArray(sets) ? sets : []).flatMap((value) => {
+      const set = objectRecord(value)
+      return typeof set?.code === "string" && typeof set.name === "string"
+        ? [[set.code, set.name] as const]
+        : []
+    }),
+  )
+}
+
+async function fetchPreconCatalog() {
+  const [response, setNames] = await Promise.all([
+    fetch(`${MTGJSON_BASE_URL}/DeckList.json`, { signal: AbortSignal.timeout(10_000) }),
+    fetchSetNames(),
+  ])
   if (!response.ok)
     throw new ConvexError({
       code: "precon_search_unavailable",
@@ -826,7 +868,7 @@ async function fetchPreconCatalog() {
   const envelope = objectRecord((await response.json()) as unknown)
   const data = Array.isArray(envelope?.data) ? envelope.data : []
   return data
-    .map(preconFromValue)
+    .map((value) => preconFromValue(value, setNames))
     .filter((deck): deck is PreconstructedDeck => deck !== null)
     .slice(0, MAX_PRECON_CATALOG)
 }

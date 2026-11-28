@@ -787,8 +787,38 @@ describe("Browse list", () => {
     }
   })
 
-  it("finds Magic precons in Browse by their set code, including rows synced before it was stored", async () => {
+  it("finds a Magic precon in Browse by set code, set name, or commander, including rows synced before search text", async () => {
     jest.useFakeTimers()
+    const files: Record<string, unknown> = {
+      "DeckList.json": [
+        {
+          fileName: "NecronDynasties_40K",
+          name: "Necron Dynasties",
+          code: "40K",
+          type: "Commander Deck",
+          releaseDate: "2022-10-07",
+        },
+        {
+          fileName: "Old_C16",
+          name: "Old Commander",
+          code: "C16",
+          type: "Commander Deck",
+          releaseDate: "2016-11-11",
+        },
+      ],
+      "SetList.json": [
+        { code: "40K", name: "Warhammer 40,000 Commander" },
+        { code: "C16", name: "Commander 2016" },
+      ],
+      "NecronDynasties_40K.json": {
+        commander: [{ name: "Szarekh, the Silent King", colorIdentity: ["B"] }],
+      },
+      "Old_C16.json": { commander: [{ name: "Atraxa, Praetors' Voice", colorIdentity: ["W"] }] },
+    }
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+      const file = String(input).split("/").pop() ?? ""
+      return new Response(JSON.stringify({ data: files[file] }), { status: 200 })
+    })
     try {
       const t = makeConvexTest()
       const stored = await t.run(
@@ -796,40 +826,28 @@ describe("Browse list", () => {
           await ctx.db.insert("deckCatalogs", {
             game: "mtg",
             source: "mtgjson",
-            externalId: "ForcesOfTheImperium_40K",
+            externalId: "NecronDynasties_40K",
             kind: "official",
-            name: "Forces of the Imperium",
+            name: "Necron Dynasties",
             format: "commander",
             publishedAt: Date.parse("2022-10-07"),
+            identityColors: ["B"],
             fetchedAt: 1,
           }),
       )
-      await t.mutation(internal.deckImports.storeCatalog, {
-        decks: [
-          {
-            fileName: "ForcesOfTheImperium_40K",
-            name: "Forces of the Imperium",
-            code: "40K",
-            type: "Commander Deck",
-            releaseDate: "2022-10-07",
-          },
-          {
-            fileName: "Old_C16",
-            name: "Old Commander",
-            code: "C16",
-            type: "Commander Deck",
-            releaseDate: "2016-11-11",
-          },
-        ],
-      })
+      await t.action(internal.deckImports.refreshCatalog, {})
       await t.finishAllScheduledFunctions(() => jest.runAllTimers())
-      const searched = await t.query(api.deckCatalogs.list, {
-        game: "mtg",
-        format: "commander",
-        query: "40k",
-      })
-      expect(searched.map((deck) => deck._id)).toEqual([stored])
+      jest.useRealTimers()
+      await t.action(internal.deckImports.fillPreconIdentity, { cursor: null })
+      const search = async (query: string) =>
+        (await t.query(api.deckCatalogs.list, { game: "mtg", format: "commander", query })).map(
+          (deck) => deck._id,
+        )
+      expect(await search("40k")).toEqual([stored])
+      expect(await search("warhammer")).toEqual([stored])
+      expect(await search("szarekh")).toEqual([stored])
     } finally {
+      fetchSpy.mockRestore()
       jest.useRealTimers()
     }
   })

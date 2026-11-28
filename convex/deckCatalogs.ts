@@ -151,15 +151,15 @@ export const list = query({
       .filter((q) => (identity ? q.eq(q.field("identityColors"), identity) : true))
       .take(BROWSE_LIMIT)
     if (!term || byName.length === BROWSE_LIMIT) return byName
-    const bySetCode = await ctx.db
+    const byText = await ctx.db
       .query("deckCatalogs")
-      .withSearchIndex("search_set_code_by_format", (search) =>
-        search.search("setCode", term).eq("game", game).eq("format", format),
+      .withSearchIndex("search_text_by_format", (search) =>
+        search.search("searchText", term).eq("game", game).eq("format", format),
       )
       .filter((q) => (identity ? q.eq(q.field("identityColors"), identity) : true))
       .take(BROWSE_LIMIT)
     const named = new Set(byName.map((deck) => deck._id))
-    return [...byName, ...bySetCode.filter((deck) => !named.has(deck._id))].slice(0, BROWSE_LIMIT)
+    return [...byName, ...byText.filter((deck) => !named.has(deck._id))].slice(0, BROWSE_LIMIT)
   },
 })
 
