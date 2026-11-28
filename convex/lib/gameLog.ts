@@ -57,7 +57,7 @@ export interface TurnStart {
   at: number
 }
 
-// why: the table keeps only the current turn, so earlier turn numbers are counted back from it over the passes still standing.
+// why: the table keeps only the current turn, so earlier turn numbers are counted back from it over the passes still standing. A turn handed to another seat keeps a start for each hand-off.
 export function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): TurnStart[] {
   if (!turn) return []
   const undone = new Set(
@@ -86,13 +86,12 @@ export function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undef
     if (number < 1) break
     const { action } = event
     if (action?.kind !== "turn.passed" && action?.kind !== "turn.set") continue
-    if (entries.at(-1)?.number !== number)
-      entries.push({
-        operationId: event.operationId,
-        playerId: action.toPlayerId,
-        number,
-        at: event.clientCreatedAt,
-      })
+    entries.push({
+      operationId: event.operationId,
+      playerId: action.toPlayerId,
+      number,
+      at: event.clientCreatedAt,
+    })
     firstPasser = action.kind === "turn.passed" ? action.playerId : undefined
     if (action.kind === "turn.passed") number -= 1
   }

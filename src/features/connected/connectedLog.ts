@@ -134,10 +134,12 @@ export function connectedLogInputs(
   })
   return {
     events: lifeEvents,
-    turns: turnLog(events, turn).map((entry) => ({
-      ...entry,
-      playerId: asPlayerId(entry.playerId),
-    })),
+    // why: the log draws one divider per turn, at the seat it was last handed to.
+    turns: turnLog(events, turn).flatMap((entry, index, all) =>
+      all[index + 1]?.number === entry.number
+        ? []
+        : [{ ...entry, playerId: asPlayerId(entry.playerId) }],
+    ),
     counters: counterLog(events, table),
   }
 }

@@ -4,6 +4,7 @@ import { translate } from "@/i18n/translate"
 
 import type { GameSummaryModel, SummaryPlayer } from "./gameSummary"
 import { playedFor, recapHeadline, recapOut, standings } from "./gameSummary"
+import { MAX_RECAP_ROWS } from "../../convex/lib/gameRecap"
 
 export interface ReceiptSeat {
   player: SummaryPlayer
@@ -42,15 +43,16 @@ export function recapReceipt(model: GameSummaryModel): Receipt {
   const onTurn = (turn: number | undefined, event: string) =>
     turn === undefined ? event : translate("play:summary.receipt.onTurn", { turn, event })
   const step = low ? steps?.[low.row - 1] : undefined
+  // why: thinned rows fold several changes, so their difference was never one hit.
   const hit =
-    low && lives
+    low && lives && (steps || lives.length < MAX_RECAP_ROWS)
       ? {
           name: nameAt(step?.seat ?? low.column),
           count: lives[low.row - 1][low.column] - lives[low.row][low.column],
         }
       : undefined
   const line =
-    lead && lives && !model.logged
+    lead && !model.logged
       ? joinParts([
           hit
             ? onTurn(

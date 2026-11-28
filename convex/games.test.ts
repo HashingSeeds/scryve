@@ -3726,7 +3726,7 @@ describe("finished game recap", () => {
     ])
   })
 
-  it("stores each seat's life over the game, with the turn and commander behind each change", async () => {
+  it("stores each seat's life over the game, with the turn and commander behind each change, even when the turn is handed on", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t, { system: "mtg", ruleset: "commander", startingLife: 40 })
     const joinerLife = (operationId: string, delta: number) =>
@@ -3764,6 +3764,14 @@ describe("finished game recap", () => {
       fromPlayerId: game.hostPlayerId,
       toPlayerId: game.joinerPlayerId,
       delta: 21,
+    })
+    await game.joiner.mutation(api.games.tableAction, {
+      ...tableArgs(game.publicId, "operation-turn-0003", {
+        kind: "turn.set",
+        playerId: game.joinerPlayerId,
+        toPlayerId: game.hostPlayerId,
+      }),
+      deviceId: "device-joiner-001",
     })
     await game.host.mutation(api.games.finishGame, {
       publicId: game.publicId,

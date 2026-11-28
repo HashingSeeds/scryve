@@ -128,6 +128,10 @@ describe("recapReceipt", () => {
     }
   })
 
+  it("still names the winner and the turn when nobody's life changed", () => {
+    expect(receiptOf([]).line).toBe("T11 Bea wins")
+  })
+
   it("reads a recap stored before it kept turns and sources as plain changes", () => {
     const receipt = receiptOf(BEA_WINS_AT_3, TURNS, (recap) =>
       recap?.lives ? { lives: recap.lives, ...(recap.outs ? { outs: recap.outs } : {}) } : recap,
