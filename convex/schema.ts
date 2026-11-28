@@ -584,6 +584,10 @@ export default defineSchema({
     publishedAt: v.optional(v.number()),
     fetchedAt: v.number(),
     identityColors: v.optional(v.array(v.string())),
+    setName: v.optional(v.string()),
+    commanderNames: v.optional(v.array(v.string())),
+    // why: precon set code, set name, and commanders in one field, so Browse finds "40k", "warhammer" or "szarekh".
+    searchText: v.optional(v.string()),
   })
     .index("by_game_and_source_and_external_id", ["game", "source", "externalId"])
     .index("by_game_and_fetched_at", ["game", "fetchedAt"])
@@ -594,6 +598,10 @@ export default defineSchema({
     .searchIndex("search_name_by_format", {
       searchField: "name",
       filterFields: ["game", "format", "kind"],
+    })
+    .searchIndex("search_text_by_format", {
+      searchField: "searchText",
+      filterFields: ["game", "format"],
     }),
 
   deckCatalogCards: defineTable({
@@ -770,6 +778,7 @@ export default defineSchema({
         fileName: v.string(),
         name: v.string(),
         code: v.optional(v.string()),
+        setName: v.optional(v.string()),
         releaseDate: v.optional(v.string()),
         type: v.optional(v.string()),
       }),

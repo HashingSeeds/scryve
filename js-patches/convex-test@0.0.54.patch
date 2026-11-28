@@ -1,8 +1,18 @@
 diff --git a/dist/index.js b/dist/index.js
-index 4aaed44325732f08b6fa1857011e68e10134f9c9..7852dfe23e4a034a2aa4638fd2d538f02da0c1bd 100644
+index 4aaed44325732f08b6fa1857011e68e10134f9c9..3fd40928eb9e1947ac723bd6db2e62d394b263ba 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -1851,7 +1851,11 @@ function withAuth(auth = authStorage.getStore() ?? new AuthFake()) {
+@@ -674,6 +674,9 @@ function evaluateSearchFilter(document, filter) {
+         case "Eq":
+             return compareValues(result, evaluateValue(filter.value)) === 0;
+         case "Search": {
++            if (typeof result !== "string") {
++                return false;
++            }
+             const queryTerms = filter.value
+                 .toLowerCase()
+                 .split(/\s+/)
+@@ -1851,7 +1854,11 @@ function withAuth(auth = authStorage.getStore() ?? new AuthFake()) {
                      // it is not faked by vitest and not removed by edge-runtime.
                      await new Promise((r) => {
                          const { port1, port2 } = new MessageChannel();

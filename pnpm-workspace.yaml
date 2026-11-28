@@ -15,7 +15,8 @@ onlyBuiltDependencies:
   - esbuild
   - unrs-resolver
 
-# convex-test 0.0.54 leaves its event-loop MessagePorts open after scheduled functions finish.
+# convex-test 0.0.54 leaves its event-loop MessagePorts open after scheduled functions finish, and
+# crashes a search on rows missing the search field (fixed upstream by 0.0.75).
 patchedDependencies:
   convex-test@0.0.54: js-patches/convex-test@0.0.54.patch
   # convex 1.42.3 adds performance.now() to Date.now() for its clock, but React Native counts

@@ -547,6 +547,9 @@ describe("generic deck resolution", () => {
   })
 })
 
+const deckListFetches = (fetchSpy: jest.SpyInstance) =>
+  fetchSpy.mock.calls.filter(([input]) => String(input).endsWith("DeckList.json")).length
+
 describe("preconstructed catalog caching", () => {
   it("returns a warmed catalog without waiting for an expired provider refresh", async () => {
     jest.useFakeTimers()
@@ -560,7 +563,7 @@ describe("preconstructed catalog caching", () => {
       expect(result).toMatchObject([{ name: "Atraxa Infect" }])
       expect(fetchSpy).not.toHaveBeenCalled()
       await t.finishAllScheduledFunctions(() => jest.runAllTimers())
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(deckListFetches(fetchSpy)).toBe(1)
     } finally {
       fetchSpy.mockRestore()
       jest.useRealTimers()
@@ -574,7 +577,7 @@ describe("preconstructed catalog caching", () => {
       const actor = t.withIdentity({ subject: "precon-searcher" })
       const first = await actor.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
       const guest = await t.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(deckListFetches(fetchSpy)).toBe(1)
       expect(first).toMatchObject([{ fileName: "AtraxaInfect", name: "Atraxa Infect" }])
       expect(guest).toEqual(first)
     } finally {

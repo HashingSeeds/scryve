@@ -144,10 +144,22 @@ export const list = query({
     const format = assertDeckGameFormat(game, args.format)
     const term = args.query.trim()
     if (term.length > 120) return []
-    const rows = catalogQuery(ctx, { game, format, query: term })
-    if (!args.colors?.length) return await rows.take(BROWSE_LIMIT)
-    const identity = IDENTITY_COLORS.filter((color) => args.colors?.includes(color))
-    return await rows.filter((q) => q.eq(q.field("identityColors"), identity)).take(BROWSE_LIMIT)
+    const identity = args.colors?.length
+      ? IDENTITY_COLORS.filter((color) => args.colors?.includes(color))
+      : undefined
+    const byName = await catalogQuery(ctx, { game, format, query: term })
+      .filter((q) => (identity ? q.eq(q.field("identityColors"), identity) : true))
+      .take(BROWSE_LIMIT)
+    if (!term || byName.length === BROWSE_LIMIT) return byName
+    const byText = await ctx.db
+      .query("deckCatalogs")
+      .withSearchIndex("search_text_by_format", (search) =>
+        search.search("searchText", term).eq("game", game).eq("format", format),
+      )
+      .filter((q) => (identity ? q.eq(q.field("identityColors"), identity) : true))
+      .take(BROWSE_LIMIT)
+    const named = new Set(byName.map((deck) => deck._id))
+    return [...byName, ...byText.filter((deck) => !named.has(deck._id))].slice(0, BROWSE_LIMIT)
   },
 })
 
@@ -619,6 +631,7 @@ export const refreshScheduled = internalAction({
     if (env.CARD_CATALOG_SYNC === "off") return null
     if (await actionCapabilityEnabled(ctx, "mtg", "exampleDecks")) {
       await ctx.runMutation(internal.deckCatalogs.seedMagicExamples, {})
+      await ctx.runMutation(internal.deckImports.requestCatalogRefresh, {})
       await ctx.scheduler.runAfter(0, internal.deckImports.fillPreconIdentity, { cursor: null })
     }
     for (const game of GAME_SYSTEM_IDS.filter(isProviderGame)) {
