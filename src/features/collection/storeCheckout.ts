@@ -13,7 +13,6 @@ export type CheckoutProblem = "unknown_card" | "not_sold"
 export type CheckoutLine = {
   item: DeckOwnershipItem
   problem?: CheckoutProblem
-  unitCents?: number
 }
 
 export type StoreCheckout = {
@@ -72,7 +71,7 @@ export function planStoreCheckout(
     if (all.length === 0) return { item, problem: "unknown_card" }
     const listed = all.filter(sold)
     if (listed.length === 0) return { item, problem: "not_sold" }
-    const pinned = chosen && sold(chosen) ? chosen : undefined
+    const pinned = store === "tcgplayer" && chosen && sold(chosen) ? chosen : undefined
     const priced = (pinned ? [pinned] : listed).flatMap(
       (printing) => storePrice(prices.get(printing.printingId), store) ?? [],
     )
@@ -80,7 +79,7 @@ export function planStoreCheckout(
     cart.push({ name: item.name, setCode: pinned?.setCode, quantity: item.missing })
     if (unitCents === undefined) unpricedCount += 1
     else totalCents += unitCents * item.missing
-    return { item, unitCents }
+    return { item }
   })
 
   const cardCount = cart.reduce((sum, card) => sum + (card.quantity ?? 0), 0)

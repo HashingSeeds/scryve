@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 
@@ -41,6 +41,8 @@ export function StoreCheckoutSheet({
 }) {
   const { themed } = useAppTheme()
   const [store, setStore] = useState<Store>("tcgplayer")
+  // why: iOS can't present the card's sheet while this one is still dismissing, so the card opens once this one is gone.
+  const cardToOpen = useRef<DeckCard>(undefined)
   const plans = useMemo(
     () => (visible ? STORE_IDS.map((id) => planStoreCheckout(game, items, id)) : []),
     [visible, game, items],
@@ -49,7 +51,16 @@ export function StoreCheckoutSheet({
   const problems = plan?.lines.filter((line) => line.problem) ?? []
 
   return (
-    <Sheet visible={visible} onClose={onClose} testID="store-checkout-sheet">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      onDismissed={() => {
+        const card = cardToOpen.current
+        cardToOpen.current = undefined
+        if (card) onOpenCard(card)
+      }}
+      testID="store-checkout-sheet"
+    >
       <View style={themed($container)}>
         <Text preset="subheading" tx="decks:collection.buyMissing" />
         <View style={themed($stores)}>
@@ -77,8 +88,8 @@ export function StoreCheckoutSheet({
                 accessibilityHint={translate("decks:checkout.openCard")}
                 style={themed($problem)}
                 onPress={() => {
+                  cardToOpen.current = item.card
                   onClose()
-                  onOpenCard(item.card)
                 }}
               >
                 <Text weight="medium" numberOfLines={1} style={$name} text={item.name} />

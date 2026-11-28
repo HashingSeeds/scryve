@@ -103,6 +103,17 @@ describe("planStoreCheckout", () => {
     expect(new URL(plan.url ?? "").searchParams.get("c")).toBe("1 Sol Ring\n1 A-Digital Card")
   })
 
+  it("prices Card Kingdom at its cheapest printing, since its builder gets only the name", () => {
+    catalogDb.replacePrices("mtg", [
+      price("sol-cmm", "cardkingdom", 900),
+      price("sol-c21", "cardkingdom", 250),
+    ])
+    const { items } = computeDeckOwnership("mtg", [
+      { name: "Sol Ring", oracleId: "ora-sol", scryfallId: "sol-cmm", quantity: 1 },
+    ])
+    expect(planStoreCheckout("mtg", items, "cardkingdom").totalCents).toBe(250)
+  })
+
   it("has no cart when the store can sell none of the missing cards", () => {
     const { items } = computeDeckOwnership("mtg", [{ name: "Sol Rnig", quantity: 1 }])
     expect(planStoreCheckout("mtg", items, "tcgplayer").url).toBeUndefined()

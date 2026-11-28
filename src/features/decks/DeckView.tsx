@@ -20,6 +20,7 @@ import { formatName, gameName, localizedDeckSections } from "@/features/game/pla
 import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { formatCurrency, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
+import { catalogDb } from "@/storage/catalogDb"
 import { useAppTheme } from "@/theme/context"
 import { radius } from "@/theme/radius"
 import type { ThemedStyle } from "@/theme/types"
@@ -182,6 +183,10 @@ export function DeckView({
     if (!showOwnership) return undefined
     return computeDeckOwnership(game, shownCards)
   }, [catalogSync.version, collectionRevision, game, showOwnership, shownCards])
+  const catalogReady = useMemo(() => {
+    void catalogSync.version
+    return showOwnership && catalogDb.hasPrintings(game) && catalogDb.hasPrices(game)
+  }, [catalogSync.version, game, showOwnership])
   const issues = useDeckIssues(game, format, shownCards)
   const side = sideboardSection({ game, format })
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
@@ -299,7 +304,7 @@ export function DeckView({
                     }
                   />
                 </View>
-                {ownership.missingCards > 0 && catalogSync.supported ? (
+                {ownership.missingCards > 0 && catalogReady ? (
                   <Button
                     testID="deck-buy-missing"
                     tx="decks:collection.buyMissing"

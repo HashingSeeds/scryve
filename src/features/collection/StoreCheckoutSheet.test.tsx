@@ -1,5 +1,5 @@
 import { Linking } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { catalogDb } from "@/storage/catalogDb"
 import { localCardDb } from "@/storage/localDb"
@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/theme/context"
 import { computeDeckOwnership } from "./deckOwnership"
 import { StoreCheckoutSheet } from "./StoreCheckoutSheet"
 
-test("a card the store lacks opens in the deck, and the cart opens at the chosen store", () => {
+test("a card the store lacks opens in the deck once the sheet closes, and the cart opens at the chosen store", async () => {
   localCardDb.clearAll()
   catalogDb.clearAll()
   catalogDb.replacePrintings(
@@ -60,8 +60,23 @@ test("a card the store lacks opens in the deck, and the cart opens at the chosen
   expect(screen.getByText("Not sold at TCGplayer")).toBeTruthy()
   expect(screen.getByTestId("store-checkout-open")).toBeDisabled()
 
+  const sheet = (visible: boolean) => (
+    <ThemeProvider>
+      <StoreCheckoutSheet
+        visible={visible}
+        game="mtg"
+        items={items}
+        onOpenCard={onOpenCard}
+        onClose={onClose}
+      />
+    </ThemeProvider>
+  )
   fireEvent.press(screen.getByTestId("store-checkout-problem-name:sol rnig"))
-  expect(onOpenCard).toHaveBeenCalledWith(typo)
+  expect(onClose).toHaveBeenCalled()
+  expect(onOpenCard).not.toHaveBeenCalled()
+  screen.rerender(sheet(false))
+  await waitFor(() => expect(onOpenCard).toHaveBeenCalledWith(typo))
+  screen.rerender(sheet(true))
 
   fireEvent.press(screen.getByTestId("store-checkout-cardkingdom"))
   expect(screen.queryByText("Not sold at Card Kingdom")).toBeNull()
