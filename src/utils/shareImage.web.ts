@@ -1,4 +1,4 @@
-import type { ShareOutcome } from "./shareImage"
+type ShareOutcome = "shared" | "dismissed" | "unreported"
 
 export const canShareImage = true
 
