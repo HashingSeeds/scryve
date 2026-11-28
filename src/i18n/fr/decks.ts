@@ -544,9 +544,12 @@ export default {
   },
   checkout: {
     totalUnpriced: "{{total}} + {{count}} sans prix",
-    notSold: "Non vendue chez {{store}}",
+    notSold: "Indisponible chez {{store}}",
     unknownCard: "Aucune carte à ce nom",
     openCard: "Ouvre la carte dans le deck",
+    beforeShipping: "Hors frais de port",
+    pricesFrom: "Prix du {{date}}",
+    optimize: "Optimisez le panier {{store}} pour ce total",
     open_one: "Ouvrir {{store}} avec {{count}} carte",
     open_many: "Ouvrir {{store}} avec {{count}} de cartes",
     open_other: "Ouvrir {{store}} avec {{count}} cartes",

@@ -509,9 +509,12 @@ export default {
   },
   checkout: {
     totalUnpriced: "{{total}} + 価格なし{{count}}枚",
-    notSold: "{{store}}では販売されていません",
+    notSold: "{{store}}では購入できません",
     unknownCard: "この名前のカードはありません",
     openCard: "デッキ内でカードを開きます",
+    beforeShipping: "送料別",
+    pricesFrom: "{{date}}時点の価格",
+    optimize: "この合計金額になるよう{{store}}のカートを最適化する",
     open_other: "{{store}}を{{count}}枚で開く",
   },
   deckLimit: {

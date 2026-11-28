@@ -505,9 +505,12 @@ export default {
   },
   checkout: {
     totalUnpriced: "{{total}} + 가격 없음 {{count}}개",
-    notSold: "{{store}}에서 판매하지 않음",
+    notSold: "{{store}}에서 구매 불가",
     unknownCard: "이 이름의 카드 없음",
     openCard: "덱에서 카드를 엽니다",
+    beforeShipping: "배송비 제외",
+    pricesFrom: "{{date}} 기준 가격",
+    optimize: "이 합계에 맞게 {{store}} 장바구니 최적화",
     open_other: "카드 {{count}}장으로 {{store}} 열기",
   },
   deckLimit: {

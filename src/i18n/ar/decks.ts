@@ -552,9 +552,12 @@ export default {
   },
   checkout: {
     totalUnpriced: "الإجمالي: {{total}} + بطاقات دون سعر: {{count}}",
-    notSold: "غير متوفرة لدى {{store}}",
+    notSold: "غير متوفر لدى {{store}}",
     unknownCard: "لا توجد بطاقة بهذا الاسم",
     openCard: "يفتح البطاقة داخل المجموعة",
+    beforeShipping: "قبل الشحن",
+    pricesFrom: "الأسعار بتاريخ {{date}}",
+    optimize: "حسّن سلة {{store}} لتطابق هذا الإجمالي",
     open_zero: "فتح {{store}} مع {{count}} بطاقة",
     open_one: "فتح {{store}} مع بطاقة واحدة",
     open_two: "فتح {{store}} مع بطاقتين",

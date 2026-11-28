@@ -619,12 +619,18 @@ const decks = {
   checkout: {
     // A store's total when some cards have no price at that store: "$42.10 + 3 unpriced".
     totalUnpriced: "{{total}} + {{count}} unpriced",
-    // Beside a card the chosen store does not list. {{store}} is TCGplayer or Card Kingdom.
-    notSold: "Not sold at {{store}}",
+    // Beside a card the chosen store does not list or has none of in stock. {{store}} is TCGplayer or Card Kingdom.
+    notSold: "Not available at {{store}}",
     // Beside a card whose name matches no card in the catalog, often a typo from an import.
     unknownCard: "No card by this name",
     // Accessibility hint on a listed card: tapping it closes the sheet and opens the card in the deck.
     openCard: "Opens the card in the deck",
+    // Under the store totals: the totals leave out shipping.
+    beforeShipping: "Before shipping",
+    // Under the store totals: the day the prices were fetched, such as "Prices from Nov 27".
+    pricesFrom: "Prices from {{date}}",
+    // Shown when TCGplayer is chosen: its cart matches the total only after the player optimizes it there. {{store}} is TCGplayer.
+    optimize: "Optimize the {{store}} cart for this total",
     open_one: "Open {{store}} with {{count}} card",
     open_other: "Open {{store}} with {{count}} cards",
   },

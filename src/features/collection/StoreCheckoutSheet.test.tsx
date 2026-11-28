@@ -57,7 +57,10 @@ test("a card the store lacks opens in the deck once the sheet closes, and the ca
     </ThemeProvider>,
   )
 
-  expect(screen.getByText("Not sold at TCGplayer")).toBeTruthy()
+  expect(screen.getByText("Not available at TCGplayer")).toBeTruthy()
+  expect(
+    screen.getByText("Before shipping · Optimize the TCGplayer cart for this total"),
+  ).toBeTruthy()
   expect(screen.getByTestId("store-checkout-open")).toBeDisabled()
 
   const sheet = (visible: boolean) => (
@@ -79,7 +82,8 @@ test("a card the store lacks opens in the deck once the sheet closes, and the ca
   screen.rerender(sheet(true))
 
   fireEvent.press(screen.getByTestId("store-checkout-cardkingdom"))
-  expect(screen.queryByText("Not sold at Card Kingdom")).toBeNull()
+  expect(screen.queryByText("Not available at Card Kingdom")).toBeNull()
+  expect(screen.getByText("Before shipping")).toBeTruthy()
   fireEvent.press(screen.getByText("Open Card Kingdom with 1 card"))
   expect(openURL).toHaveBeenCalledWith(
     expect.stringContaining("cardkingdom.com/builder?c=1+Sol+Ring"),
