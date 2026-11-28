@@ -978,9 +978,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     const choice: LayoutChoice = {
       playerCount: cellCount,
       layout: layoutVariant,
-      ...(layoutChoice?.playerCount === cellCount && chosenSeats
-        ? { slotPlayerIds: chosenSeats }
-        : {}),
+      ...(seatOrder ? { slotPlayerIds: chosenSeats } : {}),
       ...change,
     }
     setLayoutChoice(choice)
