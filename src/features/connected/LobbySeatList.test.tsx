@@ -424,6 +424,33 @@ describe("a seat with more than two decks", () => {
     expect(screen.getByText("Account full.")).toBeTruthy()
   })
 
+  it("shows the device deck that is syncing over one that failed earlier", () => {
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+          openSeats={0}
+          system="mtg"
+          deckState={{ status: "ready", value: decks.slice(0, 2) }}
+          deviceDecks={{
+            decks: [
+              deviceDeck({ error: "Account full." }),
+              deviceDeck({ localId: "local-burn", deckKey: "key-burn", name: "Burn" }),
+            ],
+            syncingLocalId: "local-burn",
+            onSyncAndUse: jest.fn(),
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={jest.fn()}
+          onViewAllDecks={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.getByText("Burn")).toBeTruthy()
+    expect(screen.getByText("Syncing…")).toBeTruthy()
+    expect(screen.queryByText("Calling All Angels")).toBeNull()
+  })
+
   it("keeps the seat's deck in view when it is not one of the two", () => {
     seat({ deckVersionId: "unplayed-v1" })
     expect(screen.getByText("played-last")).toBeTruthy()

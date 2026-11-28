@@ -34,16 +34,12 @@ export function LobbyDeviceDeckSource({
   const { sync } = useLocalDeckSync(user?.id)
   const [syncingLocalId, setSyncingLocalId] = useState<string>()
   const syncingRef = useRef<string>(undefined)
-  const [errors, setErrors] = useState<Readonly<Record<string, string>>>({})
+  const [failure, setFailure] = useState<{ localId: string; error: string }>()
   const [otherAccount, setOtherAccount] = useState<OtherAccount>()
 
   function setSyncing(localId: string | undefined) {
     syncingRef.current = localId
     setSyncingLocalId(localId)
-  }
-
-  function setError(localId: string, error?: string) {
-    setErrors(({ [localId]: _previous, ...rest }) => (error ? { ...rest, [localId]: error } : rest))
   }
 
   async function pickSynced(seat: number, deckId: Id<"decks">) {
@@ -54,21 +50,25 @@ export function LobbyDeviceDeckSource({
   async function syncAndUse(seat: number, localId: string) {
     if (syncingRef.current) return
     setSyncing(localId)
-    setError(localId)
+    setFailure(undefined)
     try {
       const result = await sync(localId)
       // why: once synced, the deck is listed under Account, so a failed pick there is a tap away.
       if (result.status === "synced") await pickSynced(seat, result.deckId).catch(() => undefined)
       else if (result.status === "other_account") setOtherAccount({ seat, result })
       else
-        setError(
+        setFailure({
           localId,
-          result.status === "limit_reached"
-            ? translate("connected:seats.accountFull")
-            : translate(`decks:localSync.${result.status}`),
-        )
+          error:
+            result.status === "limit_reached"
+              ? translate("connected:seats.accountFull")
+              : translate(`decks:localSync.${result.status}`),
+        })
     } catch (cause) {
-      setError(localId, convexErrorMessage(cause, translate("decks:localSync.failed")))
+      setFailure({
+        localId,
+        error: convexErrorMessage(cause, translate("decks:localSync.failed")),
+      })
     } finally {
       setSyncing(undefined)
     }
@@ -91,7 +91,7 @@ export function LobbyDeviceDeckSource({
           name: local.deck.name,
           cardQuantity: local.deck.cards.reduce((total, card) => total + card.quantity, 0),
           syncBlocked,
-          error: errors[local.localId],
+          error: failure?.localId === local.localId ? failure.error : undefined,
         })),
         syncingLocalId,
         onSyncAndUse: (seat, localId) => void syncAndUse(seat, localId),

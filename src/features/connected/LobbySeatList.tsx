@@ -291,8 +291,9 @@ export function LobbySeatList({
         ]
         const pinnedIds = [
           chosenDeck?._id,
-          usableDeviceDecks.find(
-            (deck) => deck.localId === deviceDecks?.syncingLocalId || deck.error,
+          (
+            usableDeviceDecks.find(({ localId }) => localId === deviceDecks?.syncingLocalId) ??
+            usableDeviceDecks.find(({ error }) => error)
           )?.localId,
         ].filter((id) => id !== undefined)
         const shownIds = new Set([...new Set([...pinnedIds, ...rankedIds])].slice(0, SHOWN_DECKS))
