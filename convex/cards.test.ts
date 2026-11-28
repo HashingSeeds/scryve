@@ -86,17 +86,26 @@ describe("card provider caching and health", () => {
   })
 
   it("does not count a queued Scryfall search that a 429 cooldown stops before sending", async () => {
-    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response({}, 429))
+    let answer = () => {}
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation(
+        () => new Promise((resolve) => (answer = () => resolve(response({}, 429)))),
+      )
     const t = makeConvexTest()
-    const results = await Promise.allSettled([
+    const usage = () => t.run((ctx) => ctx.db.query("scryfallUsage").collect())
+    const searches = Promise.allSettled([
       t.action(api.cards.search, { query: "Llanowar Elves" }),
       t.action(api.cards.search, { query: "Shivan Dragon" }),
     ])
+    // why: answer the first search's 429 only once the second holds a slot, so the second is queued, not refused.
+    while (!fetchSpy.mock.calls.length || (await usage())[0]?.requests !== 2)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    answer()
 
-    expect(results.map((result) => result.status)).toEqual(["rejected", "rejected"])
+    expect((await searches).map((result) => result.status)).toEqual(["rejected", "rejected"])
     expect(fetchSpy).toHaveBeenCalledTimes(1)
-    const rows = await t.run((ctx) => ctx.db.query("scryfallUsage").collect())
-    expect(rows).toEqual([
+    expect(await usage()).toEqual([
       expect.objectContaining({ endpoint: "/cards/search", requests: 1, rateLimited: 1 }),
     ])
   })

@@ -85,12 +85,14 @@ async function writeBucket(
   else await ctx.db.insert("externalApiRateLimits", value)
 }
 
+const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10)
+
 async function countScryfallUsage(
   ctx: MutationCtx,
   path: string,
   counts: { requests: number; rateLimited: number },
+  day = utcDay(Date.now()),
 ) {
-  const day = new Date(Date.now()).toISOString().slice(0, 10)
   const endpoint = scryfallEndpoint(path).name
   const existing = await ctx.db
     .query("scryfallUsage")
@@ -115,15 +117,18 @@ export const acquireScryfall = internalMutation({
   args: { path: v.string() },
   handler: async (ctx, { path }) => {
     const now = Date.now()
+    /** why: the request is counted on this day, so a cancel after UTC midnight takes it back from the same row. */
+    const day = utcDay(now)
     const cooldownUntil = (await bucketRow(ctx, "scryfall:cooldown"))?.nextRequestAt ?? 0
-    if (cooldownUntil > now) return { waitMs: cooldownUntil - now, blocked: true }
+    if (cooldownUntil > now) return { waitMs: cooldownUntil - now, blocked: true, day }
 
     const endpoint = scryfallEndpoint(path)
     const endpointRow = await bucketRow(ctx, endpoint.bucket)
     const earliest = Math.max(now, endpointRow?.nextRequestAt ?? now)
     for (let slot = Math.ceil(earliest / GLOBAL_SLOT_MS); ; slot += 1) {
       const requestAt = slot * GLOBAL_SLOT_MS
-      if (requestAt - now > SCRYFALL_MAX_WAIT_MS) return { waitMs: requestAt - now, blocked: true }
+      if (requestAt - now > SCRYFALL_MAX_WAIT_MS)
+        return { waitMs: requestAt - now, blocked: true, day }
       const slotBucket = `scryfall:slot:${slot % GLOBAL_SLOTS}`
       const slotRow = await bucketRow(ctx, slotBucket)
       if (slotRow?.nextRequestAt === requestAt) continue
@@ -132,17 +137,17 @@ export const acquireScryfall = internalMutation({
         bucket: endpoint.bucket,
         nextRequestAt: requestAt + endpoint.intervalMs,
       })
-      await countScryfallUsage(ctx, path, { requests: 1, rateLimited: 0 })
-      return { waitMs: requestAt - now, blocked: false }
+      await countScryfallUsage(ctx, path, { requests: 1, rateLimited: 0 }, day)
+      return { waitMs: requestAt - now, blocked: false, day }
     }
   },
 })
 
 /** why: a queued request that a 429 cooldown stops before sending was counted when it reserved its slot. */
 export const cancelScryfallRequest = internalMutation({
-  args: { path: v.string() },
-  handler: async (ctx, { path }) => {
-    await countScryfallUsage(ctx, path, { requests: -1, rateLimited: 0 })
+  args: { path: v.string(), day: v.string() },
+  handler: async (ctx, { path, day }) => {
+    await countScryfallUsage(ctx, path, { requests: -1, rateLimited: 0 }, day)
     return null
   },
 })

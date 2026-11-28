@@ -49,7 +49,7 @@ export async function fetchScryfall(
   path: string,
   options: ScryfallRequestOptions = {},
 ) {
-  const { waitMs, blocked } = await acquireScryfallSlot(ctx, path)
+  const { waitMs, blocked, day } = await acquireScryfallSlot(ctx, path)
   if (blocked) scryfallRateLimited(waitMs)
   if (waitMs > 0) {
     await wait(waitMs)
@@ -60,7 +60,7 @@ export async function fetchScryfall(
     if (cooldownUntil > Date.now()) {
       /** why: usage counts are diagnostics, so a failed correction must not replace the rate-limit error callers handle. */
       await ctx
-        .runMutation(internal.externalApiRateLimits.cancelScryfallRequest, { path })
+        .runMutation(internal.externalApiRateLimits.cancelScryfallRequest, { path, day })
         .catch(() => undefined)
       scryfallRateLimited(cooldownUntil - Date.now())
     }
