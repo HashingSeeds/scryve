@@ -230,14 +230,7 @@ function ReceiptImage({
               </SvgText>
             )}
             {outTurn === undefined ? null : (
-              <SvgText
-                x={x + 7}
-                y={y + 51}
-                {...IMAGE_FONT.regular}
-                fontSize={10}
-                fill={player.color}
-                opacity={0.75}
-              >
+              <SvgText x={x + 7} y={y + 51} {...IMAGE_FONT.regular} fontSize={10} fill={CARD.dim}>
                 {translate("play:summary.receipt.outTurn", { turn: outTurn })}
               </SvgText>
             )}
