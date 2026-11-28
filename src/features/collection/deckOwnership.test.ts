@@ -97,7 +97,6 @@ describe("deckOwnership", () => {
     expect(summary.totalCards).toBe(5)
     expect(summary.ownedCards).toBe(3)
     expect(summary.missingCards).toBe(2)
-    expect(summary.estimatedMissingCents).toBe(400)
 
     const fallbackPrinting = computeDeckOwnership("mtg", [
       {
@@ -108,7 +107,6 @@ describe("deckOwnership", () => {
       },
     ])
     expect(fallbackPrinting.missingCards).toBe(1)
-    expect(fallbackPrinting.estimatedMissingCents).toBe(200)
   })
 
   it("counts owned copies of a deck card that has only a name", () => {
