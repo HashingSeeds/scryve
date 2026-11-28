@@ -377,6 +377,31 @@ describe("a seat with more than two decks", () => {
     expect(onSyncAndUse).toHaveBeenCalledWith(1, "local-angels")
   })
 
+  it("keeps Free a slot reachable when the account is full and its device decks are hidden", () => {
+    const onManageDecks = jest.fn()
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+          openSeats={0}
+          system="mtg"
+          deckState={{ status: "ready", value: decks.slice(0, 2) }}
+          deviceDecks={{
+            decks: [deviceDeck({ syncBlocked: "accountFull" })],
+            onSyncAndUse: jest.fn(),
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={jest.fn()}
+          onManageDecks={onManageDecks}
+          onViewAllDecks={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.queryByText("Calling All Angels")).toBeNull()
+    fireEvent.press(screen.getByTestId("seat-1-free-slot"))
+    expect(onManageDecks).toHaveBeenCalledTimes(1)
+  })
+
   it("keeps the seat's deck in view when it is not one of the two", () => {
     seat({ deckVersionId: "unplayed-v1" })
     expect(screen.getByText("played-last")).toBeTruthy()

@@ -500,7 +500,7 @@ function DeckShelf({
           {favoriteError ? (
             <Text size="xs" style={themed($errorText)} text={favoriteError} />
           ) : null}
-          {writes.capacityBlocked && writes.failures[0] ? (
+          {writes.capacityBlocked && writes.failures[0] && !pickableIds ? (
             <View>
               <Text tx="decks:saveStatus.paused" />
               <Button
@@ -512,7 +512,7 @@ function DeckShelf({
               />
             </View>
           ) : null}
-          {deviceRows.length ? (
+          {deviceRows.length && !pickableIds ? (
             <LocalDeckSyncHeader
               key={access?.ownerId}
               access={access}

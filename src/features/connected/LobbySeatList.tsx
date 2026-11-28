@@ -297,6 +297,9 @@ export function LobbySeatList({
         )
         const shownDecks = rankedDecks.filter(({ _id }) => shownIds.has(_id))
         const shownDeviceDecks = usableDeviceDecks.filter(({ localId }) => shownIds.has(localId))
+        const hiddenFullDeck = usableDeviceDecks.some(
+          (deck) => deck.syncBlocked === "accountFull" && !shownIds.has(deck.localId),
+        )
         const viewAll =
           onViewAllDecks && rankedIds.length > shownIds.size
             ? () =>
@@ -579,6 +582,16 @@ export function LobbySeatList({
                         style={$viewAll}
                         onPress={viewAll}
                       />
+                    ) : null}
+                    {hiddenFullDeck && onManageDecks ? (
+                      <View style={themed($deckMessage)}>
+                        <Text size="xxs" tone="dim" tx="connected:seats.accountFull" />
+                        <TextAction
+                          testID={`seat-${seat.seat}-free-slot`}
+                          tx="connected:seats.freeSlot"
+                          onPress={onManageDecks}
+                        />
+                      </View>
                     ) : null}
                     {usableSharedDecks.length > 0 ? (
                       <Text

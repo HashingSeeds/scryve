@@ -824,9 +824,11 @@ describe("DecksScreen", () => {
     const onSelect = jest.fn()
     const view = renderShelf({
       onSelect,
+      access: { ready: true, loading: false, signedIn: true, ownerId: "owner", request: jest.fn() },
       pickableIds: new Set([commanderDeck._id, guestDeckRouteId(picked.localId)]),
     })
     expect(view.getByText("Picked")).toBeTruthy()
+    expect(view.queryByTestId("local-deck-sync-header")).toBeNull()
     expect(view.queryByText("Left out")).toBeNull()
     expect(view.queryByText("Mono Red")).toBeNull()
     fireEvent.press(view.getByText("Existing Deck"))
