@@ -834,7 +834,6 @@ export default defineSchema({
     nextRequestAt: v.number(),
   }).index("by_bucket", ["bucket"]),
 
-  // why: counts every Scryfall request and 429 per UTC day, so we can tell our volume from Scryfall-side throttling.
   scryfallUsage: defineTable({
     day: v.string(),
     endpoint: v.string(),

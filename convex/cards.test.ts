@@ -98,7 +98,6 @@ describe("card provider caching and health", () => {
       t.action(api.cards.search, { query: "Llanowar Elves" }),
       t.action(api.cards.search, { query: "Shivan Dragon" }),
     ])
-    // why: answer the first search's 429 only once the second holds a slot, so the second is queued, not refused.
     while (!fetchSpy.mock.calls.length || (await usage())[0]?.requests !== 2)
       await new Promise((resolve) => setTimeout(resolve, 5))
     answer()

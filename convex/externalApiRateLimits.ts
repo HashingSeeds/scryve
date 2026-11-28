@@ -47,7 +47,6 @@ const GLOBAL_SLOTS = SCRYFALL_MAX_WAIT_MS / GLOBAL_SLOT_MS + 2
 /** why: requests leave on different servers after timers, so spacing exactly at Scryfall's per-endpoint limit drew a 429 under load. */
 const SEND_JITTER_MARGIN_MS = 50
 
-/** why: `name` labels usage rows; card ids collapse to `:id` so each card doesn't get a row. */
 function scryfallEndpoint(path: string) {
   const endpoint = path.split("?")[0]
   if (["/cards/search", "/cards/named", "/cards/random", "/cards/collection"].includes(endpoint))
@@ -117,7 +116,6 @@ export const acquireScryfall = internalMutation({
   args: { path: v.string() },
   handler: async (ctx, { path }) => {
     const now = Date.now()
-    /** why: the request is counted on this day, so a cancel after UTC midnight takes it back from the same row. */
     const day = utcDay(now)
     const cooldownUntil = (await bucketRow(ctx, "scryfall:cooldown"))?.nextRequestAt ?? 0
     if (cooldownUntil > now) return { waitMs: cooldownUntil - now, blocked: true, day }
@@ -143,7 +141,6 @@ export const acquireScryfall = internalMutation({
   },
 })
 
-/** why: a queued request that a 429 cooldown stops before sending was counted when it reserved its slot. */
 export const cancelScryfallRequest = internalMutation({
   args: { path: v.string(), day: v.string() },
   handler: async (ctx, { path, day }) => {
@@ -152,7 +149,6 @@ export const cancelScryfallRequest = internalMutation({
   },
 })
 
-/** why: Scryfall answered 429, so pause every request for the cooldown and count the 429 against its endpoint. */
 export const blockScryfall = internalMutation({
   args: { path: v.string() },
   handler: async (ctx, { path }) => {
