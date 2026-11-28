@@ -593,7 +593,15 @@ function DeckDetailContent({
     return edit({ type: "add", card }, { game, format: deck.format })
   }
 
-  function replaceCard(previous: DeckCard, next: DeckCard): string | undefined {
+  function reprintCard(previous: DeckCard, next: DeckCard) {
+    return replaceCard(previous, next, "reprint")
+  }
+
+  function replaceCard(
+    previous: DeckCard,
+    next: DeckCard,
+    type: "replace" | "reprint" = "replace",
+  ): string | undefined {
     if (knownDeleted || !deck) return undefined
     ensureDraft()
     let resolvedNext = next
@@ -615,7 +623,7 @@ function DeckDetailContent({
         ...(next.board ? { board: next.board } : {}),
       }
     }
-    return edit({ type: "replace", previous, next: resolvedNext }, { game, format: deck.format })
+    return edit({ type, previous, next: resolvedNext }, { game, format: deck.format })
   }
 
   /**
@@ -1431,7 +1439,7 @@ function DeckDetailContent({
           }}
         />
       ) : null}
-      {changePrinting.sheet(replaceCard)}
+      {changePrinting.sheet(reprintCard)}
 
       {dialogs.shown === "actions" ? (
         <DeckActionsSheet

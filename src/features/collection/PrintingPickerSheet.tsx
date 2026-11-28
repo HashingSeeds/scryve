@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { FlatList, TouchableOpacity, View } from "react-native"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 
+import { AlertNote } from "@/components/AlertNote"
 import { CardImage } from "@/components/CardImage"
 import { ChoiceButton } from "@/components/ChoiceButton"
 import { Sheet } from "@/components/Sheet"
@@ -37,6 +38,7 @@ export function PrintingPickerSheet({
   initialFinish = "nonfoil",
   initialCondition = "NM",
   choosesCopy = true,
+  error,
   onPick,
   onClose,
   onDismissed,
@@ -50,6 +52,7 @@ export function PrintingPickerSheet({
   initialCondition?: CardCondition
   // why: a deck picks only the printing; finish and condition describe a collection copy.
   choosesCopy?: boolean
+  error?: string
   onPick: (result: PrintingPickResult) => void
   onClose: () => void
   onDismissed?: () => void
@@ -77,6 +80,7 @@ export function PrintingPickerSheet({
       <View style={themed($container)}>
         <Text preset="subheading" tx="decks:collection.pickPrinting" />
         <Text size="sm" style={{ color: theme.colors.textDim }} text={cardName} />
+        {error ? <AlertNote text={error} /> : null}
 
         {choosesCopy ? (
           <>

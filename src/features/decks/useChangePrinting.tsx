@@ -10,6 +10,7 @@ type PrintedCard = {
   oracleId?: string
   scryfallId?: string
   printingId?: string
+  providerCardId?: string
   imageUrl?: string
   smallImageUrl?: string
 }
@@ -21,6 +22,7 @@ type PrintedCard = {
 export function useChangePrinting<Card extends PrintedCard>(game: string) {
   const afterFocus = useRef<Card>(undefined)
   const [card, setCard] = useState<Card>()
+  const [error, setError] = useState<string>()
   const presence = useSheetPresence(card)
   const shown = presence.shown
 
@@ -34,7 +36,10 @@ export function useChangePrinting<Card extends PrintedCard>(game: string) {
     focusDismissed() {
       const next = afterFocus.current
       afterFocus.current = undefined
-      if (next) setCard(next)
+      if (next) {
+        setError(undefined)
+        setCard(next)
+      }
     },
     sheet: (replace: (previous: Card, next: Card) => string | undefined) =>
       shown ? (
@@ -45,14 +50,17 @@ export function useChangePrinting<Card extends PrintedCard>(game: string) {
           cardId={shown.oracleId}
           selectedPrintingId={shown.scryfallId ?? shown.printingId}
           choosesCopy={false}
+          error={error}
           onPick={({ printing }) => {
             const error = replace(shown, {
               ...shown,
               scryfallId: printing.printingId,
               ...(shown.printingId ? { printingId: printing.printingId } : {}),
+              ...(shown.providerCardId ? { providerCardId: printing.printingId } : {}),
               imageUrl: printing.imageUrl ?? shown.imageUrl,
               smallImageUrl: printing.smallImageUrl ?? printing.imageUrl ?? shown.smallImageUrl,
             })
+            setError(error)
             if (!error) setCard(undefined)
           }}
           onClose={() => setCard(undefined)}

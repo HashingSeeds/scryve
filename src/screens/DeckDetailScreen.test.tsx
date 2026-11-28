@@ -1706,7 +1706,7 @@ describe("DeckDetailScreen", () => {
     expect(mockUpdateDeck).toHaveBeenCalledWith({ deckId: "deck-1", note: "Updated note" })
   })
 
-  it("changes a card's printing from its dialog and saves the new printing", async () => {
+  it("moves every copy to the printing picked in the card's dialog and saves its ids", async () => {
     catalogDb.clearAll()
     catalogDb.replacePrintings(
       "mtg",
@@ -1723,9 +1723,20 @@ describe("DeckDetailScreen", () => {
       })),
       "v1",
     )
+    mockDetail.value = {
+      ...loadedDetail,
+      cards: [
+        {
+          ...solRing,
+          quantity: 4,
+          printingId: solRing.scryfallId,
+          providerCardId: solRing.scryfallId,
+        },
+      ],
+    }
     const view = renderDetail()
     fireEvent.press(view.getByTestId("deck-mode-build"))
-    fireEvent.press(view.getByLabelText("1× Sol Ring"))
+    fireEvent.press(view.getByLabelText("4× Sol Ring"))
     fireEvent.press(view.getByTestId("card-focus-change-printing"))
     fireEvent.press(await view.findByTestId("printing-option-sol-c21"))
     fireEvent.press(view.getByTestId("save-version-button"))
@@ -1735,8 +1746,10 @@ describe("DeckDetailScreen", () => {
           cards: [
             expect.objectContaining({
               name: "Sol Ring",
-              quantity: 1,
+              quantity: 4,
               scryfallId: "sol-c21",
+              printingId: "sol-c21",
+              providerCardId: "sol-c21",
               imageUrl: "https://cards.scryfall.io/normal/sol-c21.jpg",
             }),
           ],

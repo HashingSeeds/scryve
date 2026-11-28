@@ -186,6 +186,8 @@ export type DeckEdit<Card extends DeckCard = DeckCard> =
   | { type: "add"; card: Card }
   | { type: "remove"; card: Card }
   | { type: "replace"; previous: Card; next: Card }
+  // why: a scan swaps one copy, but changing a printing moves the whole entry, merging into the new printing when the deck already has it.
+  | { type: "reprint"; previous: Card; next: Card }
   | {
       type: "chooseCommander"
       card: Card
@@ -235,6 +237,23 @@ export function editDeck<Draft extends DeckEdits>(
         cards: result.cards,
         undo: { name: entry.name, cards: draft.cards },
       }
+    }
+    case "reprint": {
+      const entry = draft.cards.find((card) => printingKey(card) === printingKey(edit.previous))
+      if (!entry || printingKey(edit.next) === printingKey(entry)) return draft
+      const target = draft.cards.find((card) => printingKey(card) === printingKey(edit.next))
+      const cards = target
+        ? draft.cards.flatMap((card) =>
+            card === entry
+              ? []
+              : card === target
+                ? [{ ...card, quantity: Math.min(MAX_CARD_COPIES, card.quantity + entry.quantity) }]
+                : [card],
+          )
+        : draft.cards.map((card) =>
+            card === entry ? { ...edit.next, quantity: entry.quantity } : card,
+          )
+      return { ...draft, cards, undo: { name: entry.name, cards: draft.cards } }
     }
     case "move": {
       const entry = draft.cards.find((card) => printingKey(card) === printingKey(edit.card))

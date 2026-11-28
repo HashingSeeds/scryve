@@ -286,6 +286,8 @@ export function GuestDeckDetailScreen({
   const removeCard = (card: GuestCard) => edit({ type: "remove", card }, rules)
   const replaceCard = (previous: GuestCard, next: GuestCard) =>
     edit({ type: "replace", previous, next }, rules)
+  const reprintCard = (previous: GuestCard, next: GuestCard) =>
+    edit({ type: "reprint", previous, next }, rules)
   const chooseCommander = (color?: GuestCard["commanderColor"]) => {
     if (!focusedCard) return
     setFocusedKey(undefined)
@@ -701,7 +703,7 @@ export function GuestDeckDetailScreen({
             : {})}
         />
       ) : null}
-      {changePrinting.sheet(replaceCard)}
+      {changePrinting.sheet(reprintCard)}
       <ConfirmDialog
         visible={deleting && !sheets.shown}
         title={translate("decks:guestDetail.deleteTitle")}
