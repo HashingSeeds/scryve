@@ -49,7 +49,7 @@ export async function fetchScryfall(
   path: string,
   options: ScryfallRequestOptions = {},
 ) {
-  const { waitMs, blocked } = await acquireScryfallSlot(ctx, path)
+  const { waitMs, blocked, day } = await acquireScryfallSlot(ctx, path)
   if (blocked) scryfallRateLimited(waitMs)
   if (waitMs > 0) {
     await wait(waitMs)
@@ -57,7 +57,12 @@ export async function fetchScryfall(
       internal.externalApiRateLimits.scryfallCooldownUntil,
       {},
     )
-    if (cooldownUntil > Date.now()) scryfallRateLimited(cooldownUntil - Date.now())
+    if (cooldownUntil > Date.now()) {
+      await ctx
+        .runMutation(internal.externalApiRateLimits.cancelScryfallRequest, { path, day })
+        .catch(() => undefined)
+      scryfallRateLimited(cooldownUntil - Date.now())
+    }
   }
   const response = await fetch(`${SCRYFALL_BASE_URL}${path}`, {
     method: options.method,
@@ -74,10 +79,7 @@ export async function fetchScryfall(
     })
   })
   if (response.status === 429)
-    await ctx.runMutation(internal.externalApiRateLimits.block, {
-      bucket: "scryfall:cooldown",
-      durationMs: SCRYFALL_RATE_LIMIT_BLOCK_MS,
-    })
+    await ctx.runMutation(internal.externalApiRateLimits.blockScryfall, { path })
   return response
 }
 

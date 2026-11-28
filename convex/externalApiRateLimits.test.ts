@@ -4,8 +4,16 @@ import { internal } from "./_generated/api"
 describe("Scryfall request pacing", () => {
   let t: ConvexTestHarness
   let now: jest.SpiedFunction<typeof Date.now>
-  const acquire = (path: string) =>
-    t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
+  const acquire = async (path: string) => {
+    const { waitMs, blocked } = await t.mutation(internal.externalApiRateLimits.acquireScryfall, {
+      path,
+    })
+    return { waitMs, blocked }
+  }
+  const usage = async () =>
+    (await t.run((ctx) => ctx.db.query("scryfallUsage").collect())).map(
+      ({ day, endpoint, requests, rateLimited }) => ({ day, endpoint, requests, rateLimited }),
+    )
 
   beforeEach(() => {
     now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
@@ -45,10 +53,7 @@ describe("Scryfall request pacing", () => {
   })
 
   it("stops new and queued requests during a 429 cooldown", async () => {
-    await t.mutation(internal.externalApiRateLimits.block, {
-      bucket: "scryfall:cooldown",
-      durationMs: 30_000,
-    })
+    await t.mutation(internal.externalApiRateLimits.blockScryfall, { path: "/cards/example" })
     now.mockReturnValue(1_000_500)
     expect(await acquire("/cards/example")).toEqual({ waitMs: 29_500, blocked: true })
     await expect(t.query(internal.externalApiRateLimits.scryfallCooldownUntil, {})).resolves.toBe(
@@ -82,17 +87,35 @@ describe("Scryfall request pacing", () => {
     )
   })
 
-  it("preserves the full cooldown after an external 429", async () => {
-    await t.mutation(internal.externalApiRateLimits.block, {
-      bucket: "scryfall:cards-search",
-      durationMs: 30_000,
+  it("counts requests and 429s per day and endpoint", async () => {
+    await acquire("/cards/search?q=first")
+    await acquire("/cards/search?q=second")
+    await acquire("/cards/abc-123")
+    await acquire("/cards/def-456/rulings")
+    await t.mutation(internal.externalApiRateLimits.blockScryfall, {
+      path: "/cards/search?q=third",
     })
 
-    await expect(
-      t.mutation(internal.externalApiRateLimits.reserve, {
-        bucket: "scryfall:cards-search",
-        intervalMs: 500,
-      }),
-    ).resolves.toBe(30_000)
+    expect(await usage()).toEqual([
+      { day: "1970-01-01", endpoint: "/cards/search", requests: 2, rateLimited: 1 },
+      { day: "1970-01-01", endpoint: "/cards/:id", requests: 1, rateLimited: 0 },
+      { day: "1970-01-01", endpoint: "/cards/:id/rulings", requests: 1, rateLimited: 0 },
+    ])
+  })
+
+  it("takes a canceled request back from the day it was counted on", async () => {
+    now.mockReturnValue(Date.UTC(2026, 10, 27, 23, 59, 59, 900))
+    const { day } = await t.mutation(internal.externalApiRateLimits.acquireScryfall, {
+      path: "/cards/search?q=first",
+    })
+    now.mockReturnValue(Date.UTC(2026, 10, 28, 0, 0, 0, 100))
+    await t.mutation(internal.externalApiRateLimits.cancelScryfallRequest, {
+      path: "/cards/search?q=first",
+      day,
+    })
+
+    expect(await usage()).toEqual([
+      { day: "2026-11-27", endpoint: "/cards/search", requests: 0, rateLimited: 0 },
+    ])
   })
 })

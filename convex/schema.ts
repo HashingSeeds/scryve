@@ -834,6 +834,13 @@ export default defineSchema({
     nextRequestAt: v.number(),
   }).index("by_bucket", ["bucket"]),
 
+  scryfallUsage: defineTable({
+    day: v.string(),
+    endpoint: v.string(),
+    requests: v.number(),
+    rateLimited: v.number(),
+  }).index("by_day_and_endpoint", ["day", "endpoint"]),
+
   userEntitlements: defineTable({
     userId: v.id("users"),
     feature: v.string(),
