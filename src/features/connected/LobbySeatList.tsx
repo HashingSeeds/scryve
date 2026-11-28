@@ -297,9 +297,11 @@ export function LobbySeatList({
         )
         const shownDecks = rankedDecks.filter(({ _id }) => shownIds.has(_id))
         const shownDeviceDecks = usableDeviceDecks.filter(({ localId }) => shownIds.has(localId))
-        const hiddenFullDeck = usableDeviceDecks.some(
-          (deck) => deck.syncBlocked === "accountFull" && !shownIds.has(deck.localId),
-        )
+        const blockedByFullAccount = (deck: LobbyDeviceDeck) =>
+          deck.syncBlocked === "accountFull" && hasCards(deck)
+        const hiddenFullDeck =
+          !shownDeviceDecks.some(blockedByFullAccount) &&
+          usableDeviceDecks.some(blockedByFullAccount)
         const viewAll =
           onViewAllDecks && rankedIds.length > shownIds.size
             ? () =>
