@@ -47,7 +47,7 @@ const GLOBAL_SLOTS = SCRYFALL_MAX_WAIT_MS / GLOBAL_SLOT_MS + 2
 /** why: requests leave on different servers after timers, so spacing exactly at Scryfall's per-endpoint limit drew a 429 under load. */
 const SEND_JITTER_MARGIN_MS = 50
 
-/** why: `name` labels usage rows; default paths keep only their first segment so card ids don't make a row each. */
+/** why: `name` labels usage rows; card ids collapse to `:id` so each card doesn't get a row. */
 function scryfallEndpoint(path: string) {
   const endpoint = path.split("?")[0]
   if (["/cards/search", "/cards/named", "/cards/random", "/cards/collection"].includes(endpoint))
@@ -63,7 +63,7 @@ function scryfallEndpoint(path: string) {
       intervalMs: 6000 + SEND_JITTER_MARGIN_MS,
     }
   return {
-    name: endpoint.split("/").slice(0, 2).join("/"),
+    name: endpoint.replace(/^\/cards\/[^/]+/, "/cards/:id"),
     bucket: "scryfall:endpoint:default",
     intervalMs: 100,
   }
@@ -135,6 +135,15 @@ export const acquireScryfall = internalMutation({
       await countScryfallUsage(ctx, path, { requests: 1, rateLimited: 0 })
       return { waitMs: requestAt - now, blocked: false }
     }
+  },
+})
+
+/** why: a queued request that a 429 cooldown stops before sending was counted when it reserved its slot. */
+export const cancelScryfallRequest = internalMutation({
+  args: { path: v.string() },
+  handler: async (ctx, { path }) => {
+    await countScryfallUsage(ctx, path, { requests: -1, rateLimited: 0 })
+    return null
   },
 })
 

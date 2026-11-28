@@ -57,7 +57,13 @@ export async function fetchScryfall(
       internal.externalApiRateLimits.scryfallCooldownUntil,
       {},
     )
-    if (cooldownUntil > Date.now()) scryfallRateLimited(cooldownUntil - Date.now())
+    if (cooldownUntil > Date.now()) {
+      /** why: usage counts are diagnostics, so a failed correction must not replace the rate-limit error callers handle. */
+      await ctx
+        .runMutation(internal.externalApiRateLimits.cancelScryfallRequest, { path })
+        .catch(() => undefined)
+      scryfallRateLimited(cooldownUntil - Date.now())
+    }
   }
   const response = await fetch(`${SCRYFALL_BASE_URL}${path}`, {
     method: options.method,

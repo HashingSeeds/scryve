@@ -83,10 +83,10 @@ describe("Scryfall request pacing", () => {
     await acquire("/cards/search?q=first")
     await acquire("/cards/search?q=second")
     await acquire("/cards/abc-123")
+    await acquire("/cards/def-456/rulings")
     await t.mutation(internal.externalApiRateLimits.blockScryfall, {
       path: "/cards/search?q=third",
     })
-    await acquire("/cards/def-456")
 
     const rows = await t.run((ctx) => ctx.db.query("scryfallUsage").collect())
     expect(
@@ -98,7 +98,8 @@ describe("Scryfall request pacing", () => {
       })),
     ).toEqual([
       { day: "1970-01-01", endpoint: "/cards/search", requests: 2, rateLimited: 1 },
-      { day: "1970-01-01", endpoint: "/cards", requests: 1, rateLimited: 0 },
+      { day: "1970-01-01", endpoint: "/cards/:id", requests: 1, rateLimited: 0 },
+      { day: "1970-01-01", endpoint: "/cards/:id/rulings", requests: 1, rateLimited: 0 },
     ])
   })
 })

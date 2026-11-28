@@ -85,6 +85,22 @@ describe("card provider caching and health", () => {
       })
   })
 
+  it("does not count a queued Scryfall search that a 429 cooldown stops before sending", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response({}, 429))
+    const t = makeConvexTest()
+    const results = await Promise.allSettled([
+      t.action(api.cards.search, { query: "Llanowar Elves" }),
+      t.action(api.cards.search, { query: "Shivan Dragon" }),
+    ])
+
+    expect(results.map((result) => result.status)).toEqual(["rejected", "rejected"])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const rows = await t.run((ctx) => ctx.db.query("scryfallUsage").collect())
+    expect(rows).toEqual([
+      expect.objectContaining({ endpoint: "/cards/search", requests: 1, rateLimited: 1 }),
+    ])
+  })
+
   it("serves Rush card text from its own catalog and never sends Rush IDs to YGOPRODeck", async () => {
     const t = makeConvexTest()
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected provider"))
