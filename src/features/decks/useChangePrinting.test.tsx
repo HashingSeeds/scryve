@@ -28,11 +28,11 @@ function Harness({ replace }: { replace: (previous: Card, next: Card) => string 
   )
 }
 
-test("a printing the deck can't take keeps the list open and says why", () => {
+beforeEach(() => {
   catalogDb.clearAll()
   catalogDb.replacePrintings(
     "mtg",
-    ["sol-cmm", "sol-c21"].map((printingId) => ({
+    ["sol-cmm", "sol-c21", "sol-sld"].map((printingId) => ({
       game: "mtg",
       printingId,
       cardId: "ora-sol",
@@ -40,10 +40,28 @@ test("a printing the deck can't take keeps the list open and says why", () => {
       nameNormalized: "sol ring",
       setCode: printingId.slice(4),
       collectorNumber: "1",
-      finishes: ["nonfoil"],
+      finishes: printingId === "sol-sld" ? ["foil"] : ["nonfoil"],
     })),
     "v1",
   )
+})
+
+test("a foil-only printing can be picked, since a deck doesn't choose a finish", () => {
+  const replace = jest.fn(() => undefined)
+  const view = render(
+    <ThemeProvider>
+      <Harness replace={replace} />
+    </ThemeProvider>,
+  )
+  fireEvent.press(view.getByTestId("start"))
+  fireEvent.press(view.getByTestId("printing-option-sol-sld"))
+  expect(replace).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ scryfallId: "sol-sld" }),
+  )
+})
+
+test("a printing the deck can't take keeps the list open and says why", () => {
   const replace = jest.fn(() => "Offline. Pick a card you've added before.")
   const view = render(
     <ThemeProvider>

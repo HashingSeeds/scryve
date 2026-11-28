@@ -616,11 +616,13 @@ function DeckDetailContent({
         setError(offlineError)
         return offlineError
       }
+      const { section: _section, board: _board, commanderColor: _color, ...cached } = entry.card
       resolvedNext = {
-        ...entry.card,
+        ...cached,
         quantity: next.quantity,
-        ...(next.section ? { section: next.section } : {}),
+        section: cardSection(next),
         ...(next.board ? { board: next.board } : {}),
+        ...(next.commanderColor ? { commanderColor: next.commanderColor } : {}),
       }
     }
     return edit({ type, previous, next: resolvedNext }, { game, format: deck.format })

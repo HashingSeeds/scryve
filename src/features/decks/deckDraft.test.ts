@@ -178,6 +178,15 @@ describe("editDeck reprint", () => {
     ])
     expect(draft.cards.map((entry) => [entry.scryfallId, entry.quantity])).toEqual([["fdn", 4]])
   })
+
+  it("refuses a merge past 999 copies instead of dropping some", () => {
+    const result = edit(open([bolts("m10", 500), bolts("fdn", 500)]), {
+      type: "reprint",
+      previous: bolts("m10", 500),
+      next: bolts("fdn", 500),
+    })
+    expect(result).toEqual({ error: expect.stringContaining("999") })
+  })
 })
 
 describe("editDeck move", () => {

@@ -123,7 +123,8 @@ export function PrintingPickerSheet({
             style={themed($sheetScroll)}
             contentContainerStyle={themed($sheetScrollContent)}
             renderItem={({ item }) => {
-              const supported = item.finishes.length === 0 || item.finishes.includes(finish)
+              const supported =
+                !choosesCopy || item.finishes.length === 0 || item.finishes.includes(finish)
               const price = supported
                 ? lookupPrintingPrice(game, item.printingId, finish, condition)
                 : {}

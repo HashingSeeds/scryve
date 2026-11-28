@@ -242,12 +242,15 @@ export function editDeck<Draft extends DeckEdits>(
       const entry = draft.cards.find((card) => printingKey(card) === printingKey(edit.previous))
       if (!entry || printingKey(edit.next) === printingKey(entry)) return draft
       const target = draft.cards.find((card) => printingKey(card) === printingKey(edit.next))
+      if (target && target.quantity + entry.quantity > MAX_CARD_COPIES) {
+        return { error: translate("decks:draft.copyLimit", { limit: MAX_CARD_COPIES }) }
+      }
       const cards = target
         ? draft.cards.flatMap((card) =>
             card === entry
               ? []
               : card === target
-                ? [{ ...card, quantity: Math.min(MAX_CARD_COPIES, card.quantity + entry.quantity) }]
+                ? [{ ...card, quantity: card.quantity + entry.quantity }]
                 : [card],
           )
         : draft.cards.map((card) =>
