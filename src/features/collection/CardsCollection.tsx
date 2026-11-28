@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Linking, TouchableOpacity, View } from "react-native"
+import { TouchableOpacity, View } from "react-native"
 import * as Clipboard from "expo-clipboard"
 
 import { Button } from "@/components/Button"
@@ -52,7 +52,6 @@ import {
   type StoredCollectionEntry,
 } from "./collectionStore"
 import { PrintingPickerSheet } from "./PrintingPickerSheet"
-import { tcgplayerMassEntryUrl } from "./storeLinks"
 import { TradeCalculatorModal } from "./TradeCalculatorModal"
 import type { CardCondition, CardFinish } from "../../../convex/lib/cardPricing"
 
@@ -353,23 +352,6 @@ export function CardsCollection({
             id: "move",
             label: translate("decks:collection.moveToBinder"),
             onPress: () => closeMenu(() => openDialog("move")),
-          },
-          {
-            id: "buy",
-            label: translate("decks:collection.buyOnTcgplayer"),
-            onPress: () =>
-              closeMenu(
-                () =>
-                  void Linking.openURL(
-                    tcgplayerMassEntryUrl(
-                      entries.map(({ entry }) => ({
-                        name: entry.name,
-                        setCode: entry.setCode,
-                        quantity: entry.quantity,
-                      })),
-                    ),
-                  ),
-              ),
           },
         ]
       : []),

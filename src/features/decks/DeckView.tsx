@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react"
-import { Linking, Platform, View } from "react-native"
+import { Platform, View } from "react-native"
 import type { TextStyle, ViewStyle } from "react-native"
 import { router } from "expo-router"
 import { SectionList } from "@legendapp/list/section-list"
@@ -15,7 +15,7 @@ import { TextField } from "@/components/TextField"
 import { useCatalogSync } from "@/features/collection/catalogSync"
 import { useCollectionRevision } from "@/features/collection/collectionStore"
 import { computeDeckOwnership } from "@/features/collection/deckOwnership"
-import { tcgplayerMassEntryUrl } from "@/features/collection/storeLinks"
+import { StoreCheckoutSheet } from "@/features/collection/StoreCheckoutSheet"
 import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
 import { formatCurrency, joinParts } from "@/i18n/format"
@@ -146,6 +146,7 @@ export function DeckView({
   const { themed, theme } = useAppTheme()
   const [choosingCommander, setChoosingCommander] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   if (discarding && changes === 0) setDiscarding(false)
   const building = mode === "build"
@@ -302,19 +303,7 @@ export function DeckView({
                   <Button
                     testID="deck-buy-missing"
                     tx="decks:collection.buyMissing"
-                    onPress={() =>
-                      void Linking.openURL(
-                        tcgplayerMassEntryUrl(
-                          ownership.items
-                            .filter((item) => item.missing > 0)
-                            .map((item) => ({
-                              name: item.name,
-                              setCode: item.setCode,
-                              quantity: item.missing,
-                            })),
-                        ),
-                      )
-                    }
+                    onPress={() => setCheckoutOpen(true)}
                   />
                 ) : null}
               </View>
@@ -496,6 +485,15 @@ export function DeckView({
           onDiscard()
         }}
       />
+      {ownership ? (
+        <StoreCheckoutSheet
+          visible={checkoutOpen}
+          game={game}
+          items={ownership.items}
+          onOpenCard={onFocus}
+          onClose={() => setCheckoutOpen(false)}
+        />
+      ) : null}
       {analysis ? (
         <DeckAnalysisSheet
           visible={analysisOpen}

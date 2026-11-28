@@ -73,6 +73,21 @@ export function tcgplayerMassEntryUrl(
   return wrapAffiliateUrl(direct, tcgplayerAffiliateUrl(), useAffiliate)
 }
 
+export function cardKingdomBuilderUrl(
+  cards: readonly StoreCardInput[],
+  options: { affiliate?: boolean } = {},
+): string {
+  const useAffiliate = options.affiliate ?? affiliateLinksEnabled()
+  const list = cards
+    .filter((card) => (card.quantity ?? 1) > 0)
+    .map((card) => `${Math.max(1, Math.floor(card.quantity ?? 1))} ${card.name.split(" // ")[0]}`)
+    .join("\n")
+  const partner = cardKingdomPartner()
+  const params = new URLSearchParams({ c: list })
+  if (useAffiliate && partner) params.set("partner", partner)
+  return `https://www.cardkingdom.com/builder?${params.toString()}`
+}
+
 export function cardKingdomCardUrl(
   card: StoreCardInput,
   options: { buylist?: boolean; affiliate?: boolean } = {},

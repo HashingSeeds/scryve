@@ -36,6 +36,7 @@ const values = {
   scope: ["event"],
   peak_heat: ["nominal", "fair", "serious", "critical"],
   result: ["win", "draw", "none"],
+  store: ["tcgplayer", "cardkingdom"],
 } as const
 
 const LATENCY_KEYS = [
@@ -88,6 +89,9 @@ const NUMBER_KEYS = new Set<string>([
   "pass_count",
   ...LATENCY_KEYS,
   ...SCAN_COUNT_KEYS,
+  "card_count",
+  "problem_count",
+  "estimate_cents",
 ])
 
 export type GameEndSource = (typeof values.end_source)[number]
@@ -138,6 +142,12 @@ type Events = {
   keyword_viewed: { system: string; rule: string }
   card_search: { system: string; result_count: number; query: string }
   card_picked: { system: string; rank: number; pick_count: number; card: string; query: string }
+  store_checkout_opened: {
+    store: (typeof values.store)[number]
+    card_count: number
+    problem_count: number
+    estimate_cents: number
+  }
   turns_game_ended: {
     turns_enabled: boolean
     pass_count: number
@@ -175,6 +185,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   keyword_viewed: ["system", "rule"],
   card_search: ["system", "result_count", "query"],
   card_picked: ["system", "rank", "pick_count", "card", "query"],
+  store_checkout_opened: ["store", "card_count", "problem_count", "estimate_cents"],
   turns_game_ended: ["turns_enabled", "pass_count", "player_count", "mode"],
   recap_share_tapped: [],
   recap_shared: [],

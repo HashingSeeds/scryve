@@ -216,7 +216,7 @@ Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a re
 - Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. SDK initialization and event processing are scheduled after the current task, but that is not a measured performance guarantee.
 
 The explicit events are `app_opened`, `game_started`, `game_completed`, `game_abandoned`,
-`connection_attempt`, `deck_used`, `stats_viewed`, `dice_rolled`, `deck_browse_empty`, `card_scan_completed`, `rules_search`, `rules_opened`, `keyword_viewed`, `card_search`, `card_picked`, `recap_share_tapped`, and `recap_shared`. A local start means the first
+`connection_attempt`, `deck_used`, `stats_viewed`, `dice_rolled`, `deck_browse_empty`, `card_scan_completed`, `store_checkout_opened`, `rules_search`, `rules_opened`, `keyword_viewed`, `card_search`, `card_picked`, `recap_share_tapped`, and `recap_shared`. A local start means the first
 accepted gameplay action, not rendering the fresh board. Completed local games include
 `end_source`: `game_menu`, `new_game_prompt`, or `stale_game_prompt`. A cancelled
 prompt does not label a later manual finish. Connected completion observations
@@ -242,6 +242,7 @@ Browse screen can be told apart from a format that really has no lists.
 `recap_shared` a share the sheet reports as sent, which only iOS and web report. Both
 carry only the common properties, such as `platform`.
 `card_scan_completed` fires when the card scanner closes (prerelease builds only). It carries counts, never card names: cards added (including any later fixed with Wrong card), not added, skipped as already in the deck, fixed, reads, reads where the card was outlined, the session length, and the phone's peak heat (`nominal` to `critical`).
+`store_checkout_opened` fires when Buy missing on a deck hands its cart to a store (prerelease builds only). It names the store (`tcgplayer` or `cardkingdom`) and carries counts, never card names: copies sent, cards left out because the store doesn't list them or no card matches their name, and the estimated total in cents.
 Rules search runs on the device, so these events are the only record of it.
 `rules_search` fires once a search settles (1.5s without typing), when a result is opened, or
 when the rules screen closes. It carries the system, `result_count` (capped at 50), and
