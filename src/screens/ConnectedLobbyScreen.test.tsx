@@ -125,7 +125,7 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByTestId("lobby-player-count-4")).toBeDisabled()
   })
 
-  it("hides host settings and opens deck management for the joining player's game system", () => {
+  it("hides host settings from a joining player", () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
       status: "lobby",
@@ -135,23 +135,9 @@ describe("ConnectedLobbyScreen", () => {
         controlledByMe: index === 0,
       })),
     }
-    connectedHarness.decks = [
-      { _id: "deck-1", name: "Atraxa", versions: [{ _id: "deck-version-1", versionNumber: 1 }] },
-    ]
-    const onManageDecks = jest.fn()
-    render(
-      themed(
-        <ConnectedLobbyScreen
-          publicId="game-public"
-          onStarted={jest.fn()}
-          onManageDecks={onManageDecks}
-        />,
-      ),
-    )
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
     expect(screen.queryByTestId("lobby-player-count")).toBeNull()
     expect(screen.queryByTestId("lobby-require-decks")).toBeNull()
-    fireEvent.press(screen.getByTestId("manage-seat-1-decks"))
-    expect(onManageDecks).toHaveBeenCalledWith("mtg")
   })
 
   it("shows rejected settings without changing the selected count", async () => {

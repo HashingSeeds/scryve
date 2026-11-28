@@ -284,7 +284,7 @@ export default {
     chooseDeck: "○ Elige un mazo",
     needsDeck: "○ Necesita un mazo",
     newDeck: "+ Nuevo mazo",
-    manageDecks: "Gestionar mazos",
+    viewAllDecks: "Ver todos",
     account: "Cuenta",
     accountDeckLabel: "{{name}}, sincronizado",
     onDevice: "En este dispositivo",

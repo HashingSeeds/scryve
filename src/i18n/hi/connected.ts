@@ -269,7 +269,7 @@ export default {
     chooseDeck: "○ डेक चुनें",
     needsDeck: "○ डेक चाहिए",
     newDeck: "+ नया डेक",
-    manageDecks: "डेक मैनेज करें",
+    viewAllDecks: "सब देखें",
     account: "खाता",
     accountDeckLabel: "{{name}}, सिंक हो चुका",
     onDevice: "इस डिवाइस पर",

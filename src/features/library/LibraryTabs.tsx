@@ -4,11 +4,10 @@ import { View } from "react-native"
 import { router, useFocusEffect } from "expo-router"
 
 import { AppTabBar, type AppTab } from "@/components/AppTabBar"
-import { useAuthAccess } from "@/features/auth/AuthContext"
-import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
 import { useAccountEntry } from "@/features/auth/useAccountEntry"
 import { CardsCollection } from "@/features/collection/CardsCollection"
 import { CardSearch } from "@/features/decks/CardSearchScreen"
+import { DeckLibrary } from "@/features/decks/DeckLibrary"
 import { localGameRepository } from "@/features/game/localPersistence"
 import {
   isPlaySystemId,
@@ -19,8 +18,6 @@ import {
 import type { BackAction } from "@/features/game/useBackToBoard"
 import { gameRules, RULES_TEXT_IN_APP, rulesHref } from "@/features/rules/gameRules"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
-import { translate } from "@/i18n/translate"
-import { DecksScreen } from "@/screens/DecksScreen"
 import { captureAnalytics } from "@/utils/analytics"
 
 export function LibraryTabs({
@@ -97,10 +94,8 @@ const DecksTab = memo(function DecksTab({
   initialSystem?: string
   onSystemChange: (system: string) => void
 }) {
-  const auth = useAuthAccess()
-  const screen = (access?: CloudAccess) => (
-    <DecksScreen
-      access={access}
+  return (
+    <DeckLibrary
       initialSystem={initialSystem}
       back={back}
       onAddDeck={() => router.push("/connected/decks/add")}
@@ -120,15 +115,8 @@ const DecksTab = memo(function DecksTab({
           },
         })
       }
-      unavailableMessage={
-        !auth.configured
-          ? auth.configurationMessage || translate("decks:shelf.syncUnavailable")
-          : undefined
-      }
     />
   )
-  if (!auth.configured) return screen()
-  return <CloudScreen onBack={() => router.back()}>{screen}</CloudScreen>
 })
 
 const CardsTab = memo(function CardsTab({

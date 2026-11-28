@@ -35,8 +35,10 @@ import {
   type LobbyDeviceDecks,
   type LobbySharedDecks,
   type LobbySeat,
+  type SeatDeckPick,
 } from "@/features/connected/LobbySeatList"
 import { deckVersionLabel } from "@/features/decks/deckCopy"
+import { LobbyDeckPicker } from "@/features/lobby/LobbyDeckPicker"
 import { formatList, formatNumber } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
@@ -155,6 +157,7 @@ export function LobbyView({
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
   const [openTeam, setOpenTeam] = useState<number>()
+  const [deckPick, setDeckPick] = useState<SeatDeckPick>()
   // why: on iOS the paywall can only present once the picker's modal has finished dismissing.
   const [paywall, setPaywall] = useState<"closed" | "waitingForDismiss" | "open">("closed")
 
@@ -237,6 +240,7 @@ export function LobbyView({
         system={lobby.system}
         format={lobby.format}
         onManageDecks={decks?.onManage}
+        onViewAllDecks={decks ? setDeckPick : undefined}
         onAddDeck={decks?.onAddDeck}
         versionLabel={deckVersionLabel}
         selectingDeckSeats={decks?.selectingSeats}
@@ -468,6 +472,13 @@ export function LobbyView({
           />
           <Button tx="common:close" onPress={() => setInviteOpen(false)} />
         </Sheet>
+      ) : null}
+      {deckPick ? (
+        <LobbyDeckPicker
+          request={deckPick}
+          onClose={() => setDeckPick(undefined)}
+          onAddDeck={decks?.onAddDeck}
+        />
       ) : null}
       {leaveAction && openExitCopy ? (
         <ConfirmDialog

@@ -312,7 +312,7 @@ export default {
     chooseDeck: "○ اختر مجموعة",
     needsDeck: "○ تلزم مجموعة",
     newDeck: "+ مجموعة جديدة",
-    manageDecks: "إدارة المجموعات",
+    viewAllDecks: "عرض كل المجموعات",
     account: "الحساب",
     accountDeckLabel: "{{name}}، متزامنة",
     onDevice: "على هذا الجهاز",
