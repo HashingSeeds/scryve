@@ -74,10 +74,7 @@ export async function fetchScryfall(
     })
   })
   if (response.status === 429)
-    await ctx.runMutation(internal.externalApiRateLimits.block, {
-      bucket: "scryfall:cooldown",
-      durationMs: SCRYFALL_RATE_LIMIT_BLOCK_MS,
-    })
+    await ctx.runMutation(internal.externalApiRateLimits.blockScryfall, { path })
   return response
 }
 

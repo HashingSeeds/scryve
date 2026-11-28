@@ -7,6 +7,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server"
+import { SCRYFALL_RATE_LIMIT_BLOCK_MS } from "./lib/scryfall"
 
 const MAX_INTERVAL_MS = 60_000
 
@@ -38,23 +39,6 @@ export const reserve = internalMutation({
   },
 })
 
-export const block = internalMutation({
-  args: { bucket: v.string(), durationMs: v.number() },
-  handler: async (ctx, args) => {
-    if (!validInterval(args.durationMs))
-      throw new ConvexError({ code: "invalid_rate_limit", message: "Invalid block duration" })
-    const existing = await ctx.db
-      .query("externalApiRateLimits")
-      .withIndex("by_bucket", (query) => query.eq("bucket", args.bucket))
-      .unique()
-    const nextRequestAt = Math.max(existing?.nextRequestAt ?? 0, Date.now() + args.durationMs)
-    const value = { bucket: args.bucket, nextRequestAt }
-    if (existing) await ctx.db.replace(existing._id, value)
-    else await ctx.db.insert("externalApiRateLimits", value)
-    return null
-  },
-})
-
 const SCRYFALL_MAX_WAIT_MS = 10_000
 const GLOBAL_SLOT_MS = 125
 /** why: slot rows are reused each lap; one more lap than a wait window spans keeps a held slot from reading as free. */
@@ -63,13 +47,26 @@ const GLOBAL_SLOTS = SCRYFALL_MAX_WAIT_MS / GLOBAL_SLOT_MS + 2
 /** why: requests leave on different servers after timers, so spacing exactly at Scryfall's per-endpoint limit drew a 429 under load. */
 const SEND_JITTER_MARGIN_MS = 50
 
+/** why: `name` labels usage rows; default paths keep only their first segment so card ids don't make a row each. */
 function scryfallEndpoint(path: string) {
   const endpoint = path.split("?")[0]
   if (["/cards/search", "/cards/named", "/cards/random", "/cards/collection"].includes(endpoint))
-    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 500 + SEND_JITTER_MARGIN_MS }
+    return {
+      name: endpoint,
+      bucket: `scryfall:endpoint:${endpoint}`,
+      intervalMs: 500 + SEND_JITTER_MARGIN_MS,
+    }
   if (endpoint === "/cards/manifest")
-    return { bucket: `scryfall:endpoint:${endpoint}`, intervalMs: 6000 + SEND_JITTER_MARGIN_MS }
-  return { bucket: "scryfall:endpoint:default", intervalMs: 100 }
+    return {
+      name: endpoint,
+      bucket: `scryfall:endpoint:${endpoint}`,
+      intervalMs: 6000 + SEND_JITTER_MARGIN_MS,
+    }
+  return {
+    name: endpoint.split("/").slice(0, 2).join("/"),
+    bucket: "scryfall:endpoint:default",
+    intervalMs: 100,
+  }
 }
 
 async function bucketRow(ctx: QueryCtx, bucket: string) {
@@ -86,6 +83,25 @@ async function writeBucket(
 ) {
   if (existing) await ctx.db.replace(existing._id, value)
   else await ctx.db.insert("externalApiRateLimits", value)
+}
+
+async function countScryfallUsage(
+  ctx: MutationCtx,
+  path: string,
+  counts: { requests: number; rateLimited: number },
+) {
+  const day = new Date(Date.now()).toISOString().slice(0, 10)
+  const endpoint = scryfallEndpoint(path).name
+  const existing = await ctx.db
+    .query("scryfallUsage")
+    .withIndex("by_day_and_endpoint", (q) => q.eq("day", day).eq("endpoint", endpoint))
+    .unique()
+  if (!existing) await ctx.db.insert("scryfallUsage", { day, endpoint, ...counts })
+  else
+    await ctx.db.patch(existing._id, {
+      requests: existing.requests + counts.requests,
+      rateLimited: existing.rateLimited + counts.rateLimited,
+    })
 }
 
 /** why: a query, so requests already holding a slot check for a 429 cooldown without write conflicts. */
@@ -116,7 +132,23 @@ export const acquireScryfall = internalMutation({
         bucket: endpoint.bucket,
         nextRequestAt: requestAt + endpoint.intervalMs,
       })
+      await countScryfallUsage(ctx, path, { requests: 1, rateLimited: 0 })
       return { waitMs: requestAt - now, blocked: false }
     }
+  },
+})
+
+/** why: Scryfall answered 429, so pause every request for the cooldown and count the 429 against its endpoint. */
+export const blockScryfall = internalMutation({
+  args: { path: v.string() },
+  handler: async (ctx, { path }) => {
+    const existing = await bucketRow(ctx, "scryfall:cooldown")
+    const nextRequestAt = Math.max(
+      existing?.nextRequestAt ?? 0,
+      Date.now() + SCRYFALL_RATE_LIMIT_BLOCK_MS,
+    )
+    await writeBucket(ctx, existing, { bucket: "scryfall:cooldown", nextRequestAt })
+    await countScryfallUsage(ctx, path, { requests: 0, rateLimited: 1 })
+    return null
   },
 })

@@ -45,10 +45,7 @@ describe("Scryfall request pacing", () => {
   })
 
   it("stops new and queued requests during a 429 cooldown", async () => {
-    await t.mutation(internal.externalApiRateLimits.block, {
-      bucket: "scryfall:cooldown",
-      durationMs: 30_000,
-    })
+    await t.mutation(internal.externalApiRateLimits.blockScryfall, { path: "/cards/example" })
     now.mockReturnValue(1_000_500)
     expect(await acquire("/cards/example")).toEqual({ waitMs: 29_500, blocked: true })
     await expect(t.query(internal.externalApiRateLimits.scryfallCooldownUntil, {})).resolves.toBe(
@@ -82,17 +79,26 @@ describe("Scryfall request pacing", () => {
     )
   })
 
-  it("preserves the full cooldown after an external 429", async () => {
-    await t.mutation(internal.externalApiRateLimits.block, {
-      bucket: "scryfall:cards-search",
-      durationMs: 30_000,
+  it("counts requests and 429s per day and endpoint", async () => {
+    await acquire("/cards/search?q=first")
+    await acquire("/cards/search?q=second")
+    await acquire("/cards/abc-123")
+    await t.mutation(internal.externalApiRateLimits.blockScryfall, {
+      path: "/cards/search?q=third",
     })
+    await acquire("/cards/def-456")
 
-    await expect(
-      t.mutation(internal.externalApiRateLimits.reserve, {
-        bucket: "scryfall:cards-search",
-        intervalMs: 500,
-      }),
-    ).resolves.toBe(30_000)
+    const rows = await t.run((ctx) => ctx.db.query("scryfallUsage").collect())
+    expect(
+      rows.map(({ day, endpoint, requests, rateLimited }) => ({
+        day,
+        endpoint,
+        requests,
+        rateLimited,
+      })),
+    ).toEqual([
+      { day: "1970-01-01", endpoint: "/cards/search", requests: 2, rateLimited: 1 },
+      { day: "1970-01-01", endpoint: "/cards", requests: 1, rateLimited: 0 },
+    ])
   })
 })
