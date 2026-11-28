@@ -56,15 +56,10 @@ export function tcgplayerCardUrl(
   return wrapAffiliateUrl(direct, tcgplayerAffiliateUrl(), useAffiliate)
 }
 
-// why: both stores' list tools match double-faced and adventure cards by front face and reject the full Scryfall name.
-function listName(name: string) {
-  return name.split(" // ")[0]
-}
-
 function listLines(cards: readonly StoreCardInput[]) {
   return cards
     .filter((card) => (card.quantity ?? 1) > 0)
-    .map((card) => `${Math.max(1, Math.floor(card.quantity ?? 1))} ${listName(card.name)}`)
+    .map((card) => `${Math.max(1, Math.floor(card.quantity ?? 1))} ${card.name}`)
 }
 
 export function tcgplayerMassEntryUrl(

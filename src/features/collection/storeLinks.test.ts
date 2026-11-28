@@ -60,11 +60,11 @@ describe("store links", () => {
     expect(cardKingdomCardUrl({ name: "Sol Ring" })).not.toContain("partner=")
   })
 
-  it("builds a Card Kingdom builder link from front-face names, with the partner tag when on", () => {
+  it("builds a Card Kingdom builder link, with the partner tag when on", () => {
     process.env.EXPO_PUBLIC_CARDKINGDOM_PARTNER = "scryve"
     const url = new URL(
       cardKingdomBuilderUrl([
-        { name: "Delver of Secrets // Insectile Aberration", quantity: 2 },
+        { name: "Delver of Secrets", quantity: 2 },
         { name: "Sol Ring", setCode: "cmm" },
       ]),
     )
@@ -78,14 +78,14 @@ describe("store links", () => {
     )
   })
 
-  it("builds TCGplayer mass entry links from front-face names without set codes", () => {
+  it("builds TCGplayer mass entry links from names without set codes", () => {
     const url = tcgplayerMassEntryUrl([
       { name: "Swamp", setCode: "mdd", quantity: 8 },
-      { name: "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger", quantity: 4 },
+      { name: "Fire // Ice", quantity: 4 },
     ])
     expect(url).toBe(
       `https://www.tcgplayer.com/massentry?productline=Magic&c=${encodeURIComponent(
-        "8 Swamp||4 Ajani, Nacatl Pariah",
+        "8 Swamp||4 Fire // Ice",
       )}`,
     )
   })

@@ -137,6 +137,42 @@ describe("planStoreCheckout", () => {
     expect(planStoreCheckout("mtg", items, "tcgplayer").totalCents).toBe(100)
   })
 
+  it("names split cards in full and other multi-face cards by front face", () => {
+    catalogDb.replacePrintings(
+      "mtg",
+      [
+        printing("fire-ice", "ora-fire-ice", "Fire // Ice", "mh2", 10),
+        printing("delver", "ora-delver", "Delver of Secrets // Insectile Aberration", "isd", 11),
+      ],
+      "v2",
+    )
+    catalogDb.setMeta("mtg:split_card_ids", JSON.stringify(["ora-fire-ice"]))
+    const { items } = computeDeckOwnership("mtg", [
+      { name: "Fire // Ice", oracleId: "ora-fire-ice", quantity: 1 },
+      { name: "Delver of Secrets // Insectile Aberration", oracleId: "ora-delver", quantity: 4 },
+    ])
+    expect(decodeURIComponent(planStoreCheckout("mtg", items, "tcgplayer").url ?? "")).toContain(
+      "c=1 Fire // Ice||4 Delver of Secrets",
+    )
+  })
+
+  it("leaves out a card Card Kingdom prices but has none of, and skips a sold-out finish", () => {
+    catalogDb.replacePrices("mtg", [
+      price("sol-cmm", "cardkingdom", 100),
+      price("sol-c21", "cardkingdom", 250),
+      price("sol-c21", "cardkingdom", 50, "foil"),
+      price("tower", "cardkingdom", 30),
+    ])
+    catalogDb.setMeta("mtg:ck_out_of_stock", JSON.stringify(["sol-cmm", "sol-c21:foil", "tower"]))
+    const { items } = computeDeckOwnership("mtg", [
+      { name: "Sol Ring", oracleId: "ora-sol", quantity: 1 },
+      { name: "Command Tower", oracleId: "ora-tower", quantity: 1 },
+    ])
+    const plan = planStoreCheckout("mtg", items, "cardkingdom")
+    expect(plan.totalCents).toBe(250)
+    expect(plan.lines.map(({ problem }) => problem)).toEqual([undefined, "not_sold"])
+  })
+
   it("has no cart when the store can sell none of the missing cards", () => {
     const { items } = computeDeckOwnership("mtg", [{ name: "Sol Rnig", quantity: 1 }])
     expect(planStoreCheckout("mtg", items, "tcgplayer").url).toBeUndefined()

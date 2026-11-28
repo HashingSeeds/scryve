@@ -80,6 +80,8 @@ describe("cardPricing", () => {
       prices: { "scry-1": tuple! },
     })
     const price = decoded.prices[0]
+    expect(printings.splitCardIds).toEqual([])
+    expect(decoded.ckOutOfStock).toEqual([])
     expect(priceCentsForFinish(price, "nonfoil", "NM", "tcgplayer")).toBe(200)
     expect(priceCentsForFinish(price, "nonfoil", "LP", "tcgplayer")).toBe(170)
     expect(priceCentsForFinish(price, "foil", "NM", "tcgplayer")).toBe(500)

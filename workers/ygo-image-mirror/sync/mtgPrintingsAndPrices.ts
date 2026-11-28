@@ -23,6 +23,8 @@ const CARD_KINGDOM_PRICELIST_URL = "https://api.cardkingdom.com/api/v2/pricelist
 const MIN_PRINTINGS = 50_000
 const MIN_PRICES = 40_000
 
+const SPLIT_LAYOUTS = new Set(["split", "aftermath"])
+
 const NON_DECK_LAYOUTS = new Set([
   "token",
   "double_faced_token",
@@ -50,6 +52,8 @@ interface CardKingdomEntry {
   foilRetailCents?: number
   buylistCents?: number
   foilBuylistCents?: number
+  outOfStock?: boolean
+  foilOutOfStock?: boolean
 }
 
 async function defaultCardsBulkFile(fetcher: Fetch) {
@@ -109,13 +113,16 @@ export async function fetchCardKingdomPrices(
     const retail = parsePriceCents(record?.price_retail)
     const buylist = parsePriceCents(record?.price_buy)
     if (retail === undefined && buylist === undefined) continue
+    const outOfStock = retail !== undefined && record?.qty_retail === 0
     const entry = byScryfallId.get(scryfallId) ?? {}
     if (isFoil) {
       if (retail !== undefined) entry.foilRetailCents = retail
       if (buylist !== undefined) entry.foilBuylistCents = buylist
+      if (outOfStock) entry.foilOutOfStock = true
     } else {
       if (retail !== undefined) entry.retailCents = retail
       if (buylist !== undefined) entry.buylistCents = buylist
+      if (outOfStock) entry.outOfStock = true
     }
     byScryfallId.set(scryfallId, entry)
   }
@@ -158,6 +165,8 @@ export async function buildMtgPrintingsAndPrices(fetcher: Fetch = fetch): Promis
   const sets: Record<string, string> = {}
   const rows: MtgPrintingTuple[] = []
   const prices: Record<string, MtgPriceTuple> = {}
+  const splitCardIds = new Set<string>()
+  const ckOutOfStock: string[] = []
 
   for await (const line of jsonLines(response.body)) {
     const raw = objectRecord(JSON.parse(line))
@@ -217,11 +226,14 @@ export async function buildMtgPrintingsAndPrices(fetcher: Fetch = fetch): Promis
       ck?.foilBuylistCents,
     ])
     if (tuple) prices[scryfallId] = tuple
+    if (ck?.outOfStock) ckOutOfStock.push(scryfallId)
+    if (ck?.foilOutOfStock) ckOutOfStock.push(`${scryfallId}:foil`)
+    if (typeof raw.layout === "string" && SPLIT_LAYOUTS.has(raw.layout)) splitCardIds.add(oracleId)
   }
 
   return {
-    printingsPack: { version, sets, rows },
-    pricesPack: { version, asOf: Date.now(), prices },
+    printingsPack: { version, sets, rows, splitCardIds: [...splitCardIds].sort() },
+    pricesPack: { version, asOf: Date.now(), prices, ckOutOfStock },
   }
 }
 

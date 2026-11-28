@@ -1,7 +1,11 @@
 import { catalogDb } from "@/storage/catalogDb"
 import type { CatalogPrice, CatalogPrinting } from "@/storage/catalogDbTypes"
 
-import { normalizePrintingName } from "./catalogSync"
+import {
+  catalogCardKingdomOutOfStock,
+  catalogSplitCardIds,
+  normalizePrintingName,
+} from "./catalogSync"
 import type { DeckOwnershipItem } from "./deckOwnership"
 import { cardKingdomBuilderUrl, tcgplayerMassEntryUrl, type StoreCardInput } from "./storeLinks"
 
@@ -25,11 +29,24 @@ export type StoreCheckout = {
 }
 
 // why: a name-only cart lets either store fill a card with any finish, foil included.
-function storePrice(rows: readonly CatalogPrice[] | undefined, store: Store) {
+function storePrice(
+  rows: readonly CatalogPrice[] | undefined,
+  store: Store,
+  outOfStock: ReadonlySet<string>,
+) {
   const cents = (rows ?? []).flatMap((row) =>
-    row.source === store && row.retailCents !== undefined ? [row.retailCents] : [],
+    row.source === store &&
+    row.retailCents !== undefined &&
+    !outOfStock.has(row.finish === "foil" ? `${row.printingId}:foil` : row.printingId)
+      ? [row.retailCents]
+      : [],
   )
   return cents.length > 0 ? Math.min(...cents) : undefined
+}
+
+// why: both stores list split and aftermath cards (Fire // Ice) by full name and other multi-face cards by front face, and reject the rest.
+function storeCardName(name: string, split: boolean) {
+  return split ? name : name.split(" // ")[0]
 }
 
 function candidatePrintings(game: string, item: DeckOwnershipItem) {
@@ -53,10 +70,13 @@ export function planStoreCheckout(
     game,
     candidates.flatMap((printings) => printings.map((printing) => printing.printingId)),
   )
+  const outOfStock: ReadonlySet<string> =
+    store === "cardkingdom" ? catalogCardKingdomOutOfStock(game) : new Set()
+  const splitCards = catalogSplitCardIds(game)
+  const price = (printing: CatalogPrinting) =>
+    storePrice(prices.get(printing.printingId), store, outOfStock)
   const sold = (printing: CatalogPrinting) =>
-    store === "tcgplayer"
-      ? printing.tcgplayerId !== undefined
-      : storePrice(prices.get(printing.printingId), store) !== undefined
+    store === "tcgplayer" ? printing.tcgplayerId !== undefined : price(printing) !== undefined
 
   const cart: StoreCardInput[] = []
   let totalCents = 0
@@ -66,10 +86,11 @@ export function planStoreCheckout(
     if (printings.length === 0) return { item, problem: "unknown_card" }
     const listed = printings.filter(sold)
     if (listed.length === 0) return { item, problem: "not_sold" }
-    const priced = listed.flatMap(
-      (printing) => storePrice(prices.get(printing.printingId), store) ?? [],
-    )
-    cart.push({ name: item.name, quantity: item.missing })
+    const priced = listed.flatMap((printing) => price(printing) ?? [])
+    cart.push({
+      name: storeCardName(item.name, splitCards.has(listed[0].cardId)),
+      quantity: item.missing,
+    })
     if (priced.length === 0) unpricedCount += 1
     else totalCents += Math.min(...priced) * item.missing
     return { item }
