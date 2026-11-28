@@ -725,7 +725,6 @@ export const syncPreconRows = internalMutation({
         name: deck.name,
         format: preconstructedFormat(deck.type),
         ...(Number.isNaN(publishedAt) ? {} : { publishedAt }),
-        ...(deck.setName ? { setName: deck.setName } : {}),
       }
       const existing = await ctx.db
         .query("deckCatalogs")
@@ -733,22 +732,24 @@ export const syncPreconRows = internalMutation({
           q.eq("game", row.game).eq("source", row.source).eq("externalId", row.externalId),
         )
         .unique()
-      const searchText = preconSearchText({ ...row, commanderNames: existing?.commanderNames })
+      // why: a failed set list leaves deck.setName empty, so the stored name keeps its search terms.
+      const setName = deck.setName ?? existing?.setName
+      const searchText = preconSearchText({
+        ...row,
+        setName,
+        commanderNames: existing?.commanderNames,
+      })
+      const synced = { ...row, ...(setName ? { setName } : {}), searchText }
       if (!existing)
-        await ctx.db.insert("deckCatalogs", { ...row, searchText, fetchedAt: catalog.fetchedAt })
+        await ctx.db.insert("deckCatalogs", { ...synced, fetchedAt: catalog.fetchedAt })
       else if (
         existing.name !== row.name ||
         existing.format !== row.format ||
         existing.publishedAt !== row.publishedAt ||
-        existing.setName !== row.setName ||
+        existing.setName !== setName ||
         existing.searchText !== searchText
       )
-        await ctx.db.patch(existing._id, {
-          ...row,
-          publishedAt: row.publishedAt,
-          setName: row.setName,
-          searchText,
-        })
+        await ctx.db.patch(existing._id, { ...synced, publishedAt: row.publishedAt })
     }
     if (offset + PRECON_ROW_BATCH < decks.length)
       await ctx.scheduler.runAfter(0, internal.deckImports.syncPreconRows, {

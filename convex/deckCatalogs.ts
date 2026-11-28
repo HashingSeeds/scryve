@@ -631,6 +631,7 @@ export const refreshScheduled = internalAction({
     if (env.CARD_CATALOG_SYNC === "off") return null
     if (await actionCapabilityEnabled(ctx, "mtg", "exampleDecks")) {
       await ctx.runMutation(internal.deckCatalogs.seedMagicExamples, {})
+      await ctx.runMutation(internal.deckImports.requestCatalogRefresh, {})
       await ctx.scheduler.runAfter(0, internal.deckImports.fillPreconIdentity, { cursor: null })
     }
     for (const game of GAME_SYSTEM_IDS.filter(isProviderGame)) {

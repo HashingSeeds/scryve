@@ -846,6 +846,11 @@ describe("Browse list", () => {
       expect(await search("40k")).toEqual([stored])
       expect(await search("warhammer")).toEqual([stored])
       expect(await search("szarekh")).toEqual([stored])
+      delete files["SetList.json"]
+      jest.useFakeTimers()
+      await t.action(internal.deckImports.refreshCatalog, {})
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      expect(await search("warhammer")).toEqual([stored])
     } finally {
       fetchSpy.mockRestore()
       jest.useRealTimers()
