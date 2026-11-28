@@ -117,7 +117,7 @@ describe("recapReceipt", () => {
     for (const turnLog of [null, TURNS.slice(0, 1)]) {
       const receipt = receiptOf(BEA_WINS_AT_3, turnLog)
 
-      expect(receipt.line).toBe("Kenrith hit Bea for 9")
+      expect(receipt.line).toBe("Kenrith hit Bea for 9 · Bea wins")
       expect(receipt.seats.every(({ outTurn }) => outTurn === undefined)).toBe(true)
       expect(receipt.caption).toBe("Bea won at 3 life. Bea, Kenrith, Sam & Ari, Commander.")
     }

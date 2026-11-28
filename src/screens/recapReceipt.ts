@@ -1,4 +1,4 @@
-import { counterValueLabel } from "@/features/game/playSystems"
+import { counterValueLabel, playSystemRules } from "@/features/game/playSystems"
 import type { ReceiptChange, ReceiptLog } from "@/features/game/receiptLog"
 import { formatConjunction, formatDate, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
@@ -73,17 +73,19 @@ export function recapReceipt(model: GameSummaryModel): Receipt {
               }),
         )
       : undefined,
-    lead && log?.finishTurn !== undefined
+    lead && log
       ? onTurn(
           log.finishTurn,
           translate("play:summary.receipt.wins", { names, count: winners.length }),
         )
       : undefined,
   ])
+  // why: in a race the loser is out when someone else reaches the goal, so their own last change is not when they went out.
+  const survive = playSystemRules(model.system).counter.goal.kind === "survive"
   const seats = model.players.map((player): ReceiptSeat => {
     const out = recapOut(model, player)
     const outTurn =
-      out && out.cause !== "counter"
+      out?.cause === "commanderDamage" || (out?.cause === "life" && survive)
         ? log?.changes.findLast((change) => moves(player, change))?.turn
         : undefined
     return {

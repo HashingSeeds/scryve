@@ -14,7 +14,7 @@ import { shareImage } from "@/utils/shareImage"
 
 import type { GameSummaryModel, SummaryPlayer } from "./gameSummary"
 import { recapOut } from "./gameSummary"
-import { recapReceipt } from "./recapReceipt"
+import { recapReceipt, type Receipt } from "./recapReceipt"
 
 const STRIP_WIDTH = 88
 const STRIP_HEIGHT = 32
@@ -46,7 +46,7 @@ const PAD = 18
 const INNER = IMAGE_WIDTH - PAD * 2
 const CLAIM_Y = PAD + 30
 const GRAPH_TOP = 68
-const TILE_HEIGHT = 50
+const TILE_HEIGHT = 58
 const TILE_GAP = 4
 const FOOTER_Y = IMAGE_HEIGHT - PAD
 const LINE_Y = FOOTER_Y - 24
@@ -94,8 +94,15 @@ const clipped = (text: string, length: number) =>
 const fitted = (text: string, width: number, size: number, min: number) =>
   Math.max(min, Math.min(size, width / (text.length * GLYPH_WIDTH)))
 
-function ReceiptImage({ model, svgRef }: { model: GameSummaryModel; svgRef: React.Ref<Svg> }) {
-  const receipt = recapReceipt(model)
+function ReceiptImage({
+  model,
+  receipt,
+  svgRef,
+}: {
+  model: GameSummaryModel
+  receipt: Receipt
+  svgRef: React.Ref<Svg>
+}) {
   const lives = model.recap?.lives
   const scale = lives ? lifeScale(lives) : undefined
   const claimSize = fitted(receipt.claim, INNER, 30, 18)
@@ -214,19 +221,18 @@ function ReceiptImage({ model, svgRef }: { model: GameSummaryModel; svgRef: Reac
               fill={player.color}
               fillOpacity={won ? 0.34 : 0.14}
             />
-            <SvgText x={x + 7} y={y + 16} {...IMAGE_FONT.bold} fontSize={11} fill={player.color}>
+            <SvgText x={x + 7} y={y + 15} {...IMAGE_FONT.bold} fontSize={11} fill={player.color}>
               {clipped(player.name, chars)}
             </SvgText>
             {model.logged ? null : (
-              <SvgText x={x + 7} y={y + 40} {...IMAGE_FONT.bold} fontSize={21} fill={player.color}>
+              <SvgText x={x + 7} y={y + 37} {...IMAGE_FONT.bold} fontSize={21} fill={player.color}>
                 {formatNumber(player.life)}
               </SvgText>
             )}
             {outTurn === undefined ? null : (
               <SvgText
-                x={x + tileWidth - 7}
-                y={y + 40}
-                textAnchor="end"
+                x={x + 7}
+                y={y + 51}
                 {...IMAGE_FONT.regular}
                 fontSize={10}
                 fill={player.color}
@@ -272,10 +278,10 @@ export function RecapShare({
 }) {
   const svgRef = useRef<Svg>(null)
   const done = useEffectEvent(onDone)
-  const caption = useEffectEvent(() => recapReceipt(model).caption)
+  const receipt = recapReceipt(model)
+  const caption = useEffectEvent(() => receipt.caption)
   useEffect(() => {
     let active = true
-    captureAnalytics("recap_share_tapped", {})
     const frame = requestAnimationFrame(() =>
       svgRef.current?.toDataURL((base64) => {
         if (!active) return
@@ -297,7 +303,7 @@ export function RecapShare({
       importantForAccessibility="no-hide-descendants"
       style={$offscreen}
     >
-      <ReceiptImage model={model} svgRef={svgRef} />
+      <ReceiptImage model={model} receipt={receipt} svgRef={svgRef} />
     </View>
   )
 }
