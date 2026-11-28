@@ -3,6 +3,7 @@ import type { GameEvent, LocalGame, PlayerId, TurnLogEntry } from "@/features/ga
 
 import { localSummaryModel } from "./gameSummary"
 import { recapReceipt } from "./recapReceipt"
+import type { GameRecap } from "../../convex/lib/gameRecap"
 
 const START = new Date("2026-11-20T20:00:00Z").getTime()
 const SEATS = ["Bea", "Kenrith", "Ari", "Sam"] as const
@@ -52,7 +53,11 @@ const TURNS: TurnLogEntry[] = Array.from({ length: 11 }, (_, index) => ({
   at: START + (index + 1) * 100_000,
 }))
 
-function receiptOf(changes: Change[], turnLog: TurnLogEntry[] | null = TURNS) {
+function receiptOf(
+  changes: Change[],
+  turnLog: TurnLogEntry[] | null = TURNS,
+  stored = (recap: GameRecap | undefined) => recap,
+) {
   const events = changes.map(event)
   const lives = new Map(SEATS.map((name) => [name, 40]))
   for (const change of changes) lives.set(change.to, (lives.get(change.to) ?? 0) + change.delta)
@@ -77,7 +82,7 @@ function receiptOf(changes: Change[], turnLog: TurnLogEntry[] | null = TURNS) {
     result: { kind: "win", winnerPlayerIds: [id("Bea")] },
     ...(turnLog ? { turn: { ...TURNS[10], startedAt: TURNS[10].at }, turnLog } : {}),
   } as LocalGame
-  return recapReceipt(localSummaryModel(game, localGameRecap(game)))
+  return recapReceipt(localSummaryModel(game, stored(localGameRecap(game))))
 }
 
 describe("recapReceipt", () => {
@@ -121,5 +126,14 @@ describe("recapReceipt", () => {
       expect(receipt.seats.every(({ outTurn }) => outTurn === undefined)).toBe(true)
       expect(receipt.caption).toBe("Bea won at 3 life. Bea, Kenrith, Sam & Ari, Commander.")
     }
+  })
+
+  it("reads a recap stored before it kept turns and sources as plain changes", () => {
+    const receipt = receiptOf(BEA_WINS_AT_3, TURNS, (recap) =>
+      recap?.lives ? { lives: recap.lives, ...(recap.outs ? { outs: recap.outs } : {}) } : recap,
+    )
+
+    expect(receipt.line).toBe("Bea took 9 · Bea wins")
+    expect(receipt.seats.every(({ outTurn }) => outTurn === undefined)).toBe(true)
   })
 })

@@ -3726,14 +3726,30 @@ describe("finished game recap", () => {
     ])
   })
 
-  it("stores each seat's life over the game and the commander damage that took a seat out", async () => {
+  it("stores each seat's life over the game, with the turn and commander behind each change", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t, { system: "mtg", ruleset: "commander", startingLife: 40 })
     const joinerLife = (operationId: string, delta: number) =>
       lifeArgs(game.publicId, game.joinerPlayerId, operationId, delta, "device-joiner-001")
     await game.host.mutation(
+      api.games.tableAction,
+      tableArgs(game.publicId, "operation-turn-0001", {
+        kind: "turn.set",
+        playerId: game.hostPlayerId,
+        toPlayerId: game.hostPlayerId,
+      }),
+    )
+    await game.host.mutation(
       api.games.changeLife,
       lifeArgs(game.publicId, game.hostPlayerId, "operation-life-0001", -3),
+    )
+    await game.host.mutation(
+      api.games.tableAction,
+      tableArgs(game.publicId, "operation-turn-0002", {
+        kind: "turn.passed",
+        playerId: game.hostPlayerId,
+        toPlayerId: game.joinerPlayerId,
+      }),
     )
     await game.joiner.mutation(api.games.changeLife, joinerLife("operation-life-0002", -9))
     await game.joiner.mutation(api.games.changeLife, {
@@ -3762,6 +3778,11 @@ describe("finished game recap", () => {
         [37, 40],
         [37, 19],
       ],
+      steps: [
+        { seat: 0, turn: 1 },
+        { seat: 1, turn: 2, from: 0 },
+      ],
+      finishTurn: 2,
       outs: [{ seat: 1, cause: "commanderDamage", from: 0, total: 21 }],
     })
   })

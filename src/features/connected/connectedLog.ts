@@ -5,10 +5,10 @@ import {
   mergedLog,
   rowPosition,
 } from "@/features/game/LifeLog"
-import type { CounterLogEntry, GameEvent, GamePlayer, TurnLogEntry } from "@/features/game/types"
+import type { CounterLogEntry, GameEvent, GamePlayer } from "@/features/game/types"
 
 import { compareQueued, type PendingLifeAction } from "./model"
-import type { ConnectedLogEvent } from "../../../convex/lib/gameLog"
+import { turnLog, type ConnectedLogEvent } from "../../../convex/lib/gameLog"
 import { commanderField, type PARTNER_COMMANDER } from "../../../convex/lib/gameRules"
 import {
   customCounterId,
@@ -132,7 +132,14 @@ export function connectedLogInputs(
       ]
     return []
   })
-  return { events: lifeEvents, turns: turnLog(events, turn), counters: counterLog(events, table) }
+  return {
+    events: lifeEvents,
+    turns: turnLog(events, turn).map((entry) => ({
+      ...entry,
+      playerId: asPlayerId(entry.playerId),
+    })),
+    counters: counterLog(events, table),
+  }
 }
 
 export interface CounterTable {
@@ -167,54 +174,6 @@ function counterLog(events: readonly ConnectedLogEvent[], table: CounterTable): 
       at: event.clientCreatedAt,
     })
   }
-  return entries.reverse()
-}
-
-function turnLog(events: readonly ConnectedLogEvent[], turn: Turn | undefined): TurnLogEntry[] {
-  if (!turn) return []
-  const undone = new Set(
-    events.flatMap(({ action }) =>
-      action?.kind === "turn.undone" ? [action.turnOperationId] : [],
-    ),
-  )
-  const starts = events.filter(
-    ({ action, operationId }) =>
-      (action?.kind === "turn.passed" || action?.kind === "turn.set") && !undone.has(operationId),
-  )
-  const newest = starts.findLastIndex(({ operationId }) => operationId === turn.operationId)
-  if (newest < 0)
-    return [
-      {
-        operationId: turn.operationId,
-        playerId: asPlayerId(turn.playerId),
-        number: turn.number,
-        at: turn.startedAt,
-      },
-    ]
-  const entries: TurnLogEntry[] = []
-  let number = turn.number
-  let firstPasser: string | undefined
-  for (const event of starts.slice(0, newest + 1).reverse()) {
-    if (number < 1) break
-    const { action } = event
-    if (action?.kind !== "turn.passed" && action?.kind !== "turn.set") continue
-    if (entries.at(-1)?.number !== number)
-      entries.push({
-        operationId: event.operationId,
-        playerId: asPlayerId(action.toPlayerId),
-        number,
-        at: event.clientCreatedAt,
-      })
-    firstPasser = action.kind === "turn.passed" ? action.playerId : undefined
-    if (action.kind === "turn.passed") number -= 1
-  }
-  if (number === 1 && firstPasser && entries.at(-1)?.number !== 1)
-    entries.push({
-      operationId: `${turn.operationId}:first`,
-      playerId: asPlayerId(firstPasser),
-      number: 1,
-      at: 0,
-    })
   return entries.reverse()
 }
 

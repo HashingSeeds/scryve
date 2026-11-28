@@ -24,13 +24,23 @@ const recapOutValidator = v.union(
   v.object({ seat: v.number(), cause: v.literal("life") }),
 )
 
+// why: each step is the change that drew the next life row: whose life moved, on which turn, and whose commander dealt it.
+const recapStepValidator = v.object({
+  seat: v.number(),
+  turn: v.optional(v.number()),
+  from: v.optional(v.number()),
+})
+
 export const gameRecapValidator = v.object({
   lives: v.optional(v.array(v.array(v.number()))),
+  steps: v.optional(v.array(recapStepValidator)),
+  finishTurn: v.optional(v.number()),
   outs: v.optional(v.array(recapOutValidator)),
 })
 
 export type GameRecap = Infer<typeof gameRecapValidator>
 export type RecapOut = Infer<typeof recapOutValidator>
+export type RecapStep = Infer<typeof recapStepValidator>
 
 export interface RecapSeat {
   id: string
@@ -43,6 +53,8 @@ export interface RecapChange {
   playerId: string
   delta: number
   undoOf?: string
+  turn?: number
+  from?: string
 }
 
 export function buildRecap({
@@ -50,32 +62,57 @@ export function buildRecap({
   changes,
   teams,
   outs = [],
+  finishTurn,
 }: {
   seats: readonly RecapSeat[]
   changes: readonly RecapChange[]
   teams?: TurnGroups
   outs?: readonly RecapOut[]
+  finishTurn?: number
 }): GameRecap | undefined {
   const undone = new Set(changes.flatMap(({ undoOf }) => undoOf ?? []))
+  const seatOf = new Map(seats.map(({ id }, seat) => [id, seat]))
   const rows = [seats.map(({ startingLife }) => startingLife)]
-  let previous: { playerId: string; sign: number } | undefined
+  const steps: RecapStep[] = []
+  let previous: (RecapChange & { sign: number }) | undefined
   for (const change of changes) {
     if (change.undoOf !== undefined || undone.has(change.id) || change.delta === 0) continue
     const moved = new Set([change.playerId, ...teammatesOf(teams, change.playerId)])
-    if (!seats.some(({ id }) => moved.has(id))) continue
+    const seat = seatOf.get(change.playerId) ?? seats.findIndex(({ id }) => moved.has(id))
+    if (seat < 0) continue
     const last = rows[rows.length - 1]
-    const next = last.map((life, seat) => (moved.has(seats[seat].id) ? life + change.delta : life))
+    const next = last.map((life, index) =>
+      moved.has(seats[index].id) ? life + change.delta : life,
+    )
     const sign = Math.sign(change.delta)
-    if (rows.length > 1 && previous?.playerId === change.playerId && previous.sign === sign)
+    const from = change.from === undefined ? undefined : seatOf.get(change.from)
+    if (
+      rows.length > 1 &&
+      previous?.playerId === change.playerId &&
+      previous.sign === sign &&
+      previous.turn === change.turn &&
+      previous.from === change.from
+    )
       rows[rows.length - 1] = next
-    else rows.push(next)
-    previous = { playerId: change.playerId, sign }
+    else {
+      rows.push(next)
+      steps.push({
+        seat,
+        ...(change.turn === undefined ? {} : { turn: change.turn }),
+        ...(from === undefined ? {} : { from }),
+      })
+    }
+    previous = { ...change, sign }
   }
   const final = rows[rows.length - 1]
   const explained = rows.length > 1 && final.every((life, seat) => life === seats[seat].life)
-  if (!explained && outs.length === 0) return undefined
+  if (!explained && outs.length === 0 && finishTurn === undefined) return undefined
   return {
-    ...(explained ? { lives: thinned(rows) } : {}),
+    // why: thinned rows each fold several changes, so no single step explains them.
+    ...(explained
+      ? { lives: thinned(rows), ...(rows.length <= MAX_RECAP_ROWS ? { steps } : {}) }
+      : {}),
+    ...(finishTurn === undefined ? {} : { finishTurn }),
     ...(outs.length > 0 ? { outs: [...outs] } : {}),
   }
 }
@@ -138,9 +175,29 @@ export function fittedRecap(recap: unknown, finalLives: readonly number[]): Game
     rows[rows.length - 1].every((life, seat) => life === finalLives[seat])
       ? rows
       : undefined
+  const isTurn = (turn: unknown): turn is number =>
+    typeof turn === "number" && Number.isInteger(turn) && turn > 0
+  const isStep = (step: unknown): step is RecapStep =>
+    isRecord(step) &&
+    isSeat(step.seat) &&
+    (step.turn === undefined || isTurn(step.turn)) &&
+    (step.from === undefined || (isSeat(step.from) && step.from !== step.seat))
+  const steps =
+    lives &&
+    Array.isArray(recap.steps) &&
+    recap.steps.length === lives.length - 1 &&
+    recap.steps.every(isStep)
+      ? recap.steps
+      : undefined
+  const finishTurn = isTurn(recap.finishTurn) ? recap.finishTurn : undefined
   const outs = (Array.isArray(recap.outs) ? recap.outs.filter(isOut) : []).filter(
     (out, index, all) => all.findIndex(({ seat }) => seat === out.seat) === index,
   )
-  if (!lives && outs.length === 0) return undefined
-  return { ...(lives ? { lives } : {}), ...(outs.length > 0 ? { outs } : {}) }
+  if (!lives && outs.length === 0 && finishTurn === undefined) return undefined
+  return {
+    ...(lives ? { lives } : {}),
+    ...(steps ? { steps } : {}),
+    ...(finishTurn === undefined ? {} : { finishTurn }),
+    ...(outs.length > 0 ? { outs } : {}),
+  }
 }
