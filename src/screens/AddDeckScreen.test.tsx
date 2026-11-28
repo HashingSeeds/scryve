@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from "react"
 import { Linking } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
+import type { ReactTestInstance } from "react-test-renderer"
 
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { saveCardDetails } from "@/features/decks/cardDetailsCache"
@@ -404,6 +405,11 @@ describe("AddDeckScreen", () => {
     expect(problemsHeader.getByText("Lines to fix")).toBeTruthy()
     expect(problemsHeader.getByText("2")).toBeTruthy()
     expect(view.getByTestId("save-import-button")).toBeDisabled()
+    fireEvent.press(view.getByLabelText("Search for a card to replace Island (M21) 265"))
+    const barText = (node: ReactTestInstance | string): string =>
+      typeof node === "string" ? node : node.children.map(barText).join("")
+    expect(barText(view.getByTestId("card-search-input"))).toMatch(/(^| )Island$/)
+    fireEvent.press(view.getByTestId("card-search-close"))
     fireEvent.press(view.getByLabelText("Remove 0 Mountain"))
     expect(view.queryByText('"0 Mountain"')).toBeNull()
     expect(view.getByTestId("save-import-button")).toBeDisabled()

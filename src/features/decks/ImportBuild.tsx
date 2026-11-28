@@ -375,6 +375,7 @@ export function ImportBuild({
           game={game}
           format={format}
           initialSection={search.commander ? "commander" : undefined}
+          initialQuery={search.fixing ? lineCardName(search.fixing.line) : undefined}
           commanderCards={shown}
           onClose={() => setSearch(undefined)}
           onRemove={onRemove}

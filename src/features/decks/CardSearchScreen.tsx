@@ -225,6 +225,7 @@ type CardSearchProps = {
    */
   offlineCandidates?: KnownCardEntry[]
   initialSection?: string
+  initialQuery?: string
   commanderCards?: DeckCard[]
   deckCards?: DeckCard[]
   presentation?: "modal" | "screen"
@@ -250,6 +251,7 @@ export function CardSearch({
   onClose,
   offlineCandidates,
   initialSection,
+  initialQuery = "",
   commanderCards,
   deckCards,
   presentation = "modal",
@@ -352,11 +354,11 @@ export function CardSearch({
     source
       ? formatCardQuery(
           source,
-          { rest: "", filters: startingPicked, colors: startingFilters.colors },
+          { rest: initialQuery, filters: startingPicked, colors: startingFilters.colors },
           startingFilters.colorMatch,
           cardFilters,
         )
-      : "",
+      : initialQuery,
   )
   const parsed = useMemo<CardQuery>(
     () =>
