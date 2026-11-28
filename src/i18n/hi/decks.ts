@@ -272,6 +272,7 @@ export default {
   },
   cardFocus: {
     close: "कार्ड विवरण बंद करें",
+    changePrinting: "प्रिंटिंग बदलें",
     front: "सामने",
     back: "पीछे",
     loadingDetails: "विवरण लोड हो रहा है…",
@@ -512,9 +513,12 @@ export default {
   },
   checkout: {
     totalUnpriced: "{{total}} + {{count}} बिना कीमत वाले",
-    notSold: "{{store}} पर नहीं मिलता",
+    notSold: "{{store}} पर उपलब्ध नहीं",
     unknownCard: "इस नाम का कोई कार्ड नहीं",
     openCard: "कार्ड को डेक में खोलता है",
+    beforeShipping: "शिपिंग से पहले",
+    pricesFrom: "{{date}} के दाम",
+    optimize: "इस टोटल के लिए {{store}} कार्ट ऑप्टिमाइज़ करें",
     open_one: "{{store}} खोलें, {{count}} कार्ड के साथ",
     open_other: "{{store}} खोलें, {{count}} कार्ड के साथ",
   },

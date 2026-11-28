@@ -22,6 +22,21 @@ describe("MTG printings and prices sync", () => {
         prices: { usd: "1.99", usd_foil: "4.50", eur: "1.25" },
       }),
       JSON.stringify({
+        id: "scry-fire-ice",
+        oracle_id: "ora-fire-ice",
+        name: "Fire // Ice",
+        set: "mh2",
+        set_name: "Modern Horizons 2",
+        collector_number: "290",
+        rarity: "rare",
+        finishes: ["nonfoil"],
+        tcgplayer_id: 240138,
+        digital: false,
+        layout: "split",
+        image_uris: { normal: "https://cards.scryfall.io/normal/front/0/e/scry-fire-ice.jpg" },
+        prices: { usd: "0.50" },
+      }),
+      JSON.stringify({
         id: "scry-digital",
         oracle_id: "ora-dig",
         name: "Alchemy Card",
@@ -59,6 +74,7 @@ describe("MTG printings and prices sync", () => {
               is_foil: "true",
               price_retail: "5.99",
               price_buy: "2.50",
+              qty_retail: 0,
             },
           ],
         })
@@ -79,8 +95,8 @@ describe("MTG printings and prices sync", () => {
       report: () => {},
     })
 
-    expect(result.printings).toBe(1)
-    expect(result.prices).toBe(1)
+    expect(result.printings).toBe(2)
+    expect(result.prices).toBe(2)
 
     const printingsRaw = JSON.parse(
       gunzipSync(uploads.get("https://preview.example/datasets/mtg/printings.json")!).toString(),
@@ -89,7 +105,9 @@ describe("MTG printings and prices sync", () => {
       gunzipSync(uploads.get("https://preview.example/datasets/mtg/prices.json")!).toString(),
     )
 
-    expect(decodeMtgPrintingsPack(printingsRaw).printings).toEqual([
+    expect(decodeMtgPrintingsPack(printingsRaw).splitCardIds).toEqual(["ora-fire-ice"])
+    expect(decodeMtgPricesPack(pricesRaw).ckOutOfStock).toEqual(["scry-sol-1:foil"])
+    expect(decodeMtgPrintingsPack(printingsRaw).printings.slice(0, 1)).toEqual([
       {
         printingId: "scry-sol-1",
         cardId: "ora-sol",
@@ -104,7 +122,7 @@ describe("MTG printings and prices sync", () => {
         smallImageUrl: "https://cards.scryfall.io/small/front/1/2/scry-sol-1.jpg",
       },
     ])
-    expect(decodeMtgPricesPack(pricesRaw).prices).toEqual([
+    expect(decodeMtgPricesPack(pricesRaw).prices.slice(0, 1)).toEqual([
       {
         printingId: "scry-sol-1",
         usdCents: 199,

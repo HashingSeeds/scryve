@@ -37,6 +37,8 @@ export interface MtgPrintingsPack {
   version: string
   sets: Record<string, string>
   rows: MtgPrintingTuple[]
+  // why: stores list split and aftermath cards (Fire // Ice) by full name and every other multi-face card by front face, and the rows carry no layout.
+  splitCardIds?: string[]
 }
 
 export type MtgPriceTuple = (number | null)[]
@@ -45,6 +47,8 @@ export interface MtgPricesPack {
   version: string
   asOf: number
   prices: Record<string, MtgPriceTuple>
+  // why: Card Kingdom prices cards it has none of; its builder skips them. Entries are a printing id, with ":foil" for the foil finish.
+  ckOutOfStock?: string[]
 }
 
 export interface DecodedPrinting {
@@ -178,9 +182,14 @@ export function decodePriceTuple(printingId: string, tuple: MtgPriceTuple): Deco
   }
 }
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : []
+}
+
 export function decodeMtgPrintingsPack(value: unknown): {
   version: string
   printings: DecodedPrinting[]
+  splitCardIds: string[]
 } {
   const record = objectRecord(value)
   if (!record || typeof record.version !== "string" || !Array.isArray(record.rows)) {
@@ -231,13 +240,14 @@ export function decodeMtgPrintingsPack(value: unknown): {
       ...(smallImageUrl ? { smallImageUrl } : {}),
     })
   }
-  return { version: record.version, printings }
+  return { version: record.version, printings, splitCardIds: stringList(record.splitCardIds) }
 }
 
 export function decodeMtgPricesPack(value: unknown): {
   version: string
   asOf: number
   prices: DecodedPrice[]
+  ckOutOfStock: string[]
 } {
   const record = objectRecord(value)
   const priceMap = objectRecord(record?.prices)
@@ -254,7 +264,12 @@ export function decodeMtgPricesPack(value: unknown): {
     if (!Array.isArray(tuple)) continue
     prices.push(decodePriceTuple(printingId, tuple as MtgPriceTuple))
   }
-  return { version: record.version, asOf: record.asOf, prices }
+  return {
+    version: record.version,
+    asOf: record.asOf,
+    prices,
+    ckOutOfStock: stringList(record.ckOutOfStock),
+  }
 }
 
 export function priceCentsForFinish(

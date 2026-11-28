@@ -1,6 +1,9 @@
 import { catalogDb } from "@/storage/catalogDb"
 
 import {
+  catalogCardKingdomOutOfStock,
+  catalogPricesAsOf,
+  catalogSplitCardIds,
   lookupPrintingPrice,
   resolveScannedPrinting,
   syncCatalogPrintingsAndPrices,
@@ -46,6 +49,7 @@ describe("catalogSync", () => {
                 "front/1/2/lea.jpg",
               ],
             ],
+            splitCardIds: ["ora-fire-ice"],
           }),
           { status: 200, headers: { etag: '"p-v1"' } },
         )
@@ -60,6 +64,7 @@ describe("catalogSync", () => {
               "scry-cmm": [199, 550, null, 150, null, 249, 649, 110, 300],
               "scry-lea": [45000, null, null, null, null, 49999, null, 25000],
             },
+            ckOutOfStock: ["scry-lea"],
           }),
           { status: 200, headers: { etag: '"pr-v1"' } },
         )
@@ -70,6 +75,9 @@ describe("catalogSync", () => {
     const first = await syncCatalogPrintingsAndPrices("mtg", { fetcher: mockFetch, now: 1000 })
     expect(first).toEqual({ printingsUpdated: true, pricesUpdated: true })
     expect(catalogDb.hasPrintings("mtg")).toBe(true)
+    expect(catalogSplitCardIds("mtg")).toEqual(new Set(["ora-fire-ice"]))
+    expect(catalogCardKingdomOutOfStock("mtg")).toEqual(new Set(["scry-lea"]))
+    expect(catalogPricesAsOf("mtg")).toBe(1_764_000_000_000)
 
     const resolvedExact = resolveScannedPrinting("mtg", "Sol Ring", {
       setCode: "cmm",

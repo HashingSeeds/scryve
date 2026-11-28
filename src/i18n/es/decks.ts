@@ -293,6 +293,7 @@ export default {
   },
   cardFocus: {
     close: "Cerrar detalles de la carta",
+    changePrinting: "Cambiar edición",
     front: "Anverso",
     back: "Reverso",
     loadingDetails: "Cargando detalles…",
@@ -538,9 +539,12 @@ export default {
   },
   checkout: {
     totalUnpriced: "{{total}} + {{count}} sin precio",
-    notSold: "No se vende en {{store}}",
+    notSold: "No disponible en {{store}}",
     unknownCard: "No hay ninguna carta con este nombre",
     openCard: "Abre la carta en el mazo",
+    beforeShipping: "Antes del envío",
+    pricesFrom: "Precios del {{date}}",
+    optimize: "Optimiza el carrito de {{store}} para este total",
     open_one: "Abrir {{store}} con {{count}} carta",
     open_many: "Abrir {{store}} con {{count}} de cartas",
     open_other: "Abrir {{store}} con {{count}} cartas",

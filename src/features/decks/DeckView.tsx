@@ -15,6 +15,7 @@ import { TextField } from "@/components/TextField"
 import { useCatalogSync } from "@/features/collection/catalogSync"
 import { useCollectionRevision } from "@/features/collection/collectionStore"
 import { computeDeckOwnership } from "@/features/collection/deckOwnership"
+import { planStoreCheckout } from "@/features/collection/storeCheckout"
 import { StoreCheckoutSheet } from "@/features/collection/StoreCheckoutSheet"
 import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import { prereleaseBuild } from "@/features/updates/appUpdate"
@@ -187,6 +188,11 @@ export function DeckView({
     void catalogSync.version
     return showOwnership && catalogDb.hasPrintings(game) && catalogDb.hasPrices(game)
   }, [catalogSync.version, game, showOwnership])
+  // why: the bar shows what the Buy missing sheet charges at TCGplayer, so the two totals agree.
+  const missingCents = useMemo(
+    () => (ownership ? planStoreCheckout(game, ownership.items, "tcgplayer").totalCents : 0),
+    [game, ownership],
+  )
   const issues = useDeckIssues(game, format, shownCards)
   const side = sideboardSection({ game, format })
   const sideCount = totalQuantity(shownCards.filter((card) => cardSection(card) === side?.id))
@@ -299,7 +305,7 @@ export function DeckView({
                         ? translate("decks:collection.ownershipComplete")
                         : translate("decks:collection.ownershipMissing", {
                             missing: ownership.missingCards,
-                            cost: formatCurrency(ownership.estimatedMissingCents, "USD"),
+                            cost: formatCurrency(missingCents, "USD"),
                           })
                     }
                   />

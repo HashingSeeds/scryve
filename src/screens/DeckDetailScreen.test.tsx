@@ -9,6 +9,7 @@ import { loadMatchSwaps } from "@/features/decks/matchSideboard"
 import { loadAccountDraft } from "@/features/decks/savedDeckDrafts"
 import { createLocalGame, createNextMatchGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { catalogDb } from "@/storage/catalogDb"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
 
@@ -1703,6 +1704,134 @@ describe("DeckDetailScreen", () => {
     })
     expect(mockUpdateDeck).toHaveBeenCalledTimes(1)
     expect(mockUpdateDeck).toHaveBeenCalledWith({ deckId: "deck-1", note: "Updated note" })
+  })
+
+  it("moves every copy to the printing picked in the card's dialog and saves its ids", async () => {
+    catalogDb.clearAll()
+    catalogDb.replacePrintings(
+      "mtg",
+      ["22222222-2222-2222-2222-222222222222", "sol-c21"].map((printingId, index) => ({
+        game: "mtg",
+        printingId,
+        cardId: solRing.oracleId,
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: index === 0 ? "cmm" : "c21",
+        collectorNumber: String(index + 1),
+        finishes: ["nonfoil"],
+        imageUrl: `https://cards.scryfall.io/normal/${printingId}.jpg`,
+      })),
+      "v1",
+    )
+    mockDetail.value = {
+      ...loadedDetail,
+      cards: [
+        {
+          ...solRing,
+          quantity: 4,
+          printingId: solRing.scryfallId,
+          providerCardId: solRing.scryfallId,
+        },
+      ],
+    }
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("deck-mode-build"))
+    fireEvent.press(view.getByLabelText("4× Sol Ring"))
+    fireEvent.press(view.getByTestId("card-focus-change-printing"))
+    fireEvent.press(await view.findByTestId("printing-option-sol-c21"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    await waitFor(() =>
+      expect(mockSaveVersion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: [
+            expect.objectContaining({
+              name: "Sol Ring",
+              quantity: 4,
+              scryfallId: "sol-c21",
+              printingId: "sol-c21",
+              providerCardId: "sol-c21",
+              imageUrl: "https://cards.scryfall.io/normal/sol-c21.jpg",
+            }),
+          ],
+        }),
+      ),
+    )
+  })
+
+  it("keeps a main-deck card in the main deck when offline picks a printing cached from the sideboard", () => {
+    catalogDb.clearAll()
+    catalogDb.replacePrintings(
+      "mtg",
+      [solRing.scryfallId, "sol-c21"].map((printingId) => ({
+        game: "mtg",
+        printingId,
+        cardId: solRing.oracleId,
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: printingId === "sol-c21" ? "c21" : "cmm",
+        collectorNumber: "1",
+        finishes: ["nonfoil"],
+      })),
+      "v1",
+    )
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 3,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    const { board: _board, ...legacySolRing } = solRing
+    mockVersionCacheState.cards = [
+      { ...legacySolRing, printingId: solRing.scryfallId, quantity: 3 },
+    ]
+    mockVersionCacheState.knownCards = {
+      "sol-c21": {
+        game: "mtg",
+        card: {
+          _id: "card-sol-c21",
+          _creationTime: 0,
+          deckVersionId: "version-other",
+          game: "mtg",
+          identityNamespace: "scryfall-oracle",
+          cardId: solRing.oracleId,
+          printingId: "sol-c21",
+          oracleId: solRing.oracleId,
+          scryfallId: "sol-c21",
+          name: "Sol Ring",
+          quantity: 1,
+          section: "sideboard",
+          commanderColor: "U",
+        },
+      },
+    }
+    const view = renderDetail(offlineAccess)
+    fireEvent.press(view.getByTestId("deck-mode-build"))
+    fireEvent.press(view.getByLabelText("3× Sol Ring"))
+    fireEvent.press(view.getByTestId("card-focus-change-printing"))
+    fireEvent.press(view.getByTestId("printing-option-sol-c21"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    const queued = mockVersionCardUpdate.mock.calls[0][2] as Array<Record<string, unknown>>
+    expect(queued).toHaveLength(1)
+    expect(queued[0]).toMatchObject({
+      name: "Sol Ring",
+      scryfallId: "sol-c21",
+      quantity: 3,
+      section: "main",
+    })
+    expect(queued[0].commanderColor).toBeUndefined()
   })
 
   it("counts Build changes in the draft bar and discards them", () => {

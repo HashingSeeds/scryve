@@ -28,6 +28,9 @@ const META_PRINTINGS_ETAG = "printings_etag"
 const META_PRINTINGS_CHECKED_AT = "printings_checked_at"
 const META_PRICES_ETAG = "prices_etag"
 const META_PRICES_CHECKED_AT = "prices_checked_at"
+const META_SPLIT_CARD_IDS = "split_card_ids"
+const META_CK_OUT_OF_STOCK = "ck_out_of_stock"
+const META_PRICES_AS_OF = "prices_as_of"
 
 export interface PrintingPriceSummary {
   retailCents?: number
@@ -130,6 +133,26 @@ function subscribeCatalog(listener: () => void) {
   }
 }
 
+function metaList(game: string, suffix: string): Set<string> {
+  const raw = catalogDb.getMeta(metaKey(game, suffix))
+  return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+}
+
+// why: oracle ids of split and aftermath cards, which stores list by full name.
+export function catalogSplitCardIds(game: string): Set<string> {
+  return metaList(game, META_SPLIT_CARD_IDS)
+}
+
+// why: printing ids Card Kingdom prices but has none of, with ":foil" for the foil finish.
+export function catalogCardKingdomOutOfStock(game: string): Set<string> {
+  return metaList(game, META_CK_OUT_OF_STOCK)
+}
+
+export function catalogPricesAsOf(game: string): number | undefined {
+  const asOf = Number(catalogDb.getMeta(metaKey(game, META_PRICES_AS_OF)))
+  return Number.isFinite(asOf) && asOf > 0 ? asOf : undefined
+}
+
 export function catalogVersion(game: string): number {
   return catalogSnapshot(game).version
 }
@@ -190,6 +213,7 @@ async function fetchStaleCatalog(
       }))
       if (rows.length === 0) throw new Error("Catalog printings pack is empty")
       await catalogDb.replacePrintingsAsync(game, rows, pack.version)
+      catalogDb.setMeta(metaKey(game, META_SPLIT_CARD_IDS), JSON.stringify(pack.splitCardIds))
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRINTINGS_ETAG), response.etag)
       printingsUpdated = true
       updateCatalogSnapshot(game, { version: catalogVersion(game) + 1 })
@@ -289,6 +313,8 @@ async function fetchStaleCatalog(
       }
       if (rows.length === 0) throw new Error("Catalog prices pack is empty")
       await catalogDb.replacePricesAsync(game, rows)
+      catalogDb.setMeta(metaKey(game, META_CK_OUT_OF_STOCK), JSON.stringify(pack.ckOutOfStock))
+      catalogDb.setMeta(metaKey(game, META_PRICES_AS_OF), String(pack.asOf))
       if (response.etag) catalogDb.setMeta(metaKey(game, META_PRICES_ETAG), response.etag)
       pricesUpdated = true
       updateCatalogSnapshot(game, { version: catalogVersion(game) + 1 })

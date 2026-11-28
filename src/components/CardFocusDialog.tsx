@@ -20,6 +20,7 @@ import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
 import { Sheet } from "@/components/Sheet"
 import { Text } from "@/components/Text"
+import { TextAction } from "@/components/TextAction"
 import { readCardFaces } from "@/features/decks/cardFaces"
 import { COMMANDER_COLORS } from "@/features/decks/colorMatch"
 import { isBackground } from "@/features/decks/commanderSelection"
@@ -74,6 +75,7 @@ export interface CardFocusDialogProps {
   onIncrement?: () => void
   onDecrement?: () => void
   onSetCommander?: (color?: CommanderColor) => void
+  onChangePrinting?: () => void
   onOpenRule?: (id: string) => void
   visible: boolean
   onClose: () => void
@@ -141,6 +143,7 @@ export function CardFocusDialog({
   onIncrement,
   onDecrement,
   onSetCommander,
+  onChangePrinting,
   onOpenRule,
   visible,
   onClose,
@@ -313,6 +316,15 @@ export function CardFocusDialog({
             ) : null}
             {rulingsId ? <CardRulings scryfallId={rulingsId} /> : null}
             {printing ? <Text size="xs" tone="dim" text={printing} /> : null}
+            {onChangePrinting ? (
+              <TextAction
+                testID="card-focus-change-printing"
+                tx="decks:cardFocus.changePrinting"
+                size="xs"
+                style={$changePrinting}
+                onPress={onChangePrinting}
+              />
+            ) : null}
             {imageCredit ? <Text size="xxs" tone="dim" text={imageCredit} /> : null}
             {!details && !detailsError ? (
               <Text size="sm" tone="dim" tx="decks:cardFocus.loadingDetails" />
@@ -410,6 +422,7 @@ export function CardFocusDialog({
 }
 
 const $scrollBody: ViewStyle = { flex: 1 }
+const $changePrinting: ViewStyle = { alignSelf: "flex-start" }
 // why: blank space under short card text still counts as outside the keyword popover.
 const $grow: ViewStyle = { flexGrow: 1 }
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })

@@ -8,12 +8,13 @@ import { Sheet } from "@/components/Sheet"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { Text } from "@/components/Text"
 import type { DeckCard } from "@/features/decks/deckCards"
-import { formatCurrency } from "@/i18n/format"
+import { formatCurrency, formatDate, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
 
+import { catalogPricesAsOf } from "./catalogSync"
 import type { DeckOwnershipItem } from "./deckOwnership"
 import { planStoreCheckout, STORES, type Store, type StoreCheckout } from "./storeCheckout"
 
@@ -48,6 +49,7 @@ export function StoreCheckoutSheet({
     [visible, game, items],
   )
   const plan = plans.find((candidate) => candidate.store === store)
+  const asOf = visible ? catalogPricesAsOf(game) : undefined
   const problems = plan?.lines.filter((line) => line.problem) ?? []
 
   return (
@@ -75,6 +77,19 @@ export function StoreCheckoutSheet({
             />
           ))}
         </View>
+        <Text
+          size="xs"
+          tone="dim"
+          text={joinParts([
+            translate("decks:checkout.beforeShipping"),
+            asOf !== undefined &&
+              translate("decks:checkout.pricesFrom", {
+                date: formatDate(asOf, { month: "short", day: "numeric" }),
+              }),
+            store === "tcgplayer" &&
+              translate("decks:checkout.optimize", { store: STORES.tcgplayer }),
+          ])}
+        />
         {problems.length > 0 ? (
           <ScrollView
             style={themed($sheetScroll)}

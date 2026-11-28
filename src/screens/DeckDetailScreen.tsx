@@ -72,6 +72,7 @@ import {
 import { shareUrl } from "@/features/decks/shareLinks"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { useChangePrinting } from "@/features/decks/useChangePrinting"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
@@ -357,6 +358,7 @@ function DeckDetailContent({
     loadCardDetails,
   })
   const { deck, cards, cardsUnavailable, cardsCached, version, versionTarget } = view
+  const changePrinting = useChangePrinting<DeckCard>(detail?.deck.game ?? deck?.game ?? "mtg")
   const { activeVersionId, activeVersionSummary, failedEdit, failedCardEdit } = view
   const { matchVersionId } = view
   const [activeGame, setActiveGame] = useState<LocalGame | null>(null)
@@ -591,7 +593,15 @@ function DeckDetailContent({
     return edit({ type: "add", card }, { game, format: deck.format })
   }
 
-  function replaceCard(previous: DeckCard, next: DeckCard): string | undefined {
+  function reprintCard(previous: DeckCard, next: DeckCard) {
+    return replaceCard(previous, next, "reprint")
+  }
+
+  function replaceCard(
+    previous: DeckCard,
+    next: DeckCard,
+    type: "replace" | "reprint" = "replace",
+  ): string | undefined {
     if (knownDeleted || !deck) return undefined
     ensureDraft()
     let resolvedNext = next
@@ -606,14 +616,16 @@ function DeckDetailContent({
         setError(offlineError)
         return offlineError
       }
+      const { section: _section, board: _board, commanderColor: _color, ...cached } = entry.card
       resolvedNext = {
-        ...entry.card,
+        ...cached,
         quantity: next.quantity,
-        ...(next.section ? { section: next.section } : {}),
+        section: cardSection(next),
         ...(next.board ? { board: next.board } : {}),
+        ...(next.commanderColor ? { commanderColor: next.commanderColor } : {}),
       }
     }
-    return edit({ type: "replace", previous, next: resolvedNext }, { game, format: deck.format })
+    return edit({ type, previous, next: resolvedNext }, { game, format: deck.format })
   }
 
   /**
@@ -1416,11 +1428,20 @@ function DeckDetailContent({
                 onDecrement: () => decrementFocusedCard(focusedCard),
               }
             : {})}
+          onChangePrinting={
+            building && changePrinting.available
+              ? () => changePrinting.start(focusedCard, () => setFocusedKey(undefined))
+              : undefined
+          }
           visible={focus.visible}
           onClose={() => setFocusedKey(undefined)}
-          onDismissed={focus.onDismissed}
+          onDismissed={() => {
+            focus.onDismissed()
+            changePrinting.focusDismissed()
+          }}
         />
       ) : null}
+      {changePrinting.sheet(reprintCard)}
 
       {dialogs.shown === "actions" ? (
         <DeckActionsSheet

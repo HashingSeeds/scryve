@@ -157,6 +157,38 @@ describe("editDeck", () => {
   })
 })
 
+describe("editDeck reprint", () => {
+  const bolts = (scryfallId: string, quantity: number) =>
+    card("Lightning Bolt", { scryfallId, quantity })
+
+  it("moves every copy to a printing the deck lacks, in place", () => {
+    const draft = apply(open([bolts("m10", 4), card("Island")]), [
+      { type: "reprint", previous: bolts("m10", 4), next: bolts("fdn", 4) },
+    ])
+    expect(draft.cards.map((entry) => [entry.scryfallId, entry.quantity])).toEqual([
+      ["fdn", 4],
+      ["Island", 1],
+    ])
+    expect(draft.undo?.cards.map((entry) => entry.scryfallId)).toEqual(["m10", "Island"])
+  })
+
+  it("merges every copy into a printing the deck already has", () => {
+    const draft = apply(open([bolts("m10", 3), bolts("fdn", 1)]), [
+      { type: "reprint", previous: bolts("m10", 3), next: bolts("fdn", 3) },
+    ])
+    expect(draft.cards.map((entry) => [entry.scryfallId, entry.quantity])).toEqual([["fdn", 4]])
+  })
+
+  it("refuses a merge past 999 copies instead of dropping some", () => {
+    const result = edit(open([bolts("m10", 500), bolts("fdn", 500)]), {
+      type: "reprint",
+      previous: bolts("m10", 500),
+      next: bolts("fdn", 500),
+    })
+    expect(result).toEqual({ error: expect.stringContaining("999") })
+  })
+})
+
 describe("editDeck move", () => {
   const move = (target: DeckCard) => ({ type: "move", card: target }) as const
 
