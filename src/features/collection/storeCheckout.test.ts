@@ -104,10 +104,17 @@ describe("planStoreCheckout", () => {
   })
 
   it("prices a deck's chosen printing at the store's cheapest, since the store gets only the name", () => {
+    catalogDb.replacePrices("mtg", [
+      price("sol-cmm", "tcgplayer", 300),
+      price("sol-c21", "tcgplayer", 150),
+      price("sol-cmm", "cardkingdom", 900),
+      price("sol-c21", "cardkingdom", 250),
+    ])
     const { items } = computeDeckOwnership("mtg", [
       { name: "Sol Ring", oracleId: "ora-sol", scryfallId: "sol-cmm", quantity: 1 },
     ])
     expect(planStoreCheckout("mtg", items, "tcgplayer").totalCents).toBe(150)
+    expect(planStoreCheckout("mtg", items, "cardkingdom").totalCents).toBe(250)
     expect(decodeURIComponent(planStoreCheckout("mtg", items, "tcgplayer").url ?? "")).toContain(
       "c=1 Sol Ring",
     )
