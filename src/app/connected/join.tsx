@@ -30,7 +30,10 @@ function Join({ code }: { code?: string }) {
     <CloudScreen multiplayer onBack={() => router.dismissTo("/")}>
       {(access) => (
         <JoinConnectedScreen
-          access={access}
+          // why: nearby games need no account, so a signed-out guest sees Join, and sign-in waits until a code no nearby game matched is joined.
+          access={
+            access.signedIn ? access : { ...access, message: undefined, actionLabel: undefined }
+          }
           initialCode={code}
           onCodeChange={setTyped}
           nearby={<NearbyGameList code={typed} onJoin={openNearbyLobby} />}
