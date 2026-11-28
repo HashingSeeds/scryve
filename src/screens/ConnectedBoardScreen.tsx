@@ -23,6 +23,7 @@ import { DialogCard, $dialogActions, $dialogText } from "@/components/DialogCard
 import { PlayerGrid, type PlayerGridProps } from "@/components/PlayerGrid"
 import { DrawMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
+import { SeatArrangement } from "@/components/SeatArrangement"
 import { Sheet } from "@/components/Sheet"
 import { $sheetScroll, $sheetScrollContent } from "@/components/sheetStyles"
 import { TeamMarks } from "@/components/TeamMarks"
@@ -55,7 +56,11 @@ import {
 } from "@/features/connected/ConnectedLogDialog"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
-import { loadLayoutChoice, saveLayoutChoice } from "@/features/connected/layoutChoice"
+import {
+  loadLayoutChoice,
+  saveLayoutChoice,
+  type LayoutChoice,
+} from "@/features/connected/layoutChoice"
 import type { PendingLifeAction } from "@/features/connected/model"
 import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
@@ -79,11 +84,16 @@ import { isSharedDeckKey } from "@/features/decks/sharedDecks"
 import { CLAIM_CHIP, type DiceSeatChip, type TurnChipState } from "@/features/game/dice"
 import { asPlayerId, matchContextLabel } from "@/features/game/domain"
 import { GameBoard, useBoardChrome } from "@/features/game/GameBoard"
+import type { BoardSize } from "@/features/game/GameBoardStage"
 import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import { MatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { MatchScoreDialog } from "@/features/game/MatchScoreDialog"
-import { defaultConnectedLayout, playerGridLayoutForCount } from "@/features/game/playerLayouts"
+import {
+  defaultConnectedLayout,
+  isSeatOrder,
+  playerGridLayoutForCount,
+} from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
   counterValueLabel,
@@ -742,6 +752,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   )
   const [inviteError, setInviteError] = useState<string>()
   const [layoutChoice, setLayoutChoice] = useState(() => loadLayoutChoice(publicId))
+  const [boardSize, setBoardSize] = useState<BoardSize>()
   const game = view.game
   const { syncSignal, offlineSince, finishBlocker } = view
   const table = useContext(ConnectedTableContext)
@@ -794,6 +805,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     ],
     [controlled, game.players],
   )
+  const chosenSeats = layoutChoice?.slotPlayerIds
+  const seatOrder = useMemo(() => {
+    const order = chosenSeats?.map((id) => players.findIndex((seat) => seat.id === id))
+    // why: a swap saved before someone joined or left no longer names every seat, so the default order returns.
+    return isSeatOrder(order, players.length) ? order : undefined
+  }, [chosenSeats, players])
   const teams = useMemo(() => {
     const groups = connectedTeams({ variant: game.variant, table: table?.table })
     return (
@@ -956,6 +973,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const myRole = onRevealRole
     ? game.players.find((player) => player.controlledByMe && player.role)
     : undefined
+  // why: layout and seat swaps are this device's view of the table, so they save here and never sync.
+  const chooseLayout = (change: Partial<Omit<LayoutChoice, "playerCount">>) => {
+    const choice: LayoutChoice = {
+      playerCount: cellCount,
+      layout: layoutVariant,
+      ...(layoutChoice?.playerCount === cellCount && chosenSeats
+        ? { slotPlayerIds: chosenSeats }
+        : {}),
+      ...change,
+    }
+    setLayoutChoice(choice)
+    saveLayoutChoice(publicId, choice)
+  }
   const chrome = useBoardChrome({
     // why: dice stay on this device; other seats never see these rolls.
     gameId: publicId,
@@ -964,11 +994,22 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     teams,
     layout: {
       value: layoutVariant,
-      onChange: (layout) => {
-        const choice = { playerCount: cellCount, layout }
-        setLayoutChoice(choice)
-        saveLayoutChoice(publicId, choice)
-      },
+      onChange: (layout) => chooseLayout({ layout }),
+      ...(teams
+        ? {}
+        : {
+            seats: (
+              <SeatArrangement
+                players={players}
+                layoutVariant={layoutVariant}
+                board={boardSize}
+                seatOrder={seatOrder}
+                onChange={(order) =>
+                  chooseLayout({ slotPlayerIds: order.map((slot) => players[slot].id) })
+                }
+              />
+            ),
+          }),
     },
     petals: [
       {
@@ -1226,6 +1267,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       <GameBoard
         testID="connected-game-board"
         chrome={chrome}
+        onBoardSizeChange={setBoardSize}
         turns={
           turnChip
             ? { active: turnChip.turn.playerId, groups: turnGroups, nextOf: nextPlayerId }
@@ -1236,8 +1278,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           turnChips: turnsOn && !!turn,
           slotOf: (playerId) => {
             if (teams) return teamSeat(teams, playerId)
-            const slot = players.findIndex(({ id }) => id === playerId)
-            return slot < 0 ? undefined : { slot }
+            const index = players.findIndex(({ id }) => id === playerId)
+            if (index < 0) return undefined
+            return { slot: seatOrder ? seatOrder.indexOf(index) : index }
           },
         })}
         renderGrid={(boardOrientation) => (
@@ -1248,6 +1291,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             lifeStep={game.lifeStep}
             onOpenRule={(ruleId) => system && onRules?.(system, ruleId)}
             layoutVariant={layoutVariant}
+            seatOrder={seatOrder}
             disabled={!active || overlayOpen}
             {...(anySeat
               ? {}

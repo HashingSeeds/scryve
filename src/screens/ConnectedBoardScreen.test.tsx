@@ -39,6 +39,7 @@ import {
   resetConnectedHarness,
   themed,
 } from "../../test/support/connectedHarness"
+import { LifeCard } from "../components/LifeCard"
 import type { PlayerGridLayoutVariant } from "../features/game/playerLayouts"
 
 jest.mock("@/features/rules/rulesSource", () => ({ prefetchRules: jest.fn() }))
@@ -214,6 +215,39 @@ describe("ConnectedBoardScreen", () => {
     openConnectedMenu()
     fireEvent.press(screen.getByTestId("layout-button"))
     expect(screen.getByTestId("layout-tabletop").props.accessibilityState.selected).toBe(true)
+  })
+
+  it("swaps seats on this device and keeps them when the board comes back", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        playerCount: 4,
+        layout: "tabletop",
+        players: Array.from({ length: 4 }, (_, index) => ({
+          playerId: `player-${index + 1}`,
+          seat: index + 1,
+          displayName: `Player ${index + 1}`,
+          color: "#7C3AED",
+          currentLife: 40,
+          pendingDelta: 0,
+          controlledByMe: index === 0,
+        })),
+      },
+    }
+    const firstRowCard = () =>
+      within(screen.getByTestId("player-grid-row-0")).UNSAFE_getAllByType(LifeCard)[0].props
+    render(themed(<ConnectedBoardScreen publicId="seats-kept" />))
+    expect(firstRowCard().playerId).toBe("player-2")
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("layout-button"))
+    fireEvent.press(screen.getByTestId("seat-arrangement-slot-0"))
+    fireEvent.press(screen.getByTestId("seat-arrangement-slot-3"))
+    expect(firstRowCard()).toMatchObject({ playerId: "player-1", seatNumber: 4 })
+    screen.unmount()
+
+    render(themed(<ConnectedBoardScreen publicId="seats-kept" />))
+    expect(firstRowCard().playerId).toBe("player-1")
   })
 
   it("holds staged commander damage with the menu closed and sends it at the check", async () => {
