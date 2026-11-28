@@ -1519,12 +1519,13 @@ export class LocalGameRepository {
     const finalLives = [...game.players]
       .sort((left, right) => left.seat - right.seat)
       .map(({ life }) => life)
+    // why: a game saved before the recap kept turns and sources still has every event to rebuild it from.
     const recap =
       game.status !== "finished"
         ? undefined
         : raw.eventsTruncated
           ? fittedRecap(raw.recap, finalLives)
-          : (fittedRecap(raw.recap, finalLives) ?? localGameRecap(game))
+          : (localGameRecap(game) ?? fittedRecap(raw.recap, finalLives))
     return { game, eventsTruncated: raw.eventsTruncated, ...(recap ? { recap } : {}) }
   }
 }

@@ -9,7 +9,6 @@ import {
   storedPlaySystem,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import { localReceiptLog, type ReceiptLog } from "@/features/game/receiptLog"
 import { teamName } from "@/features/game/teams"
 import type {
   CommanderDamageAssignedEvent,
@@ -63,7 +62,6 @@ export interface GameSummaryModel {
   terminalReason?: string
   logged?: true
   recap?: GameRecap
-  log?: ReceiptLog
 }
 
 export interface SummaryChangeFeed {
@@ -91,11 +89,7 @@ export function localOutcome(result: LocalGame["result"], playerId: string): Sum
   return result.winnerPlayerIds.some((id) => id === playerId) ? "win" : "loss"
 }
 
-export function localSummaryModel(
-  game: LocalGame,
-  recap?: GameRecap,
-  eventsTruncated = false,
-): GameSummaryModel {
+export function localSummaryModel(game: LocalGame, recap?: GameRecap): GameSummaryModel {
   const system = isPlaySystemId(game.system) ? game.system : undefined
   const finishedAt = game.finishedAt ?? game.updatedAt
   return {
@@ -113,7 +107,6 @@ export function localSummaryModel(
         : noFormatLabel(system, game.startingLife, game.logged),
     changeCount: localChanges(game).length,
     ...(recap ? { recap } : {}),
-    ...(eventsTruncated ? {} : { log: localReceiptLog(game) }),
     players: [...game.players]
       .sort((left, right) => left.seat - right.seat)
       .map((player) => ({

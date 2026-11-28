@@ -36,6 +36,36 @@ describe("buildRecap", () => {
     ])
   })
 
+  it("starts a new row when the turn or the commander changes, and records both", () => {
+    const recap = buildRecap({
+      seats: [
+        { id: "a", startingLife: 20, life: 11 },
+        { id: "b", startingLife: 20, life: 20 },
+      ],
+      changes: [
+        { ...change("1", "a", -2), turn: 2 },
+        { ...change("2", "a", -1), turn: 2 },
+        { ...change("3", "a", -3), turn: 3 },
+        { ...change("4", "a", -3), turn: 3, from: "b" },
+      ],
+      finishTurn: 3,
+    })
+    expect(recap).toEqual({
+      lives: [
+        [20, 20],
+        [17, 20],
+        [14, 20],
+        [11, 20],
+      ],
+      steps: [
+        { seat: 0, turn: 2 },
+        { seat: 0, turn: 3 },
+        { seat: 0, turn: 3, from: 1 },
+      ],
+      finishTurn: 3,
+    })
+  })
+
   it("leaves out an undone change and its undo", () => {
     const recap = buildRecap({
       seats: [
@@ -97,6 +127,7 @@ describe("buildRecap", () => {
       changes,
     })
     expect(recap?.lives).toHaveLength(MAX_RECAP_ROWS)
+    expect(recap?.steps).toBeUndefined()
     expect(recap?.lives?.[0]).toEqual([1_000, 1_000])
     expect(recap?.lives?.at(-1)).toEqual([500, 500])
   })
@@ -132,6 +163,19 @@ describe("fittedRecap", () => {
       ],
     })
     expect(fittedRecap({ lives: "oops" }, [20, 20])).toBeUndefined()
+  })
+
+  it("keeps steps only when each one names a seat for a drawn row", () => {
+    const lives = [
+      [40, 40],
+      [37, 40],
+    ]
+    expect(fittedRecap({ lives, steps: [{ seat: 0, turn: 2 }] }, [37, 40])).toEqual({
+      lives,
+      steps: [{ seat: 0, turn: 2 }],
+    })
+    expect(fittedRecap({ lives, steps: [{ seat: 0, from: 0 }] }, [37, 40])).toEqual({ lives })
+    expect(fittedRecap({ lives, steps: [] }, [37, 40])).toEqual({ lives })
   })
 
   it("keeps lives only when their last row is the game's final lives", () => {

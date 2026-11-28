@@ -205,6 +205,7 @@ describe("lanLocalGame", () => {
     expect(game.players.map(({ life }) => life)).toEqual([40, 30])
     expect(localGameRecap(game)?.lives).toEqual([
       [40, 40],
+      [40, 33],
       [40, 30],
     ])
   })
