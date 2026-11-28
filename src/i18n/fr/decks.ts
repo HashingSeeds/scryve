@@ -297,6 +297,7 @@ export default {
   },
   cardFocus: {
     close: "Fermer les détails de la carte",
+    changePrinting: "Changer l’édition",
     front: "Recto",
     back: "Verso",
     loadingDetails: "Chargement des détails…",

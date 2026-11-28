@@ -267,6 +267,7 @@ export default {
   },
   cardFocus: {
     close: "카드 정보 닫기",
+    changePrinting: "프린트 변경",
     front: "앞면",
     back: "뒷면",
     loadingDetails: "상세 정보 불러오는 중…",

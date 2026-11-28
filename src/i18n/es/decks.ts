@@ -293,6 +293,7 @@ export default {
   },
   cardFocus: {
     close: "Cerrar detalles de la carta",
+    changePrinting: "Cambiar edición",
     front: "Anverso",
     back: "Reverso",
     loadingDetails: "Cargando detalles…",

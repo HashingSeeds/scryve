@@ -300,6 +300,7 @@ export default {
   },
   cardFocus: {
     close: "إغلاق تفاصيل البطاقة",
+    changePrinting: "تغيير الإصدار",
     front: "الوجه الأمامي",
     back: "الوجه الخلفي",
     loadingDetails: "جارٍ تحميل التفاصيل…",

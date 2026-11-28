@@ -9,6 +9,7 @@ import { loadMatchSwaps } from "@/features/decks/matchSideboard"
 import { loadAccountDraft } from "@/features/decks/savedDeckDrafts"
 import { createLocalGame, createNextMatchGame } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { catalogDb } from "@/storage/catalogDb"
 import { ThemeProvider } from "@/theme/context"
 import { clear as clearStorage } from "@/utils/storage"
 
@@ -1703,6 +1704,45 @@ describe("DeckDetailScreen", () => {
     })
     expect(mockUpdateDeck).toHaveBeenCalledTimes(1)
     expect(mockUpdateDeck).toHaveBeenCalledWith({ deckId: "deck-1", note: "Updated note" })
+  })
+
+  it("changes a card's printing from its dialog and saves the new printing", async () => {
+    catalogDb.clearAll()
+    catalogDb.replacePrintings(
+      "mtg",
+      ["22222222-2222-2222-2222-222222222222", "sol-c21"].map((printingId, index) => ({
+        game: "mtg",
+        printingId,
+        cardId: solRing.oracleId,
+        name: "Sol Ring",
+        nameNormalized: "sol ring",
+        setCode: index === 0 ? "cmm" : "c21",
+        collectorNumber: String(index + 1),
+        finishes: ["nonfoil"],
+        imageUrl: `https://cards.scryfall.io/normal/${printingId}.jpg`,
+      })),
+      "v1",
+    )
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("deck-mode-build"))
+    fireEvent.press(view.getByLabelText("1× Sol Ring"))
+    fireEvent.press(view.getByTestId("card-focus-change-printing"))
+    fireEvent.press(await view.findByTestId("printing-option-sol-c21"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    await waitFor(() =>
+      expect(mockSaveVersion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: [
+            expect.objectContaining({
+              name: "Sol Ring",
+              quantity: 1,
+              scryfallId: "sol-c21",
+              imageUrl: "https://cards.scryfall.io/normal/sol-c21.jpg",
+            }),
+          ],
+        }),
+      ),
+    )
   })
 
   it("counts Build changes in the draft bar and discards them", () => {

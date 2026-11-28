@@ -271,6 +271,7 @@ export default {
   },
   cardFocus: {
     close: "カードの詳細を閉じる",
+    changePrinting: "収録版を変更",
     front: "表面",
     back: "裏面",
     loadingDetails: "詳細を読み込み中…",

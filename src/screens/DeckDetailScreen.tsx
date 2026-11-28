@@ -72,6 +72,7 @@ import {
 import { shareUrl } from "@/features/decks/shareLinks"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { useChangePrinting } from "@/features/decks/useChangePrinting"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { formatName, gameName, localizedDeckSections } from "@/features/game/playSystems"
 import type { LocalGame } from "@/features/game/types"
@@ -357,6 +358,7 @@ function DeckDetailContent({
     loadCardDetails,
   })
   const { deck, cards, cardsUnavailable, cardsCached, version, versionTarget } = view
+  const changePrinting = useChangePrinting<DeckCard>(detail?.deck.game ?? deck?.game ?? "mtg")
   const { activeVersionId, activeVersionSummary, failedEdit, failedCardEdit } = view
   const { matchVersionId } = view
   const [activeGame, setActiveGame] = useState<LocalGame | null>(null)
@@ -1416,11 +1418,20 @@ function DeckDetailContent({
                 onDecrement: () => decrementFocusedCard(focusedCard),
               }
             : {})}
+          onChangePrinting={
+            building && changePrinting.available
+              ? () => changePrinting.start(focusedCard, () => setFocusedKey(undefined))
+              : undefined
+          }
           visible={focus.visible}
           onClose={() => setFocusedKey(undefined)}
-          onDismissed={focus.onDismissed}
+          onDismissed={() => {
+            focus.onDismissed()
+            changePrinting.focusDismissed()
+          }}
         />
       ) : null}
+      {changePrinting.sheet(replaceCard)}
 
       {dialogs.shown === "actions" ? (
         <DeckActionsSheet

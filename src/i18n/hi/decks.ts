@@ -272,6 +272,7 @@ export default {
   },
   cardFocus: {
     close: "कार्ड विवरण बंद करें",
+    changePrinting: "प्रिंटिंग बदलें",
     front: "सामने",
     back: "पीछे",
     loadingDetails: "विवरण लोड हो रहा है…",

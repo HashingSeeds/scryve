@@ -53,6 +53,7 @@ import {
 } from "@/features/decks/savedDeckDrafts"
 import { SideboardSwapSheet } from "@/features/decks/SideboardSwapSheet"
 import { useCardDetails } from "@/features/decks/useCardDetails"
+import { useChangePrinting } from "@/features/decks/useChangePrinting"
 import { useLocalDeckSyncAction } from "@/features/decks/useLocalDeckSyncAction"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { localizedDeckSections } from "@/features/game/playSystems"
@@ -234,6 +235,10 @@ export function GuestDeckDetailScreen({
   useEffect(() => {
     if (leaving) onBack()
   }, [leaving, onBack])
+
+  const changePrinting = useChangePrinting<GuestCard>(
+    (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME,
+  )
 
   if (!stored && !draft) {
     return (
@@ -673,7 +678,15 @@ export function GuestDeckDetailScreen({
           onRetryDetails={retryDetails}
           visible={focus.visible}
           onClose={() => setFocusedKey(undefined)}
-          onDismissed={focus.onDismissed}
+          onDismissed={() => {
+            focus.onDismissed()
+            changePrinting.focusDismissed()
+          }}
+          onChangePrinting={
+            building && changePrinting.available
+              ? () => changePrinting.start(focusedCard, () => setFocusedKey(undefined))
+              : undefined
+          }
           onSetCommander={building && singleCommander ? chooseCommander : undefined}
           {...(building
             ? {
@@ -688,6 +701,7 @@ export function GuestDeckDetailScreen({
             : {})}
         />
       ) : null}
+      {changePrinting.sheet(replaceCard)}
       <ConfirmDialog
         visible={deleting && !sheets.shown}
         title={translate("decks:guestDetail.deleteTitle")}

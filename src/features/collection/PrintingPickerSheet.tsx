@@ -36,8 +36,10 @@ export function PrintingPickerSheet({
   selectedPrintingId,
   initialFinish = "nonfoil",
   initialCondition = "NM",
+  choosesCopy = true,
   onPick,
   onClose,
+  onDismissed,
 }: {
   visible: boolean
   game: string
@@ -46,8 +48,11 @@ export function PrintingPickerSheet({
   selectedPrintingId?: string
   initialFinish?: CardFinish
   initialCondition?: CardCondition
+  // why: a deck picks only the printing; finish and condition describe a collection copy.
+  choosesCopy?: boolean
   onPick: (result: PrintingPickResult) => void
   onClose: () => void
+  onDismissed?: () => void
 }) {
   const { themed, theme } = useAppTheme()
   const { version } = useCatalogSync(game, visible)
@@ -63,34 +68,43 @@ export function PrintingPickerSheet({
   }, [visible, game, cardId, cardName, version])
 
   return (
-    <Sheet visible={visible} onClose={onClose} testID="printing-picker-sheet">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      onDismissed={onDismissed}
+      testID="printing-picker-sheet"
+    >
       <View style={themed($container)}>
         <Text preset="subheading" tx="decks:collection.pickPrinting" />
         <Text size="sm" style={{ color: theme.colors.textDim }} text={cardName} />
 
-        <View style={themed($pillRow)}>
-          {FINISHES.map((option) => (
-            <ChoiceButton
-              key={option}
-              compact
-              tx={`decks:cardScan.finish.${option}`}
-              selected={finish === option}
-              onPress={() => setFinish(option)}
-            />
-          ))}
-        </View>
+        {choosesCopy ? (
+          <>
+            <View style={themed($pillRow)}>
+              {FINISHES.map((option) => (
+                <ChoiceButton
+                  key={option}
+                  compact
+                  tx={`decks:cardScan.finish.${option}`}
+                  selected={finish === option}
+                  onPress={() => setFinish(option)}
+                />
+              ))}
+            </View>
 
-        <View style={themed($pillRow)}>
-          {CONDITIONS.map((option) => (
-            <ChoiceButton
-              key={option}
-              compact
-              tx={`decks:cardScan.condition.${option}`}
-              selected={condition === option}
-              onPress={() => setCondition(option)}
-            />
-          ))}
-        </View>
+            <View style={themed($pillRow)}>
+              {CONDITIONS.map((option) => (
+                <ChoiceButton
+                  key={option}
+                  compact
+                  tx={`decks:cardScan.condition.${option}`}
+                  selected={condition === option}
+                  onPress={() => setCondition(option)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {printings.length === 0 ? (
           <Text

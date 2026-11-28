@@ -297,6 +297,8 @@ const decks = {
   },
   cardFocus: {
     close: "Close card details",
+    // Opens a list of this card's printings so the player can pick the one they have or want.
+    changePrinting: "Change printing",
     // The front face of a double-faced card.
     front: "Front",
     // The back face of a double-faced card, not navigation.
