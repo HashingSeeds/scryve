@@ -365,6 +365,7 @@ function DeckShelf({
   access,
   localRows,
   hasLocalDecks,
+  pickableIds,
 }: {
   localRows: ShelfDeck[]
   hasLocalDecks: boolean
@@ -378,6 +379,7 @@ function DeckShelf({
   clearVisibleFilters: () => void
   onSelect: (deck: DeckSelection) => void
   access?: CloudAccess
+  pickableIds?: ReadonlySet<string>
 }) {
   const { themed } = useAppTheme()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
@@ -432,8 +434,9 @@ function DeckShelf({
         .filter((deck) => system === ALL_SYSTEMS || (deck.game ?? DEFAULT_DECK_GAME) === system)
         .filter((deck) => format === ALL_FORMATS || deck.format === format)
         .filter((deck) => matchesColors(deck.identityColors?.join(""), colors, colorMatch))
-        .filter((deck) => matchesSearch(deck, search)),
-    [collectionDecks, colorMatch, colors, format, search, system],
+        .filter((deck) => matchesSearch(deck, search))
+        .filter((deck) => !pickableIds || pickableIds.has(String(deck._id))),
+    [collectionDecks, colorMatch, colors, format, pickableIds, search, system],
   )
   const rows = (() => {
     const merged = [
@@ -497,7 +500,7 @@ function DeckShelf({
           {favoriteError ? (
             <Text size="xs" style={themed($errorText)} text={favoriteError} />
           ) : null}
-          {writes.capacityBlocked && writes.failures[0] ? (
+          {writes.capacityBlocked && writes.failures[0] && !pickableIds ? (
             <View>
               <Text tx="decks:saveStatus.paused" />
               <Button
@@ -509,7 +512,7 @@ function DeckShelf({
               />
             </View>
           ) : null}
-          {deviceRows.length ? (
+          {deviceRows.length && !pickableIds ? (
             <LocalDeckSyncHeader
               key={access?.ownerId}
               access={access}
@@ -558,6 +561,7 @@ export function DecksScreen({
   onSystemChange,
   unavailableMessage,
   access,
+  pickableIds,
 }: {
   back: BackAction
   initialSystem?: string
@@ -566,6 +570,7 @@ export function DecksScreen({
   onSystemChange?: (system: string) => void
   unavailableMessage?: string
   access?: CloudAccess
+  pickableIds?: ReadonlySet<string>
 }) {
   const { theme, themed } = useAppTheme()
   const { format, setGame, setFormat, colors, setColors, colorMatch, setColorMatch } =
@@ -632,7 +637,8 @@ export function DecksScreen({
       (system === ALL_SYSTEMS || guestRow.game === system) &&
       (activeFormat === ALL_FORMATS || guestRow.format === activeFormat) &&
       matchesColors(guestRow.identityColors?.join(""), activeColors, colorMatch) &&
-      matchesSearch(guestRow, search),
+      matchesSearch(guestRow, search) &&
+      (!pickableIds || pickableIds.has(guestRow._id)),
   )
   const guestOnly = Boolean(
     unavailableMessage ||
@@ -794,6 +800,7 @@ export function DecksScreen({
               access={access}
               localRows={visibleGuestRows}
               hasLocalDecks={collectionGuestRows.length > 0}
+              pickableIds={pickableIds}
             />
           </ConvexQueryBoundary>
         )}

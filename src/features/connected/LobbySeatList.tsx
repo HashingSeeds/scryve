@@ -11,6 +11,7 @@ import type { RemoteValue } from "@/features/async/remoteState"
 import { CloudGlyph } from "@/features/decks/CloudGlyph"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { DeviceGlyph } from "@/features/decks/DeviceGlyph"
+import { guestDeckLocalId, guestDeckRouteId } from "@/features/decks/guestDeck"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { formatList, joinParts } from "@/i18n/format"
 import { translate } from "@/i18n/translate"
@@ -41,6 +42,7 @@ export type SeatDeck = {
   deckKey?: string
   name: string
   cardQuantity?: number
+  lastPlayedAt?: number
   versions: { _id: string; versionNumber: number; name?: string }[]
   bringingVersionId?: string
 }
@@ -77,7 +79,14 @@ export type LobbySharedDecks = {
   onUse: (seat: number, deckKey: string) => void
 }
 
+export type SeatDeckPick = {
+  system?: string
+  deckIds: ReadonlySet<string>
+  pick: (deckId: string) => void
+}
+
 const NO_DECK_ID = "no-deck"
+const SHOWN_DECKS = 2
 
 const cardsLabel = (quantity?: number) =>
   quantity === undefined
@@ -171,6 +180,7 @@ export function LobbySeatList({
   onReport,
   onEditAppearance,
   onManageDecks,
+  onViewAllDecks,
   onAddDeck,
 }: {
   seats: LobbySeat[]
@@ -190,6 +200,7 @@ export function LobbySeatList({
   onSelectVersion?: (seat: number, deckVersionId?: string) => void
   onReport?: (seat: LobbySeat) => void
   onManageDecks?: () => void
+  onViewAllDecks?: (pick: SeatDeckPick) => void
   onAddDeck?: () => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
@@ -265,9 +276,53 @@ export function LobbySeatList({
         const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
         // why: a device sync that lands later would replace any deck picked while it ran.
         const choicesLocked = selectingDeck || deviceDecks?.syncingLocalId !== undefined
-        const showManageDecks = Boolean(
-          seat.controlledByMe && onManageDecks && system !== NO_PLAY_SYSTEM,
+        const seatDeck = (deck: SeatDeck) => {
+          const version =
+            deck.versions.find(({ _id }) => _id === deck.bringingVersionId) ??
+            deck.versions[deck.versions.length - 1]
+          if (version) onSelectVersion?.(seat.seat, version._id)
+        }
+        const rankedDecks = [...usableDecks].sort(
+          (left, right) => (right.lastPlayedAt ?? 0) - (left.lastPlayedAt ?? 0),
         )
+        const rankedIds = [
+          ...rankedDecks.map(({ _id }) => _id),
+          ...usableDeviceDecks.map(({ localId }) => localId),
+        ]
+        const pinnedIds = [
+          chosenDeck?._id,
+          (
+            usableDeviceDecks.find(({ localId }) => localId === deviceDecks?.syncingLocalId) ??
+            usableDeviceDecks.find(({ error }) => error)
+          )?.localId,
+        ].filter((id) => id !== undefined)
+        const shownIds = new Set([...new Set([...pinnedIds, ...rankedIds])].slice(0, SHOWN_DECKS))
+        const shownDecks = rankedDecks.filter(({ _id }) => shownIds.has(_id))
+        const shownDeviceDecks = usableDeviceDecks.filter(({ localId }) => shownIds.has(localId))
+        const blockedByFullAccount = (deck: LobbyDeviceDeck) =>
+          deck.syncBlocked === "accountFull" && hasCards(deck)
+        const hiddenFullDeck =
+          !shownDeviceDecks.some(blockedByFullAccount) &&
+          usableDeviceDecks.some(blockedByFullAccount)
+        const viewAll =
+          onViewAllDecks && rankedIds.length > shownIds.size
+            ? () =>
+                onViewAllDecks({
+                  system,
+                  deckIds: new Set([
+                    ...usableDecks.filter(hasCards).map(({ _id }) => _id),
+                    ...usableDeviceDecks
+                      .filter((deck) => hasCards(deck) && !deck.syncBlocked)
+                      .map(({ localId }) => guestDeckRouteId(localId)),
+                  ]),
+                  pick: (deckId) => {
+                    const localId = guestDeckLocalId(deckId)
+                    if (localId !== undefined) return deviceDecks?.onSyncAndUse(seat.seat, localId)
+                    const deck = usableDecks.find(({ _id }) => _id === deckId)
+                    if (deck) seatDeck(deck)
+                  },
+                })
+            : undefined
         const offerNewDeck = Boolean(
           deckState?.status === "ready" &&
           !choosable &&
@@ -350,15 +405,6 @@ export function LobbySeatList({
                   }
                 />
               </View>
-              {showManageDecks && !(noDecks && offerNewDeck) ? (
-                <Button
-                  testID={`manage-seat-${seat.seat}-decks`}
-                  tx="connected:seats.manageDecks"
-                  style={themed($rowAction)}
-                  textStyle={themed($rowActionText)}
-                  onPress={onManageDecks}
-                />
-              ) : null}
               {onReport && !seat.controlledByMe && seat.playerId ? (
                 <Button
                   testID={`lobby-report-player-seat-${seat.seat}`}
@@ -441,7 +487,7 @@ export function LobbySeatList({
                         onPress={() => onSelectVersion(seat.seat)}
                       />
                     )}
-                    {usableDecks.length > 0 ? (
+                    {shownDecks.length > 0 ? (
                       <Text
                         size="xxs"
                         weight="medium"
@@ -450,7 +496,7 @@ export function LobbySeatList({
                         tx="connected:seats.account"
                       />
                     ) : null}
-                    {usableDecks.map((deck) => (
+                    {shownDecks.map((deck) => (
                       <DeckOption
                         key={deck._id}
                         testID={`seat-${seat.seat}-deck-${deck._id}`}
@@ -463,16 +509,7 @@ export function LobbySeatList({
                         selected={chosenDeck?._id === deck._id}
                         disabled={choicesLocked}
                         dimmed={!hasCards(deck)}
-                        onPress={
-                          hasCards(deck)
-                            ? () => {
-                                const version =
-                                  deck.versions.find(({ _id }) => _id === deck.bringingVersionId) ??
-                                  deck.versions[deck.versions.length - 1]
-                                if (version) onSelectVersion(seat.seat, version._id)
-                              }
-                            : undefined
-                        }
+                        onPress={hasCards(deck) ? () => seatDeck(deck) : undefined}
                       />
                     ))}
                     {chosenDeck && hasCards(chosenDeck) && chosenDeck.versions.length > 1 ? (
@@ -488,7 +525,7 @@ export function LobbySeatList({
                         onSelect={(versionId) => onSelectVersion(seat.seat, versionId)}
                       />
                     ) : null}
-                    {usableDeviceDecks.length > 0 ? (
+                    {shownDeviceDecks.length > 0 ? (
                       <Text
                         size="xxs"
                         weight="medium"
@@ -497,7 +534,7 @@ export function LobbySeatList({
                         tx="connected:seats.onDevice"
                       />
                     ) : null}
-                    {usableDeviceDecks.map((deck) => {
+                    {shownDeviceDecks.map((deck) => {
                       const syncing = deviceDecks?.syncingLocalId === deck.localId
                       const freeSlot = deck.syncBlocked === "accountFull" && onManageDecks
                       return (
@@ -541,6 +578,25 @@ export function LobbySeatList({
                         />
                       )
                     })}
+                    {viewAll ? (
+                      <TextAction
+                        testID={`seat-${seat.seat}-view-all-decks`}
+                        tx="connected:seats.viewAllDecks"
+                        disabled={choicesLocked}
+                        style={$viewAll}
+                        onPress={viewAll}
+                      />
+                    ) : null}
+                    {hiddenFullDeck && onManageDecks ? (
+                      <View style={themed($deckMessage)}>
+                        <Text size="xxs" tone="dim" tx="connected:seats.accountFull" />
+                        <TextAction
+                          testID={`seat-${seat.seat}-free-slot`}
+                          tx="connected:seats.freeSlot"
+                          onPress={onManageDecks}
+                        />
+                      </View>
+                    ) : null}
                     {usableSharedDecks.length > 0 ? (
                       <Text
                         size="xxs"
@@ -662,12 +718,7 @@ const $report: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xs,
 })
 const $reportText: ThemedStyle<TextStyle> = () => ({ fontSize: 14 })
-const $rowAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 44,
-  paddingVertical: spacing.xxs,
-  paddingHorizontal: spacing.sm,
-})
-const $rowActionText: ThemedStyle<TextStyle> = () => ({ fontSize: 14, lineHeight: 18 })
+const $viewAll: ViewStyle = { alignSelf: "flex-start" }
 const $deckLoading: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $deckPlaceholderRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,

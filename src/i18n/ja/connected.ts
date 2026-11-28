@@ -257,7 +257,7 @@ export default {
     chooseDeck: "○ デッキを選択",
     needsDeck: "○ デッキが必要",
     newDeck: "+ 新しいデッキ",
-    manageDecks: "デッキを管理",
+    viewAllDecks: "すべて表示",
     account: "アカウント",
     accountDeckLabel: "{{name}}、同期済み",
     onDevice: "このデバイス",

@@ -15,19 +15,17 @@ jest.mock("../../../convex/_generated/api", () => ({ api: { decks: { detail: "de
 jest.mock("@/features/decks/localDeckSync", () => ({
   useLocalDeckSync: () => ({ sync: mockSync }),
 }))
-jest.mock("@/features/decks/guestDeck", () => ({
-  useGuestDecks: () => [
-    {
-      localId: "local-angels",
-      deck: {
-        name: "Calling All Angels",
-        game: "mtg",
-        format: "commander",
-        cards: [{ quantity: 1 }, { quantity: 98 }],
-      },
-    },
-  ],
-}))
+const angels = {
+  localId: "local-angels",
+  deck: {
+    name: "Calling All Angels",
+    game: "mtg",
+    format: "commander",
+    cards: [{ quantity: 1 }, { quantity: 98 }],
+  },
+}
+let mockGuestDecks = [angels]
+jest.mock("@/features/decks/guestDeck", () => ({ useGuestDecks: () => mockGuestDecks }))
 
 function renderSeat({
   online = true,
@@ -57,6 +55,7 @@ function renderSeat({
 }
 
 beforeEach(() => {
+  mockGuestDecks = [angels]
   mockSync.mockReset()
   mockQuery.mockReset()
 })
@@ -89,4 +88,22 @@ it("keeps the row and shows the reason when the server refuses at the limit", as
   expect(screen.getByText("Account full.")).toBeTruthy()
   expect(screen.getByText("Calling All Angels")).toBeTruthy()
   expect(onUse).not.toHaveBeenCalled()
+})
+
+it("drops an earlier failure once another deck starts to sync", async () => {
+  mockGuestDecks = [
+    angels,
+    {
+      localId: "local-burn",
+      deck: { name: "Burn", game: "mtg", format: "commander", cards: [{ quantity: 60 }] },
+    },
+  ]
+  mockSync.mockResolvedValueOnce({ status: "limit_reached" })
+  mockSync.mockReturnValueOnce(new Promise(() => {}))
+  renderSeat()
+  await act(async () => fireEvent.press(screen.getByTestId("seat-1-sync-and-use-local-angels")))
+  expect(screen.getByText("Account full.")).toBeTruthy()
+  await act(async () => fireEvent.press(screen.getByTestId("seat-1-sync-and-use-local-burn")))
+  expect(screen.queryByText("Account full.")).toBeNull()
+  expect(screen.getByText("Syncing…")).toBeTruthy()
 })

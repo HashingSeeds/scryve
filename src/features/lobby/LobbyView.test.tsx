@@ -1,7 +1,26 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
+import type { SeatDeckPick } from "@/features/connected/LobbySeatList"
+
 import { LobbyView, type LobbyViewProps } from "./LobbyView"
 import { themed } from "../../../test/support/connectedHarness"
+
+jest.mock("./LobbyDeckPicker", () => {
+  const { Pressable, Text } = jest.requireActual<typeof import("react-native")>("react-native")
+  return {
+    LobbyDeckPicker: ({ request, onClose }: { request: SeatDeckPick; onClose: () => void }) => (
+      <Pressable
+        testID="deck-picker"
+        onPress={() => {
+          onClose()
+          request.pick("deck-3")
+        }}
+      >
+        <Text>{[...request.deckIds].join(",")}</Text>
+      </Pressable>
+    ),
+  }
+})
 
 const seat = (number: number, overrides: object = {}) => ({
   playerId: `player-${number}`,
@@ -37,6 +56,30 @@ function view(overrides: Partial<LobbyViewProps> = {}) {
 }
 
 describe("LobbyView", () => {
+  it("opens the deck library from View all and seats the deck picked there", () => {
+    const onSelect = jest.fn()
+    const deck = (id: string) => ({
+      _id: id,
+      name: id,
+      format: "commander",
+      versions: [{ _id: `${id}-v1`, versionNumber: 1 }],
+    })
+    view({
+      decks: {
+        source: (render) =>
+          render({ status: "ready", value: [deck("deck-1"), deck("deck-2"), deck("deck-3")] }),
+        selectingSeats: new Set(),
+        onSelect,
+      },
+    })
+    expect(screen.queryByText("deck-3")).toBeNull()
+    fireEvent.press(screen.getByTestId("seat-1-view-all-decks"))
+    expect(screen.getByTestId("deck-picker")).toHaveTextContent("deck-1,deck-2,deck-3")
+    fireEvent.press(screen.getByTestId("deck-picker"))
+    expect(onSelect).toHaveBeenCalledWith(1, "deck-3-v1")
+    expect(screen.queryByTestId("deck-picker")).toBeNull()
+  })
+
   it("holds the start while a seated player is away, and leaves out what the lobby can't do", () => {
     const props = view({
       lobby: {

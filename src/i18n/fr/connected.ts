@@ -290,7 +290,7 @@ export default {
     chooseDeck: "○ Choisir un deck",
     needsDeck: "○ Deck requis",
     newDeck: "+ Nouveau deck",
-    manageDecks: "Gérer les decks",
+    viewAllDecks: "Tout afficher",
     account: "Compte",
     accountDeckLabel: "{{name}}, synchronisé",
     onDevice: "Sur cet appareil",

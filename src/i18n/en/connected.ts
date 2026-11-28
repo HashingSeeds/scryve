@@ -330,7 +330,8 @@ const connected = {
     chooseDeck: "○ Choose a deck",
     needsDeck: "○ Needs a deck",
     newDeck: "+ New deck",
-    manageDecks: "Manage decks",
+    // Under a player's two most recent decks; opens every deck they could play in this game.
+    viewAllDecks: "View all",
     account: "Account",
     accountDeckLabel: "{{name}}, synced",
     onDevice: "On this device",

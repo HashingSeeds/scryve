@@ -256,7 +256,7 @@ export default {
     chooseDeck: "○ 덱 선택",
     needsDeck: "○ 덱 필요",
     newDeck: "+ 새 덱",
-    manageDecks: "덱 관리",
+    viewAllDecks: "전체 보기",
     account: "계정",
     accountDeckLabel: "{{name}}, 동기화됨",
     onDevice: "이 기기",

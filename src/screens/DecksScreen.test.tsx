@@ -813,6 +813,28 @@ describe("DecksScreen", () => {
     fireEvent.press(view.getByTestId("decks-back"))
     expect(back.onPress).toHaveBeenCalledTimes(1)
   })
+  it("lists only the decks a lobby seat can pick, and hands the tapped one back", () => {
+    mockListMine.value = {
+      decks: [commanderDeck, standardDeck],
+      capacity: { used: 2, limit: 100, premium: true, canCreate: true },
+      analyticsLocked: false,
+    }
+    const picked = saveGuestDeck({ name: "Picked", format: "commander", game: "mtg", cards: [] })
+    saveGuestDeck({ name: "Left out", format: "commander", game: "mtg", cards: [] })
+    const onSelect = jest.fn()
+    const view = renderShelf({
+      onSelect,
+      access: { ready: true, loading: false, signedIn: true, ownerId: "owner", request: jest.fn() },
+      pickableIds: new Set([commanderDeck._id, guestDeckRouteId(picked.localId)]),
+    })
+    expect(view.getByText("Picked")).toBeTruthy()
+    expect(view.queryByTestId("local-deck-sync-header")).toBeNull()
+    expect(view.queryByText("Left out")).toBeNull()
+    expect(view.queryByText("Mono Red")).toBeNull()
+    fireEvent.press(view.getByText("Existing Deck"))
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ deckId: commanderDeck._id }))
+  })
+
   test("offers Sync for decks only on this device above the one list", () => {
     for (let index = 0; index < 3; index++)
       saveGuestDeck({ name: `Local ${index}`, format: "commander", game: "mtg", cards: [] })

@@ -262,7 +262,6 @@ it("lists matching device decks with Sync and use, below the account decks", () 
             deviceDeck(),
             deviceDeck({ localId: "local-modern", name: "Burn", format: "modern" }),
             deviceDeck({ localId: "local-synced", deckKey: "key-avengers", name: "Old copy" }),
-            deviceDeck({ localId: "local-empty", name: "Duo check", cardQuantity: 0 }),
           ],
           onSyncAndUse,
         }}
@@ -277,10 +276,188 @@ it("lists matching device decks with Sync and use, below the account decks", () 
   expect(screen.getByText("99 cards")).toBeTruthy()
   expect(screen.queryByText("Burn")).toBeNull()
   expect(screen.queryByText("Old copy")).toBeNull()
-  expect(screen.getByText("Empty list")).toBeTruthy()
-  expect(screen.queryByTestId("seat-2-sync-and-use-local-empty")).toBeNull()
   fireEvent.press(screen.getByTestId("seat-2-sync-and-use-local-angels"))
   expect(onSyncAndUse).toHaveBeenCalledWith(2, "local-angels")
+})
+
+it("gives an empty device deck no Sync and use", () => {
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        system="mtg"
+        deckState={{ status: "ready", value: [] }}
+        deviceDecks={{
+          decks: [deviceDeck({ localId: "local-empty", name: "Duo check", cardQuantity: 0 })],
+          onSyncAndUse: jest.fn(),
+        }}
+        versionLabel={() => "Current"}
+        onSelectVersion={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.getByText("Empty list")).toBeTruthy()
+  expect(screen.queryByTestId("seat-1-sync-and-use-local-empty")).toBeNull()
+})
+
+describe("a seat with more than two decks", () => {
+  const accountDeck = (id: string, lastPlayedAt?: number, cardQuantity = 100) => ({
+    _id: id,
+    name: id,
+    cardQuantity,
+    lastPlayedAt,
+    versions: [
+      { _id: `${id}-v1`, versionNumber: 1 },
+      { _id: `${id}-v2`, versionNumber: 2 },
+    ],
+  })
+  const decks = [
+    accountDeck("played-first", 1),
+    accountDeck("unplayed"),
+    accountDeck("played-last", 3),
+    accountDeck("empty", undefined, 0),
+  ]
+  const seat = ({
+    deckVersionId,
+    onViewAllDecks = jest.fn(),
+    onSelectVersion = jest.fn(),
+    onSyncAndUse = jest.fn(),
+  }: {
+    deckVersionId?: string
+    onViewAllDecks?: jest.Mock
+    onSelectVersion?: jest.Mock
+    onSyncAndUse?: jest.Mock
+  }) =>
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[
+            { seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true, deckVersionId },
+          ]}
+          openSeats={0}
+          system="mtg"
+          deckRequired
+          deckState={{ status: "ready", value: decks }}
+          deviceDecks={{
+            decks: [
+              deviceDeck(),
+              deviceDeck({ localId: "local-empty", deckKey: "key-empty", cardQuantity: 0 }),
+            ],
+            onSyncAndUse,
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={onSelectVersion}
+          onViewAllDecks={onViewAllDecks}
+        />
+      </ThemeProvider>,
+    )
+
+  it("shows the two most recently played and hands the rest to View all", () => {
+    const onViewAllDecks = jest.fn()
+    const onSelectVersion = jest.fn()
+    const onSyncAndUse = jest.fn()
+    seat({ onViewAllDecks, onSelectVersion, onSyncAndUse })
+    expect(screen.getAllByText(/^played-/).map((node) => node.props.children)).toEqual([
+      "played-last",
+      "played-first",
+    ])
+    expect(screen.queryByText("unplayed")).toBeNull()
+    expect(screen.queryByText("Calling All Angels")).toBeNull()
+
+    fireEvent.press(screen.getByTestId("seat-1-view-all-decks"))
+    const [request] = onViewAllDecks.mock.calls[0]
+    expect(request.system).toBe("mtg")
+    expect([...request.deckIds].sort()).toEqual(
+      ["guest-local-angels", "played-first", "played-last", "unplayed"].sort(),
+    )
+    request.pick("unplayed")
+    expect(onSelectVersion).toHaveBeenCalledWith(1, "unplayed-v2")
+    request.pick("guest-local-angels")
+    expect(onSyncAndUse).toHaveBeenCalledWith(1, "local-angels")
+  })
+
+  it("keeps Free a slot reachable when the account is full and its device decks are hidden", () => {
+    const onManageDecks = jest.fn()
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+          openSeats={0}
+          system="mtg"
+          deckState={{ status: "ready", value: decks.slice(0, 2) }}
+          deviceDecks={{
+            decks: [deviceDeck({ syncBlocked: "accountFull" })],
+            onSyncAndUse: jest.fn(),
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={jest.fn()}
+          onManageDecks={onManageDecks}
+          onViewAllDecks={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.queryByText("Calling All Angels")).toBeNull()
+    fireEvent.press(screen.getByTestId("seat-1-free-slot"))
+    expect(onManageDecks).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps a device deck whose Sync and use failed in view", () => {
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+          openSeats={0}
+          system="mtg"
+          deckState={{ status: "ready", value: decks.slice(0, 2) }}
+          deviceDecks={{
+            decks: [deviceDeck({ error: "Account full." })],
+            onSyncAndUse: jest.fn(),
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={jest.fn()}
+          onViewAllDecks={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.getByText("Calling All Angels")).toBeTruthy()
+    expect(screen.getByText("Account full.")).toBeTruthy()
+  })
+
+  it("shows the device deck that is syncing over one that failed earlier", () => {
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+          openSeats={0}
+          system="mtg"
+          deckState={{ status: "ready", value: decks.slice(0, 2) }}
+          deviceDecks={{
+            decks: [
+              deviceDeck({ error: "Account full." }),
+              deviceDeck({ localId: "local-burn", deckKey: "key-burn", name: "Burn" }),
+            ],
+            syncingLocalId: "local-burn",
+            onSyncAndUse: jest.fn(),
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={jest.fn()}
+          onViewAllDecks={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.getByText("Burn")).toBeTruthy()
+    expect(screen.getByText("Syncing…")).toBeTruthy()
+    expect(screen.queryByText("Calling All Angels")).toBeNull()
+  })
+
+  it("keeps the seat's deck in view when it is not one of the two", () => {
+    seat({ deckVersionId: "unplayed-v1" })
+    expect(screen.getByText("played-last")).toBeTruthy()
+    expect(screen.getByText("unplayed")).toBeTruthy()
+    expect(screen.queryByText("played-first")).toBeNull()
+    expect(screen.getByTestId("seat-1-view-all-decks")).toBeTruthy()
+  })
 })
 
 it("lists decks shared with the player, and marks the one their seat plays", () => {
