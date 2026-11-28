@@ -484,7 +484,6 @@ export default {
     noPrintings: "Aún no hay ediciones en caché.",
     scanMore: "Escanear más",
     moveToBinder: "Mover al archivador",
-    buyOnTcgplayer: "Comprar en TCGplayer",
     retailTotal: "Venta: {{total}}",
     buylistTotal: "Recompra: {{total}}",
     sortRecent: "Recientes",
@@ -536,6 +535,15 @@ export default {
     ownershipMissing: "Faltan: {{missing}} · {{cost}}",
     ownershipComplete: "Tienes todas las cartas de este mazo",
     buyMissing: "Comprar las que faltan",
+  },
+  checkout: {
+    totalUnpriced: "{{total}} + {{count}} sin precio",
+    notSold: "No se vende en {{store}}",
+    unknownCard: "No hay ninguna carta con este nombre",
+    openCard: "Abre la carta en el mazo",
+    open_one: "Abrir {{store}} con {{count}} carta",
+    open_many: "Abrir {{store}} con {{count}} de cartas",
+    open_other: "Abrir {{store}} con {{count}} cartas",
   },
   deckLimit: {
     countLabel: "{{used}} de {{limit}} mazos sincronizados",

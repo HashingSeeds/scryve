@@ -203,6 +203,29 @@ it("keeps scan counts and heat but nothing else from a finished scan", () => {
   )
 })
 
+it("keeps a store checkout's store and counts, and drops an unknown store", () => {
+  const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
+  expect(
+    analyticsProperties("store_checkout_opened", {
+      store: "cardkingdom",
+      card_count: 12,
+      problem_count: 1,
+      estimate_cents: 4210,
+      url: "https://www.cardkingdom.com/builder?c=1%20Sol%20Ring",
+    }),
+  ).toEqual(
+    expect.objectContaining({
+      store: "cardkingdom",
+      card_count: 12,
+      problem_count: 1,
+      estimate_cents: 4210,
+    }),
+  )
+  expect(analyticsProperties("store_checkout_opened", { store: "ebay" })).not.toHaveProperty(
+    "store",
+  )
+})
+
 it("tags events with the build environment and running update's commit, and still drops SDK device metadata", () => {
   jest.doMock("@/utils/buildEnvironment", () => ({ buildEnvironment: () => "beta" }))
   jest.doMock("expo-constants", () => ({

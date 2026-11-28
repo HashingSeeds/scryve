@@ -489,7 +489,6 @@ export default {
     noPrintings: "Aucune impression en cache.",
     scanMore: "Scanner encore",
     moveToBinder: "Déplacer vers le classeur",
-    buyOnTcgplayer: "Acheter sur TCGplayer",
     retailTotal: "Vente : {{total}}",
     buylistTotal: "Rachat : {{total}}",
     sortRecent: "Récentes",
@@ -542,6 +541,15 @@ export default {
     ownershipMissing: "Manquantes : {{missing}} · {{cost}}",
     ownershipComplete: "Vous possédez toutes les cartes de ce deck",
     buyMissing: "Acheter les manquantes",
+  },
+  checkout: {
+    totalUnpriced: "{{total}} + {{count}} sans prix",
+    notSold: "Non vendue chez {{store}}",
+    unknownCard: "Aucune carte à ce nom",
+    openCard: "Ouvre la carte dans le deck",
+    open_one: "Ouvrir {{store}} avec {{count}} carte",
+    open_many: "Ouvrir {{store}} avec {{count}} de cartes",
+    open_other: "Ouvrir {{store}} avec {{count}} cartes",
   },
   deckLimit: {
     countLabel: "{{used}} sur {{limit}} decks synchronisés",

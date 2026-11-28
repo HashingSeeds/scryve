@@ -8,7 +8,7 @@ export interface DeckOwnershipItem {
   name: string
   cardId: string
   printingId?: string
-  setCode?: string
+  card: DeckCard
   needed: number
   owned: number
   missing: number
@@ -29,7 +29,7 @@ export function computeDeckOwnership(
 ): DeckOwnershipSummary {
   const byCardId = new Map<
     string,
-    { name: string; nameKey: string; needed: number; printingId?: string; setCode?: string }
+    { name: string; nameKey: string; needed: number; printingId?: string; card: DeckCard }
   >()
 
   for (const card of cards) {
@@ -48,7 +48,7 @@ export function computeDeckOwnership(
     if (existing) {
       existing.needed += card.quantity
     } else {
-      byCardId.set(cardId, { name: card.name, nameKey, needed: card.quantity, printingId })
+      byCardId.set(cardId, { name: card.name, nameKey, needed: card.quantity, printingId, card })
     }
   }
 
@@ -71,14 +71,12 @@ export function computeDeckOwnership(
     const covered = Math.min(info.needed, owned)
     const missing = Math.max(0, info.needed - owned)
     let unitPriceCents: number | undefined
-    let setCode: string | undefined
 
     if (missing > 0) {
       const printing =
         (info.printingId ? catalogDb.getPrinting(game, info.printingId) : undefined) ??
         catalogDb.findPrintingsByCardId(game, cardId)[0] ??
         catalogDb.findPrintingsByName(game, normalizePrintingName(info.name))[0]
-      setCode = printing?.setCode
       const lookupId = printing?.printingId ?? info.printingId
       if (lookupId) {
         unitPriceCents = lookupPrintingPrice(game, lookupId, "nonfoil", "NM").retailCents
@@ -95,7 +93,7 @@ export function computeDeckOwnership(
       name: info.name,
       cardId,
       printingId: info.printingId,
-      setCode,
+      card: info.card,
       needed: info.needed,
       owned,
       missing,

@@ -457,7 +457,6 @@ export default {
     noPrintings: "キャッシュされた収録版はまだありません。",
     scanMore: "さらにスキャン",
     moveToBinder: "バインダーに移動",
-    buyOnTcgplayer: "ティーシージープレイヤーで購入",
     retailTotal: "販売価格 {{total}}",
     buylistTotal: "買取 {{total}}",
     sortRecent: "新しい順",
@@ -507,6 +506,13 @@ export default {
     ownershipMissing: "不足{{missing}} · {{cost}}",
     ownershipComplete: "このデッキのカードをすべて持っています",
     buyMissing: "不足分を購入",
+  },
+  checkout: {
+    totalUnpriced: "{{total}} + 価格なし{{count}}枚",
+    notSold: "{{store}}では販売されていません",
+    unknownCard: "この名前のカードはありません",
+    openCard: "デッキ内でカードを開きます",
+    open_other: "{{store}}を{{count}}枚で開く",
   },
   deckLimit: {
     countLabel: "同期デッキ {{used}}/{{limit}}",

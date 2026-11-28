@@ -459,7 +459,6 @@ export default {
     noPrintings: "अभी तक कोई प्रिंटिंग कैश नहीं हुई।",
     scanMore: "और स्कैन करें",
     moveToBinder: "बाइंडर में डालें",
-    buyOnTcgplayer: "टीसीजीप्लेयर पर खरीदें",
     retailTotal: "रिटेल {{total}}",
     buylistTotal: "बायलिस्ट {{total}}",
     sortRecent: "सबसे नया",
@@ -510,6 +509,14 @@ export default {
     ownershipMissing: "{{missing}} कम हैं · {{cost}}",
     ownershipComplete: "इस डेक के सभी कार्ड आपके पास हैं",
     buyMissing: "कम कार्ड खरीदें",
+  },
+  checkout: {
+    totalUnpriced: "{{total}} + {{count}} बिना कीमत वाले",
+    notSold: "{{store}} पर नहीं मिलता",
+    unknownCard: "इस नाम का कोई कार्ड नहीं",
+    openCard: "कार्ड को डेक में खोलता है",
+    open_one: "{{store}} खोलें, {{count}} कार्ड के साथ",
+    open_other: "{{store}} खोलें, {{count}} कार्ड के साथ",
   },
   deckLimit: {
     countLabel: "{{limit}} में से {{used}} सिंक डेक",

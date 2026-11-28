@@ -453,7 +453,6 @@ export default {
     noPrintings: "저장된 인쇄본이 아직 없습니다.",
     scanMore: "계속 스캔",
     moveToBinder: "바인더로 이동",
-    buyOnTcgplayer: "티씨지플레이어에서 구매",
     retailTotal: "소매가 {{total}}",
     buylistTotal: "매입가 {{total}}",
     sortRecent: "최근",
@@ -503,6 +502,13 @@ export default {
     ownershipMissing: "{{missing}}장 부족 · {{cost}}",
     ownershipComplete: "이 덱의 카드를 모두 보유하고 있습니다",
     buyMissing: "부족한 카드 구매",
+  },
+  checkout: {
+    totalUnpriced: "{{total}} + 가격 없음 {{count}}개",
+    notSold: "{{store}}에서 판매하지 않음",
+    unknownCard: "이 이름의 카드 없음",
+    openCard: "덱에서 카드를 엽니다",
+    open_other: "카드 {{count}}장으로 {{store}} 열기",
   },
   deckLimit: {
     countLabel: "동기화 덱 {{used}}/{{limit}}개",
