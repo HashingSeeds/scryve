@@ -16,6 +16,21 @@ export function lastChangeRow(lives: readonly (readonly number[])[], column: num
   return 0
 }
 
+export function lifePlot(
+  rows: number,
+  scale: LifeScale,
+  width: number,
+  height: number,
+  strokeWidth: number,
+) {
+  const inset = strokeWidth * 2
+  return {
+    x: (row: number) => inset + (row / (rows - 1)) * (width - inset * 2),
+    y: (life: number) =>
+      inset + (1 - (life - scale.low) / (scale.high - scale.low)) * (height - inset * 2),
+  }
+}
+
 export function LifeStrip({
   lives,
   column,
@@ -38,10 +53,7 @@ export function LifeStrip({
   strokeWidth?: number
 }) {
   const end = out ? lastChangeRow(lives, column) : lives.length - 1
-  const inset = strokeWidth * 2
-  const x = (row: number) => inset + (row / (lives.length - 1)) * (width - inset * 2)
-  const y = (life: number) =>
-    inset + (1 - (life - scale.low) / (scale.high - scale.low)) * (height - inset * 2)
+  const { x, y } = lifePlot(lives.length, scale, width, height, strokeWidth)
   const endX = x(end)
   const endY = y(lives[end][column])
   const reach = strokeWidth * 1.6

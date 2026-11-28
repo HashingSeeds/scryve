@@ -7,13 +7,21 @@ const hasExpoSharing = requireOptionalNativeModule("ExpoSharing") !== null
 
 export const canShareImage = hasExpoSharing || Platform.OS === "ios"
 
-export async function shareImage(base64: string, fileName: string) {
+export type ShareOutcome = "shared" | "dismissed" | "unreported"
+
+export async function shareImage(
+  base64: string,
+  fileName: string,
+  caption: string,
+): Promise<ShareOutcome> {
   const file = new File(Paths.cache, fileName)
   await file.write(base64, { encoding: "base64" })
-  if (!hasExpoSharing) {
-    await Share.share({ url: file.uri })
-    return
+  if (Platform.OS === "ios") {
+    const { action } = await Share.share({ url: file.uri, message: caption })
+    return action === Share.sharedAction ? "shared" : "dismissed"
   }
+  // why: expo-sharing sends Android only the file and never says whether it was sent, so the caption and outcome stay behind.
   const { shareAsync } = await import("expo-sharing")
-  await shareAsync(file.uri, { mimeType: "image/png", UTI: "public.png" })
+  await shareAsync(file.uri, { mimeType: "image/png" })
+  return "unreported"
 }
