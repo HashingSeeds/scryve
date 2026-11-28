@@ -289,12 +289,13 @@ export function LobbySeatList({
           ...rankedDecks.map(({ _id }) => _id),
           ...usableDeviceDecks.map(({ localId }) => localId),
         ]
-        const topIds = rankedIds.slice(0, SHOWN_DECKS)
-        const shownIds = new Set(
-          chosenDeck && !topIds.includes(chosenDeck._id)
-            ? [...topIds.slice(0, SHOWN_DECKS - 1), chosenDeck._id]
-            : topIds,
-        )
+        const pinnedIds = [
+          chosenDeck?._id,
+          usableDeviceDecks.find(
+            (deck) => deck.localId === deviceDecks?.syncingLocalId || deck.error,
+          )?.localId,
+        ].filter((id) => id !== undefined)
+        const shownIds = new Set([...new Set([...pinnedIds, ...rankedIds])].slice(0, SHOWN_DECKS))
         const shownDecks = rankedDecks.filter(({ _id }) => shownIds.has(_id))
         const shownDeviceDecks = usableDeviceDecks.filter(({ localId }) => shownIds.has(localId))
         const blockedByFullAccount = (deck: LobbyDeviceDeck) =>

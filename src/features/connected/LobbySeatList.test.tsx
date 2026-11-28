@@ -402,6 +402,28 @@ describe("a seat with more than two decks", () => {
     expect(onManageDecks).toHaveBeenCalledTimes(1)
   })
 
+  it("keeps a device deck whose Sync and use failed in view", () => {
+    render(
+      <ThemeProvider initialContext="dark">
+        <LobbySeatList
+          seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+          openSeats={0}
+          system="mtg"
+          deckState={{ status: "ready", value: decks.slice(0, 2) }}
+          deviceDecks={{
+            decks: [deviceDeck({ error: "Account full." })],
+            onSyncAndUse: jest.fn(),
+          }}
+          versionLabel={() => "Current"}
+          onSelectVersion={jest.fn()}
+          onViewAllDecks={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.getByText("Calling All Angels")).toBeTruthy()
+    expect(screen.getByText("Account full.")).toBeTruthy()
+  })
+
   it("keeps the seat's deck in view when it is not one of the two", () => {
     seat({ deckVersionId: "unplayed-v1" })
     expect(screen.getByText("played-last")).toBeTruthy()
