@@ -216,7 +216,7 @@ export default {
       claim: "{{names}}が{{value}}で勝ちました",
       onTurn: "ターン{{turn}} {{event}}",
       hit_other: "{{source}}が{{name}}に{{count}}ダメージ",
-      took_other: "{{name}}が{{count}}ダメージ",
+      took_other: "{{name}}のライフが{{count}}減少",
       wins_other: "{{names}}の勝ちです",
       outTurn: "ターン{{turn}}",
       caption: "{{claim}}。{{players}}、{{format}}。",

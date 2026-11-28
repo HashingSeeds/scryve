@@ -52,6 +52,7 @@ const FOOTER_Y = IMAGE_HEIGHT - PAD
 const LINE_Y = FOOTER_Y - 24
 const TRACE_WIDTH = 3
 const MUTED_TRACE_WIDTH = 1.8
+const TRACE_INSET = TRACE_WIDTH * 2
 const EXPORT_PIXELS = { width: 1080, height: 1350 }
 // why: the shared card stays dark in light mode, so it reads the dark palette, not the theme.
 const CARD = {
@@ -123,7 +124,7 @@ function ReceiptImage({
     .sort((left, right) => Number(left.won) - Number(right.won))
   const low = receipt.low && lives && scale ? receipt.low : undefined
   const plot =
-    lives && scale ? lifePlot(lives.length, scale, graphWidth, graphHeight, TRACE_WIDTH) : undefined
+    lives && scale ? lifePlot(lives.length, scale, graphWidth, graphHeight, TRACE_INSET) : undefined
   return (
     <Svg
       ref={svgRef}
@@ -191,6 +192,7 @@ function ReceiptImage({
                 baseline={CARD.baseline}
                 out={recapOut(model, player) !== undefined}
                 strokeWidth={won ? TRACE_WIDTH : MUTED_TRACE_WIDTH}
+                inset={TRACE_INSET}
               />
             </G>
           ))}

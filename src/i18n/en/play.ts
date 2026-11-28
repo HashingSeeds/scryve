@@ -281,9 +281,11 @@ const play = {
       // Short turn stamp before one fact from the game log, like "T9 Ana took 9". T stands for turn.
       onTurn: "T{{turn}} {{event}}",
       // {{source}} dealt {{count}} commander damage to {{name}} in one go. Kept short.
+      // ar: {{count}} is the damage dealt, not a number of hits: "{{source}} أصاب {{name}} بـ{{count}}" in every form. Never ضربة or ضربتان.
       hit_one: "{{source}} hit {{name}} for {{count}}",
       hit_other: "{{source}} hit {{name}} for {{count}}",
       // {{name}} lost {{count}} life in one go. Kept short.
+      // ja: Life lost, not damage: "{{name}}のライフが{{count}}減少". Never ダメージ.
       took_one: "{{name}} took {{count}}",
       took_other: "{{name}} took {{count}}",
       // {{count}} is how many players {{names}} lists.

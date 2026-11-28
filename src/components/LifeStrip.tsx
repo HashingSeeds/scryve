@@ -21,9 +21,8 @@ export function lifePlot(
   scale: LifeScale,
   width: number,
   height: number,
-  strokeWidth: number,
+  inset: number,
 ) {
-  const inset = strokeWidth * 2
   return {
     x: (row: number) => inset + (row / (rows - 1)) * (width - inset * 2),
     y: (life: number) =>
@@ -41,6 +40,7 @@ export function LifeStrip({
   baseline,
   out,
   strokeWidth = 2,
+  inset = strokeWidth * 2,
 }: {
   lives: readonly (readonly number[])[]
   column: number
@@ -51,9 +51,10 @@ export function LifeStrip({
   baseline: string
   out: boolean
   strokeWidth?: number
+  inset?: number
 }) {
   const end = out ? lastChangeRow(lives, column) : lives.length - 1
-  const { x, y } = lifePlot(lives.length, scale, width, height, strokeWidth)
+  const { x, y } = lifePlot(lives.length, scale, width, height, inset)
   const endX = x(end)
   const endY = y(lives[end][column])
   const reach = strokeWidth * 1.6
