@@ -94,12 +94,14 @@ beforeEach(() => {
   mockUsername = null
 })
 
-it("opens Join without auth and asks for a username only when joining", async () => {
+it("opens Join without asking for sign-in until a code is joined, and a username only then", async () => {
   mockConnectedHarness.userId = undefined
   mockConnectedHarness.convexAuthenticated = false
   const view = render(app(<JoinRoute />, false))
   fireEvent.changeText(view.getByTestId("manual-code-input"), "AB12CD")
   expect(mockOpenAuth).not.toHaveBeenCalled()
+  expect(view.queryByText("Sign in to continue.")).toBeNull()
+  expect(view.getByTestId("claim-seat-button")).toHaveTextContent("Join game")
   fireEvent.press(view.getByTestId("claim-seat-button"))
   expect(mockOpenAuth).toHaveBeenCalledTimes(1)
   expect(mockClaimSeat).not.toHaveBeenCalled()
