@@ -24,14 +24,12 @@ export type StoreCheckout = {
   url?: string
 }
 
-const FINISHES = ["nonfoil", "foil", "etched"] as const
-
+// why: a name-only cart lets either store fill a card with any finish, foil included.
 function storePrice(rows: readonly CatalogPrice[] | undefined, store: Store) {
-  for (const finish of FINISHES) {
-    const cents = rows?.find((row) => row.source === store && row.finish === finish)?.retailCents
-    if (cents !== undefined) return cents
-  }
-  return undefined
+  const cents = (rows ?? []).flatMap((row) =>
+    row.source === store && row.retailCents !== undefined ? [row.retailCents] : [],
+  )
+  return cents.length > 0 ? Math.min(...cents) : undefined
 }
 
 function candidatePrintings(game: string, item: DeckOwnershipItem) {

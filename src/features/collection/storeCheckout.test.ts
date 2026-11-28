@@ -25,11 +25,16 @@ function printing(
   }
 }
 
-function price(printingId: string, source: string, retailCents: number): CatalogPrice {
+function price(
+  printingId: string,
+  source: string,
+  retailCents: number,
+  finish = "nonfoil",
+): CatalogPrice {
   return {
     game: "mtg",
     printingId,
-    finish: "nonfoil",
+    finish,
     source,
     currency: "USD",
     retailCents,
@@ -118,6 +123,18 @@ describe("planStoreCheckout", () => {
     expect(decodeURIComponent(planStoreCheckout("mtg", items, "tcgplayer").url ?? "")).toContain(
       "c=1 Sol Ring",
     )
+  })
+
+  it("prices a printing at its cheapest finish, since the store may fill it with a foil", () => {
+    catalogDb.replacePrices("mtg", [
+      price("sol-cmm", "tcgplayer", 500),
+      price("sol-cmm", "tcgplayer", 100, "foil"),
+      price("sol-c21", "tcgplayer", 300),
+    ])
+    const { items } = computeDeckOwnership("mtg", [
+      { name: "Sol Ring", oracleId: "ora-sol", quantity: 1 },
+    ])
+    expect(planStoreCheckout("mtg", items, "tcgplayer").totalCents).toBe(100)
   })
 
   it("has no cart when the store can sell none of the missing cards", () => {
