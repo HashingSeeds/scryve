@@ -35,18 +35,15 @@ function storePrice(rows: readonly CatalogPrice[] | undefined, store: Store) {
 }
 
 function candidatePrintings(game: string, item: DeckOwnershipItem) {
-  const chosen = item.printingId ? catalogDb.getPrinting(game, item.printingId) : undefined
   const byCard = catalogDb.findPrintingsByCardId(game, item.cardId)
-  const others =
-    byCard.length > 0
-      ? byCard
-      : catalogDb.findPrintingsByName(game, normalizePrintingName(item.name))
-  return {
-    chosen,
-    all: chosen ? [chosen, ...others.filter((p) => p.printingId !== chosen.printingId)] : others,
-  }
+  if (byCard.length > 0) return byCard
+  const byName = catalogDb.findPrintingsByName(game, normalizePrintingName(item.name))
+  if (byName.length > 0) return byName
+  const chosen = item.printingId ? catalogDb.getPrinting(game, item.printingId) : undefined
+  return chosen ? [chosen] : []
 }
 
+// why: both stores get names only (a set code Scryfall and TCGplayer spell differently fails the whole Mass Entry list), so each store fills a card with its cheapest printing.
 export function planStoreCheckout(
   game: string,
   items: readonly DeckOwnershipItem[],
@@ -56,7 +53,7 @@ export function planStoreCheckout(
   const candidates = missing.map((item) => candidatePrintings(game, item))
   const prices = catalogDb.getPricesBatch(
     game,
-    candidates.flatMap(({ all }) => all.map((printing) => printing.printingId)),
+    candidates.flatMap((printings) => printings.map((printing) => printing.printingId)),
   )
   const sold = (printing: CatalogPrinting) =>
     store === "tcgplayer"
@@ -67,18 +64,16 @@ export function planStoreCheckout(
   let totalCents = 0
   let unpricedCount = 0
   const lines = missing.map((item, index): CheckoutLine => {
-    const { chosen, all } = candidates[index]
-    if (all.length === 0) return { item, problem: "unknown_card" }
-    const listed = all.filter(sold)
+    const printings = candidates[index]
+    if (printings.length === 0) return { item, problem: "unknown_card" }
+    const listed = printings.filter(sold)
     if (listed.length === 0) return { item, problem: "not_sold" }
-    const pinned = store === "tcgplayer" && chosen && sold(chosen) ? chosen : undefined
-    const priced = (pinned ? [pinned] : listed).flatMap(
+    const priced = listed.flatMap(
       (printing) => storePrice(prices.get(printing.printingId), store) ?? [],
     )
-    const unitCents = priced.length > 0 ? Math.min(...priced) : undefined
-    cart.push({ name: item.name, setCode: pinned?.setCode, quantity: item.missing })
-    if (unitCents === undefined) unpricedCount += 1
-    else totalCents += unitCents * item.missing
+    cart.push({ name: item.name, quantity: item.missing })
+    if (priced.length === 0) unpricedCount += 1
+    else totalCents += Math.min(...priced) * item.missing
     return { item }
   })
 

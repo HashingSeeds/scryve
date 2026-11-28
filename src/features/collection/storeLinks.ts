@@ -56,20 +56,23 @@ export function tcgplayerCardUrl(
   return wrapAffiliateUrl(direct, tcgplayerAffiliateUrl(), useAffiliate)
 }
 
+// why: both stores' list tools match double-faced and adventure cards by front face and reject the full Scryfall name.
+function listName(name: string) {
+  return name.split(" // ")[0]
+}
+
+function listLines(cards: readonly StoreCardInput[]) {
+  return cards
+    .filter((card) => (card.quantity ?? 1) > 0)
+    .map((card) => `${Math.max(1, Math.floor(card.quantity ?? 1))} ${listName(card.name)}`)
+}
+
 export function tcgplayerMassEntryUrl(
   cards: readonly StoreCardInput[],
   options: { affiliate?: boolean } = {},
 ): string {
   const useAffiliate = options.affiliate ?? affiliateLinksEnabled()
-  const encoded = cards
-    .filter((card) => (card.quantity ?? 1) > 0)
-    .map((card) => {
-      const qty = Math.max(1, Math.floor(card.quantity ?? 1))
-      const setSuffix = card.setCode ? ` [${card.setCode.toUpperCase()}]` : ""
-      return `${qty} ${card.name}${setSuffix}`
-    })
-    .join("||")
-  const direct = `https://www.tcgplayer.com/massentry?productline=Magic&c=${encodeURIComponent(encoded)}`
+  const direct = `https://www.tcgplayer.com/massentry?productline=Magic&c=${encodeURIComponent(listLines(cards).join("||"))}`
   return wrapAffiliateUrl(direct, tcgplayerAffiliateUrl(), useAffiliate)
 }
 
@@ -78,12 +81,8 @@ export function cardKingdomBuilderUrl(
   options: { affiliate?: boolean } = {},
 ): string {
   const useAffiliate = options.affiliate ?? affiliateLinksEnabled()
-  const list = cards
-    .filter((card) => (card.quantity ?? 1) > 0)
-    .map((card) => `${Math.max(1, Math.floor(card.quantity ?? 1))} ${card.name.split(" // ")[0]}`)
-    .join("\n")
   const partner = cardKingdomPartner()
-  const params = new URLSearchParams({ c: list })
+  const params = new URLSearchParams({ c: listLines(cards).join("\n") })
   if (useAffiliate && partner) params.set("partner", partner)
   return `https://www.cardkingdom.com/builder?${params.toString()}`
 }

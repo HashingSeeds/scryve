@@ -78,14 +78,14 @@ describe("store links", () => {
     )
   })
 
-  it("builds TCGplayer mass entry links for missing cards", () => {
+  it("builds TCGplayer mass entry links from front-face names without set codes", () => {
     const url = tcgplayerMassEntryUrl([
-      { name: "Sol Ring", setCode: "cmm", quantity: 1 },
-      { name: "Lightning Bolt", quantity: 4 },
+      { name: "Swamp", setCode: "mdd", quantity: 8 },
+      { name: "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger", quantity: 4 },
     ])
     expect(url).toBe(
       `https://www.tcgplayer.com/massentry?productline=Magic&c=${encodeURIComponent(
-        "1 Sol Ring [CMM]||4 Lightning Bolt",
+        "8 Swamp||4 Ajani, Nacatl Pariah",
       )}`,
     )
   })

@@ -69,7 +69,7 @@ describe("planStoreCheckout", () => {
     { name: "Command Tower", oracleId: "ora-tower", quantity: 1 },
   ]
 
-  it("keeps a pinned printing's set, prices the rest at their cheapest, and leaves out what the store lacks", () => {
+  it("sends names only, prices each card at its cheapest listed printing, and leaves out what the store lacks", () => {
     const { items } = computeDeckOwnership("mtg", deck)
     const plan = planStoreCheckout("mtg", items, "tcgplayer")
 
@@ -84,7 +84,7 @@ describe("planStoreCheckout", () => {
     expect(plan.totalCents).toBe(150 + 4 * 100)
     expect(plan.unpricedCount).toBe(1)
     expect(decodeURIComponent(plan.url ?? "")).toContain(
-      "c=1 Sol Ring||4 Lightning Bolt [FDN]||1 Command Tower",
+      "c=1 Sol Ring||4 Lightning Bolt||1 Command Tower",
     )
   })
 
@@ -103,15 +103,14 @@ describe("planStoreCheckout", () => {
     expect(new URL(plan.url ?? "").searchParams.get("c")).toBe("1 Sol Ring\n1 A-Digital Card")
   })
 
-  it("prices Card Kingdom at its cheapest printing, since its builder gets only the name", () => {
-    catalogDb.replacePrices("mtg", [
-      price("sol-cmm", "cardkingdom", 900),
-      price("sol-c21", "cardkingdom", 250),
-    ])
+  it("prices a deck's chosen printing at the store's cheapest, since the store gets only the name", () => {
     const { items } = computeDeckOwnership("mtg", [
       { name: "Sol Ring", oracleId: "ora-sol", scryfallId: "sol-cmm", quantity: 1 },
     ])
-    expect(planStoreCheckout("mtg", items, "cardkingdom").totalCents).toBe(250)
+    expect(planStoreCheckout("mtg", items, "tcgplayer").totalCents).toBe(150)
+    expect(decodeURIComponent(planStoreCheckout("mtg", items, "tcgplayer").url ?? "")).toContain(
+      "c=1 Sol Ring",
+    )
   })
 
   it("has no cart when the store can sell none of the missing cards", () => {
